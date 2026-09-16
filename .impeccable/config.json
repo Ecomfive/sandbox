@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-09-16T14:39:19.859Z",
+        "reason": "Fallback de font-family del boilerplate de create-next-app, sin decision de marca todavia; herramienta interna en dia 2 de un beta de 3 dias. Se revisara tipografia en el pase de pulido de UI planeado para el Dia 3."
+      }
+    ]
+  }
+}

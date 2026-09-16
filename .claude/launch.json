@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "next-dev",
+      "runtimeExecutable": "C:\\Users\\herna\\OneDrive\\Documentos\\MOM Beta Gestión Proveduria\\.claude\\dev-with-path.cmd",
+      "runtimeArgs": [],
+      "port": 3000
+    }
+  ]
+}
