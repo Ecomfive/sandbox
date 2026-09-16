@@ -40,21 +40,10 @@
   --font-sans: var(--font-geist-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0b0b0b;
-    --foreground: #f1f1f1;
-    --card: #18181a;
-    --muted: #1f1f1f;
-    --muted-foreground: #9a9a9a;
-    --border: #2c2c2c;
-    --success: #4ade80;
-    --success-soft: #052e16;
-    --warning: #fbbf24;
-    --warning-soft: #451a03;
-    --destructive: #fb7185;
-    --destructive-soft: #4c0519;
-  }
+/* Interface is light-only by decision — do not add a dark media query back
+   without checking with the user first. */
+:root {
+  color-scheme: light;
 }
 
 body {
