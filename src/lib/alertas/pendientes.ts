@@ -9,11 +9,20 @@ export interface Pendiente {
   pendiente: number;
 }
 
-/** Salidas menos entradas por producto, a partir de todo lo cargado en inventario. */
-export async function calcularPendientes(supabase: SupabaseClient): Promise<Pendiente[]> {
-  const { data: movimientos } = await supabase
+/**
+ * Salidas menos entradas por producto, a partir de todo lo cargado en inventario.
+ * Sin `paisId` calcula para todos los países (usado por el cron); la UI lo pasa
+ * para mostrar solo el país activo.
+ */
+export async function calcularPendientes(
+  supabase: SupabaseClient,
+  paisId?: string
+): Promise<Pendiente[]> {
+  let query = supabase
     .from("movimientos_inventario")
     .select("producto_id, pais_id, tipo, cantidad, productos(sku, nombre), paises(nombre)");
+  if (paisId) query = query.eq("pais_id", paisId);
+  const { data: movimientos } = await query;
 
   const mapa = new Map<string, Pendiente>();
   for (const m of movimientos ?? []) {

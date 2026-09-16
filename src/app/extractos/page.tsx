@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { getPaisActual } from "@/lib/pais";
 import { ExtractoUploader } from "./uploader";
 import { AsignarPlataformaSelect } from "./asignar-plataforma";
 import { Badge } from "@/components/ui/badge";
@@ -7,15 +8,16 @@ export const dynamic = "force-dynamic";
 
 export default async function ExtractosPage() {
   const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
 
-  const [{ data: paises }, { data: plataformas }, { data: extractos }] = await Promise.all([
-    supabase.from("paises").select("id, nombre").order("nombre"),
+  const [{ data: plataformas }, { data: extractos }] = await Promise.all([
     supabase.from("plataformas").select("id, nombre").order("nombre"),
     supabase
       .from("extractos_bancarios")
       .select(
-        "id, archivo_path, fecha_carga, pais_id, paises(nombre), movimientos_bancarios(id, fecha, monto, tipo, descripcion, plataforma_id)"
+        "id, archivo_path, fecha_carga, pais_id, movimientos_bancarios(id, fecha, monto, tipo, descripcion, plataforma_id)"
       )
+      .eq("pais_id", pais.id)
       .order("fecha_carga", { ascending: false })
       .limit(10),
   ]);
@@ -27,7 +29,7 @@ export default async function ExtractosPage() {
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
           Sube el archivo del banco, mapea las columnas y confirma para guardarlo.
         </p>
-        <ExtractoUploader paises={paises ?? []} />
+        <ExtractoUploader pais={pais} />
       </div>
 
       <div>
@@ -36,7 +38,6 @@ export default async function ExtractosPage() {
           {(extractos ?? []).map((extracto) => (
             <div key={extracto.id} className="rounded-lg border border-border bg-card p-4">
               <p className="mb-3 text-sm font-medium">
-                {(extracto.paises as unknown as { nombre: string } | null)?.nombre} —{" "}
                 {new Date(extracto.fecha_carga).toLocaleString()}
               </p>
               <div className="overflow-x-auto">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
+import { getPaisActual } from "@/lib/pais";
 import { upsertConciliacion } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
@@ -7,8 +8,6 @@ import { fieldClass, labelClassSm } from "@/components/ui/field";
 export const dynamic = "force-dynamic";
 
 interface Grupo {
-  pais_id: string;
-  pais_nombre: string;
   plataforma_id: string;
   plataforma_nombre: string;
   periodo: string; // yyyy-mm-01
@@ -17,30 +16,26 @@ interface Grupo {
 
 export default async function ConciliacionesPage() {
   const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
 
   const { data: movimientos } = await supabase
     .from("movimientos_bancarios")
-    .select("monto, fecha, plataforma_id, plataformas(nombre), extractos_bancarios(pais_id, paises(nombre))")
+    .select("monto, fecha, plataforma_id, plataformas(nombre), extractos_bancarios!inner(pais_id)")
     .eq("tipo", "deposito")
-    .not("plataforma_id", "is", null);
+    .not("plataforma_id", "is", null)
+    .eq("extractos_bancarios.pais_id", pais.id);
 
   const grupos = new Map<string, Grupo>();
   for (const m of movimientos ?? []) {
-    const extracto = m.extractos_bancarios as unknown as {
-      pais_id: string;
-      paises: { nombre: string } | null;
-    } | null;
     const plataforma = m.plataformas as unknown as { nombre: string } | null;
-    if (!extracto || !m.plataforma_id) continue;
+    if (!m.plataforma_id) continue;
     const periodo = `${String(m.fecha).slice(0, 7)}-01`;
-    const key = `${extracto.pais_id}|${m.plataforma_id}|${periodo}`;
+    const key = `${m.plataforma_id}|${periodo}`;
     const existente = grupos.get(key);
     if (existente) {
       existente.monto_bancario += Number(m.monto);
     } else {
       grupos.set(key, {
-        pais_id: extracto.pais_id,
-        pais_nombre: extracto.paises?.nombre ?? "?",
         plataforma_id: m.plataforma_id,
         plataforma_nombre: plataforma?.nombre ?? "?",
         periodo,
@@ -51,10 +46,11 @@ export default async function ConciliacionesPage() {
 
   const { data: conciliacionesExistentes } = await supabase
     .from("conciliaciones")
-    .select("pais_id, plataforma_id, periodo, monto_reportado_plataforma, diferencia, estado, notas");
+    .select("plataforma_id, periodo, monto_reportado_plataforma, diferencia, estado, notas")
+    .eq("pais_id", pais.id);
 
   const existentesPorClave = new Map(
-    (conciliacionesExistentes ?? []).map((c) => [`${c.pais_id}|${c.plataforma_id}|${c.periodo}`, c])
+    (conciliacionesExistentes ?? []).map((c) => [`${c.plataforma_id}|${c.periodo}`, c])
   );
 
   const filas = Array.from(grupos.values()).sort((a, b) => b.periodo.localeCompare(a.periodo));
@@ -69,7 +65,7 @@ export default async function ConciliacionesPage() {
 
       {filas.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Todavía no hay depósitos asignados a una plataforma. Ve a{" "}
+          Todavía no hay depósitos asignados a una plataforma para {pais.nombre}. Ve a{" "}
           <Link href="/extractos" className="text-accent hover:text-accent-hover">
             Extractos
           </Link>{" "}
@@ -79,7 +75,7 @@ export default async function ConciliacionesPage() {
 
       <div className="flex flex-col gap-4">
         {filas.map((f) => {
-          const clave = `${f.pais_id}|${f.plataforma_id}|${f.periodo}`;
+          const clave = `${f.plataforma_id}|${f.periodo}`;
           const existente = existentesPorClave.get(clave);
           const diferencia = existente ? Number(existente.diferencia) : 0;
           return (
@@ -88,16 +84,14 @@ export default async function ConciliacionesPage() {
               action={upsertConciliacion}
               className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
             >
-              <input type="hidden" name="pais_id" value={f.pais_id} />
+              <input type="hidden" name="pais_id" value={pais.id} />
               <input type="hidden" name="plataforma_id" value={f.plataforma_id} />
               <input type="hidden" name="periodo" value={f.periodo} />
               <input type="hidden" name="monto_bancario" value={f.monto_bancario} />
 
               <div>
-                <p className={labelClassSm}>País / Plataforma</p>
-                <p className="text-sm font-medium">
-                  {f.pais_nombre} · {f.plataforma_nombre}
-                </p>
+                <p className={labelClassSm}>Plataforma</p>
+                <p className="text-sm font-medium">{f.plataforma_nombre}</p>
               </div>
               <div>
                 <p className={labelClassSm}>Período</p>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
+import { getPaisActual } from "@/lib/pais";
 import { calcularPendientes } from "@/lib/alertas/pendientes";
 import { generarAlerta, actualizarEstadoAlerta } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -15,14 +16,16 @@ const ESTADO_TONO = {
 
 export default async function AlertasPage() {
   const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
 
-  const pendientes = (await calcularPendientes(supabase)).sort(
+  const pendientes = (await calcularPendientes(supabase, pais.id)).sort(
     (a, b) => b.pendiente - a.pendiente
   );
 
   const { data: alertas } = await supabase
     .from("alertas_inventario_no_retornado")
-    .select("id, cantidad, fecha_deteccion, fecha_reclamo, estado, productos(sku, nombre), paises(nombre)")
+    .select("id, cantidad, fecha_deteccion, fecha_reclamo, estado, productos(sku, nombre)")
+    .eq("pais_id", pais.id)
     .order("fecha_deteccion", { ascending: false });
 
   return (
@@ -40,8 +43,7 @@ export default async function AlertasPage() {
           <table className="w-full min-w-[32rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">País</th>
-                <th className="py-2 pr-3 font-medium">SKU</th>
+                <th className="py-2 pr-3 pl-4 font-medium">SKU</th>
                 <th className="py-2 pr-3 font-medium">Producto</th>
                 <th className="py-2 pr-3 font-medium">Pendiente</th>
                 <th className="py-2 pr-4"></th>
@@ -50,8 +52,7 @@ export default async function AlertasPage() {
             <tbody>
               {pendientes.map((p) => (
                 <tr key={p.producto_id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4">{p.pais_nombre}</td>
-                  <td className="py-2 pr-3 font-medium">{p.sku}</td>
+                  <td className="py-2 pr-3 pl-4 font-medium">{p.sku}</td>
                   <td className="py-2 pr-3 text-muted-foreground">{p.nombre}</td>
                   <td className="py-2 pr-3 tabular-nums">{p.pendiente}</td>
                   <td className="py-2 pr-4 text-right">
@@ -80,8 +81,7 @@ export default async function AlertasPage() {
           <table className="w-full min-w-[44rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">País</th>
-                <th className="py-2 pr-3 font-medium">SKU</th>
+                <th className="py-2 pr-3 pl-4 font-medium">SKU</th>
                 <th className="py-2 pr-3 font-medium">Producto</th>
                 <th className="py-2 pr-3 font-medium">Cantidad</th>
                 <th className="py-2 pr-3 font-medium">Detectada</th>
@@ -93,11 +93,9 @@ export default async function AlertasPage() {
             <tbody>
               {(alertas ?? []).map((a) => {
                 const producto = a.productos as unknown as { sku: string; nombre: string } | null;
-                const pais = a.paises as unknown as { nombre: string } | null;
                 return (
                   <tr key={a.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 pl-4">{pais?.nombre}</td>
-                    <td className="py-2 pr-3 font-medium">{producto?.sku}</td>
+                    <td className="py-2 pr-3 pl-4 font-medium">{producto?.sku}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{producto?.nombre}</td>
                     <td className="py-2 pr-3 tabular-nums">{a.cantidad}</td>
                     <td className="py-2 pr-3">{a.fecha_deteccion}</td>

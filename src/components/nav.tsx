@@ -1,22 +1,17 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { NavDrawer } from "@/components/nav-drawer";
+import { PaisSelector } from "@/components/pais-selector";
+import { createServiceClient } from "@/lib/supabase/server";
+import { getPaisActual } from "@/lib/pais";
 
-const links = [
-  { href: "/extractos", label: "Extractos" },
-  { href: "/conciliaciones", label: "Conciliación" },
-  { href: "/inventario", label: "Inventario" },
-  { href: "/alertas", label: "Alertas" },
-];
-
-export function NavBar() {
-  const pathname = usePathname();
+export async function NavBar() {
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
 
   return (
     <header className="border-b border-border bg-card">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
         <Link href="/" className="flex items-center gap-3">
           <Image
             src="/brand/ecomfive-rojo.png"
@@ -31,25 +26,11 @@ export function NavBar() {
             Gestión de Proveeduría
           </span>
         </Link>
-        <nav className="flex flex-wrap gap-1 text-sm">
-          {links.map((link) => {
-            const active = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                aria-current={active ? "page" : undefined}
-                className={
-                  active
-                    ? "rounded-md bg-accent px-3 py-1.5 text-accent-foreground transition-colors"
-                    : "rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                }
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+
+        <div className="ml-auto flex items-center gap-3">
+          <PaisSelector actual={pais.codigo} />
+          <NavDrawer />
+        </div>
       </div>
     </header>
   );

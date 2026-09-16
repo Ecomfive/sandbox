@@ -46,3 +46,11 @@ next-env.d.ts
 
 # cache local del hook de impeccable, se regenera solo
 .impeccable/hook.cache.json
+
+# sesiones de Dropi guardadas localmente (cookies vivas, nunca committear)
+.dropi-session-*.json
+.dropi-explore-*.png
+.dropi-downloads/
+
+# lock de sesion local de Claude Code, no es parte del proyecto
+.claude/scheduled_tasks.lock

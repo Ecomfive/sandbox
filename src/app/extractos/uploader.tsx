@@ -13,7 +13,7 @@ interface Pais {
 
 const ESTADO_INICIAL: ImportarExtractoState = { status: "idle" };
 
-export function ExtractoUploader({ paises }: { paises: Pais[] }) {
+export function ExtractoUploader({ pais }: { pais: Pais }) {
   const [estado, formAction, pending] = useActionState(importarExtracto, ESTADO_INICIAL);
   const [headers, setHeaders] = useState<string[]>([]);
   const [filas, setFilas] = useState<string[][]>([]);
@@ -64,16 +64,12 @@ export function ExtractoUploader({ paises }: { paises: Pais[] }) {
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
+      <input type="hidden" name="pais_id" value={pais.id} />
       <div className="flex flex-col gap-1">
         <label className={labelClass}>País</label>
-        <select name="pais_id" required className={fieldClass}>
-          <option value="">Selecciona país…</option>
-          {paises.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
-        </select>
+        <p className="text-sm text-muted-foreground">
+          {pais.nombre} — cambia el país activo desde la barra superior.
+        </p>
       </div>
 
       <div className="flex flex-col gap-1">
