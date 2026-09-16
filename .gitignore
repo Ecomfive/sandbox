@@ -43,3 +43,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# cache local del hook de impeccable, se regenera solo
+.impeccable/hook.cache.json
