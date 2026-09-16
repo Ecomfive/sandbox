@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { upsertConciliacion } from "./actions";
+import { Button } from "@/components/ui/button";
+import { fieldClass, labelClassSm } from "@/components/ui/field";
 
 export const dynamic = "force-dynamic";
 
@@ -57,19 +60,19 @@ export default async function ConciliacionesPage() {
   const filas = Array.from(grupos.values()).sort((a, b) => b.periodo.localeCompare(a.periodo));
 
   return (
-    <main className="p-8">
-      <h1 className="text-xl font-semibold mb-1">Conciliación banco vs. plataforma</h1>
-      <p className="text-sm text-gray-600 mb-6">
+    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+      <h1 className="text-lg font-semibold tracking-tight">Conciliación banco vs. plataforma</h1>
+      <p className="mt-1 mb-6 text-sm text-muted-foreground">
         Monto bancario = depósitos del extracto ya asignados a cada plataforma. Monto reportado
         por la plataforma se ingresa manualmente hasta que la extracción automática esté lista.
       </p>
 
       {filas.length === 0 && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           Todavía no hay depósitos asignados a una plataforma. Ve a{" "}
-          <a href="/extractos" className="underline">
+          <Link href="/extractos" className="text-accent hover:text-accent-hover">
             Extractos
-          </a>{" "}
+          </Link>{" "}
           y asigna plataforma a los movimientos.
         </p>
       )}
@@ -83,7 +86,7 @@ export default async function ConciliacionesPage() {
             <form
               key={clave}
               action={upsertConciliacion}
-              className="border rounded p-4 flex flex-wrap items-end gap-4"
+              className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
             >
               <input type="hidden" name="pais_id" value={f.pais_id} />
               <input type="hidden" name="plataforma_id" value={f.plataforma_id} />
@@ -91,55 +94,50 @@ export default async function ConciliacionesPage() {
               <input type="hidden" name="monto_bancario" value={f.monto_bancario} />
 
               <div>
-                <p className="text-xs text-gray-500">País / Plataforma</p>
+                <p className={labelClassSm}>País / Plataforma</p>
                 <p className="text-sm font-medium">
                   {f.pais_nombre} · {f.plataforma_nombre}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Período</p>
+                <p className={labelClassSm}>Período</p>
                 <p className="text-sm font-medium">{f.periodo.slice(0, 7)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Monto bancario</p>
-                <p className="text-sm font-medium">{f.monto_bancario.toFixed(2)}</p>
+                <p className={labelClassSm}>Monto bancario</p>
+                <p className="text-sm font-medium tabular-nums">{f.monto_bancario.toFixed(2)}</p>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500">Monto reportado por plataforma</label>
+                <label className={labelClassSm}>Monto reportado por plataforma</label>
                 <input
                   type="number"
                   step="0.01"
                   name="monto_reportado_plataforma"
                   defaultValue={existente?.monto_reportado_plataforma ?? ""}
-                  className="border rounded px-2 py-1 text-sm w-36"
+                  className={`${fieldClass} w-36 tabular-nums`}
                   required
                 />
               </div>
               <div>
-                <p className="text-xs text-gray-500">Diferencia</p>
+                <p className={labelClassSm}>Diferencia</p>
                 <p
-                  className={`text-sm font-medium ${
-                    existente && Math.abs(diferencia) > 0.01 ? "text-red-600" : "text-green-700"
+                  className={`text-sm font-medium tabular-nums ${
+                    existente && Math.abs(diferencia) > 0.01 ? "text-destructive" : "text-success"
                   }`}
                 >
                   {existente ? diferencia.toFixed(2) : "—"}
                 </p>
               </div>
-              <div className="flex flex-col gap-1 flex-1 min-w-[10rem]">
-                <label className="text-xs text-gray-500">Notas</label>
+              <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
+                <label className={labelClassSm}>Notas</label>
                 <input
                   type="text"
                   name="notas"
                   defaultValue={existente?.notas ?? ""}
-                  className="border rounded px-2 py-1 text-sm w-full"
+                  className={`${fieldClass} w-full`}
                 />
               </div>
-              <button
-                type="submit"
-                className="bg-black text-white rounded px-4 py-2 text-sm h-fit"
-              >
-                Guardar
-              </button>
+              <Button type="submit">Guardar</Button>
             </form>
           );
         })}

@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { ExtractoUploader } from "./uploader";
 import { AsignarPlataformaSelect } from "./asignar-plataforma";
+import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
@@ -20,62 +21,73 @@ export default async function ExtractosPage() {
   ]);
 
   return (
-    <main className="p-8 flex flex-col gap-10">
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="text-xl font-semibold mb-4">Cargar extracto bancario</h1>
+        <h1 className="text-lg font-semibold tracking-tight">Cargar extracto bancario</h1>
+        <p className="mt-1 mb-4 text-sm text-muted-foreground">
+          Sube el archivo del banco, mapea las columnas y confirma para guardarlo.
+        </p>
         <ExtractoUploader paises={paises ?? []} />
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">Extractos cargados</h2>
-        <div className="flex flex-col gap-6">
+        <h2 className="text-base font-semibold tracking-tight">Extractos cargados</h2>
+        <div className="mt-3 flex flex-col gap-4">
           {(extractos ?? []).map((extracto) => (
-            <div key={extracto.id} className="border rounded p-3">
-              <p className="text-sm font-medium mb-2">
+            <div key={extracto.id} className="rounded-lg border border-border bg-card p-4">
+              <p className="mb-3 text-sm font-medium">
                 {(extracto.paises as unknown as { nombre: string } | null)?.nombre} —{" "}
                 {new Date(extracto.fecha_carga).toLocaleString()}
               </p>
-              <table className="text-xs w-full border-collapse">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="pr-3 py-1">Fecha</th>
-                    <th className="pr-3 py-1">Monto</th>
-                    <th className="pr-3 py-1">Tipo</th>
-                    <th className="pr-3 py-1">Descripción</th>
-                    <th className="pr-3 py-1">Plataforma</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(extracto.movimientos_bancarios ?? []).map(
-                    (m: {
-                      id: string;
-                      fecha: string;
-                      monto: number;
-                      tipo: string;
-                      descripcion: string | null;
-                      plataforma_id: string | null;
-                    }) => (
-                      <tr key={m.id} className="border-b border-gray-100">
-                        <td className="pr-3 py-1">{m.fecha}</td>
-                        <td className="pr-3 py-1">{Number(m.monto).toFixed(2)}</td>
-                        <td className="pr-3 py-1">{m.tipo}</td>
-                        <td className="pr-3 py-1">{m.descripcion}</td>
-                        <td className="pr-3 py-1">
-                          <AsignarPlataformaSelect
-                            movimientoId={m.id}
-                            plataformaIdActual={m.plataforma_id}
-                            plataformas={plataformas ?? []}
-                          />
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[36rem] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-1.5 pr-3 font-medium">Fecha</th>
+                      <th className="py-1.5 pr-3 font-medium">Monto</th>
+                      <th className="py-1.5 pr-3 font-medium">Tipo</th>
+                      <th className="py-1.5 pr-3 font-medium">Descripción</th>
+                      <th className="py-1.5 pr-3 font-medium">Plataforma</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(extracto.movimientos_bancarios ?? []).map(
+                      (m: {
+                        id: string;
+                        fecha: string;
+                        monto: number;
+                        tipo: string;
+                        descripcion: string | null;
+                        plataforma_id: string | null;
+                      }) => (
+                        <tr key={m.id} className="border-b border-border/60">
+                          <td className="py-1.5 pr-3">{m.fecha}</td>
+                          <td className="py-1.5 pr-3 tabular-nums">
+                            {Number(m.monto).toFixed(2)}
+                          </td>
+                          <td className="py-1.5 pr-3">
+                            <Badge tone={m.tipo === "deposito" ? "success" : "neutral"}>
+                              {m.tipo}
+                            </Badge>
+                          </td>
+                          <td className="py-1.5 pr-3 text-muted-foreground">{m.descripcion}</td>
+                          <td className="py-1.5 pr-3">
+                            <AsignarPlataformaSelect
+                              movimientoId={m.id}
+                              plataformaIdActual={m.plataforma_id}
+                              plataformas={plataformas ?? []}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ))}
           {(extractos ?? []).length === 0 && (
-            <p className="text-sm text-gray-500">Todavía no hay extractos cargados.</p>
+            <p className="text-sm text-muted-foreground">Todavía no hay extractos cargados.</p>
           )}
         </div>
       </div>

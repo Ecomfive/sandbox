@@ -3,6 +3,8 @@
 import { useActionState, useMemo, useState } from "react";
 import { importarExtracto, type ImportarExtractoState } from "./actions";
 import { parseExtracto, mapearMovimientos, type MapeoColumnas } from "@/lib/extractos/parse";
+import { Button } from "@/components/ui/button";
+import { fieldClass, labelClass, labelClassSm } from "@/components/ui/field";
 
 interface Pais {
   id: string;
@@ -41,7 +43,7 @@ export function ExtractoUploader({ paises }: { paises: Pais[] }) {
   function columnaSelect(campo: keyof MapeoColumnas, requerido: boolean) {
     return (
       <select
-        className="border rounded px-2 py-1 text-sm"
+        className={fieldClass}
         value={mapeo[campo] ?? ""}
         onChange={(e) =>
           setMapeo((prev) => ({
@@ -61,10 +63,10 @@ export function ExtractoUploader({ paises }: { paises: Pais[] }) {
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-2xl">
+    <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium">País</label>
-        <select name="pais_id" required className="border rounded px-2 py-1 text-sm">
+        <label className={labelClass}>País</label>
+        <select name="pais_id" required className={fieldClass}>
           <option value="">Selecciona país…</option>
           {paises.map((p) => (
             <option key={p.id} value={p.id}>
@@ -75,35 +77,35 @@ export function ExtractoUploader({ paises }: { paises: Pais[] }) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium">Archivo (CSV o Excel)</label>
+        <label className={labelClass}>Archivo (CSV o Excel)</label>
         <input
           type="file"
           name="archivo"
           accept=".csv,.xlsx,.xls"
           required
           onChange={onFileChange}
-          className="text-sm"
+          className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-border"
         />
       </div>
 
       {headers.length > 0 && (
-        <div className="flex flex-col gap-3 border rounded p-3">
+        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
           <p className="text-sm font-medium">Mapeo de columnas</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Fecha *</label>
+              <label className={labelClassSm}>Fecha *</label>
               {columnaSelect("fecha", true)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Monto *</label>
+              <label className={labelClassSm}>Monto *</label>
               {columnaSelect("monto", true)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Descripción</label>
+              <label className={labelClassSm}>Descripción</label>
               {columnaSelect("descripcion", false)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">
+              <label className={labelClassSm}>
                 Tipo (depósito/retiro) — si no hay columna, se infiere del signo del monto
               </label>
               {columnaSelect("tipo", false)}
@@ -112,25 +114,25 @@ export function ExtractoUploader({ paises }: { paises: Pais[] }) {
 
           {preview.length > 0 && (
             <div className="overflow-x-auto">
-              <p className="text-xs text-gray-600 mb-1">
+              <p className="mb-1 text-xs text-muted-foreground">
                 Vista previa ({filas.length} filas totales, mostrando {preview.length}):
               </p>
-              <table className="text-xs border-collapse w-full">
+              <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="text-left border-b">
-                    <th className="pr-3 py-1">Fecha</th>
-                    <th className="pr-3 py-1">Monto</th>
-                    <th className="pr-3 py-1">Tipo</th>
-                    <th className="pr-3 py-1">Descripción</th>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="py-1.5 pr-3 font-medium">Fecha</th>
+                    <th className="py-1.5 pr-3 font-medium">Monto</th>
+                    <th className="py-1.5 pr-3 font-medium">Tipo</th>
+                    <th className="py-1.5 pr-3 font-medium">Descripción</th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.map((m, i) => (
-                    <tr key={i} className="border-b border-gray-100">
-                      <td className="pr-3 py-1">{m.fecha}</td>
-                      <td className="pr-3 py-1">{m.monto.toFixed(2)}</td>
-                      <td className="pr-3 py-1">{m.tipo}</td>
-                      <td className="pr-3 py-1">{m.descripcion}</td>
+                    <tr key={i} className="border-b border-border/60">
+                      <td className="py-1.5 pr-3">{m.fecha}</td>
+                      <td className="py-1.5 pr-3 tabular-nums">{m.monto.toFixed(2)}</td>
+                      <td className="py-1.5 pr-3">{m.tipo}</td>
+                      <td className="py-1.5 pr-3 text-muted-foreground">{m.descripcion}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -142,20 +144,14 @@ export function ExtractoUploader({ paises }: { paises: Pais[] }) {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={!mapeoCompleto || pending}
-        className="bg-black text-white rounded px-4 py-2 text-sm disabled:opacity-40 w-fit"
-      >
+      <Button type="submit" disabled={!mapeoCompleto || pending} className="w-fit">
         {pending ? "Importando…" : "Confirmar importación"}
-      </button>
+      </Button>
 
       {estado.status === "success" && (
-        <p className="text-sm text-green-700">
-          Importados {estado.filasImportadas} movimientos.
-        </p>
+        <p className="text-sm text-success">Importados {estado.filasImportadas} movimientos.</p>
       )}
-      {estado.status === "error" && <p className="text-sm text-red-700">{estado.mensaje}</p>}
+      {estado.status === "error" && <p className="text-sm text-destructive">{estado.mensaje}</p>}
     </form>
   );
 }

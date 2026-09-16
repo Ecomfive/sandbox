@@ -4,6 +4,8 @@ import { useActionState, useMemo, useState } from "react";
 import { importarInventario, type ImportarInventarioState } from "./actions";
 import { parseExtracto } from "@/lib/extractos/parse";
 import { mapearMovimientosInventario, type MapeoColumnasInventario } from "@/lib/inventario/parse";
+import { Button } from "@/components/ui/button";
+import { fieldClass, labelClass, labelClassSm } from "@/components/ui/field";
 
 interface Pais {
   id: string;
@@ -47,7 +49,7 @@ export function InventarioUploader({ paises }: { paises: Pais[] }) {
   function columnaSelect(campo: keyof MapeoColumnasInventario, requerido: boolean) {
     return (
       <select
-        className="border rounded px-2 py-1 text-sm"
+        className={fieldClass}
         value={mapeo[campo] ?? ""}
         onChange={(e) =>
           setMapeo((prev) => ({
@@ -67,10 +69,10 @@ export function InventarioUploader({ paises }: { paises: Pais[] }) {
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-2xl">
+    <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium">País</label>
-        <select name="pais_id" required className="border rounded px-2 py-1 text-sm">
+        <label className={labelClass}>País</label>
+        <select name="pais_id" required className={fieldClass}>
           <option value="">Selecciona país…</option>
           {paises.map((p) => (
             <option key={p.id} value={p.id}>
@@ -81,54 +83,54 @@ export function InventarioUploader({ paises }: { paises: Pais[] }) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium">Archivo del pistoleo (CSV o Excel)</label>
+        <label className={labelClass}>Archivo del pistoleo (CSV o Excel)</label>
         <input
           type="file"
           name="archivo"
           accept=".csv,.xlsx,.xls"
           required
           onChange={onFileChange}
-          className="text-sm"
+          className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-border"
         />
       </div>
 
       {headers.length > 0 && (
-        <div className="flex flex-col gap-3 border rounded p-3">
+        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
           <p className="text-sm font-medium">Mapeo de columnas</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">SKU / código *</label>
+              <label className={labelClassSm}>SKU / código *</label>
               {columnaSelect("sku", true)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Cantidad *</label>
+              <label className={labelClassSm}>Cantidad *</label>
               {columnaSelect("cantidad", true)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Nombre del producto (solo si es nuevo)</label>
+              <label className={labelClassSm}>Nombre del producto (solo si es nuevo)</label>
               {columnaSelect("nombre", false)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Fecha (si no hay, usa hoy)</label>
+              <label className={labelClassSm}>Fecha (si no hay, usa hoy)</label>
               {columnaSelect("fecha", false)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Referencia</label>
+              <label className={labelClassSm}>Referencia</label>
               {columnaSelect("referencia", false)}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">Tipo (columna, si existe)</label>
+              <label className={labelClassSm}>Tipo (columna, si existe)</label>
               {columnaSelect("tipo", false)}
             </div>
           </div>
 
           {mapeo.tipo === undefined && (
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-600">
+              <label className={labelClassSm}>
                 El archivo no tiene columna de tipo — aplicar a todas las filas:
               </label>
               <select
-                className="border rounded px-2 py-1 text-sm w-fit"
+                className={`${fieldClass} w-fit`}
                 value={tipoFijo}
                 onChange={(e) => setTipoFijo(e.target.value as "entrada" | "salida")}
               >
@@ -140,25 +142,25 @@ export function InventarioUploader({ paises }: { paises: Pais[] }) {
 
           {preview.length > 0 && (
             <div className="overflow-x-auto">
-              <p className="text-xs text-gray-600 mb-1">
+              <p className="mb-1 text-xs text-muted-foreground">
                 Vista previa ({filas.length} filas totales, mostrando {preview.length}):
               </p>
-              <table className="text-xs border-collapse w-full">
+              <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="text-left border-b">
-                    <th className="pr-3 py-1">SKU</th>
-                    <th className="pr-3 py-1">Cantidad</th>
-                    <th className="pr-3 py-1">Tipo</th>
-                    <th className="pr-3 py-1">Fecha</th>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="py-1.5 pr-3 font-medium">SKU</th>
+                    <th className="py-1.5 pr-3 font-medium">Cantidad</th>
+                    <th className="py-1.5 pr-3 font-medium">Tipo</th>
+                    <th className="py-1.5 pr-3 font-medium">Fecha</th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.map((m, i) => (
-                    <tr key={i} className="border-b border-gray-100">
-                      <td className="pr-3 py-1">{m.sku}</td>
-                      <td className="pr-3 py-1">{m.cantidad}</td>
-                      <td className="pr-3 py-1">{m.tipo}</td>
-                      <td className="pr-3 py-1">{m.fecha ?? "(hoy)"}</td>
+                    <tr key={i} className="border-b border-border/60">
+                      <td className="py-1.5 pr-3">{m.sku}</td>
+                      <td className="py-1.5 pr-3 tabular-nums">{m.cantidad}</td>
+                      <td className="py-1.5 pr-3">{m.tipo}</td>
+                      <td className="py-1.5 pr-3 text-muted-foreground">{m.fecha ?? "(hoy)"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -171,18 +173,14 @@ export function InventarioUploader({ paises }: { paises: Pais[] }) {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={!mapeoCompleto || pending}
-        className="bg-black text-white rounded px-4 py-2 text-sm disabled:opacity-40 w-fit"
-      >
+      <Button type="submit" disabled={!mapeoCompleto || pending} className="w-fit">
         {pending ? "Importando…" : "Confirmar importación"}
-      </button>
+      </Button>
 
       {estado.status === "success" && (
-        <p className="text-sm text-green-700">Importados {estado.filasImportadas} movimientos.</p>
+        <p className="text-sm text-success">Importados {estado.filasImportadas} movimientos.</p>
       )}
-      {estado.status === "error" && <p className="text-sm text-red-700">{estado.mensaje}</p>}
+      {estado.status === "error" && <p className="text-sm text-destructive">{estado.mensaje}</p>}
     </form>
   );
 }

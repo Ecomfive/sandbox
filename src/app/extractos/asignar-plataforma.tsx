@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { asignarPlataforma } from "./actions";
+import { fieldClassSm } from "@/components/ui/field";
 
 interface Plataforma {
   id: string;
@@ -21,7 +22,7 @@ export function AsignarPlataformaSelect({
 
   return (
     <select
-      className="border rounded px-1 py-0.5 text-xs disabled:opacity-50"
+      className={`${fieldClassSm} disabled:opacity-50`}
       defaultValue={plataformaIdActual ?? ""}
       disabled={pending}
       onChange={(e) => {

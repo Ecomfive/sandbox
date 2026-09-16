@@ -25,18 +25,18 @@ const modulos = [
 
 export default function Home() {
   return (
-    <main className="p-8 max-w-2xl">
-      <h1 className="text-xl font-semibold mb-1">Gestión de Proveeduría</h1>
-      <p className="text-sm text-gray-600 mb-6">Beta — Costa Rica y Panamá</p>
-      <div className="flex flex-col gap-3">
+    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+      <h1 className="text-lg font-semibold tracking-tight">Gestión de Proveeduría</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Beta — Costa Rica y Panamá</p>
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {modulos.map((m) => (
           <Link
             key={m.href}
             href={m.href}
-            className="border rounded p-4 hover:bg-gray-50 transition-colors"
+            className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-accent hover:bg-muted"
           >
-            <p className="font-medium">{m.titulo}</p>
-            <p className="text-sm text-gray-600">{m.descripcion}</p>
+            <p className="text-sm font-medium">{m.titulo}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{m.descripcion}</p>
           </Link>
         ))}
       </div>
