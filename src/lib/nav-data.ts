@@ -35,7 +35,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "CRM Dropshippers",
-    items: [{ label: "Panel de dropshippers", pronto: true }],
+    items: [{ label: "Panel de dropshippers", href: "/crm-dropshippers" }],
   },
   {
     title: "Configuración",

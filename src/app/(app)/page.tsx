@@ -53,12 +53,16 @@ export default async function Home() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [serieInventario, serieFinanzas] = await Promise.all([
+  const [serieInventario, serieFinanzas, { data: dropshippers }] = await Promise.all([
     getSerieInventario(supabase, pais.id),
     getSerieFinanzas(supabase, pais.id),
+    supabase.from("dropshippers").select("estado").eq("pais_id", pais.id),
   ]);
 
   const hayInventario = serieInventario.some((p) => p.entradas > 0 || p.salidas > 0);
+
+  const totalDropshippers = dropshippers?.length ?? 0;
+  const activosDropshippers = (dropshippers ?? []).filter((d) => d.estado === "activo").length;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -110,10 +114,24 @@ export default async function Home() {
           titulo="Inteligencia competitiva"
           descripcion="Crecimiento de proveedores y análisis de competencia — próximamente."
         />
-        <ProntoCard
+        <DepartmentCard
           titulo="CRM Dropshippers"
-          descripcion="Seguimiento de venta y comunicación por dropshipper — próximamente."
-        />
+          enlaces={[{ href: "/crm-dropshippers", label: "Ver panel" }]}
+        >
+          <p className="mb-2 text-xs text-muted-foreground">Directorio de dropshippers</p>
+          {totalDropshippers > 0 ? (
+            <div className="flex h-[200px] flex-col items-center justify-center gap-1">
+              <p className="text-3xl font-semibold tabular-nums">{totalDropshippers}</p>
+              <p className="text-sm text-muted-foreground">
+                {activosDropshippers} activo{activosDropshippers === 1 ? "" : "s"}
+              </p>
+            </div>
+          ) : (
+            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+              Todavía no hay dropshippers registrados.
+            </p>
+          )}
+        </DepartmentCard>
       </div>
     </main>
   );
