@@ -12,12 +12,18 @@ if (!bases[pais ?? ""] || !desde || !hasta) {
   process.exit(1);
 }
 
-function esperarRespuesta(page: Page): Promise<unknown[]> {
-  return new Promise((resolve) => {
+function esperarRespuesta(page: Page, timeoutMs = 45000): Promise<unknown[]> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      page.off("response", onResponse);
+      reject(new Error(`Timeout esperando respuesta de myorders/v2 (${timeoutMs}ms)`));
+    }, timeoutMs);
+
     const onResponse = async (res: Response) => {
       if (!res.url().includes("/api/orders/myorders/v2")) return;
       try {
         const json = await res.json();
+        clearTimeout(timeout);
         page.off("response", onResponse);
         resolve(json.objects ?? []);
       } catch {
@@ -38,7 +44,7 @@ async function main() {
 
   let esperaPagina = esperarRespuesta(page);
   await page.goto(`${base}/dashboard/orders/supplier?from=${desde}&until=${hasta}`, {
-    waitUntil: "networkidle",
+    waitUntil: "load",
   });
   let objetos = await esperaPagina;
   const pageSize = objetos.length;
