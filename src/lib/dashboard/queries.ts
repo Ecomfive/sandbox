@@ -39,6 +39,42 @@ export async function getSerieInventario(
   return Array.from(porDia.values());
 }
 
+export interface PuntoVentas {
+  fecha: string; // dd/mm
+  monto: number;
+  ordenes: number;
+}
+
+/** Monto y cantidad de órdenes de Dropi por día, últimos 14 días, para el país dado. */
+export async function getSerieVentas(supabase: SupabaseClient, paisId: string): Promise<PuntoVentas[]> {
+  const desde = new Date();
+  desde.setDate(desde.getDate() - 13);
+  const desdeStr = desde.toISOString().slice(0, 10);
+
+  const { data } = await supabase
+    .from("ordenes")
+    .select("fecha, monto")
+    .eq("pais_id", paisId)
+    .gte("fecha", desdeStr);
+
+  const porDia = new Map<string, PuntoVentas>();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(desde);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    porDia.set(iso, { fecha: `${iso.slice(8, 10)}/${iso.slice(5, 7)}`, monto: 0, ordenes: 0 });
+  }
+
+  for (const o of data ?? []) {
+    const punto = porDia.get(String(o.fecha));
+    if (!punto) continue;
+    punto.monto += Number(o.monto);
+    punto.ordenes += 1;
+  }
+
+  return Array.from(porDia.values());
+}
+
 export interface PuntoFinanzas {
   periodo: string; // mm/yy
   diferencia: number;

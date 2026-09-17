@@ -57,6 +57,10 @@ async function main() {
   const codigoPais = pais.toUpperCase();
   const { data: paisRow } = await supabase.from("paises").select("id").eq("codigo", codigoPais).single();
   const { data: plataformaRow } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").single();
+  if (!paisRow || !plataformaRow) {
+    throw new Error("Falta pais o plataforma Dropi. Corre las migraciones.");
+  }
+
   const { data: cuentaRow } = await supabase
     .from("cuentas_extraccion")
     .select("id")
@@ -65,9 +69,12 @@ async function main() {
     .eq("tipo", "proveedor")
     .single();
 
-  if (!paisRow || !plataformaRow || !cuentaRow) {
-    throw new Error("Falta pais, plataforma o cuenta de extraccion Dropi proveedor. Corre las migraciones.");
+  if (!cuentaRow) {
+    throw new Error("Falta la cuenta de extraccion Dropi proveedor. Corre las migraciones.");
   }
+
+  const paisId = paisRow.id;
+  const plataformaId = plataformaRow.id;
 
   for (const lote of enLotes(ordenes, 500)) {
     const { error } = await supabase
@@ -80,8 +87,8 @@ async function main() {
   const { data: productosExistentes } = await supabase
     .from("productos")
     .select("id, sku")
-    .eq("pais_id", paisRow.id)
-    .eq("plataforma_id", plataformaRow.id);
+    .eq("pais_id", paisId)
+    .eq("plataforma_id", plataformaId);
 
   const skuAId = new Map((productosExistentes ?? []).map((p) => [p.sku, p.id as string]));
   const skuANombreNuevo = new Map<string, string>();
@@ -104,8 +111,8 @@ async function main() {
 
   if (skuANombreNuevo.size > 0) {
     const nuevos = Array.from(skuANombreNuevo, ([sku, nombre]) => ({
-      pais_id: paisRow.id,
-      plataforma_id: plataformaRow.id,
+      pais_id: paisId,
+      plataforma_id: plataformaId,
       sku,
       nombre,
     }));
@@ -124,8 +131,8 @@ async function main() {
   const filasPorReferencia = new Map<string, ReturnType<typeof filaDeOrden>>();
   function filaDeOrden(orden: OrdenDropi, sku: string) {
     return {
-      pais_id: paisRow.id,
-      plataforma_id: plataformaRow.id,
+      pais_id: paisId,
+      plataforma_id: plataformaId,
       producto_id: skuAId.get(sku),
       referencia_externa: String(orden.id),
       cantidad: orden.orderdetails.length,
@@ -149,6 +156,9 @@ async function main() {
   }
 
   console.log(`Normalizadas ${filasOrdenes.length} ordenes.`);
+  if (duplicadas > 0) {
+    console.log(`Aviso: ${duplicadas} ordenes aparecian repetidas entre paginas (misma orden, una fila).`);
+  }
   if (multiProducto > 0) {
     console.log(`Aviso: ${multiProducto} ordenes traian mas de un producto; solo se guardo el primero.`);
   }

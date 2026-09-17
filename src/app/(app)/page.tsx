@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { getSerieInventario, getSerieFinanzas } from "@/lib/dashboard/queries";
+import { getSerieInventario, getSerieFinanzas, getSerieVentas } from "@/lib/dashboard/queries";
 import { InventarioChart } from "@/components/charts/inventario-chart";
 import { FinanzasChart } from "@/components/charts/finanzas-chart";
+import { VentasChart } from "@/components/charts/ventas-chart";
 import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -53,13 +54,16 @@ export default async function Home() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [serieInventario, serieFinanzas, { data: dropshippers }] = await Promise.all([
+  const [serieInventario, serieFinanzas, serieVentas, { data: dropshippers }] = await Promise.all([
     getSerieInventario(supabase, pais.id),
     getSerieFinanzas(supabase, pais.id),
+    getSerieVentas(supabase, pais.id),
     supabase.from("dropshippers").select("estado").eq("pais_id", pais.id),
   ]);
 
   const hayInventario = serieInventario.some((p) => p.entradas > 0 || p.salidas > 0);
+  const hayVentas = serieVentas.some((p) => p.ordenes > 0);
+  const totalVentas14d = serieVentas.reduce((acc, p) => acc + p.monto, 0);
 
   const totalDropshippers = dropshippers?.length ?? 0;
   const activosDropshippers = (dropshippers ?? []).filter((d) => d.estado === "activo").length;
@@ -87,6 +91,22 @@ export default async function Home() {
           ) : (
             <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
               Aún no hay movimientos de inventario en los últimos 14 días.
+            </p>
+          )}
+        </DepartmentCard>
+
+        <DepartmentCard
+          titulo="Ventas Dropi"
+          enlaces={[{ href: "/pedidos-dropi", label: "Ver pedidos" }]}
+        >
+          <p className="mb-2 text-xs text-muted-foreground">
+            Monto vendido por día, últimos 14 días{hayVentas ? ` — total ${totalVentas14d.toFixed(2)}` : ""}
+          </p>
+          {hayVentas ? (
+            <VentasChart datos={serieVentas} />
+          ) : (
+            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+              Aún no hay pedidos de Dropi cargados en los últimos 14 días.
             </p>
           )}
         </DepartmentCard>

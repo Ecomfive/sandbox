@@ -7,6 +7,7 @@ export const MODULOS: Modulo[] = [
   { clave: "dashboard", etiqueta: "Dashboard operativo" },
   { clave: "inventario", etiqueta: "Inventario" },
   { clave: "alertas", etiqueta: "Alertas de inventario" },
+  { clave: "pedidos-dropi", etiqueta: "Pedidos Dropi" },
   { clave: "extractos", etiqueta: "Extractos bancarios" },
   { clave: "conciliaciones", etiqueta: "Conciliación" },
   { clave: "productos", etiqueta: "Productos y márgenes" },

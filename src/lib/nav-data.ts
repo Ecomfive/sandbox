@@ -15,7 +15,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Inventario", href: "/inventario" },
       { label: "Alertas de inventario", href: "/alertas" },
-      { label: "Pedidos Dropi", pronto: true },
+      { label: "Pedidos Dropi", href: "/pedidos-dropi" },
       { label: "Logística", pronto: true },
     ],
   },
