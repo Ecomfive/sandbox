@@ -14,6 +14,7 @@ export const MODULOS: Modulo[] = [
   { clave: "retiros", etiqueta: "Retiros y wallet" },
   { clave: "gastos", etiqueta: "Nómina y gastos" },
   { clave: "crm-dropshippers", etiqueta: "CRM Dropshippers" },
+  { clave: "inteligencia-competitiva", etiqueta: "Inteligencia competitiva" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
 ];
 

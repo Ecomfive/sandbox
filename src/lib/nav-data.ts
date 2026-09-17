@@ -31,7 +31,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "Inteligencia competitiva",
-    items: [{ label: "Proveedores Dropi", pronto: true }],
+    items: [{ label: "Proveedores Dropi", href: "/inteligencia-competitiva" }],
   },
   {
     title: "CRM Dropshippers",
