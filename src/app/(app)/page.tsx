@@ -183,7 +183,7 @@ export default async function Home({
   ];
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <main className="mx-auto w-full max-w-[1600px] px-8 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Dashboard operativo</h1>
@@ -194,7 +194,7 @@ export default async function Home({
         <PeriodPicker />
       </div>
 
-      <DashboardSecciones secciones={secciones} />
+      <DashboardSecciones secciones={secciones} seccionInicial="ventas" />
     </main>
   );
 }

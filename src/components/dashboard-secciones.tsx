@@ -13,8 +13,14 @@ export interface SeccionDashboard {
   contenido: ReactNode;
 }
 
-export function DashboardSecciones({ secciones }: { secciones: SeccionDashboard[] }) {
-  const [activa, setActiva] = useState<string | null>(null);
+export function DashboardSecciones({
+  secciones,
+  seccionInicial,
+}: {
+  secciones: SeccionDashboard[];
+  seccionInicial?: string;
+}) {
+  const [activa, setActiva] = useState<string | null>(seccionInicial ?? null);
   const seccion = secciones.find((s) => s.clave === activa) ?? null;
 
   return (
