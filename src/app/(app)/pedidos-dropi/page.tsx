@@ -7,6 +7,24 @@ import { fieldClass, labelClassSm } from "@/components/ui/field";
 
 export const dynamic = "force-dynamic";
 
+/** Supabase limita cada respuesta a ~1000 filas; esto pagina con .range() hasta traerlas todas. */
+async function traerTodasLasFilas<T>(
+  construirConsulta: (rangoDesde: number, rangoHasta: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const TAMANO_PAGINA = 1000;
+  const filas: T[] = [];
+  let rangoDesde = 0;
+  for (;;) {
+    const { data, error } = await construirConsulta(rangoDesde, rangoDesde + TAMANO_PAGINA - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    filas.push(...data);
+    if (data.length < TAMANO_PAGINA) break;
+    rangoDesde += TAMANO_PAGINA;
+  }
+  return filas;
+}
+
 const toneEstado = (estado: string): "success" | "warning" | "destructive" | "neutral" => {
   const e = estado.toUpperCase();
   if (e.includes("ENTREGAD") || e.includes("PAGAD")) return "success";
@@ -56,14 +74,17 @@ export default async function PedidosDropiPage({
   const { data: plataformaDropi } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").single();
   const plataformaId = plataformaDropi?.id ?? "";
 
-  const [{ data: resumenFilas }, { data: ordenes }] = await Promise.all([
-    supabase
-      .from("ordenes")
-      .select("monto, estado")
-      .eq("pais_id", pais.id)
-      .eq("plataforma_id", plataformaId)
-      .gte("fecha", desde)
-      .lte("fecha", hasta),
+  const [resumen, { data: ordenes }, carteraGanancia] = await Promise.all([
+    traerTodasLasFilas<{ monto: number; estado: string; referencia_externa: string }>((rDesde, rHasta) =>
+      supabase
+        .from("ordenes")
+        .select("monto, estado, referencia_externa")
+        .eq("pais_id", pais.id)
+        .eq("plataforma_id", plataformaId)
+        .gte("fecha", desde)
+        .lte("fecha", hasta)
+        .range(rDesde, rHasta)
+    ),
     supabase
       .from("ordenes")
       .select("referencia_externa, cantidad, monto, estado, fecha, fecha_hora, productos(sku, nombre)")
@@ -74,12 +95,27 @@ export default async function PedidosDropiPage({
       .order(orden.columna, { ascending: orden.ascending })
       .order("referencia_externa", { ascending: orden.ascending })
       .limit(500),
+    traerTodasLasFilas<{ orden_referencia_externa: string | null }>((rDesde, rHasta) =>
+      supabase
+        .from("historial_cartera")
+        .select("orden_referencia_externa")
+        .eq("pais_id", pais.id)
+        .eq("plataforma_id", plataformaId)
+        .ilike("descripcion", "%GANANCIA%")
+        .range(rDesde, rHasta)
+    ),
   ]);
 
-  const resumen = resumenFilas ?? [];
   const totalOrdenes = resumen.length;
   const totalMonto = resumen.reduce((acc, o) => acc + Number(o.monto), 0);
   const todas = ordenes ?? [];
+
+  const referenciasLiquidadas = new Set(
+    (carteraGanancia ?? []).map((c) => c.orden_referencia_externa).filter((r): r is string => r !== null)
+  );
+  const esAlerta = (referencia: string, estado: string) =>
+    referenciasLiquidadas.has(referencia) && !estado.toUpperCase().includes("ENTREGAD");
+  const totalAlertas = resumen.filter((o) => esAlerta(o.referencia_externa, o.estado)).length;
 
   const porEstado = new Map<string, number>();
   for (const o of resumen) porEstado.set(o.estado, (porEstado.get(o.estado) ?? 0) + 1);
@@ -130,6 +166,18 @@ export default async function PedidosDropiPage({
               <p className="text-sm font-medium">Monto total</p>
               <p className="mt-1 text-lg font-semibold tabular-nums">{totalMonto.toFixed(2)}</p>
             </div>
+            <div
+              className={`min-w-[10rem] rounded-lg border p-4 ${
+                totalAlertas > 0 ? "border-red-300 bg-red-50" : "border-border bg-card"
+              }`}
+            >
+              <p className={`text-sm font-medium ${totalAlertas > 0 ? "text-red-700" : ""}`}>
+                Alertas: liquidado sin marcar entregado
+              </p>
+              <p className={`mt-1 text-lg font-semibold tabular-nums ${totalAlertas > 0 ? "text-red-700" : ""}`}>
+                {totalAlertas}
+              </p>
+            </div>
             {estadosOrdenados.map(([estado, cantidad]) => (
               <div key={estado} className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
                 <p className="text-sm font-medium">{estado}</p>
@@ -161,12 +209,27 @@ export default async function PedidosDropiPage({
               <tbody>
                 {todas.map((o) => {
                   const producto = o.productos as unknown as { sku: string; nombre: string } | null;
+                  const alerta = esAlerta(o.referencia_externa, o.estado);
                   return (
-                    <tr key={o.referencia_externa} className="border-b border-border/60 last:border-0">
+                    <tr
+                      key={o.referencia_externa}
+                      className={`border-b last:border-0 ${
+                        alerta ? "border-red-200 bg-red-50 text-red-900" : "border-border/60"
+                      }`}
+                    >
                       <td className="py-2 pr-3 pl-4">{o.fecha}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{formatoHora(o.fecha_hora)}</td>
-                      <td className="py-2 pr-3 font-medium">{o.referencia_externa}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{producto?.nombre ?? "—"}</td>
+                      <td className={`py-2 pr-3 ${alerta ? "text-red-700" : "text-muted-foreground"}`}>
+                        {formatoHora(o.fecha_hora)}
+                      </td>
+                      <td className="py-2 pr-3 font-medium">
+                        {alerta && (
+                          <span title="Liquidado en cartera pero aún no marcado ENTREGADO en Dropi">⚠️ </span>
+                        )}
+                        {o.referencia_externa}
+                      </td>
+                      <td className={`py-2 pr-3 ${alerta ? "" : "text-muted-foreground"}`}>
+                        {producto?.nombre ?? "—"}
+                      </td>
                       <td className="py-2 pr-3 tabular-nums">{o.cantidad}</td>
                       <td className="py-2 pr-3 tabular-nums">{Number(o.monto).toFixed(2)}</td>
                       <td className="py-2 pr-3">
