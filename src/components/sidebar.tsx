@@ -9,11 +9,22 @@ import { DashboardIcon, ChevronRightIcon, SECTION_ICONS } from "@/lib/nav-icons"
 
 const STORAGE_KEY = "sidebar_expandido";
 
+function ToggleIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.5 4.5v15" />
+    </svg>
+  );
+}
+
 function SidebarContents({
   expanded,
+  onToggle,
   onNavigate,
 }: {
   expanded: boolean;
+  onToggle?: () => void;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -21,6 +32,24 @@ function SidebarContents({
 
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
+      {onToggle && (
+        <button
+          type="button"
+          onClick={onToggle}
+          title={expanded ? "Colapsar menú" : "Desplegar el menú"}
+          className="flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ToggleIcon className="h-5 w-5 shrink-0" />
+          {expanded && <span className="text-sm font-medium">Colapsar menú</span>}
+        </button>
+      )}
+
+      {expanded && (
+        <p className="mt-1 mb-2 px-3 text-sm font-medium text-foreground">
+          Gestión de Proveeduría
+        </p>
+      )}
+
       <Link
         href="/"
         onClick={onNavigate}
@@ -130,29 +159,16 @@ export function Sidebar() {
           expanded ? "w-64" : "w-16"
         } transition-[width] duration-150`}
       >
-        <div className="flex items-center gap-2 border-b border-border px-3 py-3">
-          <button
-            type="button"
-            onClick={toggleExpanded}
-            title={expanded ? "Colapsar menú" : "Desplegar el menú"}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75}>
-              <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-              <path d="M9.5 4.5v15" />
-            </svg>
-          </button>
-          {expanded && (
-            <Image
-              src="/brand/ecomfive-rojo.png"
-              alt="Ecomfive"
-              width={161}
-              height={44}
-              className="h-5 w-auto"
-            />
-          )}
-        </div>
-        <SidebarContents expanded={expanded} />
+        <Link href="/" className="flex items-center justify-center border-b border-border px-2 py-3">
+          <Image
+            src="/brand/ecomfive-rojo.png"
+            alt="Ecomfive"
+            width={161}
+            height={44}
+            className={expanded ? "h-5 w-auto" : "h-3 w-auto"}
+          />
+        </Link>
+        <SidebarContents expanded={expanded} onToggle={toggleExpanded} />
       </aside>
 
       {/* Botón hamburguesa — móvil */}

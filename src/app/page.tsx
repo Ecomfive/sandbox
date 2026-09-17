@@ -1,44 +1,117 @@
 import Link from "next/link";
+import { createServiceClient } from "@/lib/supabase/server";
+import { getPaisActual } from "@/lib/pais";
+import { getSerieInventario, getSerieFinanzas } from "@/lib/dashboard/queries";
+import { InventarioChart } from "@/components/charts/inventario-chart";
+import { FinanzasChart } from "@/components/charts/finanzas-chart";
 
-const modulos = [
-  {
-    href: "/extractos",
-    titulo: "Extractos bancarios",
-    descripcion: "Cargar extracto (CSV/Excel) y asignar movimientos a plataforma.",
-  },
-  {
-    href: "/conciliaciones",
-    titulo: "Conciliación",
-    descripcion: "Comparar lo depositado en banco contra lo reportado por cada plataforma.",
-  },
-  {
-    href: "/inventario",
-    titulo: "Inventario (pistoleo)",
-    descripcion: "Cargar entradas y salidas de mercancía desde el sistema de escaneo.",
-  },
-  {
-    href: "/alertas",
-    titulo: "Alertas de inventario",
-    descripcion: "Inventario pendiente de retorno, listo para reclamo a la plataforma.",
-  },
-];
+export const dynamic = "force-dynamic";
 
-export default function Home() {
+function DepartmentCard({
+  titulo,
+  children,
+  enlaces,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+  enlaces: { href: string; label: string }[];
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-tight">{titulo}</h2>
+        <div className="flex gap-3">
+          {enlaces.map((e) => (
+            <Link key={e.href} href={e.href} className="text-xs text-accent hover:text-accent-hover">
+              {e.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ProntoCard({ titulo, descripcion }: { titulo: string; descripcion: string }) {
+  return (
+    <div className="flex flex-col rounded-lg border border-border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-tight text-muted-foreground">{titulo}</h2>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
+      </div>
+      <p className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
+        {descripcion}
+      </p>
+    </div>
+  );
+}
+
+export default async function Home() {
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+
+  const [serieInventario, serieFinanzas] = await Promise.all([
+    getSerieInventario(supabase, pais.id),
+    getSerieFinanzas(supabase, pais.id),
+  ]);
+
+  const hayInventario = serieInventario.some((p) => p.entradas > 0 || p.salidas > 0);
+
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <h1 className="text-lg font-semibold tracking-tight">Gestión de Proveeduría</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Beta — Costa Rica y Panamá</p>
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {modulos.map((m) => (
-          <Link
-            key={m.href}
-            href={m.href}
-            className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-accent hover:bg-muted"
-          >
-            <p className="text-sm font-medium">{m.titulo}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{m.descripcion}</p>
-          </Link>
-        ))}
+      <h1 className="text-lg font-semibold tracking-tight">Dashboard operativo</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {pais.nombre} — panorama por departamento
+      </p>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DepartmentCard
+          titulo="Operaciones"
+          enlaces={[
+            { href: "/inventario", label: "Inventario" },
+            { href: "/alertas", label: "Alertas" },
+          ]}
+        >
+          <p className="mb-2 text-xs text-muted-foreground">
+            Entradas vs. salidas de inventario, últimos 14 días
+          </p>
+          {hayInventario ? (
+            <InventarioChart datos={serieInventario} />
+          ) : (
+            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+              Aún no hay movimientos de inventario en los últimos 14 días.
+            </p>
+          )}
+        </DepartmentCard>
+
+        <DepartmentCard
+          titulo="Finanzas"
+          enlaces={[
+            { href: "/extractos", label: "Extractos" },
+            { href: "/conciliaciones", label: "Conciliación" },
+          ]}
+        >
+          <p className="mb-2 text-xs text-muted-foreground">
+            Diferencia banco vs. plataforma reportada, por mes
+          </p>
+          {serieFinanzas.length > 0 ? (
+            <FinanzasChart datos={serieFinanzas} />
+          ) : (
+            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+              Todavía no hay conciliaciones registradas.
+            </p>
+          )}
+        </DepartmentCard>
+
+        <ProntoCard
+          titulo="Inteligencia competitiva"
+          descripcion="Crecimiento de proveedores y análisis de competencia — próximamente."
+        />
+        <ProntoCard
+          titulo="CRM Dropshippers"
+          descripcion="Seguimiento de venta y comunicación por dropshipper — próximamente."
+        />
       </div>
     </main>
   );
