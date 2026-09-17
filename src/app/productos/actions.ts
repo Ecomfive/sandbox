@@ -1,0 +1,27 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createServiceClient } from "@/lib/supabase/server";
+
+export async function actualizarProducto(formData: FormData) {
+  const id = formData.get("id") as string;
+  const costoRaw = formData.get("costo") as string;
+  const precioRaw = formData.get("precio_actual") as string;
+  const margenMinimoRaw = formData.get("margen_minimo") as string;
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("productos")
+    .update({
+      costo: costoRaw === "" ? null : Number(costoRaw),
+      precio_actual: precioRaw === "" ? null : Number(precioRaw),
+      margen_minimo: Number(margenMinimoRaw),
+      ultima_modificacion_precio: new Date().toISOString().slice(0, 10),
+    })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  revalidatePath("/productos");
+}
