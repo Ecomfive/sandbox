@@ -54,3 +54,6 @@ next-env.d.ts
 
 # lock de sesion local de Claude Code, no es parte del proyecto
 .claude/scheduled_tasks.lock
+
+# cache local del CLI de Supabase
+supabase/.temp/

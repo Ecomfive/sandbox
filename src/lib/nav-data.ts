@@ -25,7 +25,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Extractos bancarios", href: "/extractos" },
       { label: "Conciliación", href: "/conciliaciones" },
       { label: "Productos y márgenes", href: "/productos" },
-      { label: "Retiros (Wallet)", pronto: true },
+      { label: "Retiros (Wallet)", href: "/retiros" },
       { label: "Nómina y gastos", pronto: true },
     ],
   },
