@@ -5,7 +5,7 @@ import type { PuntoVentas } from "@/lib/dashboard/queries";
 
 export function VentasChart({ datos, etiquetaComparacion }: { datos: PuntoVentas[]; etiquetaComparacion: string }) {
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={340}>
       <LineChart data={datos} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" vertical={false} />
         <XAxis
