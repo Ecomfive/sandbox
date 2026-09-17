@@ -5,6 +5,7 @@ import { calcularPendientes } from "@/lib/alertas/pendientes";
 import { generarAlerta, actualizarEstadoAlerta } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ const ESTADO_TONO = {
 } as const;
 
 export default async function AlertasPage() {
+  await requireModulo("alertas");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

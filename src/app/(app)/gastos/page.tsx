@@ -3,6 +3,7 @@ import { getPaisActual } from "@/lib/pais";
 import { registrarGasto, eliminarGasto } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ const etiquetaCategoria = (valor: string) =>
   CATEGORIAS.find((c) => c.valor === valor)?.etiqueta ?? valor;
 
 export default async function GastosPage() {
+  await requireModulo("gastos");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

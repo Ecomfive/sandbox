@@ -4,6 +4,7 @@ import { getPaisActual } from "@/lib/pais";
 import { upsertConciliacion } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ interface Grupo {
 }
 
 export default async function ConciliacionesPage() {
+  await requireModulo("conciliaciones");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

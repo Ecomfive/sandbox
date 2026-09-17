@@ -3,10 +3,12 @@ import { getPaisActual } from "@/lib/pais";
 import { ExtractoUploader } from "./uploader";
 import { AsignarPlataformaSelect } from "./asignar-plataforma";
 import { Badge } from "@/components/ui/badge";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExtractosPage() {
+  await requireModulo("extractos");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

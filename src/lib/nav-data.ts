@@ -41,7 +41,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Configuración",
     items: [
       { label: "Tiendas Shopify", pronto: true },
-      { label: "Usuarios y roles", pronto: true },
+      { label: "Usuarios y roles", href: "/usuarios" },
     ],
   },
 ];
@@ -62,3 +62,8 @@ export const PAISES_NAV: PaisNav[] = [
 
 export const PAIS_COOKIE = "pais_actual";
 export const PAIS_DEFAULT = "CR";
+
+/** Clave de módulo (permisos) correspondiente a un href de navegación. */
+export function moduloDeHref(href: string): string {
+  return href === "/" ? "dashboard" : href.slice(1);
+}

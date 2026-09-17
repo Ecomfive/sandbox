@@ -4,6 +4,7 @@ import { actualizarProducto } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ function margenActual(p: ProductoFila): number | null {
 }
 
 export default async function ProductosPage() {
+  await requireModulo("productos");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

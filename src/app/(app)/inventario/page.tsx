@@ -2,10 +2,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { InventarioUploader } from "./uploader";
 import { Badge } from "@/components/ui/badge";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function InventarioPage() {
+  await requireModulo("inventario");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

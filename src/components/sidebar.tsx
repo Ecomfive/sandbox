@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_SECTIONS } from "@/lib/nav-data";
+import { NAV_SECTIONS, moduloDeHref } from "@/lib/nav-data";
 import { DashboardIcon, ChevronRightIcon, SECTION_ICONS } from "@/lib/nav-icons";
 
 const STORAGE_KEY = "sidebar_expandido";
@@ -18,14 +18,22 @@ function ToggleIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function puedeVer(modulosPermitidos: string[] | null | undefined, href?: string) {
+  if (!href) return true;
+  if (!modulosPermitidos) return true;
+  return modulosPermitidos.includes(moduloDeHref(href));
+}
+
 function SidebarContents({
   expanded,
   onToggle,
   onNavigate,
+  modulosPermitidos,
 }: {
   expanded: boolean;
   onToggle?: () => void;
   onNavigate?: () => void;
+  modulosPermitidos?: string[] | null;
 }) {
   const pathname = usePathname();
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
@@ -50,19 +58,21 @@ function SidebarContents({
         </p>
       )}
 
-      <Link
-        href="/"
-        onClick={onNavigate}
-        title="Dashboard"
-        className={
-          pathname === "/"
-            ? "flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
-            : "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-        }
-      >
-        <DashboardIcon className="h-5 w-5 shrink-0" />
-        {expanded && <span>Dashboard</span>}
-      </Link>
+      {puedeVer(modulosPermitidos, "/") && (
+        <Link
+          href="/"
+          onClick={onNavigate}
+          title="Dashboard"
+          className={
+            pathname === "/"
+              ? "flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
+              : "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+          }
+        >
+          <DashboardIcon className="h-5 w-5 shrink-0" />
+          {expanded && <span>Dashboard</span>}
+        </Link>
+      )}
 
       {expanded && (
         <p className="mt-4 mb-1 px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -71,6 +81,9 @@ function SidebarContents({
       )}
 
       {NAV_SECTIONS.map((section) => {
+        const itemsVisibles = section.items.filter((item) => puedeVer(modulosPermitidos, item.href));
+        if (itemsVisibles.length === 0) return null;
+
         const SectionIcon = SECTION_ICONS[section.title] ?? DashboardIcon;
         const isOpen = expanded && (seccionAbierta ?? NAV_SECTIONS[0].title) === section.title;
 
@@ -96,7 +109,7 @@ function SidebarContents({
             </button>
             {expanded && isOpen && (
               <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-6">
-                {section.items.map((item) => {
+                {itemsVisibles.map((item) => {
                   if (item.pronto || !item.href) {
                     return (
                       <span
@@ -135,7 +148,7 @@ function SidebarContents({
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ modulosPermitidos }: { modulosPermitidos?: string[] | null }) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -168,7 +181,7 @@ export function Sidebar() {
             className={expanded ? "h-5 w-auto" : "h-3 w-auto"}
           />
         </Link>
-        <SidebarContents expanded={expanded} onToggle={toggleExpanded} />
+        <SidebarContents expanded={expanded} onToggle={toggleExpanded} modulosPermitidos={modulosPermitidos} />
       </aside>
 
       {/* Botón hamburguesa — móvil */}
@@ -206,7 +219,11 @@ export function Sidebar() {
                 </svg>
               </button>
             </div>
-            <SidebarContents expanded onNavigate={() => setMobileOpen(false)} />
+            <SidebarContents
+              expanded
+              onNavigate={() => setMobileOpen(false)}
+              modulosPermitidos={modulosPermitidos}
+            />
           </div>
           <button
             aria-label="Cerrar menú"

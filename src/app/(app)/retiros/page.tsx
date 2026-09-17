@@ -4,12 +4,14 @@ import { registrarSaldo, registrarRetiro } from "./actions";
 import { EstadoRetiroSelect } from "@/components/estado-retiro-select";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
 export default async function RetirosPage() {
+  await requireModulo("retiros");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

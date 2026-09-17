@@ -4,6 +4,7 @@ import { getPaisActual } from "@/lib/pais";
 import { getSerieInventario, getSerieFinanzas } from "@/lib/dashboard/queries";
 import { InventarioChart } from "@/components/charts/inventario-chart";
 import { FinanzasChart } from "@/components/charts/finanzas-chart";
+import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ function ProntoCard({ titulo, descripcion }: { titulo: string; descripcion: stri
 }
 
 export default async function Home() {
+  await requireModulo("dashboard");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

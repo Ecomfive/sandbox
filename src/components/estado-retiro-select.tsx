@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { actualizarEstadoRetiro } from "@/app/retiros/actions";
+import { actualizarEstadoRetiro } from "@/app/(app)/retiros/actions";
 import { fieldClassSm } from "@/components/ui/field";
 
 const ESTADOS = ["solicitado", "procesado", "rechazado"] as const;
