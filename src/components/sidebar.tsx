@@ -6,6 +6,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_SECTIONS, moduloDeHref } from "@/lib/nav-data";
 import { DashboardIcon, ChevronRightIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import { ConTooltip } from "@/components/sidebar-tooltip";
+import { AvatarUpload } from "@/components/avatar-upload";
+import { cerrarSesion } from "@/app/login/actions";
+import type { UsuarioActual } from "@/lib/auth";
 
 const STORAGE_KEY = "sidebar_expandido";
 
@@ -14,6 +18,16 @@ function ToggleIcon(props: React.SVGProps<SVGSVGElement>) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} {...props}>
       <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
       <path d="M9.5 4.5v15" />
+    </svg>
+  );
+}
+
+function LogoutIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} {...props}>
+      <path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -41,15 +55,16 @@ function SidebarContents({
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
       {onToggle && (
-        <button
-          type="button"
-          onClick={onToggle}
-          title={expanded ? "Colapsar menú" : "Desplegar el menú"}
-          className="flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <ToggleIcon className="h-5 w-5 shrink-0" />
-          {expanded && <span className="text-sm font-medium">Colapsar menú</span>}
-        </button>
+        <ConTooltip etiqueta={expanded ? "Colapsar menú" : "Desplegar el menú"} mostrar={!expanded}>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ToggleIcon className="h-5 w-5 shrink-0" />
+            {expanded && <span className="text-sm font-medium">Colapsar menú</span>}
+          </button>
+        </ConTooltip>
       )}
 
       {expanded && (
@@ -59,19 +74,20 @@ function SidebarContents({
       )}
 
       {puedeVer(modulosPermitidos, "/") && (
-        <Link
-          href="/"
-          onClick={onNavigate}
-          title="Dashboard"
-          className={
-            pathname === "/"
-              ? "flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
-              : "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-          }
-        >
-          <DashboardIcon className="h-5 w-5 shrink-0" />
-          {expanded && <span>Dashboard</span>}
-        </Link>
+        <ConTooltip etiqueta="Dashboard" mostrar={!expanded}>
+          <Link
+            href="/"
+            onClick={onNavigate}
+            className={
+              pathname === "/"
+                ? "flex w-full items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
+                : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            }
+          >
+            <DashboardIcon className="h-5 w-5 shrink-0" />
+            {expanded && <span>Dashboard</span>}
+          </Link>
+        </ConTooltip>
       )}
 
       {expanded && (
@@ -89,24 +105,25 @@ function SidebarContents({
 
         return (
           <div key={section.title} className={expanded ? "" : "py-0.5"}>
-            <button
-              type="button"
-              title={section.title}
-              onClick={() =>
-                setSeccionAbierta((prev) => (prev === section.title ? null : section.title))
-              }
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-            >
-              <SectionIcon className="h-5 w-5 shrink-0" />
-              {expanded && (
-                <>
-                  <span className="flex-1 text-left">{section.title}</span>
-                  <ChevronRightIcon
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}
-                  />
-                </>
-              )}
-            </button>
+            <ConTooltip etiqueta={section.title} mostrar={!expanded}>
+              <button
+                type="button"
+                onClick={() =>
+                  setSeccionAbierta((prev) => (prev === section.title ? null : section.title))
+                }
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                <SectionIcon className="h-5 w-5 shrink-0" />
+                {expanded && (
+                  <>
+                    <span className="flex-1 text-left">{section.title}</span>
+                    <ChevronRightIcon
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}
+                    />
+                  </>
+                )}
+              </button>
+            </ConTooltip>
             {expanded && isOpen && (
               <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-6">
                 {itemsVisibles.map((item) => {
@@ -148,7 +165,51 @@ function SidebarContents({
   );
 }
 
-export function Sidebar({ modulosPermitidos }: { modulosPermitidos?: string[] | null }) {
+function UsuarioFooter({ usuario, expanded }: { usuario: UsuarioActual; expanded: boolean }) {
+  return (
+    <div
+      className={`flex border-t border-border py-3 ${expanded ? "flex-col gap-2 px-3" : "flex-col items-center gap-3"}`}
+    >
+      <div className={expanded ? "flex items-center gap-2" : ""}>
+        <ConTooltip
+          etiqueta={`${usuario.nombre ?? usuario.email}${usuario.rolNombre ? ` · ${usuario.rolNombre}` : ""}`}
+          mostrar={!expanded}
+        >
+          <AvatarUpload nombre={usuario.nombre} email={usuario.email} avatarUrl={usuario.avatarUrl} />
+        </ConTooltip>
+        {expanded && (
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{usuario.nombre ?? usuario.email}</p>
+            {usuario.rolNombre && <p className="truncate text-xs text-muted-foreground">{usuario.rolNombre}</p>}
+          </div>
+        )}
+      </div>
+      <ConTooltip etiqueta="Cerrar sesión" mostrar={!expanded}>
+        <form action={cerrarSesion} className="w-full">
+          <button
+            type="submit"
+            className={
+              expanded
+                ? "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                : "flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            }
+          >
+            <LogoutIcon className="h-5 w-5 shrink-0" />
+            {expanded && <span>Cerrar sesión</span>}
+          </button>
+        </form>
+      </ConTooltip>
+    </div>
+  );
+}
+
+export function Sidebar({
+  modulosPermitidos,
+  usuario,
+}: {
+  modulosPermitidos?: string[] | null;
+  usuario: UsuarioActual | null;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -168,7 +229,7 @@ export function Sidebar({ modulosPermitidos }: { modulosPermitidos?: string[] | 
     <>
       {/* Riel persistente — escritorio */}
       <aside
-        className={`hidden shrink-0 flex-col border-r border-border bg-card md:flex ${
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-border bg-card md:flex ${
           expanded ? "w-64" : "w-16"
         } transition-[width] duration-150`}
       >
@@ -182,6 +243,7 @@ export function Sidebar({ modulosPermitidos }: { modulosPermitidos?: string[] | 
           />
         </Link>
         <SidebarContents expanded={expanded} onToggle={toggleExpanded} modulosPermitidos={modulosPermitidos} />
+        {usuario && <UsuarioFooter usuario={usuario} expanded={expanded} />}
       </aside>
 
       {/* Botón hamburguesa — móvil */}
@@ -224,6 +286,7 @@ export function Sidebar({ modulosPermitidos }: { modulosPermitidos?: string[] | 
               onNavigate={() => setMobileOpen(false)}
               modulosPermitidos={modulosPermitidos}
             />
+            {usuario && <UsuarioFooter usuario={usuario} expanded />}
           </div>
           <button
             aria-label="Cerrar menú"

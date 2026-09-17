@@ -8,9 +8,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full">
-      <Sidebar modulosPermitidos={usuario?.modulos ?? null} />
+      <Sidebar modulosPermitidos={usuario?.modulos ?? null} usuario={usuario} />
       <div className="flex min-h-full flex-1 flex-col">
-        <NavBar usuario={usuario} />
+        <NavBar />
         {children}
       </div>
     </div>

@@ -5,6 +5,7 @@ export interface UsuarioActual {
   id: string;
   email: string;
   nombre: string | null;
+  avatarUrl: string | null;
   rolId: string | null;
   rolNombre: string | null;
   modulos: string[];
@@ -21,7 +22,7 @@ export async function getUsuarioActual(): Promise<UsuarioActual | null> {
   const supabase = createServiceClient();
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("id, email, nombre, activo, rol_id, roles(id, nombre)")
+    .select("id, email, nombre, avatar_url, activo, rol_id, roles(id, nombre)")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -39,6 +40,7 @@ export async function getUsuarioActual(): Promise<UsuarioActual | null> {
     id: perfil.id,
     email: perfil.email,
     nombre: perfil.nombre,
+    avatarUrl: perfil.avatar_url,
     rolId: rol?.id ?? null,
     rolNombre: rol?.nombre ?? null,
     modulos,
