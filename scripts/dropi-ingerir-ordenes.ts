@@ -139,6 +139,7 @@ async function main() {
       monto: orden.total_order,
       estado: orden.status,
       fecha: orden.created_at.slice(0, 10),
+      fecha_hora: orden.created_at,
     };
   }
   for (const { orden, sku } of conSku) {
