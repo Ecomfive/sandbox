@@ -26,7 +26,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Conciliación", href: "/conciliaciones" },
       { label: "Productos y márgenes", href: "/productos" },
       { label: "Retiros (Wallet)", href: "/retiros" },
-      { label: "Nómina y gastos", pronto: true },
+      { label: "Nómina y gastos", href: "/gastos" },
     ],
   },
   {
