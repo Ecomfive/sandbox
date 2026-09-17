@@ -1,19 +1,19 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { PuntoVentas } from "@/lib/dashboard/queries";
 
-export function VentasChart({ datos }: { datos: PuntoVentas[] }) {
+export function VentasChart({ datos, etiquetaComparacion }: { datos: PuntoVentas[]; etiquetaComparacion: string }) {
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={datos} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={220}>
+      <LineChart data={datos} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="fecha"
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           axisLine={{ stroke: "var(--border)" }}
           tickLine={false}
-          interval={2}
+          interval="preserveStartEnd"
         />
         <YAxis
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
@@ -29,8 +29,25 @@ export function VentasChart({ datos }: { datos: PuntoVentas[] }) {
           }}
           formatter={(value) => Number(value).toFixed(2)}
         />
-        <Bar dataKey="monto" name="Monto" fill="var(--accent)" radius={[3, 3, 0, 0]} />
-      </BarChart>
+        <Legend wrapperStyle={{ fontSize: 12 }} />
+        <Line
+          type="monotone"
+          dataKey="actual"
+          name="Período actual"
+          stroke="var(--accent)"
+          strokeWidth={2}
+          dot={false}
+        />
+        <Line
+          type="monotone"
+          dataKey="comparacion"
+          name={`Comparación (${etiquetaComparacion})`}
+          stroke="var(--muted-foreground)"
+          strokeWidth={1.5}
+          strokeDasharray="4 4"
+          dot={false}
+        />
+      </LineChart>
     </ResponsiveContainer>
   );
 }

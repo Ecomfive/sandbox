@@ -57,3 +57,6 @@ next-env.d.ts
 
 # cache local del CLI de Supabase
 supabase/.temp/
+
+# log de la tarea programada que renueva las sesiones de Dropi
+mantener-sesiones-dropi.log

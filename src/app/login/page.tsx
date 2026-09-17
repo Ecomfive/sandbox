@@ -23,7 +23,7 @@ export default function LoginPage() {
           className="mx-auto h-8 w-auto"
         />
         <h1 className="mt-6 text-center text-lg font-semibold tracking-tight">
-          Gestión de Proveeduría
+          Sistema Gestión de Plataformas
         </h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">
           Inicia sesión con la cuenta que te invitaron.

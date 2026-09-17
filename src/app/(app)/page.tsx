@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { getSerieInventario, getSerieFinanzas, getSerieVentas } from "@/lib/dashboard/queries";
+import { getSerieInventarioComparada, getSerieVentasComparada, getSerieFinanzas } from "@/lib/dashboard/queries";
+import { resolverPeriodo, calcularDelta } from "@/lib/dashboard/periodo";
 import { InventarioChart } from "@/components/charts/inventario-chart";
 import { FinanzasChart } from "@/components/charts/finanzas-chart";
 import { VentasChart } from "@/components/charts/ventas-chart";
+import { PeriodPicker } from "@/components/period-picker";
+import { KpiCard } from "@/components/kpi-card";
+import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -35,45 +39,82 @@ function DepartmentCard({
   );
 }
 
-function ProntoCard({ titulo, descripcion }: { titulo: string; descripcion: string }) {
-  return (
-    <div className="flex flex-col rounded-lg border border-border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-tight text-muted-foreground">{titulo}</h2>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
-      </div>
-      <p className="flex h-[200px] items-center justify-center text-center text-sm text-muted-foreground">
-        {descripcion}
-      </p>
-    </div>
-  );
-}
-
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   await requireModulo("dashboard");
+  const sp = await searchParams;
+  const periodo = resolverPeriodo({
+    preset: typeof sp.preset === "string" ? sp.preset : undefined,
+    desde: typeof sp.desde === "string" ? sp.desde : undefined,
+    hasta: typeof sp.hasta === "string" ? sp.hasta : undefined,
+    comparar: typeof sp.comparar === "string" ? sp.comparar : undefined,
+  });
+
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [serieInventario, serieFinanzas, serieVentas, { data: dropshippers }] = await Promise.all([
-    getSerieInventario(supabase, pais.id),
+  const [inventario, ventas, serieFinanzas, { data: dropshippers }, { data: proveedoresComp }] = await Promise.all([
+    getSerieInventarioComparada(supabase, pais.id, periodo),
+    getSerieVentasComparada(supabase, pais.id, periodo),
     getSerieFinanzas(supabase, pais.id),
-    getSerieVentas(supabase, pais.id),
     supabase.from("dropshippers").select("estado").eq("pais_id", pais.id),
+    supabase.from("proveedores_competencia").select("id").eq("pais_id", pais.id),
   ]);
 
-  const hayInventario = serieInventario.some((p) => p.entradas > 0 || p.salidas > 0);
-  const hayVentas = serieVentas.some((p) => p.ordenes > 0);
-  const totalVentas14d = serieVentas.reduce((acc, p) => acc + p.monto, 0);
+  const hayInventario = inventario.serie.some((p) => p.entradas > 0 || p.salidas > 0);
+  const hayVentas = ventas.serie.some((p) => p.actual > 0);
+
+  const deltaVentas = calcularDelta(ventas.totalActual, ventas.totalComparacion);
+  const deltaSalidas = calcularDelta(inventario.totalSalidas, inventario.totalSalidasComparacion);
+
+  const finanzasActual = serieFinanzas[serieFinanzas.length - 1];
+  const finanzasOk = finanzasActual ? Math.abs(finanzasActual.diferencia) <= 0.01 : null;
 
   const totalDropshippers = dropshippers?.length ?? 0;
   const activosDropshippers = (dropshippers ?? []).filter((d) => d.estado === "activo").length;
+  const totalProveedoresComp = proveedoresComp?.length ?? 0;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <h1 className="text-lg font-semibold tracking-tight">Dashboard operativo</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {pais.nombre} — panorama por departamento
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Dashboard operativo</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {pais.nombre} — {periodo.etiqueta}
+          </p>
+        </div>
+        <PeriodPicker />
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <KpiCard titulo="Ventas Dropi" valor={ventas.totalActual.toFixed(2)} delta={deltaVentas} />
+        <KpiCard titulo="Salidas de inventario" valor={String(inventario.totalSalidas)} delta={deltaSalidas} />
+        <div className="min-w-[10rem] flex-1 rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Conciliación del mes</p>
+          {finanzasActual ? (
+            <>
+              <p className="mt-1 text-xl font-semibold tabular-nums">{finanzasActual.diferencia.toFixed(2)}</p>
+              <Badge tone={finanzasOk ? "success" : "destructive"}>{finanzasOk ? "Cuadrado" : "Diferencia"}</Badge>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">Sin conciliaciones registradas</p>
+          )}
+        </div>
+        <div className="min-w-[10rem] flex-1 rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Dropshippers activos</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {activosDropshippers}
+            <span className="text-sm font-normal text-muted-foreground"> / {totalDropshippers}</span>
+          </p>
+        </div>
+        <div className="min-w-[10rem] flex-1 rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Proveedores rastreados</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">{totalProveedoresComp}</p>
+        </div>
+      </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DepartmentCard
@@ -84,13 +125,13 @@ export default async function Home() {
           ]}
         >
           <p className="mb-2 text-xs text-muted-foreground">
-            Entradas vs. salidas de inventario, últimos 14 días
+            Entradas vs. salidas de inventario — {periodo.etiqueta.toLowerCase()}
           </p>
           {hayInventario ? (
-            <InventarioChart datos={serieInventario} />
+            <InventarioChart datos={inventario.serie} />
           ) : (
-            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-              Aún no hay movimientos de inventario en los últimos 14 días.
+            <p className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+              Aún no hay movimientos de inventario en este período.
             </p>
           )}
         </DepartmentCard>
@@ -100,13 +141,13 @@ export default async function Home() {
           enlaces={[{ href: "/pedidos-dropi", label: "Ver pedidos" }]}
         >
           <p className="mb-2 text-xs text-muted-foreground">
-            Monto vendido por día, últimos 14 días{hayVentas ? ` — total ${totalVentas14d.toFixed(2)}` : ""}
+            Monto vendido por día — {periodo.etiqueta.toLowerCase()}
           </p>
           {hayVentas ? (
-            <VentasChart datos={serieVentas} />
+            <VentasChart datos={ventas.serie} etiquetaComparacion={periodo.etiquetaComparacion} />
           ) : (
-            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-              Aún no hay pedidos de Dropi cargados en los últimos 14 días.
+            <p className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+              Aún no hay pedidos de Dropi cargados en este período.
             </p>
           )}
         </DepartmentCard>
@@ -124,30 +165,43 @@ export default async function Home() {
           {serieFinanzas.length > 0 ? (
             <FinanzasChart datos={serieFinanzas} />
           ) : (
-            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+            <p className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
               Todavía no hay conciliaciones registradas.
             </p>
           )}
         </DepartmentCard>
 
-        <ProntoCard
+        <DepartmentCard
           titulo="Inteligencia competitiva"
-          descripcion="Crecimiento de proveedores y análisis de competencia — próximamente."
-        />
+          enlaces={[{ href: "/inteligencia-competitiva", label: "Ver panel" }]}
+        >
+          <p className="mb-2 text-xs text-muted-foreground">Proveedores competidores rastreados</p>
+          {totalProveedoresComp > 0 ? (
+            <div className="flex h-[220px] flex-col items-center justify-center gap-1">
+              <p className="text-3xl font-semibold tabular-nums">{totalProveedoresComp}</p>
+              <p className="text-sm text-muted-foreground">proveedores en el marketplace de Dropi</p>
+            </div>
+          ) : (
+            <p className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+              Todavía no hay proveedores competidores cargados.
+            </p>
+          )}
+        </DepartmentCard>
+
         <DepartmentCard
           titulo="CRM Dropshippers"
           enlaces={[{ href: "/crm-dropshippers", label: "Ver panel" }]}
         >
           <p className="mb-2 text-xs text-muted-foreground">Directorio de dropshippers</p>
           {totalDropshippers > 0 ? (
-            <div className="flex h-[200px] flex-col items-center justify-center gap-1">
+            <div className="flex h-[220px] flex-col items-center justify-center gap-1">
               <p className="text-3xl font-semibold tabular-nums">{totalDropshippers}</p>
               <p className="text-sm text-muted-foreground">
                 {activosDropshippers} activo{activosDropshippers === 1 ? "" : "s"}
               </p>
             </div>
           ) : (
-            <p className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+            <p className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
               Todavía no hay dropshippers registrados.
             </p>
           )}

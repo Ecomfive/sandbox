@@ -64,7 +64,7 @@ export default function ActualizarClavePage() {
       <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8 shadow-sm">
         <h1 className="text-lg font-semibold tracking-tight">Elige tu contraseña</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Este será tu acceso a la Gestión de Proveeduría de Ecomfive.
+          Este será tu acceso al Sistema Gestión de Plataformas de Ecomfive.
         </p>
 
         {preparando ? (

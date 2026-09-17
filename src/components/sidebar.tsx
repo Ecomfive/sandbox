@@ -54,7 +54,7 @@ function SidebarContents({
 
       {expanded && (
         <p className="mt-1 mb-2 px-3 text-sm font-medium text-foreground">
-          Gestión de Proveeduría
+          Sistema Gestión de Plataformas
         </p>
       )}
 

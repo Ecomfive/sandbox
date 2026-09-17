@@ -8,8 +8,8 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Ecomfive · Gestión de Proveeduría",
-  description: "Control administrativo y financiero de proveeduría — Costa Rica y Panamá",
+  title: "Ecomfive · Sistema Gestión de Plataformas",
+  description: "Gestión operativa, financiera y de inteligencia competitiva de Ecomfive por país y plataforma",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
