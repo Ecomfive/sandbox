@@ -6,6 +6,7 @@ import { generarAlerta, actualizarEstadoAlerta } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
+import { linkClass } from "@/components/ui/link";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function AlertasPage() {
         <h1 className="text-lg font-semibold tracking-tight">Inventario pendiente de retorno</h1>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
           Salidas menos entradas por producto, según lo cargado en{" "}
-          <Link href="/inventario" className="text-accent hover:text-accent-hover">
+          <Link href="/inventario" className={linkClass}>
             Inventario
           </Link>
           . Generar una alerta la deja lista para el reclamo quincenal a la plataforma.

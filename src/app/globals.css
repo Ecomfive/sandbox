@@ -7,10 +7,11 @@
   --muted: #eeeeee;
   --muted-foreground: #6b6b6b;
   --border: #e3e3e3;
-  /* Ecomfive brand red (#e83b3c) darkened for AA text/button contrast. */
-  --accent: #d1302f;
-  --accent-hover: #b0201f;
-  --accent-foreground: #ffffff;
+  /* Interactions/buttons use a neutral light gray, not the Ecomfive brand
+     red — the red is reserved for the logo only (see /brand/ecomfive-rojo.png). */
+  --accent: #e4e4e7;
+  --accent-hover: #d4d4d8;
+  --accent-foreground: #27272a;
   --success: #15803d;
   --success-soft: #dcfce7;
   --warning: #b45309;

@@ -34,7 +34,7 @@ export function VentasChart({ datos, etiquetaComparacion }: { datos: PuntoVentas
           type="monotone"
           dataKey="actual"
           name="Período actual"
-          stroke="var(--accent)"
+          stroke="var(--foreground)"
           strokeWidth={2}
           dot={false}
         />

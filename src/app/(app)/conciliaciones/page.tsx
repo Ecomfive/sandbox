@@ -5,6 +5,7 @@ import { upsertConciliacion } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { requireModulo } from "@/lib/auth";
+import { linkClass } from "@/components/ui/link";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,7 @@ export default async function ConciliacionesPage() {
       {filas.length === 0 && (
         <p className="text-sm text-muted-foreground">
           Todavía no hay depósitos asignados a una plataforma para {pais.nombre}. Ve a{" "}
-          <Link href="/extractos" className="text-accent hover:text-accent-hover">
+          <Link href="/extractos" className={linkClass}>
             Extractos
           </Link>{" "}
           y asigna plataforma a los movimientos.

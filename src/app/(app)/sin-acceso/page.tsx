@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { linkClass } from "@/components/ui/link";
 
 export default function SinAccesoPage() {
   return (
@@ -8,7 +9,7 @@ export default function SinAccesoPage() {
         Tu rol no incluye este módulo. Si crees que deberías verlo, pide a un administrador que
         ajuste tus permisos en Usuarios y roles.
       </p>
-      <Link href="/" className="text-sm text-accent hover:text-accent-hover">
+      <Link href="/" className={`text-sm ${linkClass}`}>
         Volver al dashboard
       </Link>
     </main>

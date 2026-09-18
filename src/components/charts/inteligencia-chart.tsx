@@ -26,7 +26,7 @@ export function InteligenciaChart({ datos, nombreSerie }: { datos: PuntoMensual[
           }}
           formatter={(value) => [Number(value).toLocaleString("es"), nombreSerie]}
         />
-        <Line type="monotone" dataKey="valor" name={nombreSerie} stroke="var(--accent)" strokeWidth={2} dot />
+        <Line type="monotone" dataKey="valor" name={nombreSerie} stroke="var(--foreground)" strokeWidth={2} dot />
       </LineChart>
     </ResponsiveContainer>
   );

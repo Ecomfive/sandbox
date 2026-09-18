@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { linkClass } from "@/components/ui/link";
 
 export interface SeccionDashboard {
   clave: string;
@@ -33,8 +34,8 @@ export function DashboardSecciones({
             onClick={() => setActiva((prev) => (prev === s.clave ? null : s.clave))}
             className={`min-w-[10rem] flex-1 rounded-lg border p-4 text-left transition-colors ${
               activa === s.clave
-                ? "border-accent bg-accent/5 ring-1 ring-accent"
-                : "border-border bg-card hover:border-accent/50"
+                ? "border-foreground bg-accent ring-1 ring-foreground"
+                : "border-border bg-card hover:border-foreground/40"
             }`}
           >
             <p className="text-xs text-muted-foreground">{s.titulo}</p>
@@ -51,7 +52,7 @@ export function DashboardSecciones({
               <h2 className="text-base font-semibold tracking-tight">{seccion.titulo}</h2>
               <div className="flex gap-3">
                 {seccion.enlaces.map((e) => (
-                  <Link key={e.href} href={e.href} className="text-xs text-accent hover:text-accent-hover">
+                  <Link key={e.href} href={e.href} className={`text-xs ${linkClass}`}>
                     {e.label}
                   </Link>
                 ))}

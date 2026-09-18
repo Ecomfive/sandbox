@@ -31,7 +31,7 @@ export function InventarioChart({ datos }: { datos: PuntoInventario[] }) {
         />
         <Legend wrapperStyle={{ fontSize: 12 }} />
         <Line type="monotone" dataKey="entradas" name="Entradas" stroke="var(--success)" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="salidas" name="Salidas" stroke="var(--accent)" strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="salidas" name="Salidas" stroke="var(--foreground)" strokeWidth={2} dot={false} />
       </LineChart>
     </ResponsiveContainer>
   );
