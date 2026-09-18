@@ -5,6 +5,7 @@ import { EstadoRetiroSelect } from "@/components/estado-retiro-select";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -31,7 +32,7 @@ export default async function RetirosPage() {
       .order("fecha", { ascending: false }),
     supabase
       .from("retiros")
-      .select("id, monto, fecha, estado, notas, plataforma_id, plataformas(nombre)")
+      .select("id, monto, fecha, estado, notas, banco, dropi_id, plataforma_id, plataformas(nombre)")
       .eq("pais_id", pais.id)
       .order("fecha", { ascending: false })
       .limit(50),
@@ -58,8 +59,9 @@ export default async function RetirosPage() {
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Retiros y wallet</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — saldo de wallet por plataforma y seguimiento de retiros. Se registra a
-          mano hasta que haya extracción automática confiable.
+          {pais.nombre} — saldo de wallet por plataforma y seguimiento de retiros. El saldo y el
+          historial de retiros de Dropi se traen automáticamente de su panel; el resto se sigue
+          registrando a mano hasta tener una extracción confiable para cada una.
         </p>
       </div>
 
@@ -69,10 +71,16 @@ export default async function RetirosPage() {
           <KpiGrid>
             {(plataformas ?? []).map((p) => {
               const ultimo = ultimoSaldoPorPlataforma.get(p.id);
+              const esAutomatico = p.nombre === "Dropi";
               return (
                 <KpiCard
                   key={p.id}
-                  titulo={p.nombre}
+                  titulo={
+                    <span className="flex items-center gap-1.5">
+                      {p.nombre}
+                      {esAutomatico && <Badge tone="success">Automático</Badge>}
+                    </span>
+                  }
                   valor={ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
                   subtexto={ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
                 />
@@ -183,6 +191,7 @@ export default async function RetirosPage() {
                 <th className="py-2 pr-3 font-medium">Plataforma</th>
                 <th className="py-2 pr-3 font-medium">Monto</th>
                 <th className="py-2 pr-3 font-medium">Estado</th>
+                <th className="py-2 pr-3 font-medium">Banco</th>
                 <th className="py-2 pr-3 font-medium">Notas</th>
               </tr>
             </thead>
@@ -192,11 +201,17 @@ export default async function RetirosPage() {
                 return (
                   <tr key={r.id} className="border-b border-border/60 last:border-0">
                     <td className="py-2 pr-3 pl-4">{formatearFecha(r.fecha)}</td>
-                    <td className="py-2 pr-3 text-muted-foreground">{plataforma?.nombre}</td>
+                    <td className="py-2 pr-3 text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        {plataforma?.nombre}
+                        {r.dropi_id !== null && <Badge tone="success">Dropi</Badge>}
+                      </span>
+                    </td>
                     <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(r.monto), pais.codigo)}</td>
                     <td className="py-2 pr-3">
                       <EstadoRetiroSelect id={r.id} estadoActual={r.estado} />
                     </td>
+                    <td className="py-2 pr-3 text-muted-foreground">{r.banco}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{r.notas}</td>
                   </tr>
                 );

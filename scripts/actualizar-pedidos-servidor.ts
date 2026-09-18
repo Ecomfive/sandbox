@@ -1,6 +1,7 @@
 // Herramienta local con botones (sin terminal) para que Carmen pueda:
-//   1. Iniciar sesión en Dropi (cuando expire), y
-//   2. Actualizar los pedidos de un país eligiendo el rango de fechas,
+//   1. Iniciar sesión en Dropi (cuando expire),
+//   2. Actualizar los pedidos de un país eligiendo el rango de fechas, y
+//   3. Actualizar el saldo de wallet de Dropi de un país,
 // sin tener que escribir comandos. Corre SOLO en esta computadora, porque
 // Dropi bloquea cualquier acceso que no venga de un navegador real ya
 // logueado (por eso todo esto usa Playwright con una ventana visible).
@@ -78,6 +79,19 @@ function paginaPrincipal(): string {
       <label>Hasta</label>
       <input type="date" name="hasta" required />
       <button type="submit">Actualizar pedidos</button>
+    </form>
+  </fieldset>
+
+  <fieldset>
+    <legend>3. Actualizar saldo de wallet</legend>
+    <p class="aviso">Trae el historial de retiros y el saldo actual de wallet directo de Dropi — se ve en Retiros y wallet.</p>
+    <form method="POST" action="/actualizar-saldo">
+      <label>País</label>
+      <select name="pais">
+        <option value="pa">Panamá</option>
+        <option value="cr">Costa Rica</option>
+      </select>
+      <button type="submit">Actualizar saldo de wallet</button>
     </form>
   </fieldset>
 </body>
@@ -163,6 +177,38 @@ const servidor = http.createServer(async (req, res) => {
     if (extraccion.ok) {
       const archivo = `.dropi-downloads/ordenes-${pais}-${desde}_a_${hasta}.json`;
       const ingesta = await ejecutar(["tsx", "scripts/dropi-ingerir-ordenes.ts", pais, archivo]);
+      salida += "\n\n" + ingesta.salida;
+      ok = ingesta.ok;
+    }
+
+    res.end(cerrarPagina(salida, ok));
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/actualizar-saldo") {
+    let cuerpo = "";
+    for await (const chunk of req) cuerpo += chunk;
+    const datos = new URLSearchParams(cuerpo);
+    const pais = datos.get("pais") ?? "";
+
+    if (!paisValido(pais)) {
+      res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("País inválido.");
+      return;
+    }
+
+    const hoy = new Date().toISOString().slice(0, 10);
+
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.write(paginaProcesando(`Actualizando saldo de wallet de ${pais.toUpperCase()}...`));
+
+    const extraccion = await ejecutar(["tsx", "scripts/dropi-extraer-retiros.ts", pais]);
+    let salida = extraccion.salida;
+    let ok = extraccion.ok;
+
+    if (extraccion.ok) {
+      const archivo = `.dropi-downloads/retiros-${pais}-${hoy}.json`;
+      const ingesta = await ejecutar(["tsx", "scripts/dropi-ingerir-retiros.ts", pais, archivo]);
       salida += "\n\n" + ingesta.salida;
       ok = ingesta.ok;
     }
