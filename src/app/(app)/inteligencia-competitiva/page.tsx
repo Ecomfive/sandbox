@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
+import { InteligenciaChart } from "@/components/charts/inteligencia-chart";
+import { agruparProductosTotalesPorMes, agruparProveedoresNuevosPorMes, soloAnio } from "@/lib/inteligencia/agregados";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +44,13 @@ export default async function InteligenciaCompetitivaPage() {
   const totalProveedores = filas.length;
   const totalProductos = filas.reduce((acc, f) => acc + (f.actual ?? 0), 0);
 
+  const anioActual = String(new Date().getFullYear());
+  const proveedoresNuevosPorMes = agruparProveedoresNuevosPorMes(proveedores ?? []);
+  const productosTotalesPorMes = agruparProductosTotalesPorMes(snapshots ?? []);
+  const proveedoresNuevosAnio = soloAnio(proveedoresNuevosPorMes, anioActual);
+  const productosTotalesAnio = soloAnio(productosTotalesPorMes, anioActual);
+  const hayHistorialMensual = productosTotalesPorMes.length > 1;
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
       <div>
@@ -63,10 +73,46 @@ export default async function InteligenciaCompetitivaPage() {
               <p className="mt-1 text-lg font-semibold tabular-nums">{totalProveedores}</p>
             </div>
             <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-              <p className="text-sm font-medium">Productos combinados</p>
+              <p className="text-sm font-medium">Total de productos en la plataforma</p>
               <p className="mt-1 text-lg font-semibold tabular-nums">{totalProductos}</p>
             </div>
           </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm font-medium">Total de productos — {anioActual}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Acumulado al cierre de cada mes, entre los proveedores rastreados.
+              </p>
+              {productosTotalesAnio.length > 0 ? (
+                <div className="mt-2">
+                  <InteligenciaChart datos={productosTotalesAnio} nombreSerie="Productos" />
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-muted-foreground">Sin historial para {anioActual} todavía.</p>
+              )}
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm font-medium">Proveedores nuevos por mes — {anioActual}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Cuándo detectamos por primera vez a cada proveedor en nuestro rastreo.
+              </p>
+              {proveedoresNuevosAnio.length > 0 ? (
+                <div className="mt-2">
+                  <InteligenciaChart datos={proveedoresNuevosAnio} nombreSerie="Proveedores nuevos" />
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-muted-foreground">Sin historial para {anioActual} todavía.</p>
+              )}
+            </div>
+          </div>
+
+          {!hayHistorialMensual && (
+            <p className="text-xs text-muted-foreground">
+              El histórico mensual completo se irá llenando a medida que se repita el rastreo mes a
+              mes (por ahora solo hay una carga registrada).
+            </p>
+          )}
 
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[42rem] border-collapse text-sm">
@@ -81,10 +127,12 @@ export default async function InteligenciaCompetitivaPage() {
               </thead>
               <tbody>
                 {filas.map((f) => (
-                  <tr key={f.id} className="border-b border-border/60 last:border-0">
+                  <tr key={f.id} className="border-b border-border/60 last:border-0 hover:bg-muted/50">
                     <td className="py-2 pr-3 pl-4">
-                      <p className="font-medium">{f.tienda || f.nombre}</p>
-                      {f.tienda && <p className="text-xs text-muted-foreground">{f.nombre}</p>}
+                      <Link href={`/inteligencia-competitiva/${f.id}`} className="hover:underline">
+                        <p className="font-medium">{f.tienda || f.nombre}</p>
+                        {f.tienda && <p className="text-xs text-muted-foreground">{f.nombre}</p>}
+                      </Link>
                     </td>
                     <td className="py-2 pr-3 text-muted-foreground">{f.ciudad ?? "—"}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{f.categorias.join(", ") || "—"}</td>
