@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
+import { formatearFecha, formatearMoneda } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,11 @@ export default async function RetirosPage() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [{ data: plataformas }, { data: saldos }, { data: retiros }] = await Promise.all([
-    supabase.from("plataformas").select("id, nombre").order("nombre"),
+  const [{ data: plataformasPais }, { data: saldos }, { data: retiros }] = await Promise.all([
+    supabase
+      .from("pais_plataformas")
+      .select("plataforma_id, plataformas(id, nombre)")
+      .eq("pais_id", pais.id),
     supabase
       .from("saldos_wallet")
       .select("plataforma_id, monto, fecha, plataformas(nombre)")
@@ -30,6 +34,11 @@ export default async function RetirosPage() {
       .order("fecha", { ascending: false })
       .limit(50),
   ]);
+
+  const plataformas = (plataformasPais ?? [])
+    .map((pp) => pp.plataformas as unknown as { id: string; nombre: string } | null)
+    .filter((p): p is { id: string; nombre: string } => p !== null)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   const ultimoSaldoPorPlataforma = new Map<string, { monto: number; fecha: string; nombre: string }>();
   for (const s of saldos ?? []) {
@@ -62,8 +71,8 @@ export default async function RetirosPage() {
                 <KpiCard
                   key={p.id}
                   titulo={p.nombre}
-                  valor={ultimo ? ultimo.monto.toFixed(2) : "Sin registrar"}
-                  subtexto={ultimo ? `al ${ultimo.fecha}` : undefined}
+                  valor={ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
+                  subtexto={ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
                 />
               );
             })}
@@ -178,9 +187,9 @@ export default async function RetirosPage() {
                 const plataforma = r.plataformas as unknown as { nombre: string } | null;
                 return (
                   <tr key={r.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 pl-4">{r.fecha}</td>
+                    <td className="py-2 pr-3 pl-4">{formatearFecha(r.fecha)}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{plataforma?.nombre}</td>
-                    <td className="py-2 pr-3 tabular-nums">{Number(r.monto).toFixed(2)}</td>
+                    <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(r.monto), pais.codigo)}</td>
                     <td className="py-2 pr-3">
                       <EstadoRetiroSelect id={r.id} estadoActual={r.estado} />
                     </td>

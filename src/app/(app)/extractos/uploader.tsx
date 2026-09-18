@@ -6,10 +6,12 @@ import { parseExtracto, mapearMovimientos, type MapeoColumnas } from "@/lib/extr
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass, labelClassSm } from "@/components/ui/field";
 import { ProgresoCarga } from "@/components/ui/progreso-carga";
+import { formatearFecha, formatearMoneda } from "@/lib/formato";
 
 interface Pais {
   id: string;
   nombre: string;
+  codigo: string;
 }
 
 const ESTADO_INICIAL: ImportarExtractoState = { status: "idle" };
@@ -135,8 +137,8 @@ export function ExtractoUploader({ pais }: { pais: Pais }) {
                 <tbody>
                   {preview.map((m, i) => (
                     <tr key={i} className="border-b border-border/60">
-                      <td className="py-1.5 pr-3">{m.fecha}</td>
-                      <td className="py-1.5 pr-3 tabular-nums">{m.monto.toFixed(2)}</td>
+                      <td className="py-1.5 pr-3">{formatearFecha(m.fecha)}</td>
+                      <td className="py-1.5 pr-3 tabular-nums">{formatearMoneda(m.monto, pais.codigo)}</td>
                       <td className="py-1.5 pr-3">{m.tipo}</td>
                       <td className="py-1.5 pr-3 text-muted-foreground">{m.descripcion}</td>
                     </tr>

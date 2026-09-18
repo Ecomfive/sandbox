@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
+import { formatearFecha, formatearMoneda } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +62,13 @@ export default async function GastosPage() {
         ) : (
           <div className="mt-3">
             <KpiGrid>
-              <KpiCard titulo="Total del mes" valor={totalMes.toFixed(2)} />
+              <KpiCard titulo="Total del mes" valor={formatearMoneda(totalMes, pais.codigo)} />
               {CATEGORIAS.filter((c) => totalesPorCategoria.has(c.valor)).map((c) => (
-                <KpiCard key={c.valor} titulo={c.etiqueta} valor={(totalesPorCategoria.get(c.valor) ?? 0).toFixed(2)} />
+                <KpiCard
+                  key={c.valor}
+                  titulo={c.etiqueta}
+                  valor={formatearMoneda(totalesPorCategoria.get(c.valor) ?? 0, pais.codigo)}
+                />
               ))}
             </KpiGrid>
           </div>
@@ -126,10 +131,10 @@ export default async function GastosPage() {
             <tbody>
               {(gastos ?? []).map((g) => (
                 <tr key={g.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4">{g.fecha}</td>
+                  <td className="py-2 pr-3 pl-4">{formatearFecha(g.fecha)}</td>
                   <td className="py-2 pr-3 text-muted-foreground">{etiquetaCategoria(g.categoria)}</td>
                   <td className="py-2 pr-3">{g.descripcion}</td>
-                  <td className="py-2 pr-3 tabular-nums">{Number(g.monto).toFixed(2)}</td>
+                  <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(g.monto), pais.codigo)}</td>
                   <td className="py-2 pr-3">
                     <form action={eliminarGasto}>
                       <input type="hidden" name="id" value={g.id} />

@@ -7,6 +7,7 @@ import { mapearMovimientosInventario, type MapeoColumnasInventario } from "@/lib
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass, labelClassSm } from "@/components/ui/field";
 import { ProgresoCarga } from "@/components/ui/progreso-carga";
+import { formatearFecha } from "@/lib/formato";
 
 interface Pais {
   id: string;
@@ -166,7 +167,7 @@ export function InventarioUploader({ pais }: { pais: Pais }) {
                       <td className="py-1.5 pr-3">{m.sku}</td>
                       <td className="py-1.5 pr-3 tabular-nums">{m.cantidad}</td>
                       <td className="py-1.5 pr-3">{m.tipo}</td>
-                      <td className="py-1.5 pr-3 text-muted-foreground">{m.fecha ?? "(hoy)"}</td>
+                      <td className="py-1.5 pr-3 text-muted-foreground">{m.fecha ? formatearFecha(m.fecha) : "(hoy)"}</td>
                     </tr>
                   ))}
                 </tbody>

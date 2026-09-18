@@ -7,17 +7,9 @@ import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { toneEstadoPedido } from "@/lib/estados-pedido";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
-
-/** "2026-09-17T12:25:05" -> "17/09 12:25", sin pasar por Date (evita corrimientos de zona horaria). */
-function formatoHora(fechaHora: string | null): string {
-  if (!fechaHora) return "—";
-  const [fecha, hora] = fechaHora.split("T");
-  if (!fecha || !hora) return fechaHora;
-  const [, mes, dia] = fecha.split("-");
-  return `${dia}/${mes} ${hora.slice(0, 5)}`;
-}
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 const haceNDias = (n: number) => {
@@ -142,7 +134,7 @@ export default async function PedidosDropiPage({
         <>
           <KpiGrid>
             <KpiCard titulo="Órdenes en el rango" valor={totalOrdenes} />
-            <KpiCard titulo="Monto total" valor={totalMonto.toFixed(2)} />
+            <KpiCard titulo="Monto total" valor={formatearMoneda(totalMonto, pais.codigo)} />
             <KpiCard
               titulo="Alertas: liquidado sin marcar entregado"
               valor={totalAlertas}
@@ -187,9 +179,9 @@ export default async function PedidosDropiPage({
                         alerta ? "border-red-200 bg-red-50 text-red-900" : "border-border/60"
                       }`}
                     >
-                      <td className="py-2 pr-3 pl-4">{o.fecha}</td>
+                      <td className="py-2 pr-3 pl-4">{formatearFecha(o.fecha)}</td>
                       <td className={`py-2 pr-3 ${alerta ? "text-red-700" : "text-muted-foreground"}`}>
-                        {formatoHora(o.fecha_hora)}
+                        {formatearFechaHora(o.fecha_hora)}
                       </td>
                       <td className="py-2 pr-3 font-medium">
                         {alerta && (
@@ -201,7 +193,7 @@ export default async function PedidosDropiPage({
                         {producto?.nombre ?? "—"}
                       </td>
                       <td className="py-2 pr-3 tabular-nums">{o.cantidad}</td>
-                      <td className="py-2 pr-3 tabular-nums">{Number(o.monto).toFixed(2)}</td>
+                      <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(o.monto), pais.codigo)}</td>
                       <td className="py-2 pr-3">
                         <Badge tone={toneEstadoPedido(o.estado)}>{o.estado}</Badge>
                       </td>

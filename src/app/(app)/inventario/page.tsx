@@ -3,6 +3,7 @@ import { getPaisActual } from "@/lib/pais";
 import { InventarioUploader } from "./uploader";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
+import { formatearFecha } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export default async function InventarioPage() {
                 const producto = m.productos as unknown as { sku: string; nombre: string } | null;
                 return (
                   <tr key={m.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 pl-4">{m.fecha}</td>
+                    <td className="py-2 pr-3 pl-4">{formatearFecha(m.fecha)}</td>
                     <td className="py-2 pr-3 font-medium">{producto?.sku}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{producto?.nombre}</td>
                     <td className="py-2 pr-3">

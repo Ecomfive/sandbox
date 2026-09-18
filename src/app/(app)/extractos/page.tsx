@@ -4,6 +4,7 @@ import { ExtractoUploader } from "./uploader";
 import { AsignarPlataformaSelect } from "./asignar-plataforma";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
+import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function ExtractosPage() {
           {(extractos ?? []).map((extracto) => (
             <div key={extracto.id} className="rounded-lg border border-border bg-card p-4">
               <p className="mb-3 text-sm font-medium">
-                {new Date(extracto.fecha_carga).toLocaleString()}
+                {formatearFechaHoraCompleta(extracto.fecha_carga, pais.codigo)}
               </p>
               <div className="min-w-0 overflow-x-auto">
                 <table className="w-full min-w-[36rem] border-collapse text-sm">
@@ -64,9 +65,9 @@ export default async function ExtractosPage() {
                         plataforma_id: string | null;
                       }) => (
                         <tr key={m.id} className="border-b border-border/60">
-                          <td className="py-1.5 pr-3">{m.fecha}</td>
+                          <td className="py-1.5 pr-3">{formatearFecha(m.fecha)}</td>
                           <td className="py-1.5 pr-3 tabular-nums">
-                            {Number(m.monto).toFixed(2)}
+                            {formatearMoneda(Number(m.monto), pais.codigo)}
                           </td>
                           <td className="py-1.5 pr-3">
                             <Badge tone={m.tipo === "deposito" ? "success" : "neutral"}>

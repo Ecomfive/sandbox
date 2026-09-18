@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { fechaHaceMeses, snapshotMasCercano } from "@/lib/inteligencia/agregados";
+import { formatearFecha } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function DetalleProveedorCompetenciaPage({
           {proveedor.ciudad ?? "Ciudad desconocida"} · {proveedor.categorias.join(", ") || "Sin categorías"}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Detectado por primera vez el {proveedor.primera_vez_visto}.
+          Detectado por primera vez el {formatearFecha(proveedor.primera_vez_visto)}.
         </p>
       </div>
 
@@ -63,7 +64,7 @@ export default async function DetalleProveedorCompetenciaPage({
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-sm font-medium">Productos actuales</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{actual.productos_count}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Última carga: {actual.fecha}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Última carga: {formatearFecha(actual.fecha)}</p>
           </div>
 
           <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
@@ -84,7 +85,7 @@ export default async function DetalleProveedorCompetenciaPage({
                     <tr key={etiqueta} className="border-b border-border/60 last:border-0">
                       <td className="py-2 pr-3 pl-4 font-medium">{etiqueta}</td>
                       <td className="py-2 pr-3 tabular-nums text-muted-foreground">
-                        {pasado ? `${pasado.productos_count} (${pasado.fecha})` : "Sin dato"}
+                        {pasado ? `${pasado.productos_count} (${formatearFecha(pasado.fecha)})` : "Sin dato"}
                       </td>
                       <td className="py-2 pr-3">
                         {cambio === null ? (
@@ -120,7 +121,7 @@ export default async function DetalleProveedorCompetenciaPage({
               <tbody>
                 {snapshots.map((s) => (
                   <tr key={s.fecha} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 pl-4">{s.fecha}</td>
+                    <td className="py-2 pr-3 pl-4">{formatearFecha(s.fecha)}</td>
                     <td className="py-2 pr-3 tabular-nums">{s.productos_count}</td>
                   </tr>
                 ))}

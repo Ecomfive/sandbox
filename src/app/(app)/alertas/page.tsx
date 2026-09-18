@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
+import { formatearFecha } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -101,8 +102,8 @@ export default async function AlertasPage() {
                     <td className="py-2 pr-3 pl-4 font-medium">{producto?.sku}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{producto?.nombre}</td>
                     <td className="py-2 pr-3 tabular-nums">{a.cantidad}</td>
-                    <td className="py-2 pr-3">{a.fecha_deteccion}</td>
-                    <td className="py-2 pr-3">{a.fecha_reclamo ?? "—"}</td>
+                    <td className="py-2 pr-3">{formatearFecha(a.fecha_deteccion)}</td>
+                    <td className="py-2 pr-3">{a.fecha_reclamo ? formatearFecha(a.fecha_reclamo) : "—"}</td>
                     <td className="py-2 pr-3">
                       <Badge tone={ESTADO_TONO[a.estado as keyof typeof ESTADO_TONO]}>
                         {a.estado}

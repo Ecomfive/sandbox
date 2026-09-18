@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
+import { formatearMes, formatearMoneda } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -98,11 +99,11 @@ export default async function ConciliacionesPage() {
               </div>
               <div>
                 <p className={labelClassSm}>Período</p>
-                <p className="text-sm font-medium">{f.periodo.slice(0, 7)}</p>
+                <p className="text-sm font-medium">{formatearMes(f.periodo)}</p>
               </div>
               <div>
                 <p className={labelClassSm}>Monto bancario</p>
-                <p className="text-sm font-medium tabular-nums">{f.monto_bancario.toFixed(2)}</p>
+                <p className="text-sm font-medium tabular-nums">{formatearMoneda(f.monto_bancario, pais.codigo)}</p>
               </div>
               <div className="flex flex-col gap-1">
                 <label className={labelClassSm}>Monto reportado por plataforma</label>
@@ -122,7 +123,7 @@ export default async function ConciliacionesPage() {
                     existente && Math.abs(diferencia) > 0.01 ? "text-destructive" : "text-success"
                   }`}
                 >
-                  {existente ? diferencia.toFixed(2) : "—"}
+                  {existente ? formatearMoneda(diferencia, pais.codigo) : "—"}
                 </p>
               </div>
               <div className="flex min-w-[10rem] flex-1 flex-col gap-1">

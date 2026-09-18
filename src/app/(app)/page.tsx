@@ -9,6 +9,10 @@ import { PeriodPicker } from "@/components/period-picker";
 import { DashboardSecciones, type SeccionDashboard } from "@/components/dashboard-secciones";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
+import { formatearMoneda } from "@/lib/formato";
+import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +45,15 @@ export default async function Home({
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [inventario, ventas, serieFinanzas, { data: dropshippers }, { data: proveedoresComp }] = await Promise.all([
-    getSerieInventarioComparada(supabase, pais.id, periodo),
-    getSerieVentasComparada(supabase, pais.id, periodo),
-    getSerieFinanzas(supabase, pais.id),
-    supabase.from("dropshippers").select("estado").eq("pais_id", pais.id),
-    supabase.from("proveedores_competencia").select("id").eq("pais_id", pais.id),
-  ]);
+  const [inventario, ventas, serieFinanzas, { data: dropshippers }, { data: proveedoresComp }, pendientesHoy] =
+    await Promise.all([
+      getSerieInventarioComparada(supabase, pais.id, periodo),
+      getSerieVentasComparada(supabase, pais.id, periodo),
+      getSerieFinanzas(supabase, pais.id),
+      supabase.from("dropshippers").select("estado").eq("pais_id", pais.id),
+      supabase.from("proveedores_competencia").select("id").eq("pais_id", pais.id),
+      obtenerPendientesHoy(supabase, pais.id),
+    ]);
 
   const hayInventario = inventario.serie.some((p) => p.entradas > 0 || p.salidas > 0);
   const hayVentas = ventas.serie.some((p) => p.actual > 0);
@@ -66,7 +72,7 @@ export default async function Home({
     {
       clave: "ventas",
       titulo: "Ventas Dropi",
-      valor: ventas.totalActual.toFixed(2),
+      valor: formatearMoneda(ventas.totalActual, pais.codigo),
       badge: <BadgeDelta delta={deltaVentas} />,
       enlaces: [{ href: "/pedidos-dropi", label: "Ver pedidos" }],
       contenido: (
@@ -111,7 +117,7 @@ export default async function Home({
     {
       clave: "finanzas",
       titulo: "Conciliación del mes",
-      valor: finanzasActual ? finanzasActual.diferencia.toFixed(2) : "—",
+      valor: finanzasActual ? formatearMoneda(finanzasActual.diferencia, pais.codigo) : "—",
       badge: finanzasActual ? (
         <Badge tone={finanzasOk ? "success" : "destructive"}>{finanzasOk ? "Cuadrado" : "Diferencia"}</Badge>
       ) : (
@@ -194,7 +200,48 @@ export default async function Home({
         <PeriodPicker />
       </div>
 
-      <DashboardSecciones secciones={secciones} seccionInicial="ventas" />
+      {(pendientesHoy.alertasInventario > 0 ||
+        pendientesHoy.saldosSinRegistrar > 0 ||
+        pendientesHoy.pedidosConNovedad > 0) && (
+        <div className="mt-6">
+          <h2 className="mb-2 text-sm font-semibold tracking-tight text-muted-foreground uppercase">
+            Pendientes de hoy
+          </h2>
+          <KpiGrid>
+            {pendientesHoy.alertasInventario > 0 && (
+              <Link href="/alertas">
+                <KpiCard
+                  titulo="Alertas de inventario abiertas"
+                  valor={pendientesHoy.alertasInventario}
+                  tono="destructive"
+                />
+              </Link>
+            )}
+            {pendientesHoy.pedidosConNovedad > 0 && (
+              <Link href="/pedidos-dropi">
+                <KpiCard
+                  titulo="Pedidos Dropi en Novedad"
+                  valor={pendientesHoy.pedidosConNovedad}
+                  tono="destructive"
+                />
+              </Link>
+            )}
+            {pendientesHoy.saldosSinRegistrar > 0 && (
+              <Link href="/retiros">
+                <KpiCard
+                  titulo="Saldos de wallet sin registrar"
+                  valor={pendientesHoy.saldosSinRegistrar}
+                  tono="destructive"
+                />
+              </Link>
+            )}
+          </KpiGrid>
+        </div>
+      )}
+
+      <div className="mt-6">
+        <DashboardSecciones secciones={secciones} seccionInicial="ventas" />
+      </div>
     </main>
   );
 }

@@ -5,6 +5,7 @@ import { crearDropshipper, actualizarDropshipper, registrarInteraccion } from ".
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fieldClass, fieldClassSm, labelClass, labelClassSm } from "@/components/ui/field";
+import { formatearFecha } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
 
@@ -201,7 +202,7 @@ export default async function CrmDropshippersPage() {
                 const dropshipper = i.dropshippers as unknown as { nombre: string } | null;
                 return (
                   <tr key={i.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 pl-4">{i.fecha}</td>
+                    <td className="py-2 pr-3 pl-4">{formatearFecha(i.fecha)}</td>
                     <td className="py-2 pr-3 font-medium">{dropshipper?.nombre}</td>
                     <td className="py-2 pr-3">
                       <Badge tone="neutral">
