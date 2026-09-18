@@ -7,8 +7,7 @@ import { usePathname } from "next/navigation";
 import { NAV_SECTIONS, moduloDeHref, encontrarSeccionActiva, type NavSectionAnidada } from "@/lib/nav-data";
 import { DashboardIcon, ChevronRightIcon, SECTION_ICONS } from "@/lib/nav-icons";
 import { ConTooltip } from "@/components/sidebar-tooltip";
-import { AvatarUpload } from "@/components/avatar-upload";
-import { cerrarSesion } from "@/app/login/actions";
+import { CuentaMenu } from "@/components/cuenta-menu";
 import type { UsuarioActual } from "@/lib/auth";
 
 const STORAGE_KEY = "sidebar_expandido";
@@ -18,16 +17,6 @@ function ToggleIcon(props: React.SVGProps<SVGSVGElement>) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} {...props}>
       <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
       <path d="M9.5 4.5v15" />
-    </svg>
-  );
-}
-
-function LogoutIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} {...props}>
-      <path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -258,44 +247,6 @@ function SidebarContents({
   );
 }
 
-function UsuarioFooter({ usuario, expanded }: { usuario: UsuarioActual; expanded: boolean }) {
-  return (
-    <div
-      className={`flex border-t border-border py-3 ${expanded ? "flex-col gap-2 px-3" : "flex-col items-center gap-3"}`}
-    >
-      <div className={expanded ? "flex items-center gap-2" : ""}>
-        <ConTooltip
-          etiqueta={`${usuario.nombre ?? usuario.email}${usuario.rolNombre ? ` · ${usuario.rolNombre}` : ""}`}
-          mostrar={!expanded}
-        >
-          <AvatarUpload nombre={usuario.nombre} email={usuario.email} avatarUrl={usuario.avatarUrl} />
-        </ConTooltip>
-        {expanded && (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">{usuario.nombre ?? usuario.email}</p>
-            {usuario.rolNombre && <p className="truncate text-xs text-muted-foreground">{usuario.rolNombre}</p>}
-          </div>
-        )}
-      </div>
-      <ConTooltip etiqueta="Cerrar sesión" mostrar={!expanded}>
-        <form action={cerrarSesion} className="w-full">
-          <button
-            type="submit"
-            className={
-              expanded
-                ? "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                : "flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            }
-          >
-            <LogoutIcon className="h-5 w-5 shrink-0" />
-            {expanded && <span>Cerrar sesión</span>}
-          </button>
-        </form>
-      </ConTooltip>
-    </div>
-  );
-}
-
 export function Sidebar({
   modulosPermitidos,
   usuario,
@@ -343,7 +294,7 @@ export function Sidebar({
           modulosPermitidos={modulosPermitidos}
           seccionesPlataforma={seccionesPlataforma}
         />
-        {usuario && <UsuarioFooter usuario={usuario} expanded={expanded} />}
+        {usuario && <CuentaMenu usuario={usuario} expanded={expanded} />}
       </aside>
 
       {/* Botón hamburguesa — móvil */}
@@ -387,7 +338,7 @@ export function Sidebar({
               modulosPermitidos={modulosPermitidos}
               seccionesPlataforma={seccionesPlataforma}
             />
-            {usuario && <UsuarioFooter usuario={usuario} expanded />}
+            {usuario && <CuentaMenu usuario={usuario} expanded />}
           </div>
           <button
             aria-label="Cerrar menú"

@@ -2,22 +2,19 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { toneEstadoPedido } from "@/lib/estados-pedido";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { FiltroFechas } from "@/components/filtro-fechas";
+import { OrdenSelect } from "./orden-select";
+import { resolverPeriodo } from "@/lib/dashboard/periodo";
+import { linkClass } from "@/components/ui/link";
+import { AyudaContextual } from "@/components/ui/ayuda-contextual";
+import { PedidoIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
-
-const hoy = () => new Date().toISOString().slice(0, 10);
-const haceNDias = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-};
 
 const OPCIONES_ORDEN = {
   fecha_desc: { columna: "fecha", ascending: false },
@@ -33,8 +30,11 @@ export default async function PedidosDropiPage({
 }) {
   await requireModulo("pedidos-dropi");
   const sp = await searchParams;
-  const desde = typeof sp.desde === "string" && sp.desde ? sp.desde : haceNDias(6);
-  const hasta = typeof sp.hasta === "string" && sp.hasta ? sp.hasta : hoy();
+  const { desde, hasta } = resolverPeriodo({
+    preset: typeof sp.preset === "string" ? sp.preset : undefined,
+    desde: typeof sp.desde === "string" ? sp.desde : undefined,
+    hasta: typeof sp.hasta === "string" ? sp.hasta : undefined,
+  });
   const ordenClave = typeof sp.orden === "string" && sp.orden in OPCIONES_ORDEN ? sp.orden : "fecha_desc";
   const orden = OPCIONES_ORDEN[ordenClave as keyof typeof OPCIONES_ORDEN];
 
@@ -94,38 +94,27 @@ export default async function PedidosDropiPage({
   return (
     <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-8 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Pedidos Dropi</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <PedidoIcon className="h-5 w-5 text-muted-foreground" />
+          Pedidos Dropi
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {pais.nombre} — órdenes reales extraídas del panel de proveedor de Dropi.
         </p>
       </div>
 
-      <form method="get" className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
-        <div className="flex flex-col gap-1">
-          <label className={labelClassSm}>Desde</label>
-          <input type="date" name="desde" defaultValue={desde} className={fieldClass} />
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <FiltroFechas />
+          <OrdenSelect actual={ordenClave} />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClassSm}>Hasta</label>
-          <input type="date" name="hasta" defaultValue={hasta} className={fieldClass} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClassSm}>Ordenar por</label>
-          <select name="orden" defaultValue={ordenClave} className={fieldClass}>
-            <option value="fecha_desc">Fecha (recientes primero)</option>
-            <option value="fecha_asc">Fecha (antiguos primero)</option>
-            <option value="monto_asc">Monto (menor a mayor)</option>
-            <option value="monto_desc">Monto (mayor a menor)</option>
-          </select>
-        </div>
-        <Button type="submit">Filtrar</Button>
         <a
           href={`/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}`}
-          className="ml-auto text-sm font-medium text-foreground underline underline-offset-2 hover:text-muted-foreground"
+          className={`${linkClass} ml-auto`}
         >
           Descargar CSV ({totalOrdenes.toLocaleString("es")} órdenes)
         </a>
-      </form>
+      </div>
 
       {totalOrdenes === 0 ? (
         <EstadoVacio mensaje={`No hay órdenes de Dropi para ${pais.nombre} entre ${desde} y ${hasta}.`} />
@@ -135,7 +124,12 @@ export default async function PedidosDropiPage({
             <KpiCard titulo="Órdenes en el rango" valor={totalOrdenes} />
             <KpiCard titulo="Monto total" valor={formatearMoneda(totalMonto, pais.codigo)} />
             <KpiCard
-              titulo="Alertas: liquidado sin marcar entregado"
+              titulo={
+                <>
+                  Alertas: liquidado sin marcar entregado
+                  <AyudaContextual texto="Dropi ya registró la ganancia de este pedido en la cartera, pero el pedido todavía no aparece como ENTREGADO — normalmente significa que hay que actualizar su estado a mano en Dropi." />
+                </>
+              }
               valor={totalAlertas}
               tono={totalAlertas > 0 ? "destructive" : "neutral"}
             />

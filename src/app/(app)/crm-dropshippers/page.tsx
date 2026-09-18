@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { fieldClass, fieldClassSm, labelClass, labelClassSm } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { DropshipperIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,10 @@ export default async function CrmDropshippersPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">CRM Dropshippers</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <DropshipperIcon className="h-5 w-5 text-muted-foreground" />
+          CRM Dropshippers
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {pais.nombre} — directorio y bitácora de comunicación con dropshippers. El volumen de
           ventas se ingresa a mano hasta conectar las órdenes de Dropi.

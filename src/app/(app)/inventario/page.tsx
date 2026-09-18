@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { InventarioIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,8 @@ export default async function InventarioPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <InventarioIcon className="h-5 w-5 text-muted-foreground" />
           Cargar movimientos de inventario (pistoleo)
         </h1>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">

@@ -7,6 +7,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { crearSkuSimple, crearCombo, cambiarEstadoSku } from "./actions";
 import { ComboBuilder } from "./combo-builder";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { CatalogoIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,10 @@ export default async function CatalogoMaestroPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Catálogo maestro de SKU</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <CatalogoIcon className="h-5 w-5 text-muted-foreground" />
+          Catálogo maestro de SKU
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Un SKU maestro representa un producto físico, sin importar en qué plataforma se venda.
           Los combos se arman con varios SKU maestros simples y una cantidad de cada uno. Todo pasa

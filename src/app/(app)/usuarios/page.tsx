@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { MODULOS } from "@/lib/modulos";
@@ -10,6 +11,8 @@ import { crearRol } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { RecursosHumanosIcon } from "@/lib/nav-icons";
+import { linkClass } from "@/components/ui/link";
 
 export const dynamic = "force-dynamic";
 
@@ -54,11 +57,19 @@ export default async function UsuariosPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Usuarios y roles</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Invita personas al sistema y define qué módulos puede ver cada rol.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <RecursosHumanosIcon className="h-5 w-5 text-muted-foreground" />
+            Usuarios y roles
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Invita personas al sistema y define qué módulos puede ver cada rol.
+          </p>
+        </div>
+        <Link href="/usuarios/auditoria" className={linkClass}>
+          Historial de auditoría
+        </Link>
       </div>
 
       <div>

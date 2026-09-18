@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { AlertaIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,10 @@ export default async function AlertasPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Inventario pendiente de retorno</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <AlertaIcon className="h-5 w-5 text-muted-foreground" />
+          Inventario pendiente de retorno
+        </h1>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
           Salidas menos entradas por producto, según lo cargado en{" "}
           <Link href="/inventario" className={linkClass}>

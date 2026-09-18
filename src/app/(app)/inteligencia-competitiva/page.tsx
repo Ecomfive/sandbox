@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { InteligenciaChart } from "@/components/charts/inteligencia-chart";
 import { agruparProductosTotalesPorMes, agruparProveedoresNuevosPorMes, soloAnio } from "@/lib/inteligencia/agregados";
+import { InteligenciaIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,10 @@ export default async function InteligenciaCompetitivaPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Inteligencia competitiva</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <InteligenciaIcon className="h-5 w-5 text-muted-foreground" />
+          Inteligencia competitiva
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {pais.nombre} — proveedores competidores vistos desde la cuenta dropshipper de Dropi. El
           crecimiento se calcula comparando la última carga contra la anterior.

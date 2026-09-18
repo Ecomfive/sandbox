@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
@@ -21,6 +22,13 @@ export async function registrarSaldo(formData: FormData) {
     .from("saldos_wallet")
     .upsert({ pais_id, plataforma_id, monto, fecha }, { onConflict: "pais_id,plataforma_id,fecha" });
   if (error) throw new Error(error.message);
+
+  await registrarAuditoria({
+    accion: "registrar_saldo",
+    entidad: "saldos_wallet",
+    detalle: `plataforma=${plataforma_id} monto=${monto.toFixed(2)} fecha=${fecha}`,
+  });
+
   revalidatePath("/retiros");
 }
 
@@ -42,6 +50,13 @@ export async function crearRetiro(formData: FormData) {
   if (error) throw new Error(error.message);
 
   await registrarEvento(supabase, data.id, `Retiro creado por ${monto.toFixed(2)}`);
+  await registrarAuditoria({
+    accion: "crear_retiro",
+    entidad: "retiros",
+    entidadId: data.id,
+    detalle: `monto=${monto.toFixed(2)} comision=${comision.toFixed(2)}`,
+  });
+
   revalidatePath("/retiros");
   redirect(`/retiros/${data.id}`);
 }
@@ -95,6 +110,12 @@ export async function cerrarRetiro(formData: FormData) {
       ? `Novedad: se esperaban ${Number(retiro.monto_neto).toFixed(2)} y llegaron ${montoRecibido.toFixed(2)} (diferencia de ${diferencia.toFixed(2)})`
       : `Retiro cerrado: monto recibido ${montoRecibido.toFixed(2)}`
   );
+  await registrarAuditoria({
+    accion: conDiscrepancia ? "cerrar_retiro_con_novedad" : "cerrar_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    detalle: `monto_recibido=${montoRecibido.toFixed(2)} diferencia=${diferencia.toFixed(2)}`,
+  });
 
   revalidatePath("/retiros");
   revalidatePath(`/retiros/${id}`);
@@ -110,6 +131,7 @@ export async function cancelarRetiro(formData: FormData) {
   if (error) throw new Error(error.message);
 
   await registrarEvento(supabase, id, "Retiro cancelado");
+  await registrarAuditoria({ accion: "cancelar_retiro", entidad: "retiros", entidadId: id });
 
   revalidatePath("/retiros");
   revalidatePath(`/retiros/${id}`);

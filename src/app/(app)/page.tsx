@@ -13,6 +13,7 @@ import { formatearMoneda } from "@/lib/formato";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { DashboardIcon } from "@/lib/nav-icons";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -193,7 +194,10 @@ export default async function Home({
     <main className="mx-auto w-full max-w-[1600px] px-8 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">Dashboard operativo</h1>
+          <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <DashboardIcon className="h-5 w-5 text-muted-foreground" />
+            Dashboard operativo
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {pais.nombre} — {periodo.etiqueta}
           </p>

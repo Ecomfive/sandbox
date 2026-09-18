@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export async function actualizarProducto(formData: FormData) {
   const id = formData.get("id") as string;
@@ -23,6 +24,14 @@ export async function actualizarProducto(formData: FormData) {
   if (error) {
     throw new Error(error.message);
   }
+
+  await registrarAuditoria({
+    accion: "actualizar_margen",
+    entidad: "productos",
+    entidadId: id,
+    detalle: `costo=${costoRaw || "—"} precio=${precioRaw || "—"} margen_minimo=${margenMinimoRaw}%`,
+  });
+
   revalidatePath("/productos");
 }
 
@@ -38,5 +47,12 @@ export async function actualizarMargenMasivo(ids: string[], margenMinimo: number
   if (error) {
     throw new Error(error.message);
   }
+
+  await registrarAuditoria({
+    accion: "actualizar_margen_masivo",
+    entidad: "productos",
+    detalle: `${ids.length} producto(s) -> margen_minimo=${margenMinimo}%`,
+  });
+
   revalidatePath("/productos");
 }

@@ -8,6 +8,7 @@ import { requireModulo } from "@/lib/auth";
 import { margenActual, type ProductoFila } from "@/lib/margen";
 import { TablaProductos } from "./tabla-productos";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { ProductoIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,10 @@ export default async function ProductosPage({
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <h1 className="text-lg font-semibold tracking-tight">Productos y márgenes</h1>
+      <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <ProductoIcon className="h-5 w-5 text-muted-foreground" />
+        Productos y márgenes
+      </h1>
       <p className="mt-1 mb-2 text-sm text-muted-foreground">
         {pais.nombre} — costo, precio de venta y margen mínimo por producto.
       </p>

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang="es" className={`${manrope.variable} h-full antialiased`}>
       <body className="min-h-full bg-background text-foreground">{children}</body>
     </html>
   );

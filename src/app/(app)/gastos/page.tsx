@@ -8,6 +8,7 @@ import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
+import { GastoIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,10 @@ export default async function GastosPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Nómina y gastos</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <GastoIcon className="h-5 w-5 text-muted-foreground" />
+          Nómina y gastos
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {pais.nombre} — registro de gastos operativos, incluida la nómina.
         </p>

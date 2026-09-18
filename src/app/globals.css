@@ -38,7 +38,7 @@
   --color-warning-soft: var(--warning-soft);
   --color-destructive: var(--destructive);
   --color-destructive-soft: var(--destructive-soft);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-manrope);
 }
 
 /* Interface is light-only by decision — do not add a dark media query back
@@ -56,4 +56,25 @@ body {
 ::selection {
   background: var(--accent);
   color: var(--accent-foreground);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in {
+    animation: none;
+  }
 }
