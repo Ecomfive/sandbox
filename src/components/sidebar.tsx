@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_SECTIONS, moduloDeHref, type NavSectionAnidada } from "@/lib/nav-data";
+import { NAV_SECTIONS, moduloDeHref, encontrarSeccionActiva, type NavSectionAnidada } from "@/lib/nav-data";
 import { DashboardIcon, ChevronRightIcon, SECTION_ICONS } from "@/lib/nav-icons";
 import { ConTooltip } from "@/components/sidebar-tooltip";
 import { AvatarUpload } from "@/components/avatar-upload";
@@ -53,8 +53,9 @@ function SidebarContents({
 }) {
   const pathname = usePathname();
   const primeraSeccion = seccionesPlataforma[0]?.title ?? NAV_SECTIONS[0]?.title ?? null;
-  const [seccionAbierta, setSeccionAbierta] = useState<string | null>(primeraSeccion);
-  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
+  const seccionActiva = encontrarSeccionActiva(pathname, seccionesPlataforma, NAV_SECTIONS);
+  const [seccionAbierta, setSeccionAbierta] = useState<string | null>(seccionActiva?.seccionTitle ?? primeraSeccion);
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(seccionActiva?.grupoLabel ?? null);
 
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
