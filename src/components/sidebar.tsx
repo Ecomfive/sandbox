@@ -52,9 +52,9 @@ function SidebarContents({
   seccionesPlataforma: NavSectionAnidada[];
 }) {
   const pathname = usePathname();
-  const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
-  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
   const primeraSeccion = seccionesPlataforma[0]?.title ?? NAV_SECTIONS[0]?.title ?? null;
+  const [seccionAbierta, setSeccionAbierta] = useState<string | null>(primeraSeccion);
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
 
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
@@ -102,7 +102,7 @@ function SidebarContents({
 
       {seccionesPlataforma.map((section) => {
         const SectionIcon = SECTION_ICONS[section.title] ?? DashboardIcon;
-        const isOpen = expanded && (seccionAbierta ?? primeraSeccion) === section.title;
+        const isOpen = expanded && seccionAbierta === section.title;
 
         return (
           <div key={section.title} className={expanded ? "" : "py-0.5"}>
@@ -193,7 +193,7 @@ function SidebarContents({
         if (itemsVisibles.length === 0) return null;
 
         const SectionIcon = SECTION_ICONS[section.title] ?? DashboardIcon;
-        const isOpen = expanded && (seccionAbierta ?? primeraSeccion) === section.title;
+        const isOpen = expanded && seccionAbierta === section.title;
 
         return (
           <div key={section.title} className={expanded ? "" : "py-0.5"}>

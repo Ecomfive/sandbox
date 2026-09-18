@@ -11,8 +11,11 @@ export interface NavSection {
 
 export const NAV_SECTIONS: NavSection[] = [
   {
-    title: "Configuración",
-    items: [{ label: "Usuarios y roles", href: "/usuarios" }],
+    title: "Recursos Humanos",
+    items: [
+      { label: "Contrataciones", pronto: true },
+      { label: "Usuarios y roles", href: "/usuarios" },
+    ],
   },
 ];
 
