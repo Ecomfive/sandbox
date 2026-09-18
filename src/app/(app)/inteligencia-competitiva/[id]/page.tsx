@@ -5,6 +5,7 @@ import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { fechaHaceMeses, snapshotMasCercano } from "@/lib/inteligencia/agregados";
 import { formatearFecha } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function DetalleProveedorCompetenciaPage({
       </div>
 
       {!actual ? (
-        <p className="text-sm text-muted-foreground">Todavía no hay rastreos registrados para este proveedor.</p>
+        <EstadoVacio mensaje="Todavía no hay rastreos registrados para este proveedor." />
       ) : (
         <>
           <div className="rounded-lg border border-border bg-card p-4">

@@ -7,6 +7,8 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { FormularioConToast } from "@/components/ui/toast";
 
 export const dynamic = "force-dynamic";
 
@@ -79,8 +81,9 @@ export default async function RetirosPage() {
           </KpiGrid>
         </div>
 
-        <form
+        <FormularioConToast
           action={registrarSaldo}
+          mensajeExito="Saldo registrado"
           className="mt-4 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
@@ -118,13 +121,14 @@ export default async function RetirosPage() {
           <Button type="submit" variant="secondary">
             Registrar saldo
           </Button>
-        </form>
+        </FormularioConToast>
       </div>
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Registrar retiro</h2>
-        <form
+        <FormularioConToast
           action={registrarRetiro}
+          mensajeExito="Retiro registrado"
           className="mt-3 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
@@ -166,7 +170,7 @@ export default async function RetirosPage() {
             <input type="text" name="notas" className={fieldClass} />
           </div>
           <Button type="submit">Registrar retiro</Button>
-        </form>
+        </FormularioConToast>
       </div>
 
       <div>
@@ -199,9 +203,7 @@ export default async function RetirosPage() {
               })}
             </tbody>
           </table>
-          {(retiros ?? []).length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">Todavía no hay retiros registrados.</p>
-          )}
+          {(retiros ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
         </div>
       </div>
     </main>

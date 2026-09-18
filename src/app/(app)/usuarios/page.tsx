@@ -9,6 +9,7 @@ import { PermisoCheckbox } from "./permiso-checkbox";
 import { crearRol } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
 
@@ -94,9 +95,7 @@ export default async function UsuariosPage() {
               ))}
             </tbody>
           </table>
-          {(perfiles ?? []).length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">Todavía no hay usuarios invitados.</p>
-          )}
+          {(perfiles ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay usuarios invitados." />}
         </div>
       </div>
 
@@ -141,9 +140,7 @@ export default async function UsuariosPage() {
               ))}
             </tbody>
           </table>
-          {(roles ?? []).length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">Todavía no hay roles creados.</p>
-          )}
+          {(roles ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay roles creados." />}
         </div>
       </div>
     </main>

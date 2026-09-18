@@ -7,6 +7,7 @@ import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
 import { formatearMes, formatearMoneda } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
 
@@ -68,13 +69,17 @@ export default async function ConciliacionesPage() {
       </p>
 
       {filas.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Todavía no hay depósitos asignados a una plataforma para {pais.nombre}. Ve a{" "}
-          <Link href="/extractos" className={linkClass}>
-            Extractos
-          </Link>{" "}
-          y asigna plataforma a los movimientos.
-        </p>
+        <EstadoVacio
+          mensaje={
+            <>
+              Todavía no hay depósitos asignados a una plataforma para {pais.nombre}. Ve a{" "}
+              <Link href="/extractos" className={linkClass}>
+                Extractos
+              </Link>{" "}
+              y asigna plataforma a los movimientos.
+            </>
+          }
+        />
       )}
 
       <div className="flex flex-col gap-4">

@@ -1,30 +1,15 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { actualizarProducto } from "./actions";
 import { vincularProductoASku } from "../catalogo-maestro/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { requireModulo } from "@/lib/auth";
+import { margenActual, type ProductoFila } from "@/lib/margen";
+import { TablaProductos } from "./tabla-productos";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
-
-interface ProductoFila {
-  id: string;
-  sku: string;
-  nombre: string;
-  costo: number | null;
-  precio_actual: number | null;
-  margen_minimo: number;
-  ultima_modificacion_precio: string | null;
-  plataforma_nombre: string | null;
-  sku_maestro_id: string | null;
-}
-
-function margenActual(p: ProductoFila): number | null {
-  if (p.costo === null || p.precio_actual === null || p.precio_actual === 0) return null;
-  return ((p.precio_actual - p.costo) / p.precio_actual) * 100;
-}
 
 export default async function ProductosPage({
   searchParams,
@@ -112,10 +97,9 @@ export default async function ProductosPage({
       )}
 
       {productos.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Todavía no hay productos registrados para {pais.nombre}. Se crean automáticamente al
-          cargar movimientos de inventario.
-        </p>
+        <EstadoVacio
+          mensaje={`Todavía no hay productos registrados para ${pais.nombre}. Se crean automáticamente al cargar movimientos de inventario.`}
+        />
       ) : (
         <>
           <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
@@ -144,78 +128,9 @@ export default async function ProductosPage({
           </form>
 
           {productosFiltrados.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Ningún producto coincide con ese filtro.
-            </p>
+            <EstadoVacio mensaje="Ningún producto coincide con ese filtro." />
           ) : (
-            <div className="flex flex-col gap-3">
-              {productosFiltrados.map((p) => {
-            const margen = margenActual(p);
-            return (
-              <form
-                key={p.id}
-                action={actualizarProducto}
-                className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
-              >
-                <input type="hidden" name="id" value={p.id} />
-                <div className="min-w-[10rem] flex-1">
-                  <p className="text-sm font-medium">{p.nombre}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {p.sku} {p.plataforma_nombre ? `· ${p.plataforma_nombre}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm}>Costo</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    name="costo"
-                    defaultValue={p.costo ?? ""}
-                    className={`${fieldClassSm} w-24 tabular-nums`}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm}>Precio venta</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    name="precio_actual"
-                    defaultValue={p.precio_actual ?? ""}
-                    className={`${fieldClassSm} w-24 tabular-nums`}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm}>Mínimo %</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    name="margen_minimo"
-                    defaultValue={p.margen_minimo}
-                    required
-                    className={`${fieldClassSm} w-20 tabular-nums`}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className={labelClassSm}>Margen actual</p>
-                  {margen === null ? (
-                    <Badge tone="neutral">Sin datos</Badge>
-                  ) : margen < p.margen_minimo ? (
-                    <Badge tone="destructive">{margen.toFixed(1)}%</Badge>
-                  ) : (
-                    <Badge tone="success">{margen.toFixed(1)}%</Badge>
-                  )}
-                </div>
-                <Button type="submit" variant="secondary" className="text-xs">
-                  Guardar
-                </Button>
-              </form>
-                );
-              })}
-            </div>
+            <TablaProductos productos={productosFiltrados} />
           )}
         </>
       )}

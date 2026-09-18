@@ -5,6 +5,8 @@ import { AsignarPlataformaSelect } from "./asignar-plataforma";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { linkClass } from "@/components/ui/link";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,12 @@ export default async function ExtractosPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Extractos cargados</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold tracking-tight">Extractos cargados</h2>
+          <a href="/api/exportar-extractos" className={linkClass}>
+            Descargar CSV
+          </a>
+        </div>
         <div className="mt-3 flex flex-col gap-4">
           {(extractos ?? []).map((extracto) => (
             <div key={extracto.id} className="rounded-lg border border-border bg-card p-4">
@@ -90,9 +97,7 @@ export default async function ExtractosPage() {
               </div>
             </div>
           ))}
-          {(extractos ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">Todavía no hay extractos cargados.</p>
-          )}
+          {(extractos ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay extractos cargados." />}
         </div>
       </div>
     </main>

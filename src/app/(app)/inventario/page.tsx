@@ -4,6 +4,7 @@ import { InventarioUploader } from "./uploader";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
 
@@ -63,11 +64,7 @@ export default async function InventarioPage() {
               })}
             </tbody>
           </table>
-          {(movimientos ?? []).length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">
-              Todavía no hay movimientos de inventario.
-            </p>
-          )}
+          {(movimientos ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay movimientos de inventario." />}
         </div>
       </div>
     </main>

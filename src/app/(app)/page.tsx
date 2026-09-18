@@ -12,6 +12,7 @@ import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -83,9 +84,9 @@ export default async function Home({
           {hayVentas ? (
             <VentasChart datos={ventas.serie} etiquetaComparacion={periodo.etiquetaComparacion} />
           ) : (
-            <p className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
-              Aún no hay pedidos de Dropi cargados en este período.
-            </p>
+            <div className="flex h-[340px] items-center justify-center">
+              <EstadoVacio mensaje="Aún no hay pedidos de Dropi cargados en este período." />
+            </div>
           )}
         </>
       ),
@@ -107,9 +108,9 @@ export default async function Home({
           {hayInventario ? (
             <InventarioChart datos={inventario.serie} />
           ) : (
-            <p className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
-              Aún no hay movimientos de inventario en este período.
-            </p>
+            <div className="flex h-[340px] items-center justify-center">
+              <EstadoVacio mensaje="Aún no hay movimientos de inventario en este período." />
+            </div>
           )}
         </>
       ),
@@ -135,9 +136,9 @@ export default async function Home({
           {serieFinanzas.length > 0 ? (
             <FinanzasChart datos={serieFinanzas} />
           ) : (
-            <p className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
-              Todavía no hay conciliaciones registradas.
-            </p>
+            <div className="flex h-[340px] items-center justify-center">
+              <EstadoVacio mensaje="Todavía no hay conciliaciones registradas." />
+            </div>
           )}
         </>
       ),
@@ -158,9 +159,9 @@ export default async function Home({
               </p>
             </div>
           ) : (
-            <p className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
-              Todavía no hay dropshippers registrados.
-            </p>
+            <div className="flex h-[340px] items-center justify-center">
+              <EstadoVacio mensaje="Todavía no hay dropshippers registrados." />
+            </div>
           )}
         </>
       ),
@@ -179,9 +180,9 @@ export default async function Home({
               <p className="text-sm text-muted-foreground">proveedores en el marketplace de Dropi</p>
             </div>
           ) : (
-            <p className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
-              Todavía no hay proveedores competidores cargados.
-            </p>
+            <div className="flex h-[340px] items-center justify-center">
+              <EstadoVacio mensaje="Todavía no hay proveedores competidores cargados." />
+            </div>
           )}
         </>
       ),

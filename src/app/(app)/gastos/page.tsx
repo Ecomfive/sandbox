@@ -6,6 +6,8 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { FormularioConToast } from "@/components/ui/toast";
 
 export const dynamic = "force-dynamic";
 
@@ -56,9 +58,7 @@ export default async function GastosPage() {
       <div>
         <h2 className="text-base font-semibold tracking-tight">Este mes</h2>
         {gastosMes.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Todavía no hay gastos registrados para {mesActual}.
-          </p>
+          <EstadoVacio mensaje={`Todavía no hay gastos registrados para ${mesActual}.`} />
         ) : (
           <div className="mt-3">
             <KpiGrid>
@@ -77,8 +77,9 @@ export default async function GastosPage() {
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Registrar gasto</h2>
-        <form
+        <FormularioConToast
           action={registrarGasto}
+          mensajeExito="Gasto registrado"
           className="mt-3 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
@@ -112,7 +113,7 @@ export default async function GastosPage() {
             <input type="date" name="fecha" defaultValue={hoy()} required className={fieldClass} />
           </div>
           <Button type="submit">Registrar gasto</Button>
-        </form>
+        </FormularioConToast>
       </div>
 
       <div>
@@ -147,9 +148,7 @@ export default async function GastosPage() {
               ))}
             </tbody>
           </table>
-          {(gastos ?? []).length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">Todavía no hay gastos registrados.</p>
-          )}
+          {(gastos ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay gastos registrados." />}
         </div>
       </div>
     </main>

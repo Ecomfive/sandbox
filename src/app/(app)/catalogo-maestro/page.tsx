@@ -6,6 +6,7 @@ import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { crearSkuSimple, crearCombo, cambiarEstadoSku } from "./actions";
 import { ComboBuilder } from "./combo-builder";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
 
@@ -107,9 +108,10 @@ export default async function CatalogoMaestroPage() {
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Componentes</label>
             {opcionesSimples.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Todavía no hay SKUs simples aprobados para armar un combo. Aprueba al menos uno primero.
-              </p>
+              <EstadoVacio
+                mensaje="Todavía no hay SKUs simples aprobados para armar un combo. Aprueba al menos uno primero."
+                className="p-2"
+              />
             ) : (
               <ComboBuilder opciones={opcionesSimples} />
             )}
@@ -135,8 +137,8 @@ export default async function CatalogoMaestroPage() {
           <tbody>
             {lista.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
-                  Todavía no hay SKUs maestros propuestos.
+                <td colSpan={6}>
+                  <EstadoVacio mensaje="Todavía no hay SKUs maestros propuestos." />
                 </td>
               </tr>
             )}

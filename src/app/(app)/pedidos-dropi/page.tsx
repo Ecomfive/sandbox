@@ -8,6 +8,7 @@ import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { toneEstadoPedido } from "@/lib/estados-pedido";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
 
@@ -127,9 +128,7 @@ export default async function PedidosDropiPage({
       </form>
 
       {totalOrdenes === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No hay órdenes de Dropi para {pais.nombre} entre {desde} y {hasta}.
-        </p>
+        <EstadoVacio mensaje={`No hay órdenes de Dropi para ${pais.nombre} entre ${desde} y ${hasta}.`} />
       ) : (
         <>
           <KpiGrid>

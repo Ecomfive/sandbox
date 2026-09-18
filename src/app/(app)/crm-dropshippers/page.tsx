@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fieldClass, fieldClassSm, labelClass, labelClassSm } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
 
@@ -86,9 +87,10 @@ export default async function CrmDropshippersPage() {
       <div>
         <h2 className="text-base font-semibold tracking-tight">Dropshippers</h2>
         {(dropshippers ?? []).length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Todavía no hay dropshippers registrados para {pais.nombre}.
-          </p>
+          <EstadoVacio
+            mensaje={`Todavía no hay dropshippers registrados para ${pais.nombre}.`}
+            className="mt-3"
+          />
         ) : (
           <div className="mt-3 flex flex-col gap-3">
             {(dropshippers ?? []).map((d) => (
@@ -216,7 +218,7 @@ export default async function CrmDropshippersPage() {
             </tbody>
           </table>
           {(interacciones ?? []).length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">Todavía no hay interacciones registradas.</p>
+            <EstadoVacio mensaje="Todavía no hay interacciones registradas." />
           )}
         </div>
       </div>
