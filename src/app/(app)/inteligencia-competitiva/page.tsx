@@ -63,9 +63,35 @@ export default async function InteligenciaCompetitivaPage() {
       </div>
 
       {totalProveedores === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Todavía no hay proveedores cargados para {pais.nombre}.
-        </p>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm font-medium">Todavía no hay proveedores rastreados para {pais.nombre}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Este rastreo se hace con la cuenta <strong>dropshipper</strong> de Dropi de{" "}
+            {pais.nombre}, no con un archivo. Corre estos tres comandos, en orden, desde tu máquina:
+          </p>
+          <ol className="mt-3 flex flex-col gap-2 text-sm">
+            <li>
+              <p className="text-xs text-muted-foreground">
+                1. Inicia sesión (se abre una ventana para que la hagas tú mismo):
+              </p>
+              <code className="mt-0.5 block rounded bg-muted px-2 py-1 text-xs">
+                npx tsx scripts/dropi-guardar-sesion.ts {pais.codigo.toLowerCase()} dropshipper
+              </code>
+            </li>
+            <li>
+              <p className="text-xs text-muted-foreground">2. Rastrea el directorio de proveedores:</p>
+              <code className="mt-0.5 block rounded bg-muted px-2 py-1 text-xs">
+                npx tsx scripts/dropi-extraer-proveedores.ts {pais.codigo.toLowerCase()}
+              </code>
+            </li>
+            <li>
+              <p className="text-xs text-muted-foreground">3. Guarda lo rastreado en esta página:</p>
+              <code className="mt-0.5 block rounded bg-muted px-2 py-1 text-xs">
+                npx tsx scripts/dropi-ingerir-proveedores.ts {pais.codigo.toLowerCase()}
+              </code>
+            </li>
+          </ol>
+        </div>
       ) : (
         <>
           <KpiGrid>

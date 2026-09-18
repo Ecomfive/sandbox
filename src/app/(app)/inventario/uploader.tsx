@@ -6,6 +6,7 @@ import { parseExtracto } from "@/lib/extractos/parse";
 import { mapearMovimientosInventario, type MapeoColumnasInventario } from "@/lib/inventario/parse";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass, labelClassSm } from "@/components/ui/field";
+import { ProgresoCarga } from "@/components/ui/progreso-carga";
 
 interface Pais {
   id: string;
@@ -172,6 +173,12 @@ export function InventarioUploader({ pais }: { pais: Pais }) {
       <Button type="submit" disabled={!mapeoCompleto || pending} className="w-fit">
         {pending ? "Importando…" : "Confirmar importación"}
       </Button>
+
+      {pending && (
+        <ProgresoCarga
+          mensaje={`Importando ${filas.length} filas… esto puede tardar unos segundos si el archivo es grande.`}
+        />
+      )}
 
       {estado.status === "success" && (
         <p className="text-sm text-success">Importados {estado.filasImportadas} movimientos.</p>

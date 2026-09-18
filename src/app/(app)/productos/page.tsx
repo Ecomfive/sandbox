@@ -26,8 +26,16 @@ function margenActual(p: ProductoFila): number | null {
   return ((p.precio_actual - p.costo) / p.precio_actual) * 100;
 }
 
-export default async function ProductosPage() {
+export default async function ProductosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   await requireModulo("productos");
+  const sp = await searchParams;
+  const buscar = typeof sp.buscar === "string" ? sp.buscar.trim() : "";
+  const plataformaFiltro = typeof sp.plataforma === "string" ? sp.plataforma : "";
+
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
@@ -72,6 +80,20 @@ export default async function ProductosPage() {
     return m !== null && m < p.margen_minimo;
   }).length;
 
+  const plataformasDisponibles = Array.from(
+    new Set(productos.map((p) => p.plataforma_nombre).filter((n): n is string => n !== null))
+  ).sort();
+
+  const buscarNormalizado = buscar.toLowerCase();
+  const productosFiltrados = productos.filter((p) => {
+    const coincideBusqueda =
+      buscarNormalizado === "" ||
+      p.nombre.toLowerCase().includes(buscarNormalizado) ||
+      p.sku.toLowerCase().includes(buscarNormalizado);
+    const coincidePlataforma = plataformaFiltro === "" || p.plataforma_nombre === plataformaFiltro;
+    return coincideBusqueda && coincidePlataforma;
+  });
+
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
       <h1 className="text-lg font-semibold tracking-tight">Productos y márgenes</h1>
@@ -95,8 +117,39 @@ export default async function ProductosPage() {
           cargar movimientos de inventario.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {productos.map((p) => {
+        <>
+          <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
+            <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
+              <label className={labelClassSm}>Buscar por nombre o SKU</label>
+              <input
+                type="text"
+                name="buscar"
+                defaultValue={buscar}
+                placeholder="Ej: aceite, MSK-0001…"
+                className={fieldClass}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className={labelClassSm}>Plataforma</label>
+              <select name="plataforma" defaultValue={plataformaFiltro} className={fieldClass}>
+                <option value="">Todas</option>
+                {plataformasDisponibles.map((nombre) => (
+                  <option key={nombre} value={nombre}>
+                    {nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button type="submit">Filtrar</Button>
+          </form>
+
+          {productosFiltrados.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Ningún producto coincide con ese filtro.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {productosFiltrados.map((p) => {
             const margen = margenActual(p);
             return (
               <form
@@ -160,12 +213,14 @@ export default async function ProductosPage() {
                   Guardar
                 </Button>
               </form>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
-      {skusMaestrosDisponibles !== null && productos.length > 0 && (
+      {skusMaestrosDisponibles !== null && productosFiltrados.length > 0 && (
         <div className="mt-8 flex flex-col gap-3">
           <div>
             <h2 className="text-sm font-semibold">Vincular al catálogo maestro de SKU</h2>
@@ -175,7 +230,7 @@ export default async function ProductosPage() {
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            {productos.map((p) => (
+            {productosFiltrados.map((p) => (
               <form
                 key={p.id}
                 action={vincularProductoASku}

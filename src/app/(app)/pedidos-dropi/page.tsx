@@ -6,26 +6,9 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { toneEstadoPedido } from "@/lib/estados-pedido";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 
 export const dynamic = "force-dynamic";
-
-/** Supabase limita cada respuesta a ~1000 filas; esto pagina con .range() hasta traerlas todas. */
-async function traerTodasLasFilas<T>(
-  construirConsulta: (rangoDesde: number, rangoHasta: number) => PromiseLike<{ data: T[] | null; error: unknown }>
-): Promise<T[]> {
-  const TAMANO_PAGINA = 1000;
-  const filas: T[] = [];
-  let rangoDesde = 0;
-  for (;;) {
-    const { data, error } = await construirConsulta(rangoDesde, rangoDesde + TAMANO_PAGINA - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    filas.push(...data);
-    if (data.length < TAMANO_PAGINA) break;
-    rangoDesde += TAMANO_PAGINA;
-  }
-  return filas;
-}
 
 /** "2026-09-17T12:25:05" -> "17/09 12:25", sin pasar por Date (evita corrimientos de zona horaria). */
 function formatoHora(fechaHora: string | null): string {
@@ -143,6 +126,12 @@ export default async function PedidosDropiPage({
           </select>
         </div>
         <Button type="submit">Filtrar</Button>
+        <a
+          href={`/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}`}
+          className="ml-auto text-sm font-medium text-foreground underline underline-offset-2 hover:text-muted-foreground"
+        >
+          Descargar CSV ({totalOrdenes.toLocaleString("es")} órdenes)
+        </a>
       </form>
 
       {totalOrdenes === 0 ? (
@@ -165,10 +154,13 @@ export default async function PedidosDropiPage({
           </KpiGrid>
 
           {todas.length < totalOrdenes && (
-            <p className="text-xs text-muted-foreground">
-              Mostrando {todas.length} de {totalOrdenes} órdenes en la tabla (el resumen de arriba sí las
-              cuenta a todas). Achica el rango de fechas para verlas todas en la tabla.
-            </p>
+            <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm text-warning">
+              <strong className="font-semibold">
+                Mostrando {todas.length} de {totalOrdenes.toLocaleString("es")} órdenes
+              </strong>{" "}
+              en la tabla (el resumen de arriba sí las cuenta a todas). Achica el rango de fechas para
+              verlas todas, o descarga el CSV completo arriba.
+            </div>
           )}
 
           <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
