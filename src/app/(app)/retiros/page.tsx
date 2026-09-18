@@ -4,6 +4,7 @@ import { registrarSaldo, registrarRetiro } from "./actions";
 import { EstadoRetiroSelect } from "@/components/estado-retiro-select";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -53,25 +54,20 @@ export default async function RetirosPage() {
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Saldo de wallet</h2>
-        <div className="mt-3 flex flex-wrap gap-3">
-          {(plataformas ?? []).map((p) => {
-            const ultimo = ultimoSaldoPorPlataforma.get(p.id);
-            return (
-              <div key={p.id} className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-                <p className="text-sm font-medium">{p.nombre}</p>
-                {ultimo ? (
-                  <>
-                    <p className="mt-1 text-lg font-semibold tabular-nums">
-                      {ultimo.monto.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">al {ultimo.fecha}</p>
-                  </>
-                ) : (
-                  <p className="mt-1 text-sm text-muted-foreground">Sin registrar</p>
-                )}
-              </div>
-            );
-          })}
+        <div className="mt-3">
+          <KpiGrid>
+            {(plataformas ?? []).map((p) => {
+              const ultimo = ultimoSaldoPorPlataforma.get(p.id);
+              return (
+                <KpiCard
+                  key={p.id}
+                  titulo={p.nombre}
+                  valor={ultimo ? ultimo.monto.toFixed(2) : "Sin registrar"}
+                  subtexto={ultimo ? `al ${ultimo.fecha}` : undefined}
+                />
+              );
+            })}
+          </KpiGrid>
         </div>
 
         <form
@@ -166,7 +162,7 @@ export default async function RetirosPage() {
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Retiros recientes</h2>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

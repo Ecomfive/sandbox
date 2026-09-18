@@ -186,7 +186,7 @@ export default async function CrmDropshippersPage() {
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Interacciones recientes</h2>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { crearSkuSimple, crearCombo, cambiarEstadoSku } from "./actions";
 import { ComboBuilder } from "./combo-builder";
@@ -71,20 +72,11 @@ export default async function CatalogoMaestroPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-          <p className="text-sm font-medium">Propuestos</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">{conteo.propuesto}</p>
-        </div>
-        <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-          <p className="text-sm font-medium">En revisión</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">{conteo.en_revision}</p>
-        </div>
-        <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-          <p className="text-sm font-medium">Aprobados</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">{conteo.aprobado}</p>
-        </div>
-      </div>
+      <KpiGrid>
+        <KpiCard titulo="Propuestos" valor={conteo.propuesto} />
+        <KpiCard titulo="En revisión" valor={conteo.en_revision} />
+        <KpiCard titulo="Aprobados" valor={conteo.aprobado} />
+      </KpiGrid>
 
       <div className="grid gap-6 md:grid-cols-2">
         <form action={crearSkuSimple} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
@@ -128,7 +120,7 @@ export default async function CatalogoMaestroPage() {
         </form>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
         <table className="w-full min-w-[48rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">

@@ -4,6 +4,8 @@ import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { toneEstadoPedido } from "@/lib/estados-pedido";
 
 export const dynamic = "force-dynamic";
 
@@ -24,14 +26,6 @@ async function traerTodasLasFilas<T>(
   }
   return filas;
 }
-
-const toneEstado = (estado: string): "success" | "warning" | "destructive" | "neutral" => {
-  const e = estado.toUpperCase();
-  if (e.includes("ENTREGAD") || e.includes("PAGAD")) return "success";
-  if (e.includes("CANCELAD") || e.includes("DEVOLU") || e.includes("RECHAZAD")) return "destructive";
-  if (e.includes("PENDIENTE") || e.includes("TRANSPORT") || e.includes("PREPARAD")) return "warning";
-  return "neutral";
-};
 
 /** "2026-09-17T12:25:05" -> "17/09 12:25", sin pasar por Date (evita corrimientos de zona horaria). */
 function formatoHora(fechaHora: string | null): string {
@@ -157,34 +151,18 @@ export default async function PedidosDropiPage({
         </p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3">
-            <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-              <p className="text-sm font-medium">Órdenes en el rango</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">{totalOrdenes}</p>
-            </div>
-            <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-              <p className="text-sm font-medium">Monto total</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">{totalMonto.toFixed(2)}</p>
-            </div>
-            <div
-              className={`min-w-[10rem] rounded-lg border p-4 ${
-                totalAlertas > 0 ? "border-red-300 bg-red-50" : "border-border bg-card"
-              }`}
-            >
-              <p className={`text-sm font-medium ${totalAlertas > 0 ? "text-red-700" : ""}`}>
-                Alertas: liquidado sin marcar entregado
-              </p>
-              <p className={`mt-1 text-lg font-semibold tabular-nums ${totalAlertas > 0 ? "text-red-700" : ""}`}>
-                {totalAlertas}
-              </p>
-            </div>
+          <KpiGrid>
+            <KpiCard titulo="Órdenes en el rango" valor={totalOrdenes} />
+            <KpiCard titulo="Monto total" valor={totalMonto.toFixed(2)} />
+            <KpiCard
+              titulo="Alertas: liquidado sin marcar entregado"
+              valor={totalAlertas}
+              tono={totalAlertas > 0 ? "destructive" : "neutral"}
+            />
             {estadosOrdenados.map(([estado, cantidad]) => (
-              <div key={estado} className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-                <p className="text-sm font-medium">{estado}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums">{cantidad}</p>
-              </div>
+              <KpiCard key={estado} titulo={estado} valor={cantidad} />
             ))}
-          </div>
+          </KpiGrid>
 
           {todas.length < totalOrdenes && (
             <p className="text-xs text-muted-foreground">
@@ -193,7 +171,7 @@ export default async function PedidosDropiPage({
             </p>
           )}
 
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -233,7 +211,7 @@ export default async function PedidosDropiPage({
                       <td className="py-2 pr-3 tabular-nums">{o.cantidad}</td>
                       <td className="py-2 pr-3 tabular-nums">{Number(o.monto).toFixed(2)}</td>
                       <td className="py-2 pr-3">
-                        <Badge tone={toneEstado(o.estado)}>{o.estado}</Badge>
+                        <Badge tone={toneEstadoPedido(o.estado)}>{o.estado}</Badge>
                       </td>
                     </tr>
                   );

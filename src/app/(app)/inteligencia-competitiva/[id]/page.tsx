@@ -66,7 +66,7 @@ export default async function DetalleProveedorCompetenciaPage({
             <p className="mt-0.5 text-xs text-muted-foreground">Última carga: {actual.fecha}</p>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[28rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -109,7 +109,7 @@ export default async function DetalleProveedorCompetenciaPage({
             proveedores; hay que revisar la ficha individual con la sesión de dropshipper activa.
           </p>
 
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[20rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">

@@ -42,7 +42,7 @@ export default async function AlertasPage() {
           </Link>
           . Generar una alerta la deja lista para el reclamo quincenal a la plataforma.
         </p>
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[32rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -80,7 +80,7 @@ export default async function AlertasPage() {
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Alertas</h2>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[44rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

@@ -3,6 +3,7 @@ import { getPaisActual } from "@/lib/pais";
 import { registrarGasto, eliminarGasto } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -58,19 +59,13 @@ export default async function GastosPage() {
             Todavía no hay gastos registrados para {mesActual}.
           </p>
         ) : (
-          <div className="mt-3 flex flex-wrap gap-3">
-            <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-              <p className="text-sm font-medium">Total del mes</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">{totalMes.toFixed(2)}</p>
-            </div>
-            {CATEGORIAS.filter((c) => totalesPorCategoria.has(c.valor)).map((c) => (
-              <div key={c.valor} className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-                <p className="text-sm font-medium">{c.etiqueta}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums">
-                  {(totalesPorCategoria.get(c.valor) ?? 0).toFixed(2)}
-                </p>
-              </div>
-            ))}
+          <div className="mt-3">
+            <KpiGrid>
+              <KpiCard titulo="Total del mes" valor={totalMes.toFixed(2)} />
+              {CATEGORIAS.filter((c) => totalesPorCategoria.has(c.valor)).map((c) => (
+                <KpiCard key={c.valor} titulo={c.etiqueta} valor={(totalesPorCategoria.get(c.valor) ?? 0).toFixed(2)} />
+              ))}
+            </KpiGrid>
           </div>
         )}
       </div>
@@ -117,7 +112,7 @@ export default async function GastosPage() {
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Gastos recientes</h2>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

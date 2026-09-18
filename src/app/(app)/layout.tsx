@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         usuario={usuario}
         seccionesPlataforma={seccionesPlataforma}
       />
-      <div className="flex min-h-full flex-1 flex-col">
+      <div className="flex min-h-full min-w-0 flex-1 flex-col">
         <NavBar />
         {children}
       </div>

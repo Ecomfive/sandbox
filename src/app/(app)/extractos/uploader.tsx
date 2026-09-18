@@ -109,7 +109,7 @@ export function ExtractoUploader({ pais }: { pais: Pais }) {
           </div>
 
           {preview.length > 0 && (
-            <div className="overflow-x-auto">
+            <div className="min-w-0 overflow-x-auto">
               <p className="mb-1 text-xs text-muted-foreground">
                 Vista previa ({filas.length} filas totales, mostrando {preview.length}):
               </p>

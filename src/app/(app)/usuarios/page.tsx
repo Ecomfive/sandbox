@@ -69,7 +69,7 @@ export default async function UsuariosPage() {
 
       <div>
         <h2 className="text-base font-semibold tracking-tight">Usuarios</h2>
-        <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -112,7 +112,7 @@ export default async function UsuariosPage() {
           </Button>
         </form>
 
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="mt-4 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[40rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

@@ -42,7 +42,7 @@ export default async function ExtractosPage() {
               <p className="mb-3 text-sm font-medium">
                 {new Date(extracto.fecha_carga).toLocaleString()}
               </p>
-              <div className="overflow-x-auto">
+              <div className="min-w-0 overflow-x-auto">
                 <table className="w-full min-w-[36rem] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-border text-left text-muted-foreground">

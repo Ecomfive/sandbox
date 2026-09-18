@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { InteligenciaChart } from "@/components/charts/inteligencia-chart";
 import { agruparProductosTotalesPorMes, agruparProveedoresNuevosPorMes, soloAnio } from "@/lib/inteligencia/agregados";
 
@@ -67,16 +68,10 @@ export default async function InteligenciaCompetitivaPage() {
         </p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3">
-            <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-              <p className="text-sm font-medium">Proveedores rastreados</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">{totalProveedores}</p>
-            </div>
-            <div className="min-w-[10rem] rounded-lg border border-border bg-card p-4">
-              <p className="text-sm font-medium">Total de productos en la plataforma</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">{totalProductos}</p>
-            </div>
-          </div>
+          <KpiGrid>
+            <KpiCard titulo="Proveedores rastreados" valor={totalProveedores} />
+            <KpiCard titulo="Total de productos en la plataforma" valor={totalProductos} />
+          </KpiGrid>
 
           <div className="grid gap-6 md:grid-cols-2">
             <div className="rounded-lg border border-border bg-card p-4">
@@ -114,7 +109,7 @@ export default async function InteligenciaCompetitivaPage() {
             </p>
           )}
 
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[42rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">
