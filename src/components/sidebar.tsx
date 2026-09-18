@@ -64,7 +64,7 @@ function SidebarContents({
           <button
             type="button"
             onClick={onToggle}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <ToggleIcon className="h-5 w-5 shrink-0" />
             {expanded && <span className="text-sm font-medium">Colapsar menú</span>}
@@ -86,7 +86,7 @@ function SidebarContents({
             className={
               pathname === "/"
                 ? "flex w-full items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
-                : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
             }
           >
             <DashboardIcon className="h-5 w-5 shrink-0" />
@@ -113,7 +113,7 @@ function SidebarContents({
                 onClick={() =>
                   setSeccionAbierta((prev) => (prev === section.title ? null : section.title))
                 }
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
               >
                 <SectionIcon className="h-5 w-5 shrink-0" />
                 {expanded && (
@@ -152,7 +152,7 @@ function SidebarContents({
                         onClick={() =>
                           setGrupoAbierto((prev) => (prev === grupo.label ? null : grupo.label))
                         }
-                        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+                        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
                       >
                         <span>{grupo.label}</span>
                         <ChevronRightIcon
@@ -171,7 +171,7 @@ function SidebarContents({
                                 className={
                                   active
                                     ? "rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-                                    : "rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+                                    : "rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
                                 }
                               >
                                 {item.label}
@@ -204,7 +204,7 @@ function SidebarContents({
                 onClick={() =>
                   setSeccionAbierta((prev) => (prev === section.title ? null : section.title))
                 }
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
               >
                 <SectionIcon className="h-5 w-5 shrink-0" />
                 {expanded && (
@@ -242,7 +242,7 @@ function SidebarContents({
                       className={
                         active
                           ? "rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-                          : "rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+                          : "rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
                       }
                     >
                       {item.label}
@@ -283,8 +283,8 @@ function UsuarioFooter({ usuario, expanded }: { usuario: UsuarioActual; expanded
             type="submit"
             className={
               expanded
-                ? "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                : "flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                : "flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             }
           >
             <LogoutIcon className="h-5 w-5 shrink-0" />
@@ -351,7 +351,7 @@ export function Sidebar({
         type="button"
         aria-label="Abrir menú"
         onClick={() => setMobileOpen(true)}
-        className="fixed top-3 left-3 z-40 rounded-md bg-card p-2 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground md:hidden"
+        className="fixed top-3 left-3 z-40 rounded-md bg-card p-2 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground transition-colors md:hidden"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -374,7 +374,7 @@ export function Sidebar({
                 type="button"
                 aria-label="Cerrar menú"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted transition-colors"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />

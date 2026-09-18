@@ -89,6 +89,15 @@ export function InventarioUploader({ pais }: { pais: Pais }) {
           onChange={onFileChange}
           className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-border"
         />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Columnas esperadas: <strong>SKU</strong> y <strong>Cantidad</strong> (obligatorias); Tipo
+          (entrada/salida), Nombre, Fecha y Referencia son opcionales. Puedes usar cualquier nombre
+          de columna — luego las mapeas abajo.{" "}
+          <a href="/plantillas/inventario-ejemplo.csv" download className="underline underline-offset-2 hover:text-foreground">
+            Descargar plantilla de ejemplo
+          </a>
+          .
+        </p>
       </div>
 
       {headers.length > 0 && (

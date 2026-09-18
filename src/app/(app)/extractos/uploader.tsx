@@ -83,6 +83,15 @@ export function ExtractoUploader({ pais }: { pais: Pais }) {
           onChange={onFileChange}
           className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-border"
         />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Columnas esperadas: <strong>Fecha</strong> y <strong>Monto</strong> (obligatorias);
+          Descripción y Tipo (depósito/retiro) son opcionales — si falta Tipo, se infiere del signo
+          del monto. Puedes usar cualquier nombre de columna — luego las mapeas abajo.{" "}
+          <a href="/plantillas/extractos-ejemplo.csv" download className="underline underline-offset-2 hover:text-foreground">
+            Descargar plantilla de ejemplo
+          </a>
+          .
+        </p>
       </div>
 
       {headers.length > 0 && (
