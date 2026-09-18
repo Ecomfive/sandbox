@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_SECTIONS, moduloDeHref } from "@/lib/nav-data";
+import { NAV_SECTIONS, moduloDeHref, type NavSectionAnidada } from "@/lib/nav-data";
 import { DashboardIcon, ChevronRightIcon, SECTION_ICONS } from "@/lib/nav-icons";
 import { ConTooltip } from "@/components/sidebar-tooltip";
 import { AvatarUpload } from "@/components/avatar-upload";
@@ -43,14 +43,18 @@ function SidebarContents({
   onToggle,
   onNavigate,
   modulosPermitidos,
+  seccionesPlataforma,
 }: {
   expanded: boolean;
   onToggle?: () => void;
   onNavigate?: () => void;
   modulosPermitidos?: string[] | null;
+  seccionesPlataforma: NavSectionAnidada[];
 }) {
   const pathname = usePathname();
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
+  const primeraSeccion = seccionesPlataforma[0]?.title ?? NAV_SECTIONS[0]?.title ?? null;
 
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
@@ -96,12 +100,100 @@ function SidebarContents({
         </p>
       )}
 
+      {seccionesPlataforma.map((section) => {
+        const SectionIcon = SECTION_ICONS[section.title] ?? DashboardIcon;
+        const isOpen = expanded && (seccionAbierta ?? primeraSeccion) === section.title;
+
+        return (
+          <div key={section.title} className={expanded ? "" : "py-0.5"}>
+            <ConTooltip etiqueta={section.title} mostrar={!expanded}>
+              <button
+                type="button"
+                onClick={() =>
+                  setSeccionAbierta((prev) => (prev === section.title ? null : section.title))
+                }
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                <SectionIcon className="h-5 w-5 shrink-0" />
+                {expanded && (
+                  <>
+                    <span className="flex-1 text-left">{section.title}</span>
+                    <ChevronRightIcon
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}
+                    />
+                  </>
+                )}
+              </button>
+            </ConTooltip>
+            {expanded && isOpen && (
+              <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-6">
+                {section.groups.map((grupo) => {
+                  if (grupo.items.length === 0) {
+                    return (
+                      <span
+                        key={grupo.label}
+                        className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground/60"
+                      >
+                        {grupo.label}
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          Pronto
+                        </span>
+                      </span>
+                    );
+                  }
+                  const itemsVisibles = grupo.items.filter((item) => puedeVer(modulosPermitidos, item.href));
+                  if (itemsVisibles.length === 0) return null;
+                  const grupoOpen = grupoAbierto === grupo.label;
+                  return (
+                    <div key={grupo.label}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setGrupoAbierto((prev) => (prev === grupo.label ? null : grupo.label))
+                        }
+                        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+                      >
+                        <span>{grupo.label}</span>
+                        <ChevronRightIcon
+                          className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${grupoOpen ? "rotate-90" : ""}`}
+                        />
+                      </button>
+                      {grupoOpen && (
+                        <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-4">
+                          {itemsVisibles.map((item) => {
+                            const active = pathname === item.href;
+                            return (
+                              <Link
+                                key={item.label}
+                                href={item.href!}
+                                onClick={onNavigate}
+                                className={
+                                  active
+                                    ? "rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
+                                    : "rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+                                }
+                              >
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
       {NAV_SECTIONS.map((section) => {
         const itemsVisibles = section.items.filter((item) => puedeVer(modulosPermitidos, item.href));
         if (itemsVisibles.length === 0) return null;
 
         const SectionIcon = SECTION_ICONS[section.title] ?? DashboardIcon;
-        const isOpen = expanded && (seccionAbierta ?? NAV_SECTIONS[0].title) === section.title;
+        const isOpen = expanded && (seccionAbierta ?? primeraSeccion) === section.title;
 
         return (
           <div key={section.title} className={expanded ? "" : "py-0.5"}>
@@ -206,9 +298,11 @@ function UsuarioFooter({ usuario, expanded }: { usuario: UsuarioActual; expanded
 export function Sidebar({
   modulosPermitidos,
   usuario,
+  seccionesPlataforma,
 }: {
   modulosPermitidos?: string[] | null;
   usuario: UsuarioActual | null;
+  seccionesPlataforma: NavSectionAnidada[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -242,7 +336,12 @@ export function Sidebar({
             className={expanded ? "h-5 w-auto" : "h-3 w-auto"}
           />
         </Link>
-        <SidebarContents expanded={expanded} onToggle={toggleExpanded} modulosPermitidos={modulosPermitidos} />
+        <SidebarContents
+          expanded={expanded}
+          onToggle={toggleExpanded}
+          modulosPermitidos={modulosPermitidos}
+          seccionesPlataforma={seccionesPlataforma}
+        />
         {usuario && <UsuarioFooter usuario={usuario} expanded={expanded} />}
       </aside>
 
@@ -285,6 +384,7 @@ export function Sidebar({
               expanded
               onNavigate={() => setMobileOpen(false)}
               modulosPermitidos={modulosPermitidos}
+              seccionesPlataforma={seccionesPlataforma}
             />
             {usuario && <UsuarioFooter usuario={usuario} expanded />}
           </div>

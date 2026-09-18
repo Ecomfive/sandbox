@@ -23,7 +23,7 @@ export function DashboardIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function OperacionesIcon(props: SVGProps<SVGSVGElement>) {
+export function ProveeduriaIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
       <path d="M3 8l9-4 9 4-9 4-9-4Z" />
@@ -33,32 +33,13 @@ export function OperacionesIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function FinanzasIcon(props: SVGProps<SVGSVGElement>) {
+export function TiendaIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
-      <path d="M3 21h18" />
-      <path d="M4 21V10M9 21V10M15 21V10M20 21V10" />
-      <path d="M2 10l10-6 10 6" />
-    </Icon>
-  );
-}
-
-export function InteligenciaIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="M21 21l-4.3-4.3" />
-    </Icon>
-  );
-}
-
-export function CrmIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
-      <path d="M16 4.5a3.5 3.5 0 0 1 0 7" />
-      <path d="M15 13.5a6.5 6.5 0 0 1 6.5 6.5" />
+      <path d="M4 9V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v4" />
+      <path d="M3 9h18l-1 3a2 2 0 0 1-2 1.5H6A2 2 0 0 1 4 12L3 9Z" />
+      <path d="M5 13.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5.5" />
+      <path d="M10 20v-4h4v4" />
     </Icon>
   );
 }
@@ -81,9 +62,7 @@ export function ChevronRightIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
-  Operaciones: OperacionesIcon,
-  Finanzas: FinanzasIcon,
-  "Inteligencia competitiva": InteligenciaIcon,
-  "CRM Dropshippers": CrmIcon,
+  Proveeduría: ProveeduriaIcon,
+  Tiendas: TiendaIcon,
   Configuración: ConfiguracionIcon,
 };
