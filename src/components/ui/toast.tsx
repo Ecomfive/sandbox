@@ -62,21 +62,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
  * Envuelve un <form action={serverAction}> para mostrar un toast de confirmación
  * cuando la acción del servidor termina. Solo agrega el aviso visual — la acción
  * en sí sigue corriendo en el servidor exactamente igual que un form normal.
+ *
+ * `mensajeExito` acepta un texto fijo, o una función que recibe lo que devolvió
+ * la acción del servidor para elegir el mensaje/tono según el resultado real
+ * (por ejemplo, distinguir un cierre normal de uno con discrepancia).
  */
-export function FormularioConToast({
+export function FormularioConToast<TResultado = void>({
   action,
   mensajeExito,
   children,
   ...props
 }: Omit<FormHTMLAttributes<HTMLFormElement>, "action"> & {
-  action: (formData: FormData) => Promise<void>;
-  mensajeExito: string;
+  action: (formData: FormData) => Promise<TResultado>;
+  mensajeExito: string | ((resultado: TResultado) => { mensaje: string; tono?: TonoToast });
 }) {
   const { mostrarToast } = useToast();
 
   async function accionConAviso(formData: FormData) {
-    await action(formData);
-    mostrarToast(mensajeExito);
+    const resultado = await action(formData);
+    if (typeof mensajeExito === "function") {
+      const { mensaje, tono } = mensajeExito(resultado);
+      mostrarToast(mensaje, tono);
+    } else {
+      mostrarToast(mensajeExito);
+    }
   }
 
   return (

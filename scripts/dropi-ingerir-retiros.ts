@@ -46,10 +46,10 @@ function fechaLocal(isoUtc: string): string {
   return fecha.toISOString().slice(0, 10);
 }
 
-function mapearEstado(status: string): "solicitado" | "procesado" | "rechazado" {
-  if (status === "APROBADO") return "procesado";
-  if (status === "RECHAZADO") return "rechazado";
-  return "solicitado";
+function mapearEstado(status: string): "abierto" | "cerrado" | "cancelado" {
+  if (status === "APROBADO") return "cerrado";
+  if (status === "RECHAZADO") return "cancelado";
+  return "abierto";
 }
 
 async function main() {
