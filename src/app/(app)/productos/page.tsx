@@ -1,9 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { actualizarProducto } from "./actions";
+import { vincularProductoASku } from "../catalogo-maestro/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { requireModulo } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ interface ProductoFila {
   margen_minimo: number;
   ultima_modificacion_precio: string | null;
   plataforma_nombre: string | null;
+  sku_maestro_id: string | null;
 }
 
 function margenActual(p: ProductoFila): number | null {
@@ -31,8 +33,17 @@ export default async function ProductosPage() {
 
   const { data } = await supabase
     .from("productos")
-    .select("id, sku, nombre, costo, precio_actual, margen_minimo, ultima_modificacion_precio, plataformas(nombre)")
+    .select(
+      "id, sku, nombre, costo, precio_actual, margen_minimo, ultima_modificacion_precio, sku_maestro_id, plataformas(nombre)"
+    )
     .eq("pais_id", pais.id);
+
+  const { data: skusMaestrosDisponibles } = await supabase
+    .from("skus_maestros")
+    .select("id, codigo, nombre")
+    .eq("tipo", "simple")
+    .eq("estado", "aprobado")
+    .order("codigo");
 
   const productos: ProductoFila[] = (data ?? []).map((p) => ({
     id: p.id,
@@ -43,6 +54,7 @@ export default async function ProductosPage() {
     margen_minimo: Number(p.margen_minimo),
     ultima_modificacion_precio: p.ultima_modificacion_precio,
     plataforma_nombre: (p.plataformas as unknown as { nombre: string } | null)?.nombre ?? null,
+    sku_maestro_id: p.sku_maestro_id,
   }));
 
   productos.sort((a, b) => {
@@ -150,6 +162,43 @@ export default async function ProductosPage() {
               </form>
             );
           })}
+        </div>
+      )}
+
+      {skusMaestrosDisponibles !== null && productos.length > 0 && (
+        <div className="mt-8 flex flex-col gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Vincular al catálogo maestro de SKU</h2>
+            <p className="text-xs text-muted-foreground">
+              Une esta fila (específica de una plataforma) con el SKU maestro que representa el
+              mismo producto físico, para que el inventario cuadre entre plataformas.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {productos.map((p) => (
+              <form
+                key={p.id}
+                action={vincularProductoASku}
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3"
+              >
+                <input type="hidden" name="producto_id" value={p.id} />
+                <div className="min-w-[10rem] flex-1 text-sm">
+                  {p.nombre} <span className="text-xs text-muted-foreground">({p.sku})</span>
+                </div>
+                <select name="sku_maestro_id" defaultValue={p.sku_maestro_id ?? ""} className={`${fieldClass} w-64`}>
+                  <option value="">Sin vincular</option>
+                  {(skusMaestrosDisponibles ?? []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.codigo} — {s.nombre}
+                    </option>
+                  ))}
+                </select>
+                <Button type="submit" variant="secondary" className="text-xs">
+                  Guardar
+                </Button>
+              </form>
+            ))}
+          </div>
         </div>
       )}
     </main>

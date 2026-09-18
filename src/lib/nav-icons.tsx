@@ -44,6 +44,15 @@ export function TiendaIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function CatalogoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M20.6 12.5l-8.1 8.1a2 2 0 0 1-2.8 0l-6.3-6.3a2 2 0 0 1 0-2.8l8.1-8.1a2 2 0 0 1 1.4-.6h5.7a2 2 0 0 1 2 2v5.7a2 2 0 0 1-.6 1.4Z" />
+      <circle cx="15.5" cy="8.5" r="1.5" />
+    </Icon>
+  );
+}
+
 export function RecursosHumanosIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
@@ -66,5 +75,6 @@ export function ChevronRightIcon(props: SVGProps<SVGSVGElement>) {
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   Proveeduría: ProveeduriaIcon,
   Tiendas: TiendaIcon,
+  Catálogo: CatalogoIcon,
   "Recursos Humanos": RecursosHumanosIcon,
 };

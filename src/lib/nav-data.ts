@@ -11,6 +11,10 @@ export interface NavSection {
 
 export const NAV_SECTIONS: NavSection[] = [
   {
+    title: "Catálogo",
+    items: [{ label: "SKU maestro", href: "/catalogo-maestro" }],
+  },
+  {
     title: "Recursos Humanos",
     items: [
       { label: "Contrataciones", pronto: true },
