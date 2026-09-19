@@ -119,7 +119,7 @@ export default async function RetirosPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Consolidación de retiros</h1>
+        <h1 className="text-lg font-semibold tracking-tight">Conciliación de Retiros</h1>
       </div>
 
       <div>

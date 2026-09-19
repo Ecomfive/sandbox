@@ -36,7 +36,7 @@ export default async function CuentasRetiroPage() {
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10">
       <div>
         <Link href="/retiros" className={linkClass}>
-          ← Retiros y wallet
+          ← Conciliación de Retiros
         </Link>
         <h1 className="mt-2 text-lg font-semibold tracking-tight">Cuentas de retiro</h1>
         <p className="mt-1 text-sm text-muted-foreground">
