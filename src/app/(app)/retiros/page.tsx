@@ -5,31 +5,16 @@ import { registrarSaldo } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
-import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
-import { formatearFecha, formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { FormularioConToast } from "@/components/ui/toast";
 import { linkClass } from "@/components/ui/link";
 import { WalletIcon } from "@/lib/nav-icons";
+import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
 
 export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
-
-const ESTADO_TONO = {
-  abierto: "info",
-  cancelado: "neutral",
-  novedad: "destructive",
-  cerrado: "success",
-} as const;
-
-const ESTADO_ETIQUETA: Record<string, string> = {
-  abierto: "Abierto",
-  cancelado: "Cancelado",
-  novedad: "Novedad",
-  cerrado: "Cerrado",
-};
 
 export default async function RetirosPage() {
   await requireModulo("retiros");
@@ -78,6 +63,16 @@ export default async function RetirosPage() {
   const totalCerradoMes = (retiros ?? [])
     .filter((r) => r.estado === "cerrado" && r.fecha.slice(0, 7) === mesActual)
     .reduce((acc, r) => acc + Number(r.monto), 0);
+
+  const filasRetiro: FilaRetiro[] = (retiros ?? []).map((r) => ({
+    id: r.id,
+    numeroCorrelativo: r.numero_correlativo,
+    fecha: r.fecha,
+    plataformaNombre: (r.plataformas as unknown as { nombre: string } | null)?.nombre ?? null,
+    destino: (r.cuentas_retiro as unknown as { nombre: string } | null)?.nombre ?? r.banco ?? "—",
+    monto: Number(r.monto),
+    estado: r.estado,
+  }));
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
@@ -183,51 +178,7 @@ export default async function RetirosPage() {
           </KpiGrid>
         </div>
 
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full min-w-[42rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">#</th>
-                <th className="py-2 pr-3 font-medium">Creación</th>
-                <th className="py-2 pr-3 font-medium">Plataforma</th>
-                <th className="py-2 pr-3 font-medium">Destino</th>
-                <th className="py-2 pr-3 font-medium">Monto</th>
-                <th className="py-2 pr-3 font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(retiros ?? []).map((r) => {
-                const plataforma = r.plataformas as unknown as { nombre: string } | null;
-                const cuenta = r.cuentas_retiro as unknown as { nombre: string } | null;
-                return (
-                  <tr
-                    key={r.id}
-                    className="relative border-b border-border/60 last:border-0 hover:bg-muted/50"
-                  >
-                    <td className="py-2 pr-3 pl-4">
-                      <Link
-                        href={`/retiros/${r.id}`}
-                        className={`${linkClass} after:absolute after:inset-0 after:content-['']`}
-                      >
-                        #{String(r.numero_correlativo).padStart(4, "0")}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-3">{formatearFechaNumerica(r.fecha)}</td>
-                    <td className="py-2 pr-3 text-muted-foreground">{plataforma?.nombre}</td>
-                    <td className="py-2 pr-3 text-muted-foreground">{cuenta?.nombre ?? r.banco ?? "—"}</td>
-                    <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(r.monto), pais.codigo)}</td>
-                    <td className="py-2 pr-3">
-                      <Badge tone={ESTADO_TONO[r.estado as keyof typeof ESTADO_TONO]}>
-                        {ESTADO_ETIQUETA[r.estado] ?? r.estado}
-                      </Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {(retiros ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
-        </div>
+        <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} />
       </div>
     </main>
   );
