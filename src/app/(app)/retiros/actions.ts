@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
+import { insertarConCorrelativo, leerCorrelativo } from "@/lib/retiros/correlativo";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
@@ -61,13 +62,20 @@ export async function registrarSaldo(formData: FormData) {
   revalidatePath("/retiros");
 }
 
-/** Aparta el próximo correlativo al abrir la ventana de crear. Devuelve null si no se pudo (se asignará al guardar). */
-export async function reservarCorrelativo(): Promise<number | null> {
-  await requireModuloEscritura("retiros");
-  const supabase = createServiceClient();
-  const { data, error } = await supabase.rpc("reservar_correlativo_retiro");
+async function consultarSiguienteCorrelativo(supabase: ReturnType<typeof createServiceClient>): Promise<number | null> {
+  const { data, error } = await supabase.rpc("siguiente_correlativo_retiro");
   const numero = Number(data);
   return error || !Number.isInteger(numero) || numero < 1 ? null : numero;
+}
+
+/**
+ * Muestra el correlativo que tendría el próximo retiro, SIN gastarlo: abrir la ficha de crear y no
+ * guardar deja el mismo número para la próxima vez. Solo se asigna de verdad al crear el retiro.
+ * Devuelve null si no se pudo consultar (entonces se asigna al guardar).
+ */
+export async function verSiguienteCorrelativo(): Promise<number | null> {
+  await requireModuloEscritura("retiros");
+  return consultarSiguienteCorrelativo(createServiceClient());
 }
 
 export async function crearRetiro(formData: FormData) {
@@ -85,40 +93,48 @@ export async function crearRetiro(formData: FormData) {
   // La persona asignada la pone el sistema: quien crea el retiro.
   const usuario = await getUsuarioActual();
   const asignado_a = usuario?.id ?? null;
-  const correlativoTexto = (formData.get("numero_correlativo") as string) || "";
-  const numero_correlativo = /^\d+$/.test(correlativoTexto) ? Number(correlativoTexto) : null;
+  // El número que vio la persona al abrir la ficha; se usa si sigue libre (es el que escribirá en Dropi).
+  const correlativoPedido = leerCorrelativo(formData.get("numero_correlativo") as string | null);
 
   const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("retiros")
-    .insert({
-      ...(numero_correlativo !== null ? { numero_correlativo } : {}),
-      pais_id,
-      plataforma_id,
-      cuenta_retiro_id,
-      monto,
-      comision,
-      a_recibir,
-      fecha,
-      notas,
-      asignado_a,
-      fecha_limite,
-      estado: "abierto",
-    })
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
+  const { data, error } = await insertarConCorrelativo<{ id: string; numero_correlativo: number }>(
+    async (numero_correlativo) =>
+      await supabase
+        .from("retiros")
+        .insert({
+          ...(numero_correlativo !== null ? { numero_correlativo } : {}),
+          pais_id,
+          plataforma_id,
+          cuenta_retiro_id,
+          monto,
+          comision,
+          a_recibir,
+          fecha,
+          notas,
+          asignado_a,
+          fecha_limite,
+          estado: "abierto",
+        })
+        .select("id, numero_correlativo")
+        .single(),
+    () => consultarSiguienteCorrelativo(supabase),
+    correlativoPedido
+  );
+  if (error || !data) throw new Error(error?.message ?? "No se pudo crear el retiro");
 
+  const correlativoFinal = Number(data.numero_correlativo);
   await registrarEvento(supabase, data.id, `Retiro creado por ${monto.toFixed(2)}`);
   await registrarAuditoria({
     accion: "crear_retiro",
     entidad: "retiros",
     entidadId: data.id,
-    detalle: `monto=${monto.toFixed(2)} comision=${comision.toFixed(2)} a_recibir=${a_recibir.toFixed(2)}`,
+    detalle: `correlativo=${correlativoFinal} monto=${monto.toFixed(2)} comision=${comision.toFixed(2)} a_recibir=${a_recibir.toFixed(2)}`,
   });
 
   revalidatePath("/retiros");
-  redirect(`/retiros/${data.id}`);
+  // Si otra persona ocupó primero el número que se mostró, la ficha del retiro lo avisa.
+  const cambio = correlativoPedido !== null && correlativoPedido !== correlativoFinal;
+  redirect(`/retiros/${data.id}${cambio ? `?correlativo_cambio=${correlativoPedido}` : ""}`);
 }
 
 export async function cerrarRetiro(formData: FormData) {
