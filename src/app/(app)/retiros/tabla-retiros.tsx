@@ -44,18 +44,9 @@ const ESTADO_TONO = {
   cerrado: "success",
 } as const;
 
-type ColumnaId =
-  | "consolidacion"
-  | "correlativo"
-  | "fecha"
-  | "plataforma"
-  | "destino"
-  | "monto"
-  | "estado"
-  | "dropi";
+type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado" | "dropi";
 
 const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?: string }[] = [
-  { id: "consolidacion", label: "Consolidación", ocultable: true },
   { id: "correlativo", label: "#", ocultable: false, claseCelda: "font-semibold" },
   { id: "fecha", label: "Creación", ocultable: true },
   { id: "plataforma", label: "Plataforma", ocultable: true, claseCelda: "text-muted-foreground" },
@@ -75,8 +66,6 @@ function esColumnaId(valor: unknown): valor is ColumnaId {
 
 function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
   switch (id) {
-    case "consolidacion":
-      return <ConsolidadoToggle id={fila.id} consolidado={fila.consolidado} />;
     case "correlativo":
       return (
         <Link
@@ -235,6 +224,9 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
       <table className="w-full min-w-[42rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+            <th className="border-r border-border/60 px-4 py-3 text-xs font-semibold tracking-wide uppercase">
+              Consolidación
+            </th>
             {columnasVisibles.map((columna, i) => (
               <th
                 key={columna.id}
@@ -253,6 +245,9 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
         <tbody>
           {visibles.map((fila) => (
             <tr key={fila.id} className="relative border-b border-border/60 last:border-0 hover:bg-muted/50">
+              <td className="border-r border-border/40 px-4 py-3">
+                <ConsolidadoToggle id={fila.id} consolidado={fila.consolidado} />
+              </td>
               {columnasVisibles.map((columna, i) => (
                 <td
                   key={columna.id}
