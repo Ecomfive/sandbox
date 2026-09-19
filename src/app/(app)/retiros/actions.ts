@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { getUsuarioActual } from "@/lib/auth";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
@@ -66,13 +67,12 @@ export async function crearRetiro(formData: FormData) {
   const comision = Number(formData.get("comision") || 0);
   const fecha = formData.get("fecha") as string;
   const notas = (formData.get("notas") as string) || null;
-  const asignado_a = (formData.get("asignado_a") as string) || null;
-  const prioridad = (formData.get("prioridad") as string) || null;
   const fecha_limite = (formData.get("fecha_limite") as string) || null;
-  const etiquetas = ((formData.get("etiquetas") as string) || "")
-    .split(",")
-    .map((e) => e.trim())
-    .filter(Boolean);
+  const aRecibirTexto = (formData.get("a_recibir") as string) || "";
+  const a_recibir = aRecibirTexto !== "" && !Number.isNaN(Number(aRecibirTexto)) ? Number(aRecibirTexto) : monto - comision;
+  // La persona asignada la pone el sistema: quien crea el retiro.
+  const usuario = await getUsuarioActual();
+  const asignado_a = usuario?.id ?? null;
   const correlativoTexto = (formData.get("numero_correlativo") as string) || "";
   const numero_correlativo = /^\d+$/.test(correlativoTexto) ? Number(correlativoTexto) : null;
 
@@ -86,12 +86,11 @@ export async function crearRetiro(formData: FormData) {
       cuenta_retiro_id,
       monto,
       comision,
+      a_recibir,
       fecha,
       notas,
       asignado_a,
-      prioridad,
       fecha_limite,
-      etiquetas,
       estado: "abierto",
     })
     .select("id")
@@ -103,7 +102,7 @@ export async function crearRetiro(formData: FormData) {
     accion: "crear_retiro",
     entidad: "retiros",
     entidadId: data.id,
-    detalle: `monto=${monto.toFixed(2)} comision=${comision.toFixed(2)}`,
+    detalle: `monto=${monto.toFixed(2)} comision=${comision.toFixed(2)} a_recibir=${a_recibir.toFixed(2)}`,
   });
 
   revalidatePath("/retiros");
@@ -121,7 +120,7 @@ export async function cerrarRetiro(formData: FormData) {
 
   const { data: retiro, error: errorRetiro } = await supabase
     .from("retiros")
-    .select("monto_neto, comprobante_path")
+    .select("a_recibir, monto_neto, comprobante_path")
     .eq("id", id)
     .single();
   if (errorRetiro) throw new Error(errorRetiro.message);
@@ -136,7 +135,8 @@ export async function cerrarRetiro(formData: FormData) {
     comprobante_path = ruta;
   }
 
-  const diferencia = montoRecibido - Number(retiro.monto_neto);
+  const esperado = Number(retiro.a_recibir ?? retiro.monto_neto);
+  const diferencia = montoRecibido - esperado;
   const conDiscrepancia = Math.abs(diferencia) > TOLERANCIA_DISCREPANCIA;
   const estado = conDiscrepancia ? "novedad" : "cerrado";
 
@@ -156,7 +156,7 @@ export async function cerrarRetiro(formData: FormData) {
     supabase,
     id,
     conDiscrepancia
-      ? `Novedad: se esperaban ${Number(retiro.monto_neto).toFixed(2)} y llegaron ${montoRecibido.toFixed(2)} (diferencia de ${diferencia.toFixed(2)})`
+      ? `Novedad: se esperaban ${esperado.toFixed(2)} y llegaron ${montoRecibido.toFixed(2)} (diferencia de ${diferencia.toFixed(2)})`
       : `Retiro cerrado: monto recibido ${montoRecibido.toFixed(2)}`
   );
   await registrarAuditoria({

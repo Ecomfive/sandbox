@@ -22,13 +22,11 @@ export interface FilaRetiro {
   monto: number;
   estado: string;
   comision: number;
-  montoNeto: number;
+  aRecibir: number;
   montoRecibido: number | null;
   fechaCierre: string | null;
   fechaLimite: string | null;
-  prioridad: string | null;
   asignadoNombre: string | null;
-  etiquetas: string[];
   estadoDropi: string | null;
   notas: string | null;
   soporteNumero: string | null;
