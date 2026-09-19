@@ -35,11 +35,11 @@ const ESTADO_ETIQUETA: Record<string, string> = {
 type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado";
 
 const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?: string }[] = [
-  { id: "correlativo", label: "#", ocultable: false },
+  { id: "correlativo", label: "#", ocultable: false, claseCelda: "font-semibold" },
   { id: "fecha", label: "Creación", ocultable: true },
   { id: "plataforma", label: "Plataforma", ocultable: true, claseCelda: "text-muted-foreground" },
   { id: "destino", label: "Destino", ocultable: true, claseCelda: "text-muted-foreground" },
-  { id: "monto", label: "Monto", ocultable: true, claseCelda: "tabular-nums" },
+  { id: "monto", label: "Monto", ocultable: true, claseCelda: "tabular-nums font-semibold" },
   { id: "estado", label: "Estado", ocultable: true },
 ];
 
@@ -192,7 +192,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
             {columnasVisibles.map((columna, i) => (
               <th
                 key={columna.id}
-                className={`py-2 pr-3 text-xs font-semibold tracking-wide uppercase ${i === 0 ? "pl-4" : ""} ${
+                className={`px-4 py-3 text-xs font-semibold tracking-wide uppercase ${
                   i < columnasVisibles.length - 1 ? "border-r border-border/60" : ""
                 }`}
               >
@@ -208,7 +208,12 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
           {retiros.map((fila) => (
             <tr key={fila.id} className="relative border-b border-border/60 last:border-0 hover:bg-muted/50">
               {columnasVisibles.map((columna, i) => (
-                <td key={columna.id} className={`py-2 pr-3 ${i === 0 ? "pl-4" : ""} ${columna.claseCelda ?? ""}`}>
+                <td
+                  key={columna.id}
+                  className={`px-4 py-3 ${i < columnasVisibles.length - 1 ? "border-r border-border/40" : ""} ${
+                    columna.claseCelda ?? ""
+                  }`}
+                >
                   {renderCelda(columna.id, fila, codigoPais)}
                 </td>
               ))}
