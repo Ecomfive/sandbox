@@ -214,7 +214,7 @@ function Bitacora({ eventos, codigoPais }: { eventos: EventoAuditoria[]; codigoP
         />
       </label>
 
-      <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[48rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -283,7 +283,7 @@ function SincronizacionDropi({ sesiones, codigoPais }: { sesiones: SesionDropi[]
         Cada país tiene una sesión abierta con Dropi que una tarea programada en el equipo del
         proveedor renueva cada 6 horas. Aquí queda el resultado de la última vez que corrió.
       </p>
-      <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[40rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">

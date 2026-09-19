@@ -50,7 +50,7 @@ export default async function ConfiguracionPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <ConfiguracionIcon className="h-5 w-5 text-muted-foreground" />
           Configuración del sistema
         </h1>
@@ -59,7 +59,7 @@ export default async function ConfiguracionPage() {
 
       <div className="flex flex-col gap-3">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">Plataformas para crear retiros</h2>
+          <h2 className="text-sm font-semibold tracking-tight">Plataformas para crear retiros</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Elige qué plataformas aparecen en el botón &quot;+ Crear&quot; de Retiros.
           </p>
@@ -68,7 +68,7 @@ export default async function ConfiguracionPage() {
         <FormularioConToast
           action={crearPlataforma}
           mensajeExito="Plataforma agregada"
-          className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+          className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
           <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
@@ -78,7 +78,7 @@ export default async function ConfiguracionPage() {
           <Button type="submit">Crear plataforma</Button>
         </FormularioConToast>
 
-        <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[24rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -103,7 +103,7 @@ export default async function ConfiguracionPage() {
 
       <div className="flex flex-col gap-3">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">Cuentas de retiro</h2>
+          <h2 className="text-sm font-semibold tracking-tight">Cuentas de retiro</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Catálogo de cuentas bancarias, Binance o tarjetas donde se puede recibir un retiro.
           </p>
@@ -112,7 +112,7 @@ export default async function ConfiguracionPage() {
         <FormularioConToast
           action={crearCuentaRetiro}
           mensajeExito="Cuenta agregada"
-          className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+          className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
           <div className="flex flex-col gap-1">
@@ -142,7 +142,7 @@ export default async function ConfiguracionPage() {
           <Button type="submit">Agregar cuenta</Button>
         </FormularioConToast>
 
-        <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

@@ -28,9 +28,9 @@ export function KpiCard({
   children?: ReactNode;
 }) {
   return (
-    <div className={`min-w-0 rounded-lg border p-4 ${tonos[tono]}`}>
+    <div className={`min-w-0 rounded-xl border p-4 ${tonos[tono]}`}>
       {titulo && (
-        <p className={`text-sm font-medium ${tono === "destructive" ? "text-red-700" : ""}`}>{titulo}</p>
+        <p className={`text-xs font-medium ${tono === "destructive" ? "text-red-700" : ""}`}>{titulo}</p>
       )}
       <p className={`mt-1 text-lg font-semibold tabular-nums ${tono === "destructive" ? "text-red-700" : ""}`}>
         {valor}

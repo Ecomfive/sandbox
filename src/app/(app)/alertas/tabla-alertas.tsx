@@ -57,12 +57,12 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-semibold tracking-tight">Alertas</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Alertas</h2>
         <a href="/api/exportar-alertas" className={linkClass}>
           Descargar CSV
         </a>
       </div>
-      <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         {seleccionadas.size > 0 && (
           <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted px-4 py-2 text-sm">
             <span>{seleccionadas.size} seleccionada{seleccionadas.size === 1 ? "" : "s"}</span>

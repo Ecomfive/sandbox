@@ -56,7 +56,7 @@ export default async function InteligenciaCompetitivaPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <InteligenciaIcon className="h-5 w-5 text-muted-foreground" />
           Inteligencia competitiva
         </h1>
@@ -67,7 +67,7 @@ export default async function InteligenciaCompetitivaPage() {
       </div>
 
       {totalProveedores === 0 ? (
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-sm font-medium">Todavía no hay proveedores rastreados para {pais.nombre}</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Este rastreo se hace con la cuenta <strong>dropshipper</strong> de Dropi de{" "}
@@ -104,7 +104,7 @@ export default async function InteligenciaCompetitivaPage() {
           </KpiGrid>
 
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="rounded-lg border border-border bg-card p-4">
+            <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-sm font-medium">Total de productos — {anioActual}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Acumulado al cierre de cada mes, entre los proveedores rastreados.
@@ -117,7 +117,7 @@ export default async function InteligenciaCompetitivaPage() {
                 <p className="mt-4 text-sm text-muted-foreground">Sin historial para {anioActual} todavía.</p>
               )}
             </div>
-            <div className="rounded-lg border border-border bg-card p-4">
+            <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-sm font-medium">Proveedores nuevos por mes — {anioActual}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Cuándo detectamos por primera vez a cada proveedor en nuestro rastreo.
@@ -139,7 +139,7 @@ export default async function InteligenciaCompetitivaPage() {
             </p>
           )}
 
-          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[42rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">

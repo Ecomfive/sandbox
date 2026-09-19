@@ -31,7 +31,7 @@ export default async function UsuariosPage() {
     const { data: roles } = await supabase.from("roles").select("id, nombre").order("nombre");
     return (
       <main className="mx-auto flex w-full max-w-lg flex-col gap-4 px-6 py-10">
-        <h1 className="text-lg font-semibold tracking-tight">Configuración inicial</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Configuración inicial</h1>
         <p className="text-sm text-muted-foreground">
           Todavía no hay ningún usuario. Invita a la primera cuenta (normalmente con rol Admin)
           para empezar a usar el sistema con login.
@@ -64,7 +64,7 @@ export default async function UsuariosPage() {
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <RecursosHumanosIcon className="h-5 w-5 text-muted-foreground" />
             Usuarios y roles
           </h1>
@@ -79,15 +79,15 @@ export default async function UsuariosPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Invitar usuario</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Invitar usuario</h2>
         <div className="mt-3">
           <InvitarForm roles={roles ?? []} />
         </div>
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Usuarios</h2>
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <h2 className="text-sm font-semibold tracking-tight">Usuarios</h2>
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -117,7 +117,7 @@ export default async function UsuariosPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Roles y permisos</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Roles y permisos</h2>
         <form action={crearRol} className="mt-3 flex items-end gap-3">
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Nuevo rol</label>
@@ -128,7 +128,7 @@ export default async function UsuariosPage() {
           </Button>
         </form>
 
-        <div className="mt-4 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="mt-4 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[40rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

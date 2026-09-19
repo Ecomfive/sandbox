@@ -63,7 +63,7 @@ export default async function ConciliacionesPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
         <ConciliacionIcon className="h-5 w-5 text-muted-foreground" />
         Conciliación banco vs. plataforma
       </h1>
@@ -95,7 +95,7 @@ export default async function ConciliacionesPage() {
             <form
               key={clave}
               action={upsertConciliacion}
-              className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+              className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
             >
               <input type="hidden" name="pais_id" value={pais.id} />
               <input type="hidden" name="plataforma_id" value={f.plataforma_id} />

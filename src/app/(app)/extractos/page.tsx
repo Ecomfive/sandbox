@@ -32,7 +32,7 @@ export default async function ExtractosPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <ExtractoIcon className="h-5 w-5 text-muted-foreground" />
           Cargar extracto bancario
         </h1>
@@ -47,14 +47,14 @@ export default async function ExtractosPage() {
 
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold tracking-tight">Extractos cargados</h2>
+          <h2 className="text-sm font-semibold tracking-tight">Extractos cargados</h2>
           <a href="/api/exportar-extractos" className={linkClass}>
             Descargar CSV
           </a>
         </div>
         <div className="mt-3 flex flex-col gap-4">
           {(extractos ?? []).map((extracto) => (
-            <div key={extracto.id} className="rounded-lg border border-border bg-card p-4">
+            <div key={extracto.id} className="rounded-xl border border-border bg-card p-4">
               <p className="mb-3 text-sm font-medium">
                 {formatearFechaHoraCompleta(extracto.fecha_carga, pais.codigo)}
               </p>

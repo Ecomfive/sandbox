@@ -118,7 +118,7 @@ export default async function RetirosPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Conciliación de Retiros</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Conciliación de Retiros</h1>
       </div>
 
       <div>
@@ -167,7 +167,7 @@ export default async function RetirosPage() {
 
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold tracking-tight">Retiros</h2>
+          <h2 className="text-sm font-semibold tracking-tight">Retiros</h2>
           <div className="flex items-center gap-4">
             <Link href="/retiros/cuentas" className={linkClass}>
               Cuentas de retiro

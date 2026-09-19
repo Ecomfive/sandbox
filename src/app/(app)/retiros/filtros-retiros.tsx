@@ -462,7 +462,7 @@ export function BotonFiltrosRetiros({
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar..."
                     aria-label="Buscar campo para filtrar"
-                    className="w-full rounded-lg border border-border bg-card py-2 pr-3 pl-8 text-sm focus:border-foreground focus:ring-2 focus:ring-foreground focus:outline-none"
+                    className="w-full rounded-xl border border-border bg-card py-2 pr-3 pl-8 text-sm focus:border-foreground focus:ring-2 focus:ring-foreground focus:outline-none"
                   />
                 </div>
                 <div className="mt-2 max-h-64 overflow-y-auto">

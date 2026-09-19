@@ -94,7 +94,7 @@ export default async function PedidosDropiPage({
   return (
     <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-8 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <PedidoIcon className="h-5 w-5 text-muted-foreground" />
           Pedidos Dropi
         </h1>
@@ -103,7 +103,7 @@ export default async function PedidosDropiPage({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border border-border bg-card p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">
           <FiltroFechas />
           <OrdenSelect actual={ordenClave} />
@@ -148,7 +148,7 @@ export default async function PedidosDropiPage({
             </div>
           )}
 
-          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">

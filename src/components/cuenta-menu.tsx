@@ -113,7 +113,7 @@ export function CuentaMenu({ usuario, expanded }: { usuario: UsuarioActual; expa
       </button>
 
       {abierto && (
-        <div className="absolute bottom-full left-2 z-30 mb-1 w-56 rounded-lg border border-border bg-card p-1 shadow-lg">
+        <div className="absolute bottom-full left-2 z-30 mb-1 w-56 rounded-xl border border-border bg-card p-1 shadow-lg">
           <div className="px-3 py-2">
             <p className="truncate text-sm font-medium text-foreground">{usuario.nombre ?? usuario.email}</p>
             <p className="truncate text-xs text-muted-foreground">{usuario.email}</p>

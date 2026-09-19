@@ -134,7 +134,7 @@ export function CrearRetiroPanel({
             aria-modal="true"
             aria-labelledby="titulo-nuevo-retiro"
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card shadow-xl"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card shadow-xl"
           >
             <form action={crearRetiro} onSubmit={() => setEnviando(true)} aria-busy={enviando}>
               <input type="hidden" name="pais_id" value={paisId} />

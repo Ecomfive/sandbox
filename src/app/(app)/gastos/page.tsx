@@ -50,7 +50,7 @@ export default async function GastosPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <GastoIcon className="h-5 w-5 text-muted-foreground" />
           Nómina y gastos
         </h1>
@@ -60,7 +60,7 @@ export default async function GastosPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Este mes</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Este mes</h2>
         {gastosMes.length === 0 ? (
           <EstadoVacio mensaje={`Todavía no hay gastos registrados para ${mesActual}.`} />
         ) : (
@@ -80,11 +80,11 @@ export default async function GastosPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Registrar gasto</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Registrar gasto</h2>
         <FormularioConToast
           action={registrarGasto}
           mensajeExito="Gasto registrado"
-          className="mt-3 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+          className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
           <div className="flex flex-col gap-1">
@@ -121,8 +121,8 @@ export default async function GastosPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Gastos recientes</h2>
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <h2 className="text-sm font-semibold tracking-tight">Gastos recientes</h2>
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

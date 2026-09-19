@@ -48,7 +48,7 @@ export default async function DetalleProveedorCompetenciaPage({
         <Link href="/inteligencia-competitiva" className="text-sm text-muted-foreground hover:underline">
           ← Inteligencia competitiva
         </Link>
-        <h1 className="mt-2 text-lg font-semibold tracking-tight">{proveedor.tienda || proveedor.nombre}</h1>
+        <h1 className="mt-2 text-xl font-semibold tracking-tight">{proveedor.tienda || proveedor.nombre}</h1>
         {proveedor.tienda && <p className="text-sm text-muted-foreground">{proveedor.nombre}</p>}
         <p className="mt-1 text-sm text-muted-foreground">
           {proveedor.ciudad ?? "Ciudad desconocida"} · {proveedor.categorias.join(", ") || "Sin categorías"}
@@ -62,13 +62,13 @@ export default async function DetalleProveedorCompetenciaPage({
         <EstadoVacio mensaje="Todavía no hay rastreos registrados para este proveedor." />
       ) : (
         <>
-          <div className="rounded-lg border border-border bg-card p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-sm font-medium">Productos actuales</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{actual.productos_count}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Última carga: {formatearFecha(actual.fecha)}</p>
           </div>
 
-          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[28rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -111,7 +111,7 @@ export default async function DetalleProveedorCompetenciaPage({
             proveedores; hay que revisar la ficha individual con la sesión de dropshipper activa.
           </p>
 
-          <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+          <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[20rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-muted-foreground">

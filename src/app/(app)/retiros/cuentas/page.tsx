@@ -38,7 +38,7 @@ export default async function CuentasRetiroPage() {
         <Link href="/retiros" className={linkClass}>
           ← Conciliación de Retiros
         </Link>
-        <h1 className="mt-2 text-lg font-semibold tracking-tight">Cuentas de retiro</h1>
+        <h1 className="mt-2 text-xl font-semibold tracking-tight">Cuentas de retiro</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {pais.nombre} — catálogo de cuentas bancarias, Binance o tarjetas donde se puede recibir
           un retiro. Se seleccionan como destino al crear un retiro.
@@ -48,7 +48,7 @@ export default async function CuentasRetiroPage() {
       <FormularioConToast
         action={crearCuentaRetiro}
         mensajeExito="Cuenta agregada"
-        className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+        className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
       >
         <input type="hidden" name="pais_id" value={pais.id} />
         <div className="flex flex-col gap-1">
@@ -83,7 +83,7 @@ export default async function CuentasRetiroPage() {
         <Button type="submit">Agregar cuenta</Button>
       </FormularioConToast>
 
-      <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[36rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">

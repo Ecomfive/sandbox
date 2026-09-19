@@ -66,7 +66,7 @@ export default async function CatalogoMaestroPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <CatalogoIcon className="h-5 w-5 text-muted-foreground" />
           Catálogo maestro de SKU
         </h1>
@@ -84,7 +84,7 @@ export default async function CatalogoMaestroPage() {
       </KpiGrid>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <form action={crearSkuSimple} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+        <form action={crearSkuSimple} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Proponer SKU simple</h2>
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Nombre</label>
@@ -99,7 +99,7 @@ export default async function CatalogoMaestroPage() {
           </Button>
         </form>
 
-        <form action={crearCombo} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+        <form action={crearCombo} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Proponer combo</h2>
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Nombre</label>
@@ -126,7 +126,7 @@ export default async function CatalogoMaestroPage() {
         </form>
       </div>
 
-      <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[48rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">

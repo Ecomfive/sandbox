@@ -82,7 +82,7 @@ export default async function ProductosPage({
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
-      <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
         <ProductoIcon className="h-5 w-5 text-muted-foreground" />
         Productos y márgenes
       </h1>
@@ -106,7 +106,7 @@ export default async function ProductosPage({
         />
       ) : (
         <>
-          <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
+          <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4">
             <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
               <label className={labelClassSm}>Buscar por nombre o SKU</label>
               <input
@@ -153,7 +153,7 @@ export default async function ProductosPage({
               <form
                 key={p.id}
                 action={vincularProductoASku}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3"
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3"
               >
                 <input type="hidden" name="producto_id" value={p.id} />
                 <div className="min-w-[10rem] flex-1 text-sm">

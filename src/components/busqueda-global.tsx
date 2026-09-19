@@ -58,7 +58,7 @@ export function BusquedaGlobal() {
         className="w-full rounded-full border border-border bg-background px-3.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-foreground"
       />
       {abierto && (
-        <div className="absolute top-full left-0 z-40 mt-1 max-h-80 w-full min-w-[20rem] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg">
+        <div className="absolute top-full left-0 z-40 mt-1 max-h-80 w-full min-w-[20rem] overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg">
           {pending && <p className="px-3 py-2 text-xs text-muted-foreground">Buscando…</p>}
           {!pending && resultados.length === 0 && (
             <p className="px-3 py-2 text-xs text-muted-foreground">Sin resultados para “{consulta}”.</p>

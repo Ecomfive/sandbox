@@ -55,7 +55,7 @@ export default async function CrmDropshippersPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <DropshipperIcon className="h-5 w-5 text-muted-foreground" />
           CRM Dropshippers
         </h1>
@@ -66,10 +66,10 @@ export default async function CrmDropshippersPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Agregar dropshipper</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Agregar dropshipper</h2>
         <form
           action={crearDropshipper}
-          className="mt-3 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+          className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
           <div className="flex flex-col gap-1">
@@ -89,7 +89,7 @@ export default async function CrmDropshippersPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Dropshippers</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Dropshippers</h2>
         {(dropshippers ?? []).length === 0 ? (
           <EstadoVacio
             mensaje={`Todavía no hay dropshippers registrados para ${pais.nombre}.`}
@@ -101,7 +101,7 @@ export default async function CrmDropshippersPage() {
               <form
                 key={d.id}
                 action={actualizarDropshipper}
-                className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+                className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
               >
                 <input type="hidden" name="id" value={d.id} />
                 <div className="min-w-[10rem] flex-1">
@@ -148,7 +148,7 @@ export default async function CrmDropshippersPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Registrar interacción</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Registrar interacción</h2>
         {(dropshippers ?? []).length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">
             Agrega al menos un dropshipper para poder registrar interacciones.
@@ -156,7 +156,7 @@ export default async function CrmDropshippersPage() {
         ) : (
           <form
             action={registrarInteraccion}
-            className="mt-3 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+            className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
           >
             <div className="flex flex-col gap-1">
               <label className={labelClass}>Dropshipper</label>
@@ -192,8 +192,8 @@ export default async function CrmDropshippersPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Interacciones recientes</h2>
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <h2 className="text-sm font-semibold tracking-tight">Interacciones recientes</h2>
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

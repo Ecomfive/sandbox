@@ -24,13 +24,13 @@ export interface FilaSinVincular {
 export function DropiSinVincular({ filas, codigoPais }: { filas: FilaSinVincular[]; codigoPais: string }) {
   return (
     <div>
-      <h2 className="text-base font-semibold tracking-tight">Retiros de Dropi sin vincular</h2>
+      <h2 className="text-sm font-semibold tracking-tight">Retiros de Dropi sin vincular</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Dropi los reportó, pero su concepto no trae el correlativo de un retiro creado aquí. Escribe el correlativo
         (por ejemplo #0007) en el concepto del retiro en Dropi y vuelve a actualizar.
       </p>
 
-      <div className="mt-3 min-w-0 rounded-lg border border-border bg-card">
+      <div className="mt-3 min-w-0 rounded-xl border border-border bg-card">
         {filas.length === 0 ? (
           <EstadoVacio mensaje="No hay retiros de Dropi pendientes de vincular." />
         ) : (

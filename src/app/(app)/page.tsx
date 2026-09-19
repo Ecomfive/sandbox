@@ -194,7 +194,7 @@ export default async function Home({
     <main className="mx-auto w-full max-w-[1600px] px-8 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <DashboardIcon className="h-5 w-5 text-muted-foreground" />
             Dashboard operativo
           </h1>

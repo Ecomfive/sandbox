@@ -26,14 +26,14 @@ export default async function AuditoriaPage() {
         <Link href="/usuarios" className={linkClass}>
           ← Usuarios y roles
         </Link>
-        <h1 className="mt-2 text-lg font-semibold tracking-tight">Historial de auditoría</h1>
+        <h1 className="mt-2 text-xl font-semibold tracking-tight">Historial de auditoría</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Quién modificó qué en operaciones sensibles — retiros, márgenes de productos y saldos de
           wallet. Los últimos 200 movimientos.
         </p>
       </div>
 
-      <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[48rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">

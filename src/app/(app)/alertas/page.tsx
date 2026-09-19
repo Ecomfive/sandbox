@@ -43,7 +43,7 @@ export default async function AlertasPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <AlertaIcon className="h-5 w-5 text-muted-foreground" />
           Inventario pendiente de retorno
         </h1>
@@ -54,7 +54,7 @@ export default async function AlertasPage() {
           </Link>
           . Generar una alerta la deja lista para el reclamo quincenal a la plataforma.
         </p>
-        <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[32rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

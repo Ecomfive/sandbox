@@ -27,7 +27,7 @@ export default async function NotificacionesPage() {
       <div className="flex items-center gap-3">
         <NotificacionesIcon className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">Centro de notificaciones</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Centro de notificaciones</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Lo que hay que corregir hoy, quién hizo qué en operaciones sensibles, y si las sesiones
             de Dropi siguen vivas — todo en un solo lugar.

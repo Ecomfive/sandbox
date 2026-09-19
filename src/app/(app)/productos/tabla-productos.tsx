@@ -45,7 +45,7 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3">
         <input
           type="checkbox"
           checked={productos.length > 0 && seleccionados.size === productos.length}
@@ -87,7 +87,7 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
             key={`${p.id}:${p.costo}:${p.precio_actual}:${p.margen_minimo}`}
             action={actualizarProducto}
             mensajeExito="Margen actualizado"
-            className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+            className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
           >
             <input
               type="checkbox"

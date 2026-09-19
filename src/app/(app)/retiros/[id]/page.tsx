@@ -70,7 +70,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
           ← Conciliación de Retiros
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-lg font-semibold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight">
             Retiro #{String(retiro.numero_correlativo).padStart(4, "0")}
           </h1>
           <Badge tone={ESTADO_TONO[retiro.estado as keyof typeof ESTADO_TONO]}>
@@ -82,7 +82,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-card p-5 text-sm">
+      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-5 text-sm">
         <div>
           <p className="text-muted-foreground">Plataforma</p>
           <p className="font-medium">{plataforma?.nombre ?? "—"}</p>
@@ -143,7 +143,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
             retiro.estado === "novedad" ? "border-destructive/40 bg-destructive-soft" : "border-border bg-card"
           }`}
         >
-          <h2 className="mb-3 text-base font-semibold tracking-tight">Cierre</h2>
+          <h2 className="mb-3 text-sm font-semibold tracking-tight">Cierre</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-muted-foreground">Monto recibido</p>
@@ -180,8 +180,8 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
       )}
 
       {(retiro.estado === "abierto" || retiro.estado === "novedad") && (
-        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
-          <h2 className="text-base font-semibold tracking-tight">Consolidar</h2>
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold tracking-tight">Consolidar</h2>
           <CerrarRetiroForm
             retiroId={retiro.id}
             paisId={retiro.pais_id}
@@ -194,8 +194,8 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card p-5">
-        <h2 className="mb-3 text-base font-semibold tracking-tight">Historial</h2>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-3 text-sm font-semibold tracking-tight">Historial</h2>
         <div className="flex flex-col gap-3 text-sm">
           {(eventos ?? []).map((e) => (
             <div key={e.id} className="flex items-start gap-2">

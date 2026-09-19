@@ -14,7 +14,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted px-4">
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8 shadow-sm">
         <Image
           src="/brand/ecomfive-rojo.png"
           alt="Ecomfive"
@@ -22,7 +22,7 @@ export default function LoginPage() {
           height={44}
           className="mx-auto h-8 w-auto"
         />
-        <h1 className="mt-6 text-center text-lg font-semibold tracking-tight">
+        <h1 className="mt-6 text-center text-xl font-semibold tracking-tight">
           Sistema Gestión de Plataformas
         </h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">

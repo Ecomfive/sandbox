@@ -187,7 +187,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
   const columnasVisibles = orden.filter((id) => !ocultas.has(id)).map((id) => COLUMNAS_POR_ID.get(id)!);
 
   return (
-    <div className="mt-3 min-w-0 rounded-lg border border-border bg-card">
+    <div className="mt-3 min-w-0 rounded-xl border border-border bg-card">
       <div
         ref={contenedorRef}
         className="flex items-center justify-end gap-2 border-b border-border bg-muted/50 px-2 py-1.5"
@@ -210,7 +210,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
             Columnas
           </button>
           {menuAbierto && (
-            <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-border bg-card p-1 shadow-lg">
+            <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-border bg-card p-1 shadow-lg">
               {orden.map((id, indice) => {
                 const columna = COLUMNAS_POR_ID.get(id)!;
                 return (

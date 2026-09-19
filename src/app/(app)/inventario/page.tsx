@@ -24,7 +24,7 @@ export default async function InventarioPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <InventarioIcon className="h-5 w-5 text-muted-foreground" />
           Cargar movimientos de inventario (pistoleo)
         </h1>
@@ -35,8 +35,8 @@ export default async function InventarioPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Movimientos recientes</h2>
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        <h2 className="text-sm font-semibold tracking-tight">Movimientos recientes</h2>
+        <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[36rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">

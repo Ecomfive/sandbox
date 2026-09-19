@@ -52,7 +52,7 @@ export function DescargarFicha({ retiroId }: { retiroId: string }) {
           id="formatos-ficha"
           role="group"
           aria-label="Formatos de descarga"
-          className="absolute right-0 z-20 mt-1 w-60 rounded-lg border border-border bg-card p-1 shadow-lg"
+          className="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-border bg-card p-1 shadow-lg"
         >
           {FORMATOS.map((formato) => (
             <a

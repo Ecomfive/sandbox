@@ -97,7 +97,7 @@ export function ExtractoUploader({ pais }: { pais: Pais }) {
       </div>
 
       {headers.length > 0 && (
-        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
           <p className="text-sm font-medium">Mapeo de columnas</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">

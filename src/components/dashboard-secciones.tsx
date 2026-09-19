@@ -47,9 +47,9 @@ export function DashboardSecciones({
 
       <div className="mt-6">
         {seccion ? (
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold tracking-tight">{seccion.titulo}</h2>
+              <h2 className="text-sm font-semibold tracking-tight">{seccion.titulo}</h2>
               <div className="flex gap-3">
                 {seccion.enlaces.map((e) => (
                   <Link key={e.href} href={e.href} className={`text-xs ${linkClass}`}>

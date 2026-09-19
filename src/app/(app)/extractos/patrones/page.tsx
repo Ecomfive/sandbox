@@ -31,7 +31,7 @@ export default async function PatronesBancariosPage() {
         <Link href="/extractos" className={linkClass}>
           ← Cargar extracto bancario
         </Link>
-        <h1 className="mt-2 text-lg font-semibold tracking-tight">Diccionario de patrones bancarios</h1>
+        <h1 className="mt-2 text-xl font-semibold tracking-tight">Diccionario de patrones bancarios</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {pais.nombre} — cuando la descripción de un movimiento contiene uno de estos textos, el
           sistema le asigna la plataforma sola al cargar el extracto. Se llena automáticamente cada
@@ -42,7 +42,7 @@ export default async function PatronesBancariosPage() {
       <FormularioConToast
         action={crearPatron}
         mensajeExito="Patrón guardado"
-        className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+        className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
       >
         <input type="hidden" name="pais_id" value={pais.id} />
         <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
@@ -71,7 +71,7 @@ export default async function PatronesBancariosPage() {
         <Button type="submit">Guardar patrón</Button>
       </FormularioConToast>
 
-      <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[30rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
