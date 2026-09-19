@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { AgruparIcon, CerradoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon } from "@/lib/nav-icons";
 import { ICONOS } from "./filtros-retiros";
@@ -13,6 +13,8 @@ import {
   type OrdenGrupos,
   type Vista,
 } from "./vista";
+
+const ANCHO_MENU = 224; // w-56
 
 const ORDENES: { id: OrdenGrupos; etiqueta: string; Icono: typeof FlechaArribaIcon }[] = [
   { id: "asc", etiqueta: "Ascendente", Icono: FlechaArribaIcon },
@@ -60,11 +62,38 @@ export function useVistaRetiros(): [Vista, (cambio: Partial<Vista>) => void] {
   return [vista, cambiar];
 }
 
-/** Misma familia que el botón de filtros: gris en reposo, oscuro cuando está activo. */
+/**
+ * Misma familia que el botón de filtros: círculo gris de 32 px en reposo, oscuro cuando está activo.
+ * Como en ClickUp, el botón nace compacto (solo ícono) y se despliega a pastilla con su texto al activarlo.
+ */
 const pastilla = (activa: boolean) =>
-  `inline-flex min-h-8 items-center gap-1.5 !rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap transition-colors ${anilloFoco} ${
+  `relative inline-flex h-8 items-center !rounded-full px-2 text-xs font-medium whitespace-nowrap transition-colors ${anilloFoco} ${
     activa ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
   }`;
+
+/**
+ * Ícono + texto que se despliega hacia un lado. Anima `grid-template-columns` (0fr → 1fr) para que el
+ * ancho siga al contenido sin medirlo; con movimiento reducido el cambio es instantáneo.
+ */
+function Despliegue({ expandida, children }: { expandida: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={`grid transition-[grid-template-columns] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+        expandida ? "grid-cols-[1fr]" : "grid-cols-[0fr]"
+      }`}
+    >
+      <span className="min-w-0 overflow-hidden whitespace-nowrap">
+        <span
+          className={`flex items-center gap-1.5 pr-1 pl-1.5 transition-opacity duration-150 motion-reduce:transition-none ${
+            expandida ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          {children}
+        </span>
+      </span>
+    </span>
+  );
+}
 
 /**
  * "Cerrados": muestra u oculta al instante los retiros en estado Cerrado (como en ClickUp).
@@ -86,21 +115,35 @@ export function BotonCerrados({
     : visibles
       ? "Ocultar retiros cerrados"
       : "Mostrar retiros cerrados";
+  const mostrarInsignia = !visibles && ocultos > 0;
+  // El nombre accesible contiene el texto visible ("Cerrados") y suma lo que solo se ve como insignia o tooltip.
+  const nombre = forzadoPorFiltro
+    ? "Cerrados, los pide el filtro de Estado"
+    : mostrarInsignia
+      ? `Cerrados, ${ocultos} ${ocultos === 1 ? "oculto" : "ocultos"}`
+      : "Cerrados";
   return (
     <button
       type="button"
       aria-pressed={visibles}
       aria-disabled={forzadoPorFiltro || undefined}
+      aria-label={nombre}
       onClick={() => {
         if (!forzadoPorFiltro) alAlternar();
       }}
       title={titulo}
       className={`${pastilla(visibles)} ${forzadoPorFiltro ? "cursor-not-allowed" : ""}`}
     >
-      <CerradoIcon className="h-4 w-4" />
-      Cerrados
-      {!visibles && ocultos > 0 && <span className="tabular-nums">{ocultos}</span>}
-      {forzadoPorFiltro && <span className="sr-only">(los pide el filtro de Estado)</span>}
+      <CerradoIcon className="h-4 w-4 shrink-0" />
+      <Despliegue expandida={visibles}>Cerrados</Despliegue>
+      {mostrarInsignia && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-border bg-card px-1 text-xs leading-none font-semibold text-foreground tabular-nums"
+        >
+          {ocultos}
+        </span>
+      )}
     </button>
   );
 }
@@ -153,9 +196,10 @@ export function BotonAgrupar({
 
   function alternar() {
     if (!abierto) {
-      // Si el botón cae en la mitad derecha (barra que se envuelve en pantallas angostas), la lista se abre hacia la izquierda.
+      // La lista se ancla al borde derecho del botón (que no se mueve cuando el botón se despliega hacia la
+      // izquierda); solo si no cabe hacia la izquierda, como en pantallas angostas, se ancla al borde izquierdo.
       const posicion = botonRef.current?.getBoundingClientRect();
-      setAlineadoADerecha(posicion ? posicion.left > window.innerWidth / 2 : false);
+      setAlineadoADerecha(posicion ? posicion.right >= ANCHO_MENU + 8 : true);
       alAbrir?.();
     }
     setAbierto((v) => !v);
@@ -174,6 +218,9 @@ export function BotonAgrupar({
   }
 
   const opcion = "flex min-h-9 w-full items-center gap-2.5 px-2 py-2 text-left text-sm hover:bg-muted";
+  // Se despliega con un campo elegido o mientras la lista está abierta; al cerrarla sin campo vuelve a ser solo ícono.
+  const expandida = campo !== null || abierto;
+  const nombre = campo ? `Agrupar: ${etiquetaCampo(campo)}, ${orden === "asc" ? "ascendente" : "descendente"}` : "Agrupar";
 
   return (
     <div ref={contenedorRef} className="relative">
@@ -183,22 +230,27 @@ export function BotonAgrupar({
         onClick={alternar}
         aria-expanded={abierto}
         aria-controls="menu-agrupar-retiros"
+        aria-label={nombre}
+        title="Agrupar por"
         className={pastilla(campo !== null)}
       >
-        <AgruparIcon className="h-4 w-4" />
-        {campo ? (
-          <>
-            Agrupar: <span className="font-semibold">{etiquetaCampo(campo)}</span>
-            {orden === "asc" ? (
-              <FlechaArribaIcon className="h-3.5 w-3.5" />
-            ) : (
-              <FlechaAbajoIcon className="h-3.5 w-3.5" />
-            )}
-            <span className="sr-only">({orden === "asc" ? "ascendente" : "descendente"})</span>
-          </>
-        ) : (
-          "Agrupar"
-        )}
+        <AgruparIcon className="h-4 w-4 shrink-0" />
+        <Despliegue expandida={expandida}>
+          {campo ? (
+            <>
+              <span>
+                Agrupar: <span className="font-semibold">{etiquetaCampo(campo)}</span>
+              </span>
+              {orden === "asc" ? (
+                <FlechaArribaIcon className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <FlechaAbajoIcon className="h-3.5 w-3.5 shrink-0" />
+              )}
+            </>
+          ) : (
+            "Agrupar"
+          )}
+        </Despliegue>
       </button>
       {abierto && (
         <div
