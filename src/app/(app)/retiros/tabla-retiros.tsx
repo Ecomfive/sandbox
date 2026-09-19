@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { FiltroFechaCalendario } from "@/components/filtro-fecha-calendario";
 import { linkClass } from "@/components/ui/link";
 import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
 import { ArrastrarIcon, ColumnasIcon } from "@/lib/nav-icons";
+import { ESTADO_ETIQUETA, filtrarRetiros, filtroActivo } from "./filtros";
+import { BotonFiltrosRetiros, useFiltrosRetiros } from "./filtros-retiros";
 
 export interface FilaRetiro {
   id: string;
@@ -17,7 +18,21 @@ export interface FilaRetiro {
   destino: string;
   monto: number;
   estado: string;
+  comision: number;
+  montoNeto: number;
+  montoRecibido: number | null;
+  fechaCierre: string | null;
+  fechaLimite: string | null;
+  prioridad: string | null;
+  asignadoNombre: string | null;
+  etiquetas: string[];
+  origen: "Dropi" | "Manual";
+  notas: string | null;
+  soporteNumero: string | null;
 }
+
+// Sin filtros se ven los más recientes; con filtros se busca en todos los retiros cargados.
+const LIMITE_SIN_FILTROS = 50;
 
 const ESTADO_TONO = {
   abierto: "info",
@@ -25,13 +40,6 @@ const ESTADO_TONO = {
   novedad: "destructive",
   cerrado: "success",
 } as const;
-
-const ESTADO_ETIQUETA: Record<string, string> = {
-  abierto: "Abierto",
-  cancelado: "Cancelado",
-  novedad: "Novedad",
-  cerrado: "Cerrado",
-};
 
 type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado";
 
@@ -82,15 +90,12 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
 
 /** Tabla de retiros con menú de columnas: arrastrar para reordenar, casilla para ocultar.
  * La preferencia se guarda en localStorage — cada persona en su navegador ve su propio orden. */
-export function TablaRetiros({
-  retiros,
-  codigoPais,
-  hayFiltro,
-}: {
-  retiros: FilaRetiro[];
-  codigoPais: string;
-  hayFiltro: boolean;
-}) {
+export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; codigoPais: string }) {
+  const [filtros, cambiarFiltros] = useFiltrosRetiros();
+  const hayFiltros = filtros.some(filtroActivo);
+  const coincidencias = useMemo(() => filtrarRetiros(retiros, filtros), [retiros, filtros]);
+  const visibles = hayFiltros ? coincidencias : retiros.slice(0, LIMITE_SIN_FILTROS);
+
   const [orden, setOrden] = useState<ColumnaId[]>(ORDEN_DEFECTO);
   const [ocultas, setOcultas] = useState<Set<ColumnaId>>(new Set());
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -150,7 +155,16 @@ export function TablaRetiros({
 
   return (
     <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
-      <div ref={contenedorRef} className="flex items-center justify-end border-b border-border bg-muted/50 px-2 py-1.5">
+      <div
+        ref={contenedorRef}
+        className="flex items-center justify-end gap-2 border-b border-border bg-muted/50 px-2 py-1.5"
+      >
+        <BotonFiltrosRetiros
+          filas={retiros}
+          filtros={filtros}
+          alCambiar={cambiarFiltros}
+          alAbrir={() => setMenuAbierto(false)}
+        />
         <div className="relative">
           <button
             type="button"
@@ -208,14 +222,13 @@ export function TablaRetiros({
                 <span className="inline-flex items-center gap-1.5">
                   <ArrastrarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                   {columna.label}
-                  {columna.id === "fecha" && <FiltroFechaCalendario />}
                 </span>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {retiros.map((fila) => (
+          {visibles.map((fila) => (
             <tr key={fila.id} className="relative border-b border-border/60 last:border-0 hover:bg-muted/50">
               {columnasVisibles.map((columna, i) => (
                 <td
@@ -231,10 +244,14 @@ export function TablaRetiros({
           ))}
         </tbody>
       </table>
-      {retiros.length === 0 && (
-        <EstadoVacio
-          mensaje={hayFiltro ? "No hay retiros en el período seleccionado." : "Todavía no hay retiros registrados."}
-        />
+      {retiros.length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
+      {retiros.length > 0 && visibles.length === 0 && <EstadoVacio mensaje="Ningún retiro coincide con los filtros." />}
+      {retiros.length > 0 && (hayFiltros || retiros.length > LIMITE_SIN_FILTROS) && (
+        <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+          {hayFiltros
+            ? `${visibles.length} de ${retiros.length} retiros`
+            : `Mostrando los ${LIMITE_SIN_FILTROS} más recientes de ${retiros.length}. Usa los filtros para ver el resto.`}
+        </p>
       )}
     </div>
   );

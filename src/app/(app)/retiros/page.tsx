@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
-import { resolverPeriodo } from "@/lib/dashboard/periodo";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 import { linkClass } from "@/components/ui/link";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
@@ -14,35 +13,12 @@ export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
-const COLUMNAS_RETIRO =
-  "id, numero_correlativo, monto, fecha, estado, notas, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)";
-const PRESETS_VALIDOS = ["7d", "30d", "mes_actual", "mes_anterior"];
-const esFechaIso = (valor: unknown): valor is string =>
-  typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor) && !Number.isNaN(new Date(valor).getTime());
-
-export default async function RetirosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+export default async function RetirosPage() {
   await requireModulo("retiros");
-  const sp = await searchParams;
-  const desde = esFechaIso(sp.desde) ? sp.desde : undefined;
-  const hasta = esFechaIso(sp.hasta) ? sp.hasta : undefined;
-  const preset = typeof sp.preset === "string" && PRESETS_VALIDOS.includes(sp.preset) ? sp.preset : undefined;
-  const periodo = (desde && hasta) || preset ? resolverPeriodo({ preset, desde, hasta }) : null;
-
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [
-    { data: plataformasPais },
-    { data: saldos },
-    { data: retiros },
-    { data: retirosFiltrados },
-    { data: cuentasRetiro },
-    { data: perfiles },
-  ] =
+  const [{ data: plataformasPais }, { data: saldos }, { data: retiros }, { data: cuentasRetiro }, { data: perfiles }] =
     await Promise.all([
       supabase
         .from("pais_plataformas")
@@ -55,20 +31,12 @@ export default async function RetirosPage({
         .order("fecha", { ascending: false }),
       supabase
         .from("retiros")
-        .select(COLUMNAS_RETIRO)
+        .select(
+          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, prioridad, asignado_a, etiquetas, notas, soporte_numero, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
+        )
         .eq("pais_id", pais.id)
         .order("fecha", { ascending: false })
-        .limit(50),
-      periodo
-        ? supabase
-            .from("retiros")
-            .select(COLUMNAS_RETIRO)
-            .eq("pais_id", pais.id)
-            .gte("fecha", periodo.desde)
-            .lte("fecha", periodo.hasta)
-            .order("fecha", { ascending: false })
-            .limit(50)
-        : Promise.resolve({ data: null }),
+        .limit(1000),
       supabase
         .from("cuentas_retiro")
         .select("id, nombre")
@@ -106,8 +74,8 @@ export default async function RetirosPage({
     .filter((r) => r.estado === "cerrado" && r.fecha.slice(0, 7) === mesActual)
     .reduce((acc, r) => acc + Number(r.monto), 0);
 
-  const retirosTabla = periodo ? (retirosFiltrados ?? []) : (retiros ?? []);
-  const filasRetiro: FilaRetiro[] = retirosTabla.map((r) => ({
+  const nombrePerfil = new Map((perfiles ?? []).map((p) => [p.id, p.nombre ?? p.email]));
+  const filasRetiro: FilaRetiro[] = (retiros ?? []).map((r) => ({
     id: r.id,
     numeroCorrelativo: r.numero_correlativo,
     fecha: r.fecha,
@@ -115,6 +83,17 @@ export default async function RetirosPage({
     destino: (r.cuentas_retiro as unknown as { nombre: string } | null)?.nombre ?? r.banco ?? "—",
     monto: Number(r.monto),
     estado: r.estado,
+    comision: Number(r.comision),
+    montoNeto: Number(r.monto_neto),
+    montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido),
+    fechaCierre: r.fecha_cierre,
+    fechaLimite: r.fecha_limite,
+    prioridad: r.prioridad,
+    asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,
+    etiquetas: r.etiquetas ?? [],
+    origen: r.dropi_id !== null ? "Dropi" : "Manual",
+    notas: r.notas,
+    soporteNumero: r.soporte_numero,
   }));
 
   return (
@@ -190,7 +169,7 @@ export default async function RetirosPage({
           </KpiGrid>
         </div>
 
-        <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} hayFiltro={periodo !== null} />
+        <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} />
       </div>
     </main>
   );
