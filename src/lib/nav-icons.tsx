@@ -234,6 +234,32 @@ export function EtiquetaIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function AgruparIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 6h16M4 12h11M4 18h6" />
+    </Icon>
+  );
+}
+
+export function CheckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </Icon>
+  );
+}
+
+/** Círculo con visto: "retiros cerrados". */
+export function CerradoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.5l3 3 5-6" />
+    </Icon>
+  );
+}
+
 export function CalendarioIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

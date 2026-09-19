@@ -122,7 +122,7 @@ export function valoresDeSeleccion(fila: FilaRetiro, campo: CampoId): string[] {
   }
 }
 
-const ETIQUETA_SIN_VALOR: Partial<Record<CampoId, string>> = {
+export const ETIQUETA_SIN_VALOR: Partial<Record<CampoId, string>> = {
   plataforma: "Sin plataforma",
   destino: "Sin destino",
   asignado: "Sin asignar",

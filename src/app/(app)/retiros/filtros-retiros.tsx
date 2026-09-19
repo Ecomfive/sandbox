@@ -43,7 +43,7 @@ import {
 } from "./filtros";
 import type { FilaRetiro } from "./tabla-retiros";
 
-const ICONOS: Record<CampoId, ComponentType<SVGProps<SVGSVGElement>>> = {
+export const ICONOS: Record<CampoId, ComponentType<SVGProps<SVGSVGElement>>> = {
   estado: EstadoIcon,
   plataforma: TiendaIcon,
   destino: ExtractoIcon,

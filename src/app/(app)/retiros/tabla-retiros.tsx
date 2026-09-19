@@ -8,10 +8,12 @@ import { anilloFoco } from "@/components/ui/field";
 import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
-import { ArrastrarIcon, ColumnasIcon } from "@/lib/nav-icons";
-import { ESTADO_ETIQUETA, filtrarRetiros, filtroActivo } from "./filtros";
+import { ArrastrarIcon, ChevronRightIcon, ColumnasIcon } from "@/lib/nav-icons";
+import { ESTADO_ETIQUETA, filtroActivo } from "./filtros";
 import { BotonFiltrosRetiros, useFiltrosRetiros } from "./filtros-retiros";
 import { ConsolidadoToggle } from "./consolidado-toggle";
+import { BotonAgrupar, BotonCerrados, useVistaRetiros } from "./vista-retiros";
+import { agruparRetiros, aplicarVista, type CampoAgrupable, type Grupo } from "./vista";
 
 export interface FilaRetiro {
   id: string;
@@ -33,7 +35,7 @@ export interface FilaRetiro {
   soporteNumero: string | null;
 }
 
-// Sin filtros se ven los más recientes; con filtros se busca en todos los retiros cargados.
+// Sin filtros ni grupos se ven los más recientes; con filtros o agrupando se trabaja sobre todos los retiros cargados.
 const LIMITE_SIN_FILTROS = 50;
 
 const ESTADO_TONO = {
@@ -99,13 +101,46 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
   }
 }
 
+/** Nombre del grupo: para Estado y Estado en Dropi usa la misma insignia de la columna, para el resto texto. */
+function etiquetaGrupo(campo: CampoAgrupable, grupo: Grupo) {
+  if (campo === "estado") {
+    return <Badge tone={ESTADO_TONO[grupo.clave as keyof typeof ESTADO_TONO]}>{grupo.etiqueta}</Badge>;
+  }
+  if (campo === "dropi" && grupo.clave in TONO_ESTADO_DROPI) {
+    return <Badge tone={TONO_ESTADO_DROPI[grupo.clave as EstadoDropi]}>{grupo.etiqueta}</Badge>;
+  }
+  return <span className="font-semibold">{grupo.etiqueta}</span>;
+}
+
 /** Tabla de retiros con menú de columnas: arrastrar para reordenar, casilla para ocultar.
- * La preferencia se guarda en localStorage — cada persona en su navegador ve su propio orden. */
+ * La preferencia se guarda en localStorage — cada persona en su navegador ve su propio orden.
+ * Encima de la tabla: agrupar por un campo y mostrar u ocultar los retiros cerrados (como en ClickUp). */
 export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; codigoPais: string }) {
   const [filtros, cambiarFiltros] = useFiltrosRetiros();
+  const [vista, cambiarVista] = useVistaRetiros();
   const hayFiltros = filtros.some(filtroActivo);
-  const coincidencias = useMemo(() => filtrarRetiros(retiros, filtros), [retiros, filtros]);
-  const visibles = hayFiltros ? coincidencias : retiros.slice(0, LIMITE_SIN_FILTROS);
+  const agrupado = vista.agrupar !== null;
+  const { filas: filtradas, base, cerradosOcultos, cerradosVisibles, forzadoPorFiltro } = useMemo(
+    () => aplicarVista(retiros, filtros, vista.mostrarCerrados),
+    [retiros, filtros, vista.mostrarCerrados]
+  );
+  const visibles = hayFiltros || agrupado ? filtradas : filtradas.slice(0, LIMITE_SIN_FILTROS);
+  const grupos = useMemo(
+    () => (vista.agrupar ? agruparRetiros(visibles, vista.agrupar) : []),
+    [visibles, vista.agrupar]
+  );
+
+  // Grupos contraídos: se olvidan al cambiar el campo de agrupación, porque las claves ya no aplican.
+  const [contraidosPor, setContraidosPor] = useState<{ campo: CampoAgrupable | null; claves: string[] }>({
+    campo: null,
+    claves: [],
+  });
+  const contraidos = new Set(contraidosPor.campo === vista.agrupar ? contraidosPor.claves : []);
+  function alternarGrupo(clave: string) {
+    if (!vista.agrupar) return;
+    const claves = contraidos.has(clave) ? [...contraidos].filter((c) => c !== clave) : [...contraidos, clave];
+    setContraidosPor({ campo: vista.agrupar, claves });
+  }
 
   const [orden, setOrden] = useState<ColumnaId[]>(ORDEN_DEFECTO);
   const [ocultas, setOcultas] = useState<Set<ColumnaId>>(new Set());
@@ -135,6 +170,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
   }, [orden, ocultas]);
 
   useEffect(() => {
+    if (!menuAbierto) return;
     function alHacerClicFuera(e: MouseEvent) {
       if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) {
         setMenuAbierto(false);
@@ -151,7 +187,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
       document.removeEventListener("mousedown", alHacerClicFuera);
       document.removeEventListener("keydown", alTeclear);
     };
-  }, []);
+  }, [menuAbierto]);
 
   function moverColumna(origenId: ColumnaId, destinoId: ColumnaId) {
     if (origenId === destinoId) return;
@@ -186,12 +222,59 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
 
   const columnasVisibles = orden.filter((id) => !ocultas.has(id)).map((id) => COLUMNAS_POR_ID.get(id)!);
 
+  const filaRetiro = (fila: FilaRetiro) => (
+    <tr key={fila.id} className="relative border-b border-border/60 last:border-0 hover:bg-muted/50">
+      <td className="border-r border-border/40 px-4 py-3">
+        <ConsolidadoToggle id={fila.id} consolidado={fila.consolidado} />
+      </td>
+      {columnasVisibles.map((columna, i) => (
+        <td
+          key={columna.id}
+          className={`px-4 py-3 ${i < columnasVisibles.length - 1 ? "border-r border-border/40" : ""} ${
+            columna.claseCelda ?? ""
+          }`}
+        >
+          {renderCelda(columna.id, fila, codigoPais)}
+        </td>
+      ))}
+    </tr>
+  );
+
+  const notasPie: string[] = [];
+  if (hayFiltros) notasPie.push(`${visibles.length} de ${base.length} retiros`);
+  else if (agrupado) {
+    notasPie.push(
+      `${visibles.length} ${visibles.length === 1 ? "retiro" : "retiros"} en ${grupos.length} ${grupos.length === 1 ? "grupo" : "grupos"}`
+    );
+  } else if (base.length > LIMITE_SIN_FILTROS) {
+    notasPie.push(`Mostrando los ${LIMITE_SIN_FILTROS} más recientes de ${base.length}. Usa los filtros para ver el resto.`);
+  }
+  if (!cerradosVisibles && cerradosOcultos > 0) {
+    notasPie.push(`${cerradosOcultos} ${cerradosOcultos === 1 ? "cerrado oculto" : "cerrados ocultos"}`);
+  }
+
   return (
     <div className="mt-3 min-w-0 rounded-xl border border-border bg-card">
       <div
         ref={contenedorRef}
-        className="flex items-center justify-end gap-2 border-b border-border bg-muted/50 px-2 py-1.5"
+        className="flex flex-wrap items-center justify-end gap-2 border-b border-border bg-muted/50 px-2 py-1.5"
       >
+        <BotonAgrupar
+          campo={vista.agrupar}
+          alElegir={(agrupar) => cambiarVista({ agrupar })}
+          hayGrupos={grupos.length > 0}
+          alContraerTodos={() =>
+            setContraidosPor({ campo: vista.agrupar, claves: grupos.map((grupo) => grupo.clave) })
+          }
+          alExpandirTodos={() => setContraidosPor({ campo: vista.agrupar, claves: [] })}
+          alAbrir={() => setMenuAbierto(false)}
+        />
+        <BotonCerrados
+          visibles={cerradosVisibles}
+          forzadoPorFiltro={forzadoPorFiltro}
+          ocultos={cerradosOcultos}
+          alAlternar={() => cambiarVista({ mostrarCerrados: !vista.mostrarCerrados })}
+        />
         <BotonFiltrosRetiros
           filas={retiros}
           filtros={filtros}
@@ -292,39 +375,61 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
             ))}
           </tr>
         </thead>
-        <tbody>
-          {visibles.map((fila) => (
-            <tr key={fila.id} className="relative border-b border-border/60 last:border-0 hover:bg-muted/50">
-              <td className="border-r border-border/40 px-4 py-3">
-                <ConsolidadoToggle id={fila.id} consolidado={fila.consolidado} />
-              </td>
-              {columnasVisibles.map((columna, i) => (
-                <td
-                  key={columna.id}
-                  className={`px-4 py-3 ${i < columnasVisibles.length - 1 ? "border-r border-border/40" : ""} ${
-                    columna.claseCelda ?? ""
-                  }`}
-                >
-                  {renderCelda(columna.id, fila, codigoPais)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
+        {vista.agrupar
+          ? grupos.map((grupo) => {
+              const contraido = contraidos.has(grupo.clave);
+              return (
+                <tbody key={grupo.clave}>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th scope="colgroup" colSpan={columnasVisibles.length + 1} className="p-0 text-left font-normal">
+                      <button
+                        type="button"
+                        aria-expanded={!contraido}
+                        onClick={() => alternarGrupo(grupo.clave)}
+                        className="flex min-h-11 w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
+                      >
+                        <ChevronRightIcon
+                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${
+                            contraido ? "" : "rotate-90"
+                          }`}
+                        />
+                        {etiquetaGrupo(vista.agrupar!, grupo)}
+                        <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                          {grupo.filas.length} {grupo.filas.length === 1 ? "retiro" : "retiros"} ·{" "}
+                          {formatearMoneda(grupo.total, codigoPais)}
+                        </span>
+                      </button>
+                    </th>
+                  </tr>
+                  {!contraido && grupo.filas.map((fila) => filaRetiro(fila))}
+                </tbody>
+              );
+            })
+          : (
+            <tbody>{visibles.map((fila) => filaRetiro(fila))}</tbody>
+          )}
       </table>
       </div>
-      {/* Anuncia a lectores de pantalla cuántos retiros quedan al filtrar. */}
+      {/* Anuncia a lectores de pantalla cuántos retiros se ven cuando cambian los filtros, los grupos o los cerrados. */}
       <p role="status" className="sr-only">
-        {hayFiltros ? `${visibles.length} de ${retiros.length} retiros` : ""}
+        {retiros.length > 0
+          ? `${visibles.length} ${visibles.length === 1 ? "retiro" : "retiros"}${
+              agrupado ? ` en ${grupos.length} ${grupos.length === 1 ? "grupo" : "grupos"}` : ""
+            }${!cerradosVisibles && cerradosOcultos > 0 ? `, ${cerradosOcultos} cerrados ocultos` : ""}`
+          : ""}
       </p>
       {retiros.length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
-      {retiros.length > 0 && visibles.length === 0 && <EstadoVacio mensaje="Ningún retiro coincide con los filtros." />}
-      {retiros.length > 0 && (hayFiltros || retiros.length > LIMITE_SIN_FILTROS) && (
-        <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-          {hayFiltros
-            ? `${visibles.length} de ${retiros.length} retiros`
-            : `Mostrando los ${LIMITE_SIN_FILTROS} más recientes de ${retiros.length}. Usa los filtros para ver el resto.`}
-        </p>
+      {retiros.length > 0 && visibles.length === 0 && (
+        <EstadoVacio
+          mensaje={
+            hayFiltros
+              ? "Ningún retiro coincide con los filtros."
+              : `No hay retiros abiertos por ahora. Pulsa «Cerrados» para ver los ${cerradosOcultos} cerrados.`
+          }
+        />
+      )}
+      {notasPie.length > 0 && (
+        <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">{notasPie.join(" · ")}</p>
       )}
     </div>
   );
