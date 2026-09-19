@@ -23,11 +23,8 @@ export default function LoginPage() {
           className="mx-auto h-8 w-auto"
         />
         <h1 className="mt-6 text-center text-xl font-semibold tracking-tight">
-          Sistema Gestión de Plataformas
+          Ecomfive Business OS
         </h1>
-        <p className="mt-1 text-center text-sm text-muted-foreground">
-          Inicia sesión con la cuenta que te invitaron.
-        </p>
 
         <form action={formAction} className="mt-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -40,7 +37,7 @@ export default function LoginPage() {
           </div>
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <Button type="submit" disabled={pending} className="mt-2 w-full">
-            {pending ? "Ingresando…" : "Ingresar"}
+            {pending ? "Iniciando sesión…" : "Iniciar sesión"}
           </Button>
         </form>
       </div>

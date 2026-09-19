@@ -63,7 +63,7 @@ function SidebarContents({
 
       {expanded && (
         <p className="mt-1 mb-2 px-3 text-sm font-medium text-foreground">
-          Sistema Gestión de Plataformas
+          Ecomfive Business OS
         </p>
       )}
 

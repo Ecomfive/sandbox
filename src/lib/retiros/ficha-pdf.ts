@@ -57,7 +57,7 @@ export async function fichaAPdf(ficha: FichaRetiro): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(`Ficha de retiro ${numeroRetiro(ficha.correlativo)}`);
   doc.setAuthor("Ecomfive");
-  doc.setCreator("Sistema Gestión de Plataformas Ecomfive");
+  doc.setCreator("Ecomfive Business OS");
   const pagina = doc.addPage([ANCHO_PAGINA, ALTO_PAGINA]);
   const normal = await doc.embedFont(StandardFonts.Helvetica);
   const negrita = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -192,7 +192,7 @@ export async function fichaAPdf(ficha: FichaRetiro): Promise<Uint8Array> {
   // Pie
   linea(MARGEN + 22);
   texto(`Generado el ${generadoTexto(ficha)} por ${ficha.generadoPor}`, MARGEN, MARGEN + 6, { tam: 8, color: GRIS });
-  texto("Ecomfive · Sistema Gestión de Plataformas", derecha, MARGEN + 6, { tam: 8, color: GRIS, alinear: "der" });
+  texto("Ecomfive Business OS", derecha, MARGEN + 6, { tam: 8, color: GRIS, alinear: "der" });
 
   return doc.save();
 }

@@ -8,7 +8,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Ecomfive · Sistema Gestión de Plataformas",
+  title: "Ecomfive Business OS",
   description: "Gestión operativa, financiera y de inteligencia competitiva de Ecomfive por país y plataforma",
 };
 
