@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { crearRetiro, verSiguienteCorrelativo } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
-import { formatearFechaNumerica } from "@/lib/formato";
-import { CalendarioIcon, CerrarIcon, MasIcon } from "@/lib/nav-icons";
+import { CerrarIcon, MasIcon } from "@/lib/nav-icons";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -55,6 +55,7 @@ export function CrearRetiroPanel({
   plataformas: Plataforma[];
   cuentas: Cuenta[];
 }) {
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const [monto, setMonto] = useState("");
   const [comisionValor, setComisionValor] = useState("0");
@@ -64,24 +65,50 @@ export function CrearRetiroPanel({
   const [aRecibir, setARecibir] = useState("");
   const [aRecibirManual, setARecibirManual] = useState(false);
   const [fechaLimite, setFechaLimite] = useState("");
-  const [limiteAbierto, setLimiteAbierto] = useState(false);
   const [correlativo, setCorrelativo] = useState<number | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
 
+  // El menú de "+ Agregar" se cierra al hacer clic afuera o con Escape.
+  useEffect(() => {
+    if (!menuAbierto) return;
+    function alHacerClicFuera(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
+    }
+    function alPresionarEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuAbierto(false);
+    }
+    document.addEventListener("mousedown", alHacerClicFuera);
+    document.addEventListener("keydown", alPresionarEscape);
+    return () => {
+      document.removeEventListener("mousedown", alHacerClicFuera);
+      document.removeEventListener("keydown", alPresionarEscape);
+    };
+  }, [menuAbierto]);
+
   // Al abrir se MUESTRA el siguiente correlativo, sin gastarlo: solo se asigna al crear el retiro.
   // Se consulta en cada apertura (otra persona pudo crear uno mientras tanto) y, si no se guardó
-  // nada, siempre sale el mismo número.
+  // nada, siempre sale el mismo número. También se limpia todo lo escrito la vez anterior: si se
+  // canceló a medio llenar, la próxima vez que se abra debe empezar en blanco.
   async function abrirVentana() {
+    setMenuAbierto(false);
     setEnviando(false);
+    setMonto("");
+    setComisionValor("0");
+    setComisionPorcentaje("0");
+    setComisionManual(false);
+    setARecibir("");
+    setARecibirManual(false);
+    setFechaLimite("");
     setAbierto(true);
     setCorrelativo(null);
     setConsultando(true);
     // El <select> de cuenta arranca en la primera opción del navegador: se sincroniza acá
     // para que la comisión sugerida de esa cuenta ya aparezca sin tener que tocar el campo.
-    if (cuentas.length > 0) alElegirCuenta(cuentas[0].id);
+    if (cuentas.length > 0) alElegirCuenta(cuentas[0].id, 0);
     setCorrelativo(await verSiguienteCorrelativo().catch(() => null));
     setConsultando(false);
   }
@@ -146,14 +173,14 @@ export function CrearRetiroPanel({
   // Al elegir cuenta destino, sugiere la comisión configurada ahí (si tiene) — solo una
   // sugerencia: se puede seguir editando a mano, y no vuelve a aplicarse hasta cambiar de
   // cuenta otra vez. Cambiar la comisión de la cuenta después no afecta retiros ya creados.
-  function alElegirCuenta(cuentaId: string) {
+  function alElegirCuenta(cuentaId: string, montoActual: number = montoNum) {
     setCuentaSeleccionadaId(cuentaId);
     setComisionManual(false);
     const cuenta = cuentas.find((c) => c.id === cuentaId);
-    const sugerido = cuenta ? calcularComisionSugerida(cuenta, montoNum) : null;
+    const sugerido = cuenta ? calcularComisionSugerida(cuenta, montoActual) : null;
     if (sugerido == null) return;
     setComisionValor(sugerido.toFixed(2));
-    setComisionPorcentaje(montoNum > 0 ? ((sugerido / montoNum) * 100).toFixed(2) : "0");
+    setComisionPorcentaje(montoActual > 0 ? ((sugerido / montoActual) * 100).toFixed(2) : "0");
   }
 
   // Si ya hay una sugerencia activa (no se tocó a mano) y la persona escribe el monto
@@ -170,15 +197,42 @@ export function CrearRetiroPanel({
 
   return (
     <>
-      <Button
-        ref={botonAbrirRef}
-        type="button"
-        onClick={abrirVentana}
-        className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
-      >
-        <MasIcon className="mr-1 h-4 w-4" />
-        Agregar
-      </Button>
+      <div ref={menuRef} className="relative">
+        <Button
+          ref={botonAbrirRef}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={menuAbierto}
+          onClick={() => setMenuAbierto((v) => !v)}
+          className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
+        >
+          <MasIcon className="mr-1 h-4 w-4" />
+          Agregar
+        </Button>
+        {menuAbierto && (
+          <div
+            role="menu"
+            className="absolute top-full right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg"
+          >
+            <button
+              role="menuitem"
+              type="button"
+              onClick={abrirVentana}
+              className="block w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+            >
+              Nuevo retiro
+            </button>
+            <Link
+              role="menuitem"
+              href="/retiros/cuentas"
+              onClick={() => setMenuAbierto(false)}
+              className="block w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+            >
+              Cuenta destino
+            </Link>
+          </div>
+        )}
+      </div>
 
       {abierto && (
         <div
@@ -195,7 +249,6 @@ export function CrearRetiroPanel({
           >
             <form action={crearRetiro} onSubmit={() => setEnviando(true)} aria-busy={enviando}>
               <input type="hidden" name="pais_id" value={paisId} />
-              <input type="hidden" name="fecha_limite" value={fechaLimite} />
               {correlativo !== null && <input type="hidden" name="numero_correlativo" value={correlativo} />}
 
               <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
@@ -279,7 +332,7 @@ export function CrearRetiroPanel({
                 </div>
 
                 <div className="flex gap-2">
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex w-24 shrink-0 flex-col gap-1">
                     <label className={labelClassSm} htmlFor="campo-monto">
                       Monto
                       <Obligatorio />
@@ -308,6 +361,19 @@ export function CrearRetiroPanel({
                       name="fecha"
                       defaultValue={hoy()}
                       required
+                      className={`${fieldClassSm} w-full min-w-0`}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <label className={labelClassSm} htmlFor="campo-fecha-limite">
+                      Fecha límite
+                    </label>
+                    <input
+                      id="campo-fecha-limite"
+                      type="date"
+                      name="fecha_limite"
+                      value={fechaLimite}
+                      onChange={(e) => setFechaLimite(e.target.value)}
                       className={`${fieldClassSm} w-full min-w-0`}
                     />
                   </div>
@@ -389,49 +455,6 @@ export function CrearRetiroPanel({
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setLimiteAbierto((v) => !v)}
-                    aria-expanded={limiteAbierto}
-                    aria-label={
-                      fechaLimite
-                        ? `Fecha límite (opcional): ${formatearFechaNumerica(fechaLimite)}`
-                        : "Fecha límite (opcional)"
-                    }
-                    title="Fecha límite (opcional)"
-                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs hover:bg-muted ${anilloFoco} ${
-                      fechaLimite ? "border-foreground text-foreground" : "border-border text-muted-foreground"
-                    }`}
-                  >
-                    <CalendarioIcon className="h-4 w-4" />
-                    {fechaLimite && <span className="tabular-nums">{formatearFechaNumerica(fechaLimite)}</span>}
-                  </button>
-                  {limiteAbierto && (
-                    <>
-                      <input
-                        type="date"
-                        value={fechaLimite}
-                        onChange={(e) => setFechaLimite(e.target.value)}
-                        aria-label="Fecha límite"
-                        className={fieldClassSm}
-                      />
-                      {fechaLimite && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFechaLimite("");
-                            setLimiteAbierto(false);
-                          }}
-                          className={`text-xs text-muted-foreground underline hover:text-foreground ${anilloFoco}`}
-                        >
-                          Quitar
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-
                 <div>
                   <label className="sr-only" htmlFor="campo-notas">
                     Notas
@@ -456,7 +479,11 @@ export function CrearRetiroPanel({
                 <Button type="button" variant="secondary" onClick={cerrarVentana} disabled={enviando}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={cuentas.length === 0 || enviando}>
+                <Button
+                  type="submit"
+                  disabled={cuentas.length === 0 || enviando}
+                  className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
+                >
                   {enviando ? "Creando..." : "Crear retiro"}
                 </Button>
               </div>

@@ -1,10 +1,8 @@
-import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
-import { linkClass } from "@/components/ui/link";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
 import { CrearRetiroPanel } from "./crear-retiro-panel";
@@ -170,16 +168,11 @@ export default async function RetirosPage() {
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold tracking-tight">Retiros</h2>
-          <div className="flex items-center gap-4">
-            <Link href="/retiros/cuentas" className={linkClass}>
-              Cuentas de retiro
-            </Link>
-            <CrearRetiroPanel
-              paisId={pais.id}
-              plataformas={plataformasParaCrear}
-              cuentas={cuentasRetiro ?? []}
-            />
-          </div>
+          <CrearRetiroPanel
+            paisId={pais.id}
+            plataformas={plataformasParaCrear}
+            cuentas={cuentasRetiro ?? []}
+          />
         </div>
 
         <div className="mt-3">

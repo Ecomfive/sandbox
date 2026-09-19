@@ -45,7 +45,7 @@ export default async function CuentasRetiroPage() {
           ← Conciliación de Retiros
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">Cuentas de retiro</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Cuentas destino</h1>
           <VentanaCuentaRetiro paisId={pais.id} />
         </div>
       </div>

@@ -145,7 +145,7 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
 
               <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
                 <span id={tituloId} className="text-sm font-semibold">
-                  {editando ? "Modificar cuenta de retiro" : "Nueva cuenta de retiro"}
+                  {editando ? "Modificar cuenta destino" : "Nueva cuenta destino"}
                 </span>
                 <button
                   type="button"
