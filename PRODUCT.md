@@ -40,7 +40,7 @@ instead of requiring someone to notice them.
   uploaded manually (no bank API integration).
 - Inventory movements come from María José's warehouse scanning tool
   ("pistoleo"), currently imported as CSV/Excel exports.
-- Dropi is the first platform integrated; EFI and Boxful/Drop are expected to
+- Dropi is the first platform integrated; EFFI and Boxful/Drop are expected to
   follow. Two distinct Dropi account roles matter: a "proveedor" account for
   the team's own orders, and a "dropshipper" account (fase 2) for competitor
   intelligence.
