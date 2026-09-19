@@ -138,7 +138,8 @@ export default async function RetirosPage() {
             target="_blank"
             rel="noopener noreferrer"
             title="Actualizar retiros desde Dropi"
-            className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted"
+            aria-label="Actualizar retiros desde Dropi"
+            className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <ActualizarIcon className="h-4 w-4" />
           </a>

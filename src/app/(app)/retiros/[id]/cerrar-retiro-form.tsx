@@ -36,8 +36,11 @@ export function CerrarRetiroForm({
       <input type="hidden" name="pais_id" value={paisId} />
       <div className="flex flex-wrap gap-4">
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>ID de soporte bancario</label>
+          <label className={labelClass} htmlFor="campo-soporte-numero">
+            ID de soporte bancario
+          </label>
           <input
+            id="campo-soporte-numero"
             type="text"
             name="soporte_numero"
             defaultValue={soporteActual ?? ""}
@@ -45,8 +48,11 @@ export function CerrarRetiroForm({
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Monto recibido</label>
+          <label className={labelClass} htmlFor="campo-monto-recibido">
+            Monto recibido
+          </label>
           <input
+            id="campo-monto-recibido"
             type="number"
             step="0.01"
             min="0"
@@ -58,8 +64,16 @@ export function CerrarRetiroForm({
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <label className={labelClass}>Comprobante (foto o archivo)</label>
-        <input type="file" name="comprobante" accept="image/*,application/pdf" className="text-sm" />
+        <label className={labelClass} htmlFor="campo-comprobante">
+          Comprobante (foto o archivo)
+        </label>
+        <input
+          id="campo-comprobante"
+          type="file"
+          name="comprobante"
+          accept="image/*,application/pdf"
+          className="text-sm"
+        />
       </div>
       <div>
         <Button type="submit">Consolidar</Button>

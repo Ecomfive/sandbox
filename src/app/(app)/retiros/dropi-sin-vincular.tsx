@@ -30,10 +30,16 @@ export function DropiSinVincular({ filas, codigoPais }: { filas: FilaSinVincular
         (por ejemplo #0007) en el concepto del retiro en Dropi y vuelve a actualizar.
       </p>
 
-      <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="mt-3 min-w-0 rounded-lg border border-border bg-card">
         {filas.length === 0 ? (
           <EstadoVacio mensaje="No hay retiros de Dropi pendientes de vincular." />
         ) : (
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Tabla de retiros de Dropi sin vincular, desplazable horizontalmente con las flechas izquierda y derecha"
+            className="min-w-0 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
+          >
           <table className="w-full min-w-[42rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -64,6 +70,7 @@ export function DropiSinVincular({ filas, codigoPais }: { filas: FilaSinVincular
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

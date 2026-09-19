@@ -154,6 +154,18 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
     });
   }
 
+  // Alternativa de teclado al arrastrar con mouse: mueve una posición arriba/abajo.
+  function moverPorTeclado(id: ColumnaId, direccion: -1 | 1) {
+    setOrden((prev) => {
+      const indice = prev.indexOf(id);
+      const destino = indice + direccion;
+      if (destino < 0 || destino >= prev.length) return prev;
+      const copia = [...prev];
+      [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
+      return copia;
+    });
+  }
+
   function alternarVisible(id: ColumnaId) {
     setOcultas((prev) => {
       const siguiente = new Set(prev);
@@ -166,7 +178,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
   const columnasVisibles = orden.filter((id) => !ocultas.has(id)).map((id) => COLUMNAS_POR_ID.get(id)!);
 
   return (
-    <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+    <div className="mt-3 min-w-0 rounded-lg border border-border bg-card">
       <div
         ref={contenedorRef}
         className="flex items-center justify-end gap-2 border-b border-border bg-muted/50 px-2 py-1.5"
@@ -188,7 +200,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
           </button>
           {menuAbierto && (
             <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-border bg-card p-1 shadow-lg">
-              {orden.map((id) => {
+              {orden.map((id, indice) => {
                 const columna = COLUMNAS_POR_ID.get(id)!;
                 return (
                   <div
@@ -213,6 +225,26 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
                       />
                       {columna.label}
                     </label>
+                    <div className="flex shrink-0 flex-col">
+                      <button
+                        type="button"
+                        onClick={() => moverPorTeclado(id, -1)}
+                        disabled={indice === 0}
+                        aria-label={`Mover columna ${columna.label} hacia arriba`}
+                        className="rounded px-1 leading-none text-muted-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-30"
+                      >
+                        <span aria-hidden="true">▲</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moverPorTeclado(id, 1)}
+                        disabled={indice === orden.length - 1}
+                        aria-label={`Mover columna ${columna.label} hacia abajo`}
+                        className="rounded px-1 leading-none text-muted-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-30"
+                      >
+                        <span aria-hidden="true">▼</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -221,6 +253,12 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
         </div>
       </div>
 
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Tabla de retiros, desplazable horizontalmente con las flechas izquierda y derecha"
+        className="min-w-0 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
+      >
       <table className="w-full min-w-[42rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted text-left text-muted-foreground">
@@ -262,6 +300,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
           ))}
         </tbody>
       </table>
+      </div>
       {retiros.length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
       {retiros.length > 0 && visibles.length === 0 && <EstadoVacio mensaje="Ningún retiro coincide con los filtros." />}
       {retiros.length > 0 && (hayFiltros || retiros.length > LIMITE_SIN_FILTROS) && (
