@@ -11,6 +11,7 @@ import { FormularioConToast } from "@/components/ui/toast";
 import { linkClass } from "@/components/ui/link";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
+import { CrearRetiroPanel } from "./crear-retiro-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,25 +22,33 @@ export default async function RetirosPage() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [{ data: plataformasPais }, { data: saldos }, { data: retiros }] = await Promise.all([
-    supabase
-      .from("pais_plataformas")
-      .select("plataforma_id, plataformas(id, nombre)")
-      .eq("pais_id", pais.id),
-    supabase
-      .from("saldos_wallet")
-      .select("plataforma_id, monto, fecha, actualizado_en, plataformas(nombre)")
-      .eq("pais_id", pais.id)
-      .order("fecha", { ascending: false }),
-    supabase
-      .from("retiros")
-      .select(
-        "id, numero_correlativo, monto, fecha, estado, notas, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
-      )
-      .eq("pais_id", pais.id)
-      .order("fecha", { ascending: false })
-      .limit(50),
-  ]);
+  const [{ data: plataformasPais }, { data: saldos }, { data: retiros }, { data: cuentasRetiro }, { data: perfiles }] =
+    await Promise.all([
+      supabase
+        .from("pais_plataformas")
+        .select("plataforma_id, plataformas(id, nombre)")
+        .eq("pais_id", pais.id),
+      supabase
+        .from("saldos_wallet")
+        .select("plataforma_id, monto, fecha, actualizado_en, plataformas(nombre)")
+        .eq("pais_id", pais.id)
+        .order("fecha", { ascending: false }),
+      supabase
+        .from("retiros")
+        .select(
+          "id, numero_correlativo, monto, fecha, estado, notas, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
+        )
+        .eq("pais_id", pais.id)
+        .order("fecha", { ascending: false })
+        .limit(50),
+      supabase
+        .from("cuentas_retiro")
+        .select("id, nombre")
+        .eq("pais_id", pais.id)
+        .eq("activa", true)
+        .order("nombre"),
+      supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre"),
+    ]);
 
   const plataformas = (plataformasPais ?? [])
     .map((pp) => pp.plataformas as unknown as { id: string; nombre: string } | null)
@@ -177,9 +186,12 @@ export default async function RetirosPage() {
             <Link href="/retiros/cuentas" className={linkClass}>
               Cuentas de retiro
             </Link>
-            <Link href="/retiros/nuevo">
-              <Button type="button">Crear retiro</Button>
-            </Link>
+            <CrearRetiroPanel
+              paisId={pais.id}
+              plataformas={plataformas}
+              cuentas={cuentasRetiro ?? []}
+              perfiles={perfiles ?? []}
+            />
           </div>
         </div>
 

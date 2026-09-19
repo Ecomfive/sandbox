@@ -14,7 +14,7 @@ export async function crearCuentaRetiro(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/retiros/cuentas");
-  revalidatePath("/retiros/nuevo");
+  revalidatePath("/retiros");
 }
 
 export async function alternarActivaCuenta(formData: FormData) {
@@ -26,5 +26,5 @@ export async function alternarActivaCuenta(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/retiros/cuentas");
-  revalidatePath("/retiros/nuevo");
+  revalidatePath("/retiros");
 }

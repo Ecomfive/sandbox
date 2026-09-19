@@ -40,11 +40,31 @@ export async function crearRetiro(formData: FormData) {
   const comision = Number(formData.get("comision") || 0);
   const fecha = formData.get("fecha") as string;
   const notas = (formData.get("notas") as string) || null;
+  const asignado_a = (formData.get("asignado_a") as string) || null;
+  const prioridad = (formData.get("prioridad") as string) || null;
+  const fecha_limite = (formData.get("fecha_limite") as string) || null;
+  const etiquetas = ((formData.get("etiquetas") as string) || "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("retiros")
-    .insert({ pais_id, plataforma_id, cuenta_retiro_id, monto, comision, fecha, notas, estado: "abierto" })
+    .insert({
+      pais_id,
+      plataforma_id,
+      cuenta_retiro_id,
+      monto,
+      comision,
+      fecha,
+      notas,
+      asignado_a,
+      prioridad,
+      fecha_limite,
+      etiquetas,
+      estado: "abierto",
+    })
     .select("id")
     .single();
   if (error) throw new Error(error.message);

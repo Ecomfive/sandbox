@@ -25,6 +25,20 @@ const ESTADO_ETIQUETA: Record<string, string> = {
   cerrado: "Cerrado",
 };
 
+const PRIORIDAD_TONO = {
+  baja: "neutral",
+  media: "info",
+  alta: "warning",
+  urgente: "destructive",
+} as const;
+
+const PRIORIDAD_ETIQUETA: Record<string, string> = {
+  baja: "Baja",
+  media: "Media",
+  alta: "Alta",
+  urgente: "Urgente",
+};
+
 export default async function RetiroDetallePage({ params }: { params: Promise<{ id: string }> }) {
   await requireModulo("retiros");
   const { id } = await params;
@@ -33,7 +47,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
   const { data: retiro } = await supabase
     .from("retiros")
     .select(
-      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo)"
+      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, prioridad, fecha_limite, etiquetas, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -49,6 +63,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
   const plataforma = retiro.plataformas as unknown as { nombre: string } | null;
   const cuenta = retiro.cuentas_retiro as unknown as { nombre: string; tipo: string; detalle: string | null } | null;
   const codigoPais = (retiro.paises as unknown as { codigo: string } | null)?.codigo ?? "PA";
+  const asignado = retiro.perfiles as unknown as { nombre: string | null; email: string } | null;
 
   let urlComprobante: string | null = null;
   if (retiro.comprobante_path) {
@@ -103,6 +118,36 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
           <p className="text-muted-foreground">Fecha de creación</p>
           <p className="font-medium">{formatearFecha(retiro.fecha)}</p>
         </div>
+        <div>
+          <p className="text-muted-foreground">Persona asignada</p>
+          <p className="font-medium">{asignado?.nombre || asignado?.email || "Sin asignar"}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Prioridad</p>
+          {retiro.prioridad ? (
+            <Badge tone={PRIORIDAD_TONO[retiro.prioridad as keyof typeof PRIORIDAD_TONO]}>
+              {PRIORIDAD_ETIQUETA[retiro.prioridad] ?? retiro.prioridad}
+            </Badge>
+          ) : (
+            <p className="font-medium">Sin prioridad</p>
+          )}
+        </div>
+        <div>
+          <p className="text-muted-foreground">Fecha límite</p>
+          <p className="font-medium">{retiro.fecha_limite ? formatearFecha(retiro.fecha_limite) : "—"}</p>
+        </div>
+        {retiro.etiquetas && retiro.etiquetas.length > 0 && (
+          <div className="col-span-2">
+            <p className="text-muted-foreground">Etiquetas</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {retiro.etiquetas.map((et: string) => (
+                <Badge key={et} tone="neutral">
+                  {et}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
         {retiro.notas && (
           <div className="col-span-2">
             <p className="text-muted-foreground">Notas</p>

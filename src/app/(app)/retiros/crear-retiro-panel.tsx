@@ -1,0 +1,245 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { crearRetiro } from "./actions";
+import { Button } from "@/components/ui/button";
+import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
+import {
+  CalendarioIcon,
+  CerrarIcon,
+  EtiquetaIcon,
+  MasIcon,
+  PersonaIcon,
+  PrioridadIcon,
+} from "@/lib/nav-icons";
+
+const PRIORIDADES = [
+  { valor: "baja", etiqueta: "Baja" },
+  { valor: "media", etiqueta: "Media" },
+  { valor: "alta", etiqueta: "Alta" },
+  { valor: "urgente", etiqueta: "Urgente" },
+] as const;
+
+const hoy = () => new Date().toISOString().slice(0, 10);
+
+interface Plataforma {
+  id: string;
+  nombre: string;
+}
+interface Cuenta {
+  id: string;
+  nombre: string;
+}
+interface Perfil {
+  id: string;
+  nombre: string | null;
+  email: string;
+}
+
+/** Botón "+ Retiro" que despliega un panel de creación rápida (estilo "crear tarea"),
+ * en vez de navegar a una página aparte. */
+export function CrearRetiroPanel({
+  paisId,
+  plataformas,
+  cuentas,
+  perfiles,
+}: {
+  paisId: string;
+  plataformas: Plataforma[];
+  cuentas: Cuenta[];
+  perfiles: Perfil[];
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [etiquetas, setEtiquetas] = useState<string[]>([]);
+  const [etiquetaTexto, setEtiquetaTexto] = useState("");
+  const contenedorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function alHacerClicFuera(e: MouseEvent) {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    }
+    document.addEventListener("mousedown", alHacerClicFuera);
+    return () => document.removeEventListener("mousedown", alHacerClicFuera);
+  }, []);
+
+  function agregarEtiqueta() {
+    const valor = etiquetaTexto.trim();
+    if (valor && !etiquetas.includes(valor)) setEtiquetas((prev) => [...prev, valor]);
+    setEtiquetaTexto("");
+  }
+
+  return (
+    <div ref={contenedorRef} className="relative">
+      <Button type="button" onClick={() => setAbierto((v) => !v)} className="!rounded-full">
+        <MasIcon className="mr-1 h-4 w-4" />
+        Retiro
+      </Button>
+
+      {abierto && (
+        <div className="absolute right-0 z-30 mt-2 w-[26rem] max-w-[90vw] rounded-lg border border-border bg-card shadow-xl">
+          <form action={crearRetiro} onSubmit={() => setAbierto(false)}>
+            <input type="hidden" name="pais_id" value={paisId} />
+            <input type="hidden" name="etiquetas" value={etiquetas.join(",")} />
+
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+              <span className="text-sm font-semibold">Nuevo retiro</span>
+              <button
+                type="button"
+                onClick={() => setAbierto(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <CerrarIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3 p-4">
+              <div className="flex gap-2">
+                <select name="plataforma_id" required className={`${fieldClassSm} flex-1`}>
+                  {plataformas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+                {cuentas.length > 0 ? (
+                  <select name="cuenta_retiro_id" required className={`${fieldClassSm} flex-1`}>
+                    {cuentas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="flex-1 self-center text-xs text-destructive">Sin cuentas activas</p>
+                )}
+              </div>
+
+              <input
+                type="text"
+                name="notas"
+                placeholder="Escribe una nota para este retiro"
+                className={`${fieldClass} text-sm`}
+                autoFocus
+              />
+
+              <div className="flex gap-2">
+                <div className="flex flex-1 flex-col gap-1">
+                  <label className={labelClassSm}>Monto</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="monto"
+                    required
+                    className={`${fieldClassSm} tabular-nums`}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1">
+                  <label className={labelClassSm}>Comisión</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="comision"
+                    defaultValue={0}
+                    className={`${fieldClassSm} tabular-nums`}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1">
+                  <label className={labelClassSm}>Fecha</label>
+                  <input type="date" name="fecha" defaultValue={hoy()} required className={fieldClassSm} />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                <div className="flex min-w-[9rem] flex-1 flex-col gap-1">
+                  <label className={`${labelClassSm} inline-flex items-center gap-1`}>
+                    <PersonaIcon className="h-3.5 w-3.5" /> Persona asignada
+                  </label>
+                  <select name="asignado_a" defaultValue="" className={fieldClassSm}>
+                    <option value="">Sin asignar</option>
+                    {perfiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre || p.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex min-w-[9rem] flex-1 flex-col gap-1">
+                  <label className={`${labelClassSm} inline-flex items-center gap-1`}>
+                    <CalendarioIcon className="h-3.5 w-3.5" /> Fecha límite
+                  </label>
+                  <input type="date" name="fecha_limite" className={fieldClassSm} />
+                </div>
+
+                <div className="flex min-w-[9rem] flex-1 flex-col gap-1">
+                  <label className={`${labelClassSm} inline-flex items-center gap-1`}>
+                    <PrioridadIcon className="h-3.5 w-3.5" /> Prioridad
+                  </label>
+                  <select name="prioridad" defaultValue="" className={fieldClassSm}>
+                    <option value="">Sin prioridad</option>
+                    {PRIORIDADES.map((p) => (
+                      <option key={p.valor} value={p.valor}>
+                        {p.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex min-w-[9rem] flex-1 flex-col gap-1">
+                  <label className={`${labelClassSm} inline-flex items-center gap-1`}>
+                    <EtiquetaIcon className="h-3.5 w-3.5" /> Etiquetas
+                  </label>
+                  <input
+                    type="text"
+                    value={etiquetaTexto}
+                    onChange={(e) => setEtiquetaTexto(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        agregarEtiqueta();
+                      }
+                    }}
+                    placeholder="Escribe y Enter"
+                    className={fieldClassSm}
+                  />
+                  {etiquetas.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {etiquetas.map((et) => (
+                        <span
+                          key={et}
+                          className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+                        >
+                          {et}
+                          <button
+                            type="button"
+                            onClick={() => setEtiquetas((prev) => prev.filter((e) => e !== et))}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <CerrarIcon className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+              <Button type="button" variant="secondary" onClick={() => setAbierto(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={cuentas.length === 0}>
+                Crear retiro
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}

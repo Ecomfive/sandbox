@@ -189,6 +189,58 @@ export function ColumnasIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function MasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}
+
+export function CerrarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M18 6L6 18M6 6l12 12" />
+    </Icon>
+  );
+}
+
+export function PersonaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" />
+    </Icon>
+  );
+}
+
+export function PrioridadIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M5 3v18" />
+      <path d="M5 4h11l-2.5 3.5L16 11H5" />
+    </Icon>
+  );
+}
+
+export function EtiquetaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M12.59 3.41 21 12l-8.41 8.59a2 2 0 0 1-2.83 0L3 13.83V6a2.5 2.5 0 0 1 2.5-2.5H10a2 2 0 0 1 1.41.41Z" />
+      <circle cx="7.5" cy="7.5" r="1" />
+    </Icon>
+  );
+}
+
+export function CalendarioIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
+    </Icon>
+  );
+}
+
 /** Ícono de "arrastrar" (seis puntos), para asas de reordenar en listas. */
 export function ArrastrarIcon(props: SVGProps<SVGSVGElement>) {
   return (
