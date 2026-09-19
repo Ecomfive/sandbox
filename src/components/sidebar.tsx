@@ -147,9 +147,16 @@ function SidebarContents({
                 : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
             }
           >
-            <NotificacionesIcon className="h-5 w-5 shrink-0" />
+            <span className="relative inline-flex shrink-0">
+              <NotificacionesIcon className="h-5 w-5" />
+              {!expanded && totalPendientes > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning-soft px-0.5 text-[0.6rem] leading-none font-medium text-warning tabular-nums">
+                  {totalPendientes > 99 ? "99+" : totalPendientes}
+                </span>
+              )}
+            </span>
             {expanded && <span className="flex-1">Centro de notificaciones</span>}
-            {totalPendientes > 0 && (
+            {expanded && totalPendientes > 0 && (
               <span className="rounded-full bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning tabular-nums">
                 {totalPendientes}
               </span>
