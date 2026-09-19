@@ -200,9 +200,15 @@ export default async function RetirosPage() {
                 const plataforma = r.plataformas as unknown as { nombre: string } | null;
                 const cuenta = r.cuentas_retiro as unknown as { nombre: string } | null;
                 return (
-                  <tr key={r.id} className="border-b border-border/60 last:border-0">
+                  <tr
+                    key={r.id}
+                    className="relative border-b border-border/60 last:border-0 hover:bg-muted/50"
+                  >
                     <td className="py-2 pr-3 pl-4">
-                      <Link href={`/retiros/${r.id}`} className={linkClass}>
+                      <Link
+                        href={`/retiros/${r.id}`}
+                        className={`${linkClass} after:absolute after:inset-0 after:content-['']`}
+                      >
                         #{String(r.numero_correlativo).padStart(4, "0")}
                       </Link>
                     </td>
