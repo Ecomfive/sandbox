@@ -193,19 +193,30 @@ export function CrearRetiroPanel({
                   <label className={`${labelClassSm} inline-flex items-center gap-1`}>
                     <EtiquetaIcon className="h-3.5 w-3.5" /> Etiquetas
                   </label>
-                  <input
-                    type="text"
-                    value={etiquetaTexto}
-                    onChange={(e) => setEtiquetaTexto(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === ",") {
-                        e.preventDefault();
-                        agregarEtiqueta();
-                      }
-                    }}
-                    placeholder="Escribe y Enter"
-                    className={fieldClassSm}
-                  />
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={etiquetaTexto}
+                      onChange={(e) => setEtiquetaTexto(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === ",") {
+                          e.preventDefault();
+                          agregarEtiqueta();
+                        }
+                      }}
+                      placeholder="Escribe y Enter"
+                      className={`${fieldClassSm} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={agregarEtiqueta}
+                      disabled={!etiquetaTexto.trim()}
+                      title="Agregar etiqueta"
+                      className="rounded-md border border-border px-2 text-muted-foreground hover:bg-muted disabled:opacity-40"
+                    >
+                      <MasIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   {etiquetas.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-1">
                       {etiquetas.map((et) => (
