@@ -200,7 +200,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
 
       {(retiro.estado === "abierto" || retiro.estado === "novedad") && (
         <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
-          <h2 className="text-base font-semibold tracking-tight">Cerrar retiro</h2>
+          <h2 className="text-base font-semibold tracking-tight">Consolidar</h2>
           <CerrarRetiroForm
             retiroId={retiro.id}
             paisId={retiro.pais_id}

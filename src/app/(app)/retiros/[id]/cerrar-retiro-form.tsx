@@ -28,7 +28,7 @@ export function CerrarRetiroForm({
               mensaje: `Novedad: diferencia de ${formatearMoneda(resultado.diferencia, codigoPais)}`,
               tono: "destructive" as const,
             }
-          : { mensaje: "Retiro cerrado" }
+          : { mensaje: "Retiro consolidado" }
       }
       className="flex flex-col gap-4"
     >
@@ -62,7 +62,7 @@ export function CerrarRetiroForm({
         <input type="file" name="comprobante" accept="image/*,application/pdf" className="text-sm" />
       </div>
       <div>
-        <Button type="submit">Cerrar retiro</Button>
+        <Button type="submit">Consolidar</Button>
       </div>
     </FormularioConToast>
   );
