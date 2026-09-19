@@ -19,13 +19,17 @@ export const esCampoAgrupable = (valor: unknown): valor is CampoAgrupable =>
 export const etiquetaCampo = (campo: CampoAgrupable) => CAMPO_POR_ID.get(campo)!.etiqueta;
 
 /** Preferencias de vista de la tabla: cada persona guarda las suyas en su navegador. */
+export type OrdenGrupos = "asc" | "desc";
+
 export interface Vista {
   agrupar: CampoAgrupable | null;
+  /** Sentido en que se ordenan los grupos (no las filas dentro de cada grupo). */
+  orden: OrdenGrupos;
   mostrarCerrados: boolean;
 }
 
 /** Como en ClickUp, los cerrados arrancan ocultos y un botón los muestra. */
-export const VISTA_DEFECTO: Vista = { agrupar: null, mostrarCerrados: false };
+export const VISTA_DEFECTO: Vista = { agrupar: null, orden: "asc", mostrarCerrados: false };
 
 /** Lee la vista guardada descartando cualquier cosa que no tenga la forma esperada. */
 export function parsearVista(json: string): Vista {
@@ -37,9 +41,10 @@ export function parsearVista(json: string): Vista {
     return VISTA_DEFECTO;
   }
   if (typeof datos !== "object" || datos === null) return VISTA_DEFECTO;
-  const { agrupar, mostrarCerrados } = datos as { agrupar?: unknown; mostrarCerrados?: unknown };
+  const { agrupar, orden, mostrarCerrados } = datos as { agrupar?: unknown; orden?: unknown; mostrarCerrados?: unknown };
   return {
     agrupar: esCampoAgrupable(agrupar) ? agrupar : null,
+    orden: orden === "desc" ? "desc" : "asc",
     mostrarCerrados: typeof mostrarCerrados === "boolean" ? mostrarCerrados : VISTA_DEFECTO.mostrarCerrados,
   };
 }
@@ -86,8 +91,11 @@ export interface Grupo {
 // Para agrupar por estado se ordena por urgencia de conciliación, no alfabéticamente.
 const ORDEN_ESTADOS = ["abierto", "novedad", "cerrado", "cancelado"];
 
-/** Grupos en orden estable: los valores fijos en su orden, el resto alfabético y "Sin ..." al final. */
-export function agruparRetiros(filas: FilaRetiro[], campo: CampoAgrupable): Grupo[] {
+/**
+ * Grupos en orden estable: los valores fijos en su orden, el resto alfabético. En descendente se invierte
+ * ese orden, pero el grupo "Sin ..." queda siempre al final: no es un valor más, es la falta de valor.
+ */
+export function agruparRetiros(filas: FilaRetiro[], campo: CampoAgrupable, orden: OrdenGrupos = "asc"): Grupo[] {
   const porClave = new Map<string, FilaRetiro[]>();
   for (const fila of filas) {
     const clave = valoresDeSeleccion(fila, campo)[0] ?? SIN_VALOR;
@@ -110,7 +118,7 @@ export function agruparRetiros(filas: FilaRetiro[], campo: CampoAgrupable): Grup
     if (!conocidas.has(clave)) opciones.push({ valor: clave, etiqueta: clave });
   }
 
-  return opciones
+  const grupos = opciones
     .filter((opcion) => porClave.has(opcion.valor))
     .map((opcion) => {
       const grupoFilas = porClave.get(opcion.valor)!;
@@ -121,4 +129,8 @@ export function agruparRetiros(filas: FilaRetiro[], campo: CampoAgrupable): Grup
         total: grupoFilas.reduce((suma, fila) => suma + fila.monto, 0),
       };
     });
+  if (orden === "asc") return grupos;
+
+  const sinValor = grupos.filter((grupo) => grupo.clave === SIN_VALOR);
+  return [...grupos.filter((grupo) => grupo.clave !== SIN_VALOR).reverse(), ...sinValor];
 }

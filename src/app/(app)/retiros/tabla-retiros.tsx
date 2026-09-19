@@ -126,8 +126,8 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
   );
   const visibles = hayFiltros || agrupado ? filtradas : filtradas.slice(0, LIMITE_SIN_FILTROS);
   const grupos = useMemo(
-    () => (vista.agrupar ? agruparRetiros(visibles, vista.agrupar) : []),
-    [visibles, vista.agrupar]
+    () => (vista.agrupar ? agruparRetiros(visibles, vista.agrupar, vista.orden) : []),
+    [visibles, vista.agrupar, vista.orden]
   );
 
   // Grupos contraídos: se olvidan al cambiar el campo de agrupación, porque las claves ya no aplican.
@@ -261,7 +261,9 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
       >
         <BotonAgrupar
           campo={vista.agrupar}
+          orden={vista.orden}
           alElegir={(agrupar) => cambiarVista({ agrupar })}
+          alElegirOrden={(orden) => cambiarVista({ orden })}
           hayGrupos={grupos.length > 0}
           alContraerTodos={() =>
             setContraidosPor({ campo: vista.agrupar, claves: grupos.map((grupo) => grupo.clave) })

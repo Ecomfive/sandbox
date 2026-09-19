@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { anilloFoco } from "@/components/ui/field";
-import { AgruparIcon, CerradoIcon, CheckIcon } from "@/lib/nav-icons";
+import { AgruparIcon, CerradoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon } from "@/lib/nav-icons";
 import { ICONOS } from "./filtros-retiros";
 import {
   CAMPOS_AGRUPABLES,
@@ -10,8 +10,14 @@ import {
   etiquetaCampo,
   parsearVista,
   type CampoAgrupable,
+  type OrdenGrupos,
   type Vista,
 } from "./vista";
+
+const ORDENES: { id: OrdenGrupos; etiqueta: string; Icono: typeof FlechaArribaIcon }[] = [
+  { id: "asc", etiqueta: "Ascendente", Icono: FlechaArribaIcon },
+  { id: "desc", etiqueta: "Descendente", Icono: FlechaAbajoIcon },
+];
 
 // La vista vive en localStorage: cada persona conserva la suya al volver a la página.
 const CLAVE_STORAGE = "retiros-vista-v1";
@@ -105,14 +111,18 @@ export function BotonCerrados({
  */
 export function BotonAgrupar({
   campo,
+  orden,
   alElegir,
+  alElegirOrden,
   hayGrupos,
   alContraerTodos,
   alExpandirTodos,
   alAbrir,
 }: {
   campo: CampoAgrupable | null;
+  orden: OrdenGrupos;
   alElegir: (campo: CampoAgrupable | null) => void;
+  alElegirOrden: (orden: OrdenGrupos) => void;
   hayGrupos: boolean;
   alContraerTodos: () => void;
   alExpandirTodos: () => void;
@@ -157,6 +167,12 @@ export function BotonAgrupar({
     botonRef.current?.focus();
   }
 
+  function elegirOrden(nuevo: OrdenGrupos) {
+    alElegirOrden(nuevo);
+    setAbierto(false);
+    botonRef.current?.focus();
+  }
+
   const opcion = "flex min-h-9 w-full items-center gap-2.5 px-2 py-2 text-left text-sm hover:bg-muted";
 
   return (
@@ -173,6 +189,12 @@ export function BotonAgrupar({
         {campo ? (
           <>
             Agrupar: <span className="font-semibold">{etiquetaCampo(campo)}</span>
+            {orden === "asc" ? (
+              <FlechaArribaIcon className="h-3.5 w-3.5" />
+            ) : (
+              <FlechaAbajoIcon className="h-3.5 w-3.5" />
+            )}
+            <span className="sr-only">({orden === "asc" ? "ascendente" : "descendente"})</span>
           </>
         ) : (
           "Agrupar"
@@ -215,6 +237,27 @@ export function BotonAgrupar({
             <span className="flex-1">Sin agrupar</span>
             {campo === null && <CheckIcon className="h-4 w-4 shrink-0" />}
           </button>
+          {campo !== null && (
+            <div role="group" aria-label="Orden de los grupos" className="mt-1 border-t border-border pt-1">
+              <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Orden de los grupos</p>
+              {ORDENES.map(({ id, etiqueta, Icono }) => {
+                const activo = orden === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={activo}
+                    onClick={() => elegirOrden(id)}
+                    className={`${opcion} ${anilloFoco} ${activo ? "font-semibold" : ""}`}
+                  >
+                    <Icono className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1">{etiqueta}</span>
+                    {activo && <CheckIcon className="h-4 w-4 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {hayGrupos && (
             <div className="mt-1 flex gap-1 border-t border-border pt-1">
               <button
