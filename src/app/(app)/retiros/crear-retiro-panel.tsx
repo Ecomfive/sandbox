@@ -23,6 +23,8 @@ interface Plataforma {
 interface Cuenta {
   id: string;
   nombre: string;
+  comision_tipo: "porcentaje" | "monto_fijo" | null;
+  comision_valor: number | null;
 }
 
 /** Botón "+ Crear" que despliega directo el panel de creación rápida (estilo "crear tarea"),
@@ -41,6 +43,8 @@ export function CrearRetiroPanel({
   const [monto, setMonto] = useState("");
   const [comisionValor, setComisionValor] = useState("0");
   const [comisionPorcentaje, setComisionPorcentaje] = useState("0");
+  const [comisionManual, setComisionManual] = useState(false);
+  const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState("");
   const [aRecibir, setARecibir] = useState("");
   const [aRecibirManual, setARecibirManual] = useState(false);
   const [fechaLimite, setFechaLimite] = useState("");
@@ -59,6 +63,9 @@ export function CrearRetiroPanel({
     setAbierto(true);
     setCorrelativo(null);
     setConsultando(true);
+    // El <select> de cuenta arranca en la primera opción del navegador: se sincroniza acá
+    // para que la comisión sugerida de esa cuenta ya aparezca sin tener que tocar el campo.
+    if (cuentas.length > 0) alElegirCuenta(cuentas[0].id);
     setCorrelativo(await verSiguienteCorrelativo().catch(() => null));
     setConsultando(false);
   }
@@ -107,16 +114,49 @@ export function CrearRetiroPanel({
   const aRecibirMostrado = aRecibirManual ? aRecibir : montoNum > 0 || comisionNum > 0 ? montoNeto.toFixed(2) : "";
 
   function alCambiarComisionValor(valor: string) {
+    setComisionManual(true);
     setComisionValor(valor);
     const num = parseFloat(valor) || 0;
     setComisionPorcentaje(montoNum > 0 ? ((num / montoNum) * 100).toFixed(2) : "0");
   }
 
   function alCambiarComisionPorcentaje(valor: string) {
+    setComisionManual(true);
     setComisionPorcentaje(valor);
     const num = parseFloat(valor) || 0;
     setComisionValor(montoNum > 0 ? ((montoNum * num) / 100).toFixed(2) : "0");
   }
+
+  // Al elegir cuenta destino, sugiere la comisión configurada ahí (si tiene) — solo una
+  // sugerencia: se puede seguir editando a mano, y no vuelve a aplicarse hasta cambiar de
+  // cuenta otra vez. Cambiar la comisión de la cuenta después no afecta retiros ya creados.
+  function alElegirCuenta(cuentaId: string) {
+    setCuentaSeleccionadaId(cuentaId);
+    setComisionManual(false);
+    const cuenta = cuentas.find((c) => c.id === cuentaId);
+    if (!cuenta || !cuenta.comision_tipo || cuenta.comision_valor == null) return;
+    if (cuenta.comision_tipo === "porcentaje") {
+      setComisionPorcentaje(String(cuenta.comision_valor));
+      setComisionValor(montoNum > 0 ? ((montoNum * cuenta.comision_valor) / 100).toFixed(2) : "0");
+    } else {
+      setComisionValor(String(cuenta.comision_valor));
+      setComisionPorcentaje(montoNum > 0 ? ((cuenta.comision_valor / montoNum) * 100).toFixed(2) : "0");
+    }
+  }
+
+  // Si ya hay una sugerencia activa (no se tocó a mano) y la persona escribe el monto
+  // después de elegir la cuenta, recalcula la comisión sugerida con el monto nuevo.
+  useEffect(() => {
+    if (comisionManual) return;
+    const cuenta = cuentas.find((c) => c.id === cuentaSeleccionadaId);
+    if (!cuenta || !cuenta.comision_tipo || cuenta.comision_valor == null) return;
+    if (cuenta.comision_tipo === "porcentaje") {
+      setComisionValor(montoNum > 0 ? ((montoNum * cuenta.comision_valor) / 100).toFixed(2) : "0");
+    } else {
+      setComisionPorcentaje(montoNum > 0 ? ((cuenta.comision_valor / montoNum) * 100).toFixed(2) : "0");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [montoNum]);
 
   return (
     <>
@@ -211,6 +251,7 @@ export function CrearRetiroPanel({
                         id="campo-cuenta"
                         name="cuenta_retiro_id"
                         required
+                        onChange={(e) => alElegirCuenta(e.target.value)}
                         className={`${fieldClassSm} w-full min-w-0`}
                       >
                         {cuentas.map((c) => (

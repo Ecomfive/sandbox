@@ -20,6 +20,37 @@ export async function crearCuentaRetiro(formData: FormData) {
   revalidatePath("/retiros");
 }
 
+/** Edita a mano cualquier dato de una cuenta ya creada — nombre, cuenta/detalle, tipo o
+ * comisión sugerida. Solo actualiza los campos presentes en el formulario, así cada control
+ * inline (nombre, comisión, etc.) puede llamarla mandando nada más lo suyo. Cambiar esto no
+ * toca los retiros ya creados: cada uno guarda su propia comisión en su propia fila. */
+export async function actualizarCuentaRetiro(formData: FormData) {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+
+  const cambios: Record<string, string | number | null> = {};
+  if (formData.has("nombre")) cambios.nombre = (formData.get("nombre") as string).trim();
+  if (formData.has("detalle")) cambios.detalle = (formData.get("detalle") as string).trim() || null;
+  if (formData.has("tipo")) cambios.tipo = formData.get("tipo") as string;
+  if (formData.has("comision_tipo")) {
+    const tipo = (formData.get("comision_tipo") as string) || null;
+    cambios.comision_tipo = tipo;
+    if (!tipo) cambios.comision_valor = null;
+  }
+  if (formData.has("comision_valor")) {
+    const valor = formData.get("comision_valor") as string;
+    cambios.comision_valor = valor === "" ? null : Number(valor);
+  }
+  if (Object.keys(cambios).length === 0) return;
+
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("cuentas_retiro").update(cambios).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/retiros/cuentas");
+  revalidatePath("/retiros");
+}
+
 export async function alternarActivaCuenta(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;

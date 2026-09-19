@@ -4,6 +4,9 @@ import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { crearCuentaRetiro } from "./actions";
 import { ActivaToggle } from "./activa-toggle";
+import { TextoEditable } from "./texto-editable";
+import { TipoEditable } from "./tipo-editable";
+import { ComisionEditable } from "./comision-editable";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { linkClass } from "@/components/ui/link";
@@ -19,8 +22,6 @@ const TIPOS = [
   { valor: "otro", etiqueta: "Otro" },
 ] as const;
 
-const etiquetaTipo = (valor: string) => TIPOS.find((t) => t.valor === valor)?.etiqueta ?? valor;
-
 export default async function CuentasRetiroPage() {
   await requireModulo("retiros");
   const supabase = createServiceClient();
@@ -28,7 +29,7 @@ export default async function CuentasRetiroPage() {
 
   const { data: cuentas } = await supabase
     .from("cuentas_retiro")
-    .select("id, tipo, nombre, detalle, activa")
+    .select("id, tipo, nombre, detalle, activa, comision_tipo, comision_valor")
     .eq("pais_id", pais.id)
     .order("creado_en", { ascending: false });
 
@@ -39,10 +40,6 @@ export default async function CuentasRetiroPage() {
           ← Conciliación de Retiros
         </Link>
         <h1 className="mt-2 text-xl font-semibold tracking-tight">Cuentas de retiro</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — catálogo de cuentas bancarias, Binance o tarjetas donde se puede recibir
-          un retiro. Se seleccionan como destino al crear un retiro.
-        </p>
       </div>
 
       <FormularioConToast
@@ -72,7 +69,7 @@ export default async function CuentasRetiroPage() {
           />
         </div>
         <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
-          <label className={labelClass}>Detalle</label>
+          <label className={labelClass}>Cuenta</label>
           <input
             type="text"
             name="detalle"
@@ -84,21 +81,31 @@ export default async function CuentasRetiroPage() {
       </FormularioConToast>
 
       <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[36rem] border-collapse text-sm">
+        <table className="w-full min-w-[46rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
               <th className="py-2 pr-3 pl-4 font-medium">Tipo</th>
               <th className="py-2 pr-3 font-medium">Nombre</th>
-              <th className="py-2 pr-3 font-medium">Detalle</th>
+              <th className="py-2 pr-3 font-medium">Cuenta</th>
+              <th className="py-2 pr-3 font-medium">Comisión sugerida</th>
               <th className="py-2 pr-3 font-medium">Estado</th>
             </tr>
           </thead>
           <tbody>
             {(cuentas ?? []).map((c) => (
               <tr key={c.id} className="border-b border-border/60 last:border-0">
-                <td className="py-2 pr-3 pl-4">{etiquetaTipo(c.tipo)}</td>
-                <td className="py-2 pr-3 font-medium">{c.nombre}</td>
-                <td className="py-2 pr-3 text-muted-foreground">{c.detalle}</td>
+                <td className="py-2 pr-3 pl-4">
+                  <TipoEditable id={c.id} tipo={c.tipo} />
+                </td>
+                <td className="py-2 pr-3 font-medium">
+                  <TextoEditable id={c.id} campo="nombre" valor={c.nombre} />
+                </td>
+                <td className="py-2 pr-3 text-muted-foreground">
+                  <TextoEditable id={c.id} campo="detalle" valor={c.detalle ?? ""} placeholder="Sin cuenta" />
+                </td>
+                <td className="py-2 pr-3">
+                  <ComisionEditable id={c.id} comisionTipo={c.comision_tipo} comisionValor={c.comision_valor} />
+                </td>
                 <td className="py-2 pr-3">
                   <ActivaToggle id={c.id} activa={c.activa} />
                 </td>

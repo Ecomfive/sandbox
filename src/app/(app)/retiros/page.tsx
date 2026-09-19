@@ -47,7 +47,7 @@ export default async function RetirosPage() {
         .limit(1000),
       supabase
         .from("cuentas_retiro")
-        .select("id, nombre")
+        .select("id, nombre, comision_tipo, comision_valor")
         .eq("pais_id", pais.id)
         .eq("activa", true)
         .order("nombre"),
