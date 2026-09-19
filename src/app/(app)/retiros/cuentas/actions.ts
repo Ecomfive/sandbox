@@ -51,6 +51,37 @@ export async function actualizarCuentaRetiro(formData: FormData) {
   revalidatePath("/retiros");
 }
 
+/** Borra la cuenta, salvo que ya tenga retiros asociados — ahí se bloquea con un mensaje claro
+ * en vez de romper el historial de esos retiros (que muestran su destino desde esta tabla). */
+export async function eliminarCuentaRetiro(formData: FormData) {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+
+  const supabase = createServiceClient();
+  const { count } = await supabase
+    .from("retiros")
+    .select("id", { count: "exact", head: true })
+    .eq("cuenta_retiro_id", id);
+  if (count && count > 0) {
+    throw new Error(
+      `No se puede eliminar: tiene ${count} retiro${count === 1 ? "" : "s"} asociado${count === 1 ? "" : "s"}. Desactívala en vez de eliminarla.`
+    );
+  }
+
+  const { error } = await supabase.from("cuentas_retiro").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await registrarAuditoria({
+    accion: "eliminar_cuenta_retiro",
+    entidad: "cuentas_retiro",
+    entidadId: id,
+    detalle: "Cuenta de retiro eliminada",
+  });
+
+  revalidatePath("/retiros/cuentas");
+  revalidatePath("/retiros");
+}
+
 export async function alternarActivaCuenta(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;

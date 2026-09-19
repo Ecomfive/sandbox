@@ -29,4 +29,5 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   configurar_plataforma_retiro: "Configuró una plataforma para crear retiros",
   crear_plataforma: "Creó una plataforma",
   activar_cuenta_retiro: "Cambió el estado de una cuenta de retiro",
+  eliminar_cuenta_retiro: "Eliminó una cuenta de retiro",
 };
