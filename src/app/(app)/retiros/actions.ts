@@ -32,6 +32,14 @@ export async function registrarSaldo(formData: FormData) {
   revalidatePath("/retiros");
 }
 
+/** Aparta el próximo correlativo al abrir la ventana de crear. Devuelve null si no se pudo (se asignará al guardar). */
+export async function reservarCorrelativo(): Promise<number | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("reservar_correlativo_retiro");
+  const numero = Number(data);
+  return error || !Number.isInteger(numero) || numero < 1 ? null : numero;
+}
+
 export async function crearRetiro(formData: FormData) {
   const pais_id = formData.get("pais_id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
@@ -47,11 +55,14 @@ export async function crearRetiro(formData: FormData) {
     .split(",")
     .map((e) => e.trim())
     .filter(Boolean);
+  const correlativoTexto = (formData.get("numero_correlativo") as string) || "";
+  const numero_correlativo = /^\d+$/.test(correlativoTexto) ? Number(correlativoTexto) : null;
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("retiros")
     .insert({
+      ...(numero_correlativo !== null ? { numero_correlativo } : {}),
       pais_id,
       plataforma_id,
       cuenta_retiro_id,

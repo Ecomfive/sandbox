@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { crearRetiro } from "./actions";
+import { crearRetiro, reservarCorrelativo } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import {
@@ -59,6 +59,19 @@ export function CrearRetiroPanel({
   const [comisionValor, setComisionValor] = useState("0");
   const [comisionPorcentaje, setComisionPorcentaje] = useState("0");
   const menuRef = useRef<HTMLDivElement>(null);
+  const [correlativo, setCorrelativo] = useState<number | null>(null);
+  const [reservando, setReservando] = useState(false);
+
+  // El correlativo se aparta al abrir la ventana; si se cierra sin guardar y se vuelve a abrir, se reutiliza.
+  async function abrirVentana(id: string) {
+    setPlataformaId(id);
+    setMenuAbierto(false);
+    setAbierto(true);
+    if (correlativo !== null || reservando) return;
+    setReservando(true);
+    setCorrelativo(await reservarCorrelativo());
+    setReservando(false);
+  }
 
   useEffect(() => {
     function alHacerClicFuera(e: MouseEvent) {
@@ -104,11 +117,7 @@ export function CrearRetiroPanel({
               <button
                 key={p.id}
                 type="button"
-                onClick={() => {
-                  setPlataformaId(p.id);
-                  setMenuAbierto(false);
-                  setAbierto(true);
-                }}
+                onClick={() => abrirVentana(p.id)}
                 className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-muted"
               >
                 {p.nombre}
@@ -127,12 +136,31 @@ export function CrearRetiroPanel({
             onClick={(e) => e.stopPropagation()}
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card shadow-xl"
           >
-          <form action={crearRetiro} onSubmit={() => setAbierto(false)}>
+          <form
+            action={crearRetiro}
+            onSubmit={() => {
+              setAbierto(false);
+              setCorrelativo(null);
+            }}
+          >
             <input type="hidden" name="pais_id" value={paisId} />
             <input type="hidden" name="etiquetas" value={etiquetas.join(",")} />
+            {correlativo !== null && <input type="hidden" name="numero_correlativo" value={correlativo} />}
 
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <span className="text-sm font-semibold">Nuevo retiro</span>
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                Nuevo retiro
+                <span
+                  title="Escríbelo en el concepto del retiro en Dropi"
+                  className="rounded bg-muted px-2 py-0.5 text-xs font-medium tabular-nums"
+                >
+                  {correlativo !== null
+                    ? `#${String(correlativo).padStart(4, "0")}`
+                    : reservando
+                      ? "Asignando..."
+                      : "Se asigna al guardar"}
+                </span>
+              </span>
               <button
                 type="button"
                 onClick={() => setAbierto(false)}
@@ -143,6 +171,11 @@ export function CrearRetiroPanel({
             </div>
 
             <div className="flex flex-col gap-3 p-4">
+              {correlativo !== null && (
+                <p className="text-xs text-muted-foreground">
+                  Escribe este correlativo en el concepto del retiro en Dropi para que se concilie.
+                </p>
+              )}
               <div className="flex gap-2">
                 <select
                   name="plataforma_id"

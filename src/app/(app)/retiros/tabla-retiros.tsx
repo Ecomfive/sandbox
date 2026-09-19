@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { linkClass } from "@/components/ui/link";
+import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
 import { ArrastrarIcon, ColumnasIcon } from "@/lib/nav-icons";
 import { ESTADO_ETIQUETA, filtrarRetiros, filtroActivo } from "./filtros";
@@ -26,7 +27,7 @@ export interface FilaRetiro {
   prioridad: string | null;
   asignadoNombre: string | null;
   etiquetas: string[];
-  origen: "Dropi" | "Manual";
+  estadoDropi: string | null;
   notas: string | null;
   soporteNumero: string | null;
 }
@@ -41,7 +42,7 @@ const ESTADO_TONO = {
   cerrado: "success",
 } as const;
 
-type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado";
+type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado" | "dropi";
 
 const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?: string }[] = [
   { id: "correlativo", label: "#", ocultable: false, claseCelda: "font-semibold" },
@@ -50,6 +51,7 @@ const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?:
   { id: "destino", label: "Destino", ocultable: true, claseCelda: "text-muted-foreground" },
   { id: "monto", label: "Monto", ocultable: true, claseCelda: "tabular-nums font-semibold" },
   { id: "estado", label: "Estado", ocultable: true },
+  { id: "dropi", label: "Dropi", ocultable: true },
 ];
 
 const ORDEN_DEFECTO = COLUMNAS.map((c) => c.id);
@@ -84,6 +86,14 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
         <Badge tone={ESTADO_TONO[fila.estado as keyof typeof ESTADO_TONO]}>
           {ESTADO_ETIQUETA[fila.estado] ?? fila.estado}
         </Badge>
+      );
+    case "dropi":
+      return fila.estadoDropi ? (
+        <Badge tone={TONO_ESTADO_DROPI[fila.estadoDropi as EstadoDropi]}>
+          {ETIQUETA_ESTADO_DROPI[fila.estadoDropi as EstadoDropi]}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground">—</span>
       );
   }
 }

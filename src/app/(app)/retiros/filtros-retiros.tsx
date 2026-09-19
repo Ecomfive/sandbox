@@ -49,7 +49,7 @@ const ICONOS: Record<CampoId, ComponentType<SVGProps<SVGSVGElement>>> = {
   estado: EstadoIcon,
   plataforma: TiendaIcon,
   destino: ExtractoIcon,
-  origen: PedidoIcon,
+  dropi: PedidoIcon,
   prioridad: PrioridadIcon,
   asignado: PersonaIcon,
   etiquetas: EtiquetaIcon,
