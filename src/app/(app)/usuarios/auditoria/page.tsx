@@ -5,6 +5,7 @@ import { linkClass } from "@/components/ui/link";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
+import { calcularCambios } from "@/lib/auditoria";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,10 @@ const ETIQUETA_ACCION: Record<string, string> = {
   cerrar_retiro: "Cerró un retiro",
   cerrar_retiro_con_novedad: "Cerró un retiro con novedad",
   cancelar_retiro: "Canceló un retiro",
+  marcar_consolidacion: "Cambió la consolidación de un retiro",
+  configurar_plataforma_retiro: "Configuró una plataforma para crear retiros",
+  crear_plataforma: "Creó una plataforma",
+  activar_cuenta_retiro: "Cambió el estado de una cuenta de retiro",
 };
 
 export default async function AuditoriaPage() {
@@ -25,7 +30,7 @@ export default async function AuditoriaPage() {
 
   const { data: eventos } = await supabase
     .from("historial_auditoria")
-    .select("id, usuario_nombre, accion, entidad, entidad_id, detalle, creado_en")
+    .select("id, usuario_nombre, accion, entidad, entidad_id, detalle, antes, despues, creado_en")
     .order("creado_en", { ascending: false })
     .limit(200);
 
@@ -53,16 +58,33 @@ export default async function AuditoriaPage() {
             </tr>
           </thead>
           <tbody>
-            {(eventos ?? []).map((e) => (
-              <tr key={e.id} className="border-b border-border/60 last:border-0">
-                <td className="py-2 pr-3 pl-4 whitespace-nowrap">
-                  {formatearFechaHoraCompleta(e.creado_en, pais.codigo)}
-                </td>
-                <td className="py-2 pr-3 font-medium">{e.usuario_nombre ?? "—"}</td>
-                <td className="py-2 pr-3">{ETIQUETA_ACCION[e.accion] ?? e.accion}</td>
-                <td className="py-2 pr-3 text-muted-foreground">{e.detalle}</td>
-              </tr>
-            ))}
+            {(eventos ?? []).map((e) => {
+              const cambios = calcularCambios(e.antes, e.despues);
+              return (
+                <tr key={e.id} className="border-b border-border/60 last:border-0">
+                  <td className="py-2 pr-3 pl-4 whitespace-nowrap align-top">
+                    {formatearFechaHoraCompleta(e.creado_en, pais.codigo)}
+                  </td>
+                  <td className="py-2 pr-3 font-medium align-top">{e.usuario_nombre ?? "—"}</td>
+                  <td className="py-2 pr-3 align-top">{ETIQUETA_ACCION[e.accion] ?? e.accion}</td>
+                  <td className="py-2 pr-3 text-muted-foreground">
+                    {cambios.length > 0 ? (
+                      <ul className="flex flex-col gap-0.5">
+                        {cambios.map((c) => (
+                          <li key={c.campo}>
+                            <span className="text-foreground">{c.campo}</span>: {c.antes}{" "}
+                            <span aria-hidden="true">→</span>
+                            <span className="sr-only"> cambió a </span> {c.despues}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      e.detalle
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {(eventos ?? []).length === 0 && (

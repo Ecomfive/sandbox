@@ -63,7 +63,8 @@ export async function alternarDisponiblePlataforma(formData: FormData) {
     accion: "configurar_plataforma_retiro",
     entidad: "pais_plataformas",
     entidadId: id,
-    detalle: `disponible_para_retiro=${disponible}`,
+    antes: { "Disponible para crear": disponible ? "Oculta" : "Disponible" },
+    despues: { "Disponible para crear": disponible ? "Disponible" : "Oculta" },
   });
 
   revalidatePath("/configuracion");

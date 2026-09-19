@@ -8,6 +8,13 @@ import { getUsuarioActual } from "@/lib/auth";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
+const ETIQUETA_ESTADO: Record<string, string> = {
+  abierto: "Abierto",
+  cancelado: "Cancelado",
+  novedad: "Novedad",
+  cerrado: "Cerrado",
+};
+
 async function registrarEvento(supabase: ReturnType<typeof createServiceClient>, retiroId: string, evento: string) {
   await supabase.from("retiro_eventos").insert({ retiro_id: retiroId, evento });
 }
@@ -24,7 +31,8 @@ export async function alternarConsolidado(formData: FormData) {
     accion: "marcar_consolidacion",
     entidad: "retiros",
     entidadId: id,
-    detalle: `consolidado=${consolidado}`,
+    antes: { Consolidación: consolidado ? "Pendiente" : "Consolidado" },
+    despues: { Consolidación: consolidado ? "Consolidado" : "Pendiente" },
   });
 
   revalidatePath("/retiros");
@@ -120,7 +128,7 @@ export async function cerrarRetiro(formData: FormData) {
 
   const { data: retiro, error: errorRetiro } = await supabase
     .from("retiros")
-    .select("a_recibir, monto_neto, comprobante_path")
+    .select("estado, a_recibir, monto_neto, comprobante_path")
     .eq("id", id)
     .single();
   if (errorRetiro) throw new Error(errorRetiro.message);
@@ -163,7 +171,12 @@ export async function cerrarRetiro(formData: FormData) {
     accion: conDiscrepancia ? "cerrar_retiro_con_novedad" : "cerrar_retiro",
     entidad: "retiros",
     entidadId: id,
-    detalle: `monto_recibido=${montoRecibido.toFixed(2)} diferencia=${diferencia.toFixed(2)}`,
+    antes: { Estado: ETIQUETA_ESTADO[retiro.estado] ?? retiro.estado },
+    despues: {
+      Estado: ETIQUETA_ESTADO[estado] ?? estado,
+      "Monto recibido": montoRecibido.toFixed(2),
+      Diferencia: diferencia.toFixed(2),
+    },
   });
 
   revalidatePath("/retiros");
@@ -176,11 +189,19 @@ export async function cancelarRetiro(formData: FormData) {
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();
+  const { data: retiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
+
   const { error } = await supabase.from("retiros").update({ estado: "cancelado" }).eq("id", id);
   if (error) throw new Error(error.message);
 
   await registrarEvento(supabase, id, "Retiro cancelado");
-  await registrarAuditoria({ accion: "cancelar_retiro", entidad: "retiros", entidadId: id });
+  await registrarAuditoria({
+    accion: "cancelar_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    antes: { Estado: ETIQUETA_ESTADO[retiro?.estado ?? ""] ?? retiro?.estado ?? "—" },
+    despues: { Estado: "Cancelado" },
+  });
 
   revalidatePath("/retiros");
   revalidatePath(`/retiros/${id}`);

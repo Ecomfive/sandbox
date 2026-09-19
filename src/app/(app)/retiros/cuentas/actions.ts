@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export async function crearCuentaRetiro(formData: FormData) {
   const pais_id = formData.get("pais_id") as string;
@@ -24,6 +25,14 @@ export async function alternarActivaCuenta(formData: FormData) {
   const supabase = createServiceClient();
   const { error } = await supabase.from("cuentas_retiro").update({ activa }).eq("id", id);
   if (error) throw new Error(error.message);
+
+  await registrarAuditoria({
+    accion: "activar_cuenta_retiro",
+    entidad: "cuentas_retiro",
+    entidadId: id,
+    antes: { Estado: activa ? "Inactiva" : "Activa" },
+    despues: { Estado: activa ? "Activa" : "Inactiva" },
+  });
 
   revalidatePath("/retiros/cuentas");
   revalidatePath("/retiros");
