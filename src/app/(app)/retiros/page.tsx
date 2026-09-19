@@ -8,6 +8,7 @@ import { linkClass } from "@/components/ui/link";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
 import { CrearRetiroPanel } from "./crear-retiro-panel";
+import { DropiSinVincular } from "./dropi-sin-vincular";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,14 @@ export default async function RetirosPage() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [{ data: plataformasPais }, { data: saldos }, { data: retiros }, { data: cuentasRetiro }, { data: perfiles }] =
+  const [
+    { data: plataformasPais },
+    { data: saldos },
+    { data: retiros },
+    { data: cuentasRetiro },
+    { data: perfiles },
+    { data: sinVincular },
+  ] =
     await Promise.all([
       supabase
         .from("pais_plataformas")
@@ -32,7 +40,7 @@ export default async function RetirosPage() {
       supabase
         .from("retiros")
         .select(
-          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, prioridad, asignado_a, etiquetas, notas, soporte_numero, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
+          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, prioridad, asignado_a, etiquetas, notas, soporte_numero, banco, estado_dropi, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
         )
         .eq("pais_id", pais.id)
         .order("fecha", { ascending: false })
@@ -44,6 +52,12 @@ export default async function RetirosPage() {
         .eq("activa", true)
         .order("nombre"),
       supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre"),
+      supabase
+        .from("dropi_retiros_sin_vincular")
+        .select("id, dropi_id, monto, fecha, estado_dropi, banco, concepto, motivo")
+        .eq("pais_id", pais.id)
+        .order("fecha", { ascending: false })
+        .limit(200),
     ]);
 
   const plataformas = (plataformasPais ?? [])
@@ -97,7 +111,7 @@ export default async function RetirosPage() {
     prioridad: r.prioridad,
     asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,
     etiquetas: r.etiquetas ?? [],
-    origen: r.dropi_id !== null ? "Dropi" : "Manual",
+    estadoDropi: r.estado_dropi,
     notas: r.notas,
     soporteNumero: r.soporte_numero,
   }));
@@ -177,6 +191,8 @@ export default async function RetirosPage() {
 
         <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} />
       </div>
+
+      <DropiSinVincular filas={sinVincular ?? []} codigoPais={pais.codigo} />
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import { ETIQUETA_ESTADO_DROPI } from "@/lib/dropi/emparejar-retiros";
 import type { FilaRetiro } from "./tabla-retiros";
 
 export const SIN_VALOR = "__sin_valor__";
@@ -22,7 +23,7 @@ export type CampoId =
   | "estado"
   | "plataforma"
   | "destino"
-  | "origen"
+  | "dropi"
   | "prioridad"
   | "asignado"
   | "etiquetas"
@@ -46,7 +47,7 @@ export const CAMPOS: DefinicionCampo[] = [
   { id: "estado", etiqueta: "Estado", tipo: "seleccion" },
   { id: "plataforma", etiqueta: "Plataforma", tipo: "seleccion" },
   { id: "destino", etiqueta: "Destino", tipo: "seleccion" },
-  { id: "origen", etiqueta: "Origen", tipo: "seleccion" },
+  { id: "dropi", etiqueta: "Estado en Dropi", tipo: "seleccion" },
   { id: "prioridad", etiqueta: "Prioridad", tipo: "seleccion" },
   { id: "asignado", etiqueta: "Persona asignada", tipo: "seleccion" },
   { id: "etiquetas", etiqueta: "Etiquetas", tipo: "seleccion" },
@@ -127,8 +128,8 @@ export function valoresDeSeleccion(fila: FilaRetiro, campo: CampoId): string[] {
       return [fila.plataformaNombre ?? SIN_VALOR];
     case "destino":
       return [fila.destino === "—" ? SIN_VALOR : fila.destino];
-    case "origen":
-      return [fila.origen];
+    case "dropi":
+      return [fila.estadoDropi ?? SIN_VALOR];
     case "prioridad":
       return [fila.prioridad ?? SIN_VALOR];
     case "asignado":
@@ -159,10 +160,10 @@ export function opcionesDeSeleccion(filas: FilaRetiro[], campo: CampoId): Opcion
       { valor: SIN_VALOR, etiqueta: "Sin prioridad" },
     ];
   }
-  if (campo === "origen") {
+  if (campo === "dropi") {
     return [
-      { valor: "Dropi", etiqueta: "Dropi" },
-      { valor: "Manual", etiqueta: "Manual" },
+      ...Object.entries(ETIQUETA_ESTADO_DROPI).map(([valor, etiqueta]) => ({ valor, etiqueta })),
+      { valor: SIN_VALOR, etiqueta: "Sin vincular" },
     ];
   }
   const conocidos = new Set<string>();

@@ -1,0 +1,71 @@
+import { Badge } from "@/components/ui/badge";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
+import {
+  ETIQUETA_ESTADO_DROPI,
+  ETIQUETA_MOTIVO,
+  TONO_ESTADO_DROPI,
+  type EstadoDropi,
+  type MotivoSinVincular,
+} from "@/lib/dropi/emparejar-retiros";
+import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
+
+export interface FilaSinVincular {
+  id: string;
+  dropi_id: number;
+  monto: number | string;
+  fecha: string;
+  estado_dropi: EstadoDropi;
+  banco: string | null;
+  concepto: string | null;
+  motivo: MotivoSinVincular;
+}
+
+/** Retiros que Dropi reporta pero no traen el correlativo (#0007) de un retiro creado. Solo para revisar. */
+export function DropiSinVincular({ filas, codigoPais }: { filas: FilaSinVincular[]; codigoPais: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold tracking-tight">Retiros de Dropi sin vincular</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Dropi los reportó, pero su concepto no trae el correlativo de un retiro creado aquí. Escribe el correlativo
+        (por ejemplo #0007) en el concepto del retiro en Dropi y vuelve a actualizar.
+      </p>
+
+      <div className="mt-3 min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
+        {filas.length === 0 ? (
+          <EstadoVacio mensaje="No hay retiros de Dropi pendientes de vincular." />
+        ) : (
+          <table className="w-full min-w-[42rem] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Dropi</th>
+                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Fecha</th>
+                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Monto</th>
+                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Estado</th>
+                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Banco</th>
+                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Concepto</th>
+                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((fila) => (
+                <tr key={fila.id} className="border-b border-border/60 last:border-0">
+                  <td className="px-4 py-3 font-medium tabular-nums">#{fila.dropi_id}</td>
+                  <td className="px-4 py-3">{formatearFechaNumerica(fila.fecha)}</td>
+                  <td className="px-4 py-3 font-semibold tabular-nums">
+                    {formatearMoneda(Number(fila.monto), codigoPais)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge tone={TONO_ESTADO_DROPI[fila.estado_dropi]}>{ETIQUETA_ESTADO_DROPI[fila.estado_dropi]}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{fila.banco ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{fila.concepto ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{ETIQUETA_MOTIVO[fila.motivo]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}

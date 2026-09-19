@@ -7,6 +7,7 @@ import { CerrarRetiroForm } from "./cerrar-retiro-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { linkClass } from "@/components/ui/link";
+import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
   const { data: retiro } = await supabase
     .from("retiros")
     .select(
-      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, prioridad, fecha_limite, etiquetas, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
+      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, prioridad, fecha_limite, estado_dropi, dropi_id, etiquetas, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -135,6 +136,19 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
         <div>
           <p className="text-muted-foreground">Fecha límite</p>
           <p className="font-medium">{retiro.fecha_limite ? formatearFecha(retiro.fecha_limite) : "—"}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Estado en Dropi</p>
+          {retiro.estado_dropi ? (
+            <>
+              <Badge tone={TONO_ESTADO_DROPI[retiro.estado_dropi as EstadoDropi]}>
+                {ETIQUETA_ESTADO_DROPI[retiro.estado_dropi as EstadoDropi]}
+              </Badge>
+              {retiro.dropi_id !== null && <p className="mt-1 text-xs text-muted-foreground">Dropi #{retiro.dropi_id}</p>}
+            </>
+          ) : (
+            <p className="font-medium">Sin vincular</p>
+          )}
         </div>
         {retiro.etiquetas && retiro.etiquetas.length > 0 && (
           <div className="col-span-2">

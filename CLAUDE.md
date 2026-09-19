@@ -37,6 +37,14 @@ convenciones técnicas del código.
   `group by`) en vez de traer todo y calcularlo en JavaScript — ver
   [RENDIMIENTO-PENDIENTE.md](RENDIMIENTO-PENDIENTE.md) para el diagnóstico
   detallado de dónde falta esto todavía.
+- **Retiros: los crea el equipo y Dropi solo concilia.** Al abrir "Crear" se
+  reserva un correlativo (`reservar_correlativo_retiro`, empieza en #0001) que
+  se escribe en el concepto del retiro en Dropi con el formato `#0007`.
+  `scripts/dropi-ingerir-retiros.ts` nunca crea retiros: vincula por ese
+  correlativo (guarda `dropi_id`, `banco` y `estado_dropi`, sin tocar el
+  estado propio) y deja lo que no puede vincular en
+  `dropi_retiros_sin_vincular`. La lógica vive en
+  `src/lib/dropi/emparejar-retiros.ts`.
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.
