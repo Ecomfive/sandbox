@@ -52,11 +52,30 @@ export function CrearRetiroPanel({
   const [abierto, setAbierto] = useState(false);
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [etiquetaTexto, setEtiquetaTexto] = useState("");
+  const [monto, setMonto] = useState("");
+  const [comisionValor, setComisionValor] = useState("0");
+  const [comisionPorcentaje, setComisionPorcentaje] = useState("0");
 
   function agregarEtiqueta() {
     const valor = etiquetaTexto.trim();
     if (valor && !etiquetas.includes(valor)) setEtiquetas((prev) => [...prev, valor]);
     setEtiquetaTexto("");
+  }
+
+  const montoNum = parseFloat(monto) || 0;
+  const comisionNum = parseFloat(comisionValor) || 0;
+  const montoNeto = montoNum - comisionNum;
+
+  function alCambiarComisionValor(valor: string) {
+    setComisionValor(valor);
+    const num = parseFloat(valor) || 0;
+    setComisionPorcentaje(montoNum > 0 ? ((num / montoNum) * 100).toFixed(2) : "0");
+  }
+
+  function alCambiarComisionPorcentaje(valor: string) {
+    setComisionPorcentaje(valor);
+    const num = parseFloat(valor) || 0;
+    setComisionValor(montoNum > 0 ? ((montoNum * num) / 100).toFixed(2) : "0");
   }
 
   return (
@@ -112,14 +131,6 @@ export function CrearRetiroPanel({
                 )}
               </div>
 
-              <input
-                type="text"
-                name="notas"
-                placeholder="Escribe una nota para este retiro"
-                className={`${fieldClass} text-sm`}
-                autoFocus
-              />
-
               <div className="flex gap-2">
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <label className={labelClassSm}>Monto</label>
@@ -129,17 +140,9 @@ export function CrearRetiroPanel({
                     min="0"
                     name="monto"
                     required
-                    className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
-                  />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <label className={labelClassSm}>Comisión</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    name="comision"
-                    defaultValue={0}
+                    autoFocus
+                    value={monto}
+                    onChange={(e) => setMonto(e.target.value)}
                     className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
                   />
                 </div>
@@ -153,6 +156,39 @@ export function CrearRetiroPanel({
                     className={`${fieldClassSm} w-full min-w-0`}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className={labelClassSm}>Comisión</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-1">
+                    <span className="text-sm text-muted-foreground">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      name="comision"
+                      value={comisionValor}
+                      onChange={(e) => alCambiarComisionValor(e.target.value)}
+                      className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-1 items-center gap-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={comisionPorcentaje}
+                      onChange={(e) => alCambiarComisionPorcentaje(e.target.value)}
+                      className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Se descuenta del monto — neto:{" "}
+                  <span className="font-medium tabular-nums text-foreground">${montoNeto.toFixed(2)}</span>
+                </p>
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-border pt-3">
@@ -240,6 +276,13 @@ export function CrearRetiroPanel({
                   )}
                 </div>
               </div>
+
+              <input
+                type="text"
+                name="notas"
+                placeholder="Escribe una nota para este retiro"
+                className={`${fieldClass} text-sm`}
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
