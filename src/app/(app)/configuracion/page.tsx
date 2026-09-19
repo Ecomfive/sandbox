@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { crearCuentaRetiro } from "../retiros/cuentas/actions";
+import { crearPlataforma } from "./actions";
 import { ActivaToggle } from "../retiros/cuentas/activa-toggle";
 import { DisponibleToggle } from "./disponible-toggle";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,20 @@ export default async function ConfiguracionPage() {
             Elige qué plataformas aparecen en el botón &quot;+ Crear&quot; de Retiros.
           </p>
         </div>
+
+        <FormularioConToast
+          action={crearPlataforma}
+          mensajeExito="Plataforma agregada"
+          className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+        >
+          <input type="hidden" name="pais_id" value={pais.id} />
+          <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
+            <label className={labelClass}>Nombre de la plataforma</label>
+            <input type="text" name="nombre" required placeholder="Ej: Boxful" className={fieldClass} />
+          </div>
+          <Button type="submit">Crear plataforma</Button>
+        </FormularioConToast>
+
         <div className="min-w-0 overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[24rem] border-collapse text-sm">
             <thead>
