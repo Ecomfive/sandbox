@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { parseExtracto, mapearMovimientos, type MapeoColumnas } from "@/lib/extractos/parse";
 import { requireModuloEscritura } from "@/lib/auth";
+import { obtenerPatrones, sugerirPlataforma, guardarPatron } from "@/lib/extractos/patrones";
 
 export interface ImportarExtractoState {
   status: "idle" | "success" | "error";
@@ -76,6 +77,7 @@ export async function importarExtracto(
     };
   }
 
+  const patrones = await obtenerPatrones(supabase, paisId);
   const { error: errorMovimientos } = await supabase.from("movimientos_bancarios").insert(
     movimientos.map((m) => ({
       extracto_id: extracto.id,
@@ -83,6 +85,7 @@ export async function importarExtracto(
       monto: m.monto,
       descripcion: m.descripcion,
       tipo: m.tipo,
+      plataforma_id: sugerirPlataforma(m.descripcion, patrones),
     }))
   );
   if (errorMovimientos) {
@@ -105,6 +108,19 @@ export async function asignarPlataforma(movimientoId: string, plataformaId: stri
     .eq("id", movimientoId);
   if (error) {
     throw new Error(error.message);
+  }
+
+  // Recuerda esta asignación para reconocer movimientos con la misma descripción después.
+  if (plataformaId) {
+    const { data: movimiento } = await supabase
+      .from("movimientos_bancarios")
+      .select("descripcion, extractos_bancarios(pais_id)")
+      .eq("id", movimientoId)
+      .single();
+    const paisId = (movimiento?.extractos_bancarios as unknown as { pais_id: string } | null)?.pais_id;
+    if (movimiento?.descripcion && paisId) {
+      await guardarPatron(supabase, paisId, movimiento.descripcion, plataformaId);
+    }
   }
   revalidatePath("/extractos");
 }

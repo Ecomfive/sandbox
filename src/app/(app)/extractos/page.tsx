@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { ExtractoUploader } from "./uploader";
@@ -39,6 +40,9 @@ export default async function ExtractosPage() {
           Sube el archivo del banco, mapea las columnas y confirma para guardarlo.
         </p>
         <ExtractoUploader pais={pais} />
+        <Link href="/extractos/patrones" className={`mt-3 inline-block ${linkClass}`}>
+          Diccionario de patrones bancarios →
+        </Link>
       </div>
 
       <div>
