@@ -40,7 +40,7 @@ export default async function RetirosPage() {
       supabase
         .from("retiros")
         .select(
-          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, prioridad, asignado_a, etiquetas, notas, soporte_numero, banco, estado_dropi, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
+          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, prioridad, asignado_a, etiquetas, notas, soporte_numero, banco, estado_dropi, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
         )
         .eq("pais_id", pais.id)
         .order("fecha", { ascending: false })
@@ -98,6 +98,7 @@ export default async function RetirosPage() {
   const filasRetiro: FilaRetiro[] = (retiros ?? []).map((r) => ({
     id: r.id,
     numeroCorrelativo: r.numero_correlativo,
+    consolidado: r.consolidado,
     fecha: r.fecha,
     plataformaNombre: (r.plataformas as unknown as { nombre: string } | null)?.nombre ?? null,
     destino: (r.cuentas_retiro as unknown as { nombre: string } | null)?.nombre ?? r.banco ?? "—",
