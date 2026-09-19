@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { registrarSaldo } from "./actions";
-import { Button } from "@/components/ui/button";
-import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
+import { resolverPeriodo } from "@/lib/dashboard/periodo";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
-import { FormularioConToast } from "@/components/ui/toast";
 import { linkClass } from "@/components/ui/link";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
@@ -17,12 +14,35 @@ export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
-export default async function RetirosPage() {
+const COLUMNAS_RETIRO =
+  "id, numero_correlativo, monto, fecha, estado, notas, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)";
+const PRESETS_VALIDOS = ["7d", "30d", "mes_actual", "mes_anterior"];
+const esFechaIso = (valor: unknown): valor is string =>
+  typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor) && !Number.isNaN(new Date(valor).getTime());
+
+export default async function RetirosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   await requireModulo("retiros");
+  const sp = await searchParams;
+  const desde = esFechaIso(sp.desde) ? sp.desde : undefined;
+  const hasta = esFechaIso(sp.hasta) ? sp.hasta : undefined;
+  const preset = typeof sp.preset === "string" && PRESETS_VALIDOS.includes(sp.preset) ? sp.preset : undefined;
+  const periodo = (desde && hasta) || preset ? resolverPeriodo({ preset, desde, hasta }) : null;
+
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [{ data: plataformasPais }, { data: saldos }, { data: retiros }, { data: cuentasRetiro }, { data: perfiles }] =
+  const [
+    { data: plataformasPais },
+    { data: saldos },
+    { data: retiros },
+    { data: retirosFiltrados },
+    { data: cuentasRetiro },
+    { data: perfiles },
+  ] =
     await Promise.all([
       supabase
         .from("pais_plataformas")
@@ -35,12 +55,20 @@ export default async function RetirosPage() {
         .order("fecha", { ascending: false }),
       supabase
         .from("retiros")
-        .select(
-          "id, numero_correlativo, monto, fecha, estado, notas, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
-        )
+        .select(COLUMNAS_RETIRO)
         .eq("pais_id", pais.id)
         .order("fecha", { ascending: false })
         .limit(50),
+      periodo
+        ? supabase
+            .from("retiros")
+            .select(COLUMNAS_RETIRO)
+            .eq("pais_id", pais.id)
+            .gte("fecha", periodo.desde)
+            .lte("fecha", periodo.hasta)
+            .order("fecha", { ascending: false })
+            .limit(50)
+        : Promise.resolve({ data: null }),
       supabase
         .from("cuentas_retiro")
         .select("id, nombre")
@@ -78,7 +106,8 @@ export default async function RetirosPage() {
     .filter((r) => r.estado === "cerrado" && r.fecha.slice(0, 7) === mesActual)
     .reduce((acc, r) => acc + Number(r.monto), 0);
 
-  const filasRetiro: FilaRetiro[] = (retiros ?? []).map((r) => ({
+  const retirosTabla = periodo ? (retirosFiltrados ?? []) : (retiros ?? []);
+  const filasRetiro: FilaRetiro[] = retirosTabla.map((r) => ({
     id: r.id,
     numeroCorrelativo: r.numero_correlativo,
     fecha: r.fecha,
@@ -135,48 +164,6 @@ export default async function RetirosPage() {
             })}
           </KpiGrid>
         </div>
-
-        <FormularioConToast
-          action={registrarSaldo}
-          mensajeExito="Saldo registrado"
-          className="mt-4 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
-        >
-          <input type="hidden" name="pais_id" value={pais.id} />
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Plataforma</label>
-            <select name="plataforma_id" required className={fieldClass}>
-              {(plataformas ?? []).map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Saldo actual</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              name="monto"
-              required
-              className={`${fieldClass} w-32 tabular-nums`}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Fecha</label>
-            <input
-              type="date"
-              name="fecha"
-              defaultValue={hoy()}
-              required
-              className={fieldClass}
-            />
-          </div>
-          <Button type="submit" variant="secondary">
-            Registrar saldo
-          </Button>
-        </FormularioConToast>
       </div>
 
       <div>
@@ -203,7 +190,7 @@ export default async function RetirosPage() {
           </KpiGrid>
         </div>
 
-        <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} />
+        <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} hayFiltro={periodo !== null} />
       </div>
     </main>
   );

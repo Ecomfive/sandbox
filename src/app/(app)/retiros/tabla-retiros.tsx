@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { FiltroFechaCalendario } from "@/components/filtro-fecha-calendario";
 import { linkClass } from "@/components/ui/link";
 import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
 import { ArrastrarIcon, ColumnasIcon } from "@/lib/nav-icons";
@@ -81,7 +82,15 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
 
 /** Tabla de retiros con menú de columnas: arrastrar para reordenar, casilla para ocultar.
  * La preferencia se guarda en localStorage — cada persona en su navegador ve su propio orden. */
-export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; codigoPais: string }) {
+export function TablaRetiros({
+  retiros,
+  codigoPais,
+  hayFiltro,
+}: {
+  retiros: FilaRetiro[];
+  codigoPais: string;
+  hayFiltro: boolean;
+}) {
   const [orden, setOrden] = useState<ColumnaId[]>(ORDEN_DEFECTO);
   const [ocultas, setOcultas] = useState<Set<ColumnaId>>(new Set());
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -199,6 +208,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
                 <span className="inline-flex items-center gap-1.5">
                   <ArrastrarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                   {columna.label}
+                  {columna.id === "fecha" && <FiltroFechaCalendario />}
                 </span>
               </th>
             ))}
@@ -221,7 +231,11 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
           ))}
         </tbody>
       </table>
-      {retiros.length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
+      {retiros.length === 0 && (
+        <EstadoVacio
+          mensaje={hayFiltro ? "No hay retiros en el período seleccionado." : "Todavía no hay retiros registrados."}
+        />
+      )}
     </div>
   );
 }
