@@ -10,10 +10,12 @@ import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
 import { ArrastrarIcon, ColumnasIcon } from "@/lib/nav-icons";
 import { ESTADO_ETIQUETA, filtrarRetiros, filtroActivo } from "./filtros";
 import { BotonFiltrosRetiros, useFiltrosRetiros } from "./filtros-retiros";
+import { ConsolidadoToggle } from "./consolidado-toggle";
 
 export interface FilaRetiro {
   id: string;
   numeroCorrelativo: number;
+  consolidado: boolean;
   fecha: string;
   plataformaNombre: string | null;
   destino: string;
@@ -42,9 +44,18 @@ const ESTADO_TONO = {
   cerrado: "success",
 } as const;
 
-type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado" | "dropi";
+type ColumnaId =
+  | "consolidacion"
+  | "correlativo"
+  | "fecha"
+  | "plataforma"
+  | "destino"
+  | "monto"
+  | "estado"
+  | "dropi";
 
 const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?: string }[] = [
+  { id: "consolidacion", label: "Consolidación", ocultable: true },
   { id: "correlativo", label: "#", ocultable: false, claseCelda: "font-semibold" },
   { id: "fecha", label: "Creación", ocultable: true },
   { id: "plataforma", label: "Plataforma", ocultable: true, claseCelda: "text-muted-foreground" },
@@ -64,6 +75,8 @@ function esColumnaId(valor: unknown): valor is ColumnaId {
 
 function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
   switch (id) {
+    case "consolidacion":
+      return <ConsolidadoToggle id={fila.id} consolidado={fila.consolidado} />;
     case "correlativo":
       return (
         <Link

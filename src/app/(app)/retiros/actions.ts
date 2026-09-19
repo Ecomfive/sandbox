@@ -11,6 +11,24 @@ async function registrarEvento(supabase: ReturnType<typeof createServiceClient>,
   await supabase.from("retiro_eventos").insert({ retiro_id: retiroId, evento });
 }
 
+export async function alternarConsolidado(formData: FormData) {
+  const id = formData.get("id") as string;
+  const consolidado = formData.get("consolidado") === "true";
+
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("retiros").update({ consolidado }).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await registrarAuditoria({
+    accion: "marcar_consolidacion",
+    entidad: "retiros",
+    entidadId: id,
+    detalle: `consolidado=${consolidado}`,
+  });
+
+  revalidatePath("/retiros");
+}
+
 export async function registrarSaldo(formData: FormData) {
   const pais_id = formData.get("pais_id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
