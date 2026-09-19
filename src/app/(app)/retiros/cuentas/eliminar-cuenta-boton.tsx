@@ -15,11 +15,8 @@ export function EliminarCuentaBoton({ id, nombre }: { id: string; nombre: string
     const formData = new FormData();
     formData.set("id", id);
     startTransition(async () => {
-      try {
-        await eliminarCuentaRetiro(formData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo eliminar.");
-      }
+      const resultado = await eliminarCuentaRetiro(formData);
+      if (resultado?.error) setError(resultado.error);
     });
   }
 

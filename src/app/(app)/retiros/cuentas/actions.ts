@@ -52,8 +52,10 @@ export async function actualizarCuentaRetiro(formData: FormData) {
 }
 
 /** Borra la cuenta, salvo que ya tenga retiros asociados — ahí se bloquea con un mensaje claro
- * en vez de romper el historial de esos retiros (que muestran su destino desde esta tabla). */
-export async function eliminarCuentaRetiro(formData: FormData) {
+ * en vez de romper el historial de esos retiros (que muestran su destino desde esta tabla).
+ * Devuelve el error como valor en vez de lanzarlo: en producción, Next.js oculta el mensaje
+ * de cualquier excepción de un server action, y este mensaje sí lo necesita ver la persona. */
+export async function eliminarCuentaRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
@@ -63,13 +65,13 @@ export async function eliminarCuentaRetiro(formData: FormData) {
     .select("id", { count: "exact", head: true })
     .eq("cuenta_retiro_id", id);
   if (count && count > 0) {
-    throw new Error(
-      `No se puede eliminar: tiene ${count} retiro${count === 1 ? "" : "s"} asociado${count === 1 ? "" : "s"}. Desactívala en vez de eliminarla.`
-    );
+    return {
+      error: `No se puede eliminar: tiene ${count} retiro${count === 1 ? "" : "s"} asociado${count === 1 ? "" : "s"}. Desactívala en vez de eliminarla.`,
+    };
   }
 
   const { error } = await supabase.from("cuentas_retiro").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   await registrarAuditoria({
     accion: "eliminar_cuenta_retiro",
@@ -80,6 +82,7 @@ export async function eliminarCuentaRetiro(formData: FormData) {
 
   revalidatePath("/retiros/cuentas");
   revalidatePath("/retiros");
+  return {};
 }
 
 export async function alternarActivaCuenta(formData: FormData) {
