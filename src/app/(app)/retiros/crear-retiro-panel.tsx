@@ -50,10 +50,9 @@ export function CrearRetiroPanel({
   cuentas: Cuenta[];
   perfiles: Perfil[];
 }) {
-  const plataformasCrear = plataformas.filter((p) => ["Dropi", "EFFI"].includes(p.nombre));
   const [abierto, setAbierto] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const [plataformaId, setPlataformaId] = useState(plataformasCrear[0]?.id ?? "");
+  const [plataformaId, setPlataformaId] = useState(plataformas[0]?.id ?? "");
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [etiquetaTexto, setEtiquetaTexto] = useState("");
   const [monto, setMonto] = useState("");
@@ -101,7 +100,7 @@ export function CrearRetiroPanel({
 
         {menuAbierto && (
           <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
-            {plataformasCrear.map((p) => (
+            {plataformas.map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -151,7 +150,7 @@ export function CrearRetiroPanel({
                   defaultValue={plataformaId}
                   className={`${fieldClassSm} min-w-0 flex-1`}
                 >
-                  {plataformasCrear.map((p) => (
+                  {plataformas.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombre}
                     </option>

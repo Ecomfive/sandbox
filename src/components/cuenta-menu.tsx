@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { cerrarSesion } from "@/app/login/actions";
 import { subirAvatar } from "@/lib/perfil-actions";
 import { VERSION, CAMBIOS_RECIENTES } from "@/lib/version";
 import type { UsuarioActual } from "@/lib/auth";
+import { ConfiguracionIcon } from "@/lib/nav-icons";
 
 function LogoutIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -124,6 +126,13 @@ export function CuentaMenu({ usuario, expanded }: { usuario: UsuarioActual; expa
           </button>
           {error && <p className="px-3 pb-1 text-xs text-destructive">{error}</p>}
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onChangeAvatar} />
+
+          {usuario.modulos.includes("configuracion") && (
+            <Link href="/configuracion" className={itemClass} onClick={() => setAbierto(false)}>
+              <ConfiguracionIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              Configuración
+            </Link>
+          )}
 
           <form action={cerrarSesion}>
             <button type="submit" className={itemClass}>

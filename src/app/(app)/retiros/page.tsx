@@ -22,7 +22,7 @@ export default async function RetirosPage() {
     await Promise.all([
       supabase
         .from("pais_plataformas")
-        .select("plataforma_id, plataformas(id, nombre)")
+        .select("plataforma_id, disponible_para_retiro, plataformas(id, nombre)")
         .eq("pais_id", pais.id),
       supabase
         .from("saldos_wallet")
@@ -47,6 +47,12 @@ export default async function RetirosPage() {
     ]);
 
   const plataformas = (plataformasPais ?? [])
+    .map((pp) => pp.plataformas as unknown as { id: string; nombre: string } | null)
+    .filter((p): p is { id: string; nombre: string } => p !== null)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const plataformasParaCrear = (plataformasPais ?? [])
+    .filter((pp) => pp.disponible_para_retiro)
     .map((pp) => pp.plataformas as unknown as { id: string; nombre: string } | null)
     .filter((p): p is { id: string; nombre: string } => p !== null)
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -154,7 +160,7 @@ export default async function RetirosPage() {
             </Link>
             <CrearRetiroPanel
               paisId={pais.id}
-              plataformas={plataformas}
+              plataformas={plataformasParaCrear}
               cuentas={cuentasRetiro ?? []}
               perfiles={perfiles ?? []}
             />
