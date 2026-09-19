@@ -2,11 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
-import { cancelarRetiro } from "../actions";
+import { CancelarRetiroForm } from "./cancelar-retiro-form";
 import { CerrarRetiroForm } from "./cerrar-retiro-form";
 import { DescargarFicha } from "./descargar-ficha";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
@@ -191,12 +190,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
             montoRecibidoActual={retiro.monto_recibido}
           />
 
-          <form action={cancelarRetiro} className="border-t border-border pt-4">
-            <input type="hidden" name="id" value={retiro.id} />
-            <Button type="submit" variant="secondary">
-              Cancelar retiro
-            </Button>
-          </form>
+          <CancelarRetiroForm retiroId={retiro.id} />
         </div>
       )}
 
