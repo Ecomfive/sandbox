@@ -94,7 +94,22 @@ export default async function RetirosPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold tracking-tight">Saldo de wallet</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight">Saldo de wallet</h2>
+          <a
+            href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button type="button" variant="secondary">
+              Actualizar retiros desde Dropi
+            </Button>
+          </a>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Abre la herramienta local de actualización. Solo funciona en la computadora donde esa
+          herramienta está corriendo y tiene la sesión de Dropi guardada.
+        </p>
         <div className="mt-3">
           <KpiGrid>
             {(plataformas ?? []).map((p) => {

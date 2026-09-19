@@ -185,6 +185,36 @@ const servidor = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url?.startsWith("/actualizar-saldo-rapido")) {
+    const url = new URL(req.url, `http://localhost:${PUERTO}`);
+    const pais = url.searchParams.get("pais") ?? "";
+
+    if (!paisValido(pais)) {
+      res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("País inválido.");
+      return;
+    }
+
+    const hoy = new Date().toISOString().slice(0, 10);
+
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.write(paginaProcesando(`Actualizando retiros de ${pais.toUpperCase()}...`));
+
+    const extraccion = await ejecutar(["tsx", "scripts/dropi-extraer-retiros.ts", pais]);
+    let salida = extraccion.salida;
+    let ok = extraccion.ok;
+
+    if (extraccion.ok) {
+      const archivo = `.dropi-downloads/retiros-${pais}-${hoy}.json`;
+      const ingesta = await ejecutar(["tsx", "scripts/dropi-ingerir-retiros.ts", pais, archivo]);
+      salida += "\n\n" + ingesta.salida;
+      ok = ingesta.ok;
+    }
+
+    res.end(cerrarPagina(salida, ok));
+    return;
+  }
+
   if (req.method === "POST" && req.url === "/actualizar-saldo") {
     let cuerpo = "";
     for await (const chunk of req) cuerpo += chunk;
