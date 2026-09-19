@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { crearRetiro } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
@@ -52,17 +52,6 @@ export function CrearRetiroPanel({
   const [abierto, setAbierto] = useState(false);
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [etiquetaTexto, setEtiquetaTexto] = useState("");
-  const contenedorRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function alHacerClicFuera(e: MouseEvent) {
-      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) {
-        setAbierto(false);
-      }
-    }
-    document.addEventListener("mousedown", alHacerClicFuera);
-    return () => document.removeEventListener("mousedown", alHacerClicFuera);
-  }, []);
 
   function agregarEtiqueta() {
     const valor = etiquetaTexto.trim();
@@ -71,14 +60,21 @@ export function CrearRetiroPanel({
   }
 
   return (
-    <div ref={contenedorRef} className="relative">
-      <Button type="button" onClick={() => setAbierto((v) => !v)} className="!rounded-full">
+    <>
+      <Button type="button" onClick={() => setAbierto(true)} className="!rounded-full">
         <MasIcon className="mr-1 h-4 w-4" />
         Retiro
       </Button>
 
       {abierto && (
-        <div className="absolute right-0 z-30 mt-2 w-[26rem] max-w-[90vw] rounded-lg border border-border bg-card shadow-xl">
+        <div
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setAbierto(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card shadow-xl"
+          >
           <form action={crearRetiro} onSubmit={() => setAbierto(false)}>
             <input type="hidden" name="pais_id" value={paisId} />
             <input type="hidden" name="etiquetas" value={etiquetas.join(",")} />
@@ -96,7 +92,7 @@ export function CrearRetiroPanel({
 
             <div className="flex flex-col gap-3 p-4">
               <div className="flex gap-2">
-                <select name="plataforma_id" required className={`${fieldClassSm} flex-1`}>
+                <select name="plataforma_id" required className={`${fieldClassSm} min-w-0 flex-1`}>
                   {plataformas.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombre}
@@ -104,7 +100,7 @@ export function CrearRetiroPanel({
                   ))}
                 </select>
                 {cuentas.length > 0 ? (
-                  <select name="cuenta_retiro_id" required className={`${fieldClassSm} flex-1`}>
+                  <select name="cuenta_retiro_id" required className={`${fieldClassSm} min-w-0 flex-1`}>
                     {cuentas.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nombre}
@@ -125,7 +121,7 @@ export function CrearRetiroPanel({
               />
 
               <div className="flex gap-2">
-                <div className="flex flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <label className={labelClassSm}>Monto</label>
                   <input
                     type="number"
@@ -133,10 +129,10 @@ export function CrearRetiroPanel({
                     min="0"
                     name="monto"
                     required
-                    className={`${fieldClassSm} tabular-nums`}
+                    className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
                   />
                 </div>
-                <div className="flex flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <label className={labelClassSm}>Comisión</label>
                   <input
                     type="number"
@@ -144,12 +140,18 @@ export function CrearRetiroPanel({
                     min="0"
                     name="comision"
                     defaultValue={0}
-                    className={`${fieldClassSm} tabular-nums`}
+                    className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
                   />
                 </div>
-                <div className="flex flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <label className={labelClassSm}>Fecha</label>
-                  <input type="date" name="fecha" defaultValue={hoy()} required className={fieldClassSm} />
+                  <input
+                    type="date"
+                    name="fecha"
+                    defaultValue={hoy()}
+                    required
+                    className={`${fieldClassSm} w-full min-w-0`}
+                  />
                 </div>
               </div>
 
@@ -158,7 +160,7 @@ export function CrearRetiroPanel({
                   <label className={`${labelClassSm} inline-flex items-center gap-1`}>
                     <PersonaIcon className="h-3.5 w-3.5" /> Persona asignada
                   </label>
-                  <select name="asignado_a" defaultValue="" className={fieldClassSm}>
+                  <select name="asignado_a" defaultValue="" className={`${fieldClassSm} w-full`}>
                     <option value="">Sin asignar</option>
                     {perfiles.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -172,14 +174,14 @@ export function CrearRetiroPanel({
                   <label className={`${labelClassSm} inline-flex items-center gap-1`}>
                     <CalendarioIcon className="h-3.5 w-3.5" /> Fecha límite
                   </label>
-                  <input type="date" name="fecha_limite" className={fieldClassSm} />
+                  <input type="date" name="fecha_limite" className={`${fieldClassSm} w-full`} />
                 </div>
 
                 <div className="flex min-w-[9rem] flex-1 flex-col gap-1">
                   <label className={`${labelClassSm} inline-flex items-center gap-1`}>
                     <PrioridadIcon className="h-3.5 w-3.5" /> Prioridad
                   </label>
-                  <select name="prioridad" defaultValue="" className={fieldClassSm}>
+                  <select name="prioridad" defaultValue="" className={`${fieldClassSm} w-full`}>
                     <option value="">Sin prioridad</option>
                     {PRIORIDADES.map((p) => (
                       <option key={p.valor} value={p.valor}>
@@ -249,8 +251,9 @@ export function CrearRetiroPanel({
               </Button>
             </div>
           </form>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
