@@ -87,44 +87,29 @@ export default async function RetirosPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <WalletIcon className="h-5 w-5 text-muted-foreground" />
-          Retiros y wallet
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — saldo de wallet por plataforma y seguimiento de retiros. El saldo y el
-          historial de retiros de Dropi se traen automáticamente de su panel; el resto se sigue
-          registrando a mano hasta tener una extracción confiable para cada una.
-        </p>
+        <h1 className="text-lg font-semibold tracking-tight">Consolidación de retiros</h1>
       </div>
 
       <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold tracking-tight">Saldo de wallet</h2>
-          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-            {ultimaActualizacion && (
-              <p className="text-xs text-muted-foreground">
-                Última actualización:{" "}
-                <span className="tabular-nums">
-                  {formatearFechaHoraCompleta(ultimaActualizacion, pais.codigo)}
-                </span>
-              </p>
-            )}
-            <a
-              href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button type="button" variant="secondary">
-                Actualizar retiros desde Dropi
-              </Button>
-            </a>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          {ultimaActualizacion && (
+            <p className="text-xs text-muted-foreground">
+              Última actualización:{" "}
+              <span className="tabular-nums">
+                {formatearFechaHoraCompleta(ultimaActualizacion, pais.codigo)}
+              </span>
+            </p>
+          )}
+          <a
+            href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button type="button" variant="secondary">
+              Actualizar retiros desde Dropi
+            </Button>
+          </a>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Abre la herramienta local de actualización. Solo funciona en la computadora donde esa
-          herramienta está corriendo y tiene la sesión de Dropi guardada.
-        </p>
         <div className="mt-3">
           <KpiGrid>
             {(plataformas ?? []).map((p) => {
@@ -133,14 +118,14 @@ export default async function RetirosPage() {
               return (
                 <KpiCard
                   key={p.id}
-                  titulo={
-                    <span className="flex items-center gap-1.5">
-                      {p.nombre}
-                      {esAutomatico && <Badge tone="success">Automático</Badge>}
+                  titulo={esAutomatico ? null : p.nombre}
+                  valor={
+                    <span className="inline-flex items-center gap-1.5">
+                      {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
+                      {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
                     </span>
                   }
-                  valor={ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
-                  subtexto={ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
+                  subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
                 />
               );
             })}

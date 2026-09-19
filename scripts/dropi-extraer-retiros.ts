@@ -21,27 +21,38 @@ if (!bases[pais ?? ""]) {
 
 async function main() {
   const browser = await chromium.launch({ headless: false, channel: "msedge" });
-  const context = await browser.newContext({ storageState: `.dropi-session-${pais}.json` });
+  const context = await browser.newContext({
+    storageState: `.dropi-session-${pais}.json`,
+    viewport: { width: 1440, height: 900 },
+  });
   const page = await context.newPage();
 
   const respuestaWithdrawal = page.waitForResponse(
     (res) => res.url().includes("/api/withdrawal") && res.request().resourceType() === "fetch",
-    { timeout: 30000 }
+    { timeout: 60000 }
   );
 
-  await page.goto(`${bases[pais]}/dashboard`, { waitUntil: "load" });
-  await page.waitForTimeout(1500);
-  await page.locator("text=Configuraciones").first().click();
-  await page.waitForTimeout(800);
-  await page.locator("text=Retiros de Saldo").first().click();
-  await page.waitForTimeout(1500);
-  await page.locator("text=Historial de Retiros").first().click();
+  fs.mkdirSync(".dropi-downloads", { recursive: true });
+
+  try {
+    await page.goto(`${bases[pais]}/dashboard`, { waitUntil: "load" });
+    await page.waitForTimeout(1500);
+    await page.locator("text=Configuraciones").first().click();
+    await page.waitForTimeout(800);
+    await page.locator("text=Retiros de Saldo").first().click();
+    await page.waitForTimeout(1500);
+    await page.locator("text=Historial de Retiros").first().click();
+  } catch (err) {
+    const captura = `.dropi-downloads/error-navegacion-${pais}-${Date.now()}.png`;
+    await page.screenshot({ path: captura, fullPage: true }).catch(() => {});
+    console.error(`Fallo navegando el menu. Captura guardada en ${captura}.`);
+    throw err;
+  }
 
   const respuesta = await respuestaWithdrawal;
   const cuerpo = await respuesta.json();
   const objetos: Record<string, unknown>[] = cuerpo.objects ?? [];
 
-  fs.mkdirSync(".dropi-downloads", { recursive: true });
   const hoy = new Date().toISOString().slice(0, 10);
   const destino = `.dropi-downloads/retiros-${pais}-${hoy}.json`;
   fs.writeFileSync(destino, JSON.stringify(objetos, null, 2));

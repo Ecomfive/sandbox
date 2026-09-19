@@ -21,7 +21,7 @@ export function KpiCard({
   tono = "neutral",
   children,
 }: {
-  titulo: ReactNode;
+  titulo?: ReactNode;
   valor: ReactNode;
   subtexto?: ReactNode;
   tono?: Tono;
@@ -29,7 +29,9 @@ export function KpiCard({
 }) {
   return (
     <div className={`min-w-0 rounded-lg border p-4 ${tonos[tono]}`}>
-      <p className={`text-sm font-medium ${tono === "destructive" ? "text-red-700" : ""}`}>{titulo}</p>
+      {titulo && (
+        <p className={`text-sm font-medium ${tono === "destructive" ? "text-red-700" : ""}`}>{titulo}</p>
+      )}
       <p className={`mt-1 text-lg font-semibold tabular-nums ${tono === "destructive" ? "text-red-700" : ""}`}>
         {valor}
       </p>
