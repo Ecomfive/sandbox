@@ -118,9 +118,14 @@ export function CrearRetiroPanel({
 
   return (
     <>
-      <Button ref={botonAbrirRef} type="button" onClick={abrirVentana} className="!rounded-full">
+      <Button
+        ref={botonAbrirRef}
+        type="button"
+        onClick={abrirVentana}
+        className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
+      >
         <MasIcon className="mr-1 h-4 w-4" />
-        Crear
+        Agregar
       </Button>
 
       {abierto && (
