@@ -12,7 +12,7 @@ import {
   type SVGProps,
 } from "react";
 import { createPortal } from "react-dom";
-import { fieldClassSm } from "@/components/ui/field";
+import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import {
   BuscarIcon,
   CalendarioIcon,
@@ -111,11 +111,12 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
       type="button"
       aria-pressed={activo}
       onClick={onClick}
-      className={
+      title={typeof children === "string" ? children : undefined}
+      className={`max-w-full truncate !rounded-full px-2.5 py-1 text-xs ${anilloFoco} ${
         activo
-          ? "rounded-full bg-foreground px-2.5 py-1 text-xs font-medium text-background"
-          : "rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
-      }
+          ? "bg-foreground font-medium text-background"
+          : "border border-border text-muted-foreground hover:bg-muted"
+      }`}
     >
       {children}
     </button>
@@ -170,7 +171,7 @@ function EditorValor({
                 key={preset.id}
                 type="button"
                 onClick={() => alCambiar({ tipo: "fecha", ...rangoDePreset(preset.id, new Date()) })}
-                className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                className={`border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted ${anilloFoco}`}
               >
                 {preset.etiqueta}
               </button>
@@ -229,6 +230,7 @@ function EditorValor({
           type="text"
           value={valor.texto}
           placeholder="Escribe para buscar..."
+          aria-label={`Texto que contiene ${CAMPO_POR_ID.get(campo)?.etiqueta ?? "el campo"}`}
           onChange={(e) => alCambiar({ tipo: "texto", texto: e.target.value })}
           className={`${fieldClassSm} w-full`}
         />
@@ -275,9 +277,27 @@ export function BotonFiltrosRetiros({
       setAbierto(false);
     }
     function alTeclear(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      setAbierto(false);
-      botonRef.current?.focus();
+      if (e.key === "Escape") {
+        setAbierto(false);
+        botonRef.current?.focus();
+        return;
+      }
+      // El panel vive al final del <body>: Tab da la vuelta dentro de él para no perder al usuario de teclado.
+      if (e.key !== "Tab" || !panelRef.current || !panelRef.current.contains(document.activeElement)) return;
+      // (el propio panel también cuenta como "dentro": recibe el foco al abrir)
+      const enfocables = panelRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (enfocables.length === 0) return;
+      const primero = enfocables[0];
+      const ultimo = enfocables[enfocables.length - 1];
+      if (e.shiftKey && (document.activeElement === primero || document.activeElement === panelRef.current)) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault();
+        primero.focus();
+      }
     }
     function alDesplazar(e: Event) {
       if (e.target instanceof Node && panelRef.current?.contains(e.target)) return;
@@ -298,8 +318,11 @@ export function BotonFiltrosRetiros({
     };
   }, [abierto]);
 
+  // Al abrir, el foco entra al panel (al buscador si se está eligiendo campo; si no, al panel mismo).
   useEffect(() => {
-    if (abierto && eligiendo) buscadorRef.current?.focus();
+    if (!abierto) return;
+    if (eligiendo) buscadorRef.current?.focus();
+    else if (!panelRef.current?.contains(document.activeElement)) panelRef.current?.focus();
   }, [abierto, eligiendo]);
 
   function alternar() {
@@ -345,11 +368,11 @@ export function BotonFiltrosRetiros({
         ref={botonRef}
         type="button"
         onClick={alternar}
-        aria-label="Filtros"
+        aria-label={activos > 0 ? `Filtros, ${activos} ${activos === 1 ? "activo" : "activos"}` : "Filtros"}
         aria-haspopup="dialog"
         aria-expanded={abierto}
         title="Filtros"
-        className={`relative flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+        className={`relative flex h-8 w-8 items-center justify-center !rounded-full transition-colors ${anilloFoco} ${
           activos > 0
             ? "bg-foreground text-background"
             : "bg-muted text-muted-foreground hover:bg-border"
@@ -357,7 +380,10 @@ export function BotonFiltrosRetiros({
       >
         <FiltroIcon className="h-4 w-4" />
         {activos > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-border bg-card px-1 text-[10px] leading-none font-semibold text-foreground">
+          <span
+            aria-hidden="true"
+            className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-border bg-card px-1 text-xs leading-none font-semibold text-foreground"
+          >
             {activos}
           </span>
         )}
@@ -369,8 +395,9 @@ export function BotonFiltrosRetiros({
             ref={panelRef}
             role="dialog"
             aria-label="Filtros"
+            tabIndex={-1}
             style={{ top: caja.top, left: caja.left, width: caja.ancho, maxHeight: caja.altoMaximo }}
-            className="fixed z-50 overflow-y-auto rounded-xl border border-border bg-card text-sm text-foreground normal-case shadow-xl"
+            className="fixed z-50 overflow-y-auto rounded-xl border border-border bg-card text-sm text-foreground normal-case shadow-xl focus:outline-none"
           >
             <div className="flex items-center justify-between px-3 pt-3 pb-2">
               <span className="text-sm font-semibold">Filtros</span>
@@ -381,7 +408,7 @@ export function BotonFiltrosRetiros({
                     alCambiar([]);
                     setEligiendo(true);
                   }}
-                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                  className={`px-2 py-1.5 text-xs text-muted-foreground underline hover:text-foreground ${anilloFoco}`}
                 >
                   Limpiar todo
                 </button>
@@ -405,7 +432,7 @@ export function BotonFiltrosRetiros({
                           type="button"
                           onClick={() => quitar(filtro.campo)}
                           aria-label={`Quitar filtro ${definicion.etiqueta}`}
-                          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          className={`p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
                         >
                           <CerrarIcon className="h-4 w-4" />
                         </button>
@@ -446,7 +473,7 @@ export function BotonFiltrosRetiros({
                         key={campo.id}
                         type="button"
                         onClick={() => agregar(campo.id)}
-                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-muted"
+                        className={`flex w-full items-center gap-2.5 px-2 py-2 text-left hover:bg-muted ${anilloFoco}`}
                       >
                         <Icono className="h-4 w-4 shrink-0 text-muted-foreground" />
                         {campo.etiqueta}
@@ -466,7 +493,7 @@ export function BotonFiltrosRetiros({
                   <button
                     type="button"
                     onClick={() => setEligiendo(true)}
-                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className={`inline-flex items-center gap-1.5 px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
                   >
                     <MasIcon className="h-4 w-4" />
                     Agregar filtro

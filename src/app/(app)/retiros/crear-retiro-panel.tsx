@@ -3,14 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { crearRetiro, reservarCorrelativo } from "./actions";
 import { Button } from "@/components/ui/button";
-import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { formatearFechaNumerica } from "@/lib/formato";
 import { CalendarioIcon, CerrarIcon, MasIcon } from "@/lib/nav-icons";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
-const anilloFoco =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded";
+const Obligatorio = () => (
+  <span aria-hidden="true" className="text-destructive">
+    {" "}
+    *
+  </span>
+);
 
 interface Plataforma {
   id: string;
@@ -43,11 +47,13 @@ export function CrearRetiroPanel({
   const [limiteAbierto, setLimiteAbierto] = useState(false);
   const [correlativo, setCorrelativo] = useState<number | null>(null);
   const [reservando, setReservando] = useState(false);
+  const [enviando, setEnviando] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
 
   // El correlativo se aparta al abrir la ventana; si se cierra sin guardar y se vuelve a abrir, se reutiliza.
   async function abrirVentana() {
+    setEnviando(false);
     setAbierto(true);
     if (correlativo !== null || reservando) return;
     setReservando(true);
@@ -55,7 +61,9 @@ export function CrearRetiroPanel({
     setReservando(false);
   }
 
+  // Mientras se guarda no se cierra: la ventana queda abierta con el botón en "Creando..." hasta pasar a la ficha.
   function cerrarVentana() {
+    if (enviando) return;
     setAbierto(false);
     botonAbrirRef.current?.focus();
   }
@@ -128,13 +136,7 @@ export function CrearRetiroPanel({
             onClick={(e) => e.stopPropagation()}
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card shadow-xl"
           >
-            <form
-              action={crearRetiro}
-              onSubmit={() => {
-                setAbierto(false);
-                setCorrelativo(null);
-              }}
-            >
+            <form action={crearRetiro} onSubmit={() => setEnviando(true)} aria-busy={enviando}>
               <input type="hidden" name="pais_id" value={paisId} />
               <input type="hidden" name="fecha_limite" value={fechaLimite} />
               {correlativo !== null && <input type="hidden" name="numero_correlativo" value={correlativo} />}
@@ -156,8 +158,9 @@ export function CrearRetiroPanel({
                 <button
                   type="button"
                   onClick={cerrarVentana}
+                  disabled={enviando}
                   aria-label="Cerrar"
-                  className={`text-muted-foreground hover:text-foreground ${anilloFoco}`}
+                  className={`p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-40 ${anilloFoco}`}
                 >
                   <CerrarIcon className="h-4 w-4" />
                 </button>
@@ -170,32 +173,36 @@ export function CrearRetiroPanel({
                   </p>
                 )}
                 <div className="flex gap-2">
-                  <label className="sr-only" htmlFor="campo-plataforma">
-                    Plataforma
-                  </label>
-                  <select
-                    id="campo-plataforma"
-                    name="plataforma_id"
-                    required
-                    defaultValue={plataformas[0]?.id}
-                    className={`${fieldClassSm} min-w-0 flex-1`}
-                  >
-                    {plataformas.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  {cuentas.length > 0 ? (
-                    <>
-                      <label className="sr-only" htmlFor="campo-cuenta">
-                        Cuenta destino
-                      </label>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <label className={labelClassSm} htmlFor="campo-plataforma">
+                      Plataforma
+                      <Obligatorio />
+                    </label>
+                    <select
+                      id="campo-plataforma"
+                      name="plataforma_id"
+                      required
+                      defaultValue={plataformas[0]?.id}
+                      className={`${fieldClassSm} w-full min-w-0`}
+                    >
+                      {plataformas.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <label className={labelClassSm} htmlFor="campo-cuenta">
+                      Cuenta destino
+                      <Obligatorio />
+                    </label>
+                    {cuentas.length > 0 ? (
                       <select
                         id="campo-cuenta"
                         name="cuenta_retiro_id"
                         required
-                        className={`${fieldClassSm} min-w-0 flex-1`}
+                        className={`${fieldClassSm} w-full min-w-0`}
                       >
                         {cuentas.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -203,16 +210,19 @@ export function CrearRetiroPanel({
                           </option>
                         ))}
                       </select>
-                    </>
-                  ) : (
-                    <p className="flex-1 self-center text-xs text-destructive">Sin cuentas activas</p>
-                  )}
+                    ) : (
+                      <p id="campo-cuenta" role="alert" className="py-1 text-xs text-destructive">
+                        Sin cuentas activas. Crea una para poder guardar el retiro.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <label className={labelClassSm} htmlFor="campo-monto">
                       Monto
+                      <Obligatorio />
                     </label>
                     <input
                       id="campo-monto"
@@ -230,6 +240,7 @@ export function CrearRetiroPanel({
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <label className={labelClassSm} htmlFor="campo-fecha">
                       Fecha
+                      <Obligatorio />
                     </label>
                     <input
                       id="campo-fecha"
@@ -280,6 +291,7 @@ export function CrearRetiroPanel({
                 <div>
                   <label className={labelClassSm} htmlFor="campo-a-recibir">
                     A recibir
+                    <Obligatorio />
                   </label>
                   <div className="mt-1 flex items-center gap-1">
                     <span className="text-sm text-muted-foreground">$</span>
@@ -322,9 +334,13 @@ export function CrearRetiroPanel({
                     type="button"
                     onClick={() => setLimiteAbierto((v) => !v)}
                     aria-expanded={limiteAbierto}
-                    aria-label="Fecha límite (opcional)"
+                    aria-label={
+                      fechaLimite
+                        ? `Fecha límite (opcional): ${formatearFechaNumerica(fechaLimite)}`
+                        : "Fecha límite (opcional)"
+                    }
                     title="Fecha límite (opcional)"
-                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs hover:bg-muted ${anilloFoco} ${
+                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs hover:bg-muted ${anilloFoco} ${
                       fechaLimite ? "border-foreground text-foreground" : "border-border text-muted-foreground"
                     }`}
                   >
@@ -371,11 +387,17 @@ export function CrearRetiroPanel({
               </div>
 
               <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-                <Button type="button" variant="secondary" onClick={cerrarVentana}>
+                <p className="mr-auto text-xs text-muted-foreground">
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>{" "}
+                  Obligatorio
+                </p>
+                <Button type="button" variant="secondary" onClick={cerrarVentana} disabled={enviando}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={cuentas.length === 0}>
-                  Crear retiro
+                <Button type="submit" disabled={cuentas.length === 0 || enviando}>
+                  {enviando ? "Creando..." : "Crear retiro"}
                 </Button>
               </div>
             </form>
