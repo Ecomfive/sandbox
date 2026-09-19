@@ -5,6 +5,23 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 
+/** Arma el bloque de comisión sugerida a partir del formulario: según el tipo elegido, se
+ * queda solo con el/los valor(es) que aplican y anula el resto, para que nunca quede un
+ * porcentaje sobrante guardado cuando el tipo es "monto fijo", por ejemplo. */
+function leerComision(formData: FormData) {
+  const tipo = (formData.get("comision_tipo") as string) || null;
+  const pctTexto = formData.get("comision_porcentaje") as string | null;
+  const montoTexto = formData.get("comision_monto_fijo") as string | null;
+  const pct = pctTexto && pctTexto !== "" ? Number(pctTexto) : null;
+  const monto = montoTexto && montoTexto !== "" ? Number(montoTexto) : null;
+
+  return {
+    comision_tipo: tipo,
+    comision_porcentaje: tipo === "porcentaje" || tipo === "ambos" ? pct : null,
+    comision_monto_fijo: tipo === "monto_fijo" || tipo === "ambos" ? monto : null,
+  };
+}
+
 export async function crearCuentaRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const pais_id = formData.get("pais_id") as string;
@@ -13,7 +30,21 @@ export async function crearCuentaRetiro(formData: FormData) {
   const detalle = (formData.get("detalle") as string) || null;
 
   const supabase = createServiceClient();
-  const { error } = await supabase.from("cuentas_retiro").insert({ pais_id, tipo, nombre, detalle });
+
+  // Numeración simple por país (Cuenta 1, Cuenta 2...) — estas cuentas se crean muy de vez
+  // en cuando, así que no hace falta una función de correlativo a prueba de carreras.
+  const { data: ultima } = await supabase
+    .from("cuentas_retiro")
+    .select("numero")
+    .eq("pais_id", pais_id)
+    .order("numero", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const numero = (ultima?.numero ?? 0) + 1;
+
+  const { error } = await supabase
+    .from("cuentas_retiro")
+    .insert({ pais_id, tipo, nombre, detalle, numero, ...leerComision(formData) });
   if (error) throw new Error(error.message);
 
   revalidatePath("/retiros/cuentas");
@@ -21,9 +52,8 @@ export async function crearCuentaRetiro(formData: FormData) {
 }
 
 /** Edita a mano cualquier dato de una cuenta ya creada — nombre, cuenta/detalle, tipo o
- * comisión sugerida. Solo actualiza los campos presentes en el formulario, así cada control
- * inline (nombre, comisión, etc.) puede llamarla mandando nada más lo suyo. Cambiar esto no
- * toca los retiros ya creados: cada uno guarda su propia comisión en su propia fila. */
+ * comisión sugerida — todo junto, desde la ficha de "Modificar". Cambiar esto no toca los
+ * retiros ya creados: cada uno guarda su propia comisión en su propia fila. */
 export async function actualizarCuentaRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
@@ -32,15 +62,7 @@ export async function actualizarCuentaRetiro(formData: FormData) {
   if (formData.has("nombre")) cambios.nombre = (formData.get("nombre") as string).trim();
   if (formData.has("detalle")) cambios.detalle = (formData.get("detalle") as string).trim() || null;
   if (formData.has("tipo")) cambios.tipo = formData.get("tipo") as string;
-  if (formData.has("comision_tipo")) {
-    const tipo = (formData.get("comision_tipo") as string) || null;
-    cambios.comision_tipo = tipo;
-    if (!tipo) cambios.comision_valor = null;
-  }
-  if (formData.has("comision_valor")) {
-    const valor = formData.get("comision_valor") as string;
-    cambios.comision_valor = valor === "" ? null : Number(valor);
-  }
+  if (formData.has("comision_tipo")) Object.assign(cambios, leerComision(formData));
   if (Object.keys(cambios).length === 0) return;
 
   const supabase = createServiceClient();

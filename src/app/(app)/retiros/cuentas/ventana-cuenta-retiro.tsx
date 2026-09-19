@@ -13,11 +13,21 @@ const TIPOS = [
   { valor: "otro", etiqueta: "Otro" },
 ] as const;
 
+const COMISIONES = [
+  { valor: "", etiqueta: "Sin comisión" },
+  { valor: "porcentaje", etiqueta: "Porcentaje" },
+  { valor: "monto_fijo", etiqueta: "Monto fijo" },
+  { valor: "ambos", etiqueta: "Porcentaje + monto fijo" },
+] as const;
+
 interface CuentaExistente {
   id: string;
   tipo: string;
   nombre: string;
   detalle: string | null;
+  comision_tipo: string | null;
+  comision_porcentaje: number | null;
+  comision_monto_fijo: number | null;
 }
 
 /** Ventana para crear o modificar una cuenta de retiro — mismo patrón que "+ Agregar" retiro
@@ -28,6 +38,7 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
   const [abierto, setAbierto] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [comisionTipo, setComisionTipo] = useState(cuenta?.comision_tipo ?? "");
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
   const editando = !!cuenta;
@@ -35,6 +46,7 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
 
   function abrirVentana() {
     setError(null);
+    setComisionTipo(cuenta?.comision_tipo ?? "");
     setAbierto(true);
   }
 
@@ -193,6 +205,70 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
                     className={fieldClassSm}
                   />
                 </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className={labelClassSm} htmlFor="campo-comision-tipo">
+                    Comisión sugerida
+                  </label>
+                  <select
+                    id="campo-comision-tipo"
+                    name="comision_tipo"
+                    value={comisionTipo}
+                    onChange={(e) => setComisionTipo(e.target.value)}
+                    className={fieldClassSm}
+                  >
+                    {COMISIONES.map((c) => (
+                      <option key={c.valor} value={c.valor}>
+                        {c.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Se sugiere sola al elegir esta cuenta en &quot;+ Agregar&quot; retiro. Cambiarla no
+                    afecta los retiros ya creados.
+                  </p>
+                </div>
+
+                {(comisionTipo === "porcentaje" || comisionTipo === "ambos") && (
+                  <div className="flex flex-col gap-1">
+                    <label className={labelClassSm} htmlFor="campo-comision-porcentaje">
+                      Porcentaje
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        id="campo-comision-porcentaje"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="comision_porcentaje"
+                        defaultValue={cuenta?.comision_porcentaje ?? ""}
+                        className={`${fieldClassSm} w-full`}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                )}
+
+                {(comisionTipo === "monto_fijo" || comisionTipo === "ambos") && (
+                  <div className="flex flex-col gap-1">
+                    <label className={labelClassSm} htmlFor="campo-comision-monto">
+                      Monto fijo
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-muted-foreground">$</span>
+                      <input
+                        id="campo-comision-monto"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="comision_monto_fijo"
+                        defaultValue={cuenta?.comision_monto_fijo ?? ""}
+                        className={`${fieldClassSm} w-full`}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {error && <p className="text-sm text-destructive">{error}</p>}
               </div>
 
@@ -200,7 +276,11 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
                 <Button type="button" variant="secondary" onClick={cerrarVentana} disabled={pending}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={pending}>
+                <Button
+                  type="submit"
+                  disabled={pending}
+                  className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
+                >
                   {pending ? "Guardando..." : editando ? "Guardar cambios" : "Agregar cuenta"}
                 </Button>
               </div>

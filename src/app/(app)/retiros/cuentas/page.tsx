@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { ActivaToggle } from "./activa-toggle";
-import { ComisionEditable } from "./comision-editable";
 import { VentanaCuentaRetiro } from "./ventana-cuenta-retiro";
 import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
 import { linkClass } from "@/components/ui/link";
@@ -20,6 +19,14 @@ const TIPOS = [
 
 const etiquetaTipo = (valor: string) => TIPOS.find((t) => t.valor === valor)?.etiqueta ?? valor;
 
+/** Solo lectura: la comisión sugerida ya no se edita acá — se edita desde "Modificar". */
+function etiquetaComision(tipo: string | null, porcentaje: number | null, montoFijo: number | null) {
+  if (tipo === "porcentaje" && porcentaje != null) return `${porcentaje}%`;
+  if (tipo === "monto_fijo" && montoFijo != null) return `$${montoFijo.toFixed(2)}`;
+  if (tipo === "ambos" && porcentaje != null && montoFijo != null) return `${porcentaje}% + $${montoFijo.toFixed(2)}`;
+  return "—";
+}
+
 export default async function CuentasRetiroPage() {
   await requireModulo("retiros");
   const supabase = createServiceClient();
@@ -27,9 +34,9 @@ export default async function CuentasRetiroPage() {
 
   const { data: cuentas } = await supabase
     .from("cuentas_retiro")
-    .select("id, tipo, nombre, detalle, activa, comision_tipo, comision_valor")
+    .select("id, numero, tipo, nombre, detalle, activa, comision_tipo, comision_porcentaje, comision_monto_fijo")
     .eq("pais_id", pais.id)
-    .order("creado_en", { ascending: false });
+    .order("numero", { ascending: true });
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10">
@@ -44,10 +51,11 @@ export default async function CuentasRetiroPage() {
       </div>
 
       <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[46rem] border-collapse text-sm">
+        <table className="w-full min-w-[50rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              <th className="py-2 pr-3 pl-4 font-medium">Tipo</th>
+              <th className="py-2 pr-3 pl-4 font-medium">#</th>
+              <th className="py-2 pr-3 font-medium">Tipo</th>
               <th className="py-2 pr-3 font-medium">Nombre</th>
               <th className="py-2 pr-3 font-medium">Cuenta</th>
               <th className="py-2 pr-3 font-medium">Comisión sugerida</th>
@@ -58,11 +66,14 @@ export default async function CuentasRetiroPage() {
           <tbody>
             {(cuentas ?? []).map((c) => (
               <tr key={c.id} className="border-b border-border/60 last:border-0">
-                <td className="py-2 pr-3 pl-4">{etiquetaTipo(c.tipo)}</td>
+                <td className="py-2 pr-3 pl-4 font-semibold text-muted-foreground">
+                  {c.numero != null ? `#${c.numero}` : "—"}
+                </td>
+                <td className="py-2 pr-3">{etiquetaTipo(c.tipo)}</td>
                 <td className="py-2 pr-3 font-medium">{c.nombre}</td>
                 <td className="py-2 pr-3 text-muted-foreground">{c.detalle || "—"}</td>
-                <td className="py-2 pr-3">
-                  <ComisionEditable id={c.id} comisionTipo={c.comision_tipo} comisionValor={c.comision_valor} />
+                <td className="py-2 pr-3 text-muted-foreground">
+                  {etiquetaComision(c.comision_tipo, c.comision_porcentaje, c.comision_monto_fijo)}
                 </td>
                 <td className="py-2 pr-3">
                   <ActivaToggle id={c.id} activa={c.activa} />

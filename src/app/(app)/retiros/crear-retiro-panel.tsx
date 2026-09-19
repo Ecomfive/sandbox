@@ -23,8 +23,24 @@ interface Plataforma {
 interface Cuenta {
   id: string;
   nombre: string;
-  comision_tipo: "porcentaje" | "monto_fijo" | null;
-  comision_valor: number | null;
+  comision_tipo: "porcentaje" | "monto_fijo" | "ambos" | null;
+  comision_porcentaje: number | null;
+  comision_monto_fijo: number | null;
+}
+
+/** Calcula cuánto sugiere cobrar la cuenta para un monto dado — porcentaje, monto fijo, o
+ * los dos sumados si la cuenta tiene comisión "ambos" (ej. 2.5% + $3). */
+function calcularComisionSugerida(cuenta: Cuenta, montoNum: number): number | null {
+  if (!cuenta.comision_tipo) return null;
+  const dePorcentaje =
+    cuenta.comision_porcentaje != null ? (montoNum * cuenta.comision_porcentaje) / 100 : 0;
+  const deMontoFijo = cuenta.comision_monto_fijo ?? 0;
+  if (cuenta.comision_tipo === "porcentaje" && cuenta.comision_porcentaje != null) return dePorcentaje;
+  if (cuenta.comision_tipo === "monto_fijo" && cuenta.comision_monto_fijo != null) return deMontoFijo;
+  if (cuenta.comision_tipo === "ambos" && cuenta.comision_porcentaje != null && cuenta.comision_monto_fijo != null) {
+    return dePorcentaje + deMontoFijo;
+  }
+  return null;
 }
 
 /** Botón "+ Crear" que despliega directo el panel de creación rápida (estilo "crear tarea"),
@@ -134,14 +150,10 @@ export function CrearRetiroPanel({
     setCuentaSeleccionadaId(cuentaId);
     setComisionManual(false);
     const cuenta = cuentas.find((c) => c.id === cuentaId);
-    if (!cuenta || !cuenta.comision_tipo || cuenta.comision_valor == null) return;
-    if (cuenta.comision_tipo === "porcentaje") {
-      setComisionPorcentaje(String(cuenta.comision_valor));
-      setComisionValor(montoNum > 0 ? ((montoNum * cuenta.comision_valor) / 100).toFixed(2) : "0");
-    } else {
-      setComisionValor(String(cuenta.comision_valor));
-      setComisionPorcentaje(montoNum > 0 ? ((cuenta.comision_valor / montoNum) * 100).toFixed(2) : "0");
-    }
+    const sugerido = cuenta ? calcularComisionSugerida(cuenta, montoNum) : null;
+    if (sugerido == null) return;
+    setComisionValor(sugerido.toFixed(2));
+    setComisionPorcentaje(montoNum > 0 ? ((sugerido / montoNum) * 100).toFixed(2) : "0");
   }
 
   // Si ya hay una sugerencia activa (no se tocó a mano) y la persona escribe el monto
@@ -149,12 +161,10 @@ export function CrearRetiroPanel({
   useEffect(() => {
     if (comisionManual) return;
     const cuenta = cuentas.find((c) => c.id === cuentaSeleccionadaId);
-    if (!cuenta || !cuenta.comision_tipo || cuenta.comision_valor == null) return;
-    if (cuenta.comision_tipo === "porcentaje") {
-      setComisionValor(montoNum > 0 ? ((montoNum * cuenta.comision_valor) / 100).toFixed(2) : "0");
-    } else {
-      setComisionPorcentaje(montoNum > 0 ? ((cuenta.comision_valor / montoNum) * 100).toFixed(2) : "0");
-    }
+    const sugerido = cuenta ? calcularComisionSugerida(cuenta, montoNum) : null;
+    if (sugerido == null) return;
+    setComisionValor(sugerido.toFixed(2));
+    setComisionPorcentaje(montoNum > 0 ? ((sugerido / montoNum) * 100).toFixed(2) : "0");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [montoNum]);
 
