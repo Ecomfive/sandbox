@@ -1,13 +1,9 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { registrarSaldo } from "./actions";
-import { Button } from "@/components/ui/button";
-import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
-import { FormularioConToast } from "@/components/ui/toast";
 import { linkClass } from "@/components/ui/link";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
@@ -36,11 +32,11 @@ export default async function RetirosPage() {
       supabase
         .from("retiros")
         .select(
-          "id, numero_correlativo, monto, fecha, estado, notas, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
+          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, prioridad, asignado_a, etiquetas, notas, soporte_numero, banco, dropi_id, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
         )
         .eq("pais_id", pais.id)
         .order("fecha", { ascending: false })
-        .limit(50),
+        .limit(1000),
       supabase
         .from("cuentas_retiro")
         .select("id, nombre")
@@ -78,6 +74,7 @@ export default async function RetirosPage() {
     .filter((r) => r.estado === "cerrado" && r.fecha.slice(0, 7) === mesActual)
     .reduce((acc, r) => acc + Number(r.monto), 0);
 
+  const nombrePerfil = new Map((perfiles ?? []).map((p) => [p.id, p.nombre ?? p.email]));
   const filasRetiro: FilaRetiro[] = (retiros ?? []).map((r) => ({
     id: r.id,
     numeroCorrelativo: r.numero_correlativo,
@@ -86,6 +83,17 @@ export default async function RetirosPage() {
     destino: (r.cuentas_retiro as unknown as { nombre: string } | null)?.nombre ?? r.banco ?? "—",
     monto: Number(r.monto),
     estado: r.estado,
+    comision: Number(r.comision),
+    montoNeto: Number(r.monto_neto),
+    montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido),
+    fechaCierre: r.fecha_cierre,
+    fechaLimite: r.fecha_limite,
+    prioridad: r.prioridad,
+    asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,
+    etiquetas: r.etiquetas ?? [],
+    origen: r.dropi_id !== null ? "Dropi" : "Manual",
+    notas: r.notas,
+    soporteNumero: r.soporte_numero,
   }));
 
   return (
@@ -135,48 +143,6 @@ export default async function RetirosPage() {
             })}
           </KpiGrid>
         </div>
-
-        <FormularioConToast
-          action={registrarSaldo}
-          mensajeExito="Saldo registrado"
-          className="mt-4 flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
-        >
-          <input type="hidden" name="pais_id" value={pais.id} />
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Plataforma</label>
-            <select name="plataforma_id" required className={fieldClass}>
-              {(plataformas ?? []).map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Saldo actual</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              name="monto"
-              required
-              className={`${fieldClass} w-32 tabular-nums`}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Fecha</label>
-            <input
-              type="date"
-              name="fecha"
-              defaultValue={hoy()}
-              required
-              className={fieldClass}
-            />
-          </div>
-          <Button type="submit" variant="secondary">
-            Registrar saldo
-          </Button>
-        </FormularioConToast>
       </div>
 
       <div>

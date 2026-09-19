@@ -241,6 +241,32 @@ export function CalendarioIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function FiltroIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 5h18l-7 8.5V19l-4 2v-7.5L3 5Z" />
+    </Icon>
+  );
+}
+
+export function BuscarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </Icon>
+  );
+}
+
+export function EstadoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4" />
+    </Icon>
+  );
+}
+
 /** Ícono de "arrastrar" (seis puntos), para asas de reordenar en listas. */
 export function ArrastrarIcon(props: SVGProps<SVGSVGElement>) {
   return (
