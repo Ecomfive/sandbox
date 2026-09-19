@@ -82,15 +82,7 @@ export default async function RetirosPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <WalletIcon className="h-5 w-5 text-muted-foreground" />
-          Retiros y wallet
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — saldo de wallet por plataforma y seguimiento de retiros. El saldo y el
-          historial de retiros de Dropi se traen automáticamente de su panel; el resto se sigue
-          registrando a mano hasta tener una extracción confiable para cada una.
-        </p>
+        <h1 className="text-lg font-semibold tracking-tight">Consolidación de retiros</h1>
       </div>
 
       <div>
