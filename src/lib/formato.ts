@@ -24,6 +24,12 @@ export function formatearFecha(fechaIso: string): string {
   return `${Number(dia)} ${mesTexto} ${anio}`;
 }
 
+/** "2026-09-08" -> "08/09/2026". Sin pasar por Date, evita corrimientos de zona horaria. */
+export function formatearFechaNumerica(fechaIso: string): string {
+  const [anio, mes, dia] = fechaIso.slice(0, 10).split("-");
+  return `${dia}/${mes}/${anio}`;
+}
+
 /** "2026-09-01" (o cualquier fecha de ese mes) -> "sep 2026", para periodos mensuales. */
 export function formatearMes(fechaIso: string): string {
   const [anio, mes] = fechaIso.slice(0, 10).split("-");

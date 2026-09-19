@@ -7,7 +7,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
-import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { formatearFecha, formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
 import { linkClass } from "@/components/ui/link";
@@ -188,7 +188,7 @@ export default async function RetirosPage() {
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
                 <th className="py-2 pr-3 pl-4 font-medium">#</th>
-                <th className="py-2 pr-3 font-medium">Fecha</th>
+                <th className="py-2 pr-3 font-medium">Creación</th>
                 <th className="py-2 pr-3 font-medium">Plataforma</th>
                 <th className="py-2 pr-3 font-medium">Destino</th>
                 <th className="py-2 pr-3 font-medium">Monto</th>
@@ -212,13 +212,8 @@ export default async function RetirosPage() {
                         #{String(r.numero_correlativo).padStart(4, "0")}
                       </Link>
                     </td>
-                    <td className="py-2 pr-3">{formatearFecha(r.fecha)}</td>
-                    <td className="py-2 pr-3 text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        {plataforma?.nombre}
-                        {r.dropi_id !== null && <Badge tone="success">Dropi</Badge>}
-                      </span>
-                    </td>
+                    <td className="py-2 pr-3">{formatearFechaNumerica(r.fecha)}</td>
+                    <td className="py-2 pr-3 text-muted-foreground">{plataforma?.nombre}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{cuenta?.nombre ?? r.banco ?? "—"}</td>
                     <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(r.monto), pais.codigo)}</td>
                     <td className="py-2 pr-3">
