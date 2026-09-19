@@ -94,8 +94,7 @@ export default async function RetirosPage() {
       </div>
 
       <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold tracking-tight">Saldo de wallet</h2>
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <a
             href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
             target="_blank"
@@ -118,13 +117,13 @@ export default async function RetirosPage() {
               return (
                 <KpiCard
                   key={p.id}
-                  titulo={
-                    <span className="flex items-center gap-1.5">
-                      {p.nombre}
-                      {esAutomatico && <Badge tone="success">Automático</Badge>}
+                  titulo={esAutomatico ? "Saldo Wallet" : p.nombre}
+                  valor={
+                    <span className="inline-flex items-center gap-1.5">
+                      {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
+                      {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
                     </span>
                   }
-                  valor={ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
                   subtexto={ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
                 />
               );
