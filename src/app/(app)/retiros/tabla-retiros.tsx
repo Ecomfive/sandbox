@@ -190,8 +190,16 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
         <thead>
           <tr className="border-b border-border bg-muted text-left text-muted-foreground">
             {columnasVisibles.map((columna, i) => (
-              <th key={columna.id} className={`py-2 pr-3 font-medium ${i === 0 ? "pl-4" : ""}`}>
-                {columna.label}
+              <th
+                key={columna.id}
+                className={`py-2 pr-3 text-xs font-semibold tracking-wide uppercase ${i === 0 ? "pl-4" : ""} ${
+                  i < columnasVisibles.length - 1 ? "border-r border-border/60" : ""
+                }`}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <ArrastrarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                  {columna.label}
+                </span>
               </th>
             ))}
           </tr>
