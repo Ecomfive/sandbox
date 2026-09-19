@@ -9,6 +9,8 @@ function Icon(props: SVGProps<SVGSVGElement>) {
       strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       {...props}
     />
   );
@@ -289,7 +291,7 @@ export function ConfiguracionIcon(props: SVGProps<SVGSVGElement>) {
 /** Ícono de "arrastrar" (seis puntos), para asas de reordenar en listas. */
 export function ArrastrarIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false" {...props}>
       <circle cx="9" cy="6" r="1.4" />
       <circle cx="9" cy="12" r="1.4" />
       <circle cx="9" cy="18" r="1.4" />

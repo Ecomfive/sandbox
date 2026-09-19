@@ -44,8 +44,13 @@ next-env.d.ts
 .vercel
 .env*
 
-# cache local del hook de impeccable, se regenera solo
+# cache y registro locales del hook de impeccable, se regeneran solos
 .impeccable/hook.cache.json
+.impeccable/hook-runs.log
+.impeccable/config.local.json
+
+# ajustes personales de Claude Code (el hook compartido vive en .claude/settings.json)
+.claude/settings.local.json
 
 # sesiones de Dropi guardadas localmente (cookies vivas, nunca committear)
 .dropi-session-*.json
@@ -60,3 +65,4 @@ supabase/.temp/
 
 # log de la tarea programada que renueva las sesiones de Dropi
 mantener-sesiones-dropi.log
+__pycache__/

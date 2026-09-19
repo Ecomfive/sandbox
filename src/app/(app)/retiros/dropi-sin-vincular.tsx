@@ -41,15 +41,14 @@ export function DropiSinVincular({ filas, codigoPais }: { filas: FilaSinVincular
             className="min-w-0 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
           >
           <table className="w-full min-w-[42rem] border-collapse text-sm">
+            <caption className="sr-only">Retiros de Dropi sin vincular a un retiro creado</caption>
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Dropi</th>
-                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Fecha</th>
-                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Monto</th>
-                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Estado</th>
-                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Banco</th>
-                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Concepto</th>
-                <th className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">Motivo</th>
+                {["Dropi", "Fecha", "Monto", "Estado", "Banco", "Concepto", "Motivo"].map((titulo) => (
+                  <th key={titulo} scope="col" className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">
+                    {titulo}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>

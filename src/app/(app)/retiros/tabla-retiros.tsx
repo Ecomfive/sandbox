@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { anilloFoco } from "@/components/ui/field";
 import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
@@ -111,6 +112,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [arrastrando, setArrastrando] = useState<ColumnaId | null>(null);
   const contenedorRef = useRef<HTMLDivElement>(null);
+  const botonColumnasRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     try {
@@ -138,8 +140,17 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
         setMenuAbierto(false);
       }
     }
+    function alTeclear(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setMenuAbierto(false);
+      if (contenedorRef.current?.contains(document.activeElement)) botonColumnasRef.current?.focus();
+    }
     document.addEventListener("mousedown", alHacerClicFuera);
-    return () => document.removeEventListener("mousedown", alHacerClicFuera);
+    document.addEventListener("keydown", alTeclear);
+    return () => {
+      document.removeEventListener("mousedown", alHacerClicFuera);
+      document.removeEventListener("keydown", alTeclear);
+    };
   }, []);
 
   function moverColumna(origenId: ColumnaId, destinoId: ColumnaId) {
@@ -189,9 +200,11 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
         />
         <div className="relative">
           <button
+            ref={botonColumnasRef}
             type="button"
             onClick={() => setMenuAbierto((v) => !v)}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+            aria-expanded={menuAbierto}
+            className={`flex min-h-8 items-center gap-1.5 !rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted ${anilloFoco}`}
           >
             <ColumnasIcon className="h-4 w-4" />
             Columnas
@@ -219,7 +232,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
                         checked={!ocultas.has(id)}
                         disabled={!columna.ocultable}
                         onChange={() => alternarVisible(id)}
-                        className="h-3.5 w-3.5"
+                        className="h-4 w-4"
                       />
                       {columna.label}
                     </label>
@@ -229,7 +242,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
                         onClick={() => moverPorTeclado(id, -1)}
                         disabled={indice === 0}
                         aria-label={`Mover columna ${columna.label} hacia arriba`}
-                        className="rounded px-1 leading-none text-muted-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-30"
+                        className={`flex h-6 w-6 items-center justify-center text-xs leading-none text-muted-foreground hover:bg-border disabled:opacity-30 ${anilloFoco}`}
                       >
                         <span aria-hidden="true">▲</span>
                       </button>
@@ -238,7 +251,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
                         onClick={() => moverPorTeclado(id, 1)}
                         disabled={indice === orden.length - 1}
                         aria-label={`Mover columna ${columna.label} hacia abajo`}
-                        className="rounded px-1 leading-none text-muted-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-30"
+                        className={`flex h-6 w-6 items-center justify-center text-xs leading-none text-muted-foreground hover:bg-border disabled:opacity-30 ${anilloFoco}`}
                       >
                         <span aria-hidden="true">▼</span>
                       </button>
@@ -260,12 +273,13 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
       <table className="w-full min-w-[42rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-            <th className="border-r border-border/60 px-4 py-3 text-xs font-semibold tracking-wide uppercase">
+            <th scope="col" className="border-r border-border/60 px-4 py-3 text-xs font-semibold tracking-wide uppercase">
               Consolidación
             </th>
             {columnasVisibles.map((columna, i) => (
               <th
                 key={columna.id}
+                scope="col"
                 className={`px-4 py-3 text-xs font-semibold tracking-wide uppercase ${
                   i < columnasVisibles.length - 1 ? "border-r border-border/60" : ""
                 }`}
@@ -299,6 +313,10 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
         </tbody>
       </table>
       </div>
+      {/* Anuncia a lectores de pantalla cuántos retiros quedan al filtrar. */}
+      <p role="status" className="sr-only">
+        {hayFiltros ? `${visibles.length} de ${retiros.length} retiros` : ""}
+      </p>
       {retiros.length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
       {retiros.length > 0 && visibles.length === 0 && <EstadoVacio mensaje="Ningún retiro coincide con los filtros." />}
       {retiros.length > 0 && (hayFiltros || retiros.length > LIMITE_SIN_FILTROS) && (

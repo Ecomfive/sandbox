@@ -61,6 +61,29 @@ convenciones técnicas del código.
 - `scripts/` — scripts que corren fuera del request cycle (ingestión de
   Dropi, mantenimiento de sesión, etc.), ejecutados con `npx tsx`.
 
+## Interfaz: skills de diseño (obligatorio)
+
+Todo cambio que cree o modifique interfaz (páginas, componentes, formularios,
+PDF, estilos) pasa por estas dos skills, además del hook. En la respuesta
+final se dice cuáles se usaron.
+
+1. **`ui-ux-pro-max`** — antes de escribir: invocar la skill y consultar su
+   buscador (requiere Python 3), por ejemplo
+   `python .claude/skills/ui-ux-pro-max/scripts/search.py "<consulta>" --domain ux`
+   (también `--design-system` y `--stack nextjs`). Antes de entregar, repasar
+   la lista de verificación de `.claude/skills/ui-ux-pro-max/references/pro-rules.md`.
+2. **`impeccable`** — dirección y revisión de diseño (`/impeccable`, por
+   ejemplo `audit` o `polish`). Al terminar, correr el detector sobre lo que
+   cambió: `.claude/skills/impeccable/scripts/impeccable.cmd detect --json <archivos>`
+   (en macOS/Linux, sin `.cmd`).
+3. **Hook de impeccable**: corre solo tras cada Edit/Write y al terminar la
+   respuesta (`.claude/settings.json` → `.claude/hooks/impeccable-hook.cjs`,
+   funciona igual en PowerShell, cmd y Bash). Cada ejecución queda anotada en
+   `.impeccable/hook-runs.log`: si después de editar interfaz no aparece una
+   línea nueva, el hook no está corriendo — avisar y correr el detector a mano.
+   En un equipo nuevo, la primera vez descarga su motor: correr antes
+   `.claude/skills/impeccable/scripts/impeccable.cmd engine-probe`.
+
 ## Trabajo pendiente conocido
 
 - [RENDIMIENTO-PENDIENTE.md](RENDIMIENTO-PENDIENTE.md): diagnóstico de

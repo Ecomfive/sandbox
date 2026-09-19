@@ -58,6 +58,20 @@ body {
   color: var(--accent-foreground);
 }
 
+/* El placeholder por defecto de Tailwind (texto al 50%) mide 3.4:1 sobre blanco; el mínimo es 4.5:1. */
+@layer base {
+  ::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  /* Tailwind 4 deja los botones con cursor de flecha. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
