@@ -105,7 +105,7 @@ function SidebarContents({
     .filter((i): i is NavItem => i !== undefined && puedeVer(modulosPermitidos, i.href));
 
   return (
-    <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
+    <nav className="flex flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto px-2 py-3">
       {onToggle && (
         <ConTooltip etiqueta={expanded ? "Colapsar menú" : "Desplegar el menú"} mostrar={!expanded}>
           <button

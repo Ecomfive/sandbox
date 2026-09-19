@@ -1,7 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
+/** El tooltip se saca por portal a <body> — si viviera dentro del <nav> colapsable, un
+ * span posicionado a la derecha (aunque invisible) infla su ancho "scrolleable" y aparece
+ * un scroll horizontal fantasma en el riel de 64px. Fuera del árbol de nav, no pasa. */
 export function ConTooltip({
   etiqueta,
   mostrar,
@@ -11,14 +15,29 @@ export function ConTooltip({
   mostrar: boolean;
   children: ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  function alEntrar() {
+    if (!mostrar || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setPos({ top: rect.top + rect.height / 2, left: rect.right + 8 });
+  }
+
   return (
-    <div className="group relative flex">
+    <div ref={ref} className="flex" onMouseEnter={alEntrar} onMouseLeave={() => setPos(null)}>
       {children}
-      {mostrar && (
-        <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 rounded-md bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-          {etiqueta}
-        </span>
-      )}
+      {mostrar &&
+        pos &&
+        createPortal(
+          <span
+            style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateY(-50%)" }}
+            className="animate-fade-in pointer-events-none z-50 rounded-md bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background shadow-md"
+          >
+            {etiqueta}
+          </span>,
+          document.body
+        )}
     </div>
   );
 }
