@@ -12,6 +12,7 @@ import { ArrastrarIcon, ChevronRightIcon, ColumnasIcon } from "@/lib/nav-icons";
 import { ESTADO_ETIQUETA, filtroActivo } from "./filtros";
 import { BotonFiltrosRetiros, useFiltrosRetiros } from "./filtros-retiros";
 import { ConsolidadoToggle } from "./consolidado-toggle";
+import { EstadoSelect } from "./estado-select";
 import { BotonAgrupar, BotonCerrados, useVistaRetiros } from "./vista-retiros";
 import { agruparRetiros, aplicarVista, type CampoAgrupable, type Grupo } from "./vista";
 
@@ -85,10 +86,12 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
     case "monto":
       return formatearMoneda(fila.monto, codigoPais);
     case "estado":
-      return (
+      return fila.estado === "cancelado" ? (
         <Badge tone={ESTADO_TONO[fila.estado as keyof typeof ESTADO_TONO]}>
           {ESTADO_ETIQUETA[fila.estado] ?? fila.estado}
         </Badge>
+      ) : (
+        <EstadoSelect id={fila.id} estado={fila.estado} />
       );
     case "dropi":
       return fila.estadoDropi ? (
