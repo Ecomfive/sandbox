@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { crearRetiro, reservarCorrelativo } from "./actions";
+import { crearRetiro, verSiguienteCorrelativo } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { formatearFechaNumerica } from "@/lib/formato";
@@ -46,19 +46,21 @@ export function CrearRetiroPanel({
   const [fechaLimite, setFechaLimite] = useState("");
   const [limiteAbierto, setLimiteAbierto] = useState(false);
   const [correlativo, setCorrelativo] = useState<number | null>(null);
-  const [reservando, setReservando] = useState(false);
+  const [consultando, setConsultando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
 
-  // El correlativo se aparta al abrir la ventana; si se cierra sin guardar y se vuelve a abrir, se reutiliza.
+  // Al abrir se MUESTRA el siguiente correlativo, sin gastarlo: solo se asigna al crear el retiro.
+  // Se consulta en cada apertura (otra persona pudo crear uno mientras tanto) y, si no se guardó
+  // nada, siempre sale el mismo número.
   async function abrirVentana() {
     setEnviando(false);
     setAbierto(true);
-    if (correlativo !== null || reservando) return;
-    setReservando(true);
-    setCorrelativo(await reservarCorrelativo());
-    setReservando(false);
+    setCorrelativo(null);
+    setConsultando(true);
+    setCorrelativo(await verSiguienteCorrelativo().catch(() => null));
+    setConsultando(false);
   }
 
   // Mientras se guarda no se cierra: la ventana queda abierta con el botón en "Creando..." hasta pasar a la ficha.
@@ -150,13 +152,14 @@ export function CrearRetiroPanel({
                 <span id="titulo-nuevo-retiro" className="flex items-center gap-2 text-sm font-semibold">
                   Nuevo retiro
                   <span
-                    title="Escríbelo en el concepto del retiro en Dropi"
+                    aria-live="polite"
+                    title="Se confirma al crear el retiro. Escríbelo en el concepto del retiro en Dropi"
                     className="rounded bg-muted px-2 py-0.5 text-xs font-medium tabular-nums"
                   >
                     {correlativo !== null
                       ? `#${String(correlativo).padStart(4, "0")}`
-                      : reservando
-                        ? "Asignando..."
+                      : consultando
+                        ? "Calculando..."
                         : "Se asigna al guardar"}
                   </span>
                 </span>
@@ -174,7 +177,8 @@ export function CrearRetiroPanel({
               <div className="flex flex-col gap-3 p-4">
                 {correlativo !== null && (
                   <p className="text-xs text-muted-foreground">
-                    Escribe este correlativo en el concepto del retiro en Dropi para que se concilie.
+                    Escribe este correlativo en el concepto del retiro en Dropi para que se concilie. Se confirma al
+                    crear el retiro.
                   </p>
                 )}
                 <div className="flex gap-2">

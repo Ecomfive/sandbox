@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
+import { AvisoCorrelativo } from "./aviso-correlativo";
 import { CancelarRetiroForm } from "./cancelar-retiro-form";
 import { CerrarRetiroForm } from "./cerrar-retiro-form";
 import { DescargarFicha } from "./descargar-ficha";
@@ -26,9 +27,16 @@ const ESTADO_ETIQUETA: Record<string, string> = {
   cerrado: "Cerrado",
 };
 
-export default async function RetiroDetallePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RetiroDetallePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ correlativo_cambio?: string }>;
+}) {
   await requireModulo("retiros");
   const { id } = await params;
+  const { correlativo_cambio } = await searchParams;
   const supabase = createServiceClient();
 
   const { data: retiro } = await supabase
@@ -81,6 +89,8 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
           </div>
         </div>
       </div>
+
+      <AvisoCorrelativo pedido={correlativo_cambio} actual={Number(retiro.numero_correlativo)} />
 
       <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-5 text-sm">
         <div>
