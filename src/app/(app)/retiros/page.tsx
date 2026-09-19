@@ -105,10 +105,6 @@ export default async function RetirosPage() {
             </Button>
           </a>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Abre la herramienta local de actualización. Solo funciona en la computadora donde esa
-          herramienta está corriendo y tiene la sesión de Dropi guardada.
-        </p>
         <div className="mt-3">
           <KpiGrid>
             {(plataformas ?? []).map((p) => {
@@ -117,14 +113,14 @@ export default async function RetirosPage() {
               return (
                 <KpiCard
                   key={p.id}
-                  titulo={esAutomatico ? "Saldo Wallet" : p.nombre}
+                  titulo={esAutomatico ? null : p.nombre}
                   valor={
                     <span className="inline-flex items-center gap-1.5">
                       {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
                       {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
                     </span>
                   }
-                  subtexto={ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
+                  subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
                 />
               );
             })}
