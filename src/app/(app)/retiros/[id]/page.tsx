@@ -81,7 +81,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
       <div>
         <Link href="/retiros" className={linkClass}>
-          ← Retiros y wallet
+          ← Conciliación de Retiros
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold tracking-tight">

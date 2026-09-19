@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { crearRetiro, reservarCorrelativo } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
@@ -36,9 +36,8 @@ interface Perfil {
   email: string;
 }
 
-/** Botón "+ Crear" que primero pregunta la plataforma (Dropi o EFFI) y luego
- * despliega un panel de creación rápida (estilo "crear tarea"), en vez de navegar
- * a una página aparte. */
+/** Botón "+ Crear" que despliega directo el panel de creación rápida (estilo "crear tarea"),
+ * en vez de navegar a una página aparte. La plataforma se elige dentro del panel. */
 export function CrearRetiroPanel({
   paisId,
   plataformas,
@@ -51,35 +50,22 @@ export function CrearRetiroPanel({
   perfiles: Perfil[];
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [menuAbierto, setMenuAbierto] = useState(false);
-  const [plataformaId, setPlataformaId] = useState(plataformas[0]?.id ?? "");
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [etiquetaTexto, setEtiquetaTexto] = useState("");
   const [monto, setMonto] = useState("");
   const [comisionValor, setComisionValor] = useState("0");
   const [comisionPorcentaje, setComisionPorcentaje] = useState("0");
-  const menuRef = useRef<HTMLDivElement>(null);
   const [correlativo, setCorrelativo] = useState<number | null>(null);
   const [reservando, setReservando] = useState(false);
 
   // El correlativo se aparta al abrir la ventana; si se cierra sin guardar y se vuelve a abrir, se reutiliza.
-  async function abrirVentana(id: string) {
-    setPlataformaId(id);
-    setMenuAbierto(false);
+  async function abrirVentana() {
     setAbierto(true);
     if (correlativo !== null || reservando) return;
     setReservando(true);
     setCorrelativo(await reservarCorrelativo());
     setReservando(false);
   }
-
-  useEffect(() => {
-    function alHacerClicFuera(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
-    }
-    document.addEventListener("mousedown", alHacerClicFuera);
-    return () => document.removeEventListener("mousedown", alHacerClicFuera);
-  }, []);
 
   function agregarEtiqueta() {
     const valor = etiquetaTexto.trim();
@@ -105,27 +91,10 @@ export function CrearRetiroPanel({
 
   return (
     <>
-      <div ref={menuRef} className="relative">
-        <Button type="button" onClick={() => setMenuAbierto((v) => !v)} className="!rounded-full">
-          <MasIcon className="mr-1 h-4 w-4" />
-          Crear
-        </Button>
-
-        {menuAbierto && (
-          <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
-            {plataformas.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => abrirVentana(p.id)}
-                className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-muted"
-              >
-                {p.nombre}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <Button type="button" onClick={abrirVentana} className="!rounded-full">
+        <MasIcon className="mr-1 h-4 w-4" />
+        Crear
+      </Button>
 
       {abierto && (
         <div
@@ -180,7 +149,7 @@ export function CrearRetiroPanel({
                 <select
                   name="plataforma_id"
                   required
-                  defaultValue={plataformaId}
+                  defaultValue={plataformas[0]?.id}
                   className={`${fieldClassSm} min-w-0 flex-1`}
                 >
                   {plataformas.map((p) => (
