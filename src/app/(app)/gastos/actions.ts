@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export async function registrarGasto(formData: FormData) {
+  await requireModuloEscritura("gastos");
   const pais_id = formData.get("pais_id") as string;
   const categoria = formData.get("categoria") as string;
   const descripcion = formData.get("descripcion") as string;
@@ -19,6 +21,7 @@ export async function registrarGasto(formData: FormData) {
 }
 
 export async function eliminarGasto(formData: FormData) {
+  await requireModuloEscritura("gastos");
   const id = formData.get("id") as string;
   const supabase = createServiceClient();
   const { error } = await supabase.from("gastos").delete().eq("id", id);

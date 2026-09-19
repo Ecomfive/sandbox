@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export async function crearDropshipper(formData: FormData) {
+  await requireModuloEscritura("crm-dropshippers");
   const pais_id = formData.get("pais_id") as string;
   const nombre = (formData.get("nombre") as string)?.trim();
   const contacto_email = (formData.get("contacto_email") as string) || null;
@@ -20,6 +22,7 @@ export async function crearDropshipper(formData: FormData) {
 }
 
 export async function actualizarDropshipper(formData: FormData) {
+  await requireModuloEscritura("crm-dropshippers");
   const id = formData.get("id") as string;
   const estado = formData.get("estado") as string;
   const volumenRaw = formData.get("volumen_mensual_estimado") as string;
@@ -39,6 +42,7 @@ export async function actualizarDropshipper(formData: FormData) {
 }
 
 export async function registrarInteraccion(formData: FormData) {
+  await requireModuloEscritura("crm-dropshippers");
   const dropshipper_id = formData.get("dropshipper_id") as string;
   const fecha = formData.get("fecha") as string;
   const tipo = formData.get("tipo") as string;

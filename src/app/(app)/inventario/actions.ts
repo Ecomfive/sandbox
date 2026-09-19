@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { parseExtracto } from "@/lib/extractos/parse";
 import { mapearMovimientosInventario, type MapeoColumnasInventario } from "@/lib/inventario/parse";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export interface ImportarInventarioState {
   status: "idle" | "success" | "error";
@@ -15,6 +16,11 @@ export async function importarInventario(
   _prevState: ImportarInventarioState,
   formData: FormData
 ): Promise<ImportarInventarioState> {
+  try {
+    await requireModuloEscritura("inventario");
+  } catch (error) {
+    return { status: "error", mensaje: error instanceof Error ? error.message : "Sin permiso." };
+  }
   const archivo = formData.get("archivo") as File | null;
   const paisId = formData.get("pais_id") as string | null;
   const mapeoRaw = formData.get("mapeo") as string | null;

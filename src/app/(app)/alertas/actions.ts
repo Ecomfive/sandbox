@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { upsertAlerta } from "@/lib/alertas/pendientes";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export async function generarAlerta(formData: FormData) {
+  await requireModuloEscritura("alertas");
   const pais_id = formData.get("pais_id") as string;
   const producto_id = formData.get("producto_id") as string;
   const cantidad = Number(formData.get("cantidad"));
@@ -16,6 +18,7 @@ export async function generarAlerta(formData: FormData) {
 }
 
 export async function actualizarEstadoAlerta(formData: FormData) {
+  await requireModuloEscritura("alertas");
   const id = formData.get("id") as string;
   const estado = formData.get("estado") as "abierta" | "reclamada" | "resuelta";
 
@@ -32,6 +35,7 @@ export async function actualizarEstadoAlerta(formData: FormData) {
 }
 
 export async function actualizarEstadoAlertasMasivo(ids: string[], estado: "reclamada" | "resuelta") {
+  await requireModuloEscritura("alertas");
   if (ids.length === 0) return;
 
   const supabase = createServiceClient();

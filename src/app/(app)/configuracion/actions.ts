@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export async function crearPlataforma(formData: FormData) {
+  await requireModuloEscritura("configuracion");
   const pais_id = formData.get("pais_id") as string;
   const nombre = (formData.get("nombre") as string)?.trim();
   if (!nombre) throw new Error("El nombre de la plataforma es obligatorio.");
@@ -49,6 +51,7 @@ export async function crearPlataforma(formData: FormData) {
 }
 
 export async function alternarDisponiblePlataforma(formData: FormData) {
+  await requireModuloEscritura("configuracion");
   const id = formData.get("id") as string;
   const disponible = formData.get("disponible") === "true";
 

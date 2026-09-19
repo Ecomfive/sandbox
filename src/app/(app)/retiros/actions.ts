@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { getUsuarioActual } from "@/lib/auth";
+import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
@@ -20,6 +20,7 @@ async function registrarEvento(supabase: ReturnType<typeof createServiceClient>,
 }
 
 export async function alternarConsolidado(formData: FormData) {
+  await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   const consolidado = formData.get("consolidado") === "true";
 
@@ -39,6 +40,7 @@ export async function alternarConsolidado(formData: FormData) {
 }
 
 export async function registrarSaldo(formData: FormData) {
+  await requireModuloEscritura("retiros");
   const pais_id = formData.get("pais_id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
   const monto = Number(formData.get("monto"));
@@ -61,6 +63,7 @@ export async function registrarSaldo(formData: FormData) {
 
 /** Aparta el próximo correlativo al abrir la ventana de crear. Devuelve null si no se pudo (se asignará al guardar). */
 export async function reservarCorrelativo(): Promise<number | null> {
+  await requireModuloEscritura("retiros");
   const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("reservar_correlativo_retiro");
   const numero = Number(data);
@@ -68,6 +71,7 @@ export async function reservarCorrelativo(): Promise<number | null> {
 }
 
 export async function crearRetiro(formData: FormData) {
+  await requireModuloEscritura("retiros");
   const pais_id = formData.get("pais_id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
   const cuenta_retiro_id = (formData.get("cuenta_retiro_id") as string) || null;
@@ -118,6 +122,7 @@ export async function crearRetiro(formData: FormData) {
 }
 
 export async function cerrarRetiro(formData: FormData) {
+  await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   const pais_id = formData.get("pais_id") as string;
   const soporte_numero = (formData.get("soporte_numero") as string) || null;
@@ -186,6 +191,7 @@ export async function cerrarRetiro(formData: FormData) {
 }
 
 export async function cancelarRetiro(formData: FormData) {
+  await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { parseExtracto, mapearMovimientos, type MapeoColumnas } from "@/lib/extractos/parse";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export interface ImportarExtractoState {
   status: "idle" | "success" | "error";
@@ -14,6 +15,11 @@ export async function importarExtracto(
   _prevState: ImportarExtractoState,
   formData: FormData
 ): Promise<ImportarExtractoState> {
+  try {
+    await requireModuloEscritura("extractos");
+  } catch (error) {
+    return { status: "error", mensaje: error instanceof Error ? error.message : "Sin permiso." };
+  }
   const archivo = formData.get("archivo") as File | null;
   const paisId = formData.get("pais_id") as string | null;
   const mapeoRaw = formData.get("mapeo") as string | null;
@@ -91,6 +97,7 @@ export async function importarExtracto(
 }
 
 export async function asignarPlataforma(movimientoId: string, plataformaId: string) {
+  await requireModuloEscritura("extractos");
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("movimientos_bancarios")

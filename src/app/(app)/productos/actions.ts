@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export async function actualizarProducto(formData: FormData) {
+  await requireModuloEscritura("productos");
   const id = formData.get("id") as string;
   const costoRaw = formData.get("costo") as string;
   const precioRaw = formData.get("precio_actual") as string;
@@ -36,6 +38,7 @@ export async function actualizarProducto(formData: FormData) {
 }
 
 export async function actualizarMargenMasivo(ids: string[], margenMinimo: number) {
+  await requireModuloEscritura("productos");
   if (ids.length === 0) return;
 
   const supabase = createServiceClient();

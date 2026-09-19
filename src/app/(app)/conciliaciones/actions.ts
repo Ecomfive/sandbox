@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { requireModuloEscritura } from "@/lib/auth";
 
 export async function upsertConciliacion(formData: FormData) {
+  await requireModuloEscritura("conciliaciones");
   const pais_id = formData.get("pais_id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
   const periodo = formData.get("periodo") as string;

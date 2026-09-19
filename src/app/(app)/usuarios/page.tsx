@@ -46,13 +46,18 @@ export default async function UsuariosPage() {
   const [{ data: roles }, { data: perfiles }, { data: permisos }] = await Promise.all([
     supabase.from("roles").select("id, nombre").order("nombre"),
     supabase.from("perfiles").select("id, email, nombre, activo, rol_id").order("email"),
-    supabase.from("permisos_rol").select("rol_id, modulo"),
+    supabase.from("permisos_rol").select("rol_id, modulo, solo_lectura"),
   ]);
 
   const permisosPorRol = new Map<string, Set<string>>();
+  const soloLecturaPorRol = new Map<string, Set<string>>();
   for (const p of permisos ?? []) {
     if (!permisosPorRol.has(p.rol_id)) permisosPorRol.set(p.rol_id, new Set());
     permisosPorRol.get(p.rol_id)!.add(p.modulo);
+    if (p.solo_lectura) {
+      if (!soloLecturaPorRol.has(p.rol_id)) soloLecturaPorRol.set(p.rol_id, new Set());
+      soloLecturaPorRol.get(p.rol_id)!.add(p.modulo);
+    }
   }
 
   return (
@@ -64,7 +69,8 @@ export default async function UsuariosPage() {
             Usuarios y roles
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Invita personas al sistema y define qué módulos puede ver cada rol.
+            Invita personas al sistema y define qué módulos puede ver cada rol — y si puede solo
+            verlos o también crear y modificar cosas ahí.
           </p>
         </div>
         <Link href="/usuarios/auditoria" className={linkClass}>
@@ -143,7 +149,9 @@ export default async function UsuariosPage() {
                       <PermisoCheckbox
                         rolId={r.id}
                         modulo={m.clave}
+                        etiqueta={m.etiqueta}
                         activo={permisosPorRol.get(r.id)?.has(m.clave) ?? false}
+                        soloLectura={soloLecturaPorRol.get(r.id)?.has(m.clave) ?? false}
                       />
                     </td>
                   ))}

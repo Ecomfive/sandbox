@@ -2,15 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUsuarioActual } from "@/lib/auth";
+import { requireModuloEscritura } from "@/lib/auth";
 
 function generarCodigo(prefijo: "MSK" | "CMB") {
   return `${prefijo}-${Date.now().toString(36).toUpperCase()}`;
 }
 
 export async function crearSkuSimple(formData: FormData) {
-  const usuario = await getUsuarioActual();
-  if (!usuario) throw new Error("No autenticado");
+  const usuario = await requireModuloEscritura("catalogo-maestro");
 
   const nombre = (formData.get("nombre") as string).trim();
   const codigoManual = (formData.get("codigo") as string)?.trim();
@@ -29,8 +28,7 @@ export async function crearSkuSimple(formData: FormData) {
 }
 
 export async function crearCombo(formData: FormData) {
-  const usuario = await getUsuarioActual();
-  if (!usuario) throw new Error("No autenticado");
+  const usuario = await requireModuloEscritura("catalogo-maestro");
 
   const nombre = (formData.get("nombre") as string).trim();
   const codigoManual = (formData.get("codigo") as string)?.trim();
@@ -79,8 +77,7 @@ const TRANSICIONES: Record<string, string[]> = {
 };
 
 export async function cambiarEstadoSku(formData: FormData) {
-  const usuario = await getUsuarioActual();
-  if (!usuario) throw new Error("No autenticado");
+  const usuario = await requireModuloEscritura("catalogo-maestro");
 
   const id = formData.get("id") as string;
   const nuevoEstado = formData.get("nuevo_estado") as string;
@@ -105,6 +102,7 @@ export async function cambiarEstadoSku(formData: FormData) {
 }
 
 export async function vincularProductoASku(formData: FormData) {
+  await requireModuloEscritura("catalogo-maestro");
   const productoId = formData.get("producto_id") as string;
   const skuMaestroId = (formData.get("sku_maestro_id") as string) || null;
 

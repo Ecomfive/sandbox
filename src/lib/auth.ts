@@ -9,6 +9,7 @@ export interface UsuarioActual {
   rolId: string | null;
   rolNombre: string | null;
   modulos: string[];
+  modulosSoloLectura: string[];
 }
 
 /** Usuario con sesión activa, su rol y los módulos a los que ese rol tiene acceso. */
@@ -31,9 +32,14 @@ export async function getUsuarioActual(): Promise<UsuarioActual | null> {
   const rol = perfil.roles as unknown as { id: string; nombre: string } | null;
 
   let modulos: string[] = [];
+  let modulosSoloLectura: string[] = [];
   if (rol) {
-    const { data: permisos } = await supabase.from("permisos_rol").select("modulo").eq("rol_id", rol.id);
+    const { data: permisos } = await supabase
+      .from("permisos_rol")
+      .select("modulo, solo_lectura")
+      .eq("rol_id", rol.id);
     modulos = (permisos ?? []).map((p) => p.modulo);
+    modulosSoloLectura = (permisos ?? []).filter((p) => p.solo_lectura).map((p) => p.modulo);
   }
 
   return {
@@ -44,6 +50,7 @@ export async function getUsuarioActual(): Promise<UsuarioActual | null> {
     rolId: rol?.id ?? null,
     rolNombre: rol?.nombre ?? null,
     modulos,
+    modulosSoloLectura,
   };
 }
 
@@ -52,5 +59,18 @@ export async function requireModulo(clave: string): Promise<UsuarioActual> {
   const usuario = await getUsuarioActual();
   if (!usuario) redirect("/login");
   if (!usuario.modulos.includes(clave)) redirect("/sin-acceso");
+  return usuario;
+}
+
+/** Exige acceso de escritura al módulo dado — para usar dentro de cada server action que
+ * modifique datos, no solo en la página. El menú oculta los botones a quien no tiene permiso,
+ * pero un server action se puede invocar directo, así que esta es la barrera real. */
+export async function requireModuloEscritura(clave: string): Promise<UsuarioActual> {
+  const usuario = await getUsuarioActual();
+  if (!usuario) throw new Error("No hay sesión activa.");
+  if (!usuario.modulos.includes(clave)) throw new Error("No tienes acceso a este módulo.");
+  if (usuario.modulosSoloLectura.includes(clave)) {
+    throw new Error("Tu rol solo tiene acceso de lectura a este módulo.");
+  }
   return usuario;
 }
