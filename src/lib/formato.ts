@@ -1,6 +1,6 @@
-const MONEDA_POR_PAIS: Record<string, { locale: string; currency: string }> = {
-  CR: { locale: "es-CR", currency: "CRC" },
-  PA: { locale: "es-PA", currency: "USD" },
+const MONEDA_POR_PAIS: Record<string, { locale: string; currency: string; timeZone: string }> = {
+  CR: { locale: "es-CR", currency: "CRC", timeZone: "America/Costa_Rica" },
+  PA: { locale: "es-PA", currency: "USD", timeZone: "America/Panama" },
 };
 
 /** 9520682 -> "₡9.520.682,00" (CR) o "$9,520,682.00" (PA), según el país. */
@@ -40,10 +40,11 @@ export function formatearFechaHora(fechaHoraIso: string | null): string {
   return `${formatearFecha(fecha)}, ${hora.slice(0, 5)}`;
 }
 
-/** Para timestamptz reales (con zona horaria), como "cuándo se subió este archivo". */
+/** Para timestamptz reales (con zona horaria), como "cuándo se subió este archivo". Hora local del país: el servidor corre en UTC. */
 export function formatearFechaHoraCompleta(isoConZona: string, codigoPais: string): string {
-  const locale = MONEDA_POR_PAIS[codigoPais]?.locale ?? "es-PA";
-  return new Intl.DateTimeFormat(locale, {
+  const config = MONEDA_POR_PAIS[codigoPais] ?? MONEDA_POR_PAIS.PA;
+  return new Intl.DateTimeFormat(config.locale, {
+    timeZone: config.timeZone,
     day: "numeric",
     month: "short",
     year: "numeric",

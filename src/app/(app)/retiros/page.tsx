@@ -7,7 +7,7 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
-import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
 import { linkClass } from "@/components/ui/link";
@@ -43,7 +43,7 @@ export default async function RetirosPage() {
       .eq("pais_id", pais.id),
     supabase
       .from("saldos_wallet")
-      .select("plataforma_id, monto, fecha, plataformas(nombre)")
+      .select("plataforma_id, monto, fecha, actualizado_en, plataformas(nombre)")
       .eq("pais_id", pais.id)
       .order("fecha", { ascending: false }),
     supabase
@@ -72,6 +72,11 @@ export default async function RetirosPage() {
     }
   }
 
+  const ultimaActualizacion = (saldos ?? []).reduce<string | null>(
+    (max, s) => (max === null || Date.parse(s.actualizado_en) > Date.parse(max) ? s.actualizado_en : max),
+    null
+  );
+
   const mesActual = hoy().slice(0, 7);
   const abiertos = (retiros ?? []).filter((r) => r.estado === "abierto").length;
   const conNovedad = (retiros ?? []).filter((r) => r.estado === "novedad").length;
@@ -96,15 +101,25 @@ export default async function RetirosPage() {
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold tracking-tight">Saldo de wallet</h2>
-          <a
-            href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button type="button" variant="secondary">
-              Actualizar retiros desde Dropi
-            </Button>
-          </a>
+          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+            {ultimaActualizacion && (
+              <p className="text-xs text-muted-foreground">
+                Última actualización:{" "}
+                <span className="tabular-nums">
+                  {formatearFechaHoraCompleta(ultimaActualizacion, pais.codigo)}
+                </span>
+              </p>
+            )}
+            <a
+              href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button type="button" variant="secondary">
+                Actualizar retiros desde Dropi
+              </Button>
+            </a>
+          </div>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
           Abre la herramienta local de actualización. Solo funciona en la computadora donde esa
