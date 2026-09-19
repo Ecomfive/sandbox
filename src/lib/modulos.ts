@@ -18,6 +18,7 @@ export const MODULOS: Modulo[] = [
   { clave: "catalogo-maestro", etiqueta: "Catálogo maestro de SKU" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
   { clave: "configuracion", etiqueta: "Configuración del sistema" },
+  { clave: "notificaciones", etiqueta: "Centro de notificaciones" },
 ];
 
 export const MODULO_ADMIN_POR_DEFECTO = "Admin";

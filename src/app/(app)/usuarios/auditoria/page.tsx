@@ -5,23 +5,9 @@ import { linkClass } from "@/components/ui/link";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
-import { calcularCambios } from "@/lib/auditoria";
+import { calcularCambios, ETIQUETA_ACCION } from "@/lib/auditoria-cambios";
 
 export const dynamic = "force-dynamic";
-
-const ETIQUETA_ACCION: Record<string, string> = {
-  actualizar_margen: "Actualizó margen",
-  actualizar_margen_masivo: "Actualizó margen (en lote)",
-  registrar_saldo: "Registró saldo de wallet",
-  crear_retiro: "Creó un retiro",
-  cerrar_retiro: "Cerró un retiro",
-  cerrar_retiro_con_novedad: "Cerró un retiro con novedad",
-  cancelar_retiro: "Canceló un retiro",
-  marcar_consolidacion: "Cambió la consolidación de un retiro",
-  configurar_plataforma_retiro: "Configuró una plataforma para crear retiros",
-  crear_plataforma: "Creó una plataforma",
-  activar_cuenta_retiro: "Cambió el estado de una cuenta de retiro",
-};
 
 export default async function AuditoriaPage() {
   await requireModulo("usuarios");

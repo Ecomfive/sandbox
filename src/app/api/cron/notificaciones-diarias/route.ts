@@ -38,6 +38,11 @@ export async function GET(request: Request) {
         `<li>${pendientes.saldosSinRegistrar} plataforma${pendientes.saldosSinRegistrar === 1 ? "" : "s"} sin saldo de wallet registrado — <a href="${SITIO}/retiros">ver</a></li>`
       );
     }
+    if (pendientes.retirosDropiSinVincular > 0) {
+      items.push(
+        `<li>${pendientes.retirosDropiSinVincular} retiro${pendientes.retirosDropiSinVincular === 1 ? "" : "s"} de Dropi sin vincular — <a href="${SITIO}/notificaciones">ver</a></li>`
+      );
+    }
     if (items.length > 0) {
       secciones.push(`<h2>${pais.nombre}</h2><ul>${items.join("")}</ul>`);
     }
