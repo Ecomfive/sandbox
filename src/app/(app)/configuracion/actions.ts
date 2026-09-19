@@ -4,6 +4,50 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 
+export async function crearPlataforma(formData: FormData) {
+  const pais_id = formData.get("pais_id") as string;
+  const nombre = (formData.get("nombre") as string)?.trim();
+  if (!nombre) throw new Error("El nombre de la plataforma es obligatorio.");
+
+  const supabase = createServiceClient();
+
+  const { data: existente, error: errorBuscar } = await supabase
+    .from("plataformas")
+    .select("id")
+    .eq("nombre", nombre)
+    .maybeSingle();
+  if (errorBuscar) throw new Error(errorBuscar.message);
+
+  let plataforma_id = existente?.id as string | undefined;
+  if (!plataforma_id) {
+    const { data: nueva, error: errorCrear } = await supabase
+      .from("plataformas")
+      .insert({ nombre })
+      .select("id")
+      .single();
+    if (errorCrear) throw new Error(errorCrear.message);
+    plataforma_id = nueva.id;
+  }
+
+  const { error } = await supabase
+    .from("pais_plataformas")
+    .upsert(
+      { pais_id, plataforma_id, disponible_para_retiro: true },
+      { onConflict: "pais_id,plataforma_id" }
+    );
+  if (error) throw new Error(error.message);
+
+  await registrarAuditoria({
+    accion: "crear_plataforma",
+    entidad: "plataformas",
+    entidadId: plataforma_id,
+    detalle: `nombre=${nombre}`,
+  });
+
+  revalidatePath("/configuracion");
+  revalidatePath("/retiros");
+}
+
 export async function alternarDisponiblePlataforma(formData: FormData) {
   const id = formData.get("id") as string;
   const disponible = formData.get("disponible") === "true";
