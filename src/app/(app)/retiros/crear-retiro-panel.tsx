@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { crearRetiro } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
@@ -36,8 +36,9 @@ interface Perfil {
   email: string;
 }
 
-/** Botón "+ Retiro" que despliega un panel de creación rápida (estilo "crear tarea"),
- * en vez de navegar a una página aparte. */
+/** Botón "+ Crear" que primero pregunta la plataforma (Dropi, EFI, etc.) y luego
+ * despliega un panel de creación rápida (estilo "crear tarea"), en vez de navegar
+ * a una página aparte. */
 export function CrearRetiroPanel({
   paisId,
   plataformas,
@@ -50,11 +51,22 @@ export function CrearRetiroPanel({
   perfiles: Perfil[];
 }) {
   const [abierto, setAbierto] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [plataformaId, setPlataformaId] = useState(plataformas[0]?.id ?? "");
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [etiquetaTexto, setEtiquetaTexto] = useState("");
   const [monto, setMonto] = useState("");
   const [comisionValor, setComisionValor] = useState("0");
   const [comisionPorcentaje, setComisionPorcentaje] = useState("0");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function alHacerClicFuera(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
+    }
+    document.addEventListener("mousedown", alHacerClicFuera);
+    return () => document.removeEventListener("mousedown", alHacerClicFuera);
+  }, []);
 
   function agregarEtiqueta() {
     const valor = etiquetaTexto.trim();
@@ -80,10 +92,31 @@ export function CrearRetiroPanel({
 
   return (
     <>
-      <Button type="button" onClick={() => setAbierto(true)} className="!rounded-full">
-        <MasIcon className="mr-1 h-4 w-4" />
-        Retiro
-      </Button>
+      <div ref={menuRef} className="relative">
+        <Button type="button" onClick={() => setMenuAbierto((v) => !v)} className="!rounded-full">
+          <MasIcon className="mr-1 h-4 w-4" />
+          Crear
+        </Button>
+
+        {menuAbierto && (
+          <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
+            {plataformas.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setPlataformaId(p.id);
+                  setMenuAbierto(false);
+                  setAbierto(true);
+                }}
+                className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-muted"
+              >
+                {p.nombre}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {abierto && (
         <div
@@ -111,7 +144,12 @@ export function CrearRetiroPanel({
 
             <div className="flex flex-col gap-3 p-4">
               <div className="flex gap-2">
-                <select name="plataforma_id" required className={`${fieldClassSm} min-w-0 flex-1`}>
+                <select
+                  name="plataforma_id"
+                  required
+                  defaultValue={plataformaId}
+                  className={`${fieldClassSm} min-w-0 flex-1`}
+                >
                   {plataformas.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombre}
