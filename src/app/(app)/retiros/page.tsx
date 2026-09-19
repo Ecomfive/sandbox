@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 import { linkClass } from "@/components/ui/link";
@@ -143,25 +143,27 @@ export default async function RetirosPage() {
           </a>
         </div>
         <div className="mt-3">
-          <KpiGrid>
-            {(plataformas ?? []).map((p) => {
-              const ultimo = ultimoSaldoPorPlataforma.get(p.id);
-              const esAutomatico = p.nombre === "Dropi";
-              return (
-                <KpiCard
-                  key={p.id}
-                  titulo={esAutomatico ? null : p.nombre}
-                  valor={
-                    <span className="inline-flex items-center gap-1.5">
-                      {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
-                      {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
-                    </span>
-                  }
-                  subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
-                />
-              );
-            })}
-          </KpiGrid>
+          <KpiGroup titulo="Saldo de wallet">
+            <KpiGrid>
+              {(plataformas ?? []).map((p) => {
+                const ultimo = ultimoSaldoPorPlataforma.get(p.id);
+                const esAutomatico = p.nombre === "Dropi";
+                return (
+                  <KpiCard
+                    key={p.id}
+                    titulo={esAutomatico ? null : p.nombre}
+                    valor={
+                      <span className="inline-flex items-center gap-1.5">
+                        {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
+                        {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
+                      </span>
+                    }
+                    subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
+                  />
+                );
+              })}
+            </KpiGrid>
+          </KpiGroup>
         </div>
       </div>
 
@@ -181,11 +183,13 @@ export default async function RetirosPage() {
         </div>
 
         <div className="mt-3">
-          <KpiGrid>
-            <KpiCard titulo="Abiertos" valor={abiertos} />
-            <KpiCard titulo="Con novedad" valor={conNovedad} tono={conNovedad > 0 ? "destructive" : "neutral"} />
-            <KpiCard titulo="Cerrados este mes" valor={formatearMoneda(totalCerradoMes, pais.codigo)} />
-          </KpiGrid>
+          <KpiGroup titulo="Resumen">
+            <KpiGrid>
+              <KpiCard titulo="Abiertos" valor={abiertos} />
+              <KpiCard titulo="Con novedad" valor={conNovedad} tono={conNovedad > 0 ? "destructive" : "neutral"} />
+              <KpiCard titulo="Cerrados este mes" valor={formatearMoneda(totalCerradoMes, pais.codigo)} />
+            </KpiGrid>
+          </KpiGroup>
         </div>
 
         <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} />

@@ -3,7 +3,7 @@ import { getPaisActual } from "@/lib/pais";
 import { registrarGasto, eliminarGasto } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -60,11 +60,13 @@ export default async function GastosPage() {
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold tracking-tight">Este mes</h2>
         {gastosMes.length === 0 ? (
-          <EstadoVacio mensaje={`Todavía no hay gastos registrados para ${mesActual}.`} />
+          <>
+            <h2 className="text-sm font-semibold tracking-tight">Este mes</h2>
+            <EstadoVacio mensaje={`Todavía no hay gastos registrados para ${mesActual}.`} />
+          </>
         ) : (
-          <div className="mt-3">
+          <KpiGroup titulo="Este mes">
             <KpiGrid>
               <KpiCard titulo="Total del mes" valor={formatearMoneda(totalMes, pais.codigo)} />
               {CATEGORIAS.filter((c) => totalesPorCategoria.has(c.valor)).map((c) => (
@@ -75,7 +77,7 @@ export default async function GastosPage() {
                 />
               ))}
             </KpiGrid>
-          </div>
+          </KpiGroup>
         )}
       </div>
 

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { DashboardIcon } from "@/lib/nav-icons";
 import Link from "next/link";
@@ -209,38 +209,37 @@ export default async function Home({
         pendientesHoy.saldosSinRegistrar > 0 ||
         pendientesHoy.pedidosConNovedad > 0) && (
         <div className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold tracking-tight text-muted-foreground uppercase">
-            Pendientes de hoy
-          </h2>
-          <KpiGrid>
-            {pendientesHoy.alertasInventario > 0 && (
-              <Link href="/alertas">
-                <KpiCard
-                  titulo="Alertas de inventario abiertas"
-                  valor={pendientesHoy.alertasInventario}
-                  tono="destructive"
-                />
-              </Link>
-            )}
-            {pendientesHoy.pedidosConNovedad > 0 && (
-              <Link href="/pedidos-dropi">
-                <KpiCard
-                  titulo="Pedidos Dropi en Novedad"
-                  valor={pendientesHoy.pedidosConNovedad}
-                  tono="destructive"
-                />
-              </Link>
-            )}
-            {pendientesHoy.saldosSinRegistrar > 0 && (
-              <Link href="/retiros">
-                <KpiCard
-                  titulo="Saldos de wallet sin registrar"
-                  valor={pendientesHoy.saldosSinRegistrar}
-                  tono="destructive"
-                />
-              </Link>
-            )}
-          </KpiGrid>
+          <KpiGroup titulo="Pendientes de hoy">
+            <KpiGrid>
+              {pendientesHoy.alertasInventario > 0 && (
+                <Link href="/alertas">
+                  <KpiCard
+                    titulo="Alertas de inventario abiertas"
+                    valor={pendientesHoy.alertasInventario}
+                    tono="destructive"
+                  />
+                </Link>
+              )}
+              {pendientesHoy.pedidosConNovedad > 0 && (
+                <Link href="/pedidos-dropi">
+                  <KpiCard
+                    titulo="Pedidos Dropi en Novedad"
+                    valor={pendientesHoy.pedidosConNovedad}
+                    tono="destructive"
+                  />
+                </Link>
+              )}
+              {pendientesHoy.saldosSinRegistrar > 0 && (
+                <Link href="/retiros">
+                  <KpiCard
+                    titulo="Saldos de wallet sin registrar"
+                    valor={pendientesHoy.saldosSinRegistrar}
+                    tono="destructive"
+                  />
+                </Link>
+              )}
+            </KpiGrid>
+          </KpiGroup>
         </div>
       )}
 

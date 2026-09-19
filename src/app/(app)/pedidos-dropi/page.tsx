@@ -2,7 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { toneEstadoPedido } from "@/lib/estados-pedido";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
@@ -120,23 +120,25 @@ export default async function PedidosDropiPage({
         <EstadoVacio mensaje={`No hay órdenes de Dropi para ${pais.nombre} entre ${desde} y ${hasta}.`} />
       ) : (
         <>
-          <KpiGrid>
-            <KpiCard titulo="Órdenes en el rango" valor={totalOrdenes} />
-            <KpiCard titulo="Monto total" valor={formatearMoneda(totalMonto, pais.codigo)} />
-            <KpiCard
-              titulo={
-                <>
-                  Alertas: liquidado sin marcar entregado
-                  <AyudaContextual texto="Dropi ya registró la ganancia de este pedido en la cartera, pero el pedido todavía no aparece como ENTREGADO — normalmente significa que hay que actualizar su estado a mano en Dropi." />
-                </>
-              }
-              valor={totalAlertas}
-              tono={totalAlertas > 0 ? "destructive" : "neutral"}
-            />
-            {estadosOrdenados.map(([estado, cantidad]) => (
-              <KpiCard key={estado} titulo={estado} valor={cantidad} />
-            ))}
-          </KpiGrid>
+          <KpiGroup titulo="Resumen del período">
+            <KpiGrid>
+              <KpiCard titulo="Órdenes en el rango" valor={totalOrdenes} />
+              <KpiCard titulo="Monto total" valor={formatearMoneda(totalMonto, pais.codigo)} />
+              <KpiCard
+                titulo={
+                  <>
+                    Alertas: liquidado sin marcar entregado
+                    <AyudaContextual texto="Dropi ya registró la ganancia de este pedido en la cartera, pero el pedido todavía no aparece como ENTREGADO — normalmente significa que hay que actualizar su estado a mano en Dropi." />
+                  </>
+                }
+                valor={totalAlertas}
+                tono={totalAlertas > 0 ? "destructive" : "neutral"}
+              />
+              {estadosOrdenados.map(([estado, cantidad]) => (
+                <KpiCard key={estado} titulo={estado} valor={cantidad} />
+              ))}
+            </KpiGrid>
+          </KpiGroup>
 
           {todas.length < totalOrdenes && (
             <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm text-warning">

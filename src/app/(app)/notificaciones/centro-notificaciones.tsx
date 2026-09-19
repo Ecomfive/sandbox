@@ -3,7 +3,7 @@
 import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { calcularCambios, ETIQUETA_ACCION } from "@/lib/auditoria-cambios";
@@ -164,22 +164,24 @@ function PorCorregir({ pendientes }: { pendientes: PendientesHoy }) {
   }
 
   return (
-    <KpiGrid>
-      {tarjetas.map((t) => (
-        <Link key={t.clave} href={t.href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <KpiCard
-            tono="destructive"
-            titulo={
-              <span className="flex items-center gap-1.5">
-                <t.Icono className="h-4 w-4" aria-hidden="true" />
-                {t.titulo}
-              </span>
-            }
-            valor={t.cantidad}
-          />
-        </Link>
-      ))}
-    </KpiGrid>
+    <KpiGroup titulo="Módulos con pendientes">
+      <KpiGrid>
+        {tarjetas.map((t) => (
+          <Link key={t.clave} href={t.href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <KpiCard
+              tono="destructive"
+              titulo={
+                <span className="flex items-center gap-1.5">
+                  <t.Icono className="h-4 w-4" aria-hidden="true" />
+                  {t.titulo}
+                </span>
+              }
+              valor={t.cantidad}
+            />
+          </Link>
+        ))}
+      </KpiGrid>
+    </KpiGroup>
   );
 }
 

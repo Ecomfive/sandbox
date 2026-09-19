@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonKpiGrid, SkeletonTable } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonKpiGroup, SkeletonTable } from "@/components/ui/skeleton";
 
 export default function CargandoGastos() {
   return (
@@ -7,12 +7,7 @@ export default function CargandoGastos() {
         <Skeleton className="h-5 w-48" />
         <Skeleton className="mt-2 h-4 w-72" />
       </div>
-      <div>
-        <Skeleton className="h-5 w-24" />
-        <div className="mt-3">
-          <SkeletonKpiGrid cantidad={3} />
-        </div>
-      </div>
+      <SkeletonKpiGroup cantidad={3} />
       <div>
         <Skeleton className="h-5 w-40" />
         <Skeleton className="mt-3 h-20 w-full rounded-lg" />

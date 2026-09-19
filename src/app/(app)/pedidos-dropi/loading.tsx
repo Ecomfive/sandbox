@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonKpiGrid, SkeletonTable } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonKpiGroup, SkeletonTable } from "@/components/ui/skeleton";
 
 export default function CargandoPedidosDropi() {
   return (
@@ -7,7 +7,7 @@ export default function CargandoPedidosDropi() {
         <Skeleton className="h-5 w-48" />
         <Skeleton className="h-9 w-64 rounded-md" />
       </div>
-      <SkeletonKpiGrid cantidad={4} />
+      <SkeletonKpiGroup cantidad={4} />
       <SkeletonTable filas={8} columnas={6} />
     </main>
   );

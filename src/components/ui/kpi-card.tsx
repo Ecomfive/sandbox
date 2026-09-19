@@ -14,6 +14,19 @@ export function KpiGrid({ children }: { children: ReactNode }) {
   return <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3">{children}</div>;
 }
 
+/** Agrupa un KpiGrid bajo una barra de título — la tarjeta contenedora queda con su propio
+ * borde/esquinas y una franja superior que nombra el grupo, en vez de un <h2> suelto al lado. */
+export function KpiGroup({ titulo, children }: { titulo: ReactNode; children: ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border bg-muted px-4 py-1.5 text-xs font-medium text-muted-foreground">
+        {titulo}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
 export function KpiCard({
   titulo,
   valor,

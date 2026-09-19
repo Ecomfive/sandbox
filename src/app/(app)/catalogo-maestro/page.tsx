@@ -2,7 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { crearSkuSimple, crearCombo, cambiarEstadoSku } from "./actions";
 import { ComboBuilder } from "./combo-builder";
@@ -77,11 +77,13 @@ export default async function CatalogoMaestroPage() {
         </p>
       </div>
 
-      <KpiGrid>
-        <KpiCard titulo="Propuestos" valor={conteo.propuesto} />
-        <KpiCard titulo="En revisión" valor={conteo.en_revision} />
-        <KpiCard titulo="Aprobados" valor={conteo.aprobado} />
-      </KpiGrid>
+      <KpiGroup titulo="Estado del catálogo">
+        <KpiGrid>
+          <KpiCard titulo="Propuestos" valor={conteo.propuesto} />
+          <KpiCard titulo="En revisión" valor={conteo.en_revision} />
+          <KpiCard titulo="Aprobados" valor={conteo.aprobado} />
+        </KpiGrid>
+      </KpiGroup>
 
       <div className="grid gap-6 md:grid-cols-2">
         <form action={crearSkuSimple} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">

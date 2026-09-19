@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { InteligenciaChart } from "@/components/charts/inteligencia-chart";
 import { agruparProductosTotalesPorMes, agruparProveedoresNuevosPorMes, soloAnio } from "@/lib/inteligencia/agregados";
 import { InteligenciaIcon } from "@/lib/nav-icons";
@@ -98,10 +98,12 @@ export default async function InteligenciaCompetitivaPage() {
         </div>
       ) : (
         <>
-          <KpiGrid>
-            <KpiCard titulo="Proveedores rastreados" valor={totalProveedores} />
-            <KpiCard titulo="Total de productos en la plataforma" valor={totalProductos} />
-          </KpiGrid>
+          <KpiGroup titulo="Resumen">
+            <KpiGrid>
+              <KpiCard titulo="Proveedores rastreados" valor={totalProveedores} />
+              <KpiCard titulo="Total de productos en la plataforma" valor={totalProductos} />
+            </KpiGrid>
+          </KpiGroup>
 
           <div className="grid gap-6 md:grid-cols-2">
             <div className="rounded-xl border border-border bg-card p-4">

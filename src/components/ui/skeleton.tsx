@@ -17,6 +17,20 @@ export function SkeletonKpiGrid({ cantidad = 4 }: { cantidad?: number }) {
   );
 }
 
+/** Imita un KpiGroup (barra de título + grilla) mientras se resuelve la consulta. */
+export function SkeletonKpiGroup({ cantidad = 4 }: { cantidad?: number }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border bg-muted px-4 py-1.5">
+        <Skeleton className="h-3 w-28" />
+      </div>
+      <div className="p-4">
+        <SkeletonKpiGrid cantidad={cantidad} />
+      </div>
+    </div>
+  );
+}
+
 /** Imita una tabla con encabezado y filas mientras se resuelve la consulta. */
 export function SkeletonTable({ filas = 5, columnas = 4 }: { filas?: number; columnas?: number }) {
   return (
