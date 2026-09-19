@@ -9,7 +9,7 @@ import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 import { FormularioConToast } from "@/components/ui/toast";
 import { linkClass } from "@/components/ui/link";
-import { WalletIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
 
 export const dynamic = "force-dynamic";
@@ -99,10 +99,10 @@ export default async function RetirosPage() {
             href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
             target="_blank"
             rel="noopener noreferrer"
+            title="Actualizar retiros desde Dropi"
+            className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted"
           >
-            <Button type="button" variant="secondary">
-              Actualizar retiros desde Dropi
-            </Button>
+            <ActualizarIcon className="h-4 w-4" />
           </a>
         </div>
         <div className="mt-3">
