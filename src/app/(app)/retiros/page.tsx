@@ -40,7 +40,7 @@ export default async function RetirosPage() {
       supabase
         .from("retiros")
         .select(
-          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, prioridad, asignado_a, etiquetas, notas, soporte_numero, banco, estado_dropi, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
+          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, a_recibir, asignado_a, notas, soporte_numero, banco, estado_dropi, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
         )
         .eq("pais_id", pais.id)
         .order("fecha", { ascending: false })
@@ -105,13 +105,11 @@ export default async function RetirosPage() {
     monto: Number(r.monto),
     estado: r.estado,
     comision: Number(r.comision),
-    montoNeto: Number(r.monto_neto),
+    aRecibir: Number(r.a_recibir ?? r.monto_neto),
     montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido),
     fechaCierre: r.fecha_cierre,
     fechaLimite: r.fecha_limite,
-    prioridad: r.prioridad,
     asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,
-    etiquetas: r.etiquetas ?? [],
     estadoDropi: r.estado_dropi,
     notas: r.notas,
     soporteNumero: r.soporte_numero,
@@ -178,7 +176,6 @@ export default async function RetirosPage() {
               paisId={pais.id}
               plataformas={plataformasParaCrear}
               cuentas={cuentasRetiro ?? []}
-              perfiles={perfiles ?? []}
             />
           </div>
         </div>

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { CancelarRetiroForm } from "./cancelar-retiro-form";
 import { CerrarRetiroForm } from "./cerrar-retiro-form";
+import { DescargarFicha } from "./descargar-ficha";
 import { Badge } from "@/components/ui/badge";
 import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
@@ -25,20 +26,6 @@ const ESTADO_ETIQUETA: Record<string, string> = {
   cerrado: "Cerrado",
 };
 
-const PRIORIDAD_TONO = {
-  baja: "neutral",
-  media: "info",
-  alta: "warning",
-  urgente: "destructive",
-} as const;
-
-const PRIORIDAD_ETIQUETA: Record<string, string> = {
-  baja: "Baja",
-  media: "Media",
-  alta: "Alta",
-  urgente: "Urgente",
-};
-
 export default async function RetiroDetallePage({ params }: { params: Promise<{ id: string }> }) {
   await requireModulo("retiros");
   const { id } = await params;
@@ -47,7 +34,7 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
   const { data: retiro } = await supabase
     .from("retiros")
     .select(
-      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, prioridad, fecha_limite, estado_dropi, dropi_id, etiquetas, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
+      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, a_recibir, fecha_limite, estado_dropi, dropi_id, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -73,8 +60,8 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
     urlComprobante = data?.signedUrl ?? null;
   }
 
-  const diferencia =
-    retiro.monto_recibido !== null ? Number(retiro.monto_recibido) - Number(retiro.monto_neto) : null;
+  const aRecibir = Number(retiro.a_recibir ?? retiro.monto_neto);
+  const diferencia = retiro.monto_recibido !== null ? Number(retiro.monto_recibido) - aRecibir : null;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
@@ -89,6 +76,9 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
           <Badge tone={ESTADO_TONO[retiro.estado as keyof typeof ESTADO_TONO]}>
             {ESTADO_ETIQUETA[retiro.estado] ?? retiro.estado}
           </Badge>
+          <div className="ml-auto">
+            <DescargarFicha retiroId={retiro.id} />
+          </div>
         </div>
       </div>
 
@@ -111,8 +101,8 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
           <p className="font-medium tabular-nums">{formatearMoneda(Number(retiro.comision), codigoPais)}</p>
         </div>
         <div>
-          <p className="text-muted-foreground">Monto neto esperado</p>
-          <p className="font-medium tabular-nums">{formatearMoneda(Number(retiro.monto_neto), codigoPais)}</p>
+          <p className="text-muted-foreground">A recibir</p>
+          <p className="font-medium tabular-nums">{formatearMoneda(aRecibir, codigoPais)}</p>
         </div>
         <div>
           <p className="text-muted-foreground">Fecha de creación</p>
@@ -121,16 +111,6 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
         <div>
           <p className="text-muted-foreground">Persona asignada</p>
           <p className="font-medium">{asignado?.nombre || asignado?.email || "Sin asignar"}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Prioridad</p>
-          {retiro.prioridad ? (
-            <Badge tone={PRIORIDAD_TONO[retiro.prioridad as keyof typeof PRIORIDAD_TONO]}>
-              {PRIORIDAD_ETIQUETA[retiro.prioridad] ?? retiro.prioridad}
-            </Badge>
-          ) : (
-            <p className="font-medium">Sin prioridad</p>
-          )}
         </div>
         <div>
           <p className="text-muted-foreground">Fecha límite</p>
@@ -149,18 +129,6 @@ export default async function RetiroDetallePage({ params }: { params: Promise<{ 
             <p className="font-medium">Sin vincular</p>
           )}
         </div>
-        {retiro.etiquetas && retiro.etiquetas.length > 0 && (
-          <div className="col-span-2">
-            <p className="text-muted-foreground">Etiquetas</p>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {retiro.etiquetas.map((et: string) => (
-                <Badge key={et} tone="neutral">
-                  {et}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
         {retiro.notas && (
           <div className="col-span-2">
             <p className="text-muted-foreground">Notas</p>

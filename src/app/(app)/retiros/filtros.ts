@@ -1,21 +1,10 @@
 import { ETIQUETA_ESTADO_DROPI } from "@/lib/dropi/emparejar-retiros";
+import { ESTADO_ETIQUETA } from "@/lib/retiros/estados";
 import type { FilaRetiro } from "./tabla-retiros";
 
 export const SIN_VALOR = "__sin_valor__";
 
-export const ESTADO_ETIQUETA: Record<string, string> = {
-  abierto: "Abierto",
-  cancelado: "Cancelado",
-  novedad: "Novedad",
-  cerrado: "Cerrado",
-};
-
-const PRIORIDAD_ETIQUETA: Record<string, string> = {
-  baja: "Baja",
-  media: "Media",
-  alta: "Alta",
-  urgente: "Urgente",
-};
+export { ESTADO_ETIQUETA };
 
 export type TipoCampo = "seleccion" | "fecha" | "numero" | "texto";
 
@@ -24,15 +13,13 @@ export type CampoId =
   | "plataforma"
   | "destino"
   | "dropi"
-  | "prioridad"
   | "asignado"
-  | "etiquetas"
   | "creacion"
   | "cierre"
   | "limite"
   | "monto"
   | "comision"
-  | "neto"
+  | "arecibir"
   | "recibido"
   | "notas"
   | "soporte";
@@ -48,15 +35,13 @@ export const CAMPOS: DefinicionCampo[] = [
   { id: "plataforma", etiqueta: "Plataforma", tipo: "seleccion" },
   { id: "destino", etiqueta: "Destino", tipo: "seleccion" },
   { id: "dropi", etiqueta: "Estado en Dropi", tipo: "seleccion" },
-  { id: "prioridad", etiqueta: "Prioridad", tipo: "seleccion" },
   { id: "asignado", etiqueta: "Persona asignada", tipo: "seleccion" },
-  { id: "etiquetas", etiqueta: "Etiquetas", tipo: "seleccion" },
   { id: "creacion", etiqueta: "Fecha de creación", tipo: "fecha" },
   { id: "cierre", etiqueta: "Fecha de cierre", tipo: "fecha" },
   { id: "limite", etiqueta: "Fecha límite", tipo: "fecha" },
   { id: "monto", etiqueta: "Monto", tipo: "numero" },
   { id: "comision", etiqueta: "Comisión", tipo: "numero" },
-  { id: "neto", etiqueta: "Monto neto", tipo: "numero" },
+  { id: "arecibir", etiqueta: "A recibir", tipo: "numero" },
   { id: "recibido", etiqueta: "Monto recibido", tipo: "numero" },
   { id: "notas", etiqueta: "Notas", tipo: "texto" },
   { id: "soporte", etiqueta: "N.º de soporte", tipo: "texto" },
@@ -130,12 +115,8 @@ export function valoresDeSeleccion(fila: FilaRetiro, campo: CampoId): string[] {
       return [fila.destino === "—" ? SIN_VALOR : fila.destino];
     case "dropi":
       return [fila.estadoDropi ?? SIN_VALOR];
-    case "prioridad":
-      return [fila.prioridad ?? SIN_VALOR];
     case "asignado":
       return [fila.asignadoNombre ?? SIN_VALOR];
-    case "etiquetas":
-      return fila.etiquetas.length > 0 ? fila.etiquetas : [SIN_VALOR];
     default:
       return [];
   }
@@ -144,21 +125,13 @@ export function valoresDeSeleccion(fila: FilaRetiro, campo: CampoId): string[] {
 const ETIQUETA_SIN_VALOR: Partial<Record<CampoId, string>> = {
   plataforma: "Sin plataforma",
   destino: "Sin destino",
-  prioridad: "Sin prioridad",
   asignado: "Sin asignar",
-  etiquetas: "Sin etiquetas",
 };
 
-/** Estado, prioridad y origen tienen valores fijos; el resto se arma con lo que hay en los retiros. */
+/** Estado y estado en Dropi tienen valores fijos; el resto se arma con lo que hay en los retiros. */
 export function opcionesDeSeleccion(filas: FilaRetiro[], campo: CampoId): Opcion[] {
   if (campo === "estado") {
     return Object.entries(ESTADO_ETIQUETA).map(([valor, etiqueta]) => ({ valor, etiqueta }));
-  }
-  if (campo === "prioridad") {
-    return [
-      ...Object.entries(PRIORIDAD_ETIQUETA).map(([valor, etiqueta]) => ({ valor, etiqueta })),
-      { valor: SIN_VALOR, etiqueta: "Sin prioridad" },
-    ];
   }
   if (campo === "dropi") {
     return [
@@ -189,7 +162,7 @@ function fechaDeCampo(fila: FilaRetiro, campo: CampoId): string | null {
 function numeroDeCampo(fila: FilaRetiro, campo: CampoId): number | null {
   if (campo === "monto") return fila.monto;
   if (campo === "comision") return fila.comision;
-  if (campo === "neto") return fila.montoNeto;
+  if (campo === "arecibir") return fila.aRecibir;
   if (campo === "recibido") return fila.montoRecibido;
   return null;
 }
