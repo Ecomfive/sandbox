@@ -4,7 +4,7 @@ type Tono = "neutral" | "destructive";
 
 const tonos: Record<Tono, string> = {
   neutral: "border-border bg-card",
-  destructive: "border-red-300 bg-red-50",
+  destructive: "border-destructive/30 bg-destructive-soft",
 };
 
 /** Grilla responsiva para tarjetas de indicadores — nunca se cortan ni desbordan, a cualquier ancho.
@@ -43,9 +43,9 @@ export function KpiCard({
   return (
     <div className={`min-w-0 rounded-xl border p-4 ${tonos[tono]}`}>
       {titulo && (
-        <p className={`text-xs font-medium ${tono === "destructive" ? "text-red-700" : ""}`}>{titulo}</p>
+        <p className={`text-xs font-medium ${tono === "destructive" ? "text-destructive" : ""}`}>{titulo}</p>
       )}
-      <p className={`mt-1 text-lg font-semibold tabular-nums ${tono === "destructive" ? "text-red-700" : ""}`}>
+      <p className={`mt-1 text-lg font-semibold tabular-nums ${tono === "destructive" ? "text-destructive" : ""}`}>
         {valor}
       </p>
       {subtexto && <p className="mt-0.5 text-xs text-muted-foreground">{subtexto}</p>}

@@ -311,8 +311,23 @@ export function NotificacionesIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function EstrellaIcon({ filled, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill={filled ? "currentColor" : "none"}
+      {...props}
+    >
+      <path d="m12 3 2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1L6.6 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z" />
+    </svg>
+  );
+}
+
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
-  General: NotificacionesIcon,
   Proveeduría: ProveeduriaIcon,
   Tiendas: TiendaIcon,
   Catálogo: CatalogoIcon,

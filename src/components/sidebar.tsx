@@ -4,10 +4,17 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_SECTIONS, moduloDeHref, encontrarSeccionActiva, type NavSectionAnidada } from "@/lib/nav-data";
-import { DashboardIcon, ChevronRightIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import {
+  NAV_SECTIONS,
+  moduloDeHref,
+  encontrarSeccionActiva,
+  type NavSectionAnidada,
+  type NavItem,
+} from "@/lib/nav-data";
+import { DashboardIcon, ChevronRightIcon, NotificacionesIcon, SECTION_ICONS } from "@/lib/nav-icons";
 import { ConTooltip } from "@/components/sidebar-tooltip";
-import { CuentaMenu } from "@/components/cuenta-menu";
+import { CuentaFooter } from "@/components/cuenta-footer";
+import { FavoritoToggle } from "@/components/favorito-toggle";
 import type { UsuarioActual } from "@/lib/auth";
 
 const STORAGE_KEY = "sidebar_expandido";
@@ -27,24 +34,75 @@ function puedeVer(modulosPermitidos: string[] | null | undefined, href?: string)
   return modulosPermitidos.includes(moduloDeHref(href));
 }
 
+/** Fila de un ítem hoja (Link) con su estrella de favorito al lado — usada tanto en los
+ * grupos por plataforma como en las secciones planas de NAV_SECTIONS. */
+function ItemHoja({
+  item,
+  activo,
+  esFavorito,
+  onNavigate,
+}: {
+  item: NavItem;
+  activo: boolean;
+  esFavorito: boolean;
+  onNavigate?: () => void;
+}) {
+  if (item.pronto || !item.href) {
+    return (
+      <span className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground/60">
+        {item.label}
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
+      </span>
+    );
+  }
+  return (
+    <div className="flex items-center gap-0.5">
+      <Link
+        href={item.href}
+        onClick={onNavigate}
+        className={
+          activo
+            ? "flex-1 rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
+            : "flex-1 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
+        }
+      >
+        {item.label}
+      </Link>
+      <FavoritoToggle href={item.href} activo={esFavorito} />
+    </div>
+  );
+}
+
 function SidebarContents({
   expanded,
   onToggle,
   onNavigate,
   modulosPermitidos,
   seccionesPlataforma,
+  favoritos,
+  totalPendientes,
 }: {
   expanded: boolean;
   onToggle?: () => void;
   onNavigate?: () => void;
   modulosPermitidos?: string[] | null;
   seccionesPlataforma: NavSectionAnidada[];
+  favoritos: string[];
+  totalPendientes: number;
 }) {
   const pathname = usePathname();
   const primeraSeccion = seccionesPlataforma[0]?.title ?? NAV_SECTIONS[0]?.title ?? null;
   const seccionActiva = encontrarSeccionActiva(pathname, seccionesPlataforma, NAV_SECTIONS);
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(seccionActiva?.seccionTitle ?? primeraSeccion);
   const [grupoAbierto, setGrupoAbierto] = useState<string | null>(seccionActiva?.grupoLabel ?? null);
+
+  const todosLosItems: NavItem[] = [
+    ...seccionesPlataforma.flatMap((s) => s.groups.flatMap((g) => g.items)),
+    ...NAV_SECTIONS.flatMap((s) => s.items),
+  ];
+  const favoritosVisibles = favoritos
+    .map((href) => todosLosItems.find((i) => i.href === href))
+    .filter((i): i is NavItem => i !== undefined && puedeVer(modulosPermitidos, i.href));
 
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
@@ -59,12 +117,6 @@ function SidebarContents({
             {expanded && <span className="text-sm font-medium">Colapsar menú</span>}
           </button>
         </ConTooltip>
-      )}
-
-      {expanded && (
-        <p className="mt-1 mb-2 px-3 text-sm font-medium text-foreground">
-          Ecomfive Business OS
-        </p>
       )}
 
       {puedeVer(modulosPermitidos, "/") && (
@@ -82,6 +134,51 @@ function SidebarContents({
             {expanded && <span>Dashboard</span>}
           </Link>
         </ConTooltip>
+      )}
+
+      {puedeVer(modulosPermitidos, "/notificaciones") && (
+        <ConTooltip etiqueta="Centro de notificaciones" mostrar={!expanded}>
+          <Link
+            href="/notificaciones"
+            onClick={onNavigate}
+            className={
+              pathname === "/notificaciones"
+                ? "flex w-full items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
+                : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            }
+          >
+            <NotificacionesIcon className="h-5 w-5 shrink-0" />
+            {expanded && <span className="flex-1">Centro de notificaciones</span>}
+            {totalPendientes > 0 && (
+              <span className="rounded-full bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning tabular-nums">
+                {totalPendientes}
+              </span>
+            )}
+          </Link>
+        </ConTooltip>
+      )}
+
+      {expanded && (
+        <>
+          <p className="mt-4 mb-1 px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Accesos rápidos
+          </p>
+          {favoritosVisibles.length === 0 ? (
+            <p className="px-3 text-xs text-muted-foreground">Marca una página con ☆ para tenerla aquí.</p>
+          ) : (
+            <div className="flex flex-col gap-0.5">
+              {favoritosVisibles.map((item) => (
+                <ItemHoja
+                  key={item.href}
+                  item={item}
+                  activo={pathname === item.href}
+                  esFavorito
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {expanded && (
@@ -150,23 +247,15 @@ function SidebarContents({
                       </button>
                       {grupoOpen && (
                         <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-4">
-                          {itemsVisibles.map((item) => {
-                            const active = pathname === item.href;
-                            return (
-                              <Link
-                                key={item.label}
-                                href={item.href!}
-                                onClick={onNavigate}
-                                className={
-                                  active
-                                    ? "rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-                                    : "rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
-                                }
-                              >
-                                {item.label}
-                              </Link>
-                            );
-                          })}
+                          {itemsVisibles.map((item) => (
+                            <ItemHoja
+                              key={item.label}
+                              item={item}
+                              activo={pathname === item.href}
+                              esFavorito={!!item.href && favoritos.includes(item.href)}
+                              onNavigate={onNavigate}
+                            />
+                          ))}
                         </div>
                       )}
                     </div>
@@ -208,36 +297,15 @@ function SidebarContents({
             </ConTooltip>
             {expanded && isOpen && (
               <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-6">
-                {itemsVisibles.map((item) => {
-                  if (item.pronto || !item.href) {
-                    return (
-                      <span
-                        key={item.label}
-                        className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground/60"
-                      >
-                        {item.label}
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                          Pronto
-                        </span>
-                      </span>
-                    );
-                  }
-                  const active = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      onClick={onNavigate}
-                      className={
-                        active
-                          ? "rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-                          : "rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
-                      }
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
+                {itemsVisibles.map((item) => (
+                  <ItemHoja
+                    key={item.label}
+                    item={item}
+                    activo={pathname === item.href}
+                    esFavorito={!!item.href && favoritos.includes(item.href)}
+                    onNavigate={onNavigate}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -251,10 +319,14 @@ export function Sidebar({
   modulosPermitidos,
   usuario,
   seccionesPlataforma,
+  favoritos,
+  totalPendientes,
 }: {
   modulosPermitidos?: string[] | null;
   usuario: UsuarioActual | null;
   seccionesPlataforma: NavSectionAnidada[];
+  favoritos: string[];
+  totalPendientes: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -293,8 +365,10 @@ export function Sidebar({
           onToggle={toggleExpanded}
           modulosPermitidos={modulosPermitidos}
           seccionesPlataforma={seccionesPlataforma}
+          favoritos={favoritos}
+          totalPendientes={totalPendientes}
         />
-        {usuario && <CuentaMenu usuario={usuario} expanded={expanded} />}
+        {usuario && <CuentaFooter usuario={usuario} expanded={expanded} />}
       </aside>
 
       {/* Botón hamburguesa — móvil */}
@@ -337,8 +411,10 @@ export function Sidebar({
               onNavigate={() => setMobileOpen(false)}
               modulosPermitidos={modulosPermitidos}
               seccionesPlataforma={seccionesPlataforma}
+              favoritos={favoritos}
+              totalPendientes={totalPendientes}
             />
-            {usuario && <CuentaMenu usuario={usuario} expanded />}
+            {usuario && <CuentaFooter usuario={usuario} expanded />}
           </div>
           <button
             aria-label="Cerrar menú"

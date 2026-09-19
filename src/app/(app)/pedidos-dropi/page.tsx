@@ -171,11 +171,11 @@ export default async function PedidosDropiPage({
                     <tr
                       key={o.referencia_externa}
                       className={`border-b last:border-0 ${
-                        alerta ? "border-red-200 bg-red-50 text-red-900" : "border-border/60"
+                        alerta ? "border-destructive/30 bg-destructive-soft text-destructive" : "border-border/60"
                       }`}
                     >
                       <td className="py-2 pr-3 pl-4">{formatearFecha(o.fecha)}</td>
-                      <td className={`py-2 pr-3 ${alerta ? "text-red-700" : "text-muted-foreground"}`}>
+                      <td className={`py-2 pr-3 ${alerta ? "text-destructive" : "text-muted-foreground"}`}>
                         {formatearFechaHora(o.fecha_hora)}
                       </td>
                       <td className="py-2 pr-3 font-medium">

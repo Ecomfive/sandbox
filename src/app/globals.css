@@ -41,10 +41,29 @@
   --font-sans: var(--font-manrope);
 }
 
-/* Interface is light-only by decision — do not add a dark media query back
-   without checking with the user first. */
 :root {
   color-scheme: light;
+}
+
+/* Modo oscuro manual (interruptor en el pie del menú), no por preferencia del sistema —
+   se activa poniendo data-theme="dark" en <html> (ver src/components/theme-toggle.tsx). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #18181b;
+  --foreground: #f4f4f5;
+  --card: #232326;
+  --muted: #2a2a2e;
+  --muted-foreground: #a1a1aa;
+  --border: #38383d;
+  --accent: #3f3f46;
+  --accent-hover: #4b4b52;
+  --accent-foreground: #f4f4f5;
+  --success: #4ade80;
+  --success-soft: #14532d;
+  --warning: #fbbf24;
+  --warning-soft: #452a04;
+  --destructive: #fb7185;
+  --destructive-soft: #4c0519;
 }
 
 body {
