@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";
+import { BotonCompartir } from "@/components/compartir/boton-compartir";
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import { useEtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { anilloFoco } from "@/components/ui/field";
@@ -38,7 +39,7 @@ export function BarraMigas({
   const router = useRouter();
   const etiquetaDetalle = useEtiquetaMiga();
   const ruta = rutaActual ?? pathname;
-  const { migas, favoritoHref } = useMemo(
+  const { migas, favoritoHref, moduloHref, moduloEtiqueta } = useMemo(
     () => construirMigas(ruta, seccionesPlataforma, NAV_SECTIONS, etiquetaDetalle),
     [ruta, seccionesPlataforma, etiquetaDetalle]
   );
@@ -111,8 +112,13 @@ export function BarraMigas({
             <FavoritoToggle href={favoritoHref} activo={favoritos.includes(favoritoHref)} variante="miga" />
           )}
         </div>
-        {/* Acciones de la página: mismo lugar en todas las secciones. */}
-        <div id="acciones-encabezado" className="flex shrink-0 items-center gap-2" />
+        {/* Acciones de la página: mismo lugar en todas las secciones; Compartir siempre es la última. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <div id="acciones-encabezado" className="flex items-center gap-2" />
+          {moduloHref && moduloEtiqueta && (
+            <BotonCompartir key={ruta} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />
+          )}
+        </div>
       </div>
     </div>
   );

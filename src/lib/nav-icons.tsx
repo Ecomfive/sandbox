@@ -242,6 +242,17 @@ export function AgruparIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Persona con un "+": compartir / dar acceso. */
+export function CompartirIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="9.5" cy="8" r="3.5" />
+      <path d="M2.5 20a7 7 0 0 1 14 0" />
+      <path d="M19 8v6M16 11h6" />
+    </Icon>
+  );
+}
+
 export function FlechaIzquierdaIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
