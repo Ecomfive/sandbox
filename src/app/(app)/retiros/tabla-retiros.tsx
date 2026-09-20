@@ -1,5 +1,6 @@
 "use client";
 
+import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -248,13 +249,8 @@ export function TablaRetiros({
         columnas={{ defs: COLUMNAS, estado: columnasGuardadas, cambiar: cambiarColumnas }}
       />
 
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label="Tabla de retiros, desplazable horizontalmente con las flechas izquierda y derecha"
-        className="min-w-0 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
-      >
-        <table className="w-full min-w-[42rem] border-collapse text-sm">
+      <ContenedorTabla ariaLabel="Tabla de retiros">
+        <table className="tabla-datos w-full min-w-[42rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
               {columnasVisibles.map((columna) => (
@@ -299,7 +295,7 @@ export function TablaRetiros({
             <tbody>{visibles.map((fila) => filaRetiro(fila))}</tbody>
           )}
         </table>
-      </div>
+      </ContenedorTabla>
       {/* Anuncia a lectores de pantalla cuántos retiros se ven cuando cambian los filtros, los grupos o los cerrados. */}
       <p role="status" className="sr-only">
         {retiros.length > 0

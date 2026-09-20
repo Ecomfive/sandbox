@@ -104,6 +104,17 @@ convenciones técnicas del código.
   `formatearValor` da un nombre legible a valores que ordenan bien pero se leen
   mal (una fecha ISO). No pongas `total` si sumar mezclaría cosas distintas
   (entradas y salidas).
+- **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
+  `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
+  y la `<table>` lleva la clase `tabla-datos`; los estilos están en
+  `globals.css`. La densidad (Cómoda o Compacta, en el menú «Columnas») la elige
+  cada persona y vale para todas las tablas (`densidad-filas-v1`). La barra de
+  herramientas queda fija arriba al bajar la página y, si la tabla cabe sin
+  desplazarse de lado, su encabezado queda fijo debajo de ella; si es más ancha
+  que su tarjeta se desplaza de lado (como región con teclado) y el encabezado no
+  se fija, porque un encabezado fijo no funciona dentro de una caja que se
+  desplaza de lado. No pongas `overflow-hidden` en una tarjeta que contenga una
+  tabla: rompe lo fijo.
 - **Borde de los campos de formulario.** Los `input`, `select` y `textarea` usan
   `fieldClass` / `fieldClassSm` (`src/components/ui/field.ts`), que llevan
   `border-border-control` (`--border-control`: 3:1 contra el fondo, WCAG 1.4.11).

@@ -4,9 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ArrastrarIcon, ColumnasIcon } from "@/lib/nav-icons";
+import { DENSIDADES } from "@/lib/tabla/densidad";
+import { useDensidad } from "./densidad";
 import type { ColumnaDef, EstadoColumnas } from "./ganchos";
 
-/** Menú "Columnas": casilla para ocultar, arrastrar (o flechas) para reordenar. Cada persona guarda el suyo. */
+/**
+ * Menú "Columnas": casilla para ocultar, arrastrar (o flechas) para reordenar, y la densidad de las filas
+ * (cómoda o compacta, para todas las tablas). Cada persona guarda lo suyo.
+ */
 export function MenuColumnas({
   columnas,
   estado,
@@ -18,6 +23,7 @@ export function MenuColumnas({
 }) {
   const [abierto, setAbierto] = useState(false);
   const [arrastrando, setArrastrando] = useState<string | null>(null);
+  const [densidad, cambiarDensidad] = useDensidad();
   const contenedorRef = useRef<HTMLDivElement>(null);
   const botonRef = useRef<HTMLButtonElement>(null);
   const porId = new Map(columnas.map((c) => [c.id, c]));
@@ -66,7 +72,7 @@ export function MenuColumnas({
 
   return (
     <div ref={contenedorRef} className="relative">
-      <Tooltip texto="Mostrar y ordenar columnas">
+      <Tooltip texto="Columnas y densidad">
         <button
           ref={botonRef}
           type="button"
@@ -129,6 +135,24 @@ export function MenuColumnas({
               </div>
             );
           })}
+          <div role="group" aria-label="Densidad de las filas" className="mt-1 border-t border-border p-1">
+            <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Densidad de las filas</p>
+            <div className="flex gap-1 px-1 pb-1">
+              {DENSIDADES.map(({ valor, etiqueta }) => (
+                <button
+                  key={valor}
+                  type="button"
+                  aria-pressed={densidad === valor}
+                  onClick={() => cambiarDensidad(valor)}
+                  className={`min-h-8 flex-1 rounded-md px-2 py-1 text-xs font-medium ${anilloFoco} ${
+                    densidad === valor ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border"
+                  }`}
+                >
+                  {etiqueta}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

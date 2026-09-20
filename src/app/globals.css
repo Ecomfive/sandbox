@@ -96,6 +96,33 @@ body {
   }
 }
 
+/* Tablas de datos (ver ContenedorTabla). Alto de la barra de herramientas, que queda fija arriba. */
+:root {
+  --alto-barra-tabla: 45px;
+}
+
+table.tabla-datos thead th {
+  background: var(--muted);
+}
+
+/* Densidad compacta: filas más bajas. Elegida por cada persona en el menú "Columnas". */
+[data-densidad="compacta"] table.tabla-datos :is(td, th) {
+  padding-block: 0.25rem;
+}
+
+/* Con la barra y el encabezado fijos, el foco de teclado no debe quedar tapado por ellos (WCAG 2.4.11):
+   al enfocar una fila, el navegador deja este margen libre arriba. */
+html {
+  scroll-padding-top: 6rem;
+}
+
+/* Encabezado fijo bajo la barra de herramientas mientras se baja la página. */
+[data-encabezado-fijo] table.tabla-datos thead th {
+  position: sticky;
+  top: var(--alto-barra-tabla);
+  z-index: 10;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
