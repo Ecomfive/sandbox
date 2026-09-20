@@ -130,7 +130,7 @@ export default async function RetirosPage() {
               </span>
             </p>
           )}
-          <Tooltip texto="Actualiza los retiros con la información más reciente de Dropi.">
+          <Tooltip texto="Actualizar desde Dropi">
             <a
               href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
               target="_blank"

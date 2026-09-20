@@ -112,10 +112,10 @@ export function BotonCerrados({
   alAlternar: () => void;
 }) {
   const titulo = forzadoPorFiltro
-    ? "Se ven porque el filtro de Estado incluye Cerrado."
+    ? "Lo pide el filtro de Estado."
     : visibles
-      ? "Oculta rápidamente los retiros cerrados."
-      : "Muestra rápidamente los retiros cerrados.";
+      ? "Ocultar cerrados"
+      : "Mostrar cerrados";
   const mostrarInsignia = !visibles && ocultos > 0;
   // El nombre accesible contiene el texto visible ("Cerrados") y suma lo que solo se ve como insignia o tooltip.
   const nombre = forzadoPorFiltro
@@ -226,7 +226,7 @@ export function BotonAgrupar({
 
   return (
     <div ref={contenedorRef} className="relative">
-      <Tooltip texto="Agrupa los retiros por estado, plataforma, destino y más.">
+      <Tooltip texto="Agrupar por campo">
         <button
           ref={botonRef}
           type="button"

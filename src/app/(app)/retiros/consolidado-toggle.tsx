@@ -13,7 +13,7 @@ export function ConsolidadoToggle({ id, consolidado }: { id: string; consolidado
   const [pending, startTransition] = useTransition();
 
   return (
-    <Tooltip texto={consolidado ? "Marca este retiro como pendiente de consolidar." : "Marca este retiro como consolidado."}>
+    <Tooltip texto={consolidado ? "Marcar como pendiente" : "Marcar como consolidado"}>
       <button
         type="button"
         disabled={pending}

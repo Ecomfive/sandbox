@@ -365,7 +365,7 @@ export function BotonFiltrosRetiros({
 
   return (
     <>
-      <Tooltip texto="Filtra rápidamente los retiros por cualquier campo.">
+      <Tooltip texto="Filtrar retiros">
         <button
           ref={botonRef}
           type="button"

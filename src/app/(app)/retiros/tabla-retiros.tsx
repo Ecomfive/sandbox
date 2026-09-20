@@ -288,7 +288,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
           alAbrir={() => setMenuAbierto(false)}
         />
         <div className="relative">
-          <Tooltip texto="Elige, oculta y reordena las columnas de la tabla.">
+          <Tooltip texto="Mostrar y ordenar columnas">
             <button
               ref={botonColumnasRef}
               type="button"

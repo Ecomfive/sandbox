@@ -48,7 +48,7 @@ export function FavoritoToggle({
 
   if (!enMiga) return boton;
   return (
-    <Tooltip texto={activo ? "Quita esta página de tus accesos rápidos." : "Marca esta página como favorita: la tendrás en Accesos rápidos del menú."}>
+    <Tooltip texto={activo ? "Quitar de favoritos" : "Marcar como favorito"}>
       {boton}
     </Tooltip>
   );

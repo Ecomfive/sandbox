@@ -54,9 +54,11 @@ convenciones técnicas del código.
   (`src/lib/nav-data.ts`) y la ruta (`src/lib/migas.ts`): una página nueva del
   menú aparece sola; una subpágina fija se agrega a `SUBPAGINAS`; una página de
   detalle renderiza `<EtiquetaMiga texto="Retiro #0009" />`. No pongas enlaces
-  "← Volver" a mano. Los botones de ícono explican qué hacen con
-  `<Tooltip texto="...">` (`src/components/ui/tooltip.tsx`, una frase que dice
-  qué hace), no con `title=`.
+  "← Volver" a mano: las migas ya traen su botón de volver (historial del
+  navegador). Los botones de ícono explican qué hacen con
+  `<Tooltip texto="...">` (`src/components/ui/tooltip.tsx`), no con `title=`; el
+  texto es corto y preciso (2 a 4 palabras, verbo en infinitivo: "Filtrar
+  retiros", "Mostrar cerrados").
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.
