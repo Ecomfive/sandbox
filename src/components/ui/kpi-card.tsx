@@ -10,10 +10,13 @@ const tonos: Record<Tono, string> = {
 /** Grilla responsiva para tarjetas de indicadores — nunca se cortan ni desbordan, a cualquier ancho.
  * `min-w-0` es necesario porque este grid suele vivir dentro de un contenedor flex-col: sin eso,
  * un hijo flex no se encoge por debajo del ancho "natural" de sus columnas y la página se corta.
- * Cada tarjeta crece hasta 20rem y no más: en una página ancha, dos o tres tarjetas no se estiran
- * a media pantalla cada una. */
+ * Cada tarjeta mide entre 12rem y 20rem: en una página ancha, dos o tres tarjetas no se estiran a media
+ * pantalla cada una. (No es un grid con `minmax(12rem, 20rem)`: ahí el navegador cuenta las columnas con
+ * el máximo y, en un ancho intermedio, deja apiladas tarjetas que sí caben en fila.) */
 export function KpiGrid({ children }: { children: ReactNode }) {
-  return <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(12rem,20rem))] gap-3">{children}</div>;
+  return (
+    <div className="flex min-w-0 flex-wrap gap-3 [&>*]:max-w-80 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">{children}</div>
+  );
 }
 
 /** Agrupa un KpiGrid bajo una barra de título — la tarjeta contenedora queda con su propio
