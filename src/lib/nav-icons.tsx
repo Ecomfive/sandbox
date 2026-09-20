@@ -409,6 +409,25 @@ export function PapeleraIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Marcador: vistas guardadas de una tabla. */
+export function VistasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M6 4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17l-6-4-6 4V4Z" />
+    </Icon>
+  );
+}
+
+/** Dos eslabones: copiar el enlace a lo que se ve. */
+export function EnlaceIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
+      <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
+    </Icon>
+  );
+}
+
 /** Dos flechas cruzadas: acción de "conciliar" un retiro (ir a la ficha a cerrarlo/consolidarlo). */
 export function ConciliarIcon(props: SVGProps<SVGSVGElement>) {
   return (
