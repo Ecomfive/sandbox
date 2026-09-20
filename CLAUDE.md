@@ -58,7 +58,10 @@ convenciones técnicas del código.
   navegador). Los botones de ícono explican qué hacen con
   `<Tooltip texto="...">` (`src/components/ui/tooltip.tsx`), no con `title=`; el
   texto es corto y preciso (2 a 4 palabras, verbo en infinitivo: "Filtrar
-  retiros", "Mostrar cerrados").
+  retiros", "Mostrar cerrados"). El botón **Compartir** de la misma franja
+  (`src/components/compartir/`) muestra quién tiene acceso a la sección: sale de
+  los roles (`permisos_rol` + `perfiles`, ver `src/lib/compartir-actions.ts`), es
+  solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles.
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.

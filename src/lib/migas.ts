@@ -10,7 +10,12 @@ export interface Migas {
   migas: Miga[];
   /** Página del menú que se puede marcar como favorita desde las migas (solo la página actual si es un módulo). */
   favoritoHref: string | null;
+  /** Módulo (y su nombre) al que pertenece la página: de él salen los permisos que muestra "Compartir". */
+  moduloHref: string | null;
+  moduloEtiqueta: string | null;
 }
+
+const SIN_MIGAS: Migas = { migas: [], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
 
 /** Páginas que no están en el menú lateral pero tienen su propio título. */
 const TITULOS_APARTE: Record<string, string> = {
@@ -74,12 +79,28 @@ export function construirMigas(
   const ruta = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 
   const titulo = TITULOS_APARTE[ruta];
-  if (titulo) return { migas: [{ etiqueta: titulo }], favoritoHref: null };
+  if (titulo) {
+    // "Sin acceso" no es un módulo: no hay permisos que mostrar.
+    const esModulo = ruta !== "/sin-acceso";
+    return {
+      migas: [{ etiqueta: titulo }],
+      favoritoHref: null,
+      moduloHref: esModulo ? ruta : null,
+      moduloEtiqueta: esModulo ? titulo : null,
+    };
+  }
 
   const modulos = modulosDeNav(seccionesPlataforma, navSections);
 
   const exacto = modulos.find((m) => m.href === ruta);
-  if (exacto) return { migas: rutaDeModulo(exacto, false), favoritoHref: exacto.href };
+  if (exacto) {
+    return {
+      migas: rutaDeModulo(exacto, false),
+      favoritoHref: exacto.href,
+      moduloHref: exacto.href,
+      moduloEtiqueta: exacto.label,
+    };
+  }
 
   // Ruta más larga primero, para que un módulo con prefijo común no se lleve la subpágina de otro.
   const padre = modulos
@@ -87,8 +108,13 @@ export function construirMigas(
     .sort((a, b) => b.href.length - a.href.length)[0];
   if (padre) {
     const etiqueta = SUBPAGINAS[ruta] ?? etiquetaDetalle ?? "Detalle";
-    return { migas: [...rutaDeModulo(padre, true), { etiqueta }], favoritoHref: null };
+    return {
+      migas: [...rutaDeModulo(padre, true), { etiqueta }],
+      favoritoHref: null,
+      moduloHref: padre.href,
+      moduloEtiqueta: padre.label,
+    };
   }
 
-  return { migas: [], favoritoHref: null };
+  return SIN_MIGAS;
 }
