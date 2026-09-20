@@ -1,8 +1,9 @@
+// El borde de los campos usa border-control (3:1 contra el fondo), no el border de divisores.
 export const fieldClass =
-  "rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground focus:border-foreground";
+  "rounded-md border border-border-control bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground focus:border-foreground";
 
 export const fieldClassSm =
-  "rounded border border-border bg-card px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-foreground focus:border-foreground";
+  "rounded border border-border-control bg-card px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-foreground focus:border-foreground";
 
 /** Anillo de foco visible para botones y enlaces (2px, contraste 17:1 con el fondo). */
 export const anilloFoco =
