@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
@@ -10,7 +11,6 @@ import { crearRol } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { RecursosHumanosIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -59,17 +59,11 @@ export default async function UsuariosPage() {
   }
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <RecursosHumanosIcon className="h-5 w-5 text-muted-foreground" />
-          Usuarios y roles
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Invita personas al sistema y define qué módulos puede ver cada rol — y si puede solo
-          verlos o también crear y modificar cosas ahí.
-        </p>
-      </div>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Usuarios y roles" oculto>
+        Invita personas al sistema y define qué módulos puede ver cada rol — y si puede solo
+        verlos o también crear y modificar cosas ahí.
+      </EncabezadoPagina>
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Invitar usuario</h2>

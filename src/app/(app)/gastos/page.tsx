@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -9,7 +10,6 @@ import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
-import { GastoIcon } from "@/lib/nav-icons";
 import { CATEGORIAS } from "./def-gastos";
 import { TablaGastos } from "./tabla-gastos";
 
@@ -39,16 +39,10 @@ export default async function GastosPage() {
   }
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <GastoIcon className="h-5 w-5 text-muted-foreground" />
-          Nómina y gastos
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — registro de gastos operativos, incluida la nómina.
-        </p>
-      </div>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Nómina y gastos" oculto>
+        {pais.nombre} — registro de gastos operativos, incluida la nómina.
+      </EncabezadoPagina>
 
       <div>
         {gastosMes.length === 0 ? (

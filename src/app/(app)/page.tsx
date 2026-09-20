@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -14,7 +15,6 @@ import { formatearMoneda } from "@/lib/formato";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { DashboardIcon } from "@/lib/nav-icons";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -194,15 +194,9 @@ export default async function Home({
   return (
     <Pagina ancho="ancha">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <DashboardIcon className="h-5 w-5 text-muted-foreground" />
-            Dashboard operativo
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {pais.nombre} — {periodo.etiqueta}
-          </p>
-        </div>
+        <EncabezadoPagina titulo="Dashboard operativo" oculto>
+          {pais.nombre} — {periodo.etiqueta}
+        </EncabezadoPagina>
         <PeriodPicker />
       </div>
 

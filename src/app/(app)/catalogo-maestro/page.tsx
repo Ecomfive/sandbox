@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
@@ -67,18 +68,12 @@ export default async function CatalogoMaestroPage() {
   for (const s of lista) conteo[s.estado as keyof typeof conteo]++;
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-8">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <CatalogoIcon className="h-5 w-5 text-muted-foreground" />
-          Catálogo maestro de SKU
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Un SKU maestro representa un producto físico, sin importar en qué plataforma se venda.
-          Los combos se arman con varios SKU maestros simples y una cantidad de cada uno. Todo pasa
-          por revisión antes de quedar aprobado.
-        </p>
-      </div>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Catálogo maestro de SKU" icono={CatalogoIcon}>
+        Un SKU maestro representa un producto físico, sin importar en qué plataforma se venda.
+        Los combos se arman con varios SKU maestros simples y una cantidad de cada uno. Todo pasa
+        por revisión antes de quedar aprobado.
+      </EncabezadoPagina>
 
       <KpiGroup titulo="Estado del catálogo">
         <KpiGrid>

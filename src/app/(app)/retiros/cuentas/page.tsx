@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -19,9 +20,9 @@ export default async function CuentasRetiroPage() {
     .order("numero", { ascending: true });
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">Cuentas destino</h1>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Cuentas destino" oculto />
+      <div className="flex justify-end">
         <VentanaCuentaRetiro paisId={pais.id} />
       </div>
 

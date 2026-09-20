@@ -3,7 +3,7 @@ import { Skeleton, SkeletonKpiGroup, SkeletonTable } from "@/components/ui/skele
 
 export default function CargandoCatalogoMaestro() {
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-8">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
       <div>
         <Skeleton className="h-5 w-48" />
         <Skeleton className="mt-2 h-4 w-72" />
