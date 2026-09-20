@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -10,7 +11,6 @@ import { TablaPlataformas } from "./tabla-plataformas";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { FormularioConToast } from "@/components/ui/toast";
-import { ConfiguracionIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -40,14 +40,10 @@ export default async function ConfiguracionPage() {
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   return (
-    <Pagina ancho="angosta" className="flex flex-col gap-10">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <ConfiguracionIcon className="h-5 w-5 text-muted-foreground" />
-          Configuración del sistema
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{pais.nombre} — solo visible para administradores.</p>
-      </div>
+    <Pagina ancho="angosta" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Configuración del sistema" oculto>
+        {pais.nombre} — solo visible para administradores.
+      </EncabezadoPagina>
 
       <div className="flex flex-col gap-3">
         <div>

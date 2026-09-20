@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -5,7 +6,6 @@ import { requireModulo } from "@/lib/auth";
 import { crearDropshipper, registrarInteraccion } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { DropshipperIcon } from "@/lib/nav-icons";
 import { TIPOS_INTERACCION, type FilaDropshipper, type FilaInteraccion } from "./def-crm";
 import { ListaDropshippers } from "./lista-dropshippers";
 import { TablaInteracciones } from "./tabla-interacciones";
@@ -52,17 +52,11 @@ export default async function CrmDropshippersPage() {
   }));
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <DropshipperIcon className="h-5 w-5 text-muted-foreground" />
-          CRM Dropshippers
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — directorio y bitácora de comunicación con dropshippers. El volumen de
-          ventas se ingresa a mano hasta conectar las órdenes de Dropi.
-        </p>
-      </div>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="CRM Dropshippers" oculto>
+        {pais.nombre} — directorio y bitácora de comunicación con dropshippers. El volumen de
+        ventas se ingresa a mano hasta conectar las órdenes de Dropi.
+      </EncabezadoPagina>
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Agregar dropshipper</h2>

@@ -30,6 +30,6 @@ export function Pagina({
   children: ReactNode;
 }) {
   return (
-    <main className={`mx-auto w-full px-6 py-10 ${ANCHOS[ancho]} ${className}`.trim()}>{children}</main>
+    <main className={`mx-auto w-full px-6 py-6 ${ANCHOS[ancho]} ${className}`.trim()}>{children}</main>
   );
 }

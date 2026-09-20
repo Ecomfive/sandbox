@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
@@ -33,13 +34,10 @@ export default async function AuditoriaPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Historial de auditoría</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quién modificó qué en operaciones sensibles — retiros, márgenes de productos y saldos de
-          wallet. Los últimos 200 movimientos.
-        </p>
-      </div>
+      <EncabezadoPagina titulo="Historial de auditoría" oculto>
+        Quién modificó qué en operaciones sensibles — retiros, márgenes de productos y saldos de
+        wallet. Los últimos 200 movimientos.
+      </EncabezadoPagina>
 
       <TablaAuditoria eventos={filas} />
     </Pagina>

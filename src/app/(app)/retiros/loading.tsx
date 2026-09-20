@@ -3,26 +3,19 @@ import { Skeleton, SkeletonKpiGroup, SkeletonTable } from "@/components/ui/skele
 
 export default function CargandoRetiros() {
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
-      <div>
-        <Skeleton className="h-5 w-48" />
-        <Skeleton className="mt-2 h-4 w-80" />
-      </div>
-      <div>
-        <Skeleton className="h-4 w-56" />
-        <div className="mt-3">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <div className="flex flex-wrap gap-3">
+        <div className="min-w-0 flex-[3_1_39rem]">
           <SkeletonKpiGroup cantidad={4} />
         </div>
-      </div>
-      <div>
-        <Skeleton className="h-5 w-32" />
-        <div className="mt-3">
+        <div className="min-w-0 flex-[2_1_39rem]">
           <SkeletonKpiGroup cantidad={3} />
         </div>
-        <Skeleton className="mt-4 h-20 w-full rounded-lg" />
       </div>
       <div>
-        <Skeleton className="h-5 w-32" />
+        <div className="flex justify-end">
+          <Skeleton className="h-9 w-28 rounded-full" />
+        </div>
         <div className="mt-3">
           <SkeletonTable filas={5} columnas={5} />
         </div>

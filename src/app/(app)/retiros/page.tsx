@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -119,76 +120,75 @@ export default async function RetirosPage() {
   }));
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Conciliación de Retiros</h1>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Conciliación de Retiros" oculto />
+
+      {/* Saldos y resumen en una sola franja: lado a lado cuando caben, uno sobre otro si no. */}
+      <div className="flex flex-wrap gap-3">
+        <KpiGroup
+          className="flex-[3_1_39rem]"
+          titulo="Saldo de wallet"
+          accion={
+            <span className="flex items-center gap-2 font-normal">
+              {ultimaActualizacion && (
+                <span>
+                  Última actualización:{" "}
+                  <span className="tabular-nums">
+                    {formatearFechaHoraCompleta(ultimaActualizacion, pais.codigo)}
+                  </span>
+                </span>
+              )}
+              <Tooltip texto="Actualizar desde Dropi">
+                <a
+                  href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Actualizar retiros desde Dropi"
+                  className="inline-flex items-center justify-center rounded-md border border-border bg-card p-1 text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <ActualizarIcon className="h-3.5 w-3.5" />
+                </a>
+              </Tooltip>
+            </span>
+          }
+        >
+          <KpiGrid>
+            {(plataformas ?? []).map((p) => {
+              const ultimo = ultimoSaldoPorPlataforma.get(p.id);
+              const esAutomatico = p.nombre === "Dropi";
+              return (
+                <KpiCard
+                  key={p.id}
+                  titulo={esAutomatico ? null : p.nombre}
+                  valor={
+                    <span className="inline-flex items-center gap-1.5">
+                      {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
+                      {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
+                    </span>
+                  }
+                  subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
+                />
+              );
+            })}
+          </KpiGrid>
+        </KpiGroup>
+
+        <KpiGroup titulo="Resumen de retiros" className="flex-[2_1_39rem]">
+          <KpiGrid>
+            <KpiCard titulo="Abiertos" valor={abiertos} />
+            <KpiCard titulo="Con novedad" valor={conNovedad} tono={conNovedad > 0 ? "destructive" : "neutral"} />
+            <KpiCard titulo="Cerrados este mes" valor={formatearMoneda(totalCerradoMes, pais.codigo)} />
+          </KpiGrid>
+        </KpiGroup>
       </div>
 
       <div>
-        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-          {ultimaActualizacion && (
-            <p className="text-xs text-muted-foreground">
-              Última actualización:{" "}
-              <span className="tabular-nums">
-                {formatearFechaHoraCompleta(ultimaActualizacion, pais.codigo)}
-              </span>
-            </p>
-          )}
-          <Tooltip texto="Actualizar desde Dropi">
-            <a
-              href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Actualizar retiros desde Dropi"
-              className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <ActualizarIcon className="h-4 w-4" />
-            </a>
-          </Tooltip>
-        </div>
-        <div className="mt-3">
-          <KpiGroup titulo="Saldo de wallet">
-            <KpiGrid>
-              {(plataformas ?? []).map((p) => {
-                const ultimo = ultimoSaldoPorPlataforma.get(p.id);
-                const esAutomatico = p.nombre === "Dropi";
-                return (
-                  <KpiCard
-                    key={p.id}
-                    titulo={esAutomatico ? null : p.nombre}
-                    valor={
-                      <span className="inline-flex items-center gap-1.5">
-                        {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
-                        {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
-                      </span>
-                    }
-                    subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
-                  />
-                );
-              })}
-            </KpiGrid>
-          </KpiGroup>
-        </div>
-      </div>
-
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold tracking-tight">Retiros</h2>
+        <div className="flex justify-end">
           <CrearRetiroPanel
             paisId={pais.id}
             plataformas={plataformasParaCrear}
             cuentas={cuentasRetiro ?? []}
           />
-        </div>
-
-        <div className="mt-3">
-          <KpiGroup titulo="Resumen">
-            <KpiGrid>
-              <KpiCard titulo="Abiertos" valor={abiertos} />
-              <KpiCard titulo="Con novedad" valor={conNovedad} tono={conNovedad > 0 ? "destructive" : "neutral"} />
-              <KpiCard titulo="Cerrados este mes" valor={formatearMoneda(totalCerradoMes, pais.codigo)} />
-            </KpiGrid>
-          </KpiGroup>
         </div>
 
         <TablaRetiros

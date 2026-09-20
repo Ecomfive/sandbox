@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -12,7 +13,6 @@ import { TablaPedidos, type FilaPedido } from "./tabla-pedidos";
 import { resolverPeriodo } from "@/lib/dashboard/periodo";
 import { linkClass } from "@/components/ui/link";
 import { AyudaContextual } from "@/components/ui/ayuda-contextual";
-import { PedidoIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -104,15 +104,9 @@ export default async function PedidosDropiPage({
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <PedidoIcon className="h-5 w-5 text-muted-foreground" />
-          Pedidos Dropi
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — órdenes reales extraídas del panel de proveedor de Dropi.
-        </p>
-      </div>
+      <EncabezadoPagina titulo="Pedidos Dropi" oculto>
+        {pais.nombre} — órdenes reales extraídas del panel de proveedor de Dropi.
+      </EncabezadoPagina>
 
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-end gap-3">

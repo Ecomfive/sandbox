@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -6,7 +7,6 @@ import { TablaProveedores } from "./tabla-proveedores";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { InteligenciaChart } from "@/components/charts/inteligencia-chart";
 import { agruparProductosTotalesPorMes, agruparProveedoresNuevosPorMes, soloAnio } from "@/lib/inteligencia/agregados";
-import { InteligenciaIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -54,17 +54,11 @@ export default async function InteligenciaCompetitivaPage() {
   const hayHistorialMensual = productosTotalesPorMes.length > 1;
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-8">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <InteligenciaIcon className="h-5 w-5 text-muted-foreground" />
-          Inteligencia competitiva
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — proveedores competidores vistos desde la cuenta dropshipper de Dropi. El
-          crecimiento se calcula comparando la última carga contra la anterior.
-        </p>
-      </div>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Inteligencia competitiva" oculto>
+        {pais.nombre} — proveedores competidores vistos desde la cuenta dropshipper de Dropi. El
+        crecimiento se calcula comparando la última carga contra la anterior.
+      </EncabezadoPagina>
 
       {totalProveedores === 0 ? (
         <div className="rounded-xl border border-border bg-card p-4">
