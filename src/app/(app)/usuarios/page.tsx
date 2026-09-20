@@ -1,18 +1,15 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { MODULOS } from "@/lib/modulos";
 import { InvitarForm } from "./invitar-form";
-import { RolSelect } from "./rol-select";
-import { ActivoToggle } from "./activo-toggle";
+import { TablaUsuarios } from "./tabla-usuarios";
 import { PermisoCheckbox } from "./permiso-checkbox";
 import { crearRol } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { RecursosHumanosIcon } from "@/lib/nav-icons";
-import { linkClass } from "@/components/ui/link";
 
 export const dynamic = "force-dynamic";
 
@@ -62,20 +59,15 @@ export default async function UsuariosPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <RecursosHumanosIcon className="h-5 w-5 text-muted-foreground" />
-            Usuarios y roles
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Invita personas al sistema y define qué módulos puede ver cada rol — y si puede solo
-            verlos o también crear y modificar cosas ahí.
-          </p>
-        </div>
-        <Link href="/usuarios/auditoria" className={linkClass}>
-          Historial de auditoría
-        </Link>
+      <div>
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+          <RecursosHumanosIcon className="h-5 w-5 text-muted-foreground" />
+          Usuarios y roles
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Invita personas al sistema y define qué módulos puede ver cada rol — y si puede solo
+          verlos o también crear y modificar cosas ahí.
+        </p>
       </div>
 
       <div>
@@ -87,32 +79,18 @@ export default async function UsuariosPage() {
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Usuarios</h2>
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[36rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">Correo</th>
-                <th className="py-2 pr-3 font-medium">Nombre</th>
-                <th className="py-2 pr-3 font-medium">Rol</th>
-                <th className="py-2 pr-3 font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(perfiles ?? []).map((p) => (
-                <tr key={p.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 font-medium">{p.email}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">{p.nombre ?? "—"}</td>
-                  <td className="py-2 pr-3">
-                    <RolSelect perfilId={p.id} rolIdActual={p.rol_id} roles={roles ?? []} />
-                  </td>
-                  <td className="py-2 pr-3">
-                    <ActivoToggle perfilId={p.id} activo={p.activo} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {(perfiles ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay usuarios invitados." />}
+        <div className="mt-3">
+          <TablaUsuarios
+            usuarios={(perfiles ?? []).map((p) => ({
+              id: p.id,
+              email: p.email,
+              nombre: p.nombre,
+              rolId: p.rol_id,
+              rolNombre: (roles ?? []).find((r) => r.id === p.rol_id)?.nombre ?? null,
+              activo: p.activo,
+            }))}
+            roles={roles ?? []}
+          />
         </div>
       </div>
 
