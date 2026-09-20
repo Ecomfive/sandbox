@@ -184,8 +184,23 @@ export function TablaRetiros({
       if (!guardado) return;
       const datos = JSON.parse(guardado) as { orden?: unknown[]; ocultas?: unknown[] };
       const ordenGuardado = (datos.orden ?? []).filter(esColumnaId);
-      const faltantes = ORDEN_DEFECTO.filter((id) => !ordenGuardado.includes(id));
-      setOrden([...ordenGuardado, ...faltantes]);
+      // Una columna nueva (agregada después de que alguien ya guardó su propio orden) se
+      // inserta junto a donde iría por defecto, en vez de siempre al final: se busca la
+      // columna por defecto más cercana hacia atrás que ya esté en el orden guardado.
+      const resultado = [...ordenGuardado];
+      ORDEN_DEFECTO.forEach((id, indiceDefecto) => {
+        if (resultado.includes(id)) return;
+        let posicionInsercion = resultado.length;
+        for (let i = indiceDefecto - 1; i >= 0; i--) {
+          const indice = resultado.indexOf(ORDEN_DEFECTO[i]);
+          if (indice !== -1) {
+            posicionInsercion = indice + 1;
+            break;
+          }
+        }
+        resultado.splice(posicionInsercion, 0, id);
+      });
+      setOrden(resultado);
       setOcultas(new Set((datos.ocultas ?? []).filter(esColumnaId).filter((id) => id !== "correlativo")));
     } catch {
       // localStorage puede fallar (modo privado, cuotas, etc.) — se usa el orden por defecto.
