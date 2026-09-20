@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -9,7 +10,6 @@ import { requireModulo } from "@/lib/auth";
 import { margenActual, type ProductoFila } from "@/lib/margen";
 import { TablaProductos } from "./tabla-productos";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { ProductoIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -77,20 +77,16 @@ export default async function ProductosPage({
 
   return (
     <Pagina ancho="ancha">
-      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-        <ProductoIcon className="h-5 w-5 text-muted-foreground" />
-        Productos y márgenes
-      </h1>
-      <p className="mt-1 mb-2 text-sm text-muted-foreground">
+      <EncabezadoPagina titulo="Productos y márgenes" oculto className="mb-2">
         {pais.nombre} — costo, precio de venta y margen mínimo por producto.
-      </p>
+      </EncabezadoPagina>
       {bajoMargen > 0 && (
-        <p className="mb-6 text-sm">
+        <p className="mb-4 text-sm">
           <Badge tone="destructive">{bajoMargen} producto{bajoMargen === 1 ? "" : "s"} bajo el margen mínimo</Badge>
         </p>
       )}
       {bajoMargen === 0 && conDatos > 0 && (
-        <p className="mb-6">
+        <p className="mb-4">
           <Badge tone="success">Todos los productos están sobre su margen mínimo</Badge>
         </p>
       )}

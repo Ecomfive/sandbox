@@ -78,7 +78,16 @@ convenciones técnicas del código.
   corrido; una tabla puede ocupar la pantalla. Las páginas de un mismo módulo
   (las pestañas) usan el mismo ancho. Un formulario suelto dentro de una página
   ancha se limita con `max-w-5xl` para que sus campos no se estiren. Las
-  pantallas de acceso (login, sin acceso) no usan `Pagina`.
+  pantallas de acceso (login, sin acceso) no usan `Pagina`. El margen
+  vertical de `Pagina` y el espacio entre bloques son de 24 px (`py-6`,
+  `gap-6`), no 40: la tabla debe verse sin bajar. El título de la página va con
+  `<EncabezadoPagina titulo="..." oculto>` (`src/components/ui/encabezado-pagina.tsx`)
+  cuando es igual al de las migas de pan (queda como `<h1>` solo para lectores de
+  pantalla y la descripción sigue visible); si dice algo que las migas no
+  dicen («Cargar extracto bancario»), va visible con su ícono. Un dato secundario
+  de un grupo de indicadores (la fecha de actualización) va en la franja del
+  `KpiGroup` (`accion`), no en una fila aparte; varios grupos comparten fila con
+  `className="flex-[3_1_39rem]"` dentro de un `flex flex-wrap`.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

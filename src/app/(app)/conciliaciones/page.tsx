@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -9,7 +10,6 @@ import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
 import { formatearMes, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { ConciliacionIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -64,14 +64,10 @@ export default async function ConciliacionesPage() {
 
   return (
     <Pagina ancho="media">
-      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-        <ConciliacionIcon className="h-5 w-5 text-muted-foreground" />
-        Conciliación banco vs. plataforma
-      </h1>
-      <p className="mt-1 mb-6 text-sm text-muted-foreground">
+      <EncabezadoPagina titulo="Conciliación banco vs. plataforma" oculto className="mb-4">
         Monto bancario = depósitos del extracto ya asignados a cada plataforma. Monto reportado
         por la plataforma se ingresa manualmente hasta que la extracción automática esté lista.
-      </p>
+      </EncabezadoPagina>
 
       {filas.length === 0 && (
         <EstadoVacio

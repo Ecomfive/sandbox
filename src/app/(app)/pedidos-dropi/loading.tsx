@@ -4,10 +4,7 @@ import { Skeleton, SkeletonKpiGroup, SkeletonTable } from "@/components/ui/skele
 export default function CargandoPedidosDropi() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Skeleton className="h-5 w-48" />
-        <Skeleton className="h-9 w-64 rounded-md" />
-      </div>
+      <Skeleton className="h-4 w-80" />
       <SkeletonKpiGroup cantidad={4} />
       <SkeletonTable filas={8} columnas={6} />
     </Pagina>

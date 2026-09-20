@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -51,15 +52,11 @@ export default async function ExtractosPage() {
   );
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
       <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <ExtractoIcon className="h-5 w-5 text-muted-foreground" />
-          Cargar extracto bancario
-        </h1>
-        <p className="mt-1 mb-4 text-sm text-muted-foreground">
+        <EncabezadoPagina titulo="Cargar extracto bancario" icono={ExtractoIcon} className="mb-4">
           Sube el archivo del banco, mapea las columnas y confirma para guardarlo.
-        </p>
+        </EncabezadoPagina>
         <div className="max-w-5xl">
           <ExtractoUploader pais={pais} />
         </div>

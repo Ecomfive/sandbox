@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -42,19 +43,15 @@ export default async function AlertasPage() {
   });
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
       <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <AlertaIcon className="h-5 w-5 text-muted-foreground" />
-          Inventario pendiente de retorno
-        </h1>
-        <p className="mt-1 mb-4 text-sm text-muted-foreground">
+        <EncabezadoPagina titulo="Inventario pendiente de retorno" icono={AlertaIcon} className="mb-4">
           Salidas menos entradas por producto, según lo cargado en{" "}
           <Link href="/inventario" className={linkClass}>
             Inventario
           </Link>
           . Generar una alerta la deja lista para el reclamo quincenal a la plataforma.
-        </p>
+        </EncabezadoPagina>
         <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[32rem] border-collapse text-sm">
             <thead>

@@ -1,3 +1,4 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -25,15 +26,12 @@ export default async function PatronesBancariosPage() {
   ]);
 
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Diccionario de patrones bancarios</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {pais.nombre} — cuando la descripción de un movimiento contiene uno de estos textos, el
-          sistema le asigna la plataforma sola al cargar el extracto. Se llena automáticamente cada
-          vez que asignas una plataforma a mano, pero también puedes agregar o afinar patrones aquí.
-        </p>
-      </div>
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Diccionario de patrones bancarios" oculto>
+        {pais.nombre} — cuando la descripción de un movimiento contiene uno de estos textos, el
+        sistema le asigna la plataforma sola al cargar el extracto. Se llena automáticamente cada
+        vez que asignas una plataforma a mano, pero también puedes agregar o afinar patrones aquí.
+      </EncabezadoPagina>
 
       <FormularioConToast
         action={crearPatron}

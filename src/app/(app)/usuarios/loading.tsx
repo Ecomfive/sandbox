@@ -3,7 +3,7 @@ import { Skeleton, SkeletonTable } from "@/components/ui/skeleton";
 
 export default function CargandoUsuarios() {
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
       <div>
         <Skeleton className="h-5 w-48" />
         <div className="mt-3">
