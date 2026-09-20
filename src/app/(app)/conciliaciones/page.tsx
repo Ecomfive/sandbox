@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -62,7 +63,7 @@ export default async function ConciliacionesPage() {
   const filas = Array.from(grupos.values()).sort((a, b) => b.periodo.localeCompare(a.periodo));
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10">
+    <Pagina ancho="media">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
         <ConciliacionIcon className="h-5 w-5 text-muted-foreground" />
         Conciliación banco vs. plataforma
@@ -149,6 +150,6 @@ export default async function ConciliacionesPage() {
           );
         })}
       </div>
-    </main>
+    </Pagina>
   );
 }

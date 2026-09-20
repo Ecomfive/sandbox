@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -41,7 +42,7 @@ export default async function AlertasPage() {
   });
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-10">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <AlertaIcon className="h-5 w-5 text-muted-foreground" />
@@ -89,6 +90,6 @@ export default async function AlertasPage() {
       </div>
 
       <TablaAlertas alertas={alertas} />
-    </main>
+    </Pagina>
   );
 }

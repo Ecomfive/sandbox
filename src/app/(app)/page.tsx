@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { getSerieInventarioComparada, getSerieVentasComparada, getSerieFinanzas } from "@/lib/dashboard/queries";
@@ -191,7 +192,7 @@ export default async function Home({
   ];
 
   return (
-    <main className="mx-auto w-full max-w-[1600px] px-8 py-10">
+    <Pagina ancho="ancha">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
@@ -246,6 +247,6 @@ export default async function Home({
       <div className="mt-6">
         <DashboardSecciones secciones={secciones} seccionInicial="ventas" />
       </div>
-    </main>
+    </Pagina>
   );
 }

@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
@@ -118,7 +119,7 @@ export default async function RetirosPage() {
   }));
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-10">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Conciliación de Retiros</h1>
       </div>
@@ -200,6 +201,6 @@ export default async function RetirosPage() {
       </div>
 
       <DropiSinVincular filas={sinVincular ?? []} codigoPais={pais.codigo} />
-    </main>
+    </Pagina>
   );
 }

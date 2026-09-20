@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
@@ -23,7 +24,7 @@ export default async function NotificacionesPage() {
   ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+    <Pagina ancho="media" className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
         <NotificacionesIcon className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
         <div>
@@ -41,6 +42,6 @@ export default async function NotificacionesPage() {
         sesionesDropi={sesionesDropi ?? []}
         codigoPais={pais.codigo}
       />
-    </main>
+    </Pagina>
   );
 }

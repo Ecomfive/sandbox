@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { MODULOS } from "@/lib/modulos";
+import { Pagina } from "@/components/ui/pagina";
 import { InvitarForm } from "./invitar-form";
 import { TablaUsuarios } from "./tabla-usuarios";
 import { PermisoCheckbox } from "./permiso-checkbox";
@@ -58,7 +59,7 @@ export default async function UsuariosPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-10">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <RecursosHumanosIcon className="h-5 w-5 text-muted-foreground" />
@@ -140,6 +141,6 @@ export default async function UsuariosPage() {
           {(roles ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay roles creados." />}
         </div>
       </div>
-    </main>
+    </Pagina>
   );
 }

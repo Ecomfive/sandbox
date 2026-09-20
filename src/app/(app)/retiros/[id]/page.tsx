@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { notFound } from "next/navigation";
 import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -73,7 +74,7 @@ export default async function RetiroDetallePage({
   const diferencia = retiro.monto_recibido !== null ? Number(retiro.monto_recibido) - aRecibir : null;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
+    <Pagina ancho="ficha" className="flex flex-col gap-6">
       <div>
         <EtiquetaMiga texto={`Retiro #${String(retiro.numero_correlativo).padStart(4, "0")}`} />
         <div className="flex flex-wrap items-center gap-3">
@@ -218,6 +219,6 @@ export default async function RetiroDetallePage({
           ))}
         </div>
       </div>
-    </main>
+    </Pagina>
   );
 }
