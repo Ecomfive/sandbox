@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { notFound } from "next/navigation";
 import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -43,7 +44,7 @@ export default async function DetalleProveedorCompetenciaPage({
   const actual = snapshots[0] ?? null;
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-10">
+    <Pagina ancho="angosta" className="flex flex-col gap-6">
       <div>
         <EtiquetaMiga texto={proveedor.tienda || proveedor.nombre} />
         <h1 className="text-xl font-semibold tracking-tight">{proveedor.tienda || proveedor.nombre}</h1>
@@ -129,6 +130,6 @@ export default async function DetalleProveedorCompetenciaPage({
           </div>
         </>
       )}
-    </main>
+    </Pagina>
   );
 }

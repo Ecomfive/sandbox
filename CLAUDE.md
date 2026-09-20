@@ -69,6 +69,16 @@ convenciones técnicas del código.
   los roles (`permisos_rol` + `perfiles`, ver `src/lib/accesos-actions.ts`), es
   solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles. Se
   llama «Accesos» y no «Compartir» porque no comparte ni da permisos.
+- **Ancho de las páginas.** El contenido de toda página (y de su `loading.tsx`,
+  para que no salte al cargar) va dentro de `<Pagina ancho="...">`
+  (`src/components/ui/pagina.tsx`), no en un `<main>` con `max-w-*` a mano:
+  `ancha` (hasta 1800 px) para tablas y listas de datos, `media` (1024 px) para
+  listas de tarjetas y texto, `angosta` (768 px) para formularios y ajustes,
+  `ficha` (672 px) para un solo registro. El límite de ancho es para texto
+  corrido; una tabla puede ocupar la pantalla. Las páginas de un mismo módulo
+  (las pestañas) usan el mismo ancho. Un formulario suelto dentro de una página
+  ancha se limita con `max-w-5xl` para que sus campos no se estiren. Las
+  pantallas de acceso (login, sin acceso) no usan `Pagina`.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

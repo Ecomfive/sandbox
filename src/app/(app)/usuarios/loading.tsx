@@ -1,8 +1,9 @@
+import { Pagina } from "@/components/ui/pagina";
 import { Skeleton, SkeletonTable } from "@/components/ui/skeleton";
 
 export default function CargandoUsuarios() {
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-10">
       <div>
         <Skeleton className="h-5 w-48" />
         <div className="mt-3">
@@ -15,6 +16,6 @@ export default function CargandoUsuarios() {
           <SkeletonTable filas={4} columnas={5} />
         </div>
       </div>
-    </main>
+    </Pagina>
   );
 }

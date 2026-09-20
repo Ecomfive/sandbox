@@ -1,8 +1,9 @@
+import { Pagina } from "@/components/ui/pagina";
 import { Skeleton, SkeletonKpiGrid } from "@/components/ui/skeleton";
 
 export default function CargandoDashboard() {
   return (
-    <main className="mx-auto w-full max-w-[1600px] px-8 py-10">
+    <Pagina ancho="ancha">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Skeleton className="h-5 w-56" />
@@ -14,6 +15,6 @@ export default function CargandoDashboard() {
         <SkeletonKpiGrid cantidad={5} />
       </div>
       <Skeleton className="mt-6 h-[420px] w-full" />
-    </main>
+    </Pagina>
   );
 }

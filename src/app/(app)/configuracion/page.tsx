@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
@@ -39,7 +40,7 @@ export default async function ConfiguracionPage() {
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-10">
+    <Pagina ancho="angosta" className="flex flex-col gap-10">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <ConfiguracionIcon className="h-5 w-5 text-muted-foreground" />
@@ -115,6 +116,6 @@ export default async function ConfiguracionPage() {
 
         <TablaCuentasConfiguracion cuentas={cuentas ?? []} />
       </div>
-    </main>
+    </Pagina>
   );
 }

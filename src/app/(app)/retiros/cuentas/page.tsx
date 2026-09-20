@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
@@ -18,13 +19,13 @@ export default async function CuentasRetiroPage() {
     .order("numero", { ascending: true });
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold tracking-tight">Cuentas destino</h1>
         <VentanaCuentaRetiro paisId={pais.id} />
       </div>
 
       <TablaCuentas cuentas={cuentas ?? []} paisId={pais.id} />
-    </main>
+    </Pagina>
   );
 }

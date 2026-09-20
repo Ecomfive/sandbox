@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export default async function CatalogoMaestroPage() {
   for (const s of lista) conteo[s.estado as keyof typeof conteo]++;
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-8">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <CatalogoIcon className="h-5 w-5 text-muted-foreground" />
@@ -87,7 +88,7 @@ export default async function CatalogoMaestroPage() {
         </KpiGrid>
       </KpiGroup>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid max-w-5xl gap-6 md:grid-cols-2">
         <form action={crearSkuSimple} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Proponer SKU simple</h2>
           <div className="flex flex-col gap-1">
@@ -131,6 +132,6 @@ export default async function CatalogoMaestroPage() {
       </div>
 
       <TablaCatalogo skus={filas} />
-    </main>
+    </Pagina>
   );
 }

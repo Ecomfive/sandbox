@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
@@ -24,7 +25,7 @@ export default async function PatronesBancariosPage() {
   ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Diccionario de patrones bancarios</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -73,6 +74,6 @@ export default async function PatronesBancariosPage() {
           plataforma: (p.plataformas as unknown as { nombre: string } | null)?.nombre ?? null,
         }))}
       />
-    </main>
+    </Pagina>
   );
 }

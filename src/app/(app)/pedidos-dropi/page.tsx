@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
@@ -102,7 +103,7 @@ export default async function PedidosDropiPage({
   const estadosOrdenados = Array.from(porEstado.entries()).sort((a, b) => b[1] - a[1]);
 
   return (
-    <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-8 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <PedidoIcon className="h-5 w-5 text-muted-foreground" />
@@ -163,6 +164,6 @@ export default async function PedidosDropiPage({
           <TablaPedidos pedidos={filasPedido} codigoPais={pais.codigo} />
         </>
       )}
-    </main>
+    </Pagina>
   );
 }

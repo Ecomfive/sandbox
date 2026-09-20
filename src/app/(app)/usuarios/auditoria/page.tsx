@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
@@ -31,7 +32,7 @@ export default async function AuditoriaPage() {
   }));
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Historial de auditoría</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -41,6 +42,6 @@ export default async function AuditoriaPage() {
       </div>
 
       <TablaAuditoria eventos={filas} />
-    </main>
+    </Pagina>
   );
 }
