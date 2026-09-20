@@ -123,7 +123,9 @@ convenciones técnicas del código.
   hace que la tabla arranque agrupada (quien ya eligió una vista no la pierde) y
   `formatearValor` da un nombre legible a valores que ordenan bien pero se leen
   mal (una fecha ISO). No pongas `total` si sumar mezclaría cosas distintas
-  (entradas y salidas).
+  (entradas y salidas). Un filtro de un toque («Mis retiros») se pasa a
+  `<BarraHerramientas atajos={[...]}>` (`AtajoFiltro`, `src/lib/tabla/atajos.ts`): es un
+  filtro de selección que el botón enciende o apaga sin tocar los de otros campos.
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
   y la `<table>` lleva la clase `tabla-datos`; los estilos están en

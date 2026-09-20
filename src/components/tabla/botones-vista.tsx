@@ -117,6 +117,34 @@ export function BotonCerrados({
 }
 
 /**
+ * Atajo de filtro («Mis retiros»): un toque aplica el filtro y otro lo quita. Nace como ícono y se despliega
+ * a pastilla con su texto al activarse, igual que Cerrados.
+ */
+export function BotonAtajo({
+  etiqueta,
+  ayuda,
+  icono: Icono,
+  activo,
+  alAlternar,
+}: {
+  etiqueta: string;
+  /** Tooltip mientras está apagado. */
+  ayuda: string;
+  icono: IconoComp;
+  activo: boolean;
+  alAlternar: () => void;
+}) {
+  return (
+    <Tooltip texto={activo ? `Quitar «${etiqueta}»` : ayuda}>
+      <button type="button" aria-pressed={activo} aria-label={etiqueta} onClick={alAlternar} className={pastilla(activo)}>
+        <Icono className="h-4 w-4 shrink-0" />
+        <Despliegue expandida={activo}>{etiqueta}</Despliegue>
+      </button>
+    </Tooltip>
+  );
+}
+
+/**
  * "Agrupar": pastilla con el campo elegido; abre una lista para cambiar de campo o quitar la
  * agrupación, elegir el orden de los grupos y —con grupos a la vista— contraerlos o expandirlos todos.
  */

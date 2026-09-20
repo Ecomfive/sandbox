@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import type { DefTabla } from "@/lib/tabla/motor";
 import { camposAgrupables } from "@/lib/tabla/vista";
 import { BotonFiltros } from "./boton-filtros";
-import { BotonAgrupar, BotonCerrados, type IconoComp } from "./botones-vista";
+import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
+import { PersonaIcon } from "@/lib/nav-icons";
+import { BotonAgrupar, BotonAtajo, BotonCerrados, type IconoComp } from "./botones-vista";
 import type { ColumnaDef, EstadoColumnas } from "./ganchos";
 import { MenuColumnas } from "./menu-columnas";
 import type { TablaInteractiva } from "./usar-tabla";
@@ -21,6 +23,7 @@ export function BarraHerramientas<F>({
   iconos,
   nombreFilas,
   columnas,
+  atajos,
   extra,
 }: {
   def: DefTabla<F>;
@@ -31,6 +34,8 @@ export function BarraHerramientas<F>({
   /** En plural y en minúscula: "retiros". */
   nombreFilas: string;
   columnas?: { defs: ColumnaDef[]; estado: EstadoColumnas; cambiar: (cambio: { orden?: string[]; ocultas?: string[] }) => void };
+  /** Filtros de un toque (p. ej. «Mis retiros»); el ícono es el del campo que filtran. */
+  atajos?: AtajoFiltro[];
   extra?: ReactNode;
 }) {
   const agrupables = camposAgrupables(def).map((id) => ({ id, etiqueta: def.campos.find((c) => c.id === id)!.etiqueta }));
@@ -69,6 +74,16 @@ export function BarraHerramientas<F>({
             alAlternar={() => cambiarVista({ mostrarCerrados: !vista.mostrarCerrados })}
           />
         )}
+        {atajos?.map((atajo) => (
+          <BotonAtajo
+            key={atajo.id}
+            etiqueta={atajo.etiqueta}
+            ayuda={atajo.ayuda}
+            icono={iconos[atajo.filtro.campo] ?? PersonaIcon}
+            activo={atajoActivo(filtros, atajo)}
+            alAlternar={() => cambiarFiltros(alternarAtajo(filtros, atajo))}
+          />
+        ))}
         <BotonFiltros
           def={def}
           filas={filas}
