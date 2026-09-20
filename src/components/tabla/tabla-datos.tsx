@@ -52,8 +52,11 @@ export function TablaDatos<F, C = undefined>({
   etiquetaGrupo?: (campo: string, grupo: Grupo<F>) => ReactNode;
   /** Formatea la suma del grupo; sin él el grupo solo cuenta filas. */
   formatearTotal?: (total: number) => string;
-  /** Columna fija a la derecha (botones de la fila), fuera del menú de columnas. */
-  accion?: { etiqueta: string; render: (fila: F) => ReactNode };
+  /**
+   * Columna de botones de la fila, fuera del menú de columnas. Con `fija` queda pegada al borde derecho
+   * aunque la tabla se desplace de lado, con su encabezado visible.
+   */
+  accion?: { etiqueta: string; render: (fila: F) => ReactNode; fija?: boolean };
   claseFila?: (fila: F) => string;
   ariaLabel: string;
   anchoMinimo?: string;
@@ -70,13 +73,23 @@ export function TablaDatos<F, C = undefined>({
   const anchoColumnas = visibles_.length + (accion ? 1 : 0);
 
   const fila = (f: F) => (
-    <tr key={claveFila(f)} className={`border-b border-border/60 last:border-0 ${claseFila?.(f) ?? ""}`}>
+    <tr key={claveFila(f)} className={`group border-b border-border/60 last:border-0 ${claseFila?.(f) ?? ""}`}>
       {visibles_.map((c, i) => (
         <td key={c.id} className={`py-2 pr-3 ${i === 0 ? "pl-4" : ""} ${c.clase ?? ""}`}>
           {c.render(f, contexto as C)}
         </td>
       ))}
-      {accion && <td className="py-2 pr-3">{accion.render(f)}</td>}
+      {accion && (
+        <td
+          className={
+            accion.fija
+              ? "sticky right-0 z-10 border-l border-border/60 bg-card py-2 pr-4 pl-3 group-hover:bg-muted/50"
+              : "py-2 pr-3"
+          }
+        >
+          {accion.render(f)}
+        </td>
+      )}
     </tr>
   );
 
@@ -118,8 +131,15 @@ export function TablaDatos<F, C = undefined>({
                 </th>
               ))}
               {accion && (
-                <th scope="col" className="py-2 pr-3 font-medium">
-                  <span className="sr-only">{accion.etiqueta}</span>
+                <th
+                  scope="col"
+                  className={
+                    accion.fija
+                      ? "sticky right-0 z-10 bg-muted py-2 pr-4 pl-3 text-center font-medium"
+                      : "py-2 pr-3 font-medium"
+                  }
+                >
+                  {accion.fija ? accion.etiqueta : <span className="sr-only">{accion.etiqueta}</span>}
                 </th>
               )}
             </tr>

@@ -1,27 +1,16 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { crearSkuSimple, crearCombo, cambiarEstadoSku } from "./actions";
+import { crearSkuSimple, crearCombo } from "./actions";
 import { ComboBuilder } from "./combo-builder";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { CatalogoIcon } from "@/lib/nav-icons";
+import type { FilaSku } from "./def-catalogo";
+import { TablaCatalogo } from "./tabla-catalogo";
 
 export const dynamic = "force-dynamic";
-
-const ETIQUETA_ESTADO: Record<string, string> = {
-  propuesto: "Propuesto",
-  en_revision: "En revisión",
-  aprobado: "Aprobado",
-};
-
-const TONO_ESTADO: Record<string, "warning" | "info" | "success"> = {
-  propuesto: "warning",
-  en_revision: "info",
-  aprobado: "success",
-};
 
 interface SkuMaestro {
   id: string;
@@ -59,6 +48,19 @@ export default async function CatalogoMaestroPage() {
   }
 
   const opcionesSimples = lista.filter((s) => s.tipo === "simple" && s.estado === "aprobado");
+
+  const filas: FilaSku[] = lista.map((s) => ({
+    id: s.id,
+    codigo: s.codigo,
+    nombre: s.nombre,
+    tipo: s.tipo,
+    estado: s.estado,
+    componentes:
+      s.tipo === "combo"
+        ? (componentesPorCombo.get(s.id) ?? []).map((c) => `${c.cantidad}× ${c.codigo}`).join(", ")
+        : "",
+    creado: s.creado_en.slice(0, 10),
+  }));
 
   const conteo = { propuesto: 0, en_revision: 0, aprobado: 0 };
   for (const s of lista) conteo[s.estado as keyof typeof conteo]++;
@@ -128,72 +130,7 @@ export default async function CatalogoMaestroPage() {
         </form>
       </div>
 
-      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[48rem] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              <th className="py-2 pr-3 pl-4 font-medium">Código</th>
-              <th className="py-2 pr-3 font-medium">Nombre</th>
-              <th className="py-2 pr-3 font-medium">Tipo</th>
-              <th className="py-2 pr-3 font-medium">Componentes</th>
-              <th className="py-2 pr-3 font-medium">Estado</th>
-              <th className="py-2 pr-3 font-medium">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lista.length === 0 && (
-              <tr>
-                <td colSpan={6}>
-                  <EstadoVacio mensaje="Todavía no hay SKUs maestros propuestos." />
-                </td>
-              </tr>
-            )}
-            {lista.map((s) => {
-              const componentes = componentesPorCombo.get(s.id) ?? [];
-              const siguientes: { etiqueta: string; valor: string }[] =
-                s.estado === "propuesto"
-                  ? [{ etiqueta: "Enviar a revisión", valor: "en_revision" }]
-                  : s.estado === "en_revision"
-                    ? [
-                        { etiqueta: "Aprobar", valor: "aprobado" },
-                        { etiqueta: "Regresar a propuesto", valor: "propuesto" },
-                      ]
-                    : [{ etiqueta: "Regresar a revisión", valor: "en_revision" }];
-
-              return (
-                <tr key={s.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 font-medium">{s.codigo}</td>
-                  <td className="py-2 pr-3">{s.nombre}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">
-                    {s.tipo === "combo" ? "Combo" : "Simple"}
-                  </td>
-                  <td className="py-2 pr-3 text-muted-foreground">
-                    {s.tipo === "combo"
-                      ? componentes.map((c) => `${c.cantidad}× ${c.codigo}`).join(", ") || "—"
-                      : "—"}
-                  </td>
-                  <td className="py-2 pr-3">
-                    <Badge tone={TONO_ESTADO[s.estado]}>{ETIQUETA_ESTADO[s.estado]}</Badge>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <div className="flex flex-wrap gap-2">
-                      {siguientes.map((sig) => (
-                        <form key={sig.valor} action={cambiarEstadoSku}>
-                          <input type="hidden" name="id" value={s.id} />
-                          <input type="hidden" name="nuevo_estado" value={sig.valor} />
-                          <Button type="submit" variant="secondary" className="text-xs">
-                            {sig.etiqueta}
-                          </Button>
-                        </form>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <TablaCatalogo skus={filas} />
     </main>
   );
 }

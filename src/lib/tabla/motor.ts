@@ -24,6 +24,11 @@ export interface CampoSeleccion<F> extends CampoComun {
   opciones?: () => Opcion[];
   /** Nombre de la opción "sin valor" cuando las opciones salen de las filas. */
   etiquetaSinValor?: string;
+  /**
+   * Cómo se muestra un valor cuando las opciones salen de las filas (por defecto, el valor tal cual).
+   * Sirve para valores que ordenan bien pero se leen mal, como una fecha ISO.
+   */
+  formatearValor?: (valor: string) => string;
   /** Se puede agrupar la tabla por este campo. */
   agrupable?: boolean;
   /** Orden preferido de los grupos (por valor); los que falten van después. */
@@ -66,6 +71,8 @@ export interface DefTabla<F> {
   };
   /** Cantidad que se suma por grupo (monto, unidades...). Sin esto los grupos solo cuentan filas. */
   total?: (fila: F) => number;
+  /** Vista con la que arranca quien aún no eligió una (por ejemplo, agrupada por extracto). */
+  vistaInicial?: { agrupar: string; orden?: "asc" | "desc" };
 }
 
 export type ValorFiltro =
@@ -144,7 +151,9 @@ export function opcionesDeSeleccion<F>(def: DefTabla<F>, filas: F[], campo: stri
       else conocidos.add(valor);
     }
   }
-  const opciones = [...conocidos].sort((a, b) => a.localeCompare(b)).map((valor) => ({ valor, etiqueta: valor }));
+  const opciones = [...conocidos]
+    .sort((a, b) => a.localeCompare(b))
+    .map((valor) => ({ valor, etiqueta: definicion.formatearValor?.(valor) ?? valor }));
   if (haySinValor) opciones.push({ valor: SIN_VALOR, etiqueta: definicion.etiquetaSinValor ?? "Sin dato" });
   return opciones;
 }
