@@ -154,6 +154,27 @@ convenciones técnicas del código.
   número de un retiro) va en `csvAntes`. Un texto que empieza por `=`, `+`, `-` o
   `@` se escribe con comilla para que Excel no lo ejecute. Las descargas del
   servidor de un período completo (`/api/exportar-*`) siguen aparte.
+- **Acciones en lote (Retiros).** La tabla de Retiros tiene una casilla por fila
+  y una en el encabezado («seleccionar los que se ven»); al marcar aparece
+  `BarraLote` (`src/app/(app)/retiros/barra-lote.tsx`) fija abajo: pasar a
+  Abierto, Novedad o Cerrado y descargar solo lo marcado. Cuenta únicamente lo que
+  está en pantalla (una acción nunca toca un retiro que la persona no tiene
+  delante; los grupos contraídos no cuentan). **Alcance a propósito**: son los
+  mismos estados que ya se cambian uno a uno (solo mueve la etiqueta; no registra
+  monto recibido ni comprobante), y los cancelados no se tocan. Eliminar, cancelar
+  y conciliar **no** van en lote: no se deshacen o piden datos de cada retiro.
+  Pedir confirmación va en la misma barra (sin ventana) y dice cuántos cambian y
+  cuántos se omiten. Máximo 100 por vez (`MAX_LOTE`: los ids viajan en la
+  dirección de la consulta). Permisos: hace falta escritura en Retiros; con solo
+  lectura no se dibujan ni casillas ni barra (`puedeEscribir`), y el servidor lo
+  vuelve a comprobar. La lógica y su escritura viven en `src/lib/retiros/en-lote.ts`
+  (`cambiarEstadoEnLote`, con cliente de Supabase inyectado para probarla): una sola
+  actualización, y por cada retiro que cambió, su evento en `retiro_eventos` y su
+  fila de auditoría (misma acción `cambiar_estado_retiro`, con «En lote» en el
+  detalle) con `registrarAuditoriaLote`, que consulta a la persona una vez y
+  guarda todo de una. La acción del servidor devuelve el error como valor. Para
+  otra acción en lote: agrégala a `barra-lote.tsx` y su lógica a `en-lote.ts`
+  siguiendo el mismo patrón (planear, confirmar, una escritura, auditoría por fila).
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
   y la `<table>` lleva la clase `tabla-datos`; los estilos están en

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ import type { Grupo } from "@/lib/tabla/vista";
 import { DEF_RETIROS, ESTADO_ETIQUETA } from "./filtros";
 import { EstadoSelect } from "./estado-select";
 import type { Cuenta, Plataforma } from "./crear-retiro-panel";
+import { BarraLote } from "./barra-lote";
 import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
 import { EditarRetiroPanel } from "./editar-retiro-panel";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
@@ -98,6 +100,9 @@ const COLUMNAS: (ColumnaDef & { id: ColumnaId; claseCelda?: string })[] = [
 ];
 const COLUMNAS_POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]));
 
+/** Fondo opaco de una fila marcada (también el de su celda de acciones, que queda fija a la derecha). */
+const FONDO_MARCADA = "bg-[color-mix(in_oklab,var(--accent)_45%,var(--card))]";
+
 function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
   switch (id) {
     case "correlativo":
@@ -162,6 +167,7 @@ export function TablaRetiros({
   plataformas,
   cuentas,
   miNombre,
+  puedeEscribir,
 }: {
   retiros: FilaRetiro[];
   codigoPais: string;
@@ -170,23 +176,75 @@ export function TablaRetiros({
   cuentas: Cuenta[];
   /** Cómo aparece la persona que tiene la sesión en «Persona asignada»; con él sale «Mis retiros». */
   miNombre?: string | null;
+  /** Solo quien puede modificar retiros ve las casillas y la barra de acciones en lote. */
+  puedeEscribir: boolean;
 }) {
   const tabla = useTablaInteractiva(DEF_RETIROS, retiros, { limiteSinFiltros: LIMITE_SIN_FILTROS });
   const [columnasGuardadas, cambiarColumnas] = useColumnas("retiros", COLUMNAS);
   const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado } = tabla;
+
+  // Lo marcado. Solo cuenta lo que se ve ahora (filas de los grupos abiertos, o las de la lista): así una acción
+  // nunca toca un retiro que la persona no tiene delante. Un retiro marcado que un filtro esconde sigue marcado
+  // y reaparece marcado cuando el filtro se quita.
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const filasEnPantalla = agrupado ? grupos.filter((g) => !contraidos.has(g.clave)).flatMap((g) => g.filas) : visibles;
+  const filasMarcadas = puedeEscribir ? filasEnPantalla.filter((f) => marcados.has(f.id)) : [];
+  const todasMarcadas = filasEnPantalla.length > 0 && filasMarcadas.length === filasEnPantalla.length;
+
+  function alternarFila(id: string) {
+    setMarcados((actuales) => {
+      const nuevos = new Set(actuales);
+      if (!nuevos.delete(id)) nuevos.add(id);
+      return nuevos;
+    });
+  }
+
+  function alternarTodas() {
+    setMarcados((actuales) => {
+      const nuevos = new Set(actuales);
+      for (const fila of filasEnPantalla) {
+        if (todasMarcadas) nuevos.delete(fila.id);
+        else nuevos.add(fila.id);
+      }
+      return nuevos;
+    });
+  }
 
   const columnasVisibles = columnasGuardadas.orden
     .filter((id) => !columnasGuardadas.ocultas.has(id))
     .map((id) => COLUMNAS_POR_ID.get(id as ColumnaId)!);
 
   const filaRetiro = (fila: FilaRetiro) => (
-    <tr key={fila.id} className="group relative border-b border-border/60 last:border-0 hover:bg-muted/50">
+    <tr
+      key={fila.id}
+      className={`group relative border-b border-border/60 last:border-0 ${
+        marcados.has(fila.id) ? FONDO_MARCADA : "hover:bg-muted/50"
+      }`}
+    >
+      {puedeEscribir && (
+        // `relative z-10`: la fila entera es un enlace estirado (ver el número #), la casilla debe quedar encima.
+        <td className="relative z-10 w-10 border-r border-border/40 px-2 py-3">
+          <label className="-my-2 flex h-8 w-8 cursor-pointer items-center justify-center">
+            <input
+              type="checkbox"
+              checked={marcados.has(fila.id)}
+              onChange={() => alternarFila(fila.id)}
+              aria-label={`Seleccionar el retiro #${String(fila.numeroCorrelativo).padStart(4, "0")}`}
+              className="h-4 w-4 cursor-pointer accent-foreground"
+            />
+          </label>
+        </td>
+      )}
       {columnasVisibles.map((columna) => (
         <td key={columna.id} className={`border-r border-border/40 px-4 py-3 ${columna.claseCelda ?? ""}`}>
           {renderCelda(columna.id, fila, codigoPais)}
         </td>
       ))}
-      <td className="sticky right-0 z-10 bg-card px-2 py-3 group-hover:bg-muted/50">
+      <td
+        className={`sticky right-0 z-10 px-2 py-3 ${
+          marcados.has(fila.id) ? FONDO_MARCADA : "bg-card group-hover:bg-muted/50"
+        }`}
+      >
         <div className="flex items-center justify-center gap-1">
           <ConciliarRetiroPanel
             retiro={{
@@ -268,6 +326,23 @@ export function TablaRetiros({
         <table className="tabla-datos w-full min-w-[42rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+              {puedeEscribir && (
+                <th scope="col" className="w-10 border-r border-border/60 px-2 py-3">
+                  <label className="-my-2 flex h-8 w-8 cursor-pointer items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={todasMarcadas}
+                      ref={(el) => {
+                        if (el) el.indeterminate = filasMarcadas.length > 0 && !todasMarcadas;
+                      }}
+                      onChange={alternarTodas}
+                      disabled={filasEnPantalla.length === 0}
+                      aria-label="Seleccionar todos los retiros que se ven"
+                      className="h-4 w-4 cursor-pointer accent-foreground"
+                    />
+                  </label>
+                </th>
+              )}
               {columnasVisibles.map((columna) => (
                 <th
                   key={columna.id}
@@ -294,7 +369,7 @@ export function TablaRetiros({
               return (
                 <tbody key={grupo.clave}>
                   <EncabezadoGrupo
-                    columnas={columnasVisibles.length + 1}
+                    columnas={columnasVisibles.length + (puedeEscribir ? 2 : 1)}
                     contraido={contraido}
                     alAlternar={() => tabla.alternarGrupo(grupo.clave)}
                     etiqueta={etiquetaGrupo(vista.agrupar!, grupo)}
@@ -311,6 +386,14 @@ export function TablaRetiros({
           )}
         </table>
       </ContenedorTabla>
+      {filasMarcadas.length > 0 && (
+        <BarraLote
+          filas={filasMarcadas}
+          cerradosOcultos={!vista.mostrarCerrados}
+          alQuitar={() => setMarcados(new Set())}
+          alTerminar={() => setMarcados(new Set())}
+        />
+      )}
       {/* Anuncia a lectores de pantalla cuántos retiros se ven cuando cambian los filtros, los grupos o los cerrados. */}
       <p role="status" className="sr-only">
         {retiros.length > 0
