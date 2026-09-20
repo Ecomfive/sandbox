@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { Badge } from "@/components/ui/badge";
+import { TablaProveedores } from "./tabla-proveedores";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { InteligenciaChart } from "@/components/charts/inteligencia-chart";
 import { agruparProductosTotalesPorMes, agruparProveedoresNuevosPorMes, soloAnio } from "@/lib/inteligencia/agregados";
@@ -141,45 +140,17 @@ export default async function InteligenciaCompetitivaPage() {
             </p>
           )}
 
-          <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full min-w-[42rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                  <th className="py-2 pr-3 pl-4 font-medium">Proveedor</th>
-                  <th className="py-2 pr-3 font-medium">Ciudad</th>
-                  <th className="py-2 pr-3 font-medium">Categorías</th>
-                  <th className="py-2 pr-3 font-medium">Productos</th>
-                  <th className="py-2 pr-3 font-medium">Cambio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filas.map((f) => (
-                  <tr key={f.id} className="border-b border-border/60 last:border-0 hover:bg-muted/50">
-                    <td className="py-2 pr-3 pl-4">
-                      <Link href={`/inteligencia-competitiva/${f.id}`} className="hover:underline">
-                        <p className="font-medium">{f.tienda || f.nombre}</p>
-                        {f.tienda && <p className="text-xs text-muted-foreground">{f.nombre}</p>}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-3 text-muted-foreground">{f.ciudad ?? "—"}</td>
-                    <td className="py-2 pr-3 text-muted-foreground">{f.categorias.join(", ") || "—"}</td>
-                    <td className="py-2 pr-3 tabular-nums">{f.actual ?? "—"}</td>
-                    <td className="py-2 pr-3">
-                      {f.cambio === null ? (
-                        <span className="text-xs text-muted-foreground">Sin historial</span>
-                      ) : f.cambio === 0 ? (
-                        <Badge tone="neutral">Sin cambio</Badge>
-                      ) : f.cambio > 0 ? (
-                        <Badge tone="success">+{f.cambio}</Badge>
-                      ) : (
-                        <Badge tone="destructive">{f.cambio}</Badge>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TablaProveedores
+            proveedores={filas.map((f) => ({
+              id: f.id,
+              titulo: f.tienda || f.nombre,
+              subtitulo: f.tienda ? f.nombre : null,
+              ciudad: f.ciudad,
+              categorias: f.categorias,
+              actual: f.actual,
+              cambio: f.cambio,
+            }))}
+          />
         </>
       )}
     </main>

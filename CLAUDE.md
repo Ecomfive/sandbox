@@ -73,11 +73,17 @@ convenciones técnicas del código.
 - **Tablas con barra de herramientas común** (Agrupar, filas cerradas, Filtros,
   Columnas — igual en todos los módulos, estilo ClickUp). Ya la usan Retiros,
   Alertas, Pedidos Dropi, Gastos, Usuarios, Auditoría, CRM Dropshippers
-  (directorio e interacciones) y Productos. Para sumarla a otra tabla: describe
+  (directorio e interacciones), Productos, Catálogo maestro, Cuentas destino,
+  Configuración (plataformas y cuentas), Inteligencia competitiva (lista de
+  proveedores), Inventario, Extractos (movimientos, agrupados por extracto) y
+  Patrones bancarios. Quedan sin ella, a propósito, las tablas de resumen fijo
+  (el comparativo por período y el historial de un proveedor). Para sumarla a
+  otra tabla: describe
   sus campos en una `DefTabla` (`src/lib/tabla/motor.ts`; ver `gastos/def-gastos.ts`
   o `retiros/filtros.ts`) y, según lo que muestres, usa un componente listo de
   `src/components/tabla/`: `TablaDatos` (tabla que solo muestra datos, con
-  columnas y una columna fija de acciones) o `ListaDatos` (lista de tarjetas con
+  columnas y una columna de acciones, que con `fija` queda pegada a la derecha)
+  o `ListaDatos` (lista de tarjetas con
   su propio formulario; sin menú de columnas). Si la tabla tiene comportamiento
   propio (selección, fila que se edita), arma la suya con `useTablaInteractiva` +
   `useColumnas` y dibuja `<BarraHerramientas>`, como `retiros/tabla-retiros.tsx`.
@@ -86,7 +92,12 @@ convenciones técnicas del código.
   columnas) se guarda en su navegador con la `clave` de la tabla
   (`<clave>-filtros-v1`, `-vista-v1`, `-columnas-v2`). Las páginas sirven las
   filas ya listas (serializables) y la definición y las columnas de un cliente
-  son constantes del módulo.
+  son constantes del módulo (si la definición depende del país, una por país y
+  siempre la misma, como `defMovimientosBanco`). En la definición, `vistaInicial`
+  hace que la tabla arranque agrupada (quien ya eligió una vista no la pierde) y
+  `formatearValor` da un nombre legible a valores que ordenan bien pero se leen
+  mal (una fecha ISO). No pongas `total` si sumar mezclaría cosas distintas
+  (entradas y salidas).
 - **Borde de los campos de formulario.** Los `input`, `select` y `textarea` usan
   `fieldClass` / `fieldClassSm` (`src/components/ui/field.ts`), que llevan
   `border-border-control` (`--border-control`: 3:1 contra el fondo, WCAG 1.4.11).

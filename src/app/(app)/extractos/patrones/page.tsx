@@ -1,10 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { crearPatron, eliminarPatron } from "./actions";
+import { crearPatron } from "./actions";
+import { TablaPatrones } from "./tabla-patrones";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
 
 export const dynamic = "force-dynamic";
@@ -66,38 +66,13 @@ export default async function PatronesBancariosPage() {
         <Button type="submit">Guardar patrón</Button>
       </FormularioConToast>
 
-      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[30rem] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              <th className="py-2 pr-3 pl-4 font-medium">Texto a buscar</th>
-              <th className="py-2 pr-3 font-medium">Plataforma</th>
-              <th className="py-2 pr-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(patrones ?? []).map((p) => (
-              <tr key={p.id} className="border-b border-border/60 last:border-0">
-                <td className="py-2 pr-3 pl-4 font-mono text-xs">{p.fragmento}</td>
-                <td className="py-2 pr-3">
-                  {(p.plataformas as unknown as { nombre: string } | null)?.nombre ?? "—"}
-                </td>
-                <td className="py-2 pr-3 text-right">
-                  <form action={eliminarPatron}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <Button type="submit" variant="ghost" className="text-xs">
-                      Eliminar
-                    </Button>
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {(patrones ?? []).length === 0 && (
-          <EstadoVacio mensaje="Todavía no hay patrones guardados. Asigna una plataforma a un movimiento en Extractos y quedará guardado aquí." />
-        )}
-      </div>
+      <TablaPatrones
+        patrones={(patrones ?? []).map((p) => ({
+          id: p.id,
+          fragmento: p.fragmento,
+          plataforma: (p.plataformas as unknown as { nombre: string } | null)?.nombre ?? null,
+        }))}
+      />
     </main>
   );
 }

@@ -28,7 +28,13 @@ export function camposAgrupables<F>(def: DefTabla<F>): string[] {
  * tabla lo pide arrancan ocultos (colas de trabajo) y si no, a la vista (reportes).
  */
 export function vistaDefecto<F>(def: DefTabla<F>): Vista {
-  return { agrupar: null, orden: "asc", mostrarCerrados: def.cerrados ? !def.cerrados.ocultosPorDefecto : true };
+  const inicial = def.vistaInicial;
+  const agrupar = inicial && camposAgrupables(def).includes(inicial.agrupar) ? inicial.agrupar : null;
+  return {
+    agrupar,
+    orden: agrupar ? (inicial?.orden ?? "asc") : "asc",
+    mostrarCerrados: def.cerrados ? !def.cerrados.ocultosPorDefecto : true,
+  };
 }
 
 /** Lee la vista guardada descartando cualquier cosa que no tenga la forma esperada. */

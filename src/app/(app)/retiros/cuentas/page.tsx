@@ -1,29 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { ActivaToggle } from "./activa-toggle";
 import { VentanaCuentaRetiro } from "./ventana-cuenta-retiro";
-import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { TablaCuentas } from "./tabla-cuentas";
 
 export const dynamic = "force-dynamic";
-
-const TIPOS = [
-  { valor: "banco", etiqueta: "Banco" },
-  { valor: "binance", etiqueta: "Binance" },
-  { valor: "tarjeta", etiqueta: "Tarjeta" },
-  { valor: "otro", etiqueta: "Otro" },
-] as const;
-
-const etiquetaTipo = (valor: string) => TIPOS.find((t) => t.valor === valor)?.etiqueta ?? valor;
-
-/** Solo lectura: la comisión sugerida ya no se edita acá — se edita desde "Modificar". */
-function etiquetaComision(tipo: string | null, porcentaje: number | null, montoFijo: number | null) {
-  if (tipo === "porcentaje" && porcentaje != null) return `${porcentaje}%`;
-  if (tipo === "monto_fijo" && montoFijo != null) return `$${montoFijo.toFixed(2)}`;
-  if (tipo === "ambos" && porcentaje != null && montoFijo != null) return `${porcentaje}% + $${montoFijo.toFixed(2)}`;
-  return "—";
-}
 
 export default async function CuentasRetiroPage() {
   await requireModulo("retiros");
@@ -43,48 +24,7 @@ export default async function CuentasRetiroPage() {
         <VentanaCuentaRetiro paisId={pais.id} />
       </div>
 
-      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[50rem] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              <th className="py-2 pr-3 pl-4 font-medium">#</th>
-              <th className="py-2 pr-3 font-medium">Tipo</th>
-              <th className="py-2 pr-3 font-medium">Nombre</th>
-              <th className="py-2 pr-3 font-medium">Cuenta</th>
-              <th className="py-2 pr-3 font-medium">Comisión sugerida</th>
-              <th className="py-2 pr-3 font-medium">Estado</th>
-              <th className="sticky right-0 z-10 bg-muted py-2 pr-4 pl-3 text-center font-medium">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(cuentas ?? []).map((c) => (
-              <tr key={c.id} className="group border-b border-border/60 last:border-0">
-                <td className="py-2 pr-3 pl-4 font-semibold text-muted-foreground">
-                  {c.numero != null ? `#${c.numero}` : "—"}
-                </td>
-                <td className="py-2 pr-3">{etiquetaTipo(c.tipo)}</td>
-                <td className="py-2 pr-3 font-medium">{c.nombre}</td>
-                <td className="py-2 pr-3 text-muted-foreground">{c.detalle || "—"}</td>
-                <td className="py-2 pr-3 text-muted-foreground">
-                  {etiquetaComision(c.comision_tipo, c.comision_porcentaje, c.comision_monto_fijo)}
-                </td>
-                <td className="py-2 pr-3">
-                  <ActivaToggle id={c.id} activa={c.activa} />
-                </td>
-                <td className="sticky right-0 z-10 border-l border-border/60 bg-card py-2 pr-4 pl-3 group-hover:bg-muted/50">
-                  <div className="flex items-center justify-center gap-1">
-                    <VentanaCuentaRetiro paisId={pais.id} cuenta={c} />
-                    <EliminarCuentaBoton id={c.id} nombre={c.nombre} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {(cuentas ?? []).length === 0 && (
-          <EstadoVacio mensaje="Todavía no hay cuentas de retiro registradas." />
-        )}
-      </div>
+      <TablaCuentas cuentas={cuentas ?? []} paisId={pais.id} />
     </main>
   );
 }

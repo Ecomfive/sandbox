@@ -1,11 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { ExtractoUploader } from "./uploader";
-import { AsignarPlataformaSelect } from "./asignar-plataforma";
-import { Badge } from "@/components/ui/badge";
+import type { FilaMovimientoBanco } from "./def-movimientos";
+import { TablaMovimientosBanco } from "./tabla-movimientos";
 import { requireModulo } from "@/lib/auth";
-import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { linkClass } from "@/components/ui/link";
 import { ExtractoIcon } from "@/lib/nav-icons";
 
@@ -28,6 +26,29 @@ export default async function ExtractosPage() {
       .limit(10),
   ]);
 
+  const nombrePlataforma = new Map((plataformas ?? []).map((p) => [p.id, p.nombre]));
+  const movimientos: FilaMovimientoBanco[] = (extractos ?? []).flatMap((extracto) =>
+    (extracto.movimientos_bancarios ?? []).map(
+      (m: {
+        id: string;
+        fecha: string;
+        monto: number;
+        tipo: string;
+        descripcion: string | null;
+        plataforma_id: string | null;
+      }) => ({
+        id: m.id,
+        extracto: extracto.fecha_carga,
+        fecha: m.fecha,
+        monto: Number(m.monto),
+        tipo: m.tipo,
+        descripcion: m.descripcion,
+        plataformaId: m.plataforma_id,
+        plataforma: m.plataforma_id ? (nombrePlataforma.get(m.plataforma_id) ?? null) : null,
+      })
+    )
+  );
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <div>
@@ -48,60 +69,12 @@ export default async function ExtractosPage() {
             Descargar CSV
           </a>
         </div>
-        <div className="mt-3 flex flex-col gap-4">
-          {(extractos ?? []).map((extracto) => (
-            <div key={extracto.id} className="rounded-xl border border-border bg-card p-4">
-              <p className="mb-3 text-sm font-medium">
-                {formatearFechaHoraCompleta(extracto.fecha_carga, pais.codigo)}
-              </p>
-              <div className="min-w-0 overflow-x-auto">
-                <table className="w-full min-w-[36rem] border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-muted-foreground">
-                      <th className="py-1.5 pr-3 font-medium">Fecha</th>
-                      <th className="py-1.5 pr-3 font-medium">Monto</th>
-                      <th className="py-1.5 pr-3 font-medium">Tipo</th>
-                      <th className="py-1.5 pr-3 font-medium">Descripción</th>
-                      <th className="py-1.5 pr-3 font-medium">Plataforma</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(extracto.movimientos_bancarios ?? []).map(
-                      (m: {
-                        id: string;
-                        fecha: string;
-                        monto: number;
-                        tipo: string;
-                        descripcion: string | null;
-                        plataforma_id: string | null;
-                      }) => (
-                        <tr key={m.id} className="border-b border-border/60">
-                          <td className="py-1.5 pr-3">{formatearFecha(m.fecha)}</td>
-                          <td className="py-1.5 pr-3 tabular-nums">
-                            {formatearMoneda(Number(m.monto), pais.codigo)}
-                          </td>
-                          <td className="py-1.5 pr-3">
-                            <Badge tone={m.tipo === "deposito" ? "success" : "neutral"}>
-                              {m.tipo}
-                            </Badge>
-                          </td>
-                          <td className="py-1.5 pr-3 text-muted-foreground">{m.descripcion}</td>
-                          <td className="py-1.5 pr-3">
-                            <AsignarPlataformaSelect
-                              movimientoId={m.id}
-                              plataformaIdActual={m.plataforma_id}
-                              plataformas={plataformas ?? []}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-          {(extractos ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay extractos cargados." />}
+        <div className="mt-3">
+          <TablaMovimientosBanco
+            movimientos={movimientos}
+            codigoPais={pais.codigo}
+            plataformas={plataformas ?? []}
+          />
         </div>
       </div>
     </main>

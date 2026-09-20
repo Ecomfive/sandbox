@@ -3,24 +3,15 @@ import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { crearCuentaRetiro } from "../retiros/cuentas/actions";
 import { crearPlataforma } from "./actions";
-import { ActivaToggle } from "../retiros/cuentas/activa-toggle";
-import { DisponibleToggle } from "./disponible-toggle";
+import { TIPOS_CUENTA } from "../retiros/cuentas/def-cuentas";
+import { TablaCuentasConfiguracion } from "../retiros/cuentas/tabla-cuentas";
+import { TablaPlataformas } from "./tabla-plataformas";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
 import { ConfiguracionIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
-
-const TIPOS = [
-  { valor: "banco", etiqueta: "Banco" },
-  { valor: "binance", etiqueta: "Binance" },
-  { valor: "tarjeta", etiqueta: "Tarjeta" },
-  { valor: "otro", etiqueta: "Otro" },
-] as const;
-
-const etiquetaTipo = (valor: string) => TIPOS.find((t) => t.valor === valor)?.etiqueta ?? valor;
 
 export default async function ConfiguracionPage() {
   await requireModulo("configuracion");
@@ -34,7 +25,7 @@ export default async function ConfiguracionPage() {
       .eq("pais_id", pais.id),
     supabase
       .from("cuentas_retiro")
-      .select("id, tipo, nombre, detalle, activa")
+      .select("id, numero, tipo, nombre, detalle, activa, comision_tipo, comision_porcentaje, comision_monto_fijo")
       .eq("pais_id", pais.id)
       .order("creado_en", { ascending: false }),
   ]);
@@ -78,27 +69,7 @@ export default async function ConfiguracionPage() {
           <Button type="submit">Crear plataforma</Button>
         </FormularioConToast>
 
-        <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[24rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">Plataforma</th>
-                <th className="py-2 pr-3 font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plataformas.map((p) => (
-                <tr key={p.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 font-medium">{p.nombre}</td>
-                  <td className="py-2 pr-3">
-                    <DisponibleToggle id={p.id} disponible={p.disponible} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {plataformas.length === 0 && <EstadoVacio mensaje="Este país no tiene plataformas registradas." />}
-        </div>
+        <TablaPlataformas plataformas={plataformas} />
       </div>
 
       <div className="flex flex-col gap-3">
@@ -118,7 +89,7 @@ export default async function ConfiguracionPage() {
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Tipo</label>
             <select name="tipo" required defaultValue="banco" className={fieldClass}>
-              {TIPOS.map((t) => (
+              {TIPOS_CUENTA.map((t) => (
                 <option key={t.valor} value={t.valor}>
                   {t.etiqueta}
                 </option>
@@ -142,33 +113,7 @@ export default async function ConfiguracionPage() {
           <Button type="submit">Agregar cuenta</Button>
         </FormularioConToast>
 
-        <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[36rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">Tipo</th>
-                <th className="py-2 pr-3 font-medium">Nombre</th>
-                <th className="py-2 pr-3 font-medium">Detalle</th>
-                <th className="py-2 pr-3 font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(cuentas ?? []).map((c) => (
-                <tr key={c.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4">{etiquetaTipo(c.tipo)}</td>
-                  <td className="py-2 pr-3 font-medium">{c.nombre}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">{c.detalle}</td>
-                  <td className="py-2 pr-3">
-                    <ActivaToggle id={c.id} activa={c.activa} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {(cuentas ?? []).length === 0 && (
-            <EstadoVacio mensaje="Todavía no hay cuentas de retiro registradas." />
-          )}
-        </div>
+        <TablaCuentasConfiguracion cuentas={cuentas ?? []} />
       </div>
     </main>
   );
