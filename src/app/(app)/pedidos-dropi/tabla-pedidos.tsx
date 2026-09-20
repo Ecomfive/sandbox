@@ -2,6 +2,8 @@
 
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
@@ -79,7 +81,20 @@ export function TablaPedidos({ pedidos, codigoPais }: { pedidos: FilaPedido[]; c
       case "orden":
         return (
           <>
-            {p.alerta && <span title="Liquidado en cartera pero aún no marcado ENTREGADO en Dropi">⚠️ </span>}
+            {p.alerta && (
+              <>
+                <Tooltip texto="Liquidado en cartera, sin marcar ENTREGADO en Dropi">
+                  <span
+                    role="img"
+                    aria-label="Alerta: liquidado en cartera, sin marcar ENTREGADO en Dropi"
+                    tabIndex={0}
+                    className={anilloFoco}
+                  >
+                    ⚠️
+                  </span>
+                </Tooltip>{" "}
+              </>
+            )}
             {p.referencia}
           </>
         );

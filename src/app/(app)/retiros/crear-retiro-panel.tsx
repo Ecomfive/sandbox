@@ -252,7 +252,6 @@ export function CrearRetiroPanel({
                   Nuevo retiro
                   <span
                     aria-live="polite"
-                    title="Se confirma al crear el retiro. Escríbelo en el concepto del retiro en Dropi"
                     className="rounded bg-muted px-2 py-0.5 text-xs font-medium tabular-nums"
                   >
                     {correlativo !== null

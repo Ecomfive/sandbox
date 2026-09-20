@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { conciliarRetiro } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { CerrarIcon, ConciliarIcon } from "@/lib/nav-icons";
 
 export interface RetiroParaConciliar {
@@ -95,16 +96,17 @@ export function ConciliarRetiroPanel({ retiro, paisId }: { retiro: RetiroParaCon
 
   return (
     <>
-      <button
-        ref={botonAbrirRef}
-        type="button"
-        onClick={abrirVentana}
-        aria-label="Conciliar retiro"
-        title="Conciliar"
-        className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-      >
-        <ConciliarIcon className="h-4 w-4" />
-      </button>
+      <Tooltip texto="Conciliar retiro">
+        <button
+          ref={botonAbrirRef}
+          type="button"
+          onClick={abrirVentana}
+          aria-label="Conciliar retiro"
+          className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+        >
+          <ConciliarIcon className="h-4 w-4" />
+        </button>
+      </Tooltip>
 
       {abierto && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={cerrarVentana}>

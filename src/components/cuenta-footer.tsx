@@ -8,6 +8,7 @@ import { VERSION, CAMBIOS_RECIENTES } from "@/lib/version";
 import type { UsuarioActual } from "@/lib/auth";
 import { ConfiguracionIcon } from "@/lib/nav-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ConTooltip } from "@/components/sidebar-tooltip";
 
 function LogoutIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -55,48 +56,52 @@ export function CuentaFooter({ usuario, expanded }: { usuario: UsuarioActual; ex
   }
 
   const iniciales = (usuario.nombre || usuario.email).trim().charAt(0).toUpperCase();
+  const nombreUsuario = usuario.nombre ?? usuario.email;
 
   return (
     <div className="flex flex-col gap-1 border-t border-border p-2">
       {usuario.modulos.includes("configuracion") && (
-        <Link
-          href="/configuracion"
-          title={!expanded ? "Configuración" : undefined}
-          className={expanded ? itemClass : "flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"}
-        >
-          <ConfiguracionIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-          {expanded && "Configuración"}
-        </Link>
+        <ConTooltip etiqueta="Configuración" mostrar={!expanded}>
+          <Link
+            href="/configuracion"
+            aria-label={!expanded ? "Configuración" : undefined}
+            className={expanded ? itemClass : "flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"}
+          >
+            <ConfiguracionIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            {expanded && "Configuración"}
+          </Link>
+        </ConTooltip>
       )}
 
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={pending}
-        title={!expanded ? `${usuario.nombre ?? usuario.email}${usuario.rolNombre ? ` · ${usuario.rolNombre}` : ""}` : "Cambiar foto de perfil"}
-        className={`flex w-full items-center gap-2.5 rounded-md p-1.5 hover:bg-muted transition-colors disabled:opacity-50 ${expanded ? "" : "justify-center"}`}
-      >
-        <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
-          {usuario.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={usuario.avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-sm font-medium text-muted-foreground">
-              {iniciales}
-            </span>
-          )}
-        </span>
-        {expanded && (
-          <span className="min-w-0 flex-1 text-left">
-            <span className="block truncate text-sm font-medium text-foreground">
-              {usuario.nombre ?? usuario.email}
-            </span>
-            {usuario.rolNombre && (
-              <span className="block truncate text-xs text-muted-foreground">{usuario.rolNombre}</span>
+      {/* Menú colapsado: el tooltip dice quién es; desplegado: qué hace el botón. */}
+      <ConTooltip etiqueta={expanded ? "Cambiar foto de perfil" : `${nombreUsuario}${usuario.rolNombre ? ` · ${usuario.rolNombre}` : ""}`} mostrar>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={pending}
+          aria-label={`Cambiar foto de perfil de ${nombreUsuario}`}
+          className={`flex w-full items-center gap-2.5 rounded-md p-1.5 hover:bg-muted transition-colors disabled:opacity-50 ${expanded ? "" : "justify-center"}`}
+        >
+          <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
+            {usuario.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={usuario.avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-sm font-medium text-muted-foreground">
+                {iniciales}
+              </span>
             )}
           </span>
-        )}
-      </button>
+          {expanded && (
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block truncate text-sm font-medium text-foreground">{nombreUsuario}</span>
+              {usuario.rolNombre && (
+                <span className="block truncate text-xs text-muted-foreground">{usuario.rolNombre}</span>
+              )}
+            </span>
+          )}
+        </button>
+      </ConTooltip>
       {error && <p className="px-3 text-xs text-destructive">{error}</p>}
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onChangeAvatar} />
 
@@ -130,13 +135,15 @@ export function CuentaFooter({ usuario, expanded }: { usuario: UsuarioActual; ex
         </>
       ) : (
         <form action={cerrarSesion}>
-          <button
-            type="submit"
-            title="Cerrar sesión"
-            className="flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogoutIcon className="h-4 w-4" />
-          </button>
+          <ConTooltip etiqueta="Cerrar sesión" mostrar>
+            <button
+              type="submit"
+              aria-label="Cerrar sesión"
+              className="flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <LogoutIcon className="h-4 w-4" />
+            </button>
+          </ConTooltip>
         </form>
       )}
     </div>
