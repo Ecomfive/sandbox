@@ -161,12 +161,15 @@ export function TablaRetiros({
   paisId,
   plataformas,
   cuentas,
+  miNombre,
 }: {
   retiros: FilaRetiro[];
   codigoPais: string;
   paisId: string;
   plataformas: Plataforma[];
   cuentas: Cuenta[];
+  /** Cómo aparece la persona que tiene la sesión en «Persona asignada»; con él sale «Mis retiros». */
+  miNombre?: string | null;
 }) {
   const tabla = useTablaInteractiva(DEF_RETIROS, retiros, { limiteSinFiltros: LIMITE_SIN_FILTROS });
   const [columnasGuardadas, cambiarColumnas] = useColumnas("retiros", COLUMNAS);
@@ -247,6 +250,18 @@ export function TablaRetiros({
         iconos={ICONOS}
         nombreFilas="retiros"
         columnas={{ defs: COLUMNAS, estado: columnasGuardadas, cambiar: cambiarColumnas }}
+        atajos={
+          miNombre
+            ? [
+                {
+                  id: "mis-retiros",
+                  etiqueta: "Mis retiros",
+                  ayuda: "Ver solo mis retiros",
+                  filtro: { campo: "asignado", valor: { tipo: "seleccion", valores: [miNombre] } },
+                },
+              ]
+            : undefined
+        }
       />
 
       <ContenedorTabla ariaLabel="Tabla de retiros">

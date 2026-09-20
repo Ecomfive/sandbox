@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const hoy = () => new Date().toISOString().slice(0, 10);
 
 export default async function RetirosPage() {
-  await requireModulo("retiros");
+  const usuario = await requireModulo("retiros");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
@@ -197,6 +197,7 @@ export default async function RetirosPage() {
           paisId={pais.id}
           plataformas={plataformasParaCrear}
           cuentas={cuentasRetiro ?? []}
+          miNombre={usuario.nombre ?? usuario.email}
         />
       </div>
 
