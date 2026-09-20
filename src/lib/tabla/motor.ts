@@ -71,6 +71,11 @@ export interface DefTabla<F> {
   };
   /** Cantidad que se suma por grupo (monto, unidades...). Sin esto los grupos solo cuentan filas. */
   total?: (fila: F) => number;
+  /**
+   * Columnas que van primero en el CSV de «Descargar» y que no son un campo de filtro (el número de un
+   * retiro, por ejemplo). Los campos de `campos` salen después, todos.
+   */
+  csvAntes?: { etiqueta: string; valor: (fila: F) => string | number | null }[];
   /** Vista con la que arranca quien aún no eligió una (por ejemplo, agrupada por extracto). */
   vistaInicial?: { agrupar: string; orden?: "asc" | "desc" };
 }

@@ -7,6 +7,7 @@ import { BotonFiltros } from "./boton-filtros";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import { PersonaIcon } from "@/lib/nav-icons";
 import { BotonAgrupar, BotonAtajo, BotonCerrados, type IconoComp } from "./botones-vista";
+import { BotonDescargar } from "./boton-descargar";
 import type { ColumnaDef, EstadoColumnas } from "./ganchos";
 import { MenuColumnas } from "./menu-columnas";
 import type { TablaInteractiva } from "./usar-tabla";
@@ -41,6 +42,9 @@ export function BarraHerramientas<F>({
   const agrupables = camposAgrupables(def).map((id) => ({ id, etiqueta: def.campos.find((c) => c.id === id)!.etiqueta }));
   const { vista, cambiarVista, resultado, filtros, cambiarFiltros, grupos } = tabla;
   const campoEstado = def.cerrados ? def.campos.find((c) => c.id === def.cerrados!.campoEstado)?.etiqueta : undefined;
+  // Lo que se descarga es lo que se ve: las filas que dejan los filtros (no solo las primeras que caben en
+  // pantalla) y, con grupos, en el orden de los grupos.
+  const filasParaDescargar = vista.agrupar ? grupos.flatMap((g) => g.filas) : resultado.filas;
 
   return (
     // Queda fija arriba al bajar la página, con fondo opaco para que las filas no se vean por debajo.
@@ -93,6 +97,7 @@ export function BarraHerramientas<F>({
           nombreFilas={nombreFilas}
         />
         {columnas && <MenuColumnas columnas={columnas.defs} estado={columnas.estado} alCambiar={columnas.cambiar} />}
+        <BotonDescargar def={def} filas={filasParaDescargar} nombreFilas={nombreFilas} />
       </div>
     </div>
   );

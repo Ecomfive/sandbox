@@ -27,6 +27,8 @@ export {
 /** Cómo se filtra, agrupa y oculta cerrados en la tabla de Conciliación de Retiros. */
 export const DEF_RETIROS: DefTabla<FilaRetiro> = {
   clave: "retiros",
+  // El número del retiro no es un filtro, pero es lo primero que se busca en el CSV: «#0007».
+  csvAntes: [{ etiqueta: "N.º de retiro", valor: (f) => `#${String(f.numeroCorrelativo).padStart(4, "0")}` }],
   campos: [
     {
       id: "estado",

@@ -136,6 +136,14 @@ convenciones técnicas del código.
   (entradas y salidas). Un filtro de un toque («Mis retiros») se pasa a
   `<BarraHerramientas atajos={[...]}>` (`AtajoFiltro`, `src/lib/tabla/atajos.ts`): es un
   filtro de selección que el botón enciende o apaga sin tocar los de otros campos.
+- **Descargar lo que se ve.** Toda tabla con barra de herramientas trae el botón
+  «Descargar»: un CSV (con BOM para Excel) de las filas que dejan los filtros, en
+  el orden de la pantalla, armado en el navegador con la `DefTabla`
+  (`src/lib/tabla/csv.ts`). Salen todos los `campos` de la definición, con los
+  nombres que se ven; lo que sea un identificador y no un campo de filtro (el
+  número de un retiro) va en `csvAntes`. Un texto que empieza por `=`, `+`, `-` o
+  `@` se escribe con comilla para que Excel no lo ejecute. Las descargas del
+  servidor de un período completo (`/api/exportar-*`) siguen aparte.
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
   y la `<table>` lleva la clase `tabla-datos`; los estilos están en
