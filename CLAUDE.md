@@ -64,10 +64,11 @@ convenciones técnicas del código.
   `ConTooltip` (`src/components/sidebar-tooltip.tsx`), que también aparece con
   el foco de teclado. Lo que no es enfocable (un ⚠️) se vuelve `tabIndex={0}`
   con `role="img"` para poder envolverlo. La única excepción a `title=` es el
-  chip de filtro con texto recortado, que muestra su nombre completo. El botón **Compartir** de la misma franja
-  (`src/components/compartir/`) muestra quién tiene acceso a la sección: sale de
-  los roles (`permisos_rol` + `perfiles`, ver `src/lib/compartir-actions.ts`), es
-  solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles.
+  chip de filtro con texto recortado, que muestra su nombre completo. El botón **Accesos** de la misma franja
+  (`src/components/accesos/`) muestra quién tiene acceso a la sección: sale de
+  los roles (`permisos_rol` + `perfiles`, ver `src/lib/accesos-actions.ts`), es
+  solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles. Se
+  llama «Accesos» y no «Compartir» porque no comparte ni da permisos.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

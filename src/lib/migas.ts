@@ -10,7 +10,7 @@ export interface Migas {
   migas: Miga[];
   /** Página del menú que se puede marcar como favorita desde las migas (solo la página actual si es un módulo). */
   favoritoHref: string | null;
-  /** Módulo (y su nombre) al que pertenece la página: de él salen los permisos que muestra "Compartir". */
+  /** Módulo (y su nombre) al que pertenece la página: de él salen los permisos que muestra "Accesos". */
   moduloHref: string | null;
   moduloEtiqueta: string | null;
 }

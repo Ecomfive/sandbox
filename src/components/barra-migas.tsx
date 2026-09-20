@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { BotonCompartir } from "@/components/compartir/boton-compartir";
+import { BotonAccesos } from "@/components/accesos/boton-accesos";
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import { useEtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { anilloFoco } from "@/components/ui/field";
@@ -116,11 +116,11 @@ export function BarraMigas({
             <FavoritoToggle href={favoritoHref} activo={favoritos.includes(favoritoHref)} variante="miga" />
           )}
         </div>
-        {/* Acciones de la página: mismo lugar en todas las secciones; Compartir siempre es la última. */}
+        {/* Acciones de la página: mismo lugar en todas las secciones; Accesos siempre es la última. */}
         <div className="flex shrink-0 items-center gap-2">
           <div id="acciones-encabezado" className="flex items-center gap-2" />
           {moduloHref && moduloEtiqueta && (
-            <BotonCompartir key={ruta} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />
+            <BotonAccesos key={ruta} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />
           )}
         </div>
       </div>
