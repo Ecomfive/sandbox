@@ -68,7 +68,9 @@ const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?:
 
 const ORDEN_DEFECTO = COLUMNAS.map((c) => c.id);
 const COLUMNAS_POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]));
-const STORAGE_KEY = "retiros-columnas-v1";
+// v2: se sube de versión porque quienes ya tenían un orden guardado en v1 podían haber
+// arrastrado "Consolidación" al final antes de este cambio — arranca de cero una sola vez.
+const STORAGE_KEY = "retiros-columnas-v2";
 
 function esColumnaId(valor: unknown): valor is ColumnaId {
   return typeof valor === "string" && ORDEN_DEFECTO.includes(valor as ColumnaId);
