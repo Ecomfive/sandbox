@@ -1,14 +1,13 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { Badge } from "@/components/ui/badge";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
-import { toneEstadoPedido } from "@/lib/estados-pedido";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
-import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
+import { formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FiltroFechas } from "@/components/filtro-fechas";
 import { OrdenSelect } from "./orden-select";
+import { TablaPedidos, type FilaPedido } from "./tabla-pedidos";
 import { resolverPeriodo } from "@/lib/dashboard/periodo";
 import { linkClass } from "@/components/ui/link";
 import { AyudaContextual } from "@/components/ui/ayuda-contextual";
@@ -87,6 +86,17 @@ export default async function PedidosDropiPage({
     referenciasLiquidadas.has(referencia) && !estado.toUpperCase().includes("ENTREGAD");
   const totalAlertas = resumen.filter((o) => esAlerta(o.referencia_externa, o.estado)).length;
 
+  const filasPedido: FilaPedido[] = todas.map((o) => ({
+    referencia: o.referencia_externa,
+    fecha: o.fecha,
+    fechaHora: o.fecha_hora,
+    producto: (o.productos as unknown as { sku: string; nombre: string } | null)?.nombre ?? null,
+    cantidad: o.cantidad,
+    monto: Number(o.monto),
+    estado: o.estado,
+    alerta: esAlerta(o.referencia_externa, o.estado),
+  }));
+
   const porEstado = new Map<string, number>();
   for (const o of resumen) porEstado.set(o.estado, (porEstado.get(o.estado) ?? 0) + 1);
   const estadosOrdenados = Array.from(porEstado.entries()).sort((a, b) => b[1] - a[1]);
@@ -150,54 +160,7 @@ export default async function PedidosDropiPage({
             </div>
           )}
 
-          <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full min-w-[52rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                  <th className="py-2 pr-3 pl-4 font-medium">Fecha</th>
-                  <th className="py-2 pr-3 font-medium">Fecha y hora del pedido</th>
-                  <th className="py-2 pr-3 font-medium">Orden</th>
-                  <th className="py-2 pr-3 font-medium">Producto</th>
-                  <th className="py-2 pr-3 font-medium">Cantidad</th>
-                  <th className="py-2 pr-3 font-medium">Monto</th>
-                  <th className="py-2 pr-3 font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todas.map((o) => {
-                  const producto = o.productos as unknown as { sku: string; nombre: string } | null;
-                  const alerta = esAlerta(o.referencia_externa, o.estado);
-                  return (
-                    <tr
-                      key={o.referencia_externa}
-                      className={`border-b last:border-0 ${
-                        alerta ? "border-destructive/30 bg-destructive-soft text-destructive" : "border-border/60"
-                      }`}
-                    >
-                      <td className="py-2 pr-3 pl-4">{formatearFecha(o.fecha)}</td>
-                      <td className={`py-2 pr-3 ${alerta ? "text-destructive" : "text-muted-foreground"}`}>
-                        {formatearFechaHora(o.fecha_hora)}
-                      </td>
-                      <td className="py-2 pr-3 font-medium">
-                        {alerta && (
-                          <span title="Liquidado en cartera pero aún no marcado ENTREGADO en Dropi">⚠️ </span>
-                        )}
-                        {o.referencia_externa}
-                      </td>
-                      <td className={`py-2 pr-3 ${alerta ? "" : "text-muted-foreground"}`}>
-                        {producto?.nombre ?? "—"}
-                      </td>
-                      <td className="py-2 pr-3 tabular-nums">{o.cantidad}</td>
-                      <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(o.monto), pais.codigo)}</td>
-                      <td className="py-2 pr-3">
-                        <Badge tone={toneEstadoPedido(o.estado)}>{o.estado}</Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <TablaPedidos pedidos={filasPedido} codigoPais={pais.codigo} />
         </>
       )}
     </main>

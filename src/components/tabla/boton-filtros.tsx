@@ -1,65 +1,24 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ComponentType,
-  type ReactNode,
-  type SVGProps,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
-  BuscarIcon,
-  CalendarioIcon,
-  CerrarIcon,
-  EstadoIcon,
-  ExtractoIcon,
-  FiltroIcon,
-  GastoIcon,
-  MasIcon,
-  PedidoIcon,
-  PersonaIcon,
-  TiendaIcon,
-} from "@/lib/nav-icons";
-import {
-  CAMPOS,
-  CAMPO_POR_ID,
   PRESETS_FECHA,
+  campoDe,
   filtroActivo,
   filtroVacio,
   normalizar,
   opcionesDeSeleccion,
-  parsearFiltros,
   rangoDePreset,
-  type CampoId,
+  type DefTabla,
   type Filtro,
   type TipoCampo,
   type ValorFiltro,
-} from "./filtros";
-import type { FilaRetiro } from "./tabla-retiros";
-
-export const ICONOS: Record<CampoId, ComponentType<SVGProps<SVGSVGElement>>> = {
-  estado: EstadoIcon,
-  plataforma: TiendaIcon,
-  destino: ExtractoIcon,
-  dropi: PedidoIcon,
-  asignado: PersonaIcon,
-  creacion: CalendarioIcon,
-  cierre: CalendarioIcon,
-  limite: CalendarioIcon,
-  monto: GastoIcon,
-  comision: GastoIcon,
-  arecibir: GastoIcon,
-  recibido: GastoIcon,
-  notas: ExtractoIcon,
-  soporte: ExtractoIcon,
-};
+} from "@/lib/tabla/motor";
+import { BuscarIcon, CerrarIcon, EstadoIcon, FiltroIcon, MasIcon } from "@/lib/nav-icons";
+import type { IconoComp } from "./botones-vista";
 
 const OPERADOR: Record<TipoCampo, string> = {
   seleccion: "es cualquiera de",
@@ -67,44 +26,6 @@ const OPERADOR: Record<TipoCampo, string> = {
   numero: "entre",
   texto: "contiene",
 };
-
-// Los filtros viven en sessionStorage para que sobrevivan a entrar a un retiro y volver.
-const CLAVE_STORAGE = "retiros-filtros-v1";
-const oyentes = new Set<() => void>();
-let filtrosEnMemoria: string | null = null;
-
-function suscribir(avisar: () => void) {
-  oyentes.add(avisar);
-  return () => {
-    oyentes.delete(avisar);
-  };
-}
-
-function leerFiltrosGuardados(): string {
-  if (filtrosEnMemoria !== null) return filtrosEnMemoria;
-  try {
-    return sessionStorage.getItem(CLAVE_STORAGE) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function guardarFiltros(json: string) {
-  filtrosEnMemoria = json;
-  try {
-    sessionStorage.setItem(CLAVE_STORAGE, json);
-  } catch {
-    // Sin sessionStorage (modo privado, cuotas) los filtros siguen funcionando mientras no se recargue.
-  }
-  oyentes.forEach((avisar) => avisar());
-}
-
-export function useFiltrosRetiros(): [Filtro[], (filtros: Filtro[]) => void] {
-  const json = useSyncExternalStore(suscribir, leerFiltrosGuardados, () => "");
-  const filtros = useMemo(() => parsearFiltros(json), [json]);
-  const cambiar = useCallback((nuevos: Filtro[]) => guardarFiltros(JSON.stringify(nuevos)), []);
-  return [filtros, cambiar];
-}
 
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
   return (
@@ -124,20 +45,22 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
   );
 }
 
-function EditorValor({
+function EditorValor<F>({
+  def,
   campo,
   valor,
   filas,
   alCambiar,
 }: {
-  campo: CampoId;
+  def: DefTabla<F>;
+  campo: string;
   valor: ValorFiltro;
-  filas: FilaRetiro[];
+  filas: F[];
   alCambiar: (valor: ValorFiltro) => void;
 }) {
   switch (valor.tipo) {
     case "seleccion": {
-      const opciones = opcionesDeSeleccion(filas, campo);
+      const opciones = opcionesDeSeleccion(def, filas, campo);
       if (opciones.length === 0) {
         return <p className="text-xs text-muted-foreground">Todavía no hay valores para elegir.</p>;
       }
@@ -231,7 +154,7 @@ function EditorValor({
           type="text"
           value={valor.texto}
           placeholder="Escribe para buscar..."
-          aria-label={`Texto que contiene ${CAMPO_POR_ID.get(campo)?.etiqueta ?? "el campo"}`}
+          aria-label={`Texto que contiene ${campoDe(def, campo)?.etiqueta ?? "el campo"}`}
           onChange={(e) => alCambiar({ tipo: "texto", texto: e.target.value })}
           className={`${fieldClassSm} w-full`}
         />
@@ -240,20 +163,26 @@ function EditorValor({
 }
 
 /**
- * Botón de filtros (ícono de embudo) que abre un panel estilo ClickUp: se elige un
- * campo del retiro en una lista con buscador y se le asigna el valor. Los filtros
- * se combinan con "y". El panel se dibuja en document.body para que el overflow
- * de la tabla no lo recorte.
+ * Botón de filtros (ícono de embudo) que abre un panel estilo ClickUp: se elige un campo de la tabla
+ * en una lista con buscador y se le asigna el valor. Los filtros se combinan con "y". El panel se
+ * dibuja en document.body para que el overflow de la tabla no lo recorte.
  */
-export function BotonFiltrosRetiros({
+export function BotonFiltros<F>({
+  def,
   filas,
   filtros,
   alCambiar,
+  iconos,
+  nombreFilas,
   alAbrir,
 }: {
-  filas: FilaRetiro[];
+  def: DefTabla<F>;
+  filas: F[];
   filtros: Filtro[];
   alCambiar: (filtros: Filtro[]) => void;
+  iconos: Record<string, IconoComp>;
+  /** En plural y en minúscula, para el tooltip: "retiros" -> "Filtrar retiros". */
+  nombreFilas: string;
   alAbrir?: () => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -265,8 +194,8 @@ export function BotonFiltrosRetiros({
   const buscadorRef = useRef<HTMLInputElement>(null);
 
   const activos = filtros.filter(filtroActivo).length;
-  const usados = new Set(filtros.map((f) => f.campo));
-  const camposDisponibles = CAMPOS.filter(
+  const usados = useMemo(() => new Set(filtros.map((f) => f.campo)), [filtros]);
+  const camposDisponibles = def.campos.filter(
     (campo) => !usados.has(campo.id) && normalizar(campo.etiqueta).includes(normalizar(busqueda.trim()))
   );
 
@@ -347,25 +276,25 @@ export function BotonFiltrosRetiros({
     setAbierto(true);
   }
 
-  function agregar(campo: CampoId) {
-    alCambiar([...filtros, filtroVacio(campo)]);
+  function agregar(campo: string) {
+    alCambiar([...filtros, filtroVacio(def, campo)]);
     setEligiendo(false);
     setBusqueda("");
   }
 
-  function quitar(campo: CampoId) {
+  function quitar(campo: string) {
     const resto = filtros.filter((f) => f.campo !== campo);
     alCambiar(resto);
     if (resto.length === 0) setEligiendo(true);
   }
 
-  function reemplazar(campo: CampoId, valor: ValorFiltro) {
+  function reemplazar(campo: string, valor: ValorFiltro) {
     alCambiar(filtros.map((f) => (f.campo === campo ? { campo, valor } : f)));
   }
 
   return (
     <>
-      <Tooltip texto="Filtrar retiros">
+      <Tooltip texto={`Filtrar ${nombreFilas}`}>
         <button
           ref={botonRef}
           type="button"
@@ -374,9 +303,7 @@ export function BotonFiltrosRetiros({
           aria-haspopup="dialog"
           aria-expanded={abierto}
           className={`relative flex h-8 w-8 items-center justify-center !rounded-full transition-colors ${anilloFoco} ${
-            activos > 0
-              ? "bg-foreground text-background"
-              : "bg-muted text-muted-foreground hover:bg-border"
+            activos > 0 ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border"
           }`}
         >
           <FiltroIcon className="h-4 w-4" />
@@ -420,8 +347,9 @@ export function BotonFiltrosRetiros({
             {filtros.length > 0 && (
               <div className="flex flex-col gap-2 px-3 pb-2">
                 {filtros.map((filtro) => {
-                  const definicion = CAMPO_POR_ID.get(filtro.campo)!;
-                  const Icono = ICONOS[filtro.campo];
+                  const definicion = campoDe(def, filtro.campo);
+                  if (!definicion) return null;
+                  const Icono = iconos[filtro.campo] ?? EstadoIcon;
                   return (
                     <div key={filtro.campo} className="rounded-lg border border-border p-2.5">
                       <div className="flex items-center justify-between gap-2">
@@ -441,6 +369,7 @@ export function BotonFiltrosRetiros({
                       </div>
                       <div className="mt-2">
                         <EditorValor
+                          def={def}
                           campo={filtro.campo}
                           valor={filtro.valor}
                           filas={filas}
@@ -469,7 +398,7 @@ export function BotonFiltrosRetiros({
                 </div>
                 <div className="mt-2 max-h-64 overflow-y-auto">
                   {camposDisponibles.map((campo) => {
-                    const Icono = ICONOS[campo.id];
+                    const Icono = iconos[campo.id] ?? EstadoIcon;
                     return (
                       <button
                         key={campo.id}
@@ -484,13 +413,13 @@ export function BotonFiltrosRetiros({
                   })}
                   {camposDisponibles.length === 0 && (
                     <p className="px-2 py-3 text-muted-foreground">
-                      {usados.size === CAMPOS.length ? "Ya usaste todos los campos." : "Sin resultados."}
+                      {usados.size === def.campos.length ? "Ya usaste todos los campos." : "Sin resultados."}
                     </p>
                   )}
                 </div>
               </div>
             ) : (
-              usados.size < CAMPOS.length && (
+              usados.size < def.campos.length && (
                 <div className="px-3 pb-3">
                   <button
                     type="button"

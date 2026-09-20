@@ -1,73 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
-import { AgruparIcon, CerradoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon } from "@/lib/nav-icons";
-import { ICONOS } from "./filtros-retiros";
+import type { OrdenGrupos } from "@/lib/tabla/vista";
 import {
-  CAMPOS_AGRUPABLES,
-  VISTA_DEFECTO,
-  etiquetaCampo,
-  parsearVista,
-  type CampoAgrupable,
-  type OrdenGrupos,
-  type Vista,
-} from "./vista";
+  AgruparIcon,
+  CerradoIcon,
+  CheckIcon,
+  EstadoIcon,
+  FlechaAbajoIcon,
+  FlechaArribaIcon,
+} from "@/lib/nav-icons";
+
+export type IconoComp = ComponentType<SVGProps<SVGSVGElement>>;
 
 const ANCHO_MENU = 224; // w-56
 
-const ORDENES: { id: OrdenGrupos; etiqueta: string; Icono: typeof FlechaArribaIcon }[] = [
+const ORDENES: { id: OrdenGrupos; etiqueta: string; Icono: IconoComp }[] = [
   { id: "asc", etiqueta: "Ascendente", Icono: FlechaArribaIcon },
   { id: "desc", etiqueta: "Descendente", Icono: FlechaAbajoIcon },
 ];
-
-// La vista vive en localStorage: cada persona conserva la suya al volver a la página.
-const CLAVE_STORAGE = "retiros-vista-v1";
-const oyentes = new Set<() => void>();
-let vistaEnMemoria: string | null = null;
-
-function suscribir(avisar: () => void) {
-  oyentes.add(avisar);
-  return () => {
-    oyentes.delete(avisar);
-  };
-}
-
-function leerVistaGuardada(): string {
-  if (vistaEnMemoria !== null) return vistaEnMemoria;
-  try {
-    return localStorage.getItem(CLAVE_STORAGE) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function guardarVista(json: string) {
-  vistaEnMemoria = json;
-  try {
-    localStorage.setItem(CLAVE_STORAGE, json);
-  } catch {
-    // Sin localStorage (modo privado, cuotas) la vista funciona mientras no se recargue la página.
-  }
-  oyentes.forEach((avisar) => avisar());
-}
-
-export function useVistaRetiros(): [Vista, (cambio: Partial<Vista>) => void] {
-  const json = useSyncExternalStore(suscribir, leerVistaGuardada, () => "");
-  const vista = useMemo(() => (json === "" ? VISTA_DEFECTO : parsearVista(json)), [json]);
-  const cambiar = useCallback(
-    (cambio: Partial<Vista>) => guardarVista(JSON.stringify({ ...parsearVista(leerVistaGuardada()), ...cambio })),
-    []
-  );
-  return [vista, cambiar];
-}
 
 /**
  * Misma familia que el botón de filtros: círculo gris de 32 px en reposo, oscuro cuando está activo.
  * Como en ClickUp, el botón nace compacto (solo ícono) y se despliega a pastilla con su texto al activarlo.
  */
-const pastilla = (activa: boolean) =>
+export const pastilla = (activa: boolean) =>
   `relative inline-flex h-8 items-center !rounded-full px-2 text-xs font-medium whitespace-nowrap transition-colors ${anilloFoco} ${
     activa ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
   }`;
@@ -76,7 +35,7 @@ const pastilla = (activa: boolean) =>
  * Ícono + texto que se despliega hacia un lado. Anima `grid-template-columns` (0fr → 1fr) para que el
  * ancho siga al contenido sin medirlo; con movimiento reducido el cambio es instantáneo.
  */
-function Despliegue({ expandida, children }: { expandida: boolean; children: ReactNode }) {
+export function Despliegue({ expandida, children }: { expandida: boolean; children: ReactNode }) {
   return (
     <span
       className={`grid transition-[grid-template-columns] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
@@ -97,32 +56,39 @@ function Despliegue({ expandida, children }: { expandida: boolean; children: Rea
 }
 
 /**
- * "Cerrados": muestra u oculta al instante los retiros en estado Cerrado (como en ClickUp).
- * Si un filtro de Estado ya pide los cerrados, el botón queda fijo en "activo" y lo explica.
+ * Botón de las filas "cerradas" (Cerrados, Resueltas, Entregados...): las muestra u oculta al instante.
+ * Si un filtro del campo de estado ya pide esas filas, el botón queda fijo en "activo" y lo explica.
  */
 export function BotonCerrados({
+  etiqueta,
+  campoEstado,
   visibles,
   forzadoPorFiltro,
   ocultos,
   alAlternar,
 }: {
+  /** En plural y con mayúscula: "Cerrados". */
+  etiqueta: string;
+  /** Nombre del campo cuyo filtro puede forzarlas: "Estado". */
+  campoEstado: string;
   visibles: boolean;
   forzadoPorFiltro: boolean;
   ocultos: number;
   alAlternar: () => void;
 }) {
+  const minuscula = etiqueta.toLowerCase();
   const titulo = forzadoPorFiltro
-    ? "Lo pide el filtro de Estado."
+    ? `Lo pide el filtro de ${campoEstado}.`
     : visibles
-      ? "Ocultar cerrados"
-      : "Mostrar cerrados";
+      ? `Ocultar ${minuscula}`
+      : `Mostrar ${minuscula}`;
   const mostrarInsignia = !visibles && ocultos > 0;
-  // El nombre accesible contiene el texto visible ("Cerrados") y suma lo que solo se ve como insignia o tooltip.
+  // El nombre accesible contiene el texto visible y suma lo que solo se ve como insignia o tooltip.
   const nombre = forzadoPorFiltro
-    ? "Cerrados, los pide el filtro de Estado"
+    ? `${etiqueta}, los pide el filtro de ${campoEstado}`
     : mostrarInsignia
-      ? `Cerrados, ${ocultos} ${ocultos === 1 ? "oculto" : "ocultos"}`
-      : "Cerrados";
+      ? `${etiqueta}, ${ocultos} ${ocultos === 1 ? "oculto" : "ocultos"}`
+      : etiqueta;
   return (
     <Tooltip texto={titulo}>
       <button
@@ -136,7 +102,7 @@ export function BotonCerrados({
         className={`${pastilla(visibles)} ${forzadoPorFiltro ? "cursor-not-allowed" : ""}`}
       >
         <CerradoIcon className="h-4 w-4 shrink-0" />
-        <Despliegue expandida={visibles}>Cerrados</Despliegue>
+        <Despliegue expandida={visibles}>{etiqueta}</Despliegue>
         {mostrarInsignia && (
           <span
             aria-hidden="true"
@@ -152,9 +118,11 @@ export function BotonCerrados({
 
 /**
  * "Agrupar": pastilla con el campo elegido; abre una lista para cambiar de campo o quitar la
- * agrupación, y —con grupos a la vista— contraerlos o expandirlos todos.
+ * agrupación, elegir el orden de los grupos y —con grupos a la vista— contraerlos o expandirlos todos.
  */
 export function BotonAgrupar({
+  campos,
+  iconos,
   campo,
   orden,
   alElegir,
@@ -164,19 +132,23 @@ export function BotonAgrupar({
   alExpandirTodos,
   alAbrir,
 }: {
-  campo: CampoAgrupable | null;
+  campos: { id: string; etiqueta: string }[];
+  iconos: Record<string, IconoComp>;
+  campo: string | null;
   orden: OrdenGrupos;
-  alElegir: (campo: CampoAgrupable | null) => void;
+  alElegir: (campo: string | null) => void;
   alElegirOrden: (orden: OrdenGrupos) => void;
   hayGrupos: boolean;
   alContraerTodos: () => void;
   alExpandirTodos: () => void;
   alAbrir?: () => void;
 }) {
+  const idMenu = useId();
   const [abierto, setAbierto] = useState(false);
   const [alineadoADerecha, setAlineadoADerecha] = useState(false);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const botonRef = useRef<HTMLButtonElement>(null);
+  const etiquetaCampo = (id: string) => campos.find((c) => c.id === id)?.etiqueta ?? id;
 
   useEffect(() => {
     if (!abierto) return;
@@ -207,7 +179,7 @@ export function BotonAgrupar({
     setAbierto((v) => !v);
   }
 
-  function elegir(nuevo: CampoAgrupable | null) {
+  function elegir(nuevo: string | null) {
     alElegir(nuevo);
     setAbierto(false);
     botonRef.current?.focus();
@@ -232,7 +204,7 @@ export function BotonAgrupar({
           type="button"
           onClick={alternar}
           aria-expanded={abierto}
-          aria-controls="menu-agrupar-retiros"
+          aria-controls={idMenu}
           aria-label={nombre}
           className={pastilla(campo !== null)}
         >
@@ -257,7 +229,7 @@ export function BotonAgrupar({
       </Tooltip>
       {abierto && (
         <div
-          id="menu-agrupar-retiros"
+          id={idMenu}
           role="group"
           aria-label="Agrupar por"
           className={`absolute z-20 mt-1 w-56 rounded-xl border border-border bg-card p-1 text-foreground shadow-lg ${
@@ -265,8 +237,8 @@ export function BotonAgrupar({
           }`}
         >
           <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Agrupar por</p>
-          {CAMPOS_AGRUPABLES.map((id) => {
-            const Icono = ICONOS[id];
+          {campos.map(({ id, etiqueta }) => {
+            const Icono = iconos[id] ?? EstadoIcon;
             const activo = campo === id;
             return (
               <button
@@ -277,7 +249,7 @@ export function BotonAgrupar({
                 className={`${opcion} ${anilloFoco} ${activo ? "font-semibold" : ""}`}
               >
                 <Icono className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="flex-1">{etiquetaCampo(id)}</span>
+                <span className="flex-1">{etiqueta}</span>
                 {activo && <CheckIcon className="h-4 w-4 shrink-0" />}
               </button>
             );

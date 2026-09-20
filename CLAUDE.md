@@ -62,6 +62,16 @@ convenciones técnicas del código.
   (`src/components/compartir/`) muestra quién tiene acceso a la sección: sale de
   los roles (`permisos_rol` + `perfiles`, ver `src/lib/compartir-actions.ts`), es
   solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles.
+- **Tablas con barra de herramientas común** (Agrupar, filas cerradas, Filtros,
+  Columnas — igual en todos los módulos, estilo ClickUp). Retiros, Alertas y
+  Pedidos Dropi ya la usan. Para sumarla a otra tabla: describe sus campos en
+  una `DefTabla` (`src/lib/tabla/motor.ts`; ver `retiros/filtros.ts`,
+  `alertas/def-alertas.ts` o `pedidos-dropi/def-pedidos.ts`), usa
+  `useTablaInteractiva` + `useColumnas` y dibuja `<BarraHerramientas>`
+  (`src/components/tabla/`). La lógica pura vive en `src/lib/tabla/` y el
+  tooltip de cada botón sale solo; no copies la barra a mano. Lo que cada
+  persona elige (filtros, vista, columnas) se guarda en su navegador con la
+  `clave` de la tabla (`<clave>-filtros-v1`, `-vista-v1`, `-columnas-v1`).
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.
