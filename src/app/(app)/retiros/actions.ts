@@ -233,6 +233,88 @@ export async function cancelarRetiro(formData: FormData) {
   revalidatePath(`/retiros/${id}`);
 }
 
+/** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado
+ * por, monto, comisión, fechas o nota — todo junto, desde la ficha de "Modificar". No toca el
+ * estado (eso lo hace cambiarEstadoRetiro) ni el correlativo. */
+export async function actualizarRetiro(formData: FormData) {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+  const plataforma_id = formData.get("plataforma_id") as string;
+  const cuenta_retiro_id = (formData.get("cuenta_retiro_id") as string) || null;
+  const monto = Number(formData.get("monto"));
+  const comision = Number(formData.get("comision") || 0);
+  const fecha = formData.get("fecha") as string;
+  const notas = (formData.get("notas") as string) || null;
+  const fecha_limite = (formData.get("fecha_limite") as string) || null;
+  // "A recibir" tampoco se edita a mano acá: se recalcula igual que al crear.
+  const a_recibir = monto - comision;
+  const gestionadoPorTexto = formData.get("gestionado_por") as string;
+  const gestionado_por = gestionadoPorTexto === "correo" ? "correo" : "plataforma";
+
+  const supabase = createServiceClient();
+  const { data: antes, error: errorAntes } = await supabase
+    .from("retiros")
+    .select("monto, comision")
+    .eq("id", id)
+    .single();
+  if (errorAntes) throw new Error(errorAntes.message);
+
+  const { error } = await supabase
+    .from("retiros")
+    .update({
+      plataforma_id,
+      cuenta_retiro_id,
+      monto,
+      comision,
+      a_recibir,
+      fecha,
+      notas,
+      fecha_limite,
+      gestionado_por,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await registrarEvento(
+    supabase,
+    id,
+    `Retiro modificado: monto ${Number(antes.monto).toFixed(2)} → ${monto.toFixed(2)}`
+  );
+  await registrarAuditoria({
+    accion: "editar_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    antes: { Monto: Number(antes.monto).toFixed(2), Comisión: Number(antes.comision).toFixed(2) },
+    despues: { Monto: monto.toFixed(2), Comisión: comision.toFixed(2) },
+  });
+
+  revalidatePath("/retiros");
+  revalidatePath(`/retiros/${id}`);
+}
+
+/** Borra el retiro por completo. Sus eventos (retiro_eventos) se borran en cascada; ninguna
+ * otra tabla referencia retiros.id, así que no hace falta bloquear por relaciones como en
+ * eliminarCuentaRetiro. Devuelve el error como valor en vez de lanzarlo, porque en producción
+ * Next.js oculta el mensaje de cualquier excepción de un server action. */
+export async function eliminarRetiro(formData: FormData): Promise<{ error?: string }> {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("retiros").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  await registrarAuditoria({
+    accion: "eliminar_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    detalle: "Retiro eliminado",
+  });
+
+  revalidatePath("/retiros");
+  return {};
+}
+
 /** Cambio manual y directo del estado desde la columna de la tabla — a diferencia de
  * cerrarRetiro(), no toca monto recibido ni comprobante: solo mueve la etiqueta. Sirve para
  * marcar a mano una novedad detectada en Dropi, o archivar un retiro como cerrado sin pasar

@@ -16,11 +16,11 @@ const Obligatorio = () => (
   </span>
 );
 
-interface Plataforma {
+export interface Plataforma {
   id: string;
   nombre: string;
 }
-interface Cuenta {
+export interface Cuenta {
   id: string;
   nombre: string;
   comision_tipo: "porcentaje" | "monto_fijo" | "ambos" | null;
@@ -29,8 +29,9 @@ interface Cuenta {
 }
 
 /** Calcula cuánto sugiere cobrar la cuenta para un monto dado — porcentaje, monto fijo, o
- * los dos sumados si la cuenta tiene comisión "ambos" (ej. 2.5% + $3). */
-function calcularComisionSugerida(cuenta: Cuenta, montoNum: number): number | null {
+ * los dos sumados si la cuenta tiene comisión "ambos" (ej. 2.5% + $3). Se usa también al
+ * editar un retiro, si se cambia de cuenta destino. */
+export function calcularComisionSugerida(cuenta: Cuenta, montoNum: number): number | null {
   if (!cuenta.comision_tipo) return null;
   const dePorcentaje =
     cuenta.comision_porcentaje != null ? (montoNum * cuenta.comision_porcentaje) / 100 : 0;

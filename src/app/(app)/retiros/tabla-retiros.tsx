@@ -16,13 +16,18 @@ import { ConsolidadoToggle } from "./consolidado-toggle";
 import { EstadoSelect } from "./estado-select";
 import { BotonAgrupar, BotonCerrados, useVistaRetiros } from "./vista-retiros";
 import { agruparRetiros, aplicarVista, type CampoAgrupable, type Grupo } from "./vista";
+import type { Cuenta, Plataforma } from "./crear-retiro-panel";
+import { EditarRetiroPanel } from "./editar-retiro-panel";
+import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 
 export interface FilaRetiro {
   id: string;
   numeroCorrelativo: number;
   consolidado: boolean;
   fecha: string;
+  plataformaId: string | null;
   plataformaNombre: string | null;
+  cuentaRetiroId: string | null;
   destino: string;
   monto: number;
   estado: string;
@@ -33,6 +38,7 @@ export interface FilaRetiro {
   fechaLimite: string | null;
   asignadoNombre: string | null;
   estadoDropi: string | null;
+  gestionadoPor: string;
   notas: string | null;
   soporteNumero: string | null;
 }
@@ -47,7 +53,7 @@ const ESTADO_TONO = {
   cerrado: "success",
 } as const;
 
-type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado" | "dropi";
+type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado" | "dropi" | "acciones";
 
 const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?: string }[] = [
   { id: "correlativo", label: "#", ocultable: false, claseCelda: "font-semibold" },
@@ -57,6 +63,7 @@ const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?:
   { id: "monto", label: "Monto", ocultable: true, claseCelda: "tabular-nums font-semibold" },
   { id: "estado", label: "Estado", ocultable: true },
   { id: "dropi", label: "Dropi", ocultable: true },
+  { id: "acciones", label: "Acciones", ocultable: false },
 ];
 
 const ORDEN_DEFECTO = COLUMNAS.map((c) => c.id);
@@ -67,7 +74,13 @@ function esColumnaId(valor: unknown): valor is ColumnaId {
   return typeof valor === "string" && ORDEN_DEFECTO.includes(valor as ColumnaId);
 }
 
-function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
+function renderCelda(
+  id: ColumnaId,
+  fila: FilaRetiro,
+  codigoPais: string,
+  plataformas: Plataforma[],
+  cuentas: Cuenta[]
+) {
   switch (id) {
     case "correlativo":
       return (
@@ -102,6 +115,28 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
       ) : (
         <span className="text-muted-foreground">—</span>
       );
+    case "acciones":
+      return (
+        <div className="flex items-center gap-1">
+          <EditarRetiroPanel
+            retiro={{
+              id: fila.id,
+              numeroCorrelativo: fila.numeroCorrelativo,
+              plataformaId: fila.plataformaId,
+              cuentaRetiroId: fila.cuentaRetiroId,
+              gestionadoPor: fila.gestionadoPor,
+              monto: fila.monto,
+              comision: fila.comision,
+              fecha: fila.fecha,
+              fechaLimite: fila.fechaLimite,
+              notas: fila.notas,
+            }}
+            plataformas={plataformas}
+            cuentas={cuentas}
+          />
+          <EliminarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
+        </div>
+      );
   }
 }
 
@@ -119,7 +154,17 @@ function etiquetaGrupo(campo: CampoAgrupable, grupo: Grupo) {
 /** Tabla de retiros con menú de columnas: arrastrar para reordenar, casilla para ocultar.
  * La preferencia se guarda en localStorage — cada persona en su navegador ve su propio orden.
  * Encima de la tabla: agrupar por un campo y mostrar u ocultar los retiros cerrados (como en ClickUp). */
-export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; codigoPais: string }) {
+export function TablaRetiros({
+  retiros,
+  codigoPais,
+  plataformas,
+  cuentas,
+}: {
+  retiros: FilaRetiro[];
+  codigoPais: string;
+  plataformas: Plataforma[];
+  cuentas: Cuenta[];
+}) {
   const [filtros, cambiarFiltros] = useFiltrosRetiros();
   const [vista, cambiarVista] = useVistaRetiros();
   const hayFiltros = filtros.some(filtroActivo);
@@ -238,7 +283,7 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
             columna.claseCelda ?? ""
           }`}
         >
-          {renderCelda(columna.id, fila, codigoPais)}
+          {renderCelda(columna.id, fila, codigoPais, plataformas, cuentas)}
         </td>
       ))}
     </tr>

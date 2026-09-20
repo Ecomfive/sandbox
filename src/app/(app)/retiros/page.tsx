@@ -39,7 +39,7 @@ export default async function RetirosPage() {
       supabase
         .from("retiros")
         .select(
-          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, a_recibir, asignado_a, notas, soporte_numero, banco, estado_dropi, plataforma_id, plataformas(nombre), cuentas_retiro(nombre)"
+          "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, a_recibir, asignado_a, notas, soporte_numero, banco, estado_dropi, plataforma_id, cuenta_retiro_id, gestionado_por, plataformas(nombre), cuentas_retiro(nombre)"
         )
         .eq("pais_id", pais.id)
         .order("fecha", { ascending: false })
@@ -99,7 +99,9 @@ export default async function RetirosPage() {
     numeroCorrelativo: r.numero_correlativo,
     consolidado: r.consolidado,
     fecha: r.fecha,
+    plataformaId: r.plataforma_id,
     plataformaNombre: (r.plataformas as unknown as { nombre: string } | null)?.nombre ?? null,
+    cuentaRetiroId: r.cuenta_retiro_id,
     destino: (r.cuentas_retiro as unknown as { nombre: string } | null)?.nombre ?? r.banco ?? "—",
     monto: Number(r.monto),
     estado: r.estado,
@@ -110,6 +112,7 @@ export default async function RetirosPage() {
     fechaLimite: r.fecha_limite,
     asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,
     estadoDropi: r.estado_dropi,
+    gestionadoPor: r.gestionado_por,
     notas: r.notas,
     soporteNumero: r.soporte_numero,
   }));
@@ -187,7 +190,12 @@ export default async function RetirosPage() {
           </KpiGroup>
         </div>
 
-        <TablaRetiros retiros={filasRetiro} codigoPais={pais.codigo} />
+        <TablaRetiros
+          retiros={filasRetiro}
+          codigoPais={pais.codigo}
+          plataformas={plataformasParaCrear}
+          cuentas={cuentasRetiro ?? []}
+        />
       </div>
 
       <DropiSinVincular filas={sinVincular ?? []} codigoPais={pais.codigo} />
