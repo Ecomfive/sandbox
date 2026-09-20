@@ -12,6 +12,12 @@ import { paginasBuscables } from "@/lib/paleta";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
+import {
+  SIN_PENDIENTES,
+  calcularPendientesMenu,
+  necesitaPendientes,
+  type PendientesMenu,
+} from "@/lib/contadores-menu";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const usuario = await getUsuarioActual();
@@ -21,14 +27,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const seccionesPlataforma = construirSeccionesPlataforma(plataformasPais);
   const paginas = paginasBuscables(seccionesPlataforma, NAV_SECTIONS, usuario?.modulos ?? null);
   const favoritos = usuario ? await obtenerFavoritos(supabase, usuario.id) : [];
-  const pendientesHoy =
-    usuario?.modulos.includes("notificaciones") ? await obtenerPendientesHoy(supabase, pais.id) : null;
-  const totalPendientes = pendientesHoy
-    ? pendientesHoy.alertasInventario +
-      pendientesHoy.pedidosConNovedad +
-      pendientesHoy.saldosSinRegistrar +
-      pendientesHoy.retirosDropiSinVincular
-    : 0;
+  // Sin await a propósito: el menú lleva la promesa y los contadores llegan por streaming; si la consulta
+  // falla, el menú sale sin contadores en vez de romper la página.
+  const pendientes: Promise<PendientesMenu> =
+    usuario && necesitaPendientes(usuario.modulos)
+      ? obtenerPendientesHoy(supabase, pais.id)
+          .then((p) => calcularPendientesMenu(p, usuario.modulos))
+          .catch(() => SIN_PENDIENTES)
+      : Promise.resolve(SIN_PENDIENTES);
 
   return (
     <ToastProvider>
@@ -38,7 +44,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           usuario={usuario}
           seccionesPlataforma={seccionesPlataforma}
           favoritos={favoritos}
-          totalPendientes={totalPendientes}
+          pendientes={pendientes}
         />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} />

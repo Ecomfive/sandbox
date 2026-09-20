@@ -98,6 +98,20 @@ convenciones técnicas del código.
   páginas sale del menú y de las pestañas de cada módulo
   (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
+- **Contadores en el menú lateral.** Las páginas donde se resuelve un pendiente
+  (Alertas de inventario, Pedidos Dropi, Conciliación de Retiros) muestran una
+  pastilla con cuántos hay, y el grupo o la sección cerrados muestran la suma de
+  lo que esconden (con el riel colapsado, sobre el ícono). El reparto vive en
+  `calcularPendientesMenu` (`src/lib/contadores-menu.ts`), que parte de
+  `obtenerPendientesHoy` (solo `count` con `head`, nada de traer filas) y respeta
+  los módulos de la persona; para sumar una página, agrégala ahí. **El layout no
+  espera la consulta**: crea la promesa y el menú la lee con `use()` dentro de un
+  `Suspense` (`src/components/sidebar.tsx`), así que el menú sale al instante y
+  los números llegan después; si la consulta falla, el menú sale sin contadores.
+  Los números se calculan al cargar el layout, no en cada navegación entre páginas
+  (el layout persiste): se ven al día tras recargar o al refrescar la ruta. La
+  pastilla dice «3 pendientes» a los lectores de pantalla (texto oculto, no una
+  región en vivo).
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y
