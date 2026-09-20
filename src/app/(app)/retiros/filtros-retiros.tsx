@@ -13,6 +13,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   BuscarIcon,
   CalendarioIcon,
@@ -364,30 +365,31 @@ export function BotonFiltrosRetiros({
 
   return (
     <>
-      <button
-        ref={botonRef}
-        type="button"
-        onClick={alternar}
-        aria-label={activos > 0 ? `Filtros, ${activos} ${activos === 1 ? "activo" : "activos"}` : "Filtros"}
-        aria-haspopup="dialog"
-        aria-expanded={abierto}
-        title="Filtros"
-        className={`relative flex h-8 w-8 items-center justify-center !rounded-full transition-colors ${anilloFoco} ${
-          activos > 0
-            ? "bg-foreground text-background"
-            : "bg-muted text-muted-foreground hover:bg-border"
-        }`}
-      >
-        <FiltroIcon className="h-4 w-4" />
-        {activos > 0 && (
-          <span
-            aria-hidden="true"
-            className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-border bg-card px-1 text-xs leading-none font-semibold text-foreground"
-          >
-            {activos}
-          </span>
-        )}
-      </button>
+      <Tooltip texto="Filtrar retiros">
+        <button
+          ref={botonRef}
+          type="button"
+          onClick={alternar}
+          aria-label={activos > 0 ? `Filtros, ${activos} ${activos === 1 ? "activo" : "activos"}` : "Filtros"}
+          aria-haspopup="dialog"
+          aria-expanded={abierto}
+          className={`relative flex h-8 w-8 items-center justify-center !rounded-full transition-colors ${anilloFoco} ${
+            activos > 0
+              ? "bg-foreground text-background"
+              : "bg-muted text-muted-foreground hover:bg-border"
+          }`}
+        >
+          <FiltroIcon className="h-4 w-4" />
+          {activos > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-border bg-card px-1 text-xs leading-none font-semibold text-foreground"
+            >
+              {activos}
+            </span>
+          )}
+        </button>
+      </Tooltip>
 
       {abierto &&
         createPortal(

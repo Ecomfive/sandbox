@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { crearPatron, eliminarPatron } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { linkClass } from "@/components/ui/link";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
 
@@ -28,10 +26,7 @@ export default async function PatronesBancariosPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10">
       <div>
-        <Link href="/extractos" className={linkClass}>
-          ← Cargar extracto bancario
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold tracking-tight">Diccionario de patrones bancarios</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Diccionario de patrones bancarios</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {pais.nombre} — cuando la descripción de un movimiento contiene uno de estos textos, el
           sistema le asigna la plataforma sola al cargar el extracto. Se llena automáticamente cada

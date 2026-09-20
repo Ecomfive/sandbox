@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
+import { Tooltip } from "@/components/ui/tooltip";
 import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
@@ -129,16 +130,17 @@ export default async function RetirosPage() {
               </span>
             </p>
           )}
-          <a
-            href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Actualizar retiros desde Dropi"
-            aria-label="Actualizar retiros desde Dropi"
-            className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <ActualizarIcon className="h-4 w-4" />
-          </a>
+          <Tooltip texto="Actualizar desde Dropi">
+            <a
+              href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Actualizar retiros desde Dropi"
+              className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <ActualizarIcon className="h-4 w-4" />
+            </a>
+          </Tooltip>
         </div>
         <div className="mt-3">
           <KpiGroup titulo="Saldo de wallet">

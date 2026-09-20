@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BarraMigas } from "@/components/barra-migas";
 import { NavBar } from "@/components/nav";
 import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
@@ -39,6 +40,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar />
+          <BarraMigas seccionesPlataforma={seccionesPlataforma} favoritos={favoritos} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>
       </div>

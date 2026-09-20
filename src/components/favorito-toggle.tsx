@@ -1,15 +1,27 @@
 "use client";
 
 import { useTransition } from "react";
+import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { alternarFavorito } from "@/lib/favoritos-actions";
 import { EstrellaIcon } from "@/lib/nav-icons";
 
-/** Estrella para marcar/desmarcar una página del menú como acceso rápido. Vive al lado del
- * link, no adentro: por eso preventDefault/stopPropagation, para no disparar la navegación. */
-export function FavoritoToggle({ href, activo }: { href: string; activo: boolean }) {
+/** Estrella para marcar/desmarcar una página del menú como acceso rápido. En el menú vive al lado
+ * del link, no adentro: por eso preventDefault/stopPropagation, para no disparar la navegación.
+ * En las migas de pan (`variante="miga"`) es más grande y explica lo que hace con un tooltip. */
+export function FavoritoToggle({
+  href,
+  activo,
+  variante = "menu",
+}: {
+  href: string;
+  activo: boolean;
+  variante?: "menu" | "miga";
+}) {
   const [pending, startTransition] = useTransition();
+  const enMiga = variante === "miga";
 
-  return (
+  const boton = (
     <button
       type="button"
       aria-label={activo ? "Quitar de accesos rápidos" : "Agregar a accesos rápidos"}
@@ -22,11 +34,22 @@ export function FavoritoToggle({ href, activo }: { href: string; activo: boolean
           alternarFavorito(href, !activo);
         });
       }}
-      className={`shrink-0 rounded p-1 transition-colors disabled:opacity-50 ${
-        activo ? "text-warning hover:text-warning" : "text-muted-foreground/50 hover:text-muted-foreground"
+      className={`shrink-0 rounded transition-colors disabled:opacity-50 ${anilloFoco} ${enMiga ? "p-1.5" : "p-1"} ${
+        activo
+          ? "text-warning hover:text-warning"
+          : enMiga
+            ? "text-muted-foreground hover:text-foreground"
+            : "text-muted-foreground/50 hover:text-muted-foreground"
       }`}
     >
-      <EstrellaIcon filled={activo} className="h-3.5 w-3.5" />
+      <EstrellaIcon filled={activo} className={enMiga ? "h-4 w-4" : "h-3.5 w-3.5"} />
     </button>
+  );
+
+  if (!enMiga) return boton;
+  return (
+    <Tooltip texto={activo ? "Quitar de favoritos" : "Marcar como favorito"}>
+      {boton}
+    </Tooltip>
   );
 }

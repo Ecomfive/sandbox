@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
@@ -287,16 +288,18 @@ export function TablaRetiros({ retiros, codigoPais }: { retiros: FilaRetiro[]; c
           alAbrir={() => setMenuAbierto(false)}
         />
         <div className="relative">
-          <button
-            ref={botonColumnasRef}
-            type="button"
-            onClick={() => setMenuAbierto((v) => !v)}
-            aria-expanded={menuAbierto}
-            className={`flex min-h-8 items-center gap-1.5 !rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted ${anilloFoco}`}
-          >
-            <ColumnasIcon className="h-4 w-4" />
-            Columnas
-          </button>
+          <Tooltip texto="Mostrar y ordenar columnas">
+            <button
+              ref={botonColumnasRef}
+              type="button"
+              onClick={() => setMenuAbierto((v) => !v)}
+              aria-expanded={menuAbierto}
+              className={`flex min-h-8 items-center gap-1.5 !rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted ${anilloFoco}`}
+            >
+              <ColumnasIcon className="h-4 w-4" />
+              Columnas
+            </button>
+          </Tooltip>
           {menuAbierto && (
             <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-border bg-card p-1 shadow-lg">
               {orden.map((id, indice) => {
