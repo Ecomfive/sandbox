@@ -20,7 +20,6 @@ export default async function ProductosPage({
   await requireModulo("productos");
   const sp = await searchParams;
   const buscar = typeof sp.buscar === "string" ? sp.buscar.trim() : "";
-  const plataformaFiltro = typeof sp.plataforma === "string" ? sp.plataforma : "";
 
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -66,19 +65,14 @@ export default async function ProductosPage({
     return m !== null && m < p.margen_minimo;
   }).length;
 
-  const plataformasDisponibles = Array.from(
-    new Set(productos.map((p) => p.plataforma_nombre).filter((n): n is string => n !== null))
-  ).sort();
-
+  // La plataforma y el estado del margen se filtran o agrupan desde la barra de herramientas de la lista.
   const buscarNormalizado = buscar.toLowerCase();
-  const productosFiltrados = productos.filter((p) => {
-    const coincideBusqueda =
+  const productosFiltrados = productos.filter(
+    (p) =>
       buscarNormalizado === "" ||
       p.nombre.toLowerCase().includes(buscarNormalizado) ||
-      p.sku.toLowerCase().includes(buscarNormalizado);
-    const coincidePlataforma = plataformaFiltro === "" || p.plataforma_nombre === plataformaFiltro;
-    return coincideBusqueda && coincidePlataforma;
-  });
+      p.sku.toLowerCase().includes(buscarNormalizado)
+  );
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -117,18 +111,7 @@ export default async function ProductosPage({
                 className={fieldClass}
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Plataforma</label>
-              <select name="plataforma" defaultValue={plataformaFiltro} className={fieldClass}>
-                <option value="">Todas</option>
-                {plataformasDisponibles.map((nombre) => (
-                  <option key={nombre} value={nombre}>
-                    {nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <Button type="submit">Filtrar</Button>
+            <Button type="submit">Buscar</Button>
           </form>
 
           {productosFiltrados.length === 0 ? (

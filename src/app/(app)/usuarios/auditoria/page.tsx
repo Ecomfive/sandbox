@@ -1,9 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
-import { calcularCambios, ETIQUETA_ACCION } from "@/lib/auditoria-cambios";
+import { calcularCambios } from "@/lib/auditoria-cambios";
+import type { FilaAuditoria } from "./def-auditoria";
+import { TablaAuditoria } from "./tabla-auditoria";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,17 @@ export default async function AuditoriaPage() {
     .order("creado_en", { ascending: false })
     .limit(200);
 
+  // La fecha con la zona horaria del país y los cambios (antes → después) se resuelven aquí, en el servidor.
+  const filas: FilaAuditoria[] = (eventos ?? []).map((e) => ({
+    id: e.id,
+    creadoEn: e.creado_en,
+    fechaTexto: formatearFechaHoraCompleta(e.creado_en, pais.codigo),
+    usuario: e.usuario_nombre,
+    accion: e.accion,
+    cambios: calcularCambios(e.antes, e.despues),
+    detalle: e.detalle,
+  }));
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <div>
@@ -28,50 +40,7 @@ export default async function AuditoriaPage() {
         </p>
       </div>
 
-      <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[48rem] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              <th className="py-2 pr-3 pl-4 font-medium">Fecha</th>
-              <th className="py-2 pr-3 font-medium">Usuario</th>
-              <th className="py-2 pr-3 font-medium">Acción</th>
-              <th className="py-2 pr-3 font-medium">Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(eventos ?? []).map((e) => {
-              const cambios = calcularCambios(e.antes, e.despues);
-              return (
-                <tr key={e.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 whitespace-nowrap align-top">
-                    {formatearFechaHoraCompleta(e.creado_en, pais.codigo)}
-                  </td>
-                  <td className="py-2 pr-3 font-medium align-top">{e.usuario_nombre ?? "—"}</td>
-                  <td className="py-2 pr-3 align-top">{ETIQUETA_ACCION[e.accion] ?? e.accion}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">
-                    {cambios.length > 0 ? (
-                      <ul className="flex flex-col gap-0.5">
-                        {cambios.map((c) => (
-                          <li key={c.campo}>
-                            <span className="text-foreground">{c.campo}</span>: {c.antes}{" "}
-                            <span aria-hidden="true">→</span>
-                            <span className="sr-only"> cambió a </span> {c.despues}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      e.detalle
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {(eventos ?? []).length === 0 && (
-          <EstadoVacio mensaje="Todavía no hay movimientos registrados en el historial de auditoría." />
-        )}
-      </div>
+      <TablaAuditoria eventos={filas} />
     </main>
   );
 }

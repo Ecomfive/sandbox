@@ -5,8 +5,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { FormularioConToast, useToast } from "@/components/ui/toast";
+import type { IconoComp } from "@/components/tabla/botones-vista";
+import { ListaDatos } from "@/components/tabla/lista-datos";
 import { margenActual, type ProductoFila } from "@/lib/margen";
+import { EstadoIcon, GastoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
+import type { NombreFilas } from "@/lib/tabla/pie";
 import { actualizarProducto, actualizarMargenMasivo } from "./actions";
+import { DEF_PRODUCTOS } from "./def-productos";
+
+const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
+const ICONOS: Record<string, IconoComp> = {
+  estado: EstadoIcon,
+  plataforma: TiendaIcon,
+  nombre: ProductoIcon,
+  sku: ProductoIcon,
+  costo: GastoIcon,
+  precio: GastoIcon,
+  minimo: GastoIcon,
+  margen: GastoIcon,
+};
 
 export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
@@ -23,16 +40,9 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
     });
   }
 
-  function alternarTodos() {
-    setSeleccionados((actual) =>
-      actual.size === productos.length ? new Set() : new Set(productos.map((p) => p.id))
-    );
-  }
-
-  function aplicarMargenMasivo() {
+  function aplicarMargenMasivo(ids: string[]) {
     const valor = Number(nuevoMargen);
     if (nuevoMargen === "" || Number.isNaN(valor)) return;
-    const ids = Array.from(seleccionados);
     startTransition(async () => {
       await actualizarMargenMasivo(ids, valor);
       mostrarToast(
@@ -43,19 +53,22 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
     });
   }
 
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3">
+  // La selección solo cuenta lo que se ve: si un filtro esconde un producto marcado, no se le aplica el cambio.
+  function barraSeleccion(visibles: ProductoFila[]) {
+    const marcados = visibles.filter((p) => seleccionados.has(p.id)).map((p) => p.id);
+    const todos = marcados.length === visibles.length;
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
         <input
           type="checkbox"
-          checked={productos.length > 0 && seleccionados.size === productos.length}
-          onChange={alternarTodos}
-          aria-label="Seleccionar todos los productos"
+          checked={todos}
+          onChange={() => setSeleccionados(todos ? new Set() : new Set(visibles.map((p) => p.id)))}
+          aria-label="Seleccionar todos los productos visibles"
         />
         <span className="text-sm text-muted-foreground">
-          {seleccionados.size > 0 ? `${seleccionados.size} seleccionado${seleccionados.size === 1 ? "" : "s"}` : "Seleccionar todos"}
+          {marcados.length > 0 ? `${marcados.length} seleccionado${marcados.length === 1 ? "" : "s"}` : "Seleccionar todos"}
         </span>
-        {seleccionados.size > 0 && (
+        {marcados.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <label className={labelClassSm}>Nuevo margen mínimo %</label>
             <input
@@ -72,15 +85,26 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
               variant="secondary"
               className="text-xs"
               disabled={pending || nuevoMargen === ""}
-              onClick={aplicarMargenMasivo}
+              onClick={() => aplicarMargenMasivo(marcados)}
             >
               Aplicar a seleccionados
             </Button>
           </div>
         )}
       </div>
+    );
+  }
 
-      {productos.map((p) => {
+  return (
+    <ListaDatos
+      def={DEF_PRODUCTOS}
+      filas={productos}
+      iconos={ICONOS}
+      nombre={NOMBRE}
+      claveFila={(p) => p.id}
+      encima={barraSeleccion}
+      vacio="Todavía no hay productos."
+      renderFila={(p) => {
         const margen = margenActual(p);
         return (
           <FormularioConToast
@@ -152,7 +176,7 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
             </Button>
           </FormularioConToast>
         );
-      })}
-    </div>
+      }}
+    />
   );
 }

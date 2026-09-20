@@ -10,6 +10,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { construirMigas } from "@/lib/migas";
 import { NAV_SECTIONS, type NavSectionAnidada } from "@/lib/nav-data";
+import { pestanaActiva, pestanasDe } from "@/lib/pestanas";
 import { ChevronRightIcon, FlechaIzquierdaIcon } from "@/lib/nav-icons";
 
 /** La API de navegación solo cuenta entradas del mismo sitio; sin ella se cae al largo del historial. */
@@ -45,6 +46,9 @@ export function BarraMigas({
   );
 
   if (migas.length === 0) return null;
+
+  const pestanas = pestanasDe(moduloHref);
+  const pestanaActual = pestanaActiva(pestanas, ruta);
 
   // Volver = la página anterior del historial (respeta el botón "atrás" del navegador). Si esta
   // página se abrió directo (sin página anterior de la plataforma), sube al módulo padre de las
@@ -120,6 +124,32 @@ export function BarraMigas({
           )}
         </div>
       </div>
+
+      {/* Pestañas del módulo (como las vistas de ClickUp): solo si tiene subpáginas. */}
+      {pestanas.length > 1 && (
+        <nav aria-label={`Secciones de ${moduloEtiqueta}`} className="pr-6 pl-14 md:pl-6">
+          <ul className="flex gap-1 overflow-x-auto">
+            {pestanas.map((pestana) => {
+              const activa = pestana.href === pestanaActual;
+              return (
+                <li key={pestana.href} className="shrink-0">
+                  <Link
+                    href={pestana.href}
+                    aria-current={activa ? "page" : undefined}
+                    className={`relative inline-flex min-h-9 items-center px-3 text-sm whitespace-nowrap transition-colors ${anilloFoco} ${
+                      activa
+                        ? "font-semibold text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {pestana.etiqueta}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
     </div>
   );
 }

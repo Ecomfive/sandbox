@@ -62,16 +62,31 @@ convenciones técnicas del código.
   (`src/components/compartir/`) muestra quién tiene acceso a la sección: sale de
   los roles (`permisos_rol` + `perfiles`, ver `src/lib/compartir-actions.ts`), es
   solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles.
+- **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
+  franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
+  `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y
+  la primera pestaña es el módulo mismo); una página de detalle cuenta en la
+  pestaña de su módulo. Hoy: Retiros (Retiros, Cuentas destino), Usuarios
+  (Usuarios y roles, Historial de auditoría) y Extractos (Cargar extracto,
+  Diccionario de patrones). Al sumar una subpágina, agrégala ahí en vez de
+  poner un enlace suelto en la página.
 - **Tablas con barra de herramientas común** (Agrupar, filas cerradas, Filtros,
-  Columnas — igual en todos los módulos, estilo ClickUp). Retiros, Alertas y
-  Pedidos Dropi ya la usan. Para sumarla a otra tabla: describe sus campos en
-  una `DefTabla` (`src/lib/tabla/motor.ts`; ver `retiros/filtros.ts`,
-  `alertas/def-alertas.ts` o `pedidos-dropi/def-pedidos.ts`), usa
-  `useTablaInteractiva` + `useColumnas` y dibuja `<BarraHerramientas>`
-  (`src/components/tabla/`). La lógica pura vive en `src/lib/tabla/` y el
-  tooltip de cada botón sale solo; no copies la barra a mano. Lo que cada
-  persona elige (filtros, vista, columnas) se guarda en su navegador con la
-  `clave` de la tabla (`<clave>-filtros-v1`, `-vista-v1`, `-columnas-v2`).
+  Columnas — igual en todos los módulos, estilo ClickUp). Ya la usan Retiros,
+  Alertas, Pedidos Dropi, Gastos, Usuarios, Auditoría, CRM Dropshippers
+  (directorio e interacciones) y Productos. Para sumarla a otra tabla: describe
+  sus campos en una `DefTabla` (`src/lib/tabla/motor.ts`; ver `gastos/def-gastos.ts`
+  o `retiros/filtros.ts`) y, según lo que muestres, usa un componente listo de
+  `src/components/tabla/`: `TablaDatos` (tabla que solo muestra datos, con
+  columnas y una columna fija de acciones) o `ListaDatos` (lista de tarjetas con
+  su propio formulario; sin menú de columnas). Si la tabla tiene comportamiento
+  propio (selección, fila que se edita), arma la suya con `useTablaInteractiva` +
+  `useColumnas` y dibuja `<BarraHerramientas>`, como `retiros/tabla-retiros.tsx`.
+  La lógica pura vive en `src/lib/tabla/` y el tooltip de cada botón sale solo;
+  no copies la barra a mano. Lo que cada persona elige (filtros, vista,
+  columnas) se guarda en su navegador con la `clave` de la tabla
+  (`<clave>-filtros-v1`, `-vista-v1`, `-columnas-v2`). Las páginas sirven las
+  filas ya listas (serializables) y la definición y las columnas de un cliente
+  son constantes del módulo.
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.

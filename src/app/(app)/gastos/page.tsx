@@ -1,30 +1,20 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { registrarGasto, eliminarGasto } from "./actions";
+import { registrarGasto } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
-import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
 import { GastoIcon } from "@/lib/nav-icons";
+import { CATEGORIAS } from "./def-gastos";
+import { TablaGastos } from "./tabla-gastos";
 
 export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
-
-const CATEGORIAS = [
-  { valor: "nomina", etiqueta: "Nómina" },
-  { valor: "alquiler", etiqueta: "Alquiler" },
-  { valor: "servicios", etiqueta: "Servicios" },
-  { valor: "marketing", etiqueta: "Marketing" },
-  { valor: "logistica", etiqueta: "Logística" },
-  { valor: "otros", etiqueta: "Otros" },
-] as const;
-
-const etiquetaCategoria = (valor: string) =>
-  CATEGORIAS.find((c) => c.valor === valor)?.etiqueta ?? valor;
 
 export default async function GastosPage() {
   await requireModulo("gastos");
@@ -124,37 +114,17 @@ export default async function GastosPage() {
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Gastos recientes</h2>
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[36rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">Fecha</th>
-                <th className="py-2 pr-3 font-medium">Categoría</th>
-                <th className="py-2 pr-3 font-medium">Descripción</th>
-                <th className="py-2 pr-3 font-medium">Monto</th>
-                <th className="py-2 pr-3 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {(gastos ?? []).map((g) => (
-                <tr key={g.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4">{formatearFecha(g.fecha)}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">{etiquetaCategoria(g.categoria)}</td>
-                  <td className="py-2 pr-3">{g.descripcion}</td>
-                  <td className="py-2 pr-3 tabular-nums">{formatearMoneda(Number(g.monto), pais.codigo)}</td>
-                  <td className="py-2 pr-3">
-                    <form action={eliminarGasto}>
-                      <input type="hidden" name="id" value={g.id} />
-                      <Button type="submit" variant="ghost" className="text-xs">
-                        Eliminar
-                      </Button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {(gastos ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay gastos registrados." />}
+        <div className="mt-3">
+          <TablaGastos
+            gastos={(gastos ?? []).map((g) => ({
+              id: g.id,
+              categoria: g.categoria,
+              descripcion: g.descripcion,
+              monto: Number(g.monto),
+              fecha: g.fecha,
+            }))}
+            codigoPais={pais.codigo}
+          />
         </div>
       </div>
     </main>

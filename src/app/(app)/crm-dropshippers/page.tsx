@@ -1,37 +1,17 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { crearDropshipper, actualizarDropshipper, registrarInteraccion } from "./actions";
+import { crearDropshipper, registrarInteraccion } from "./actions";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { fieldClass, fieldClassSm, labelClass, labelClassSm } from "@/components/ui/field";
-import { formatearFecha } from "@/lib/formato";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { fieldClass, labelClass } from "@/components/ui/field";
 import { DropshipperIcon } from "@/lib/nav-icons";
+import { TIPOS_INTERACCION, type FilaDropshipper, type FilaInteraccion } from "./def-crm";
+import { ListaDropshippers } from "./lista-dropshippers";
+import { TablaInteracciones } from "./tabla-interacciones";
 
 export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
-
-const ESTADOS = [
-  { valor: "prospecto", etiqueta: "Prospecto" },
-  { valor: "activo", etiqueta: "Activo" },
-  { valor: "inactivo", etiqueta: "Inactivo" },
-] as const;
-
-const TIPOS_INTERACCION = [
-  { valor: "llamada", etiqueta: "Llamada" },
-  { valor: "whatsapp", etiqueta: "WhatsApp" },
-  { valor: "email", etiqueta: "Correo" },
-  { valor: "reunion", etiqueta: "Reunión" },
-  { valor: "otro", etiqueta: "Otro" },
-] as const;
-
-const toneEstado: Record<string, "neutral" | "success" | "info"> = {
-  prospecto: "info",
-  activo: "success",
-  inactivo: "neutral",
-};
 
 export default async function CrmDropshippersPage() {
   await requireModulo("crm-dropshippers");
@@ -51,6 +31,24 @@ export default async function CrmDropshippersPage() {
       .order("fecha", { ascending: false })
       .limit(50),
   ]);
+
+  const filasDropshippers: FilaDropshipper[] = (dropshippers ?? []).map((d) => ({
+    id: d.id,
+    nombre: d.nombre,
+    email: d.contacto_email,
+    telefono: d.contacto_telefono,
+    estado: d.estado,
+    volumen: d.volumen_mensual_estimado === null ? null : Number(d.volumen_mensual_estimado),
+    notas: d.notas,
+  }));
+
+  const filasInteracciones: FilaInteraccion[] = (interacciones ?? []).map((i) => ({
+    id: i.id,
+    fecha: i.fecha,
+    dropshipper: (i.dropshippers as unknown as { nombre: string } | null)?.nombre ?? "",
+    tipo: i.tipo,
+    nota: i.nota,
+  }));
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
@@ -90,61 +88,9 @@ export default async function CrmDropshippersPage() {
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Dropshippers</h2>
-        {(dropshippers ?? []).length === 0 ? (
-          <EstadoVacio
-            mensaje={`Todavía no hay dropshippers registrados para ${pais.nombre}.`}
-            className="mt-3"
-          />
-        ) : (
-          <div className="mt-3 flex flex-col gap-3">
-            {(dropshippers ?? []).map((d) => (
-              <form
-                key={d.id}
-                action={actualizarDropshipper}
-                className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
-              >
-                <input type="hidden" name="id" value={d.id} />
-                <div className="min-w-[10rem] flex-1">
-                  <p className="text-sm font-medium">{d.nombre}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {d.contacto_email ?? "—"} {d.contacto_telefono ? `· ${d.contacto_telefono}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm}>Estado</label>
-                  <select name="estado" defaultValue={d.estado} className={fieldClassSm}>
-                    {ESTADOS.map((e) => (
-                      <option key={e.valor} value={e.valor}>
-                        {e.etiqueta}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm}>Volumen mensual est.</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    name="volumen_mensual_estimado"
-                    defaultValue={d.volumen_mensual_estimado ?? ""}
-                    className={`${fieldClassSm} w-32 tabular-nums`}
-                  />
-                </div>
-                <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
-                  <label className={labelClassSm}>Notas</label>
-                  <input type="text" name="notas" defaultValue={d.notas ?? ""} className={fieldClassSm} />
-                </div>
-                <Badge tone={toneEstado[d.estado] ?? "neutral"}>
-                  {ESTADOS.find((e) => e.valor === d.estado)?.etiqueta ?? d.estado}
-                </Badge>
-                <Button type="submit" variant="secondary" className="text-xs">
-                  Guardar
-                </Button>
-              </form>
-            ))}
-          </div>
-        )}
+        <div className="mt-3">
+          <ListaDropshippers dropshippers={filasDropshippers} pais={pais.nombre} />
+        </div>
       </div>
 
       <div>
@@ -193,37 +139,8 @@ export default async function CrmDropshippersPage() {
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Interacciones recientes</h2>
-        <div className="mt-3 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[36rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">Fecha</th>
-                <th className="py-2 pr-3 font-medium">Dropshipper</th>
-                <th className="py-2 pr-3 font-medium">Tipo</th>
-                <th className="py-2 pr-3 font-medium">Nota</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(interacciones ?? []).map((i) => {
-                const dropshipper = i.dropshippers as unknown as { nombre: string } | null;
-                return (
-                  <tr key={i.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 pl-4">{formatearFecha(i.fecha)}</td>
-                    <td className="py-2 pr-3 font-medium">{dropshipper?.nombre}</td>
-                    <td className="py-2 pr-3">
-                      <Badge tone="neutral">
-                        {TIPOS_INTERACCION.find((t) => t.valor === i.tipo)?.etiqueta ?? i.tipo}
-                      </Badge>
-                    </td>
-                    <td className="py-2 pr-3 text-muted-foreground">{i.nota}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {(interacciones ?? []).length === 0 && (
-            <EstadoVacio mensaje="Todavía no hay interacciones registradas." />
-          )}
+        <div className="mt-3">
+          <TablaInteracciones interacciones={filasInteracciones} />
         </div>
       </div>
     </main>
