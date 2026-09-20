@@ -8,8 +8,8 @@ import { anilloFoco } from "@/components/ui/field";
 import { linkClass } from "@/components/ui/link";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AccesoSeccion, PersonaConAcceso } from "@/lib/acceso-seccion";
-import { obtenerAccesoSeccion } from "@/lib/compartir-actions";
-import { CerrarIcon, CompartirIcon } from "@/lib/nav-icons";
+import { obtenerAccesoSeccion } from "@/lib/accesos-actions";
+import { AccesosIcon, CerrarIcon } from "@/lib/nav-icons";
 
 type Estado =
   | { tipo: "cerrado" }
@@ -33,11 +33,12 @@ function Avatar({ persona }: { persona: PersonaConAcceso }) {
 }
 
 /**
- * "Compartir" de la franja de migas: muestra quién tiene acceso a la sección actual (lo da el rol de cada
- * persona), con atajo a Usuarios y roles para dar más acceso y botón para copiar el vínculo. Solo consulta
- * al abrirse, así que no suma trabajo a cada página. `cargar` solo se cambia en pruebas visuales.
+ * "Accesos" de la franja de migas: muestra quién tiene acceso a la sección actual (lo da el rol de cada
+ * persona), con atajo a Usuarios y roles para dar más acceso y botón para copiar el vínculo. Es solo
+ * lectura: no comparte ni da permisos, por eso no se llama "Compartir". Solo consulta al abrirse, así que
+ * no suma trabajo a cada página. `cargar` solo se cambia en pruebas visuales.
  */
-export function BotonCompartir({
+export function BotonAccesos({
   moduloHref,
   moduloEtiqueta,
   cargar = obtenerAccesoSeccion,
@@ -122,8 +123,8 @@ export function BotonCompartir({
             abierto ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
           }`}
         >
-          <CompartirIcon className="h-4 w-4 shrink-0" />
-          <span className="max-sm:sr-only">Compartir</span>
+          <AccesosIcon className="h-4 w-4 shrink-0" />
+          <span className="max-sm:sr-only">Accesos</span>
         </button>
       </Tooltip>
 
@@ -131,14 +132,14 @@ export function BotonCompartir({
         <div
           ref={panelRef}
           role="dialog"
-          aria-labelledby="titulo-compartir"
+          aria-labelledby="titulo-accesos"
           tabIndex={-1}
           className="absolute right-0 z-30 mt-1 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-card text-sm text-foreground shadow-xl focus:outline-none"
         >
           <div className="flex items-start justify-between gap-2 px-4 pt-3 pb-2">
             <div className="min-w-0">
-              <h2 id="titulo-compartir" className="text-sm font-semibold">
-                Acceso a esta sección
+              <h2 id="titulo-accesos" className="text-sm font-semibold">
+                Accesos a esta sección
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">{moduloEtiqueta}</span>. El acceso se da por rol.
