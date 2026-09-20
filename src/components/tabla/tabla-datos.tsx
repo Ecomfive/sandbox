@@ -1,5 +1,6 @@
 "use client";
 
+import { ContenedorTabla } from "./contenedor-tabla";
 import type { ReactNode } from "react";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import type { DefTabla } from "@/lib/tabla/motor";
@@ -116,13 +117,8 @@ export function TablaDatos<F, C = undefined>({
         nombreFilas={nombre.plural}
         columnas={{ defs: columnas, estado: guardadas, cambiar: cambiarColumnas }}
       />
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label={`${ariaLabel}, desplazable horizontalmente con las flechas izquierda y derecha`}
-        className="min-w-0 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
-      >
-        <table className="w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
+      <ContenedorTabla ariaLabel={ariaLabel}>
+        <table className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
               {visibles_.map((c, i) => (
@@ -166,7 +162,7 @@ export function TablaDatos<F, C = undefined>({
             <tbody>{visibles.map((f) => fila(f))}</tbody>
           )}
         </table>
-      </div>
+      </ContenedorTabla>
       <p role="status" className="sr-only">
         {filas.length > 0 ? `${visibles.length} ${visibles.length === 1 ? nombre.singular : nombre.plural}` : ""}
       </p>

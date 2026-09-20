@@ -1,5 +1,6 @@
 "use client";
 
+import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -228,13 +229,8 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
             </Button>
           </div>
         )}
-        <div
-          tabIndex={0}
-          role="region"
-          aria-label="Tabla de alertas, desplazable horizontalmente con las flechas izquierda y derecha"
-          className="min-w-0 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
-        >
-          <table className="w-full min-w-[46rem] border-collapse text-sm">
+        <ContenedorTabla ariaLabel="Tabla de alertas">
+          <table className="tabla-datos w-full min-w-[46rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-muted-foreground">
                 <th scope="col" className="py-2 pr-2 pl-4">
@@ -274,7 +270,7 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
               <tbody>{visibles.map((a) => filaAlerta(a))}</tbody>
             )}
           </table>
-        </div>
+        </ContenedorTabla>
         {alertas.length === 0 && <EstadoVacio mensaje="Todavía no hay alertas generadas." />}
         {alertas.length > 0 && visibles.length === 0 && (
           <EstadoVacio

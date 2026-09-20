@@ -1,5 +1,6 @@
 "use client";
 
+import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { anilloFoco } from "@/components/ui/field";
@@ -160,13 +161,8 @@ export function TablaPedidos({ pedidos, codigoPais }: { pedidos: FilaPedido[]; c
         nombreFilas="órdenes"
         columnas={{ defs: COLUMNAS, estado: columnasGuardadas, cambiar: cambiarColumnas }}
       />
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label="Tabla de órdenes de Dropi, desplazable horizontalmente con las flechas izquierda y derecha"
-        className="min-w-0 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
-      >
-        <table className="w-full min-w-[52rem] border-collapse text-sm">
+      <ContenedorTabla ariaLabel="Tabla de órdenes de Dropi">
+        <table className="tabla-datos w-full min-w-[52rem] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted text-left text-muted-foreground">
               {columnasVisibles.map((columna, i) => (
@@ -198,7 +194,7 @@ export function TablaPedidos({ pedidos, codigoPais }: { pedidos: FilaPedido[]; c
             <tbody>{visibles.map((p) => fila(p))}</tbody>
           )}
         </table>
-      </div>
+      </ContenedorTabla>
       {pedidos.length > 0 && visibles.length === 0 && (
         <EstadoVacio
           mensaje={
