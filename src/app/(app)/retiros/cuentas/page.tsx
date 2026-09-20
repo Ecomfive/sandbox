@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { ActivaToggle } from "./activa-toggle";
 import { VentanaCuentaRetiro } from "./ventana-cuenta-retiro";
 import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
-import { linkClass } from "@/components/ui/link";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const dynamic = "force-dynamic";
@@ -40,14 +38,9 @@ export default async function CuentasRetiroPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10">
-      <div>
-        <Link href="/retiros" className={linkClass}>
-          ← Conciliación de Retiros
-        </Link>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">Cuentas destino</h1>
-          <VentanaCuentaRetiro paisId={pais.id} />
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold tracking-tight">Cuentas destino</h1>
+        <VentanaCuentaRetiro paisId={pais.id} />
       </div>
 
       <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">

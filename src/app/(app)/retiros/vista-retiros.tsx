@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { AgruparIcon, CerradoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon } from "@/lib/nav-icons";
 import { ICONOS } from "./filtros-retiros";
 import {
@@ -111,10 +112,10 @@ export function BotonCerrados({
   alAlternar: () => void;
 }) {
   const titulo = forzadoPorFiltro
-    ? "Se ven porque el filtro de Estado incluye Cerrado"
+    ? "Se ven porque el filtro de Estado incluye Cerrado."
     : visibles
-      ? "Ocultar retiros cerrados"
-      : "Mostrar retiros cerrados";
+      ? "Oculta rápidamente los retiros cerrados."
+      : "Muestra rápidamente los retiros cerrados.";
   const mostrarInsignia = !visibles && ocultos > 0;
   // El nombre accesible contiene el texto visible ("Cerrados") y suma lo que solo se ve como insignia o tooltip.
   const nombre = forzadoPorFiltro
@@ -123,28 +124,29 @@ export function BotonCerrados({
       ? `Cerrados, ${ocultos} ${ocultos === 1 ? "oculto" : "ocultos"}`
       : "Cerrados";
   return (
-    <button
-      type="button"
-      aria-pressed={visibles}
-      aria-disabled={forzadoPorFiltro || undefined}
-      aria-label={nombre}
-      onClick={() => {
-        if (!forzadoPorFiltro) alAlternar();
-      }}
-      title={titulo}
-      className={`${pastilla(visibles)} ${forzadoPorFiltro ? "cursor-not-allowed" : ""}`}
-    >
-      <CerradoIcon className="h-4 w-4 shrink-0" />
-      <Despliegue expandida={visibles}>Cerrados</Despliegue>
-      {mostrarInsignia && (
-        <span
-          aria-hidden="true"
-          className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-border bg-card px-1 text-xs leading-none font-semibold text-foreground tabular-nums"
-        >
-          {ocultos}
-        </span>
-      )}
-    </button>
+    <Tooltip texto={titulo}>
+      <button
+        type="button"
+        aria-pressed={visibles}
+        aria-disabled={forzadoPorFiltro || undefined}
+        aria-label={nombre}
+        onClick={() => {
+          if (!forzadoPorFiltro) alAlternar();
+        }}
+        className={`${pastilla(visibles)} ${forzadoPorFiltro ? "cursor-not-allowed" : ""}`}
+      >
+        <CerradoIcon className="h-4 w-4 shrink-0" />
+        <Despliegue expandida={visibles}>Cerrados</Despliegue>
+        {mostrarInsignia && (
+          <span
+            aria-hidden="true"
+            className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-border bg-card px-1 text-xs leading-none font-semibold text-foreground tabular-nums"
+          >
+            {ocultos}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -224,34 +226,35 @@ export function BotonAgrupar({
 
   return (
     <div ref={contenedorRef} className="relative">
-      <button
-        ref={botonRef}
-        type="button"
-        onClick={alternar}
-        aria-expanded={abierto}
-        aria-controls="menu-agrupar-retiros"
-        aria-label={nombre}
-        title="Agrupar por"
-        className={pastilla(campo !== null)}
-      >
-        <AgruparIcon className="h-4 w-4 shrink-0" />
-        <Despliegue expandida={expandida}>
-          {campo ? (
-            <>
-              <span>
-                Agrupar: <span className="font-semibold">{etiquetaCampo(campo)}</span>
-              </span>
-              {orden === "asc" ? (
-                <FlechaArribaIcon className="h-3.5 w-3.5 shrink-0" />
-              ) : (
-                <FlechaAbajoIcon className="h-3.5 w-3.5 shrink-0" />
-              )}
-            </>
-          ) : (
-            "Agrupar"
-          )}
-        </Despliegue>
-      </button>
+      <Tooltip texto="Agrupa los retiros por estado, plataforma, destino y más.">
+        <button
+          ref={botonRef}
+          type="button"
+          onClick={alternar}
+          aria-expanded={abierto}
+          aria-controls="menu-agrupar-retiros"
+          aria-label={nombre}
+          className={pastilla(campo !== null)}
+        >
+          <AgruparIcon className="h-4 w-4 shrink-0" />
+          <Despliegue expandida={expandida}>
+            {campo ? (
+              <>
+                <span>
+                  Agrupar: <span className="font-semibold">{etiquetaCampo(campo)}</span>
+                </span>
+                {orden === "asc" ? (
+                  <FlechaArribaIcon className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                  <FlechaAbajoIcon className="h-3.5 w-3.5 shrink-0" />
+                )}
+              </>
+            ) : (
+              "Agrupar"
+            )}
+          </Despliegue>
+        </button>
+      </Tooltip>
       {abierto && (
         <div
           id="menu-agrupar-retiros"

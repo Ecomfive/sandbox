@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
-import { linkClass } from "@/components/ui/link";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
@@ -23,10 +21,7 @@ export default async function AuditoriaPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <div>
-        <Link href="/usuarios" className={linkClass}>
-          ← Usuarios y roles
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold tracking-tight">Historial de auditoría</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Historial de auditoría</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Quién modificó qué en operaciones sensibles — retiros, márgenes de productos y saldos de
           wallet. Los últimos 200 movimientos.

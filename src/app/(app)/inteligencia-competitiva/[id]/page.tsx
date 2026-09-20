@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -45,10 +45,8 @@ export default async function DetalleProveedorCompetenciaPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-10">
       <div>
-        <Link href="/inteligencia-competitiva" className="text-sm text-muted-foreground hover:underline">
-          ← Inteligencia competitiva
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold tracking-tight">{proveedor.tienda || proveedor.nombre}</h1>
+        <EtiquetaMiga texto={proveedor.tienda || proveedor.nombre} />
+        <h1 className="text-xl font-semibold tracking-tight">{proveedor.tienda || proveedor.nombre}</h1>
         {proveedor.tienda && <p className="text-sm text-muted-foreground">{proveedor.nombre}</p>}
         <p className="mt-1 text-sm text-muted-foreground">
           {proveedor.ciudad ?? "Ciudad desconocida"} · {proveedor.categorias.join(", ") || "Sin categorías"}

@@ -49,6 +49,14 @@ convenciones técnicas del código.
   estado propio) y deja lo que no puede vincular en
   `dropi_retiros_sin_vincular`. La lógica vive en
   `src/lib/dropi/emparejar-retiros.ts`.
+- **Encabezado y tooltips (estilo ClickUp).** Las migas de pan y la estrella de
+  favorito salen solas en `BarraMigas` (layout de `(app)`), a partir del menú
+  (`src/lib/nav-data.ts`) y la ruta (`src/lib/migas.ts`): una página nueva del
+  menú aparece sola; una subpágina fija se agrega a `SUBPAGINAS`; una página de
+  detalle renderiza `<EtiquetaMiga texto="Retiro #0009" />`. No pongas enlaces
+  "← Volver" a mano. Los botones de ícono explican qué hacen con
+  `<Tooltip texto="...">` (`src/components/ui/tooltip.tsx`, una frase que dice
+  qué hace), no con `title=`.
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.

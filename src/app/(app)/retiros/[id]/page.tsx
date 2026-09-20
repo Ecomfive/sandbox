@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { AvisoCorrelativo } from "./aviso-correlativo";
@@ -74,10 +74,8 @@ export default async function RetiroDetallePage({
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
       <div>
-        <Link href="/retiros" className={linkClass}>
-          ← Conciliación de Retiros
-        </Link>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
+        <EtiquetaMiga texto={`Retiro #${String(retiro.numero_correlativo).padStart(4, "0")}`} />
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-semibold tracking-tight">
             Retiro #{String(retiro.numero_correlativo).padStart(4, "0")}
           </h1>
