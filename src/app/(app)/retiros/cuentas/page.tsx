@@ -53,12 +53,12 @@ export default async function CuentasRetiroPage() {
               <th className="py-2 pr-3 font-medium">Cuenta</th>
               <th className="py-2 pr-3 font-medium">Comisión sugerida</th>
               <th className="py-2 pr-3 font-medium">Estado</th>
-              <th className="py-2 pr-3 font-medium">Acciones</th>
+              <th className="sticky right-0 z-10 bg-muted py-2 pr-4 pl-3 text-center font-medium">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {(cuentas ?? []).map((c) => (
-              <tr key={c.id} className="border-b border-border/60 last:border-0">
+              <tr key={c.id} className="group border-b border-border/60 last:border-0">
                 <td className="py-2 pr-3 pl-4 font-semibold text-muted-foreground">
                   {c.numero != null ? `#${c.numero}` : "—"}
                 </td>
@@ -71,8 +71,8 @@ export default async function CuentasRetiroPage() {
                 <td className="py-2 pr-3">
                   <ActivaToggle id={c.id} activa={c.activa} />
                 </td>
-                <td className="py-2 pr-3">
-                  <div className="flex items-center gap-1">
+                <td className="sticky right-0 z-10 border-l border-border/60 bg-card py-2 pr-4 pl-3 group-hover:bg-muted/50">
+                  <div className="flex items-center justify-center gap-1">
                     <VentanaCuentaRetiro paisId={pais.id} cuenta={c} />
                     <EliminarCuentaBoton id={c.id} nombre={c.nombre} />
                   </div>

@@ -71,7 +71,7 @@ convenciones técnicas del código.
   (`src/components/tabla/`). La lógica pura vive en `src/lib/tabla/` y el
   tooltip de cada botón sale solo; no copies la barra a mano. Lo que cada
   persona elige (filtros, vista, columnas) se guarda en su navegador con la
-  `clave` de la tabla (`<clave>-filtros-v1`, `-vista-v1`, `-columnas-v1`).
+  `clave` de la tabla (`<clave>-filtros-v1`, `-vista-v1`, `-columnas-v2`).
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.

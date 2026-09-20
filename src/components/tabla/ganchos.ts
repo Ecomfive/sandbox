@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { ordenConColumnasNuevas } from "@/lib/tabla/columnas";
 import { parsearFiltros, type DefTabla, type Filtro } from "@/lib/tabla/motor";
 import { parsearVista, vistaDefecto, type Vista } from "@/lib/tabla/vista";
 import { almacen } from "./almacen";
@@ -43,7 +44,9 @@ export function useColumnas(
   clave: string,
   columnas: ColumnaDef[]
 ): [EstadoColumnas, (cambio: { orden?: string[]; ocultas?: string[] }) => void] {
-  const a = almacen(`${clave}-columnas-v1`, "local");
+  // v2: quienes tenían un orden de columnas guardado antes de que Consolidación fuera una columna más
+  // (Retiros) lo pierden una sola vez; en las demás tablas es simplemente la primera versión.
+  const a = almacen(`${clave}-columnas-v2`, "local");
   const json = useSyncExternalStore(a.suscribir, a.leer, () => "");
 
   const estado = useMemo<EstadoColumnas>(() => {
@@ -54,8 +57,7 @@ export function useColumnas(
       try {
         const datos = JSON.parse(json) as { orden?: unknown[]; ocultas?: unknown[] };
         const esId = (v: unknown): v is string => typeof v === "string" && ids.includes(v);
-        const guardado = (datos.orden ?? []).filter(esId);
-        orden = [...guardado, ...ids.filter((id) => !guardado.includes(id))];
+        orden = ordenConColumnasNuevas(ids, (datos.orden ?? []).filter(esId));
         const noOcultables = new Set(columnas.filter((c) => !c.ocultable).map((c) => c.id));
         ocultas = (datos.ocultas ?? []).filter(esId).filter((id) => !noOcultables.has(id));
       } catch {
