@@ -12,7 +12,18 @@ import type { DefTabla } from "@/lib/tabla/motor";
  * archivo se arma en el navegador con la definición de la tabla, sin pedirle nada al servidor. Lleva una
  * marca al principio (BOM) para que Excel lea bien los acentos.
  */
-export function BotonDescargar<F>({ def, filas, nombreFilas }: { def: DefTabla<F>; filas: F[]; nombreFilas: string }) {
+export function BotonDescargar<F>({
+  def,
+  filas,
+  nombreFilas,
+  ayuda = "Descargar filas visibles",
+}: {
+  def: DefTabla<F>;
+  filas: F[];
+  nombreFilas: string;
+  /** Lo que dice el tooltip; cambia si lo que baja no son las filas visibles (p. ej. las seleccionadas). */
+  ayuda?: string;
+}) {
   const { mostrarToast } = useToast();
   const vacio = filas.length === 0;
 
@@ -31,7 +42,7 @@ export function BotonDescargar<F>({ def, filas, nombreFilas }: { def: DefTabla<F
   }
 
   return (
-    <Tooltip texto={vacio ? "No hay filas para descargar" : "Descargar filas visibles"}>
+    <Tooltip texto={vacio ? "No hay filas para descargar" : ayuda}>
       <button
         type="button"
         onClick={descargar}

@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
-import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { insertarConCorrelativo, leerCorrelativo } from "@/lib/retiros/correlativo";
+import { cambiarEstadoEnLote, type ResultadoLote } from "@/lib/retiros/en-lote";
 import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
 
 const TOLERANCIA_DISCREPANCIA = 3;
@@ -385,6 +386,30 @@ export async function eliminarRetiro(formData: FormData): Promise<{ error?: stri
 
   revalidatePath("/retiros");
   return {};
+}
+
+/**
+ * Pasa a varios retiros a Abierto, Novedad o Cerrado desde la barra de acciones de la tabla. Es el mismo cambio
+ * manual que `cambiarEstadoRetiro` (solo mueve la etiqueta; no toca monto recibido ni comprobante), con los mismos
+ * permisos: hace falta acceso de escritura a Retiros. Los cancelados no se tocan. La lógica está en
+ * `cambiarEstadoEnLote` (`src/lib/retiros/en-lote.ts`); aquí solo se comprueba el permiso y se refresca la página.
+ * Devuelve el error como valor, porque en producción Next.js oculta el mensaje de cualquier excepción.
+ */
+export async function cambiarEstadoRetirosEnLote(ids: string[], nuevoEstado: string): Promise<ResultadoLote> {
+  try {
+    await requireModuloEscritura("retiros");
+  } catch (e) {
+    return {
+      cambiados: 0,
+      yaEstaban: 0,
+      cancelados: 0,
+      noEncontrados: 0,
+      error: e instanceof Error ? e.message : "No tienes permiso para cambiar retiros.",
+    };
+  }
+  const resultado = await cambiarEstadoEnLote(createServiceClient(), ids, nuevoEstado, registrarAuditoriaLote);
+  if (resultado.cambiados > 0) revalidatePath("/retiros");
+  return resultado;
 }
 
 /** Cambio manual y directo del estado desde la columna de la tabla — a diferencia de

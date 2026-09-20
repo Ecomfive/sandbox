@@ -198,6 +198,7 @@ export default async function RetirosPage() {
           plataformas={plataformasParaCrear}
           cuentas={cuentasRetiro ?? []}
           miNombre={usuario.nombre ?? usuario.email}
+          puedeEscribir={!usuario.modulosSoloLectura.includes("retiros")}
         />
       </div>
 
