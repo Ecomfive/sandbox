@@ -4,12 +4,10 @@ import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { calcularPendientes } from "@/lib/alertas/pendientes";
-import { generarAlerta } from "./actions";
 import { TablaAlertas, type AlertaFila } from "./tabla-alertas";
-import { Button } from "@/components/ui/button";
+import { TablaPendientes } from "./tabla-pendientes";
 import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { AlertaIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
@@ -52,38 +50,15 @@ export default async function AlertasPage() {
           </Link>
           . Generar una alerta la deja lista para el reclamo quincenal a la plataforma.
         </EncabezadoPagina>
-        <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[32rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">SKU</th>
-                <th className="py-2 pr-3 font-medium">Producto</th>
-                <th className="py-2 pr-3 font-medium">Pendiente</th>
-                <th className="py-2 pr-4"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendientes.map((p) => (
-                <tr key={p.producto_id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 font-medium">{p.sku}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">{p.nombre}</td>
-                  <td className="py-2 pr-3 tabular-nums">{p.pendiente}</td>
-                  <td className="py-2 pr-4 text-right">
-                    <form action={generarAlerta}>
-                      <input type="hidden" name="pais_id" value={p.pais_id} />
-                      <input type="hidden" name="producto_id" value={p.producto_id} />
-                      <input type="hidden" name="cantidad" value={p.pendiente} />
-                      <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
-                        Generar alerta
-                      </Button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {pendientes.length === 0 && <EstadoVacio mensaje="No hay inventario pendiente por ahora." />}
-        </div>
+        <TablaPendientes
+          pendientes={pendientes.map((p) => ({
+            productoId: p.producto_id,
+            paisId: p.pais_id,
+            sku: p.sku,
+            nombre: p.nombre,
+            pendiente: p.pendiente,
+          }))}
+        />
       </div>
 
       <TablaAlertas alertas={alertas} />

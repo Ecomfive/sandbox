@@ -98,7 +98,7 @@ convenciones técnicas del código.
   poner un enlace suelto en la página.
 - **Tablas con barra de herramientas común** (Agrupar, filas cerradas, Filtros,
   Columnas — igual en todos los módulos, estilo ClickUp). Ya la usan Retiros,
-  Alertas, Pedidos Dropi, Gastos, Usuarios, Auditoría, CRM Dropshippers
+  Alertas (las alertas y el inventario pendiente de retorno), Pedidos Dropi, Gastos, Usuarios, Auditoría, CRM Dropshippers
   (directorio e interacciones), Productos, Catálogo maestro, Cuentas destino,
   Configuración (plataformas y cuentas), Inteligencia competitiva (lista de
   proveedores), Inventario, Extractos (movimientos, agrupados por extracto) y
