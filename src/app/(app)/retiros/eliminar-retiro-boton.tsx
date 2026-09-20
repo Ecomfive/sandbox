@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { eliminarRetiro } from "./actions";
 import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { PapeleraIcon } from "@/lib/nav-icons";
 
 /** Ícono de eliminar por fila en Conciliación de Retiros — mismo patrón que EliminarCuentaBoton
@@ -28,16 +29,17 @@ export function EliminarRetiroBoton({ id, correlativo }: { id: string; correlati
 
   return (
     <span className="relative z-10 inline-block">
-      <button
-        type="button"
-        onClick={alHacerClic}
-        disabled={pending}
-        aria-label={`Eliminar retiro ${numero}`}
-        title="Eliminar"
-        className={`rounded p-1.5 text-muted-foreground hover:bg-destructive-soft hover:text-destructive disabled:opacity-50 ${anilloFoco}`}
-      >
-        <PapeleraIcon className="h-4 w-4" />
-      </button>
+      <Tooltip texto="Eliminar retiro">
+        <button
+          type="button"
+          onClick={alHacerClic}
+          disabled={pending}
+          aria-label={`Eliminar retiro ${numero}`}
+          className={`rounded p-1.5 text-muted-foreground hover:bg-destructive-soft hover:text-destructive disabled:opacity-50 ${anilloFoco}`}
+        >
+          <PapeleraIcon className="h-4 w-4" />
+        </button>
+      </Tooltip>
       {error && (
         <span
           role="alert"

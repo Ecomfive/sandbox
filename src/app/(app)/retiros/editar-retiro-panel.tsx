@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { actualizarRetiro } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { CerrarIcon, LapizIcon } from "@/lib/nav-icons";
 import { calcularComisionSugerida, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 
@@ -157,16 +158,17 @@ export function EditarRetiroPanel({
 
   return (
     <>
-      <button
-        ref={botonAbrirRef}
-        type="button"
-        onClick={abrirVentana}
-        aria-label="Modificar retiro"
-        title="Modificar"
-        className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-      >
-        <LapizIcon className="h-4 w-4" />
-      </button>
+      <Tooltip texto="Modificar retiro">
+        <button
+          ref={botonAbrirRef}
+          type="button"
+          onClick={abrirVentana}
+          aria-label="Modificar retiro"
+          className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+        >
+          <LapizIcon className="h-4 w-4" />
+        </button>
+      </Tooltip>
 
       {abierto && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={cerrarVentana}>

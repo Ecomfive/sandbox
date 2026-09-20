@@ -25,7 +25,17 @@ export function ConTooltip({
   }
 
   return (
-    <div ref={ref} className="flex" onMouseEnter={alEntrar} onMouseLeave={() => setPos(null)}>
+    <div
+      ref={ref}
+      className="flex"
+      onMouseEnter={alEntrar}
+      onMouseLeave={() => setPos(null)}
+      onFocus={(e) => {
+        // Solo con teclado: con el ratón ya lo maneja el cursor.
+        if (e.target.matches(":focus-visible")) alEntrar();
+      }}
+      onBlur={() => setPos(null)}
+    >
       {children}
       {mostrar &&
         pos &&

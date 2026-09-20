@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ConTooltip } from "@/components/sidebar-tooltip";
 
 const STORAGE_KEY = "tema";
 
@@ -37,15 +38,18 @@ export function ThemeToggle({ expanded }: { expanded: boolean }) {
   }
 
   if (!expanded) {
+    const etiqueta = oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
     return (
-      <button
-        type="button"
-        onClick={() => elegir(oscuro ? "light" : "dark")}
-        aria-label={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-        className="flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-      >
-        {oscuro ? <LunaIcon className="h-4 w-4" /> : <SolIcon className="h-4 w-4" />}
-      </button>
+      <ConTooltip etiqueta={etiqueta} mostrar>
+        <button
+          type="button"
+          onClick={() => elegir(oscuro ? "light" : "dark")}
+          aria-label={etiqueta}
+          className="flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+          {oscuro ? <LunaIcon className="h-4 w-4" /> : <SolIcon className="h-4 w-4" />}
+        </button>
+      </ConTooltip>
     );
   }
 

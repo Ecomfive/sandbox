@@ -58,7 +58,13 @@ convenciones técnicas del código.
   navegador). Los botones de ícono explican qué hacen con
   `<Tooltip texto="...">` (`src/components/ui/tooltip.tsx`), no con `title=`; el
   texto es corto y preciso (2 a 4 palabras, verbo en infinitivo: "Filtrar
-  retiros", "Mostrar cerrados"). El botón **Compartir** de la misma franja
+  retiros", "Mostrar cerrados"). Un botón de ícono lleva además su `aria-label`;
+  un botón que solo muestra un estado ("Activo") dice en el `aria-label` el
+  estado y lo que hace al pulsarlo. En el menú lateral colapsado se usa
+  `ConTooltip` (`src/components/sidebar-tooltip.tsx`), que también aparece con
+  el foco de teclado. Lo que no es enfocable (un ⚠️) se vuelve `tabIndex={0}`
+  con `role="img"` para poder envolverlo. La única excepción a `title=` es el
+  chip de filtro con texto recortado, que muestra su nombre completo. El botón **Compartir** de la misma franja
   (`src/components/compartir/`) muestra quién tiene acceso a la sección: sale de
   los roles (`permisos_rol` + `perfiles`, ver `src/lib/compartir-actions.ts`), es
   solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles.

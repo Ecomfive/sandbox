@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { crearCuentaRetiro, actualizarCuentaRetiro } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { CerrarIcon, LapizIcon, MasIcon } from "@/lib/nav-icons";
 
 const TIPOS = [
@@ -104,16 +105,17 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
   return (
     <>
       {editando ? (
-        <button
-          ref={botonAbrirRef}
-          type="button"
-          onClick={abrirVentana}
-          aria-label="Modificar cuenta"
-          title="Modificar"
-          className={`rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-        >
-          <LapizIcon className="h-4 w-4" />
-        </button>
+        <Tooltip texto="Modificar cuenta">
+          <button
+            ref={botonAbrirRef}
+            type="button"
+            onClick={abrirVentana}
+            aria-label="Modificar cuenta"
+            className={`rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+          >
+            <LapizIcon className="h-4 w-4" />
+          </button>
+        </Tooltip>
       ) : (
         <Button
           ref={botonAbrirRef}
