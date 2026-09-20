@@ -136,6 +136,16 @@ convenciones técnicas del código.
   (entradas y salidas). Un filtro de un toque («Mis retiros») se pasa a
   `<BarraHerramientas atajos={[...]}>` (`AtajoFiltro`, `src/lib/tabla/atajos.ts`): es un
   filtro de selección que el botón enciende o apaga sin tocar los de otros campos.
+- **Vistas guardadas.** Toda tabla con barra de herramientas trae el menú «Vistas»
+  (`src/components/tabla/menu-vistas.tsx`): guarda con nombre lo que se ve (filtros,
+  agrupación, cerrados y columnas), lo aplica de nuevo, elimina (con confirmación en
+  la misma fila), restablece y **copia un enlace** a la vista
+  (`?vista-<clave>=<código>`, `src/lib/tabla/vistas.ts`). Las vistas son de cada
+  persona (`<clave>-vistas-guardadas-v1` en su navegador, máximo 20; no viajan a
+  otro equipo ni otro navegador). Al abrir un enlace con una vista, se aplica, se
+  quita el parámetro de la dirección y lo que la persona tenía queda guardado como
+  «Antes del enlace». Compartir vistas con nombre para todo el equipo pediría una
+  tabla en Supabase: no existe todavía.
 - **Descargar lo que se ve.** Toda tabla con barra de herramientas trae el botón
   «Descargar»: un CSV (con BOM para Excel) de las filas que dejan los filtros, en
   el orden de la pantalla, armado en el navegador con la `DefTabla`

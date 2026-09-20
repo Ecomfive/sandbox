@@ -8,6 +8,8 @@ import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos
 import { PersonaIcon } from "@/lib/nav-icons";
 import { BotonAgrupar, BotonAtajo, BotonCerrados, type IconoComp } from "./botones-vista";
 import { BotonDescargar } from "./boton-descargar";
+import { MenuVistas } from "./menu-vistas";
+import type { EstadoTabla } from "@/lib/tabla/vistas";
 import type { ColumnaDef, EstadoColumnas } from "./ganchos";
 import { MenuColumnas } from "./menu-columnas";
 import type { TablaInteractiva } from "./usar-tabla";
@@ -46,6 +48,13 @@ export function BarraHerramientas<F>({
   // pantalla) y, con grupos, en el orden de los grupos.
   const filasParaDescargar = vista.agrupar ? grupos.flatMap((g) => g.filas) : resultado.filas;
 
+  // Aplicar una vista guardada (o la de un enlace) es escribir cada parte donde ya se guarda: filtros, vista y columnas.
+  function aplicarEstado(nuevo: EstadoTabla) {
+    cambiarFiltros(nuevo.filtros);
+    cambiarVista(nuevo.vista);
+    if (columnas && nuevo.columnas) columnas.cambiar(nuevo.columnas);
+  }
+
   return (
     // Queda fija arriba al bajar la página, con fondo opaco para que las filas no se vean por debajo.
     <div
@@ -55,6 +64,16 @@ export function BarraHerramientas<F>({
     >
       {extra && <div className="flex items-center gap-2">{extra}</div>}
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <MenuVistas
+          def={def}
+          estado={{
+            filtros,
+            vista,
+            columnas: columnas ? { orden: columnas.estado.orden, ocultas: [...columnas.estado.ocultas] } : null,
+          }}
+          idsColumnas={columnas ? columnas.defs.map((c) => c.id) : null}
+          aplicar={aplicarEstado}
+        />
         {agrupables.length > 0 && (
           <BotonAgrupar
             campos={agrupables}
