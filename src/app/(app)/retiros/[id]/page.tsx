@@ -6,6 +6,7 @@ import { AvisoCorrelativo } from "./aviso-correlativo";
 import { CancelarRetiroForm } from "./cancelar-retiro-form";
 import { CerrarRetiroForm } from "./cerrar-retiro-form";
 import { DescargarFicha } from "./descargar-ficha";
+import { ConsolidadoToggle } from "../consolidado-toggle";
 import { Badge } from "@/components/ui/badge";
 import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
@@ -42,7 +43,7 @@ export default async function RetiroDetallePage({
   const { data: retiro } = await supabase
     .from("retiros")
     .select(
-      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, a_recibir, fecha_limite, estado_dropi, dropi_id, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
+      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, consolidado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, a_recibir, fecha_limite, estado_dropi, dropi_id, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -82,6 +83,7 @@ export default async function RetiroDetallePage({
           <Badge tone={ESTADO_TONO[retiro.estado as keyof typeof ESTADO_TONO]}>
             {ESTADO_ETIQUETA[retiro.estado] ?? retiro.estado}
           </Badge>
+          <ConsolidadoToggle id={retiro.id} consolidado={retiro.consolidado} />
           <div className="ml-auto">
             <DescargarFicha retiroId={retiro.id} />
           </div>

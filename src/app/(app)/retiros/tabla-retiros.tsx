@@ -12,11 +12,11 @@ import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
 import { ArrastrarIcon, ChevronRightIcon, ColumnasIcon } from "@/lib/nav-icons";
 import { ESTADO_ETIQUETA, filtroActivo } from "./filtros";
 import { BotonFiltrosRetiros, useFiltrosRetiros } from "./filtros-retiros";
-import { ConsolidadoToggle } from "./consolidado-toggle";
 import { EstadoSelect } from "./estado-select";
 import { BotonAgrupar, BotonCerrados, useVistaRetiros } from "./vista-retiros";
 import { agruparRetiros, aplicarVista, type CampoAgrupable, type Grupo } from "./vista";
 import type { Cuenta, Plataforma } from "./crear-retiro-panel";
+import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
 import { EditarRetiroPanel } from "./editar-retiro-panel";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 
@@ -53,7 +53,7 @@ const ESTADO_TONO = {
   cerrado: "success",
 } as const;
 
-type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "estado" | "dropi" | "acciones";
+type ColumnaId = "correlativo" | "fecha" | "plataforma" | "destino" | "monto" | "consolidado" | "estado" | "dropi";
 
 const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?: string }[] = [
   { id: "correlativo", label: "#", ocultable: false, claseCelda: "font-semibold" },
@@ -61,9 +61,9 @@ const COLUMNAS: { id: ColumnaId; label: string; ocultable: boolean; claseCelda?:
   { id: "plataforma", label: "Plataforma", ocultable: true, claseCelda: "text-muted-foreground" },
   { id: "destino", label: "Destino", ocultable: true, claseCelda: "text-muted-foreground" },
   { id: "monto", label: "Monto", ocultable: true, claseCelda: "tabular-nums font-semibold" },
+  { id: "consolidado", label: "Consolidación", ocultable: true },
   { id: "estado", label: "Estado", ocultable: true },
   { id: "dropi", label: "Dropi", ocultable: true },
-  { id: "acciones", label: "Acciones", ocultable: false },
 ];
 
 const ORDEN_DEFECTO = COLUMNAS.map((c) => c.id);
@@ -74,13 +74,7 @@ function esColumnaId(valor: unknown): valor is ColumnaId {
   return typeof valor === "string" && ORDEN_DEFECTO.includes(valor as ColumnaId);
 }
 
-function renderCelda(
-  id: ColumnaId,
-  fila: FilaRetiro,
-  codigoPais: string,
-  plataformas: Plataforma[],
-  cuentas: Cuenta[]
-) {
+function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
   switch (id) {
     case "correlativo":
       return (
@@ -99,6 +93,12 @@ function renderCelda(
       return fila.destino;
     case "monto":
       return formatearMoneda(fila.monto, codigoPais);
+    case "consolidado":
+      return (
+        <Badge tone={fila.consolidado ? "success" : "warning"}>
+          {fila.consolidado ? "Consolidado" : "Pendiente"}
+        </Badge>
+      );
     case "estado":
       return fila.estado === "cancelado" ? (
         <Badge tone={ESTADO_TONO[fila.estado as keyof typeof ESTADO_TONO]}>
@@ -114,28 +114,6 @@ function renderCelda(
         </Badge>
       ) : (
         <span className="text-muted-foreground">—</span>
-      );
-    case "acciones":
-      return (
-        <div className="flex items-center gap-1">
-          <EditarRetiroPanel
-            retiro={{
-              id: fila.id,
-              numeroCorrelativo: fila.numeroCorrelativo,
-              plataformaId: fila.plataformaId,
-              cuentaRetiroId: fila.cuentaRetiroId,
-              gestionadoPor: fila.gestionadoPor,
-              monto: fila.monto,
-              comision: fila.comision,
-              fecha: fila.fecha,
-              fechaLimite: fila.fechaLimite,
-              notas: fila.notas,
-            }}
-            plataformas={plataformas}
-            cuentas={cuentas}
-          />
-          <EliminarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
-        </div>
       );
   }
 }
@@ -157,11 +135,13 @@ function etiquetaGrupo(campo: CampoAgrupable, grupo: Grupo) {
 export function TablaRetiros({
   retiros,
   codigoPais,
+  paisId,
   plataformas,
   cuentas,
 }: {
   retiros: FilaRetiro[];
   codigoPais: string;
+  paisId: string;
   plataformas: Plataforma[];
   cuentas: Cuenta[];
 }) {
@@ -272,20 +252,51 @@ export function TablaRetiros({
   const columnasVisibles = orden.filter((id) => !ocultas.has(id)).map((id) => COLUMNAS_POR_ID.get(id)!);
 
   const filaRetiro = (fila: FilaRetiro) => (
-    <tr key={fila.id} className="relative border-b border-border/60 last:border-0 hover:bg-muted/50">
-      <td className="border-r border-border/40 px-4 py-3">
-        <ConsolidadoToggle id={fila.id} consolidado={fila.consolidado} />
-      </td>
-      {columnasVisibles.map((columna, i) => (
-        <td
-          key={columna.id}
-          className={`px-4 py-3 ${i < columnasVisibles.length - 1 ? "border-r border-border/40" : ""} ${
-            columna.claseCelda ?? ""
-          }`}
-        >
-          {renderCelda(columna.id, fila, codigoPais, plataformas, cuentas)}
+    <tr key={fila.id} className="group relative border-b border-border/60 last:border-0 hover:bg-muted/50">
+      {columnasVisibles.map((columna) => (
+        <td key={columna.id} className={`border-r border-border/40 px-4 py-3 ${columna.claseCelda ?? ""}`}>
+          {renderCelda(columna.id, fila, codigoPais)}
         </td>
       ))}
+      <td className="sticky right-0 z-10 bg-card px-2 py-3 group-hover:bg-muted/50">
+        <div className="flex items-center justify-center gap-1">
+          <ConciliarRetiroPanel
+            retiro={{
+              id: fila.id,
+              numeroCorrelativo: fila.numeroCorrelativo,
+              plataformaNombre: fila.plataformaNombre,
+              destino: fila.destino,
+              gestionadoPor: fila.gestionadoPor,
+              monto: fila.monto,
+              fecha: fila.fecha,
+              fechaLimite: fila.fechaLimite,
+              comision: fila.comision,
+              aRecibir: fila.aRecibir,
+              notas: fila.notas,
+              soporteNumero: fila.soporteNumero,
+              montoRecibido: fila.montoRecibido,
+            }}
+            paisId={paisId}
+          />
+          <EditarRetiroPanel
+            retiro={{
+              id: fila.id,
+              numeroCorrelativo: fila.numeroCorrelativo,
+              plataformaId: fila.plataformaId,
+              cuentaRetiroId: fila.cuentaRetiroId,
+              gestionadoPor: fila.gestionadoPor,
+              monto: fila.monto,
+              comision: fila.comision,
+              fecha: fila.fecha,
+              fechaLimite: fila.fechaLimite,
+              notas: fila.notas,
+            }}
+            plataformas={plataformas}
+            cuentas={cuentas}
+          />
+          <EliminarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
+        </div>
+      </td>
     </tr>
   );
 
@@ -409,16 +420,11 @@ export function TablaRetiros({
       <table className="w-full min-w-[42rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-            <th scope="col" className="border-r border-border/60 px-4 py-3 text-xs font-semibold tracking-wide uppercase">
-              Consolidación
-            </th>
-            {columnasVisibles.map((columna, i) => (
+            {columnasVisibles.map((columna) => (
               <th
                 key={columna.id}
                 scope="col"
-                className={`px-4 py-3 text-xs font-semibold tracking-wide uppercase ${
-                  i < columnasVisibles.length - 1 ? "border-r border-border/60" : ""
-                }`}
+                className="border-r border-border/60 px-4 py-3 text-xs font-semibold tracking-wide uppercase"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <ArrastrarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
@@ -426,6 +432,12 @@ export function TablaRetiros({
                 </span>
               </th>
             ))}
+            <th
+              scope="col"
+              className="sticky right-0 z-10 bg-muted px-2 py-3 text-center text-xs font-semibold tracking-wide uppercase"
+            >
+              Acciones
+            </th>
           </tr>
         </thead>
         {vista.agrupar

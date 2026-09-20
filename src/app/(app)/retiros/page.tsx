@@ -193,6 +193,7 @@ export default async function RetirosPage() {
         <TablaRetiros
           retiros={filasRetiro}
           codigoPais={pais.codigo}
+          paisId={pais.id}
           plataformas={plataformasParaCrear}
           cuentas={cuentasRetiro ?? []}
         />

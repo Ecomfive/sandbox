@@ -210,6 +210,78 @@ export async function cerrarRetiro(formData: FormData) {
   return { conDiscrepancia, diferencia };
 }
 
+/**
+ * Concilia un retiro desde la ventana de "Conciliar" en la tabla: a diferencia de cerrarRetiro
+ * (que deja pasar una discrepancia marcando "novedad"), acá NO se guarda nada si el monto
+ * recibido se aleja de lo esperado más de TOLERANCIA_DISCREPANCIA — hay que corregirlo o
+ * investigarlo antes de poder conciliar. Al conciliar, además de cerrar el retiro, marca la
+ * bandera de consolidación (antes editable a mano, ahora solo se activa desde acá).
+ */
+export async function conciliarRetiro(formData: FormData): Promise<{ error?: string }> {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+  const pais_id = formData.get("pais_id") as string;
+  const soporte_numero = (formData.get("soporte_numero") as string) || null;
+  const montoRecibido = Number(formData.get("monto_recibido"));
+  const comprobante = formData.get("comprobante") as File | null;
+
+  const supabase = createServiceClient();
+  const { data: retiro, error: errorRetiro } = await supabase
+    .from("retiros")
+    .select("estado, a_recibir, monto_neto, comprobante_path")
+    .eq("id", id)
+    .single();
+  if (errorRetiro) return { error: errorRetiro.message };
+
+  const esperado = Number(retiro.a_recibir ?? retiro.monto_neto);
+  const diferencia = montoRecibido - esperado;
+  if (Math.abs(diferencia) > TOLERANCIA_DISCREPANCIA) {
+    return {
+      error: `No se puede conciliar: se esperaban $${esperado.toFixed(2)} y se recibieron $${montoRecibido.toFixed(2)} (diferencia de $${diferencia.toFixed(2)}, máximo permitido $${TOLERANCIA_DISCREPANCIA}). Corrige el monto o investiga antes de conciliar.`,
+    };
+  }
+
+  let comprobante_path = retiro.comprobante_path as string | null;
+  if (comprobante && comprobante.size > 0) {
+    const ruta = `${pais_id}/${id}/${Date.now()}-${comprobante.name}`;
+    const { error: errorSubida } = await supabase.storage
+      .from("comprobantes-retiro")
+      .upload(ruta, comprobante, { contentType: comprobante.type || "application/octet-stream" });
+    if (errorSubida) return { error: errorSubida.message };
+    comprobante_path = ruta;
+  }
+
+  const { error } = await supabase
+    .from("retiros")
+    .update({
+      estado: "cerrado",
+      soporte_numero,
+      comprobante_path,
+      monto_recibido: montoRecibido,
+      fecha_cierre: new Date().toISOString().slice(0, 10),
+      consolidado: true,
+    })
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  await registrarEvento(supabase, id, `Retiro conciliado: monto recibido ${montoRecibido.toFixed(2)}`);
+  await registrarAuditoria({
+    accion: "conciliar_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    antes: { Estado: ETIQUETA_ESTADO[retiro.estado] ?? retiro.estado, Consolidación: "Pendiente" },
+    despues: {
+      Estado: "Cerrado",
+      Consolidación: "Consolidado",
+      "Monto recibido": montoRecibido.toFixed(2),
+    },
+  });
+
+  revalidatePath("/retiros");
+  revalidatePath(`/retiros/${id}`);
+  return {};
+}
+
 export async function cancelarRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
