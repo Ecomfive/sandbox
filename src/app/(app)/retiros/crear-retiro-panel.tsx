@@ -62,8 +62,6 @@ export function CrearRetiroPanel({
   const [comisionPorcentaje, setComisionPorcentaje] = useState("0");
   const [comisionManual, setComisionManual] = useState(false);
   const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState("");
-  const [aRecibir, setARecibir] = useState("");
-  const [aRecibirManual, setARecibirManual] = useState(false);
   const [fechaLimite, setFechaLimite] = useState("");
   const [correlativo, setCorrelativo] = useState<number | null>(null);
   const [consultando, setConsultando] = useState(false);
@@ -100,8 +98,6 @@ export function CrearRetiroPanel({
     setComisionValor("0");
     setComisionPorcentaje("0");
     setComisionManual(false);
-    setARecibir("");
-    setARecibirManual(false);
     setFechaLimite("");
     setAbierto(true);
     setCorrelativo(null);
@@ -152,9 +148,8 @@ export function CrearRetiroPanel({
 
   const montoNum = parseFloat(monto) || 0;
   const comisionNum = parseFloat(comisionValor) || 0;
+  // "A recibir" ya no se edita a mano: siempre es monto menos comisión (ver crearRetiro()).
   const montoNeto = montoNum - comisionNum;
-  // Por defecto "A recibir" sigue a monto − comisión; al escribirlo a mano deja de seguirlo.
-  const aRecibirMostrado = aRecibirManual ? aRecibir : montoNum > 0 || comisionNum > 0 ? montoNeto.toFixed(2) : "";
 
   function alCambiarComisionValor(valor: string) {
     setComisionManual(true);
@@ -331,6 +326,23 @@ export function CrearRetiroPanel({
                   </div>
                 </div>
 
+                <div className="flex flex-col gap-1">
+                  <label className={labelClassSm} htmlFor="campo-gestionado-por">
+                    Gestionado por
+                    <Obligatorio />
+                  </label>
+                  <select
+                    id="campo-gestionado-por"
+                    name="gestionado_por"
+                    required
+                    defaultValue="plataforma"
+                    className={`${fieldClassSm} w-40`}
+                  >
+                    <option value="plataforma">Plataforma</option>
+                    <option value="correo">Correo</option>
+                  </select>
+                </div>
+
                 <div className="flex gap-2">
                   <div className="flex w-24 shrink-0 flex-col gap-1">
                     <label className={labelClassSm} htmlFor="campo-monto">
@@ -417,7 +429,6 @@ export function CrearRetiroPanel({
                 <div>
                   <label className={labelClassSm} htmlFor="campo-a-recibir">
                     A recibir
-                    <Obligatorio />
                   </label>
                   <div className="mt-1 flex items-center gap-1">
                     <span className="text-sm text-muted-foreground">$</span>
@@ -425,46 +436,24 @@ export function CrearRetiroPanel({
                       id="campo-a-recibir"
                       type="number"
                       step="0.01"
-                      min="0"
-                      name="a_recibir"
-                      required
-                      aria-describedby="ayuda-a-recibir"
-                      value={aRecibirMostrado}
-                      onChange={(e) => {
-                        setARecibir(e.target.value);
-                        setARecibirManual(true);
-                      }}
-                      className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
+                      readOnly
+                      tabIndex={-1}
+                      value={montoNeto.toFixed(2)}
+                      className={`${fieldClassSm} w-full min-w-0 cursor-not-allowed bg-muted tabular-nums`}
                     />
                   </div>
-                  <p id="ayuda-a-recibir" className="mt-1 text-xs text-muted-foreground">
-                    Monto que debe llegar. Por defecto es el monto menos la comisión (
-                    <span className="tabular-nums">${montoNeto.toFixed(2)}</span>); puedes cambiarlo.
-                    {aRecibirManual && (
-                      <>
-                        {" "}
-                        <button
-                          type="button"
-                          onClick={() => setARecibirManual(false)}
-                          className={`underline hover:text-foreground ${anilloFoco}`}
-                        >
-                          Volver al cálculo
-                        </button>
-                      </>
-                    )}
-                  </p>
                 </div>
 
                 <div>
-                  <label className="sr-only" htmlFor="campo-notas">
-                    Notas
+                  <label className={labelClassSm} htmlFor="campo-notas">
+                    Nota
                   </label>
                   <input
                     id="campo-notas"
                     type="text"
                     name="notas"
                     placeholder="Escribe una nota para este retiro"
-                    className={`${fieldClass} w-full text-sm`}
+                    className={`${fieldClass} mt-1 w-full text-sm`}
                   />
                 </div>
               </div>

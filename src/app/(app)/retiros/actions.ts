@@ -88,8 +88,11 @@ export async function crearRetiro(formData: FormData) {
   const fecha = formData.get("fecha") as string;
   const notas = (formData.get("notas") as string) || null;
   const fecha_limite = (formData.get("fecha_limite") as string) || null;
-  const aRecibirTexto = (formData.get("a_recibir") as string) || "";
-  const a_recibir = aRecibirTexto !== "" && !Number.isNaN(Number(aRecibirTexto)) ? Number(aRecibirTexto) : monto - comision;
+  // "A recibir" ya no se edita a mano: siempre es monto menos comisión, para que la comisión
+  // configurada en la cuenta destino se refleje tal cual, sin que alguien la pise sin querer.
+  const a_recibir = monto - comision;
+  const gestionadoPorTexto = formData.get("gestionado_por") as string;
+  const gestionado_por = gestionadoPorTexto === "correo" ? "correo" : "plataforma";
   // La persona asignada la pone el sistema: quien crea el retiro.
   const usuario = await getUsuarioActual();
   const asignado_a = usuario?.id ?? null;
@@ -113,6 +116,7 @@ export async function crearRetiro(formData: FormData) {
           notas,
           asignado_a,
           fecha_limite,
+          gestionado_por,
           estado: "abierto",
         })
         .select("id, numero_correlativo")
