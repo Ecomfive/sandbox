@@ -7,7 +7,8 @@ import { TransicionPagina } from "@/components/transicion-pagina";
 import { getUsuarioActual } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
-import { construirSeccionesPlataforma } from "@/lib/nav-data";
+import { NAV_SECTIONS, construirSeccionesPlataforma } from "@/lib/nav-data";
+import { paginasBuscables } from "@/lib/paleta";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const pais = await getPaisActual(supabase);
   const plataformasPais = await obtenerPlataformasPais(supabase, pais.id);
   const seccionesPlataforma = construirSeccionesPlataforma(plataformasPais);
+  const paginas = paginasBuscables(seccionesPlataforma, NAV_SECTIONS, usuario?.modulos ?? null);
   const favoritos = usuario ? await obtenerFavoritos(supabase, usuario.id) : [];
   const pendientesHoy =
     usuario?.modulos.includes("notificaciones") ? await obtenerPendientesHoy(supabase, pais.id) : null;
@@ -39,7 +41,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           totalPendientes={totalPendientes}
         />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
-          <NavBar />
+          <NavBar paginas={paginas} />
           <BarraMigas seccionesPlataforma={seccionesPlataforma} favoritos={favoritos} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>
