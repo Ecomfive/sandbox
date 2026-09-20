@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +13,8 @@ import {
 } from "@/lib/nav-data";
 import { DashboardIcon, ChevronRightIcon, NotificacionesIcon, SECTION_ICONS } from "@/lib/nav-icons";
 import { ConTooltip } from "@/components/sidebar-tooltip";
+import { ContadorMenu, ContadorSobreIcono } from "@/components/sidebar-contador";
+import { SIN_PENDIENTES, sumaDeItems, textoPendientes, type PendientesMenu } from "@/lib/contadores-menu";
 import { CuentaFooter } from "@/components/cuenta-footer";
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import type { UsuarioActual } from "@/lib/auth";
@@ -40,11 +42,14 @@ function ItemHoja({
   item,
   activo,
   esFavorito,
+  cantidad = 0,
   onNavigate,
 }: {
   item: NavItem;
   activo: boolean;
   esFavorito: boolean;
+  /** Pendientes de esta página (0 = ninguno, no se dibuja). */
+  cantidad?: number;
   onNavigate?: () => void;
 }) {
   if (item.pronto || !item.href) {
@@ -62,14 +67,56 @@ function ItemHoja({
         onClick={onNavigate}
         className={
           activo
-            ? "flex-1 rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-            : "flex-1 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
+            ? "flex flex-1 items-center justify-between gap-2 rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
+            : "flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
         }
       >
         {item.label}
+        <ContadorMenu cantidad={cantidad} />
       </Link>
       <FavoritoToggle href={item.href} activo={esFavorito} />
     </div>
+  );
+}
+
+/** Botón de una sección del menú. Con la sección cerrada (o el riel colapsado) muestra lo que suman sus páginas. */
+function CabeceraSeccion({
+  titulo,
+  expanded,
+  abierta,
+  cantidad,
+  alAlternar,
+}: {
+  titulo: string;
+  expanded: boolean;
+  abierta: boolean;
+  cantidad: number;
+  alAlternar: () => void;
+}) {
+  const Icono = SECTION_ICONS[titulo] ?? DashboardIcon;
+  return (
+    <ConTooltip etiqueta={cantidad > 0 ? `${titulo} · ${textoPendientes(cantidad)}` : titulo} mostrar={!expanded}>
+      <button
+        type="button"
+        onClick={alAlternar}
+        aria-label={expanded ? undefined : cantidad > 0 ? `${titulo}, ${textoPendientes(cantidad)}` : titulo}
+        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+      >
+        <span className="relative inline-flex shrink-0">
+          <Icono className="h-5 w-5" />
+          {!expanded && <ContadorSobreIcono cantidad={cantidad} />}
+        </span>
+        {expanded && (
+          <>
+            <span className="flex-1 text-left">{titulo}</span>
+            {!abierta && <ContadorMenu cantidad={cantidad} />}
+            <ChevronRightIcon
+              className={`h-4 w-4 text-muted-foreground transition-transform ${abierta ? "rotate-90" : ""}`}
+            />
+          </>
+        )}
+      </button>
+    </ConTooltip>
   );
 }
 
@@ -80,7 +127,7 @@ function SidebarContents({
   modulosPermitidos,
   seccionesPlataforma,
   favoritos,
-  totalPendientes,
+  pendientes,
 }: {
   expanded: boolean;
   onToggle?: () => void;
@@ -88,8 +135,9 @@ function SidebarContents({
   modulosPermitidos?: string[] | null;
   seccionesPlataforma: NavSectionAnidada[];
   favoritos: string[];
-  totalPendientes: number;
+  pendientes: PendientesMenu;
 }) {
+  const { contadores, total: totalPendientes } = pendientes;
   const pathname = usePathname();
   const primeraSeccion = seccionesPlataforma[0]?.title ?? NAV_SECTIONS[0]?.title ?? null;
   const seccionActiva = encontrarSeccionActiva(pathname, seccionesPlataforma, NAV_SECTIONS);
@@ -180,6 +228,7 @@ function SidebarContents({
                   item={item}
                   activo={pathname === item.href}
                   esFavorito
+                  cantidad={item.href ? contadores[item.href] : 0}
                   onNavigate={onNavigate}
                 />
               ))}
@@ -195,32 +244,22 @@ function SidebarContents({
       )}
 
       {seccionesPlataforma.map((section) => {
-        const SectionIcon = SECTION_ICONS[section.title] ?? DashboardIcon;
         const isOpen = expanded && seccionAbierta === section.title;
 
         return (
           <div key={section.title} className={expanded ? "" : "py-0.5"}>
-            <ConTooltip etiqueta={section.title} mostrar={!expanded}>
-              <button
-                type="button"
-                onClick={() =>
-                  setSeccionAbierta((prev) => (prev === section.title ? null : section.title))
-                }
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                <SectionIcon className="h-5 w-5 shrink-0" />
-                {expanded && (
-                  <>
-                    <span className="flex-1 text-left">{section.title}</span>
-                    <ChevronRightIcon
-                      className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}
-                    />
-                  </>
-                )}
-              </button>
-            </ConTooltip>
+            <CabeceraSeccion
+              titulo={section.title}
+              expanded={expanded}
+              abierta={isOpen}
+              cantidad={sumaDeItems(
+                section.groups.flatMap((g) => g.items),
+                contadores
+              )}
+              alAlternar={() => setSeccionAbierta((prev) => (prev === section.title ? null : section.title))}
+            />
             {expanded && isOpen && (
-              <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-6">
+              <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
                 {section.groups.map((grupo) => {
                   if (grupo.items.length === 0) {
                     return (
@@ -248,18 +287,22 @@ function SidebarContents({
                         className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
                       >
                         <span>{grupo.label}</span>
-                        <ChevronRightIcon
-                          className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${grupoOpen ? "rotate-90" : ""}`}
-                        />
+                        <span className="flex items-center gap-2">
+                          {!grupoOpen && <ContadorMenu cantidad={sumaDeItems(itemsVisibles, contadores)} />}
+                          <ChevronRightIcon
+                            className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${grupoOpen ? "rotate-90" : ""}`}
+                          />
+                        </span>
                       </button>
                       {grupoOpen && (
-                        <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-4">
+                        <div className="ml-2 flex flex-col gap-0.5 border-l border-border pl-2">
                           {itemsVisibles.map((item) => (
                             <ItemHoja
                               key={item.label}
                               item={item}
                               activo={pathname === item.href}
                               esFavorito={!!item.href && favoritos.includes(item.href)}
+                              cantidad={item.href ? contadores[item.href] : 0}
                               onNavigate={onNavigate}
                             />
                           ))}
@@ -278,38 +321,26 @@ function SidebarContents({
         const itemsVisibles = section.items.filter((item) => puedeVer(modulosPermitidos, item.href));
         if (itemsVisibles.length === 0) return null;
 
-        const SectionIcon = SECTION_ICONS[section.title] ?? DashboardIcon;
         const isOpen = expanded && seccionAbierta === section.title;
 
         return (
           <div key={section.title} className={expanded ? "" : "py-0.5"}>
-            <ConTooltip etiqueta={section.title} mostrar={!expanded}>
-              <button
-                type="button"
-                onClick={() =>
-                  setSeccionAbierta((prev) => (prev === section.title ? null : section.title))
-                }
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                <SectionIcon className="h-5 w-5 shrink-0" />
-                {expanded && (
-                  <>
-                    <span className="flex-1 text-left">{section.title}</span>
-                    <ChevronRightIcon
-                      className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}
-                    />
-                  </>
-                )}
-              </button>
-            </ConTooltip>
+            <CabeceraSeccion
+              titulo={section.title}
+              expanded={expanded}
+              abierta={isOpen}
+              cantidad={sumaDeItems(itemsVisibles, contadores)}
+              alAlternar={() => setSeccionAbierta((prev) => (prev === section.title ? null : section.title))}
+            />
             {expanded && isOpen && (
-              <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-6">
+              <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
                 {itemsVisibles.map((item) => (
                   <ItemHoja
                     key={item.label}
                     item={item}
                     activo={pathname === item.href}
                     esFavorito={!!item.href && favoritos.includes(item.href)}
+                    cantidad={item.href ? contadores[item.href] : 0}
                     onNavigate={onNavigate}
                   />
                 ))}
@@ -322,18 +353,43 @@ function SidebarContents({
   );
 }
 
+type PropsContenido = Parameters<typeof SidebarContents>[0];
+
+function ContenidoResuelto({
+  pendientes,
+  ...props
+}: Omit<PropsContenido, "pendientes"> & { pendientes: Promise<PendientesMenu> }) {
+  return <SidebarContents {...props} pendientes={use(pendientes)} />;
+}
+
+/**
+ * El menú sale de inmediato y los contadores llegan cuando la consulta termina: la promesa la crea el
+ * layout sin esperarla, así contar pendientes no retrasa la carga de ninguna página. Mientras tanto se
+ * dibuja el mismo menú sin contadores (las pastillas están al final de cada fila: no mueve nada).
+ */
+function ContenidoConPendientes({
+  pendientes,
+  ...props
+}: Omit<PropsContenido, "pendientes"> & { pendientes: Promise<PendientesMenu> }) {
+  return (
+    <Suspense fallback={<SidebarContents {...props} pendientes={SIN_PENDIENTES} />}>
+      <ContenidoResuelto {...props} pendientes={pendientes} />
+    </Suspense>
+  );
+}
+
 export function Sidebar({
   modulosPermitidos,
   usuario,
   seccionesPlataforma,
   favoritos,
-  totalPendientes,
+  pendientes,
 }: {
   modulosPermitidos?: string[] | null;
   usuario: UsuarioActual | null;
   seccionesPlataforma: NavSectionAnidada[];
   favoritos: string[];
-  totalPendientes: number;
+  pendientes: Promise<PendientesMenu>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -367,13 +423,13 @@ export function Sidebar({
             className={expanded ? "h-5 w-auto" : "h-3 w-auto"}
           />
         </Link>
-        <SidebarContents
+        <ContenidoConPendientes
           expanded={expanded}
           onToggle={toggleExpanded}
           modulosPermitidos={modulosPermitidos}
           seccionesPlataforma={seccionesPlataforma}
           favoritos={favoritos}
-          totalPendientes={totalPendientes}
+          pendientes={pendientes}
         />
         {usuario && <CuentaFooter usuario={usuario} expanded={expanded} />}
       </aside>
@@ -413,13 +469,13 @@ export function Sidebar({
                 </svg>
               </button>
             </div>
-            <SidebarContents
+            <ContenidoConPendientes
               expanded
               onNavigate={() => setMobileOpen(false)}
               modulosPermitidos={modulosPermitidos}
               seccionesPlataforma={seccionesPlataforma}
               favoritos={favoritos}
-              totalPendientes={totalPendientes}
+              pendientes={pendientes}
             />
             {usuario && <CuentaFooter usuario={usuario} expanded />}
           </div>
