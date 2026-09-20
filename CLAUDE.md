@@ -87,6 +87,12 @@ convenciones técnicas del código.
   (`<clave>-filtros-v1`, `-vista-v1`, `-columnas-v2`). Las páginas sirven las
   filas ya listas (serializables) y la definición y las columnas de un cliente
   son constantes del módulo.
+- **Borde de los campos de formulario.** Los `input`, `select` y `textarea` usan
+  `fieldClass` / `fieldClassSm` (`src/components/ui/field.ts`), que llevan
+  `border-border-control` (`--border-control`: 3:1 contra el fondo, WCAG 1.4.11).
+  `border-border` (1.28:1) es solo para divisores y tarjetas: nunca lo pongas en
+  un campo. Un campo con clases propias (como el buscador global) usa también
+  `border-border-control`.
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.

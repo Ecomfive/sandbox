@@ -7,6 +7,9 @@
   --muted: #eeeeee;
   --muted-foreground: #6b6b6b;
   --border: #e3e3e3;
+  /* Borde de los campos de formulario (input, select): el contorno es lo que delimita el campo, así que
+     necesita 3:1 contra el fondo (WCAG 1.4.11). --border (1.28:1) queda para divisores y tarjetas. */
+  --border-control: #8a8a8a;
   /* Interactions/buttons use a neutral light gray, not the Ecomfive brand
      red — the red is reserved for the logo only (see /brand/ecomfive-rojo.png). */
   --accent: #e4e4e7;
@@ -29,6 +32,7 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-border-control: var(--border-control);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-foreground: var(--accent-foreground);
@@ -55,6 +59,7 @@
   --muted: #2a2a2e;
   --muted-foreground: #a1a1aa;
   --border: #38383d;
+  --border-control: #71717a;
   --accent: #3f3f46;
   --accent-hover: #4b4b52;
   --accent-foreground: #f4f4f5;
