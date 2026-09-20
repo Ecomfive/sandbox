@@ -124,6 +124,14 @@ convenciones técnicas del código.
   `formatearValor` da un nombre legible a valores que ordenan bien pero se leen
   mal (una fecha ISO). No pongas `total` si sumar mezclaría cosas distintas
   (entradas y salidas).
+- **Descargar lo que se ve.** Toda tabla con barra de herramientas trae el botón
+  «Descargar»: un CSV (con BOM para Excel) de las filas que dejan los filtros, en
+  el orden de la pantalla, armado en el navegador con la `DefTabla`
+  (`src/lib/tabla/csv.ts`). Salen todos los `campos` de la definición, con los
+  nombres que se ven; lo que sea un identificador y no un campo de filtro (el
+  número de un retiro) va en `csvAntes`. Un texto que empieza por `=`, `+`, `-` o
+  `@` se escribe con comilla para que Excel no lo ejecute. Las descargas del
+  servidor de un período completo (`/api/exportar-*`) siguen aparte.
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
   y la `<table>` lleva la clase `tabla-datos`; los estilos están en
