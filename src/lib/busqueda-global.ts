@@ -3,9 +3,11 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { getUsuarioActual } from "@/lib/auth";
+import { etiquetaCorrelativo, leerBusquedaRetiro } from "@/lib/paleta";
+import { formatearMoneda } from "@/lib/formato";
 
 export interface ResultadoBusqueda {
-  tipo: "pedido" | "producto" | "dropshipper";
+  tipo: "retiro" | "pedido" | "producto" | "dropshipper";
   etiquetaTipo: string;
   titulo: string;
   detalle: string;
@@ -14,10 +16,15 @@ export interface ResultadoBusqueda {
 
 const LIMITE_POR_TIPO = 5;
 
-/** Busca por nombre/SKU/referencia en pedidos, productos y dropshippers, respetando los módulos del usuario. */
+/**
+ * Busca por correlativo de retiro (#0007 o 7), nombre/SKU/referencia en pedidos, productos y
+ * dropshippers, respetando los módulos del usuario.
+ */
 export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[]> {
   const texto = consulta.trim();
-  if (texto.length < 2) return [];
+  const correlativo = leerBusquedaRetiro(texto);
+  // Un número suelto ("7") busca un retiro aunque tenga un solo dígito; el resto pide al menos 2 letras.
+  if (texto.length < 2 && correlativo === null) return [];
 
   const usuario = await getUsuarioActual();
   if (!usuario) return [];
@@ -28,7 +35,32 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
 
   const tareas: PromiseLike<unknown>[] = [];
 
-  if (usuario.modulos.includes("productos")) {
+  if (correlativo !== null && usuario.modulos.includes("retiros")) {
+    tareas.push(
+      supabase
+        .from("retiros")
+        .select("id, numero_correlativo, monto, estado, plataformas(nombre)")
+        .eq("pais_id", pais.id)
+        .eq("numero_correlativo", correlativo)
+        .limit(LIMITE_POR_TIPO)
+        .then(({ data }) => {
+          for (const r of data ?? []) {
+            const plataforma = Array.isArray(r.plataformas) ? r.plataformas[0] : r.plataformas;
+            resultados.unshift({
+              tipo: "retiro",
+              etiquetaTipo: "Retiro",
+              titulo: `Retiro ${etiquetaCorrelativo(r.numero_correlativo)}`,
+              detalle: [plataforma?.nombre, formatearMoneda(Number(r.monto), pais.codigo), r.estado].filter(Boolean).join(" · "),
+              href: `/retiros/${r.id}`,
+            });
+          }
+        })
+    );
+  }
+
+  const buscaTexto = texto.length >= 2;
+
+  if (buscaTexto && usuario.modulos.includes("productos")) {
     tareas.push(
       supabase
         .from("productos")
@@ -50,7 +82,7 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
     );
   }
 
-  if (usuario.modulos.includes("pedidos-dropi")) {
+  if (buscaTexto && usuario.modulos.includes("pedidos-dropi")) {
     tareas.push(
       supabase
         .from("ordenes")
@@ -73,7 +105,7 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
     );
   }
 
-  if (usuario.modulos.includes("crm-dropshippers")) {
+  if (buscaTexto && usuario.modulos.includes("crm-dropshippers")) {
     tareas.push(
       supabase
         .from("dropshippers")
