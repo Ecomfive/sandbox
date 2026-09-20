@@ -88,6 +88,16 @@ convenciones técnicas del código.
   de un grupo de indicadores (la fecha de actualización) va en la franja del
   `KpiGroup` (`accion`), no en una fila aparte; varios grupos comparten fila con
   `className="flex-[3_1_39rem]"` dentro de un `flex flex-wrap`.
+- **Buscador con Ctrl K.** El buscador de la barra de arriba
+  (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
+  página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
+  navegador de cada persona) y otras a las que ir; al escribir filtra las páginas
+  del menú al instante y pide al servidor retiros (por correlativo: `#0007` o `7`),
+  pedidos, productos y dropshippers (`src/lib/busqueda-global.ts`, que respeta los
+  módulos de la persona). Es un combobox con flechas, Enter y Escape. La lista de
+  páginas sale del menú y de las pestañas de cada módulo
+  (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede
+  buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y
@@ -98,7 +108,7 @@ convenciones técnicas del código.
   poner un enlace suelto en la página.
 - **Tablas con barra de herramientas común** (Agrupar, filas cerradas, Filtros,
   Columnas — igual en todos los módulos, estilo ClickUp). Ya la usan Retiros,
-  Alertas, Pedidos Dropi, Gastos, Usuarios, Auditoría, CRM Dropshippers
+  Alertas (las alertas y el inventario pendiente de retorno), Pedidos Dropi, Gastos, Usuarios, Auditoría, CRM Dropshippers
   (directorio e interacciones), Productos, Catálogo maestro, Cuentas destino,
   Configuración (plataformas y cuentas), Inteligencia competitiva (lista de
   proveedores), Inventario, Extractos (movimientos, agrupados por extracto) y
@@ -123,7 +133,9 @@ convenciones técnicas del código.
   hace que la tabla arranque agrupada (quien ya eligió una vista no la pierde) y
   `formatearValor` da un nombre legible a valores que ordenan bien pero se leen
   mal (una fecha ISO). No pongas `total` si sumar mezclaría cosas distintas
-  (entradas y salidas).
+  (entradas y salidas). Un filtro de un toque («Mis retiros») se pasa a
+  `<BarraHerramientas atajos={[...]}>` (`AtajoFiltro`, `src/lib/tabla/atajos.ts`): es un
+  filtro de selección que el botón enciende o apaga sin tocar los de otros campos.
 - **Descargar lo que se ve.** Toda tabla con barra de herramientas trae el botón
   «Descargar»: un CSV (con BOM para Excel) de las filas que dejan los filtros, en
   el orden de la pantalla, armado en el navegador con la `DefTabla`
