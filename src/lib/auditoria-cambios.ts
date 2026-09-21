@@ -33,4 +33,9 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_plataforma: "Creó una plataforma",
   activar_cuenta_retiro: "Cambió el estado de una cuenta de retiro",
   eliminar_cuenta_retiro: "Eliminó una cuenta de retiro",
+  crear_usuario: "Creó un usuario",
+  editar_usuario: "Modificó un usuario",
+  suspender_usuario: "Cambió el estado de un usuario",
+  eliminar_usuario: "Eliminó un usuario",
+  generar_contrasena_temporal: "Generó una contraseña temporal",
 };
