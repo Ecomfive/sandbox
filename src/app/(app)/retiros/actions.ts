@@ -85,7 +85,13 @@ export async function crearRetiro(formData: FormData) {
   const plataforma_id = formData.get("plataforma_id") as string;
   const cuenta_retiro_id = (formData.get("cuenta_retiro_id") as string) || null;
   const monto = Number(formData.get("monto"));
-  const comision = Number(formData.get("comision") || 0);
+  const comisionTexto = String(formData.get("comision") ?? "").trim();
+  const comision = Number(comisionTexto);
+  // Lo que la ficha ya exige (cuenta elegida, monto mayor a cero y comisión escrita, aunque sea 0): se vuelve a
+  // comprobar aquí porque un server action se puede invocar sin pasar por la ficha.
+  if (!cuenta_retiro_id) throw new Error("Elige la cuenta destino.");
+  if (!(monto > 0)) throw new Error("El monto debe ser mayor a cero.");
+  if (comisionTexto === "" || !(comision >= 0)) throw new Error("Escribe la comisión (puede ser 0).");
   const fecha = formData.get("fecha") as string;
   const notas = (formData.get("notas") as string) || null;
   const fecha_limite = (formData.get("fecha_limite") as string) || null;

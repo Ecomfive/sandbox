@@ -237,11 +237,14 @@ export function FormularioCuenta({
             </select>
           </Campo>
           {tipoCuenta !== "binance" && (
-            <Campo etiqueta="Cuenta" id="campo-cuenta-cuenta">
+            // Al crear, la cuenta es obligatoria; una cuenta ya guardada sin este dato se puede seguir modificando.
+            <Campo etiqueta="Cuenta" id="campo-cuenta-cuenta" obligatorio={!editando} faltante={faltante}>
               <input
                 id="campo-cuenta-cuenta"
                 type="text"
                 name="detalle"
+                required={!editando}
+                aria-invalid={invalido("campo-cuenta-cuenta") || undefined}
                 defaultValue={cuenta?.detalle ?? ""}
                 placeholder="Ej: cuenta 04-01-23-00123-4"
                 className={fieldClass}
@@ -286,11 +289,13 @@ export function FormularioCuenta({
                   invalido={invalido("binance-tipo-identificacion")}
                 />
               </Campo>
-              <Campo etiqueta="Número de identificación" id="binance-numero-identificacion">
+              <Campo etiqueta="Número de identificación" id="binance-numero-identificacion" obligatorio={!editando} faltante={faltante}>
                 <input
                   id="binance-numero-identificacion"
                   type="text"
                   name="binance_numero_identificacion"
+                  required={!editando}
+                  aria-invalid={invalido("binance-numero-identificacion") || undefined}
                   defaultValue={datosBinance?.numero_identificacion}
                   placeholder="Ej: 8-123-456"
                   className={fieldClass}

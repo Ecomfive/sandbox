@@ -1,11 +1,12 @@
 import { anilloFoco } from "@/components/ui/field";
 
-/** El aviso que sale bajo un campo obligatorio cuando se pulsó «Crear» sin llenarlo (ver `useFaltantes`). */
-export function AvisoFaltante({ id, faltante }: { id: string; faltante: string | null }) {
+/** El aviso que sale bajo un campo obligatorio cuando se pulsó «Crear» sin llenarlo (ver `useFaltantes`). Con `mensaje`
+ * dice otra cosa (p. ej. «Debe ser mayor a cero» si el campo tiene un valor pero no sirve). */
+export function AvisoFaltante({ id, faltante, mensaje = "Falta este dato" }: { id: string; faltante: string | null; mensaje?: string }) {
   if (faltante !== id) return null;
   return (
     <p id={`${id}-falta`} role="alert" className="text-xs text-destructive">
-      Falta este dato
+      {mensaje}
     </p>
   );
 }
