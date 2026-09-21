@@ -25,7 +25,10 @@ convenciones técnicas del código.
   `"use server"`). Si un Client Component necesita un callback dinámico,
   sacarlo a su propio archivo `"use client"` y definir la función ahí
   dentro (ver `src/app/(app)/retiros/[id]/cerrar-retiro-form.tsx` como
-  ejemplo).
+  ejemplo). Caso típico: el `mensajeExito` de `FormularioConToast` como función
+  solo sirve en un Client Component; en una página (Server Component) va un texto
+  fijo, y si la acción devuelve `{ error }` el aviso sale en rojo solo (así falló
+  Configuración con «Agregar cuenta»: la página dejaba de cargar).
 - Acciones que crean/modifican datos importantes deben registrar auditoría
   con `registrarAuditoria()` (`src/lib/auditoria.ts`) — ver
   `src/app/(app)/retiros/actions.ts` o `productos/actions.ts` como ejemplo.
@@ -110,7 +113,10 @@ convenciones técnicas del código.
   **como valor** (`{ error }`), porque en producción Next.js oculta el mensaje de una
   excepción; sin la migración, las cuentas que no son Binance siguen funcionando y la
   lista se consulta sin esa columna. Cambiar una cuenta de Binance a otro tipo borra sus
-  datos (`binance_previo`).
+  datos (`binance_previo`). Los tipos de cuenta que se ofrecen son Banco, Binance y Otro
+  (`TIPOS_CUENTA`, una sola lista para la ficha, «Nueva cuenta», Configuración y el
+  filtro); «Tarjeta» ya no se ofrece, pero la base todavía lo admite y una cuenta antigua
+  lo conserva y se sigue mostrando (`tiposParaElegir`).
 - **Botón «Crear» de la barra.** `MenuCrear` (`src/components/menu-crear.tsx`, en
   `NavBar`) lista lo que se crea a menudo desde cualquier página; las opciones salen de
   `ACCIONES_CREAR` (`src/lib/crear-global.ts`) y solo aparecen las de módulos que la

@@ -70,7 +70,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
  *
  * `mensajeExito` acepta un texto fijo, o una función que recibe lo que devolvió
  * la acción del servidor para elegir el mensaje/tono según el resultado real
- * (por ejemplo, distinguir un cierre normal de uno con discrepancia).
+ * (por ejemplo, distinguir un cierre normal de uno con discrepancia). **La función solo
+ * sirve si el formulario se dibuja desde un Client Component**: un Server Component no
+ * puede pasarla (Next.js falla al dibujar la página); ahí usa el texto fijo.
+ *
+ * Con un texto fijo, si la acción devuelve `{ error: "..." }` (como hacen las acciones que
+ * no lanzan sus errores, porque en producción Next.js oculta el mensaje de una excepción),
+ * el aviso es ese error en rojo en vez del de éxito.
  */
 export function FormularioConToast<TResultado = void>({
   action,
@@ -89,7 +95,9 @@ export function FormularioConToast<TResultado = void>({
       const { mensaje, tono } = mensajeExito(resultado);
       mostrarToast(mensaje, tono);
     } else {
-      mostrarToast(mensajeExito);
+      const error = (resultado as { error?: unknown } | null | undefined)?.error;
+      if (typeof error === "string" && error) mostrarToast(error, "destructive");
+      else mostrarToast(mensajeExito);
     }
   }
 

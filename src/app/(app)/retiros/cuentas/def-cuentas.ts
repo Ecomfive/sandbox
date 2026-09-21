@@ -1,13 +1,24 @@
 import type { DefTabla } from "@/lib/tabla/motor";
 
+/** Los tipos que se ofrecen al crear o modificar una cuenta, y en el filtro de la tabla. */
 export const TIPOS_CUENTA = [
   { valor: "banco", etiqueta: "Banco" },
   { valor: "binance", etiqueta: "Binance" },
-  { valor: "tarjeta", etiqueta: "Tarjeta" },
   { valor: "otro", etiqueta: "Otro" },
 ] as const;
 
-export const etiquetaTipoCuenta = (valor: string) => TIPOS_CUENTA.find((t) => t.valor === valor)?.etiqueta ?? valor;
+/** «Tarjeta» ya no se ofrece, pero la base todavía lo admite y una cuenta guardada antes puede tenerlo: se sigue
+ * mostrando con su nombre, y su ficha lo conserva como opción para no cambiarle el tipo al abrirla. */
+const TIPOS_ANTERIORES: Record<string, string> = { tarjeta: "Tarjeta" };
+
+export const etiquetaTipoCuenta = (valor: string) =>
+  TIPOS_CUENTA.find((t) => t.valor === valor)?.etiqueta ?? TIPOS_ANTERIORES[valor] ?? valor;
+
+/** Los tipos de la lista desplegable de una cuenta: los que se ofrecen y, si la cuenta ya tenía uno anterior, ese. */
+export function tiposParaElegir(tipoActual?: string): readonly { valor: string; etiqueta: string }[] {
+  if (!tipoActual || TIPOS_CUENTA.some((t) => t.valor === tipoActual)) return TIPOS_CUENTA;
+  return [...TIPOS_CUENTA, { valor: tipoActual, etiqueta: etiquetaTipoCuenta(tipoActual) }];
+}
 
 /** Solo lectura: la comisión sugerida se edita desde "Modificar" (o desde Configuración al crearla). */
 export function etiquetaComision(tipo: string | null, porcentaje: number | null, montoFijo: number | null) {
