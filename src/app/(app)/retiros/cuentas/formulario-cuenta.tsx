@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, type ComponentType, type ReactNode } from "react";
 import { crearCuentaRetiro, actualizarCuentaRetiro } from "./actions";
-import type { FilaCuenta } from "./def-cuentas";
+import { tiposParaElegir, type FilaCuenta } from "./def-cuentas";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
@@ -14,13 +14,6 @@ import {
   datosBinanceDeLaBase,
   paisComoEnDropi,
 } from "@/lib/retiros/datos-binance";
-
-const TIPOS = [
-  { valor: "banco", etiqueta: "Banco" },
-  { valor: "binance", etiqueta: "Binance" },
-  { valor: "tarjeta", etiqueta: "Tarjeta" },
-  { valor: "otro", etiqueta: "Otro" },
-] as const;
 
 const COMISIONES = [
   { valor: "", etiqueta: "Sin comisión" },
@@ -231,7 +224,7 @@ export function FormularioCuenta({
               onChange={(e) => setTipoCuenta(e.target.value)}
               className={fieldClass}
             >
-              {TIPOS.map((t) => (
+              {tiposParaElegir(cuenta?.tipo).map((t) => (
                 <option key={t.valor} value={t.valor}>
                   {t.etiqueta}
                 </option>

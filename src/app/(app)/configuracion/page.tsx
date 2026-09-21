@@ -75,13 +75,13 @@ export default async function ConfiguracionPage() {
         <div>
           <h2 className="text-sm font-semibold tracking-tight">Cuentas de retiro</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Catálogo de cuentas bancarias, Binance o tarjetas donde se puede recibir un retiro.
+            Catálogo de cuentas bancarias o Binance donde se puede recibir un retiro.
           </p>
         </div>
 
         <FormularioConToast
           action={crearCuentaRetiro}
-          mensajeExito={(r) => (r?.error ? { mensaje: r.error, tono: "destructive" } : { mensaje: "Cuenta agregada" })}
+          mensajeExito="Cuenta agregada"
           className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
