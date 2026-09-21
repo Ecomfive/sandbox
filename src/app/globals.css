@@ -143,8 +143,25 @@ html {
   animation: fade-in 200ms ease-out;
 }
 
+/* Un panel que sale por la derecha (la ficha de una cuenta, la vista de un retiro). */
+@keyframes entrar-derecha {
+  from {
+    opacity: 0.6;
+    transform: translateX(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-entrar-derecha {
+  animation: entrar-derecha 220ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in {
+  .animate-fade-in,
+  .animate-entrar-derecha {
     animation: none;
   }
 }

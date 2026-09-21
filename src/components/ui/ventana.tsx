@@ -40,7 +40,10 @@ export function Ventana({
   useEffect(() => {
     if (!abierto) return;
     const anterior = document.activeElement as HTMLElement | null;
-    panelRef.current?.querySelector<HTMLElement>(ENFOCABLES)?.focus();
+    // El foco entra en el campo marcado con `data-enfocar` (el primero que hay que llenar) o, si no hay, en el primer
+    // elemento enfocable.
+    const panel = panelRef.current;
+    (panel?.querySelector<HTMLElement>("[data-enfocar]") ?? panel?.querySelector<HTMLElement>(ENFOCABLES))?.focus();
 
     function alPresionarTecla(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -85,7 +88,7 @@ export function Ventana({
         onClick={(e) => e.stopPropagation()}
         className={
           lado === "derecha"
-            ? `flex h-full w-full ${anchoClase} flex-col overflow-y-auto border-l border-border bg-card shadow-xl`
+            ? `animate-entrar-derecha flex h-full w-full ${anchoClase} flex-col overflow-y-auto border-l border-border bg-card shadow-xl`
             : `max-h-[90vh] w-full ${anchoClase} overflow-y-auto rounded-xl border border-border bg-card shadow-xl`
         }
       >

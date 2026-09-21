@@ -154,8 +154,14 @@ convenciones técnicas del código.
   `ATAJOS_IR` (y una prueba de que no choca). Para una ventana modal nueva usa
   `<Ventana>` (`src/components/ui/ventana.tsx`, al centro o como panel a la derecha):
   `role="dialog"`, foco atrapado, Escape y clic fuera la cierran y el foco vuelve a
-  donde estaba. Las ventanas de Retiros (crear, editar, conciliar) y la de cuentas
-  destino tienen su propia copia de esa lógica.
+  donde estaba (el foco entra en el campo con `data-enfocar`, o en el primero).
+  Un panel a la derecha (`lado="derecha"`) sale con una animación corta
+  (`animate-entrar-derecha`, sin movimiento si la persona pide menos animación).
+  **La ficha de una cuenta destino** (`retiros/cuentas/ventana-cuenta-retiro.tsx`,
+  crear y modificar) es ese panel: cabecera con el título, cuerpo en bloques con
+  ícono (`Seccion`: Cuenta, Datos de la cuenta si es Binance, Comisión sugerida) y
+  botones fijos abajo; úsala como modelo para otra ficha lateral. Las ventanas de
+  Retiros (crear, editar, conciliar) tienen su propia copia de la lógica de `Ventana`.
   **Toda ventana modal o globo flotante se dibuja en `<body>` con `createPortal`**
   (`Ventana`, `AyudaContextual`, `Tooltip`, y las ventanas de Retiros y Cuentas): un
   `position: fixed` dentro de la tabla queda atrapado en el contexto de apilamiento
