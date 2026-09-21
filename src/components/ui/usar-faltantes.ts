@@ -39,9 +39,12 @@ export function useFaltantes() {
     const primero = formRef.current?.querySelector<HTMLElement>(":invalid:not(form):not(fieldset)");
     if (!primero) return false;
     if (primero.id) setFaltante(primero.id);
+    // Un campo que no se ve (el `<input type="file">` oculto detrás de un botón con ícono) indica con `data-destino` el
+    // `id` del elemento que sí: la página baja hasta ese y el foco entra en él.
+    const destino = (primero.dataset.destino && document.getElementById(primero.dataset.destino)) || primero;
     const reducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    primero.scrollIntoView({ block: "center", behavior: reducido ? "auto" : "smooth" });
-    primero.focus({ preventScroll: true });
+    destino.scrollIntoView({ block: "center", behavior: reducido ? "auto" : "smooth" });
+    destino.focus({ preventScroll: true });
     return true;
   }, []);
 

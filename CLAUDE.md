@@ -154,12 +154,15 @@ convenciones técnicas del código.
   ventana en el medio**: despliegan una sección al final de la misma ficha, **encima del
   historial** (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`; solo una a la vez), la ficha
   baja hasta ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco
-  entra en su primer campo. Conciliar pide **Recibido** (obligatorio; si se aleja de «A
-  recibir» más de lo tolerado, `conciliarRetiro` no concilia y lo dice), **ID / Referencia**
-  y el soporte (opcionales; el soporte se adjunta con un botón que es **solo un ícono**,
-  sin texto: `BotonAdjuntar` con `AdjuntoIcon`; ya con archivo se marca en verde y su
-  nombre queda en el tooltip) y, al conciliar, deja el retiro cerrado y consolidado.
-  Novedad pide una
+  entra en su primer campo. Conciliar pide **tres datos, todos obligatorios**: **Recibido**
+  (si se aleja de «A recibir» más de lo tolerado, `conciliarRetiro` no concilia y lo dice),
+  **ID / Referencia** y el **soporte** (se adjunta con un botón que es **solo un ícono**,
+  sin texto: `BotonAdjuntar` con `AdjuntoIcon`; sin archivo lleva un asterisco rojo, ya con
+  archivo se marca en verde y su nombre queda en el tooltip). `conciliarRetiro` también los
+  exige en el servidor (un soporte que el retiro ya tenía guardado cuenta como adjunto) y,
+  al conciliar, deja el retiro cerrado y consolidado. Un campo oculto detrás de un botón
+  (el `<input type="file">`) indica con `data-destino` el elemento que sí se ve, para que
+  `useFaltantes` baje hasta él y le dé el foco. Novedad pide una
   **nota** (obligatoria, hasta 500 caracteres): `agregarNovedadRetiro` pasa el retiro a
   novedad y deja la nota en su historial («Novedad: …») y en la auditoría; entonces aparece
   «Abrir» (`reabrirRetiro`). Las dos secciones usan el botón grande de `BotonCrear` y
@@ -170,7 +173,10 @@ convenciones técnicas del código.
   Persona asignada, Consolidación, Estado en Dropi, Soporte) van seguidos, y **el historial
   de actividad (`HistorialRetiro`, `retiros/historial-retiro.tsx`) es siempre lo último de
   la ficha**, debajo de Conciliar o Novedad cuando están desplegadas; por eso no vive
-  dentro del formulario. Con cambios sin guardar, cerrar la ficha pide confirmación.
+  dentro del formulario. **No le pongas `key` a `HistorialRetiro`** en la ficha: con una
+  `key={fila.id}` al conciliar o agregar una novedad la sección se quedaba en «Conciliando…»
+  y no se cerraba (el estado pendiente de la acción no terminaba). Con cambios sin guardar,
+  cerrar la ficha pide confirmación.
   **La tabla no tiene columna de acciones**: lo que se hace con un retiro se hace desde
   su ficha. Ctrl/Cmd/Shift-clic o
   clic central en el `#` abren la página completa (`retiros/[id]/`) en una pestaña nueva,

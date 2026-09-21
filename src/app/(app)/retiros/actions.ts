@@ -240,6 +240,16 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
     .single();
   if (errorRetiro) return { error: errorRetiro.message };
 
+  // Los tres datos de la conciliación son obligatorios (lo que la ficha ya exige; se vuelve a comprobar aquí porque un
+  // server action se puede invocar sin pasar por la ficha): lo recibido, la referencia y el soporte. Un soporte que el
+  // retiro ya tenía guardado cuenta como adjunto.
+  if (!(montoRecibido >= 0) || String(formData.get("monto_recibido") ?? "").trim() === "") {
+    return { error: "Falta el monto recibido." };
+  }
+  if (!soporte_numero?.trim()) return { error: "Falta el ID / referencia." };
+  const hayArchivo = !!comprobante && comprobante.size > 0;
+  if (!hayArchivo && !retiro.comprobante_path) return { error: "Falta adjuntar el soporte." };
+
   const esperado = Number(retiro.a_recibir ?? retiro.monto_neto);
   const diferencia = montoRecibido - esperado;
   if (Math.abs(diferencia) > TOLERANCIA_DISCREPANCIA) {

@@ -13,13 +13,14 @@ import { ConciliarIcon } from "@/lib/nav-icons";
 
 /**
  * Lo que se pide para conciliar un retiro, al final de su ficha (el botón «Conciliar» lleva hasta aquí; ya no se abre
- * una ventana en el medio). Lo demás (plataforma, cuenta destino, montos, fechas) ya está en la ficha.
- *  - **Recibido** (obligatorio): lo que llegó de verdad. Se compara con «A recibir»; si se aleja más de lo tolerado, el
- *    servidor no concilia y lo dice (`conciliarRetiro`).
- *  - **ID / Referencia** y el **soporte** (comprobante, imagen o PDF): opcionales; el soporte ya guardado se conserva si
- *    no se sube otro. El soporte se adjunta con un botón que es solo un ícono, sin texto (`BotonAdjuntar`).
- * El botón grande de abajo sigue la misma regla que los de crear (`useFaltantes`): apagado mientras falte el recibido y,
- * al pulsarlo así, lleva a ese campo. Al conciliar el retiro queda cerrado y consolidado.
+ * una ventana en el medio). Lo demás (plataforma, cuenta destino, montos, fechas) ya está en la ficha. **Los tres datos
+ * son obligatorios**:
+ *  - **Recibido**: lo que llegó de verdad. Se compara con «A recibir»; si se aleja más de lo tolerado, el servidor no
+ *    concilia y lo dice (`conciliarRetiro`).
+ *  - **ID / Referencia**: el número de la transferencia.
+ *  - **Soporte** (comprobante, imagen o PDF): se adjunta con un botón que es solo un ícono, sin texto (`BotonAdjuntar`).
+ * El botón grande de abajo sigue la misma regla que los de crear (`useFaltantes`): apagado mientras falte alguno y, al
+ * pulsarlo así, lleva al primero que falta. Al conciliar el retiro queda cerrado y consolidado.
  */
 export function SeccionConciliarRetiro({
   id,
@@ -45,6 +46,8 @@ export function SeccionConciliarRetiro({
   const [error, setError] = useState<string | null>(null);
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const idRecibido = `campo-recibido-${id}`;
+  const idReferencia = `campo-referencia-${id}`;
+  const idSoporte = `campo-soporte-${id}`;
 
   function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -100,22 +103,34 @@ export function SeccionConciliarRetiro({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className={labelClassSm} htmlFor={`campo-referencia-${id}`}>
+            <label className={labelClassSm} htmlFor={idReferencia}>
               ID / Referencia
+              <span aria-hidden="true" className="text-destructive"> *</span>
             </label>
             <input
-              id={`campo-referencia-${id}`}
+              id={idReferencia}
               type="text"
               name="soporte_numero"
+              required
+              aria-invalid={faltante === idReferencia || undefined}
               defaultValue={soporteNumero ?? ""}
               placeholder="Ej: 4839201756"
               className={fieldClass}
             />
+            <AvisoFaltante id={idReferencia} faltante={faltante} />
           </div>
 
-          {/* El soporte se adjunta con solo un ícono (sin texto): imagen o PDF. */}
-          <div>
-            <BotonAdjuntar name="comprobante" accept="image/*,application/pdf" nombreAccesible="Adjuntar soporte" />
+          {/* El soporte se adjunta con solo un ícono (sin texto): imagen o PDF. Obligatorio. */}
+          <div className="flex flex-col gap-1">
+            <BotonAdjuntar
+              id={idSoporte}
+              name="comprobante"
+              accept="image/*,application/pdf"
+              nombreAccesible="Adjuntar soporte"
+              obligatorio
+              invalido={faltante === idSoporte}
+            />
+            <AvisoFaltante id={idSoporte} faltante={faltante} mensaje="Falta adjuntar el soporte" />
           </div>
 
           {error && (

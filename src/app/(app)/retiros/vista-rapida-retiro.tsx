@@ -283,8 +283,11 @@ export function VistaRapidaRetiro({
             />
           )}
 
-          {/* Siempre lo último de la ficha: con Conciliar o Novedad desplegadas, el historial queda debajo de ellas. */}
-          <HistorialRetiro key={fila.id} id={fila.id} codigoPais={codigoPais} version={versionHistorial} />
+          {/* Siempre lo último de la ficha: con Conciliar o Novedad desplegadas, el historial queda debajo de ellas.
+              Sin `key`: con una `key={fila.id}` aquí, al conciliar o agregar una novedad la sección se quedaba en
+              «Conciliando…» y no se cerraba (el estado pendiente de la acción nunca terminaba). No hace falta: al
+              cerrar la ficha `Ventana` desmonta todo, así que cada retiro empieza con su historial nuevo. */}
+          <HistorialRetiro id={fila.id} codigoPais={codigoPais} version={versionHistorial} />
         </div>
       )}
     </Ventana>
