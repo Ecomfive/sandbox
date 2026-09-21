@@ -65,7 +65,7 @@ export function BarraHerramientas<F>({
   return (
     // Queda fija arriba al bajar la página, con fondo opaco para que las filas no se vean por debajo.
     <div
-      className={`sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-border bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] px-2 py-1.5 ${
+      className={`sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-border bg-card px-2 py-1.5 ${
         extra ? "justify-between" : "justify-end"
       }`}
     >

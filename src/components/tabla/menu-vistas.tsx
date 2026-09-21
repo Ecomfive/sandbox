@@ -175,7 +175,7 @@ export function MenuVistas<F>({
           }`}
         >
           <VistasIcon className="h-4 w-4 shrink-0" />
-          <span className="max-w-[9rem] truncate">{nombreBoton}</span>
+          <span className="sr-only">{nombreBoton}</span>
         </button>
       </Tooltip>
       {abierto && (

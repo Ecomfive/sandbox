@@ -78,10 +78,11 @@ export function MenuColumnas({
           type="button"
           onClick={() => setAbierto((v) => !v)}
           aria-expanded={abierto}
+          aria-label="Columnas y densidad"
           className={`flex min-h-8 items-center gap-1.5 !rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted ${anilloFoco}`}
         >
           <ColumnasIcon className="h-4 w-4" />
-          Columnas
+          <span className="sr-only">Columnas</span>
         </button>
       </Tooltip>
       {abierto && (

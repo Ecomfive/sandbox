@@ -98,7 +98,7 @@ export function BotonDescargar<F>({
           }`}
         >
           <DescargarIcon className="h-4 w-4" />
-          Descargar
+          <span className="sr-only">Descargar</span>
         </button>
       </Tooltip>
     );
@@ -123,7 +123,7 @@ export function BotonDescargar<F>({
           className={`flex min-h-8 items-center gap-1.5 !rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted ${anilloFoco}`}
         >
           <DescargarIcon className="h-4 w-4" />
-          Descargar
+          <span className="sr-only">Descargar</span>
           <ChevronRightIcon className={`h-3 w-3 transition-transform motion-reduce:transition-none ${abierto ? "-rotate-90" : "rotate-90"}`} />
         </button>
       </Tooltip>
