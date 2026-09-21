@@ -145,21 +145,22 @@ convenciones técnicas del código.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
   de pasos (Creado, Aprobado, Recibido — no es lo mismo que `estado`, ver
-  `pasosDelRetiro`) y las pestañas Detalle e Historial. **La ficha ya es el formulario**
-  (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
-  que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
-  grandes de Conciliar, Abrir (solo en novedad), Cancelar y Eliminar, aparecen "Guardar
-  cambios" y "Cancelar" — que solo se ven con cambios sin guardar. Guardar no cierra la
-  ficha. El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma
-  de reabrirlo. Las dos pestañas quedan montadas a la vez (una se oculta con `hidden`, no
-  se desmonta): pasar a Historial y volver no pierde lo que se estaba escribiendo. Con
-  cambios sin guardar, cerrar la ficha pide confirmación. **La tabla no tiene columna de
-  acciones**: lo que se hace con un retiro se hace desde su ficha. Ctrl/Cmd/Shift-clic o
-  clic central en el `#` abren la página completa (`retiros/[id]/`) en una pestaña nueva,
-  como cualquier enlace. Lo que muestra la ficha sale de la fila ya cargada (se busca por
-  id, así que si la fila cambia el panel se actualiza); solo la actividad se pide al
-  abrir, con la acción de lectura `obtenerActividadRetiro` (`retiros/actividad.ts`: basta
-  poder abrir Retiros, devuelve el error como valor, trae los 30 eventos más recientes).
+  `pasosDelRetiro`). **La ficha ya es el formulario** (`retiros/formulario-editar-retiro.tsx`,
+  sin un botón "Modificar" aparte, mismo patrón que la ficha de cuenta destino): se cambia
+  un campo y arriba, junto a los botones grandes de Conciliar, Abrir (solo en novedad),
+  Cancelar y Eliminar, aparecen "Guardar cambios" y "Cancelar" — que solo se ven con
+  cambios sin guardar. Guardar no cierra la ficha. El selector de Estado se ve siempre,
+  hasta en un retiro cancelado: es la forma de reabrirlo. Sin pestañas: los campos, los
+  datos que no se editan (Recibido, Cierre, Persona asignada, Consolidación, Estado en
+  Dropi, Soporte) y el historial de actividad van todos seguidos, uno debajo del otro.
+  Con cambios sin guardar, cerrar la ficha pide confirmación. **La tabla no tiene columna
+  de acciones**: lo que se hace con un retiro se hace desde su ficha. Ctrl/Cmd/Shift-clic
+  o clic central en el `#` abren la página completa (`retiros/[id]/`) en una pestaña
+  nueva, como cualquier enlace. Lo que muestra la ficha sale de la fila ya cargada (se
+  busca por id, así que si la fila cambia el panel se actualiza); solo la actividad se
+  pide al abrir, con la acción de lectura `obtenerActividadRetiro` (`retiros/actividad.ts`:
+  basta poder abrir Retiros, devuelve el error como valor, trae los 30 eventos más
+  recientes).
 - **Atajos de teclado y ventanas.** `AtajosTeclado` (`src/components/atajos-teclado.tsx`,
   en la barra de arriba) da atajos de una tecla al estilo ClickUp: `g` y luego una
   letra va a una página (solo las que la persona puede abrir; la lista y las letras

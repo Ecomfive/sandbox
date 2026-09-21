@@ -33,21 +33,14 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
   );
 }
 
-const PESTANAS = [
-  { id: "detalle", etiqueta: "Detalle" },
-  { id: "historial", etiqueta: "Historial" },
-] as const;
-type Pestana = (typeof PESTANAS)[number]["id"];
-
 /**
  * El cuerpo de la ficha de un retiro, debajo de su barra de pasos: los campos editables (mismo patrón visual que
- * «Nuevo retiro»), las pestañas Detalle e Historial, y los datos que no se editan a mano (Recibido, Cierre,
- * Persona asignada, Consolidación, Estado en Dropi, Soporte). **No hay un botón «Modificar»**: se cambia un campo
- * y arriba, junto a las `acciones` de la ficha (Conciliar, Abrir, Cancelar, Eliminar), aparecen «Guardar cambios»
- * y «Cancelar» — que solo se ven cuando se cambió algo. Guardar no cierra la ficha. Con `key={fila.id}-versión}`
- * en quien lo usa, cancelar (o pasar a otro retiro) lo vuelve a montar con los datos de la fila, sin arrastrar lo
- * escrito. Los campos siguen montados al cambiar de pestaña (la de Historial solo se oculta), así que ir a ver el
- * historial no pierde lo que se estaba escribiendo.
+ * «Nuevo retiro»), los datos que no se editan a mano (Recibido, Cierre, Persona asignada, Consolidación, Estado en
+ * Dropi, Soporte) y, al final, el historial de actividad — todo en una sola vista, sin pestañas. **No hay un botón
+ * «Modificar»**: se cambia un campo y arriba, junto a las `acciones` de la ficha (Conciliar, Abrir, Cancelar,
+ * Eliminar), aparecen «Guardar cambios» y «Cancelar» — que solo se ven cuando se cambió algo. Guardar no cierra la
+ * ficha. Con `key={fila.id}-versión}` en quien lo usa, cancelar (o pasar a otro retiro) lo vuelve a montar con los
+ * datos de la fila, sin arrastrar lo escrito.
  */
 export function FormularioEditarRetiro({
   fila,
@@ -74,7 +67,6 @@ export function FormularioEditarRetiro({
   /** Se llama cuando la persona cambia cualquier campo (para saber si hay cambios sin guardar). */
   alModificar?: () => void;
 }) {
-  const [pestana, setPestana] = useState<Pestana>("detalle");
   const [eventos, setEventos] = useState<EventoRetiro[] | null | undefined>(undefined);
   useEffect(() => {
     let vigente = true;
@@ -208,28 +200,7 @@ export function FormularioEditarRetiro({
         )}
       </div>
 
-      <div className="flex gap-1 border-b border-border px-4" role="tablist">
-        {PESTANAS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="tab"
-            aria-selected={pestana === p.id}
-            onClick={() => setPestana(p.id)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-              pestana === p.id
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {p.etiqueta}
-          </button>
-        ))}
-      </div>
-
-      {/* Nunca se desmonta al cambiar de pestaña (solo se oculta): así ir a ver el historial no
-          pierde lo que se estaba escribiendo acá. */}
-      <div className={`flex flex-col gap-3 p-4 ${pestana === "detalle" ? "" : "hidden"}`}>
+      <div className="flex flex-col gap-3 p-4">
         <div className="flex gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <label className={labelClassSm} htmlFor={`campo-plataforma-${fila.id}`}>
@@ -460,13 +431,9 @@ export function FormularioEditarRetiro({
         </div>
       </div>
 
-      <section
-        aria-labelledby={`actividad-retiro-${fila.id}`}
-        aria-busy={cargandoHistorial}
-        className={`p-4 ${pestana === "historial" ? "" : "hidden"}`}
-      >
-        <h3 id={`actividad-retiro-${fila.id}`} className="sr-only">
-          Actividad
+      <section aria-labelledby={`actividad-retiro-${fila.id}`} aria-busy={cargandoHistorial} className="border-t border-border p-4">
+        <h3 id={`actividad-retiro-${fila.id}`} className="mb-3 text-sm font-semibold">
+          Historial
         </h3>
         {cargandoHistorial ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
