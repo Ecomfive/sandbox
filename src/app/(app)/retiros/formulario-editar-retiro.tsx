@@ -19,8 +19,9 @@ const Obligatorio = () => (
   </span>
 );
 
-// Igual que en "Nuevo retiro": "cancelado" queda afuera a propósito — sigue siendo una acción
-// aparte (el botón Cancelar de la ficha), no un valor más del selector.
+// Igual que en "Nuevo retiro": "cancelado" queda afuera del selector a propósito — cancelar
+// sigue siendo una acción aparte (el botón Cancelar de la ficha), no un valor más para elegir acá.
+// El selector se ve siempre, incluso en un retiro ya cancelado: es la forma de reabrirlo.
 const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
@@ -109,7 +110,6 @@ export function FormularioEditarRetiro({
   const montoNeto = montoNum - comisionNum;
   const moneda = (valor: number) => formatearMoneda(valor, codigoPais);
   const diferencia = fila.montoRecibido !== null ? fila.montoRecibido - fila.aRecibir : null;
-  const estadoEditable = ESTADOS_EDITABLES.includes(fila.estado as (typeof ESTADOS_EDITABLES)[number]);
 
   function alCambiarComisionValor(valor: string) {
     setComisionManual(true);
@@ -291,31 +291,21 @@ export function FormularioEditarRetiro({
           <div className="flex flex-col gap-1">
             <label className={labelClassSm} htmlFor={`campo-estado-${fila.id}`}>
               Estado
-              {estadoEditable && <Obligatorio />}
+              <Obligatorio />
             </label>
-            {estadoEditable ? (
-              <select
-                id={`campo-estado-${fila.id}`}
-                name="estado"
-                required
-                defaultValue={fila.estado}
-                className={`${fieldClassSm} w-40`}
-              >
-                {ESTADOS_EDITABLES.map((valor) => (
-                  <option key={valor} value={valor}>
-                    {ESTADO_ETIQUETA[valor]}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id={`campo-estado-${fila.id}`}
-                type="text"
-                disabled
-                value={ESTADO_ETIQUETA[fila.estado] ?? fila.estado}
-                className={`${fieldClassSm} w-40 cursor-not-allowed bg-muted`}
-              />
-            )}
+            <select
+              id={`campo-estado-${fila.id}`}
+              name="estado"
+              required
+              defaultValue={fila.estado}
+              className={`${fieldClassSm} w-40`}
+            >
+              {ESTADOS_EDITABLES.map((valor) => (
+                <option key={valor} value={valor}>
+                  {ESTADO_ETIQUETA[valor]}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

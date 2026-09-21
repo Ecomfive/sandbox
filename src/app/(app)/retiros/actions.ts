@@ -10,9 +10,10 @@ import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
-/** Estados que se pueden elegir a mano desde la ficha de "Modificar".
- * "cancelado" queda afuera a propósito: sigue siendo una acción aparte (botón Cancelar), no un
- * valor más del selector, porque es un cierre distinto al de la conciliación normal. */
+/** Estados que se pueden elegir a mano desde el selector de Estado de la ficha (se ve siempre,
+ * hasta en un retiro cancelado: es la forma de reabrirlo). "cancelado" queda afuera del selector
+ * a propósito: sigue siendo una acción aparte (botón Cancelar), porque es un cierre distinto al
+ * de la conciliación normal. */
 const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
 type EstadoEditable = (typeof ESTADOS_EDITABLES)[number];
 
@@ -335,9 +336,10 @@ export async function reabrirRetiro(formData: FormData) {
 }
 
 /** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado
- * por, monto, comisión, fechas, nota y estado — todo junto, desde la ficha de "Modificar". El
- * estado ya no se edita directo en la columna de la tabla ni en lote: solo cambia desde acá, al
- * conciliar o al cancelar. No toca el correlativo. */
+ * por, monto, comisión, fechas, nota y estado — todo junto, desde su propia ficha (que ya es el
+ * formulario, sin un botón "Modificar" aparte). El estado no se edita directo en la columna de la
+ * tabla ni en lote: solo cambia desde acá (o al conciliar, al cancelar, o con "Abrir" para quitar
+ * una novedad). No toca el correlativo. */
 export async function actualizarRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
@@ -362,8 +364,9 @@ export async function actualizarRetiro(formData: FormData) {
     .single();
   if (errorAntes) throw new Error(errorAntes.message);
 
-  // El estado solo se toca si viene en el formulario y es uno editable a mano — la ficha no lo
-  // manda para un retiro cancelado, así que uno cancelado nunca se reabre desde acá.
+  // El estado solo se toca si viene en el formulario y es uno editable a mano (abierto, novedad o
+  // cerrado). El selector de la ficha se ve siempre, hasta en un retiro cancelado: es la forma de
+  // reabrirlo, eligiendo a qué estado vuelve.
   const estadoValido = estadoTexto !== null && ESTADOS_EDITABLES.includes(estadoTexto as EstadoEditable);
   const cambios: Record<string, unknown> = {
     plataforma_id,
