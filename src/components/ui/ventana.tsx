@@ -20,6 +20,7 @@ export function Ventana({
   titulo,
   lado = "centro",
   ancho = "md",
+  navegacion,
   children,
 }: {
   abierto: boolean;
@@ -27,6 +28,8 @@ export function Ventana({
   titulo: ReactNode;
   lado?: "centro" | "derecha";
   ancho?: "sm" | "md" | "lg";
+  /** Botones de la cabecera junto a «Cerrar» (p. ej. pasar al registro anterior o siguiente). */
+  navegacion?: ReactNode;
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -92,18 +95,29 @@ export function Ventana({
             : `max-h-[90vh] w-full ${anchoClase} overflow-y-auto rounded-xl border border-border bg-card shadow-xl`
         }
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-2.5">
-          <h2 id={tituloId} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+        <div
+          className={`sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card ${
+            lado === "derecha" ? "px-5 py-3" : "px-4 py-2.5"
+          }`}
+        >
+          <h2 id={tituloId} className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold">
             {titulo}
           </h2>
-          <button
-            type="button"
-            onClick={alCerrar}
-            aria-label="Cerrar"
-            className={`shrink-0 p-1.5 text-muted-foreground hover:text-foreground ${anilloFoco}`}
-          >
-            <CerrarIcon className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {navegacion}
+            <button
+              type="button"
+              onClick={alCerrar}
+              aria-label="Cerrar"
+              className={
+                lado === "derecha"
+                  ? `flex h-9 w-9 items-center justify-center border border-border bg-card text-foreground hover:bg-muted ${anilloFoco} !rounded-md`
+                  : `p-1.5 text-muted-foreground hover:text-foreground ${anilloFoco}`
+              }
+            >
+              <CerrarIcon className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         {children}
       </div>

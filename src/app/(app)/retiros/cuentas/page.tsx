@@ -12,7 +12,8 @@ export const metadata = { title: "Cuentas destino" };
 export const dynamic = "force-dynamic";
 
 export default async function CuentasRetiroPage() {
-  await requireModulo("retiros");
+  const usuario = await requireModulo("retiros");
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("retiros");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
@@ -27,11 +28,13 @@ export default async function CuentasRetiroPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Cuentas destino" oculto />
-      <div className="flex justify-end">
-        <VentanaCuentaRetiro paisId={pais.id} paisNombre={pais.nombre} />
-      </div>
+      {puedeEscribir && (
+        <div className="flex justify-end">
+          <VentanaCuentaRetiro paisId={pais.id} paisNombre={pais.nombre} />
+        </div>
+      )}
 
-      <TablaCuentas cuentas={cuentas ?? []} paisId={pais.id} paisNombre={pais.nombre} />
+      <TablaCuentas cuentas={cuentas ?? []} paisId={pais.id} paisNombre={pais.nombre} puedeEscribir={puedeEscribir} />
     </Pagina>
   );
 }

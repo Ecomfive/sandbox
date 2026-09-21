@@ -39,6 +39,7 @@ export function TablaDatos<F, C = undefined>({
   etiquetaGrupo,
   formatearTotal,
   accion,
+  abrirFila,
   claseFila,
   ariaLabel,
   anchoMinimo = "36rem",
@@ -63,6 +64,13 @@ export function TablaDatos<F, C = undefined>({
    * aunque la tabla se desplace de lado, con su encabezado visible.
    */
   accion?: { etiqueta: string; render: (fila: F) => ReactNode; fija?: boolean };
+  /**
+   * Hace que toda la fila se pueda pulsar para abrir su ficha. Un clic en un botón, enlace o campo de la fila
+   * (el interruptor de estado, por ejemplo) sigue haciendo lo suyo y no abre nada. Para teclado y lectores de
+   * pantalla, el contenido de la primera columna es un botón (`etiqueta` es su nombre). `alAbrir` recibe, además de
+   * la fila, las claves de las filas en el orden en que se ven (para pasar a la anterior o a la siguiente).
+   */
+  abrirFila?: { etiqueta: (fila: F) => string; alAbrir: (fila: F, orden: string[]) => void };
   claseFila?: (fila: F) => string;
   ariaLabel: string;
   anchoMinimo?: string;
@@ -83,11 +91,40 @@ export function TablaDatos<F, C = undefined>({
   const visibles_ = guardadas.orden.filter((id) => !guardadas.ocultas.has(id)).map((id) => porId.get(id)!);
   const anchoColumnas = visibles_.length + (accion ? 1 : 0);
 
+  // Las filas en el orden en que se ven: con grupos, los que están abiertos; sin ellos, la página actual.
+  const ordenEnPantalla = () =>
+    (vista.agrupar ? grupos.filter((g) => !contraidos.has(g.clave)).flatMap((g) => g.filas) : visibles).map(claveFila);
+
   const fila = (f: F) => (
-    <tr key={claveFila(f)} className={`group border-b border-border/60 last:border-0 ${claseFila?.(f) ?? ""}`}>
+    <tr
+      key={claveFila(f)}
+      onClick={
+        abrirFila
+          ? (e) => {
+              if ((e.target as HTMLElement).closest("button, a, input, select, textarea, label, summary")) return;
+              // El foco pasa al botón de la fila antes de abrir: al cerrar la ficha vuelve ahí y no se pierde.
+              e.currentTarget.querySelector<HTMLElement>("button[aria-haspopup='dialog']")?.focus({ preventScroll: true });
+              abrirFila.alAbrir(f, ordenEnPantalla());
+            }
+          : undefined
+      }
+      className={`group border-b border-border/60 last:border-0 ${abrirFila ? "cursor-pointer hover:bg-muted/50" : ""} ${claseFila?.(f) ?? ""}`}
+    >
       {visibles_.map((c, i) => (
         <td key={c.id} className={`py-2 pr-3 ${i === 0 ? "pl-4" : ""} ${c.clase ?? ""}`}>
-          {c.render(f, contexto as C)}
+          {abrirFila && i === 0 ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-label={abrirFila.etiqueta(f)}
+              onClick={() => abrirFila.alAbrir(f, ordenEnPantalla())}
+              className="-mx-1 rounded px-1 text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+            >
+              {c.render(f, contexto as C)}
+            </button>
+          ) : (
+            c.render(f, contexto as C)
+          )}
         </td>
       ))}
       {accion && (
