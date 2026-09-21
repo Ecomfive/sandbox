@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { FormularioConToast } from "@/components/ui/toast";
 
+export const metadata = { title: "Configuración" };
+
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracionPage() {
@@ -59,10 +61,10 @@ export default async function ConfiguracionPage() {
           className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
-          <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
-            <label className={labelClass}>Nombre de la plataforma</label>
+          <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+            <span className={labelClass}>Nombre de la plataforma</span>
             <input type="text" name="nombre" required placeholder="Ej: Boxful" className={fieldClass} />
-          </div>
+          </label>
           <Button type="submit">Crear plataforma</Button>
         </FormularioConToast>
 
@@ -83,8 +85,8 @@ export default async function ConfiguracionPage() {
           className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Tipo</label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Tipo</span>
             <select name="tipo" required defaultValue="banco" className={fieldClass}>
               {TIPOS_CUENTA.map((t) => (
                 <option key={t.valor} value={t.valor}>
@@ -92,9 +94,9 @@ export default async function ConfiguracionPage() {
                 </option>
               ))}
             </select>
-          </div>
-          <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
-            <label className={labelClass}>Nombre</label>
+          </label>
+          <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+            <span className={labelClass}>Nombre</span>
             <input
               type="text"
               name="nombre"
@@ -102,11 +104,11 @@ export default async function ConfiguracionPage() {
               placeholder="Ej: Banco General - Ahorros"
               className={fieldClass}
             />
-          </div>
-          <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
-            <label className={labelClass}>Detalle</label>
+          </label>
+          <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+            <span className={labelClass}>Detalle</span>
             <input type="text" name="detalle" placeholder="Ej: cuenta 04-01-23-00123-4" className={fieldClass} />
-          </div>
+          </label>
           <Button type="submit">Agregar cuenta</Button>
         </FormularioConToast>
 

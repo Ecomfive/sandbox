@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
+export const metadata = { title: "Usuarios y roles" };
+
 export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
@@ -92,10 +94,10 @@ export default async function UsuariosPage() {
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Roles y permisos</h2>
         <form action={crearRol} className="mt-3 flex items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Nuevo rol</label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Nuevo rol</span>
             <input type="text" name="nombre" required className={fieldClass} placeholder="Ej. Finanzas" />
-          </div>
+          </label>
           <Button type="submit" variant="secondary">
             Crear rol
           </Button>

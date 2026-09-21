@@ -16,6 +16,8 @@ import { linkClass } from "@/components/ui/link";
 import { AyudaContextual } from "@/components/ui/ayuda-contextual";
 import { alternarEstado, descripcionFiltro, estadosDeParametro, hrefPedidos } from "@/lib/pedidos/filtro-url";
 
+export const metadata = { title: "Pedidos Dropi" };
+
 export const dynamic = "force-dynamic";
 
 const OPCIONES_ORDEN = {

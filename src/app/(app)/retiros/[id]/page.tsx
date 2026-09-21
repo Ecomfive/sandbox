@@ -13,6 +13,8 @@ import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 
+export const metadata = { title: "Ficha de retiro" };
+
 export const dynamic = "force-dynamic";
 
 const ESTADO_TONO = {

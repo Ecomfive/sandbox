@@ -6,6 +6,8 @@ import { getPaisActual } from "@/lib/pais";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { CentroNotificaciones } from "./centro-notificaciones";
 
+export const metadata = { title: "Centro de notificaciones" };
+
 export const dynamic = "force-dynamic";
 
 export default async function NotificacionesPage() {

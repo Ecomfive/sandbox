@@ -13,15 +13,19 @@ export function AsignarPlataformaSelect({
   movimientoId,
   plataformaIdActual,
   plataformas,
+  movimiento,
 }: {
   movimientoId: string;
   plataformaIdActual: string | null;
   plataformas: Plataforma[];
+  /** Cómo se llama el movimiento («Depósito Dropi»), para que el nombre del campo diga de cuál es. */
+  movimiento?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
 
   return (
     <select
+      aria-label={movimiento ? `Plataforma del movimiento «${movimiento}»` : "Plataforma del movimiento"}
       className={`${fieldClassSm} disabled:opacity-50`}
       defaultValue={plataformaIdActual ?? ""}
       disabled={pending}

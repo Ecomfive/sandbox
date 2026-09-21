@@ -8,6 +8,8 @@ import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { InteligenciaChart } from "@/components/charts/inteligencia-chart";
 import { agruparProductosTotalesPorMes, agruparProveedoresNuevosPorMes, soloAnio } from "@/lib/inteligencia/agregados";
 
+export const metadata = { title: "Inteligencia competitiva" };
+
 export const dynamic = "force-dynamic";
 
 export default async function InteligenciaCompetitivaPage() {

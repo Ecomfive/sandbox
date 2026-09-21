@@ -8,6 +8,8 @@ import { calcularCambios } from "@/lib/auditoria-cambios";
 import type { FilaAuditoria } from "./def-auditoria";
 import { TablaAuditoria } from "./tabla-auditoria";
 
+export const metadata = { title: "Historial de auditoría" };
+
 export const dynamic = "force-dynamic";
 
 export default async function AuditoriaPage() {

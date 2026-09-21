@@ -74,12 +74,12 @@ export default function ActualizarClavePage() {
         ) : (
           <form action={formAction} className="mt-6 flex flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <label className={labelClass}>Nueva contraseña</label>
-              <PasswordInput name="password" required minLength={8} autoComplete="new-password" />
+              <label htmlFor="password" className={labelClass}>Nueva contraseña</label>
+              <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className={labelClass}>Confirmar contraseña</label>
-              <PasswordInput name="confirmacion" required minLength={8} autoComplete="new-password" />
+              <label htmlFor="confirmacion" className={labelClass}>Confirmar contraseña</label>
+              <PasswordInput id="confirmacion" name="confirmacion" required minLength={8} autoComplete="new-password" />
             </div>
             {state.error && <p className="text-sm text-destructive">{state.error}</p>}
             <Button type="submit" disabled={pending} className="mt-2 w-full">

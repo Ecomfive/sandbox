@@ -266,6 +266,22 @@ convenciones técnicas del código.
   tabla: rompe lo fijo. El encabezado fijo tiene `z-index: 15` (`globals.css`): lo
   que una fila eleve con `z-10` (casillas, desplegables, la celda de acciones fija)
   no debe pasar de 10 o se verá por encima del encabezado al bajar.
+- **Formularios accesibles y títulos de página.** Todo campo tiene nombre: la etiqueta
+  **envuelve** al campo (`<label className="flex flex-col gap-1"><span
+  className={labelClass}>Nombre</span><input/></label>`, sin `id`, vale en componentes
+  de servidor y de cliente), o lleva `htmlFor` con el `id` del campo (el campo de
+  archivo y la contraseña). Nunca `<div><label>Nombre</label><input/></div>`: ese texto
+  no está ligado al campo (pulsarlo no lo enfoca y un lector de pantalla no lo lee).
+  Lo que se repite en una lista dice de quién es: `aria-label={`Costo de ${p.nombre}`}`,
+  `Rol de ${usuario}`; un selector suelto (país, comparar) lleva `aria-label`. Corre
+  `node scripts/revisar-formularios.cjs` antes de un PR con formularios: sale con error
+  si una etiqueta no está ligada o un campo no tiene nombre. Cada página exporta su
+  título (`export const metadata = { title: "Retiros" }`, con el nombre del menú; la
+  plantilla del layout raíz agrega « · Ecomfive»); una página de cliente (login) no
+  puede exportarlo y lo pone un `layout.tsx` de su carpeta. El texto secundario
+  (`--muted-foreground`) mide ≥ 4,5:1 sobre el fondo, la tarjeta, `--muted` y `--accent`
+  (la superficie de lo seleccionado) en los dos temas: si cambias esos colores, recalcula.
+  El menú lateral y cada región de navegación llevan `aria-label`.
 - **Borde de los campos de formulario.** Los `input`, `select` y `textarea` usan
   `fieldClass` / `fieldClassSm` (`src/components/ui/field.ts`), que llevan
   `border-border-control` (`--border-control`: 3:1 contra el fondo, WCAG 1.4.11).

@@ -8,6 +8,8 @@ import { fechaHaceMeses, snapshotMasCercano } from "@/lib/inteligencia/agregados
 import { formatearFecha } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
+export const metadata = { title: "Detalle de proveedor" };
+
 export const dynamic = "force-dynamic";
 
 const PERIODOS = [

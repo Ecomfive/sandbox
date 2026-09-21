@@ -16,6 +16,8 @@ import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
+export const metadata = { title: "Dashboard operativo" };
+
 export const dynamic = "force-dynamic";
 
 function BadgeDelta({ delta }: { delta: number | null }) {

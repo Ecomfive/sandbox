@@ -11,6 +11,8 @@ import { linkClass } from "@/components/ui/link";
 import { formatearMes, formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
+export const metadata = { title: "Conciliaciones" };
+
 export const dynamic = "force-dynamic";
 
 interface Grupo {
@@ -111,8 +113,8 @@ export default async function ConciliacionesPage() {
                 <p className={labelClassSm}>Monto bancario</p>
                 <p className="text-sm font-medium tabular-nums">{formatearMoneda(f.monto_bancario, pais.codigo)}</p>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className={labelClassSm}>Monto reportado por plataforma</label>
+              <label className="flex flex-col gap-1">
+                <span className={labelClassSm}>Monto reportado por plataforma</span>
                 <input
                   type="number"
                   step="0.01"
@@ -121,7 +123,7 @@ export default async function ConciliacionesPage() {
                   className={`${fieldClass} w-36 tabular-nums`}
                   required
                 />
-              </div>
+              </label>
               <div>
                 <p className={labelClassSm}>Diferencia</p>
                 <p
@@ -132,15 +134,15 @@ export default async function ConciliacionesPage() {
                   {existente ? formatearMoneda(diferencia, pais.codigo) : "—"}
                 </p>
               </div>
-              <div className="flex min-w-[10rem] flex-1 flex-col gap-1">
-                <label className={labelClassSm}>Notas</label>
+              <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+                <span className={labelClassSm}>Notas</span>
                 <input
                   type="text"
                   name="notas"
                   defaultValue={existente?.notas ?? ""}
                   className={`${fieldClass} w-full`}
                 />
-              </div>
+              </label>
               <Button type="submit">Guardar</Button>
             </form>
           );

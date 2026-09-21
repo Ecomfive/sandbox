@@ -10,6 +10,8 @@ import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
 import { AlertaIcon } from "@/lib/nav-icons";
 
+export const metadata = { title: "Alertas de inventario" };
+
 export const dynamic = "force-dynamic";
 
 export default async function AlertasPage() {

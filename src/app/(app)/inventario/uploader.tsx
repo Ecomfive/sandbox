@@ -74,15 +74,16 @@ export function InventarioUploader({ pais }: { pais: Pais }) {
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       <input type="hidden" name="pais_id" value={pais.id} />
       <div className="flex flex-col gap-1">
-        <label className={labelClass}>País</label>
+        <span className={labelClass}>País</span>
         <p className="text-sm text-muted-foreground">
           {pais.nombre} — cambia el país activo desde la barra superior.
         </p>
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className={labelClass}>Archivo del pistoleo (CSV o Excel)</label>
+        <label htmlFor="archivo-pistoleo" className={labelClass}>Archivo del pistoleo (CSV o Excel)</label>
         <input
+          id="archivo-pistoleo"
           type="file"
           name="archivo"
           accept=".csv,.xlsx,.xls"
@@ -105,37 +106,37 @@ export function InventarioUploader({ pais }: { pais: Pais }) {
         <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
           <p className="text-sm font-medium">Mapeo de columnas</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>SKU / código *</label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>SKU / código *</span>
               {columnaSelect("sku", true)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Cantidad *</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Cantidad *</span>
               {columnaSelect("cantidad", true)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Nombre del producto (solo si es nuevo)</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Nombre del producto (solo si es nuevo)</span>
               {columnaSelect("nombre", false)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Fecha (si no hay, usa hoy)</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Fecha (si no hay, usa hoy)</span>
               {columnaSelect("fecha", false)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Referencia</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Referencia</span>
               {columnaSelect("referencia", false)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Tipo (columna, si existe)</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Tipo (columna, si existe)</span>
               {columnaSelect("tipo", false)}
-            </div>
+            </label>
           </div>
 
           {mapeo.tipo === undefined && (
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>
                 El archivo no tiene columna de tipo — aplicar a todas las filas:
-              </label>
+              </span>
               <select
                 className={`${fieldClass} w-fit`}
                 value={tipoFijo}
@@ -144,7 +145,7 @@ export function InventarioUploader({ pais }: { pais: Pais }) {
                 <option value="salida">Salida (mercancía que sale)</option>
                 <option value="entrada">Entrada (devolución/reingreso)</option>
               </select>
-            </div>
+            </label>
           )}
 
           {preview.length > 0 && (

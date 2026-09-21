@@ -14,6 +14,7 @@ export function PeriodPicker() {
     <div className="flex flex-wrap items-center gap-2">
       <FiltroFechas />
       <select
+        aria-label="Comparar con"
         value={compararActual}
         onChange={(e) => {
           const params = new URLSearchParams(searchParams.toString());

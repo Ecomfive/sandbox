@@ -27,13 +27,13 @@ export default function LoginPage() {
         </h1>
 
         <form action={formAction} className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Correo</label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Correo</span>
             <input type="email" name="email" required autoComplete="email" className={fieldClass} />
-          </div>
+          </label>
           <div className="flex flex-col gap-1">
-            <label className={labelClass}>Contraseña</label>
-            <PasswordInput name="password" required autoComplete="current-password" />
+            <label htmlFor="password" className={labelClass}>Contraseña</label>
+            <PasswordInput id="password" name="password" required autoComplete="current-password" />
           </div>
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <Button type="submit" disabled={pending} className="mt-2 w-full">

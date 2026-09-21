@@ -142,77 +142,77 @@ export function ConciliarRetiroPanel({ retiro, paisId }: { retiro: RetiroParaCon
 
               <div className="flex flex-col gap-3 p-4">
                 <div className="flex gap-2">
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm}>Plataforma</label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={labelClassSm}>Plataforma</span>
                     <input type="text" disabled value={retiro.plataformaNombre ?? "—"} className={campoBloqueado} />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm}>Cuenta destino</label>
+                  </label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={labelClassSm}>Cuenta destino</span>
                     <input type="text" disabled value={retiro.destino} className={campoBloqueado} />
-                  </div>
+                  </label>
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm}>Gestionado por</label>
+                <label className="flex flex-col gap-1">
+                  <span className={labelClassSm}>Gestionado por</span>
                   <input
                     type="text"
                     disabled
                     value={GESTIONADO_ETIQUETA[retiro.gestionadoPor] ?? retiro.gestionadoPor}
                     className={`${campoBloqueado} w-40`}
                   />
-                </div>
+                </label>
 
                 <div className="flex gap-2">
-                  <div className="flex w-28 shrink-0 flex-col gap-1">
-                    <label className={labelClassSm}>Monto</label>
+                  <label className="flex w-28 shrink-0 flex-col gap-1">
+                    <span className={labelClassSm}>Monto</span>
                     <input
                       type="text"
                       disabled
                       value={retiro.monto.toFixed(2)}
                       className={`${campoBloqueado} tabular-nums`}
                     />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm}>Fecha</label>
+                  </label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={labelClassSm}>Fecha</span>
                     <input type="text" disabled value={retiro.fecha} className={campoBloqueado} />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm}>Fecha límite</label>
+                  </label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={labelClassSm}>Fecha límite</span>
                     <input type="text" disabled value={retiro.fechaLimite ?? "—"} className={campoBloqueado} />
-                  </div>
+                  </label>
                 </div>
 
                 <div className="flex gap-2">
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm}>Comisión</label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={labelClassSm}>Comisión</span>
                     <input
                       type="text"
                       disabled
                       value={`$${retiro.comision.toFixed(2)}`}
                       className={`${campoBloqueado} tabular-nums`}
                     />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm}>A recibir</label>
+                  </label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={labelClassSm}>A recibir</span>
                     <input
                       type="text"
                       disabled
                       value={`$${retiro.aRecibir.toFixed(2)}`}
                       className={`${campoBloqueado} tabular-nums`}
                     />
-                  </div>
+                  </label>
                 </div>
 
                 {retiro.notas && (
-                  <div>
-                    <label className={labelClassSm}>Nota</label>
+                  <label>
+                    <span className={labelClassSm}>Nota</span>
                     <input
                       type="text"
                       disabled
                       value={retiro.notas}
                       className={`${fieldClass} mt-1 w-full cursor-not-allowed bg-muted text-sm`}
                     />
-                  </div>
+                  </label>
                 )}
 
                 <div className="mt-2 flex flex-col gap-3 border-t border-border pt-3">

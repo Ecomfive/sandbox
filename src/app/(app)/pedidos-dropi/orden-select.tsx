@@ -16,8 +16,8 @@ export function OrdenSelect({ actual }: { actual: string }) {
   const searchParams = useSearchParams();
 
   return (
-    <div className="flex flex-col gap-1">
-      <label className={labelClassSm}>Ordenar por</label>
+    <label className="flex flex-col gap-1">
+      <span className={labelClassSm}>Ordenar por</span>
       <select
         defaultValue={actual}
         className={fieldClass}
@@ -33,6 +33,6 @@ export function OrdenSelect({ actual }: { actual: string }) {
           </option>
         ))}
       </select>
-    </div>
+    </label>
   );
 }

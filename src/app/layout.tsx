@@ -8,7 +8,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Ecomfive Business OS",
+  // Cada página pone su nombre («Retiros») y la plantilla le agrega el del producto: «Retiros · Ecomfive».
+  title: { default: "Ecomfive Business OS", template: "%s · Ecomfive" },
   description: "Gestión operativa, financiera y de inteligencia competitiva de Ecomfive por país y plataforma",
 };
 
