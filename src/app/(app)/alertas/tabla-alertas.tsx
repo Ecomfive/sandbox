@@ -197,7 +197,7 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
 
   return (
     <div>
-      <h2 className="text-sm font-semibold tracking-tight">Alertas</h2>
+      <h2 className="text-sm font-semibold tracking-tight">Alertas generadas</h2>
       {alertas.length > 0 && (
         // Las tarjetas de estado filtran esta tabla; se pueden juntar y pulsar otra vez las quita.
         <div className="mt-3">
