@@ -117,10 +117,12 @@ html {
 }
 
 /* Encabezado fijo bajo la barra de herramientas mientras se baja la página. */
+/* z-index 15: por encima de lo que las filas elevan con z-10 (la casilla, el desplegable de Estado, la celda de
+   acciones fija), para que al bajar no se vean por encima del encabezado; y por debajo de la barra (z-20). */
 [data-encabezado-fijo] table.tabla-datos thead th {
   position: sticky;
   top: var(--alto-barra-tabla);
-  z-index: 10;
+  z-index: 15;
 }
 
 @keyframes fade-in {
