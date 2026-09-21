@@ -3,17 +3,18 @@ import { anilloFoco } from "@/components/ui/field";
 
 type Tono = "neutro" | "oscuro" | "peligro";
 
+// Los colores salen de los tokens, que cambian con el tema: en oscuro el «oscuro» pasa a claro y el texto se invierte
+// (un #202020 fijo se confundía con la tarjeta oscura). El texto de los rellenos es `text-background`, que en los dos
+// temas contrasta con `foreground` y con `destructive`.
 const TONOS: Record<Tono, string> = {
   neutro: "border-border bg-card text-foreground hover:bg-muted",
-  // Los tokens cambian con el tema: negro con texto blanco en claro, y a la inversa en oscuro (un #202020 fijo se
-  // confundía con la tarjeta oscura).
   oscuro: "border-foreground bg-foreground text-background hover:bg-foreground/85",
-  peligro: "border-destructive/30 bg-card text-destructive hover:bg-destructive-soft",
+  peligro: "border-destructive bg-destructive text-background hover:bg-destructive/85",
 };
 
 /**
- * Acción de una ficha: ícono arriba y texto debajo, en una fila de botones iguales (como la fila de acciones de la
- * ficha de un pedido en otros sistemas). Se reparten el ancho de la fila; con `disabled` se apaga y no responde.
+ * Acción de una ficha: ícono arriba y texto debajo, en una fila de botones del mismo tamaño y rellenos de color (como
+ * la fila de acciones de la ficha de un pedido en otros sistemas). Apagado (`disabled`) se ve gris y no responde.
  */
 export const BotonAccion = forwardRef<
   HTMLButtonElement,
@@ -26,7 +27,7 @@ export const BotonAccion = forwardRef<
     <button
       ref={ref}
       type="button"
-      className={`flex min-h-14 flex-col items-center justify-center gap-1 border px-3 py-2 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 ${TONOS[tono]} ${anilloFoco} !rounded-lg ${className}`}
+      className={`flex h-16 w-24 shrink-0 flex-col items-center justify-center gap-1 border px-2 py-1.5 text-center text-xs leading-tight font-medium transition-colors disabled:pointer-events-none disabled:border-transparent disabled:bg-muted disabled:text-muted-foreground ${TONOS[tono]} ${anilloFoco} !rounded-lg ${className}`}
       {...props}
     >
       <Icono className="h-4 w-4" />

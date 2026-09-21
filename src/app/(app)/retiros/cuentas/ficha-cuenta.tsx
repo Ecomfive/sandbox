@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
-import { alternarActivaCuenta } from "./actions";
+import { useRef, useState, type ReactNode } from "react";
 import { etiquetaComision, etiquetaTipoCuenta, type FilaCuenta } from "./def-cuentas";
 import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
 import { FormularioCuenta, Seccion } from "./formulario-cuenta";
+import { LineaDeTiempoCuenta } from "./linea-de-tiempo-cuenta";
 import { Badge } from "@/components/ui/badge";
-import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { EstadoIcon, ExtractoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
+import { ExtractoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 import { datosBinanceDeLaBase } from "@/lib/retiros/datos-binance";
 
 function Dato({ etiqueta, children, ancho }: { etiqueta: string; children: ReactNode; ancho?: boolean }) {
@@ -50,29 +49,23 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
   );
 }
 
-/** Desactivar o reactivar la cuenta a mano, sin pedir confirmación — al revés de «Eliminar», que solo desactiva
- * (con su propio aviso) y no deja volver a activarla desde ahí. */
-function AlternarActivaBoton({ cuenta }: { cuenta: FilaCuenta }) {
-  const [pending, startTransition] = useTransition();
-  const { mostrarToast } = useToast();
-
-  function alHacerClic() {
-    const formData = new FormData();
-    formData.set("id", cuenta.id);
-    formData.set("activa", String(!cuenta.activa));
-    startTransition(async () => {
-      try {
-        await alternarActivaCuenta(formData);
-      } catch {
-        mostrarToast("No se pudo cambiar el estado de la cuenta. Inténtalo de nuevo.", "destructive");
-      }
-    });
-  }
-
+/** Lo primero de la ficha, sobre los botones: el país con la comisión y la línea de tiempo (creada y eliminada). */
+function EncabezadoFicha({ cuenta, paisNombre, codigoPais }: { cuenta: FilaCuenta; paisNombre: string; codigoPais: string }) {
   return (
-    <BotonAccion icono={EstadoIcon} onClick={alHacerClic} disabled={pending}>
-      {cuenta.activa ? "Desactivar" : "Reactivar"}
-    </BotonAccion>
+    <div className="flex flex-col gap-5 p-5">
+      <p className="text-sm text-muted-foreground">
+        {paisNombre} ·{" "}
+        {cuenta.comision_tipo
+          ? `Comisión sugerida ${etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)}`
+          : "Sin comisión sugerida"}
+      </p>
+      <LineaDeTiempoCuenta
+        creadaEn={cuenta.creado_en}
+        eliminadaEn={cuenta.eliminada_en}
+        eliminada={!cuenta.activa}
+        codigoPais={codigoPais}
+      />
+    </div>
   );
 }
 
@@ -80,7 +73,7 @@ function AlternarActivaBoton({ cuenta }: { cuenta: FilaCuenta }) {
 function DatosDeLaCuenta({ cuenta }: { cuenta: FilaCuenta }) {
   const datosBinance = datosBinanceDeLaBase(cuenta.datos_binance);
   return (
-    <div className="flex flex-col divide-y divide-border p-5">
+    <div className="flex flex-col divide-y divide-border border-t border-border p-5">
       <Seccion icono={WalletIcon} titulo="Cuenta">
         <dl className="flex flex-col gap-3">
           <Dato etiqueta="Nombre">{cuenta.nombre}</Dato>
@@ -125,10 +118,14 @@ function DatosDeLaCuenta({ cuenta }: { cuenta: FilaCuenta }) {
 }
 
 /**
- * Ficha de una cuenta destino: el panel a la derecha que se abre al pulsar su fila. Arriba, el título con su número y
- * estado, las flechas para pasar a la cuenta de arriba o de abajo (en el orden en que se ven en la tabla) y cerrar.
- * Con permiso de escritura la ficha **ya es el formulario**: no hay un botón «Modificar»; se cambian los campos, se
- * pulsa «Guardar cambios» (que cierra la ficha) y las acciones Desactivar y Eliminar están arriba de los campos. Si hay
+ * Ficha de una cuenta destino: el panel a la derecha que se abre al pulsar su fila, con la estructura de la ficha de un
+ * pedido: cabecera con el título, sus insignias, las flechas para pasar a la cuenta de arriba o de abajo (en el orden en
+ * que se ven en la tabla) y cerrar; el país y la comisión; la línea de tiempo (creada y eliminada, con sus fechas); una
+ * fila de botones; y los datos en bloques con ícono.
+ *
+ * Con permiso de escritura la ficha **ya es el formulario** (no hay un botón «Modificar»), y **no tiene botones abajo**:
+ * la fila de botones tiene «Eliminar» y, cuando se cambia un campo, aparecen ahí mismo «Guardar cambios» y «Cancelar»
+ * (que descarta lo escrito). Guardar no cierra la ficha: los botones vuelven a ser solo «Eliminar» y sale un aviso. Con
  * cambios sin guardar, cerrar o pasar a otra cuenta pide confirmación. Sin permiso de escritura solo se leen los datos.
  * Lo que muestra sale de la fila ya cargada, así que se actualiza sola al guardar o al eliminarla (que la desactiva, no
  * la borra): la ficha queda abierta con su nuevo estado, aunque la fila haya salido de la tabla de abajo por el filtro
@@ -139,6 +136,7 @@ export function FichaCuenta({
   orden,
   paisId,
   paisNombre,
+  codigoPais,
   puedeEscribir,
   alIr,
   alCerrar,
@@ -149,18 +147,29 @@ export function FichaCuenta({
   orden: string[];
   paisId: string;
   paisNombre: string;
+  /** Para mostrar las horas de la línea de tiempo en la hora del país. */
+  codigoPais: string;
   puedeEscribir: boolean;
   alIr: (id: string) => void;
   alCerrar: () => void;
 }) {
+  const { mostrarToast } = useToast();
   const [guardando, setGuardando] = useState(false);
   // De qué cuenta hay cambios sin guardar (el id, para que no pase a otra cuenta ni sobreviva a una eliminada).
   const [sinGuardarId, setSinGuardarId] = useState<string | null>(null);
+  // Sube al cancelar: con otra `key` el formulario se monta de nuevo con los datos de la cuenta y suelta lo escrito.
+  const [version, setVersion] = useState(0);
+  const raiz = useRef<HTMLDivElement>(null);
   const sinGuardar = !!cuenta && sinGuardarId === cuenta.id;
 
   /** Pide confirmación si se van a perder cambios; devuelve si se puede seguir. */
   function puedeDescartar() {
     return !sinGuardar || confirm("Hay cambios sin guardar. ¿Descartarlos?");
+  }
+
+  /** El botón que se pulsó desaparece (Guardar y Cancelar solo existen con cambios): el foco vuelve al primer campo. */
+  function enfocarPrimerCampo() {
+    requestAnimationFrame(() => raiz.current?.querySelector<HTMLElement>("[data-enfocar]")?.focus());
   }
 
   function cerrar() {
@@ -176,9 +185,16 @@ export function FichaCuenta({
   }
 
   function alGuardar() {
-    setGuardando(false); // el formulario se desmonta: ya no avisará que terminó
+    setGuardando(false);
     setSinGuardarId(null);
-    alCerrar();
+    mostrarToast("Cambios guardados");
+    enfocarPrimerCampo();
+  }
+
+  function alCancelar() {
+    setSinGuardarId(null);
+    setVersion((v) => v + 1);
+    enfocarPrimerCampo();
   }
 
   const indice = cuenta ? orden.indexOf(cuenta.id) : -1;
@@ -197,7 +213,7 @@ export function FichaCuenta({
           <>
             <span className="text-lg font-semibold">{`Cuenta${numero}`}</span>
             <Badge tone="neutral">{etiquetaTipoCuenta(cuenta.tipo)}</Badge>
-            <Badge tone={cuenta.activa ? "success" : "neutral"}>{cuenta.activa ? "Activa" : "Inactiva"}</Badge>
+            <Badge tone={cuenta.activa ? "success" : "destructive"}>{cuenta.activa ? "Activa" : "Eliminada"}</Badge>
           </>
         )
       }
@@ -218,28 +234,31 @@ export function FichaCuenta({
         </>
       }
     >
-      {cuenta &&
-        (puedeEscribir ? (
-          <div className="flex flex-1 flex-col">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2 border-b border-border p-5">
-              <AlternarActivaBoton cuenta={cuenta} />
-              <EliminarCuentaBoton id={cuenta.id} nombre={cuenta.nombre} />
-            </div>
-            {/* Con `key`, al pasar a otra cuenta el formulario arranca con los datos de esa cuenta. */}
+      {cuenta && (
+        <div ref={raiz} className="flex flex-1 flex-col">
+          {puedeEscribir ? (
+            // Con `key`, al pasar a otra cuenta (o al cancelar) el formulario arranca con los datos de la cuenta.
             <FormularioCuenta
-              key={cuenta.id}
+              key={`${cuenta.id}-${version}`}
               paisId={paisId}
               paisNombre={paisNombre}
               cuenta={cuenta}
+              botonesArriba
+              encabezado={<EncabezadoFicha cuenta={cuenta} paisNombre={paisNombre} codigoPais={codigoPais} />}
+              acciones={<EliminarCuentaBoton id={cuenta.id} nombre={cuenta.nombre} yaEliminada={!cuenta.activa} />}
               alGuardar={alGuardar}
-              alCancelar={cerrar}
+              alCancelar={alCancelar}
               alCambiarGuardando={setGuardando}
               alModificar={() => setSinGuardarId(cuenta.id)}
             />
-          </div>
-        ) : (
-          <DatosDeLaCuenta cuenta={cuenta} />
-        ))}
+          ) : (
+            <>
+              <EncabezadoFicha cuenta={cuenta} paisNombre={paisNombre} codigoPais={codigoPais} />
+              <DatosDeLaCuenta cuenta={cuenta} />
+            </>
+          )}
+        </div>
+      )}
     </Ventana>
   );
 }

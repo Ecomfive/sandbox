@@ -3,9 +3,10 @@
 import { useEffect, useState, useTransition, type ComponentType, type ReactNode } from "react";
 import { crearCuentaRetiro, actualizarCuentaRetiro } from "./actions";
 import type { FilaCuenta } from "./def-cuentas";
+import { BotonAccion } from "@/components/ui/boton-accion";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
-import { ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
+import { CerrarIcon, CheckIcon, ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 import {
   BANCOS_BINANCE,
   PAISES_BINANCE,
@@ -96,9 +97,13 @@ function Campo({ etiqueta, id, obligatorio, children }: { etiqueta: string; id: 
 }
 
 /**
- * El formulario de una cuenta destino, con sus bloques y los botones fijos abajo. Sin `cuenta` crea (lleva el país);
- * con `cuenta` modifica. Se monta al abrirse la ficha (o al pasar a «Modificar»), así que arranca siempre con los
- * datos de la cuenta y no arrastra lo escrito la vez anterior. El error se muestra encima de los botones.
+ * El formulario de una cuenta destino, con sus bloques. Sin `cuenta` crea (lleva el país); con `cuenta` modifica. Arranca
+ * siempre con los datos de la cuenta (se monta de nuevo al pasar a otra), sin arrastrar lo escrito antes.
+ *
+ * Los botones van de dos maneras. Por defecto, fijos abajo (Cancelar y Agregar/Guardar), como en «Nueva cuenta». Con
+ * `botonesArriba` (la ficha de una cuenta) no hay barra abajo: una fila de botones en el mismo estilo que las acciones
+ * de la ficha queda pegada bajo la cabecera, y **Guardar cambios y Cancelar solo aparecen cuando se cambió algo**, junto
+ * a las `acciones` de la ficha (Eliminar). El error se muestra debajo de los botones.
  */
 export function FormularioCuenta({
   paisId,
@@ -108,6 +113,9 @@ export function FormularioCuenta({
   alCancelar,
   alCambiarGuardando,
   alModificar,
+  botonesArriba,
+  encabezado,
+  acciones,
 }: {
   paisId: string;
   /** El país de la página: es el que sugiere el formulario de una cuenta Binance. */
@@ -120,7 +128,14 @@ export function FormularioCuenta({
   alCambiarGuardando?: (guardando: boolean) => void;
   /** Se llama cuando la persona cambia cualquier campo (para saber si hay cambios sin guardar). */
   alModificar?: () => void;
+  /** Los botones van arriba y no abajo (ver arriba). */
+  botonesArriba?: boolean;
+  /** Con `botonesArriba`: lo que va sobre la fila de botones (la línea de tiempo de la ficha). */
+  encabezado?: ReactNode;
+  /** Con `botonesArriba`: botones propios de la ficha, junto a Guardar y Cancelar. */
+  acciones?: ReactNode;
 }) {
+  const [modificado, setModificado] = useState(false);
   const [pending, startTransition] = useTransition();
   useEffect(() => {
     alCambiarGuardando?.(pending);
@@ -139,7 +154,10 @@ export function FormularioCuenta({
       try {
         const resultado = editando ? await actualizarCuentaRetiro(formData) : await crearCuentaRetiro(formData);
         if (resultado?.error) setError(resultado.error);
-        else alGuardar();
+        else {
+          setModificado(false);
+          alGuardar();
+        }
       } catch {
         setError("No se pudo guardar. Inténtalo de nuevo.");
       }
@@ -147,12 +165,48 @@ export function FormularioCuenta({
   }
 
   return (
-    <form onSubmit={alEnviar} onChange={alModificar} aria-busy={pending} className="flex flex-1 flex-col">
+    <form
+      onSubmit={alEnviar}
+      onChange={() => {
+        setModificado(true);
+        alModificar?.();
+      }}
+      aria-busy={pending}
+      className="flex flex-1 flex-col"
+    >
       {!editando && <input type="hidden" name="pais_id" value={paisId} />}
       {editando && <input type="hidden" name="id" value={cuenta.id} />}
       {/* Ya tenía datos de Binance: si el tipo cambia, el servidor sabe que hay que quitarlos. Va fuera del
           bloque de Binance porque ese bloque desaparece justo al cambiar el tipo. */}
       {editando && datosBinance && <input type="hidden" name="binance_previo" value="1" />}
+
+      {botonesArriba && (
+        <>
+          {encabezado}
+          {/* Pegada bajo la cabecera del panel (su alto lo publica `Ventana` como --alto-cabecera) para que Guardar
+              siga a la vista aunque se esté cambiando un campo de más abajo. */}
+          <div className="sticky top-[var(--alto-cabecera,3.8rem)] z-[5] flex flex-col gap-2 border-y border-border bg-card px-5 py-3">
+            <div className="flex flex-wrap gap-2">
+              {modificado && (
+                <>
+                  <BotonAccion type="submit" tono="oscuro" icono={CheckIcon} disabled={pending}>
+                    {pending ? "Guardando..." : "Guardar cambios"}
+                  </BotonAccion>
+                  <BotonAccion icono={CerrarIcon} onClick={alCancelar} disabled={pending}>
+                    Cancelar
+                  </BotonAccion>
+                </>
+              )}
+              {acciones}
+            </div>
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="flex flex-1 flex-col divide-y divide-border p-5">
         <Seccion icono={WalletIcon} titulo="Cuenta">
@@ -315,21 +369,23 @@ export function FormularioCuenta({
         </Seccion>
       </div>
 
-      <div className="sticky bottom-0 mt-auto flex flex-col gap-2 border-t border-border bg-card p-4">
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={alCancelar} disabled={pending}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={pending} className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]">
-            {pending ? "Guardando..." : editando ? "Guardar cambios" : "Agregar cuenta"}
-          </Button>
+      {!botonesArriba && (
+        <div className="sticky bottom-0 mt-auto flex flex-col gap-2 border-t border-border bg-card p-4">
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={alCancelar} disabled={pending}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending} className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]">
+              {pending ? "Guardando..." : editando ? "Guardar cambios" : "Agregar cuenta"}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </form>
   );
 }

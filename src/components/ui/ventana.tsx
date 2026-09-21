@@ -33,6 +33,7 @@ export function Ventana({
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const cabeceraRef = useRef<HTMLDivElement>(null);
   const tituloId = useId();
   // Siempre la última función, sin volver a montar los oyentes en cada render.
   const cerrarRef = useRef(alCerrar);
@@ -75,6 +76,20 @@ export function Ventana({
     };
   }, [abierto]);
 
+  // La cabecera queda fija arriba; su alto (que cambia si el título ocupa dos líneas) se publica como
+  // `--alto-cabecera` para que algo dentro del panel pueda pegarse justo debajo al desplazarse.
+  useEffect(() => {
+    if (!abierto) return;
+    const panel = panelRef.current;
+    const cabecera = cabeceraRef.current;
+    if (!panel || !cabecera) return;
+    const medir = () => panel.style.setProperty("--alto-cabecera", `${cabecera.offsetHeight}px`);
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(cabecera);
+    return () => observador.disconnect();
+  }, [abierto]);
+
   if (!abierto) return null;
 
   const anchoClase = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl" }[ancho];
@@ -96,6 +111,7 @@ export function Ventana({
         }
       >
         <div
+          ref={cabeceraRef}
           className={`sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card ${
             lado === "derecha" ? "px-5 py-3" : "px-4 py-2.5"
           }`}
