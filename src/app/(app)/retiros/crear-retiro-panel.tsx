@@ -65,8 +65,9 @@ export function CrearRetiroPanel({
 }) {
   const [abierto, setAbierto] = useState(false);
   const [monto, setMonto] = useState("");
-  const [comisionValor, setComisionValor] = useState("0");
-  const [comisionPorcentaje, setComisionPorcentaje] = useState("0");
+  // La comisión arranca vacía: es un dato obligatorio que hay que escribir (o que sugiere la cuenta al elegirla).
+  const [comisionValor, setComisionValor] = useState("");
+  const [comisionPorcentaje, setComisionPorcentaje] = useState("");
   const [comisionManual, setComisionManual] = useState(false);
   const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState("");
   const [fechaLimite, setFechaLimite] = useState("");
@@ -89,16 +90,15 @@ export function CrearRetiroPanel({
   async function abrirVentana() {
     setEnviando(false);
     setMonto("");
-    setComisionValor("0");
-    setComisionPorcentaje("0");
+    setComisionValor("");
+    setComisionPorcentaje("");
     setComisionManual(false);
     setFechaLimite("");
+    // Ninguna cuenta destino viene elegida: la persona tiene que escoger una de la lista.
+    setCuentaSeleccionadaId("");
     setAbierto(true);
     setCorrelativo(null);
     setConsultando(true);
-    // El <select> de cuenta arranca en la primera opción del navegador: se sincroniza acá
-    // para que la comisión sugerida de esa cuenta ya aparezca sin tener que tocar el campo.
-    if (cuentas.length > 0) alElegirCuenta(cuentas[0].id, 0);
     setCorrelativo(await verSiguienteCorrelativo().catch(() => null));
     setConsultando(false);
   }
@@ -253,9 +253,11 @@ export function CrearRetiroPanel({
                         name="cuenta_retiro_id"
                         required
                         aria-invalid={invalido("campo-cuenta")}
+                        defaultValue=""
                         onChange={(e) => alElegirCuenta(e.target.value)}
                         className={`${fieldClass} w-full min-w-0`}
                       >
+                        <option value="">Selecciona una cuenta</option>
                         {cuentas.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.nombre}
@@ -304,7 +306,7 @@ export function CrearRetiroPanel({
                       id="campo-monto"
                       type="number"
                       step="0.01"
-                      min="0"
+                      min="0.01"
                       name="monto"
                       required
                       data-enfocar
@@ -315,7 +317,12 @@ export function CrearRetiroPanel({
                       className={`${fieldClass} w-full min-w-0 tabular-nums`}
                     />
                   </div>
-                  <AvisoFaltante id="campo-monto" faltante={faltante} />
+                  {/* El monto tiene que ser mayor a cero: con un 0 escrito el aviso lo dice, no «falta». */}
+                  <AvisoFaltante
+                    id="campo-monto"
+                    faltante={faltante}
+                    mensaje={monto !== "" ? "Debe ser mayor a cero" : undefined}
+                  />
                 </div>
                 <div className="flex min-w-0 flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-a-recibir">
@@ -337,15 +344,19 @@ export function CrearRetiroPanel({
                 <div className="sm:col-span-2">
                   <p className={labelClassSm} id="etiqueta-comision">
                     Comisión
+                    <Obligatorio />
                   </p>
                   <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 items-center gap-1">
                       <span className="text-sm text-muted-foreground">$</span>
                       <input
+                        id="campo-comision"
                         type="number"
                         step="0.01"
                         min="0"
                         name="comision"
+                        required
+                        aria-invalid={invalido("campo-comision")}
                         aria-label="Comisión en dólares"
                         aria-describedby="etiqueta-comision"
                         placeholder="Ej: 3.00"
@@ -368,6 +379,9 @@ export function CrearRetiroPanel({
                       />
                       <span className="text-sm text-muted-foreground">%</span>
                     </div>
+                  </div>
+                  <div className="mt-1">
+                    <AvisoFaltante id="campo-comision" faltante={faltante} />
                   </div>
                 </div>
               </div>

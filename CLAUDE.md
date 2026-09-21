@@ -213,7 +213,14 @@ convenciones técnicas del código.
   (`src/components/ui/usar-faltantes.ts`): `formRef`, `completo`, `faltante`,
   `revisar` (en `onInput` y `onChange`) y `señalarFaltante`; cada campo obligatorio
   necesita `id`, `required` y `aria-invalid={faltante === id || undefined}`
-  (`fieldClass` pinta el borde). Las ventanas de
+  (`fieldClass` pinta el borde). Lo obligatorio hoy: en «Nuevo retiro», la cuenta destino
+  (**sin ninguna preelegida**: hay que escoger una), el monto (**mayor a cero**, `min="0.01"`)
+  y la comisión (hay que escribirla, aunque sea 0; arranca vacía y solo la rellena la
+  comisión sugerida de la cuenta que se elija); `crearRetiro` lo vuelve a comprobar en el
+  servidor. En «Nueva cuenta destino», el nombre, el tipo, la cuenta (o, si es Binance, el
+  tipo de identificación, el número de identificación y el número de cuenta); la cuenta y
+  el número de identificación solo se exigen **al crear**, para no bloquear la
+  modificación de una cuenta guardada antes sin ese dato. Las ventanas de
   Retiros de **editar** y **conciliar** todavía tienen su propia copia de la lógica de `Ventana`.
   **Toda ventana modal o globo flotante se dibuja en `<body>` con `createPortal`**
   (`Ventana`, `AyudaContextual`, `Tooltip`, y las ventanas de Retiros y Cuentas): un
