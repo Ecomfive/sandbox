@@ -165,6 +165,19 @@ convenciones técnicas del código.
   (entradas y salidas). Un filtro de un toque («Mis retiros») se pasa a
   `<BarraHerramientas atajos={[...]}>` (`AtajoFiltro`, `src/lib/tabla/atajos.ts`): es un
   filtro de selección que el botón enciende o apaga sin tocar los de otros campos.
+- **Editar una fila en su sitio (Productos).** No pongas un formulario abierto en cada
+  fila (Productos llegó a 240 controles y 530 KB de HTML): la fila muestra texto, un
+  lápiz («Editar producto») la vuelve campos y aparecen Guardar y Cancelar
+  (`productos/tabla-productos.tsx`). Un `<tr>` no puede ir dentro de un `<form>`:
+  hay **un** `<form id="editar-producto">` para toda la tabla y los campos de la fila
+  que se edita se ligan a él con el atributo `form`; como quedan fuera del `<form>`,
+  Enter y Escape se atienden con un `onKeyDown` en la tarjeta. Solo se edita una fila
+  a la vez y lo que sea un `<select>` grande (los SKU maestros) se dibuja **solo** en
+  esa fila, no en todas. Si una columna editable está oculta en el menú «Columnas», su
+  valor viaja en un campo oculto (si no, «Guardar» lo borraría). La acción del servidor
+  valida lo que recibe (un campo ausente no es un campo vacío). Guardar y vincular el
+  SKU maestro son dos acciones de módulos distintos (`productos` y `catalogo-maestro`):
+  con solo lectura en uno no se ofrece lo del otro (`puedeEscribir`, `puedeVincular`).
 - **Vistas guardadas.** Toda tabla con barra de herramientas trae el menú «Vistas»
   (`src/components/tabla/menu-vistas.tsx`): guarda con nombre lo que se ve (filtros,
   agrupación, cerrados y columnas), lo aplica de nuevo, elimina (con confirmación en
