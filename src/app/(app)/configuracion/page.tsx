@@ -81,7 +81,7 @@ export default async function ConfiguracionPage() {
 
         <FormularioConToast
           action={crearCuentaRetiro}
-          mensajeExito="Cuenta agregada"
+          mensajeExito={(r) => (r?.error ? { mensaje: r.error, tono: "destructive" } : { mensaje: "Cuenta agregada" })}
           className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />

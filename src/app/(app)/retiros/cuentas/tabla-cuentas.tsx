@@ -69,7 +69,7 @@ const COLUMNAS_CONFIGURACION: ColumnaTabla<FilaCuenta, unknown>[] = [
 ];
 
 /** Cuentas destino de Retiros, con la barra de herramientas común y las acciones fijas a la derecha. */
-export function TablaCuentas({ cuentas, paisId }: { cuentas: FilaCuenta[]; paisId: string }) {
+export function TablaCuentas({ cuentas, paisId, paisNombre }: { cuentas: FilaCuenta[]; paisId: string; paisNombre: string }) {
   return (
     <TablaDatos
       def={DEF_CUENTAS}
@@ -84,7 +84,7 @@ export function TablaCuentas({ cuentas, paisId }: { cuentas: FilaCuenta[]; paisI
         fija: true,
         render: (c) => (
           <div className="flex items-center justify-center gap-1">
-            <VentanaCuentaRetiro paisId={paisId} cuenta={c} />
+            <VentanaCuentaRetiro paisId={paisId} paisNombre={paisNombre} cuenta={c} />
             <EliminarCuentaBoton id={c.id} nombre={c.nombre} />
           </div>
         ),

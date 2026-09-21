@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { leerDatosBinance, type DatosBinance } from "@/lib/retiros/datos-binance";
 
 /** Arma el bloque de comisión sugerida a partir del formulario: según el tipo elegido, se
  * queda solo con el/los valor(es) que aplican y anula el resto, para que nunca quede un
@@ -22,12 +23,30 @@ function leerComision(formData: FormData) {
   };
 }
 
-export async function crearCuentaRetiro(formData: FormData) {
+/**
+ * Para una cuenta Binance, los datos en el formato de Dropi (país, banco, identificación, tipo y número de cuenta).
+ * `null` si el formulario no los trae (el formulario viejo de Configuración solo manda «Detalle»): entonces se
+ * guarda como siempre. El número de cuenta también va en `detalle`, que es lo que muestran las listas.
+ */
+function leerBinance(formData: FormData): { datos: DatosBinance } | { error: string } | null {
+  if (formData.get("tipo") !== "binance" || !formData.has("binance_numero_cuenta")) return null;
+  return leerDatosBinance(formData);
+}
+
+const AVISO_MIGRACION =
+  "Falta correr la migración 0039 en Supabase para guardar los datos de Binance (ver supabase/migrations).";
+
+/** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
+export async function crearCuentaRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const pais_id = formData.get("pais_id") as string;
   const tipo = formData.get("tipo") as string;
   const nombre = formData.get("nombre") as string;
-  const detalle = (formData.get("detalle") as string) || null;
+  let detalle = (formData.get("detalle") as string) || null;
+
+  const binance = leerBinance(formData);
+  if (binance && "error" in binance) return { error: binance.error };
+  if (binance) detalle = binance.datos.numero_cuenta;
 
   const supabase = createServiceClient();
 
@@ -42,35 +61,54 @@ export async function crearCuentaRetiro(formData: FormData) {
     .maybeSingle();
   const numero = (ultima?.numero ?? 0) + 1;
 
-  const { error } = await supabase
-    .from("cuentas_retiro")
-    .insert({ pais_id, tipo, nombre, detalle, numero, ...leerComision(formData) });
-  if (error) throw new Error(error.message);
+  const { error } = await supabase.from("cuentas_retiro").insert({
+    pais_id,
+    tipo,
+    nombre,
+    detalle,
+    numero,
+    ...(binance ? { datos_binance: binance.datos } : {}),
+    ...leerComision(formData),
+  });
+  if (error) return { error: error.message.includes("datos_binance") ? AVISO_MIGRACION : error.message };
 
   revalidatePath("/retiros/cuentas");
   revalidatePath("/retiros");
+  return {};
 }
 
 /** Edita a mano cualquier dato de una cuenta ya creada — nombre, cuenta/detalle, tipo o
  * comisión sugerida — todo junto, desde la ficha de "Modificar". Cambiar esto no toca los
  * retiros ya creados: cada uno guarda su propia comisión en su propia fila. */
-export async function actualizarCuentaRetiro(formData: FormData) {
+export async function actualizarCuentaRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
-  const cambios: Record<string, string | number | null> = {};
+  const cambios: Record<string, string | number | DatosBinance | null> = {};
   if (formData.has("nombre")) cambios.nombre = (formData.get("nombre") as string).trim();
   if (formData.has("detalle")) cambios.detalle = (formData.get("detalle") as string).trim() || null;
   if (formData.has("tipo")) cambios.tipo = formData.get("tipo") as string;
+
+  const binance = leerBinance(formData);
+  if (binance && "error" in binance) return { error: binance.error };
+  if (binance) {
+    cambios.datos_binance = binance.datos;
+    cambios.detalle = binance.datos.numero_cuenta;
+  } else if (formData.get("tipo") !== "binance" && formData.get("binance_previo") === "1") {
+    // Dejó de ser Binance: se quitan sus datos (solo si los tenía, para no tocar la columna de más).
+    cambios.datos_binance = null;
+  }
+
   if (formData.has("comision_tipo")) Object.assign(cambios, leerComision(formData));
-  if (Object.keys(cambios).length === 0) return;
+  if (Object.keys(cambios).length === 0) return {};
 
   const supabase = createServiceClient();
   const { error } = await supabase.from("cuentas_retiro").update(cambios).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message.includes("datos_binance") ? AVISO_MIGRACION : error.message };
 
   revalidatePath("/retiros/cuentas");
   revalidatePath("/retiros");
+  return {};
 }
 
 /** Borra la cuenta, salvo que ya tenga retiros asociados — ahí se bloquea con un mensaje claro
