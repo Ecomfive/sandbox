@@ -77,13 +77,11 @@ export function TablaCuentas({
   cuentas,
   paisId,
   paisNombre,
-  codigoPais,
   puedeEscribir,
 }: {
   cuentas: FilaCuenta[];
   paisId: string;
   paisNombre: string;
-  codigoPais: string;
   puedeEscribir: boolean;
 }) {
   // Qué cuenta está abierta y en qué orden se veían las filas al abrirla (para las flechas de anterior y siguiente).
@@ -113,7 +111,6 @@ export function TablaCuentas({
         orden={abierta?.orden ?? []}
         paisId={paisId}
         paisNombre={paisNombre}
-        codigoPais={codigoPais}
         puedeEscribir={puedeEscribir}
         alIr={(id) => setAbierta((a) => (a ? { ...a, id } : a))}
         alCerrar={() => setAbierta(null)}

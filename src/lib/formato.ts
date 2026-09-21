@@ -46,24 +46,6 @@ export function formatearFechaHora(fechaHoraIso: string | null): string {
   return `${formatearFecha(fecha)}, ${hora.slice(0, 5)}`;
 }
 
-/** La fecha y la hora de un timestamptz por separado («21 sept 2026» y «01:11 p. m.»), para mostrarlas en dos líneas.
- * Hora local del país, como `formatearFechaHoraCompleta`. */
-export function formatearFechaYHora(isoConZona: string, codigoPais: string): { fecha: string; hora: string } {
-  const config = MONEDA_POR_PAIS[codigoPais] ?? MONEDA_POR_PAIS.PA;
-  const fecha = new Intl.DateTimeFormat(config.locale, {
-    timeZone: config.timeZone,
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(isoConZona));
-  const hora = new Intl.DateTimeFormat(config.locale, {
-    timeZone: config.timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(isoConZona));
-  return { fecha, hora };
-}
-
 /** Para timestamptz reales (con zona horaria), como "cuándo se subió este archivo". Hora local del país: el servidor corre en UTC. */
 export function formatearFechaHoraCompleta(isoConZona: string, codigoPais: string): string {
   const config = MONEDA_POR_PAIS[codigoPais] ?? MONEDA_POR_PAIS.PA;

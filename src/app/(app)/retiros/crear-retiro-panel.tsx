@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { pideCrear } from "@/lib/crear-global";
 import { crearRetiro, verSiguienteCorrelativo } from "./actions";
+import { AvisoFaltante, BotonCrear } from "@/components/ui/boton-crear";
 import { Button } from "@/components/ui/button";
-import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
-import { CerrarIcon, MasIcon } from "@/lib/nav-icons";
+import { fieldClass, labelClassSm } from "@/components/ui/field";
+import { Seccion } from "@/components/ui/seccion-ficha";
+import { useFaltantes } from "@/components/ui/usar-faltantes";
+import { Ventana } from "@/components/ui/ventana";
+import { CalendarioIcon, ExtractoIcon, GastoIcon, MasIcon, WalletIcon } from "@/lib/nav-icons";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -46,9 +49,11 @@ export function calcularComisionSugerida(cuenta: Cuenta, montoNum: number): numb
   return null;
 }
 
-/** Botón "+ Crear" que despliega directo el panel de creación rápida (estilo "crear tarea"),
- * en vez de navegar a una página aparte. La plataforma se elige dentro del panel.
- * La persona asignada no se pide: la pone el sistema con quien crea el retiro. */
+/** Botón "Agregar" que despliega directo la ficha de nuevo retiro, un panel que sale por la derecha (como las demás
+ * fichas), en vez de navegar a una página aparte. La plataforma se elige dentro de la ficha.
+ * La persona asignada no se pide: la pone el sistema con quien crea el retiro.
+ * Al final hay un botón grande de crear: apagado mientras falte un dato obligatorio, y al pulsarlo así lleva al dato
+ * que falta (ver `useFaltantes`). */
 export function CrearRetiroPanel({
   paisId,
   plataformas,
@@ -68,8 +73,9 @@ export function CrearRetiroPanel({
   const [correlativo, setCorrelativo] = useState<number | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [enviando, setEnviando] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
+  const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
+  const invalido = (id: string) => faltante === id || undefined;
 
   const parametros = useSearchParams();
   const router = useRouter();
@@ -109,41 +115,12 @@ export function CrearRetiroPanel({
   }, [parametros]);
 
   // Mientras se guarda no se cierra: la ventana queda abierta con el botón en "Creando..." hasta pasar a la ficha.
+  // `Ventana` se encarga de Escape, del foco dentro de la ficha y de que el foco vuelva a donde estaba.
   function cerrarVentana() {
     if (enviando) return;
     setAbierto(false);
-    botonAbrirRef.current?.focus();
+    requestAnimationFrame(() => botonAbrirRef.current?.focus());
   }
-
-  // Escape cierra el panel, y Tab queda atrapado dentro de él mientras está abierto.
-  useEffect(() => {
-    if (!abierto) return;
-
-    function alPresionarTecla(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        cerrarVentana();
-        return;
-      }
-      if (e.key !== "Tab" || !panelRef.current) return;
-      const enfocables = panelRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      if (enfocables.length === 0) return;
-      const primero = enfocables[0];
-      const ultimo = enfocables[enfocables.length - 1];
-      if (e.shiftKey && document.activeElement === primero) {
-        e.preventDefault();
-        ultimo.focus();
-      } else if (!e.shiftKey && document.activeElement === ultimo) {
-        e.preventDefault();
-        primero.focus();
-      }
-    }
-
-    document.addEventListener("keydown", alPresionarTecla);
-    return () => document.removeEventListener("keydown", alPresionarTecla);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [abierto]);
 
   const montoNum = parseFloat(monto) || 0;
   const comisionNum = parseFloat(comisionValor) || 0;
@@ -189,6 +166,13 @@ export function CrearRetiroPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [montoNum]);
 
+  // Sin cuentas activas no hay retiro que crear aunque el resto esté lleno: el botón pide llevar a ese aviso.
+  const puedeCrear = completo && cuentas.length > 0;
+
+  function alPulsarSinCompletar() {
+    if (!señalarFaltante()) document.getElementById("campo-cuenta")?.scrollIntoView({ block: "center" });
+  }
+
   return (
     <>
       {/* «Agregar» abre directo la ficha de nuevo retiro; las cuentas destino se agregan en su propia pestaña. */}
@@ -203,82 +187,74 @@ export function CrearRetiroPanel({
         Agregar
       </Button>
 
-      {abierto &&
-        createPortal(
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-          onClick={cerrarVentana}
+      <Ventana
+        abierto={abierto}
+        alCerrar={cerrarVentana}
+        lado="derecha"
+        ancho="lg"
+        titulo={
+          <>
+            <span className="text-lg font-semibold">Retiro</span>
+            <span aria-live="polite" className="rounded bg-muted px-2 py-0.5 text-xs font-medium tabular-nums">
+              {correlativo !== null
+                ? `#${String(correlativo).padStart(4, "0")}`
+                : consultando
+                  ? "Calculando..."
+                  : "Se asigna al guardar"}
+            </span>
+          </>
+        }
+      >
+        <form
+          ref={formRef}
+          action={crearRetiro}
+          onSubmit={() => setEnviando(true)}
+          onInput={revisar}
+          onChange={revisar}
+          aria-busy={enviando}
+          className="flex flex-1 flex-col"
         >
-          <div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="titulo-nuevo-retiro"
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card shadow-xl"
-          >
-            <form action={crearRetiro} onSubmit={() => setEnviando(true)} aria-busy={enviando}>
-              <input type="hidden" name="pais_id" value={paisId} />
-              {correlativo !== null && <input type="hidden" name="numero_correlativo" value={correlativo} />}
+          <input type="hidden" name="pais_id" value={paisId} />
+          {correlativo !== null && <input type="hidden" name="numero_correlativo" value={correlativo} />}
 
-              <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-                <span id="titulo-nuevo-retiro" className="flex items-center gap-2 text-sm font-semibold">
-                  Retiro
-                  <span
-                    aria-live="polite"
-                    className="rounded bg-muted px-2 py-0.5 text-xs font-medium tabular-nums"
+          <div className="flex flex-1 flex-col divide-y divide-border p-5">
+            <Seccion icono={WalletIcon} titulo="Retiro">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label className={labelClassSm} htmlFor="campo-plataforma">
+                    Plataforma
+                    <Obligatorio />
+                  </label>
+                  <select
+                    id="campo-plataforma"
+                    name="plataforma_id"
+                    required
+                    aria-invalid={invalido("campo-plataforma")}
+                    defaultValue={plataformas[0]?.id}
+                    className={`${fieldClass} w-full min-w-0`}
                   >
-                    {correlativo !== null
-                      ? `#${String(correlativo).padStart(4, "0")}`
-                      : consultando
-                        ? "Calculando..."
-                        : "Se asigna al guardar"}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={cerrarVentana}
-                  disabled={enviando}
-                  aria-label="Cerrar"
-                  className={`p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-40 ${anilloFoco}`}
-                >
-                  <CerrarIcon className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-3 p-4">
-                <div className="flex gap-2">
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm} htmlFor="campo-plataforma">
-                      Plataforma
-                      <Obligatorio />
-                    </label>
-                    <select
-                      id="campo-plataforma"
-                      name="plataforma_id"
-                      required
-                      defaultValue={plataformas[0]?.id}
-                      className={`${fieldClassSm} w-full min-w-0`}
-                    >
-                      {plataformas.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm} htmlFor="campo-cuenta">
-                      Cuenta destino
-                      <Obligatorio />
-                    </label>
-                    {cuentas.length > 0 ? (
+                    {plataformas.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <AvisoFaltante id="campo-plataforma" faltante={faltante} />
+                </div>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label className={labelClassSm} htmlFor="campo-cuenta">
+                    Cuenta destino
+                    <Obligatorio />
+                  </label>
+                  {cuentas.length > 0 ? (
+                    <>
                       <select
                         id="campo-cuenta"
                         name="cuenta_retiro_id"
                         required
+                        aria-invalid={invalido("campo-cuenta")}
                         onChange={(e) => alElegirCuenta(e.target.value)}
-                        className={`${fieldClassSm} w-full min-w-0`}
+                        className={`${fieldClass} w-full min-w-0`}
                       >
                         {cuentas.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -286,15 +262,15 @@ export function CrearRetiroPanel({
                           </option>
                         ))}
                       </select>
-                    ) : (
-                      <p id="campo-cuenta" role="alert" className="py-1 text-xs text-destructive">
-                        Sin cuentas activas. Crea una para poder guardar el retiro.
-                      </p>
-                    )}
-                  </div>
+                      <AvisoFaltante id="campo-cuenta" faltante={faltante} />
+                    </>
+                  ) : (
+                    <p id="campo-cuenta" role="alert" className="py-1 text-xs text-destructive">
+                      Sin cuentas activas. Crea una para poder guardar el retiro.
+                    </p>
+                  )}
                 </div>
-
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-gestionado-por">
                     Gestionado por
                     <Obligatorio />
@@ -303,20 +279,27 @@ export function CrearRetiroPanel({
                     id="campo-gestionado-por"
                     name="gestionado_por"
                     required
+                    aria-invalid={invalido("campo-gestionado-por")}
                     defaultValue="plataforma"
-                    className={`${fieldClassSm} w-40`}
+                    className={`${fieldClass} w-full min-w-0`}
                   >
                     <option value="plataforma">Plataforma</option>
                     <option value="correo">Correo</option>
                   </select>
+                  <AvisoFaltante id="campo-gestionado-por" faltante={faltante} />
                 </div>
+              </div>
+            </Seccion>
 
-                <div className="flex gap-2">
-                  <div className="flex w-24 shrink-0 flex-col gap-1">
-                    <label className={labelClassSm} htmlFor="campo-monto">
-                      Monto
-                      <Obligatorio />
-                    </label>
+            <Seccion icono={GastoIcon} titulo="Montos">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label className={labelClassSm} htmlFor="campo-monto">
+                    Monto
+                    <Obligatorio />
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-muted-foreground">$</span>
                     <input
                       id="campo-monto"
                       type="number"
@@ -324,81 +307,21 @@ export function CrearRetiroPanel({
                       min="0"
                       name="monto"
                       required
-                      autoFocus
+                      data-enfocar
+                      aria-invalid={invalido("campo-monto")}
+                      placeholder="Ej: 1500.00"
                       value={monto}
                       onChange={(e) => setMonto(e.target.value)}
-                      className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
+                      className={`${fieldClass} w-full min-w-0 tabular-nums`}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm} htmlFor="campo-fecha">
-                      Fecha
-                      <Obligatorio />
-                    </label>
-                    <input
-                      id="campo-fecha"
-                      type="date"
-                      name="fecha"
-                      defaultValue={hoy()}
-                      required
-                      className={`${fieldClassSm} w-full min-w-0`}
-                    />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <label className={labelClassSm} htmlFor="campo-fecha-limite">
-                      Fecha límite
-                    </label>
-                    <input
-                      id="campo-fecha-limite"
-                      type="date"
-                      name="fecha_limite"
-                      value={fechaLimite}
-                      onChange={(e) => setFechaLimite(e.target.value)}
-                      className={`${fieldClassSm} w-full min-w-0`}
-                    />
-                  </div>
+                  <AvisoFaltante id="campo-monto" faltante={faltante} />
                 </div>
-
-                <div>
-                  <p className={labelClassSm} id="etiqueta-comision">
-                    Comisión
-                  </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-1">
-                      <span className="text-sm text-muted-foreground">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        name="comision"
-                        aria-label="Comisión en dólares"
-                        aria-describedby="etiqueta-comision"
-                        value={comisionValor}
-                        onChange={(e) => alCambiarComisionValor(e.target.value)}
-                        className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
-                      />
-                    </div>
-                    <div className="flex min-w-0 flex-1 items-center gap-1">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        aria-label="Comisión en porcentaje"
-                        aria-describedby="etiqueta-comision"
-                        value={comisionPorcentaje}
-                        onChange={(e) => alCambiarComisionPorcentaje(e.target.value)}
-                        className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
-                      />
-                      <span className="text-sm text-muted-foreground">%</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
+                <div className="flex min-w-0 flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-a-recibir">
                     A recibir
                   </label>
-                  <div className="mt-1 flex items-center gap-1">
+                  <div className="flex items-center gap-1">
                     <span className="text-sm text-muted-foreground">$</span>
                     <input
                       id="campo-a-recibir"
@@ -407,47 +330,111 @@ export function CrearRetiroPanel({
                       readOnly
                       tabIndex={-1}
                       value={montoNeto.toFixed(2)}
-                      className={`${fieldClassSm} w-full min-w-0 cursor-not-allowed bg-muted tabular-nums`}
+                      className={`${fieldClass} w-full min-w-0 cursor-not-allowed bg-muted tabular-nums`}
                     />
                   </div>
                 </div>
+                <div className="sm:col-span-2">
+                  <p className={labelClassSm} id="etiqueta-comision">
+                    Comisión
+                  </p>
+                  <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex min-w-0 items-center gap-1">
+                      <span className="text-sm text-muted-foreground">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="comision"
+                        aria-label="Comisión en dólares"
+                        aria-describedby="etiqueta-comision"
+                        placeholder="Ej: 3.00"
+                        value={comisionValor}
+                        onChange={(e) => alCambiarComisionValor(e.target.value)}
+                        className={`${fieldClass} w-full min-w-0 tabular-nums`}
+                      />
+                    </div>
+                    <div className="flex min-w-0 items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        aria-label="Comisión en porcentaje"
+                        aria-describedby="etiqueta-comision"
+                        placeholder="Ej: 2.5"
+                        value={comisionPorcentaje}
+                        onChange={(e) => alCambiarComisionPorcentaje(e.target.value)}
+                        className={`${fieldClass} w-full min-w-0 tabular-nums`}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Seccion>
 
-                <div>
-                  <label className={labelClassSm} htmlFor="campo-notas">
-                    Nota
+            <Seccion icono={CalendarioIcon} titulo="Fechas">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label className={labelClassSm} htmlFor="campo-fecha">
+                    Fecha
+                    <Obligatorio />
                   </label>
                   <input
-                    id="campo-notas"
-                    type="text"
-                    name="notas"
-                    placeholder="Escribe una nota para este retiro"
-                    className={`${fieldClass} mt-1 w-full text-sm`}
+                    id="campo-fecha"
+                    type="date"
+                    name="fecha"
+                    defaultValue={hoy()}
+                    required
+                    aria-invalid={invalido("campo-fecha")}
+                    className={`${fieldClass} w-full min-w-0`}
+                  />
+                  <AvisoFaltante id="campo-fecha" faltante={faltante} />
+                </div>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label className={labelClassSm} htmlFor="campo-fecha-limite">
+                    Fecha límite
+                  </label>
+                  <input
+                    id="campo-fecha-limite"
+                    type="date"
+                    name="fecha_limite"
+                    value={fechaLimite}
+                    onChange={(e) => setFechaLimite(e.target.value)}
+                    className={`${fieldClass} w-full min-w-0`}
                   />
                 </div>
               </div>
+            </Seccion>
 
-              <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-                <p className="mr-auto text-xs text-muted-foreground">
-                  <span aria-hidden="true" className="text-destructive">
-                    *
-                  </span>{" "}
-                  Obligatorio
-                </p>
-                <Button type="button" variant="secondary" onClick={cerrarVentana} disabled={enviando}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={cuentas.length === 0 || enviando}
-                  className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
-                >
-                  {enviando ? "Creando..." : "Crear retiro"}
-                </Button>
-              </div>
-            </form>
+            <Seccion icono={ExtractoIcon} titulo="Nota">
+              <input
+                id="campo-notas"
+                type="text"
+                name="notas"
+                aria-label="Nota"
+                placeholder="Ej: Retiro semanal de ventas de septiembre"
+                className={`${fieldClass} w-full`}
+              />
+            </Seccion>
           </div>
-        </div>
-        , document.body)}
+
+          <div className="sticky bottom-0 mt-auto flex flex-col gap-2 border-t border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">
+              <span aria-hidden="true" className="text-destructive">
+                *
+              </span>{" "}
+              Obligatorio
+            </p>
+            <BotonCrear
+              puede={puedeCrear}
+              enviando={enviando}
+              etiqueta="Crear retiro"
+              alPulsarSinCompletar={alPulsarSinCompletar}
+            />
+          </div>
+        </form>
+      </Ventana>
     </>
   );
 }

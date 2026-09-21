@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { crearCuentaRetiro, actualizarCuentaRetiro } from "./actions";
 import { tiposParaElegir, type FilaCuenta } from "./def-cuentas";
 import { BotonAccion } from "@/components/ui/boton-accion";
-import { Button } from "@/components/ui/button";
+import { AvisoFaltante, BotonCrear } from "@/components/ui/boton-crear";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
+import { Seccion } from "@/components/ui/seccion-ficha";
+import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { CerrarIcon, CheckIcon, ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 import {
   BANCOS_BINANCE,
@@ -22,29 +24,6 @@ const COMISIONES = [
   { valor: "ambos", etiqueta: "Porcentaje + monto fijo" },
 ] as const;
 
-/** Un bloque de la ficha: ícono y título, y sus campos debajo. */
-export function Seccion({
-  icono: Icono,
-  titulo,
-  children,
-}: {
-  icono: ComponentType<{ className?: string }>;
-  titulo: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3 py-5 first:pt-0 last:pb-0">
-      <h3 className="flex items-center gap-2 text-sm font-semibold">
-        <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Icono className="h-4 w-4" />
-        </span>
-        {titulo}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
 /**
  * Lista desplegable para un dato que se elige entre pocas opciones: con un clic se ve toda la lista y se cambia,
  * sin borrar antes lo que había (un campo de texto con sugerencias solo muestra las que coinciden con lo escrito).
@@ -57,16 +36,19 @@ function SelectorDeLista({
   opciones,
   valorInicial,
   obligatorio,
+  invalido,
 }: {
   id: string;
   name: string;
   opciones: readonly string[];
   valorInicial: string;
   obligatorio?: boolean;
+  /** Marca el campo como el dato que falta (ver `useFaltantes`). */
+  invalido?: boolean;
 }) {
   const lista = valorInicial && !opciones.includes(valorInicial) ? [valorInicial, ...opciones] : opciones;
   return (
-    <select id={id} name={name} required={obligatorio} defaultValue={valorInicial} className={fieldClass}>
+    <select id={id} name={name} required={obligatorio} aria-invalid={invalido || undefined} defaultValue={valorInicial} className={fieldClass}>
       {obligatorio && <option value="">Selecciona</option>}
       {lista.map((o) => (
         <option key={o} value={o}>
@@ -77,7 +59,20 @@ function SelectorDeLista({
   );
 }
 
-function Campo({ etiqueta, id, obligatorio, children }: { etiqueta: string; id: string; obligatorio?: boolean; children: ReactNode }) {
+function Campo({
+  etiqueta,
+  id,
+  obligatorio,
+  faltante,
+  children,
+}: {
+  etiqueta: string;
+  id: string;
+  obligatorio?: boolean;
+  /** El `id` del dato obligatorio que se está señalando (ver `useFaltantes`): si es este, se avisa debajo. */
+  faltante?: string | null;
+  children: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <label className={labelClassSm} htmlFor={id}>
@@ -85,6 +80,7 @@ function Campo({ etiqueta, id, obligatorio, children }: { etiqueta: string; id: 
         {obligatorio && <span aria-hidden="true" className="text-destructive"> *</span>}
       </label>
       {children}
+      {obligatorio && <AvisoFaltante id={id} faltante={faltante ?? null} />}
     </div>
   );
 }
@@ -93,10 +89,11 @@ function Campo({ etiqueta, id, obligatorio, children }: { etiqueta: string; id: 
  * El formulario de una cuenta destino, con sus bloques. Sin `cuenta` crea (lleva el país); con `cuenta` modifica. Arranca
  * siempre con los datos de la cuenta (se monta de nuevo al pasar a otra), sin arrastrar lo escrito antes.
  *
- * Los botones van de dos maneras. Por defecto, fijos abajo (Cancelar y Agregar/Guardar), como en «Nueva cuenta». Con
- * `botonesArriba` (la ficha de una cuenta) no hay barra abajo: una fila de botones en el mismo estilo que las acciones
- * de la ficha queda pegada bajo la cabecera, y **Guardar cambios y Cancelar solo aparecen cuando se cambió algo**, junto
- * a las `acciones` de la ficha (Eliminar). El error se muestra debajo de los botones.
+ * Los botones van de dos maneras. Por defecto (crear, «Nueva cuenta destino»), un botón grande al final: apagado mientras
+ * falte un dato obligatorio y, al pulsarlo así, lleva al dato que falta (`useFaltantes`). Con `botonesArriba` (la ficha de
+ * una cuenta) no hay barra abajo: una fila de botones en el mismo estilo que las acciones de la ficha queda pegada bajo
+ * la cabecera, y **Guardar cambios y Cancelar solo aparecen cuando se cambió algo**, junto a las `acciones` de la ficha
+ * (Eliminar). El error se muestra junto a los botones.
  */
 export function FormularioCuenta({
   paisId,
@@ -116,7 +113,8 @@ export function FormularioCuenta({
   cuenta?: FilaCuenta;
   /** Se llama cuando el servidor guardó sin error. */
   alGuardar: () => void;
-  alCancelar: () => void;
+  /** Con `botonesArriba`: lo que hace el botón Cancelar (descartar lo escrito). */
+  alCancelar?: () => void;
   /** Avisa si está guardando, para que la ventana no se cierre a mitad de camino. */
   alCambiarGuardando?: (guardando: boolean) => void;
   /** Se llama cuando la persona cambia cualquier campo (para saber si hay cambios sin guardar). */
@@ -129,6 +127,8 @@ export function FormularioCuenta({
   acciones?: ReactNode;
 }) {
   const [modificado, setModificado] = useState(false);
+  const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
+  const invalido = (id: string) => faltante === id;
   const [pending, startTransition] = useTransition();
   useEffect(() => {
     alCambiarGuardando?.(pending);
@@ -159,8 +159,11 @@ export function FormularioCuenta({
 
   return (
     <form
+      ref={formRef}
       onSubmit={alEnviar}
+      onInput={revisar}
       onChange={() => {
+        revisar();
         setModificado(true);
         alModificar?.();
       }}
@@ -203,23 +206,25 @@ export function FormularioCuenta({
 
       <div className="flex flex-1 flex-col divide-y divide-border p-5">
         <Seccion icono={WalletIcon} titulo="Cuenta">
-          <Campo etiqueta="Nombre" id="campo-nombre-cuenta">
+          <Campo etiqueta="Nombre" id="campo-nombre-cuenta" obligatorio faltante={faltante}>
             <input
               id="campo-nombre-cuenta"
               type="text"
               name="nombre"
               required
               data-enfocar
+              aria-invalid={invalido("campo-nombre-cuenta") || undefined}
               defaultValue={cuenta?.nombre}
-              placeholder="Ej: Banco General - Ahorros"
+              placeholder="Ej: Banco Ejemplo - Ahorros"
               className={fieldClass}
             />
           </Campo>
-          <Campo etiqueta="Tipo" id="campo-tipo-cuenta">
+          <Campo etiqueta="Tipo" id="campo-tipo-cuenta" obligatorio faltante={faltante}>
             <select
               id="campo-tipo-cuenta"
               name="tipo"
               required
+              aria-invalid={invalido("campo-tipo-cuenta") || undefined}
               value={tipoCuenta}
               onChange={(e) => setTipoCuenta(e.target.value)}
               className={fieldClass}
@@ -271,13 +276,14 @@ export function FormularioCuenta({
                   ))}
                 </datalist>
               </Campo>
-              <Campo etiqueta="Tipo de identificación" id="binance-tipo-identificacion" obligatorio>
+              <Campo etiqueta="Tipo de identificación" id="binance-tipo-identificacion" obligatorio faltante={faltante}>
                 <SelectorDeLista
                   id="binance-tipo-identificacion"
                   name="binance_tipo_identificacion"
                   opciones={TIPOS_IDENTIFICACION}
                   valorInicial={datosBinance?.tipo_identificacion ?? ""}
                   obligatorio
+                  invalido={invalido("binance-tipo-identificacion")}
                 />
               </Campo>
               <Campo etiqueta="Número de identificación" id="binance-numero-identificacion">
@@ -286,11 +292,12 @@ export function FormularioCuenta({
                   type="text"
                   name="binance_numero_identificacion"
                   defaultValue={datosBinance?.numero_identificacion}
+                  placeholder="Ej: 8-123-456"
                   className={fieldClass}
                 />
               </Campo>
             </div>
-            <Campo etiqueta="Número de cuenta" id="binance-numero-cuenta" obligatorio>
+            <Campo etiqueta="Número de cuenta" id="binance-numero-cuenta" obligatorio faltante={faltante}>
               <input
                 id="binance-numero-cuenta"
                 type="text"
@@ -298,8 +305,9 @@ export function FormularioCuenta({
                 required
                 autoComplete="off"
                 spellCheck={false}
+                aria-invalid={invalido("binance-numero-cuenta") || undefined}
                 defaultValue={datosBinance?.numero_cuenta ?? cuenta?.detalle ?? ""}
-                placeholder="Dirección de la billetera (ej: T…)"
+                placeholder="Ej: TAbCdEfGhJkLmNpQrStUvWxYz12345678"
                 className={`${fieldClass} font-mono`}
               />
             </Campo>
@@ -334,6 +342,7 @@ export function FormularioCuenta({
                       step="0.01"
                       min="0"
                       name="comision_porcentaje"
+                      placeholder="Ej: 2.5"
                       defaultValue={cuenta?.comision_porcentaje ?? ""}
                       className={`${fieldClass} w-full`}
                     />
@@ -351,6 +360,7 @@ export function FormularioCuenta({
                       step="0.01"
                       min="0"
                       name="comision_monto_fijo"
+                      placeholder="Ej: 1.50"
                       defaultValue={cuenta?.comision_monto_fijo ?? ""}
                       className={`${fieldClass} w-full`}
                     />
@@ -369,14 +379,13 @@ export function FormularioCuenta({
               {error}
             </p>
           )}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={alCancelar} disabled={pending}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending} className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]">
-              {pending ? "Guardando..." : editando ? "Guardar cambios" : "Agregar cuenta"}
-            </Button>
-          </div>
+          <BotonCrear
+            puede={completo}
+            enviando={pending}
+            etiqueta={editando ? "Guardar cambios" : "Crear cuenta"}
+            etiquetaEnviando="Guardando..."
+            alPulsarSinCompletar={señalarFaltante}
+          />
         </div>
       )}
     </form>
