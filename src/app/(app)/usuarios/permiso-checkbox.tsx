@@ -19,25 +19,28 @@ export function PermisoCheckbox({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <input
-        type="checkbox"
-        aria-label={`Acceso al módulo ${etiqueta}`}
-        defaultChecked={activo}
-        disabled={pending}
-        className="h-4 w-4 accent-accent disabled:opacity-50"
-        onChange={(e) => {
-          const formData = new FormData();
-          formData.set("rol_id", rolId);
-          formData.set("modulo", modulo);
-          formData.set("activo", String(e.target.checked));
-          startTransition(() => {
-            togglePermiso(formData);
-          });
-        }}
-      />
+    <div className="flex flex-col items-center">
+      {/* La caja se ve de 16 px, pero su zona de clic mide 24 (WCAG 2.5.8): la etiqueta que la envuelve también marca. */}
+      <label className="flex h-6 w-6 cursor-pointer items-center justify-center">
+        <input
+          type="checkbox"
+          aria-label={`Acceso al módulo ${etiqueta}`}
+          defaultChecked={activo}
+          disabled={pending}
+          className="h-4 w-4 accent-accent disabled:opacity-50"
+          onChange={(e) => {
+            const formData = new FormData();
+            formData.set("rol_id", rolId);
+            formData.set("modulo", modulo);
+            formData.set("activo", String(e.target.checked));
+            startTransition(() => {
+              togglePermiso(formData);
+            });
+          }}
+        />
+      </label>
       {activo && (
-        <label className="flex items-center gap-1 text-[0.65rem] whitespace-nowrap text-muted-foreground">
+        <label className="flex min-h-6 cursor-pointer items-center gap-1 text-[0.65rem] whitespace-nowrap text-muted-foreground">
           <input
             type="checkbox"
             aria-label={`Solo lectura en ${etiqueta}`}

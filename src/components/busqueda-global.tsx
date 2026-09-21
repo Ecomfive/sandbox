@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { EVENTO_ABRIR_BUSCADOR } from "@/components/atajos-teclado";
 import { almacen } from "@/components/tabla/almacen";
 import { buscarGlobal, type ResultadoBusqueda } from "@/lib/busqueda-global";
 import {
@@ -62,6 +63,17 @@ export function BusquedaGlobal({ paginas }: { paginas: PaginaBuscable[] }) {
     }
     document.addEventListener("keydown", alTeclear);
     return () => document.removeEventListener("keydown", alTeclear);
+  }, []);
+
+  // El atajo «/» (ver AtajosTeclado) también abre el buscador.
+  useEffect(() => {
+    function abrir() {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+      setAbierto(true);
+    }
+    document.addEventListener(EVENTO_ABRIR_BUSCADOR, abrir);
+    return () => document.removeEventListener(EVENTO_ABRIR_BUSCADOR, abrir);
   }, []);
 
   useEffect(() => {
