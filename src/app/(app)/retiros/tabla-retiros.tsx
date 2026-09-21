@@ -30,7 +30,6 @@ import {
 import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
 import type { Grupo } from "@/lib/tabla/vista";
 import { DEF_RETIROS, ESTADO_ETIQUETA } from "./filtros";
-import { EstadoSelect } from "./estado-select";
 import { CrearRetiroPanel, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 import { BarraLote } from "./barra-lote";
 import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
@@ -134,12 +133,11 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
         </Badge>
       );
     case "estado":
-      return fila.estado === "cancelado" ? (
-        <Badge tone={ESTADO_TONO[fila.estado as keyof typeof ESTADO_TONO]}>
+      // Solo lectura: el estado no se cambia desde la tabla (cambia al conciliar, cancelar o editar el retiro).
+      return (
+        <Badge tone={ESTADO_TONO[fila.estado as keyof typeof ESTADO_TONO] ?? "neutral"}>
           {ESTADO_ETIQUETA[fila.estado] ?? fila.estado}
         </Badge>
-      ) : (
-        <EstadoSelect id={fila.id} estado={fila.estado} />
       );
     case "dropi":
       return fila.estadoDropi ? (

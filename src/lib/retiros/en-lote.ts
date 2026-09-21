@@ -2,9 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EntradaAuditoria } from "../auditoria";
 import { ESTADO_ETIQUETA } from "./estados";
 
-/** Estados a los que se puede pasar un grupo de retiros. Son los mismos que ya se eligen uno a uno en la
- * columna Estado; «cancelado» y eliminar quedan fuera a propósito (no se deshacen), y conciliar pide el
- * monto recibido y el comprobante de cada retiro. */
+/** Estados a los que se puede pasar un grupo de retiros. La columna Estado de la tabla es de solo lectura: esta
+ * barra es la única forma de mover la etiqueta a mano. «cancelado» y eliminar quedan fuera a propósito (no se
+ * deshacen), y conciliar pide el monto recibido y el comprobante de cada retiro. */
 export const ESTADOS_EN_LOTE = ["abierto", "novedad", "cerrado"] as const;
 export type EstadoEnLote = (typeof ESTADOS_EN_LOTE)[number];
 
@@ -86,7 +86,7 @@ export function mensajeResultadoLote(
 /**
  * Pasa varios retiros a `nuevoEstado` de una vez: lee sus estados, decide cuáles cambian (`planearCambioEstado`),
  * los actualiza con una sola instrucción y deja, por cada retiro que cambió, su evento y su fila de auditoría
- * (la misma acción que el cambio uno a uno, con «En lote» en el detalle). No comprueba permisos: eso lo hace
+ * (acción `cambiar_estado_retiro`, con «En lote» en el detalle). No comprueba permisos: eso lo hace
  * quien la llama. Devuelve el error como valor (en producción Next.js oculta el mensaje de una excepción).
  */
 export async function cambiarEstadoEnLote(
