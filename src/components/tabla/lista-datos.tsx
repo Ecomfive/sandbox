@@ -8,6 +8,8 @@ import type { Grupo } from "@/lib/tabla/vista";
 import { BarraHerramientas } from "./barra-herramientas";
 import type { IconoComp } from "./botones-vista";
 import { EncabezadoGrupoBloque } from "./encabezado-grupo";
+import { Paginacion } from "./paginacion";
+import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "./usar-pagina-arriba";
 import { useTablaInteractiva } from "./usar-tabla";
 
 /**
@@ -25,6 +27,7 @@ export function ListaDatos<F>({
   etiquetaGrupo,
   formatearTotal,
   encima,
+  porPagina = POR_PAGINA,
   vacio,
 }: {
   def: DefTabla<F>;
@@ -37,10 +40,13 @@ export function ListaDatos<F>({
   formatearTotal?: (total: number) => string;
   /** Bloque entre la barra y la lista que necesita saber qué filas se ven (p. ej. seleccionar todas). */
   encima?: (visibles: F[]) => ReactNode;
+  /** Tarjetas por página cuando no hay filtros ni grupos (50 por defecto); con menos que eso no se ve la paginación. */
+  porPagina?: number;
   vacio: string;
 }) {
-  const tabla = useTablaInteractiva(def, filas);
-  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado } = tabla;
+  const tabla = useTablaInteractiva(def, filas, { porPagina });
+  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
+  const { raiz, alIrA } = useIrAPaginaArriba(tabla.irAPagina);
 
   const notas = notasPie({
     hayFiltros,
@@ -55,7 +61,7 @@ export function ListaDatos<F>({
   });
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={raiz} className="flex flex-col gap-3">
       <div className="min-w-0 rounded-xl border border-border bg-card [&>div]:border-b-0">
         <BarraHerramientas def={def} filas={filas} tabla={tabla} iconos={iconos} nombreFilas={nombre.plural} />
       </div>
@@ -92,8 +98,14 @@ export function ListaDatos<F>({
           })
         : visibles.map((f) => <div key={claveFila(f)}>{renderFila(f)}</div>)}
 
+      {paginacion && (
+        // La paginación trae su propio borde superior; aquí va en su propia tarjeta, así que se quita.
+        <div className="rounded-xl border border-border bg-card [&>nav]:border-t-0">
+          <Paginacion pagina={paginacion} nombre={nombre} alIrA={alIrA} />
+        </div>
+      )}
       <p role="status" className="sr-only">
-        {filas.length > 0 ? `${visibles.length} ${visibles.length === 1 ? nombre.singular : nombre.plural}` : ""}
+        {filas.length > 0 ? textoEstadoTabla(nombre, paginacion ? paginacion.total : visibles.length, paginacion) : ""}
       </p>
       {notas.length > 0 && <p className="px-1 text-xs text-muted-foreground">{notas.join(" · ")}</p>}
     </div>

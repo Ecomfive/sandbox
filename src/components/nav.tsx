@@ -1,4 +1,5 @@
 import { PaisSelector } from "@/components/pais-selector";
+import { AtajosTeclado } from "@/components/atajos-teclado";
 import { BusquedaGlobal } from "@/components/busqueda-global";
 import { MenuCrear } from "@/components/menu-crear";
 import { getUsuarioActual } from "@/lib/auth";
@@ -18,6 +19,7 @@ export async function NavBar({ paginas }: { paginas: PaginaBuscable[] }) {
         <BusquedaGlobal paginas={paginas} />
         <div className="flex items-center gap-2">
           <MenuCrear acciones={accionesCrear} />
+          <AtajosTeclado paginas={paginas} />
           <PaisSelector actual={pais.codigo} />
         </div>
       </div>

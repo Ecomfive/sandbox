@@ -100,6 +100,13 @@ convenciones técnicas del código.
   y limpia el parámetro con `router.replace`; Gastos pone el cursor en el primer campo
   con `pideCrear`). Para sumar una opción: agrégala a `ACCIONES_CREAR` y, si abre un
   formulario, haz que su página atienda `?nuevo=1`.
+- **País de cada persona.** `getPaisActual` (`src/lib/pais.ts`) resuelve el país con
+  este orden: la cookie `pais_actual` de este navegador; si no hay, el último país que
+  la persona eligió (`perfiles.pais_preferido`, migración 0038, que `setPaisActual`
+  guarda al cambiar de país); y si tampoco, Costa Rica. La consulta a `perfiles` solo
+  se hace **sin cookie** (otro equipo, cookies borradas), para no sumar un viaje a
+  cada página; con cookie manda la cookie aunque en otro equipo se haya elegido otro
+  país. Sin la migración todo sigue como antes (cookie o Costa Rica).
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
@@ -110,6 +117,18 @@ convenciones técnicas del código.
   páginas sale del menú y de las pestañas de cada módulo
   (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
+- **Atajos de teclado y ventanas.** `AtajosTeclado` (`src/components/atajos-teclado.tsx`,
+  en la barra de arriba) da atajos de una tecla al estilo ClickUp: `g` y luego una
+  letra va a una página (solo las que la persona puede abrir; la lista y las letras
+  están en `src/lib/atajos.ts`), `/` abre el buscador y `?` lista los atajos. **Nunca
+  actúan mientras se escribe en un campo ni con una ventana abierta**, y se pueden
+  apagar en la propia ayuda (`atajos-teclado-v1`; WCAG 2.1.4): apagados, `?` y Ctrl K
+  siguen. Una página nueva del menú no gana atajo sola: agrégale su letra en
+  `ATAJOS_IR` (y una prueba de que no choca). Para una ventana modal nueva usa
+  `<Ventana>` (`src/components/ui/ventana.tsx`, al centro o como panel a la derecha):
+  `role="dialog"`, foco atrapado, Escape y clic fuera la cierran y el foco vuelve a
+  donde estaba. Las ventanas de Retiros (crear, editar, conciliar) tienen su propia
+  copia de esa lógica.
 - **Contadores en el menú lateral.** Las páginas donde se resuelve un pendiente
   (Alertas de inventario, Pedidos Dropi, Conciliación de Retiros) muestran una
   pastilla con cuántos hay, y el grupo o la sección cerrados muestran la suma de
@@ -173,6 +192,19 @@ convenciones técnicas del código.
   (entradas y salidas). Un filtro de un toque («Mis retiros») se pasa a
   `<BarraHerramientas atajos={[...]}>` (`AtajoFiltro`, `src/lib/tabla/atajos.ts`): es un
   filtro de selección que el botón enciende o apaga sin tocar los de otros campos.
+- **Editar una fila en su sitio (Productos).** No pongas un formulario abierto en cada
+  fila (Productos llegó a 240 controles y 530 KB de HTML): la fila muestra texto, un
+  lápiz («Editar producto») la vuelve campos y aparecen Guardar y Cancelar
+  (`productos/tabla-productos.tsx`). Un `<tr>` no puede ir dentro de un `<form>`:
+  hay **un** `<form id="editar-producto">` para toda la tabla y los campos de la fila
+  que se edita se ligan a él con el atributo `form`; como quedan fuera del `<form>`,
+  Enter y Escape se atienden con un `onKeyDown` en la tarjeta. Solo se edita una fila
+  a la vez y lo que sea un `<select>` grande (los SKU maestros) se dibuja **solo** en
+  esa fila, no en todas. Si una columna editable está oculta en el menú «Columnas», su
+  valor viaja en un campo oculto (si no, «Guardar» lo borraría). La acción del servidor
+  valida lo que recibe (un campo ausente no es un campo vacío). Guardar y vincular el
+  SKU maestro son dos acciones de módulos distintos (`productos` y `catalogo-maestro`):
+  con solo lectura en uno no se ofrece lo del otro (`puedeEscribir`, `puedeVincular`).
 - **Vistas guardadas.** Toda tabla con barra de herramientas trae el menú «Vistas»
   (`src/components/tabla/menu-vistas.tsx`): guarda con nombre lo que se ve (filtros,
   agrupación, cerrados y columnas), lo aplica de nuevo, elimina (con confirmación en
@@ -258,8 +290,16 @@ convenciones técnicas del código.
   cuenta de páginas y los botones con «…» salen de `src/lib/tabla/paginacion.ts`.
   **Solo se pagina sin filtros ni grupos**: con filtros o agrupando se ven todos los
   resultados (los grupos y el «N de M» del pie ya orientan). La página se olvida al
-  cambiar los filtros, la agrupación o los cerrados. Hoy la usa Retiros; las demás
-  tablas siguen con `limiteSinFiltros` (un tope con aviso) hasta que se pidan. Lo
+  cambiar los filtros, la agrupación o los cerrados. **Toda tabla la trae**:
+  `TablaDatos` y `ListaDatos` paginan de 50 en 50 por defecto (`porPagina`, y con
+  menos filas que eso la paginación no se ve), y Retiros, Pedidos y Alertas, que
+  arman la suya, usan `useTablaInteractiva(..., { porPagina: POR_PAGINA })` +
+  `<Paginacion>` + `useIrAPaginaArriba` (`usar-pagina-arriba.ts`: vuelve al
+  principio de la tabla al cambiar de página y da el texto del aviso oculto). Es
+  paginación **en el cliente**: la página sigue enviando todas las filas cargadas
+  y solo dibuja 50, que es lo que pesa (el DOM y la hidratación); los filtros, las
+  vistas guardadas y la descarga siguen trabajando sobre todas. Paginar en el
+  servidor exigiría mover ahí filtros, agrupación y vistas: no se ha hecho. Lo
   que esté marcado (acciones en lote) cuenta solo en la página que se ve.
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
@@ -317,6 +357,14 @@ convenciones técnicas del código.
      del mismo `Promise.all` en vez de esperar antes. El layout de `(app)` es el
      ejemplo: usuario, país, plataformas y favoritos arrancan a la vez y los
      contadores del menú no se esperan.
+  4. *Contar, sumar y agrupar se hace en la base, no en JavaScript.* Cuando una
+     página solo necesita totales, una función SQL (`create function … language
+     sql stable`, ver `0037_resumen_pedidos_dropi.sql`) devuelve un renglón por
+     grupo en vez de miles de filas. Se llama con `supabase.rpc` desde el cliente
+     del servidor, y el código **conserva un plan B en JavaScript** (misma forma
+     de respuesta) por si la migración aún no se corrió: ver
+     `obtenerResumenPedidos`. Las funciones se prueban contra un Postgres real
+     (PGlite) comparando su resultado con el del plan B.
   Para medir, no hay que adivinar: un servidor de Supabase falso que anota cada
   consulta y le suma latencia, con la app real apuntando a él, muestra cuántas
   hace cada página y en qué orden.

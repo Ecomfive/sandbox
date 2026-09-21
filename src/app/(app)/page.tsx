@@ -101,7 +101,7 @@ export default async function Home({
       badge: <BadgeDelta delta={deltaSalidas} />,
       enlaces: [
         { href: "/inventario", label: "Inventario" },
-        { href: "/alertas", label: "Alertas" },
+        { href: "/alertas", label: "Alertas de inventario" },
       ],
       contenido: (
         <>

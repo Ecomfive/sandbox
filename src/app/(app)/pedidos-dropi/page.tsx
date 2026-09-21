@@ -5,7 +5,7 @@ import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
 import { requireModulo } from "@/lib/auth";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
-import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { contarFiltrado, obtenerResumenPedidos, totalesPedidos } from "@/lib/pedidos/resumen";
 import { formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FiltroFechas } from "@/components/filtro-fechas";
@@ -71,52 +71,29 @@ export default async function PedidosDropiPage({
       .limit(500);
   };
 
-  const [resumen, ordenesGenerales, carteraGanancia] = await Promise.all([
-    traerTodasLasFilas<{ monto: number; estado: string; referencia_externa: string }>((rDesde, rHasta) =>
-      supabase
-        .from("ordenes")
-        .select("monto, estado, referencia_externa")
-        .eq("pais_id", pais.id)
-        .eq("plataforma_id", plataformaId)
-        .gte("fecha", desde)
-        .lte("fecha", hasta)
-        .range(rDesde, rHasta)
-    ),
+  // El resumen (cuántas órdenes, cuánto suman, por estado y cuáles están en alerta) lo calcula la base: un renglón
+  // por estado en vez de traer todas las órdenes del período para contarlas aquí (ver `obtenerResumenPedidos`).
+  const [resumen, ordenesGenerales] = await Promise.all([
+    obtenerResumenPedidos(supabase, { paisId: pais.id, plataformaId, desde, hasta }),
     soloAlertas ? Promise.resolve({ data: null }) : consultarOrdenes(),
-    traerTodasLasFilas<{ orden_referencia_externa: string | null }>((rDesde, rHasta) =>
-      supabase
-        .from("historial_cartera")
-        .select("orden_referencia_externa")
-        .eq("pais_id", pais.id)
-        .eq("plataforma_id", plataformaId)
-        .ilike("descripcion", "%GANANCIA%")
-        .range(rDesde, rHasta)
-    ),
   ]);
 
-  const totalOrdenes = resumen.length;
-  const totalMonto = resumen.reduce((acc, o) => acc + Number(o.monto), 0);
-
-  const referenciasLiquidadas = new Set(
-    (carteraGanancia ?? []).map((c) => c.orden_referencia_externa).filter((r): r is string => r !== null)
-  );
-  const esAlerta = (referencia: string, estado: string) =>
-    referenciasLiquidadas.has(referencia) && !estado.toUpperCase().includes("ENTREGAD");
-  const alertas = resumen.filter((o) => esAlerta(o.referencia_externa, o.estado));
-  const totalAlertas = alertas.length;
+  const { ordenes: totalOrdenes, monto: totalMonto, alertas: totalAlertas } = totalesPedidos(resumen.grupos);
+  const referenciasEnAlerta = new Set(resumen.alertas.map((a) => a.referencia));
+  const esAlerta = (referencia: string) => referenciasEnAlerta.has(referencia);
 
   // Con el filtro de alertas, las órdenes de la tabla son las de esas referencias (no se sabían antes de mirar la cartera).
   let ordenes = ordenesGenerales.data;
   if (soloAlertas) {
-    const referencias = alertas
-      .filter((o) => coincideEstado(o.estado))
-      .map((o) => o.referencia_externa)
+    const referencias = resumen.alertas
+      .filter((a) => coincideEstado(a.estado))
+      .map((a) => a.referencia)
       .slice(0, 300);
     ordenes = referencias.length > 0 ? (await consultarOrdenes(referencias)).data : [];
   }
   const todas = ordenes ?? [];
   // Cuántas órdenes tiene el filtro puesto (la tabla trae como máximo 500 de ellas).
-  const totalFiltrado = (soloAlertas ? alertas : resumen).filter((o) => coincideEstado(o.estado)).length;
+  const totalFiltrado = contarFiltrado(resumen.grupos, estados, soloAlertas);
 
   const filasPedido: FilaPedido[] = todas.map((o) => ({
     referencia: o.referencia_externa,
@@ -126,12 +103,10 @@ export default async function PedidosDropiPage({
     cantidad: o.cantidad,
     monto: Number(o.monto),
     estado: o.estado,
-    alerta: esAlerta(o.referencia_externa, o.estado),
+    alerta: esAlerta(o.referencia_externa),
   }));
 
-  const porEstado = new Map<string, number>();
-  for (const o of resumen) porEstado.set(o.estado, (porEstado.get(o.estado) ?? 0) + 1);
-  const estadosOrdenados = Array.from(porEstado.entries()).sort((a, b) => b[1] - a[1]);
+  const estadosOrdenados = resumen.grupos.map((g) => [g.estado, g.cantidad] as const);
 
   // Las tarjetas del resumen son enlaces a esta misma página con el filtro puesto; conservan el período y el orden.
   // Cada una suma su estado a los elegidos o, si ya estaba, lo quita (pulsar otra vez una tarjeta la apaga).

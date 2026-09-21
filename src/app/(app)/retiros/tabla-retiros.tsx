@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { Paginacion } from "@/components/tabla/paginacion";
+import { POR_PAGINA, useIrAPaginaArriba } from "@/components/tabla/usar-pagina-arriba";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -59,7 +60,6 @@ export interface FilaRetiro {
 
 // Sin filtros ni grupos se ve una página de 50 (los más recientes primero); con filtros o agrupando se trabaja sobre
 // todos los retiros cargados.
-const POR_PAGINA = 50;
 
 const NOMBRE_FILAS: NombreFilas = { singular: "retiro", plural: "retiros" };
 
@@ -186,13 +186,7 @@ export function TablaRetiros({
   const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
 
   // Al cambiar de página se vuelve al principio de la tabla (si quien pulsó estaba abajo, no se queda mirando el final).
-  const raiz = useRef<HTMLDivElement>(null);
-  function irAPagina(pagina: number) {
-    tabla.irAPagina(pagina);
-    if (raiz.current && raiz.current.getBoundingClientRect().top < 0) {
-      requestAnimationFrame(() => raiz.current?.scrollIntoView({ block: "start" }));
-    }
-  }
+  const { raiz, alIrA: irAPagina } = useIrAPaginaArriba(tabla.irAPagina);
 
   // Lo marcado. Solo cuenta lo que se ve ahora (filas de los grupos abiertos, o las de la lista): así una acción
   // nunca toca un retiro que la persona no tiene delante. Un retiro marcado que un filtro esconde sigue marcado

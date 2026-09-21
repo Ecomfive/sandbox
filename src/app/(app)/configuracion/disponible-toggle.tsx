@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { alternarDisponiblePlataforma } from "./actions";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
+import { anilloFoco } from "@/components/ui/field";
 
 export function DisponibleToggle({ id, disponible }: { id: string; disponible: boolean }) {
   const [pending, startTransition] = useTransition();
@@ -25,7 +26,8 @@ export function DisponibleToggle({ id, disponible }: { id: string; disponible: b
           });
         }}
         aria-label={`${estado}. ${accion}`}
-        className="disabled:opacity-50"
+        // El botón mide 24 px de alto (la insignia sola, 20): objetivo mínimo de WCAG 2.5.8.
+        className={`inline-flex min-h-6 items-center rounded-full disabled:opacity-50 ${anilloFoco}`}
       >
         <Badge tone={disponible ? "success" : "neutral"}>{estado}</Badge>
       </button>
