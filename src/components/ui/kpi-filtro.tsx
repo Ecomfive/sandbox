@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useFiltros } from "@/components/tabla/ganchos";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ContenidoKpi, claseKpi } from "./kpi-card";
+import { ContenidoKpi, claseKpi, type Tono } from "./kpi-card";
 
 /**
  * Una tarjeta de indicador que **filtra la tabla de la misma página**: al pulsarla pone el filtro del atajo (y al
@@ -29,7 +29,7 @@ export function KpiFiltro<F>({
   titulo?: ReactNode;
   valor: ReactNode;
   subtexto?: ReactNode;
-  tono?: "neutral" | "destructive";
+  tono?: Tono;
   /** Menos relleno: para tarjetas dentro de un `KpiGrid compacta`. */
   compacta?: boolean;
   children?: ReactNode;

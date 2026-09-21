@@ -58,7 +58,14 @@ export function TarjetasResumenRetiros({
   });
   return (
     <>
-      <KpiFiltro def={DEF_RETIROS} atajo={porEstado("abiertos", "Abiertos", "abierto")} titulo="Retiros abiertos" valor={abiertos} compacta />
+      <KpiFiltro
+        def={DEF_RETIROS}
+        atajo={porEstado("abiertos", "Abiertos", "abierto")}
+        titulo="Retiros abiertos"
+        valor={abiertos}
+        tono="info"
+        compacta
+      />
       <KpiFiltro
         def={DEF_RETIROS}
         atajo={porEstado("con-novedad", "Con novedad", "novedad")}
@@ -73,9 +80,17 @@ export function TarjetasResumenRetiros({
         titulo="Cerrados este mes"
         valor={cerradosDelMes}
         subtexto={retiros(cantidadCerradosDelMes)}
+        tono="success"
         compacta
       />
-      <KpiFiltro def={DEF_RETIROS} atajo={porEstado("cerrados", "Cerrados", "cerrado")} titulo="Retiros cerrados" valor={cerrados} compacta />
+      <KpiFiltro
+        def={DEF_RETIROS}
+        atajo={porEstado("cerrados", "Cerrados", "cerrado")}
+        titulo="Retiros cerrados"
+        valor={cerrados}
+        tono="success"
+        compacta
+      />
       <KpiCard titulo="Total de retiros" valor={totalRetiros} compacta />
     </>
   );

@@ -1,27 +1,29 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-type Tono = "neutral" | "destructive";
+export type Tono = "neutral" | "info" | "success" | "warning" | "destructive";
 
-const tonos: Record<Tono, string> = {
-  neutral: "border-border bg-card",
-  destructive: "border-destructive/30 bg-destructive-soft",
+/** Color del puntito junto al título — la tarjeta en sí siempre queda neutral (fondo y borde
+ * iguales para todas); lo que cambia según la sección es solo ese punto, no toda la tarjeta. */
+const puntos: Record<Tono, string> = {
+  neutral: "bg-muted-foreground",
+  info: "bg-accent-foreground",
+  success: "bg-success",
+  warning: "bg-warning",
+  destructive: "bg-destructive",
 };
 
 /** Lo que agrega una tarjeta que se puede pulsar: mano, resalte al pasar y anillo de foco. */
 const INTERACTIVA =
-  "block w-full cursor-pointer text-left transition-colors focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none";
-const AL_PASAR: Record<Tono, string> = {
-  neutral: "hover:border-border-control hover:bg-muted/50",
-  destructive: "hover:border-destructive hover:brightness-95",
-};
+  "block w-full cursor-pointer text-left transition-colors hover:border-border-control hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none";
 /** La tarjeta que está filtrando ahora: borde y anillo del color del texto, para que se vea cuál es. */
 const SELECCIONADA = "!border-foreground ring-1 ring-foreground";
 
-/** Clases de una tarjeta; las comparte `KpiFiltro`, que es un botón y no un enlace. */
+/** Clases de una tarjeta; las comparte `KpiFiltro`, que es un botón y no un enlace. La tarjeta
+ * siempre es neutral (borde y fondo iguales) — el tono solo colorea el puntito del título. */
 export function claseKpi(tono: Tono, interactiva: boolean, seleccionada = false, compacta = false): string {
-  return `min-w-0 rounded-xl border ${compacta ? "px-3 py-2.5" : "p-4"} ${tonos[tono]} ${
-    interactiva ? `${INTERACTIVA} ${AL_PASAR[tono]}` : ""
+  return `min-w-0 rounded-xl border border-border bg-card ${compacta ? "px-3 py-2.5" : "p-4"} ${
+    interactiva ? INTERACTIVA : ""
   } ${seleccionada ? SELECCIONADA : ""}`.trim();
 }
 
@@ -95,14 +97,13 @@ export function ContenidoKpi({
   return (
     <>
       {titulo && (
-        <p className={`text-xs font-medium ${tono === "destructive" ? "text-destructive" : ""}`}>
-          {titulo}
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${puntos[tono]}`} />
+          <span>{titulo}</span>
           {ayuda}
         </p>
       )}
-      <p className={`mt-1 text-lg font-semibold tabular-nums ${tono === "destructive" ? "text-destructive" : ""}`}>
-        {valor}
-      </p>
+      <p className="mt-1 text-lg font-semibold tabular-nums">{valor}</p>
       {subtexto && <p className="mt-0.5 text-xs text-muted-foreground">{subtexto}</p>}
       {children}
       {ayudaLectores && <span className="sr-only">. {ayudaLectores}</span>}
