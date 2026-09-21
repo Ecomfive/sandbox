@@ -309,6 +309,14 @@ convenciones técnicas del código.
      del mismo `Promise.all` en vez de esperar antes. El layout de `(app)` es el
      ejemplo: usuario, país, plataformas y favoritos arrancan a la vez y los
      contadores del menú no se esperan.
+  4. *Contar, sumar y agrupar se hace en la base, no en JavaScript.* Cuando una
+     página solo necesita totales, una función SQL (`create function … language
+     sql stable`, ver `0037_resumen_pedidos_dropi.sql`) devuelve un renglón por
+     grupo en vez de miles de filas. Se llama con `supabase.rpc` desde el cliente
+     del servidor, y el código **conserva un plan B en JavaScript** (misma forma
+     de respuesta) por si la migración aún no se corrió: ver
+     `obtenerResumenPedidos`. Las funciones se prueban contra un Postgres real
+     (PGlite) comparando su resultado con el del plan B.
   Para medir, no hay que adivinar: un servidor de Supabase falso que anota cada
   consulta y le suma latencia, con la app real apuntando a él, muestra cuántas
   hace cada página y en qué orden.
