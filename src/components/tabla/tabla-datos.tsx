@@ -11,6 +11,8 @@ import type { IconoComp } from "./botones-vista";
 import type { DescargaCompleta } from "./boton-descargar";
 import { EncabezadoGrupo } from "./encabezado-grupo";
 import { useColumnas, type ColumnaDef } from "./ganchos";
+import { Paginacion } from "./paginacion";
+import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "./usar-pagina-arriba";
 import { useTablaInteractiva } from "./usar-tabla";
 
 export interface ColumnaTabla<F, C = undefined> extends ColumnaDef {
@@ -41,6 +43,7 @@ export function TablaDatos<F, C = undefined>({
   ariaLabel,
   anchoMinimo = "36rem",
   limiteSinFiltros,
+  porPagina = POR_PAGINA,
   descargaCompleta,
   vacio,
 }: {
@@ -64,14 +67,17 @@ export function TablaDatos<F, C = undefined>({
   ariaLabel: string;
   anchoMinimo?: string;
   limiteSinFiltros?: number;
+  /** Filas por página cuando no hay filtros ni grupos (50 por defecto); con menos filas que eso no se ve la paginación. */
+  porPagina?: number;
   /** Descarga que arma el servidor con más filas que las cargadas; el botón Descargar la ofrece junto a «Lo que se ve». */
   descargaCompleta?: DescargaCompleta;
   /** Mensaje cuando no hay filas cargadas. */
   vacio: string;
 }) {
-  const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros });
+  const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros, porPagina });
   const [guardadas, cambiarColumnas] = useColumnas(def.clave, columnas);
-  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado } = tabla;
+  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
+  const { raiz, alIrA } = useIrAPaginaArriba(tabla.irAPagina);
 
   const porId = new Map(columnas.map((c) => [c.id, c]));
   const visibles_ = guardadas.orden.filter((id) => !guardadas.ocultas.has(id)).map((id) => porId.get(id)!);
@@ -112,7 +118,7 @@ export function TablaDatos<F, C = undefined>({
   });
 
   return (
-    <div className="min-w-0 rounded-xl border border-border bg-card">
+    <div ref={raiz} className="min-w-0 rounded-xl border border-border bg-card">
       <BarraHerramientas
         def={def}
         filas={filas}
@@ -168,8 +174,9 @@ export function TablaDatos<F, C = undefined>({
           )}
         </table>
       </ContenedorTabla>
+      {paginacion && <Paginacion pagina={paginacion} nombre={nombre} alIrA={alIrA} />}
       <p role="status" className="sr-only">
-        {filas.length > 0 ? `${visibles.length} ${visibles.length === 1 ? nombre.singular : nombre.plural}` : ""}
+        {filas.length > 0 ? textoEstadoTabla(nombre, paginacion ? paginacion.total : visibles.length, paginacion) : ""}
       </p>
       {filas.length === 0 && <EstadoVacio mensaje={vacio} />}
       {filas.length > 0 && visibles.length === 0 && (

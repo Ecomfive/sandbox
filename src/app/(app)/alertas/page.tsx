@@ -8,7 +8,6 @@ import { TablaAlertas, type AlertaFila } from "./tabla-alertas";
 import { TablaPendientes } from "./tabla-pendientes";
 import { requireModulo } from "@/lib/auth";
 import { linkClass } from "@/components/ui/link";
-import { AlertaIcon } from "@/lib/nav-icons";
 
 export const metadata = { title: "Alertas de inventario" };
 
@@ -45,13 +44,14 @@ export default async function AlertasPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <div>
-        <EncabezadoPagina titulo="Inventario pendiente de retorno" icono={AlertaIcon} className="mb-4">
+        <EncabezadoPagina titulo="Alertas de inventario" oculto className="mb-4">
           Salidas menos entradas por producto, según lo cargado en{" "}
           <Link href="/inventario" className={linkClass}>
             Inventario
           </Link>
           . Generar una alerta la deja lista para el reclamo quincenal a la plataforma.
         </EncabezadoPagina>
+        <h2 className="mb-3 text-sm font-semibold tracking-tight">Pendiente de retorno</h2>
         <TablaPendientes
           pendientes={pendientes.map((p) => ({
             productoId: p.producto_id,

@@ -53,8 +53,14 @@ miles de filas completas a JavaScript.
 
 ## Estado
 
-- **Punto 1 (Pedidos Dropi, agregaciones en Postgres): sin aplicar.** Espera
-  confirmación de Hernán antes de tocarlo.
+- **Punto 1 (Pedidos Dropi, agregaciones en Postgres): aplicado** (rama
+  `pedidos-agregado-en-base`, con Hernán confirmando el 21 sept). Migración
+  `0037_resumen_pedidos_dropi.sql`: `pedidos_dropi_resumen` (un renglón por
+  estado: cantidad, monto y alertas) y `pedidos_dropi_alertas`; la página las
+  llama con `obtenerResumenPedidos` (`src/lib/pedidos/resumen.ts`). Si la
+  migración no se ha corrido, la página cae al cálculo en JavaScript de antes.
+  **Hay que correr la 0037 en el editor SQL de Supabase** para que el arreglo
+  tenga efecto.
 - **Puntos 2 y 3: aplicados** (rama `rendimiento-carga`). País, plataformas del
   país y la plataforma Dropi se guardan en memoria unos minutos
   (`src/lib/cache-ttl.ts`); el perfil de la persona y sus permisos se piden en
