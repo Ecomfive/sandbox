@@ -19,10 +19,10 @@ const AL_PASAR: Record<Tono, string> = {
 const SELECCIONADA = "!border-foreground ring-1 ring-foreground";
 
 /** Clases de una tarjeta; las comparte `KpiFiltro`, que es un botón y no un enlace. */
-export function claseKpi(tono: Tono, interactiva: boolean, seleccionada = false): string {
-  return `min-w-0 rounded-xl border p-4 ${tonos[tono]} ${interactiva ? `${INTERACTIVA} ${AL_PASAR[tono]}` : ""} ${
-    seleccionada ? SELECCIONADA : ""
-  }`.trim();
+export function claseKpi(tono: Tono, interactiva: boolean, seleccionada = false, compacta = false): string {
+  return `min-w-0 rounded-xl border ${compacta ? "px-3 py-2.5" : "p-4"} ${tonos[tono]} ${
+    interactiva ? `${INTERACTIVA} ${AL_PASAR[tono]}` : ""
+  } ${seleccionada ? SELECCIONADA : ""}`.trim();
 }
 
 /** Fila que se parte en varias para tarjetas de indicadores — nunca se cortan ni desbordan, a cualquier ancho.
@@ -30,10 +30,18 @@ export function claseKpi(tono: Tono, interactiva: boolean, seleccionada = false)
  * no se encoge por debajo del ancho "natural" de su contenido y la página se corta.
  * Cada tarjeta mide entre 12rem y 20rem: en una página ancha, dos o tres tarjetas no se estiran a media
  * pantalla cada una. (No es un grid con `minmax(12rem, 20rem)`: ahí el navegador cuenta las columnas con
- * el máximo y, en un ancho intermedio, deja apiladas tarjetas que sí caben en fila.) */
-export function KpiGrid({ children }: { children: ReactNode }) {
+ * el máximo y, en un ancho intermedio, deja apiladas tarjetas que sí caben en fila.)
+ * `compacta` (con las tarjetas también `compacta`): tarjetas desde 9rem, para que un grupo de tres o cuatro
+ * quepa en una sola línea junto a otro grupo; sigue envolviendo si no caben, nunca recorta. */
+export function KpiGrid({ children, compacta = false }: { children: ReactNode; compacta?: boolean }) {
   return (
-    <div className="flex min-w-0 flex-wrap gap-3 [&>*]:max-w-80 [&>*]:min-w-0 [&>*]:flex-[1_1_12rem]">{children}</div>
+    <div
+      className={`flex min-w-0 flex-wrap gap-3 [&>*]:max-w-80 [&>*]:min-w-0 ${
+        compacta ? "[&>*]:flex-[1_1_9rem]" : "[&>*]:flex-[1_1_12rem]"
+      }`}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -116,6 +124,7 @@ export function KpiCard({
   activa = false,
   ayuda,
   ayudaLectores,
+  compacta = false,
   children,
 }: {
   titulo?: ReactNode;
@@ -124,6 +133,8 @@ export function KpiCard({
   tono?: Tono;
   href?: string;
   activa?: boolean;
+  /** Menos relleno: para tarjetas dentro de un `KpiGrid compacta`. */
+  compacta?: boolean;
   /** Un botón de ayuda («?») junto al título. Con `href`, la tarjeta se vuelve un enlace extendido: un botón no puede ir dentro de un enlace. */
   ayuda?: ReactNode;
   ayudaLectores?: string;
@@ -141,11 +152,11 @@ export function KpiCard({
       {children}
     </ContenidoKpi>
   );
-  if (!href) return <div className={claseKpi(tono, false)}>{contenido}</div>;
+  if (!href) return <div className={claseKpi(tono, false, false, compacta)}>{contenido}</div>;
   if (ayuda) {
     // Enlace extendido: el enlace es el título y cubre toda la tarjeta con su ::after; la ayuda va encima (z-10).
     return (
-      <div className={`${claseKpi(tono, true, activa)} relative`}>
+      <div className={`${claseKpi(tono, true, activa, compacta)} relative`}>
         <ContenidoKpi
           titulo={
             <>
@@ -171,7 +182,12 @@ export function KpiCard({
     );
   }
   return (
-    <Link href={href} scroll={false} aria-current={activa ? "true" : undefined} className={claseKpi(tono, true, activa)}>
+    <Link
+      href={href}
+      scroll={false}
+      aria-current={activa ? "true" : undefined}
+      className={claseKpi(tono, true, activa, compacta)}
+    >
       {contenido}
     </Link>
   );

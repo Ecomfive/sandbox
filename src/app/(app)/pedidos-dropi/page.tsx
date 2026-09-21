@@ -14,6 +14,7 @@ import { resolverPeriodo } from "@/lib/dashboard/periodo";
 import Link from "next/link";
 import { linkClass } from "@/components/ui/link";
 import { AyudaContextual } from "@/components/ui/ayuda-contextual";
+import { alternarEstado, descripcionFiltro, estadosDeParametro, hrefPedidos } from "@/lib/pedidos/filtro-url";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +40,12 @@ export default async function PedidosDropiPage({
   const ordenClave = typeof sp.orden === "string" && sp.orden in OPCIONES_ORDEN ? sp.orden : "fecha_desc";
   const orden = OPCIONES_ORDEN[ordenClave as keyof typeof OPCIONES_ORDEN];
 
-  // Filtros que ponen las tarjetas del resumen (van en la dirección, para que la tabla traiga todas las de ese
-  // estado y no solo las que caben en las primeras 500): un estado, o «liquidado sin marcar entregado».
-  const filtroEstado = typeof sp.estado === "string" && sp.estado !== "" ? sp.estado : null;
+  // Filtros que ponen las tarjetas del resumen (van en la dirección, para que la tabla traiga todas las de esos
+  // estados y no solo las que caben en las primeras 500): uno o varios estados (uno u otro), y/o «liquidado sin
+  // marcar entregado» (que se combina con los estados: deben cumplirse las dos cosas).
+  const estados = estadosDeParametro(sp.estado);
   const soloAlertas = sp.alertas === "1";
+  const coincideEstado = (estado: string) => estados.length === 0 || estados.includes(estado);
 
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -50,7 +53,7 @@ export default async function PedidosDropiPage({
   const { data: plataformaDropi } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").single();
   const plataformaId = plataformaDropi?.id ?? "";
 
-  /** Las órdenes de la tabla (hasta 500): las del período, más el filtro de estado o solo las referencias dadas. */
+  /** Las órdenes de la tabla (hasta 500): las del período, más el filtro de estados o solo las referencias dadas. */
   const consultarOrdenes = (referencias?: string[]) => {
     let consulta = supabase
       .from("ordenes")
@@ -59,7 +62,7 @@ export default async function PedidosDropiPage({
       .eq("plataforma_id", plataformaId)
       .gte("fecha", desde)
       .lte("fecha", hasta);
-    if (filtroEstado) consulta = consulta.eq("estado", filtroEstado);
+    if (estados.length > 0) consulta = consulta.in("estado", estados);
     if (referencias) consulta = consulta.in("referencia_externa", referencias);
     return consulta
       .order(orden.columna, { ascending: orden.ascending })
@@ -104,16 +107,15 @@ export default async function PedidosDropiPage({
   // Con el filtro de alertas, las órdenes de la tabla son las de esas referencias (no se sabían antes de mirar la cartera).
   let ordenes = ordenesGenerales.data;
   if (soloAlertas) {
-    const referencias = alertas.map((o) => o.referencia_externa).slice(0, 300);
+    const referencias = alertas
+      .filter((o) => coincideEstado(o.estado))
+      .map((o) => o.referencia_externa)
+      .slice(0, 300);
     ordenes = referencias.length > 0 ? (await consultarOrdenes(referencias)).data : [];
   }
   const todas = ordenes ?? [];
   // Cuántas órdenes tiene el filtro puesto (la tabla trae como máximo 500 de ellas).
-  const totalFiltrado = soloAlertas
-    ? totalAlertas
-    : filtroEstado
-      ? resumen.filter((o) => o.estado === filtroEstado).length
-      : totalOrdenes;
+  const totalFiltrado = (soloAlertas ? alertas : resumen).filter((o) => coincideEstado(o.estado)).length;
 
   const filasPedido: FilaPedido[] = todas.map((o) => ({
     referencia: o.referencia_externa,
@@ -131,18 +133,19 @@ export default async function PedidosDropiPage({
   const estadosOrdenados = Array.from(porEstado.entries()).sort((a, b) => b[1] - a[1]);
 
   // Las tarjetas del resumen son enlaces a esta misma página con el filtro puesto; conservan el período y el orden.
-  const hrefConFiltro = (filtro: Record<string, string> = {}) => {
-    const parametros = new URLSearchParams();
-    for (const clave of ["preset", "desde", "hasta", "orden"]) {
-      const valor = sp[clave];
-      if (typeof valor === "string") parametros.set(clave, valor);
-    }
-    for (const [clave, valor] of Object.entries(filtro)) parametros.set(clave, valor);
-    const texto = parametros.toString();
-    return texto ? `/pedidos-dropi?${texto}` : "/pedidos-dropi";
-  };
-  const hayFiltro = soloAlertas || filtroEstado !== null;
-  const nombreFiltro = soloAlertas ? "liquidado sin marcar entregado" : filtroEstado;
+  // Cada una suma su estado a los elegidos o, si ya estaba, lo quita (pulsar otra vez una tarjeta la apaga).
+  const conservar: Record<string, string> = {};
+  for (const clave of ["preset", "desde", "hasta", "orden"]) {
+    const valor = sp[clave];
+    if (typeof valor === "string") conservar[clave] = valor;
+  }
+  const hrefSinFiltro = hrefPedidos(conservar, [], false);
+  const hrefDeEstado = (estado: string) => hrefPedidos(conservar, alternarEstado(estados, estado), soloAlertas);
+  const hrefDeAlertas = hrefPedidos(conservar, estados, !soloAlertas);
+  const hayFiltro = soloAlertas || estados.length > 0;
+  const nombreFiltro = descripcionFiltro(estados, soloAlertas);
+  const etiquetaDescargaCompleta =
+    estados.length > 1 ? "Todas las de estos estados" : estados.length === 1 ? "Todas las de este estado" : "Todo el período";
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -166,9 +169,9 @@ export default async function PedidosDropiPage({
             accion={
               hayFiltro && (
                 <span className="flex items-center gap-2 font-normal">
-                  Tabla filtrada por «{nombreFiltro}»
-                  <Link href={hrefConFiltro()} scroll={false} className={linkClass}>
-                    Quitar filtro
+                  Tabla filtrada por {nombreFiltro}
+                  <Link href={hrefSinFiltro} scroll={false} className={linkClass}>
+                    {estados.length + (soloAlertas ? 1 : 0) > 1 ? "Quitar filtros" : "Quitar filtro"}
                   </Link>
                 </span>
               )
@@ -178,7 +181,7 @@ export default async function PedidosDropiPage({
               <KpiCard
                 titulo="Órdenes en el rango"
                 valor={totalOrdenes}
-                href={hrefConFiltro()}
+                href={hrefSinFiltro}
                 activa={!hayFiltro}
                 ayudaLectores="Ver todas, sin filtrar la tabla"
               />
@@ -190,20 +193,29 @@ export default async function PedidosDropiPage({
                 }
                 valor={totalAlertas}
                 tono={totalAlertas > 0 ? "destructive" : "neutral"}
-                href={totalAlertas > 0 ? hrefConFiltro({ alertas: "1" }) : undefined}
+                href={totalAlertas > 0 || soloAlertas ? hrefDeAlertas : undefined}
                 activa={soloAlertas}
-                ayudaLectores="Filtrar la tabla por estas alertas"
+                ayudaLectores={soloAlertas ? "Quitar el filtro de alertas" : "Filtrar la tabla por estas alertas"}
               />
-              {estadosOrdenados.map(([estado, cantidad]) => (
-                <KpiCard
-                  key={estado}
-                  titulo={estado}
-                  valor={cantidad}
-                  href={hrefConFiltro({ estado })}
-                  activa={filtroEstado === estado}
-                  ayudaLectores={`Filtrar la tabla por ${estado}`}
-                />
-              ))}
+              {estadosOrdenados.map(([estado, cantidad]) => {
+                const elegido = estados.includes(estado);
+                return (
+                  <KpiCard
+                    key={estado}
+                    titulo={estado}
+                    valor={cantidad}
+                    href={hrefDeEstado(estado)}
+                    activa={elegido}
+                    ayudaLectores={
+                      elegido
+                        ? `Quitar ${estado} del filtro`
+                        : estados.length > 0
+                          ? `Sumar ${estado} al filtro`
+                          : `Filtrar la tabla por ${estado}`
+                    }
+                  />
+                );
+              })}
             </KpiGrid>
           </KpiGroup>
 
@@ -214,7 +226,7 @@ export default async function PedidosDropiPage({
               </strong>{" "}
               en la tabla (el resumen de arriba sí las cuenta a todas). Achica el rango de fechas
               {hayFiltro ? "" : " o pulsa un estado del resumen"} para verlas todas, o usa «Descargar» en la tabla y
-              elige «{filtroEstado ? "Todas las de este estado" : "Todo el período"}».
+              elige «{etiquetaDescargaCompleta}».
             </div>
           )}
 
@@ -226,10 +238,10 @@ export default async function PedidosDropiPage({
               soloAlertas
                 ? undefined
                 : {
-                    href: `/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}${
-                      filtroEstado ? `&estado=${encodeURIComponent(filtroEstado)}` : ""
-                    }`,
-                    etiqueta: filtroEstado ? "Todas las de este estado" : "Todo el período",
+                    href: `/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}${estados
+                      .map((e) => `&estado=${encodeURIComponent(e)}`)
+                      .join("")}`,
+                    etiqueta: etiquetaDescargaCompleta,
                     detalle: `${totalFiltrado.toLocaleString("es")} órdenes`,
                   }
             }

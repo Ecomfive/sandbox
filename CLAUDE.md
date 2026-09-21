@@ -87,7 +87,11 @@ convenciones técnicas del código.
   dicen («Cargar extracto bancario»), va visible con su ícono. Un dato secundario
   de un grupo de indicadores (la fecha de actualización) va en la franja del
   `KpiGroup` (`accion`), no en una fila aparte; varios grupos comparten fila con
-  `className="flex-[3_1_39rem]"` dentro de un `flex flex-wrap`.
+  bases pequeñas dentro de un `flex flex-wrap` (Retiros: `flex-[1_1_22rem]` el saldo y
+  `flex-[2_1_30rem]` el resumen, con `KpiGrid compacta` y tarjetas `compacta`: una
+  sola línea desde unos 845 px de contenido, y por debajo envuelven sin recortar).
+  Calcula el ancho de las bases pensando en pantallas de ~1 200 px de contenido, no
+  en 1 900: un mínimo de 39rem por grupo las apilaba en las pantallas del equipo.
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
@@ -218,11 +222,21 @@ convenciones técnicas del código.
   `catalogo-maestro/tarjetas-estado.tsx`, `gastos/tarjetas-mes.tsx`) porque una
   `DefTabla` con funciones no cruza de servidor a cliente. El filtro es un
   `AtajoFiltro` (`src/lib/tabla/atajos.ts`), que puede llevar `ademas` (filtros de
-  otros campos: «cerrados» + el mes que suma la tarjeta). (3) Si la tabla solo
+  otros campos: «cerrados» + el mes que suma la tarjeta). **Pulsar de nuevo la
+  tarjeta activa quita el filtro** (al quitar el último, la tabla queda sin filtrar),
+  y **las tarjetas de estado se pueden juntar** (`suma: true`: abiertos O con
+  novedad; es coherente porque una fila tiene un solo estado). Las compuestas
+  (cerrados + mes) no se combinan: se declaran `excluye` en las que suman y al
+  pulsar una se apaga la otra. Ya lo usan Retiros, Catálogo, Gastos (categorías) y
+  Alertas (Abiertas / Reclamadas / Resueltas). No hagas clicables las insignias de
+  estado dentro de las filas: son estado, no controles. (3) Si la tabla solo
   trae una parte de los datos (Pedidos Dropi: 500 de miles), el filtro va **en el
-  servidor**, en la dirección (`?estado=ENTREGADO`, `?alertas=1`), para que la
-  tabla traiga todo lo de ese estado y el número de la tarjeta coincida; las
-  tarjetas conservan el período y el orden. El número de una tarjeta debe ser el
+  servidor**, en la dirección (`?estado=A&estado=B`, `?alertas=1`;
+  `src/lib/pedidos/filtro-url.ts`), para que la tabla traiga todo lo de esos
+  estados y el número de la tarjeta coincida; cada tarjeta es un enlace que suma su
+  estado o, si ya estaba, lo quita, y «Alertas» se combina con los estados (las dos
+  cosas a la vez). Las tarjetas conservan el período y el orden y el menú
+  «Descargar» baja lo mismo que filtran. El número de una tarjeta debe ser el
   de lo que filtra (si suma el mes, el filtro incluye el mes). Las tarjetas de
   totales que no filtran nada (saldos de wallet, Inteligencia competitiva) no son
   pulsables. Las de «Pendientes de hoy» del Dashboard llevan a su módulo; la de
