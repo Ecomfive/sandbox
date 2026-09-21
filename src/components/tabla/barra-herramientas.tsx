@@ -7,7 +7,7 @@ import { BotonFiltros } from "./boton-filtros";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import { PersonaIcon } from "@/lib/nav-icons";
 import { BotonAgrupar, BotonAtajo, BotonCerrados, type IconoComp } from "./botones-vista";
-import { BotonDescargar } from "./boton-descargar";
+import { BotonDescargar, type DescargaCompleta } from "./boton-descargar";
 import { MenuVistas } from "./menu-vistas";
 import type { EstadoTabla } from "@/lib/tabla/vistas";
 import type { ColumnaDef, EstadoColumnas } from "./ganchos";
@@ -28,6 +28,7 @@ export function BarraHerramientas<F>({
   columnas,
   atajos,
   extra,
+  descargaCompleta,
 }: {
   def: DefTabla<F>;
   /** Todas las filas de la tabla, sin filtrar (de ahí salen las opciones de los filtros). */
@@ -40,6 +41,8 @@ export function BarraHerramientas<F>({
   /** Filtros de un toque (p. ej. «Mis retiros»); el ícono es el del campo que filtran. */
   atajos?: AtajoFiltro[];
   extra?: ReactNode;
+  /** Si la tabla tiene cargada solo una parte y el servidor arma el total: el botón Descargar ofrece las dos opciones. */
+  descargaCompleta?: DescargaCompleta;
 }) {
   const agrupables = camposAgrupables(def).map((id) => ({ id, etiqueta: def.campos.find((c) => c.id === id)!.etiqueta }));
   const { vista, cambiarVista, resultado, filtros, cambiarFiltros, grupos } = tabla;
@@ -116,7 +119,7 @@ export function BarraHerramientas<F>({
           nombreFilas={nombreFilas}
         />
         {columnas && <MenuColumnas columnas={columnas.defs} estado={columnas.estado} alCambiar={columnas.cambiar} />}
-        <BotonDescargar def={def} filas={filasParaDescargar} nombreFilas={nombreFilas} />
+        <BotonDescargar def={def} filas={filasParaDescargar} nombreFilas={nombreFilas} completa={descargaCompleta} />
       </div>
     </div>
   );
