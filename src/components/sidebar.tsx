@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useEffect, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,7 @@ import {
 import { DashboardIcon, ChevronRightIcon, NotificacionesIcon, SECTION_ICONS } from "@/lib/nav-icons";
 import { ConTooltip } from "@/components/sidebar-tooltip";
 import { ContadorMenu, ContadorSobreIcono } from "@/components/sidebar-contador";
+import { PanelSeccion, type GrupoPanel } from "@/components/sidebar-panel";
 import { SIN_PENDIENTES, sumaDeItems, textoPendientes, type PendientesMenu } from "@/lib/contadores-menu";
 import { CuentaFooter } from "@/components/cuenta-footer";
 import { FavoritoToggle } from "@/components/favorito-toggle";
@@ -85,20 +86,32 @@ function CabeceraSeccion({
   expanded,
   abierta,
   cantidad,
+  panelAbierto,
   alAlternar,
+  alAbrirPanel,
 }: {
   titulo: string;
   expanded: boolean;
   abierta: boolean;
   cantidad: number;
+  /** Con el riel colapsado: si el panel de esta sección está abierto. */
+  panelAbierto: boolean;
+  /** Con el menú desplegado: abre o cierra la sección. */
   alAlternar: () => void;
+  /** Con el riel colapsado: abre (o cierra) el panel de la sección junto al ícono. */
+  alAbrirPanel: (ancla: DOMRect, abridor: HTMLElement) => void;
 }) {
   const Icono = SECTION_ICONS[titulo] ?? DashboardIcon;
   return (
-    <ConTooltip etiqueta={cantidad > 0 ? `${titulo} · ${textoPendientes(cantidad)}` : titulo} mostrar={!expanded}>
+    <ConTooltip
+      etiqueta={cantidad > 0 ? `${titulo} · ${textoPendientes(cantidad)}` : titulo}
+      mostrar={!expanded && !panelAbierto}
+    >
       <button
         type="button"
-        onClick={alAlternar}
+        data-panel-abridor=""
+        aria-expanded={expanded ? abierta : panelAbierto}
+        onClick={(e) => (expanded ? alAlternar() : alAbrirPanel(e.currentTarget.getBoundingClientRect(), e.currentTarget))}
         aria-label={expanded ? undefined : cantidad > 0 ? `${titulo}, ${textoPendientes(cantidad)}` : titulo}
         className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
       >
@@ -143,6 +156,27 @@ function SidebarContents({
   const seccionActiva = encontrarSeccionActiva(pathname, seccionesPlataforma, NAV_SECTIONS);
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(seccionActiva?.seccionTitle ?? primeraSeccion);
   const [grupoAbierto, setGrupoAbierto] = useState<string | null>(seccionActiva?.grupoLabel ?? null);
+  // Riel colapsado: el panel de la sección cuyo ícono se pulsó (junto a él, sin desplegar el menú).
+  const [panel, setPanel] = useState<{ titulo: string; ancla: DOMRect; abridor: HTMLElement } | null>(null);
+  const cerrarPanel = useCallback(() => setPanel(null), []);
+  const alternarPanel = (titulo: string) => (ancla: DOMRect, abridor: HTMLElement) =>
+    setPanel((actual) => (actual?.titulo === titulo ? null : { titulo, ancla, abridor }));
+
+  /** Las páginas de una sección tal como las ve la persona (según sus módulos), para su panel. */
+  function gruposDePanel(titulo: string): GrupoPanel[] {
+    const deLaPlataforma = seccionesPlataforma.find((s) => s.title === titulo);
+    if (deLaPlataforma) {
+      return deLaPlataforma.groups
+        .map((g) => ({
+          label: g.label,
+          pronto: g.pronto || g.items.length === 0,
+          items: g.items.filter((item) => puedeVer(modulosPermitidos, item.href)),
+        }))
+        .filter((g) => g.pronto || g.items.length > 0);
+    }
+    const plana = NAV_SECTIONS.find((s) => s.title === titulo);
+    return plana ? [{ label: null, pronto: false, items: plana.items.filter((item) => puedeVer(modulosPermitidos, item.href)) }] : [];
+  }
 
   const todosLosItems: NavItem[] = [
     ...seccionesPlataforma.flatMap((s) => s.groups.flatMap((g) => g.items)),
@@ -159,6 +193,7 @@ function SidebarContents({
           <button
             type="button"
             onClick={onToggle}
+            aria-label={expanded ? undefined : "Desplegar el menú"}
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <ToggleIcon className="h-5 w-5 shrink-0" />
@@ -172,6 +207,7 @@ function SidebarContents({
           <Link
             href="/"
             onClick={onNavigate}
+            aria-label={expanded ? undefined : "Dashboard"}
             className={
               pathname === "/"
                 ? "flex w-full items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
@@ -189,6 +225,13 @@ function SidebarContents({
           <Link
             href="/notificaciones"
             onClick={onNavigate}
+            aria-label={
+              expanded
+                ? undefined
+                : totalPendientes > 0
+                  ? `Centro de notificaciones, ${textoPendientes(totalPendientes)}`
+                  : "Centro de notificaciones"
+            }
             className={
               pathname === "/notificaciones"
                 ? "flex w-full items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
@@ -197,18 +240,10 @@ function SidebarContents({
           >
             <span className="relative inline-flex shrink-0">
               <NotificacionesIcon className="h-5 w-5" />
-              {!expanded && totalPendientes > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning-soft px-0.5 text-[0.6rem] leading-none font-medium text-warning tabular-nums">
-                  {totalPendientes > 99 ? "99+" : totalPendientes}
-                </span>
-              )}
+              {!expanded && <ContadorSobreIcono cantidad={totalPendientes} />}
             </span>
             {expanded && <span className="flex-1">Centro de notificaciones</span>}
-            {expanded && totalPendientes > 0 && (
-              <span className="rounded-full bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning tabular-nums">
-                {totalPendientes}
-              </span>
-            )}
+            {expanded && <ContadorMenu cantidad={totalPendientes} />}
           </Link>
         </ConTooltip>
       )}
@@ -256,7 +291,9 @@ function SidebarContents({
                 section.groups.flatMap((g) => g.items),
                 contadores
               )}
+              panelAbierto={panel?.titulo === section.title}
               alAlternar={() => setSeccionAbierta((prev) => (prev === section.title ? null : section.title))}
+              alAbrirPanel={alternarPanel(section.title)}
             />
             {expanded && isOpen && (
               <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
@@ -330,7 +367,9 @@ function SidebarContents({
               expanded={expanded}
               abierta={isOpen}
               cantidad={sumaDeItems(itemsVisibles, contadores)}
+              panelAbierto={panel?.titulo === section.title}
               alAlternar={() => setSeccionAbierta((prev) => (prev === section.title ? null : section.title))}
+              alAbrirPanel={alternarPanel(section.title)}
             />
             {expanded && isOpen && (
               <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
@@ -349,6 +388,19 @@ function SidebarContents({
           </div>
         );
       })}
+
+      {!expanded && panel && (
+        <PanelSeccion
+          titulo={panel.titulo}
+          grupos={gruposDePanel(panel.titulo)}
+          contadores={contadores}
+          pathname={pathname}
+          ancla={panel.ancla}
+          abridor={panel.abridor}
+          alCerrar={cerrarPanel}
+          alNavegar={onNavigate}
+        />
+      )}
     </nav>
   );
 }

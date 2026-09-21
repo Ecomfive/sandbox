@@ -112,6 +112,17 @@ convenciones técnicas del código.
   (el layout persiste): se ven al día tras recargar o al refrescar la ruta. La
   pastilla dice «3 pendientes» a los lectores de pantalla (texto oculto, no una
   región en vivo).
+- **Riel del menú colapsado.** Con el menú colapsado (solo íconos), pulsar el ícono
+  de una sección (Proveeduría, Tiendas, Catálogo, Recursos Humanos) abre a su
+  derecha un **panel** con las páginas de esa sección y sus contadores
+  (`PanelSeccion`, `src/components/sidebar-panel.tsx`), para ir a ellas sin
+  desplegar el menú. Va por portal a `<body>`; el foco pasa a la primera página;
+  se cierra con Escape (el foco vuelve al ícono), al pulsar fuera, al pulsar el
+  mismo ícono o al elegir una página, y Tab más allá de la última página lo cierra
+  y sigue desde el ícono. El ícono lleva `data-panel-abridor` y `aria-expanded`.
+  Todo control del riel debe tener nombre accesible aunque no muestre texto
+  (`aria-label` cuando `!expanded`). Con el menú desplegado nada cambia (las
+  secciones se abren en el propio menú).
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y
