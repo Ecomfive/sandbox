@@ -27,12 +27,18 @@ export default async function ConciliacionesPage() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const { data: movimientos } = await supabase
-    .from("movimientos_bancarios")
-    .select("monto, fecha, plataforma_id, plataformas(nombre), extractos_bancarios!inner(pais_id)")
-    .eq("tipo", "deposito")
-    .not("plataforma_id", "is", null)
-    .eq("extractos_bancarios.pais_id", pais.id);
+  const [{ data: movimientos }, { data: conciliacionesExistentes }] = await Promise.all([
+    supabase
+      .from("movimientos_bancarios")
+      .select("monto, fecha, plataforma_id, plataformas(nombre), extractos_bancarios!inner(pais_id)")
+      .eq("tipo", "deposito")
+      .not("plataforma_id", "is", null)
+      .eq("extractos_bancarios.pais_id", pais.id),
+    supabase
+      .from("conciliaciones")
+      .select("plataforma_id, periodo, monto_reportado_plataforma, diferencia, estado, notas")
+      .eq("pais_id", pais.id),
+  ]);
 
   const grupos = new Map<string, Grupo>();
   for (const m of movimientos ?? []) {
@@ -52,11 +58,6 @@ export default async function ConciliacionesPage() {
       });
     }
   }
-
-  const { data: conciliacionesExistentes } = await supabase
-    .from("conciliaciones")
-    .select("plataforma_id, periodo, monto_reportado_plataforma, diferencia, estado, notas")
-    .eq("pais_id", pais.id);
 
   const existentesPorClave = new Map(
     (conciliacionesExistentes ?? []).map((c) => [`${c.plataforma_id}|${c.periodo}`, c])

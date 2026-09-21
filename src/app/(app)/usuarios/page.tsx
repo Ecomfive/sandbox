@@ -18,11 +18,10 @@ export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
   const supabase = createServiceClient();
-  const { count: totalPerfiles } = await supabase
-    .from("perfiles")
-    .select("id", { count: "exact", head: true });
-
-  const usuario = await getUsuarioActual();
+  const [{ count: totalPerfiles }, usuario] = await Promise.all([
+    supabase.from("perfiles").select("id", { count: "exact", head: true }),
+    getUsuarioActual(),
+  ]);
 
   if (!usuario) {
     if ((totalPerfiles ?? 0) > 0) redirect("/login");

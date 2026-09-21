@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createSessionClient, createServiceClient } from "@/lib/supabase/server";
 
@@ -12,34 +13,59 @@ export interface UsuarioActual {
   modulosSoloLectura: string[];
 }
 
-/** Usuario con sesión activa, su rol y los módulos a los que ese rol tiene acceso. */
-export async function getUsuarioActual(): Promise<UsuarioActual | null> {
+interface Permiso {
+  modulo: string;
+  solo_lectura: boolean;
+}
+
+/**
+ * Id de la persona con sesión en esta petición (o null): la única consulta a la autenticación. Con `cache` el
+ * layout, la página y el resto de la petición comparten la misma respuesta. Se separa del perfil para poder pedir
+ * lo que solo depende del id (los favoritos) sin esperar a que se resuelvan el perfil y los permisos.
+ */
+export const getUsuarioIdSesion = cache(async (): Promise<string | null> => {
   const session = await createSessionClient();
   const {
     data: { user },
   } = await session.auth.getUser();
-  if (!user) return null;
+  return user?.id ?? null;
+});
+
+/** Usuario con sesión activa, su rol y los módulos a los que ese rol tiene acceso (una vez por petición). */
+export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> => {
+  const userId = await getUsuarioIdSesion();
+  if (!userId) return null;
 
   const supabase = createServiceClient();
-  const { data: perfil } = await supabase
+  // Perfil, rol y permisos en una sola consulta (antes eran dos, una tras otra). Si la base no devuelve los permisos
+  // incluidos (o la consulta falla), se piden aparte como antes: el acceso nunca depende de que esto funcione.
+  const completo = await supabase
     .from("perfiles")
-    .select("id, email, nombre, avatar_url, activo, rol_id, roles(id, nombre)")
-    .eq("id", user.id)
+    .select("id, email, nombre, avatar_url, activo, rol_id, roles(id, nombre, permisos_rol(modulo, solo_lectura))")
+    .eq("id", userId)
     .maybeSingle();
+  const perfil = completo.error
+    ? (
+        await supabase
+          .from("perfiles")
+          .select("id, email, nombre, avatar_url, activo, rol_id, roles(id, nombre)")
+          .eq("id", userId)
+          .maybeSingle()
+      ).data
+    : completo.data;
 
   if (!perfil || !perfil.activo) return null;
 
-  const rol = perfil.roles as unknown as { id: string; nombre: string } | null;
+  const rol = perfil.roles as unknown as { id: string; nombre: string; permisos_rol?: Permiso[] } | null;
 
-  let modulos: string[] = [];
-  let modulosSoloLectura: string[] = [];
+  let permisos: Permiso[] = [];
   if (rol) {
-    const { data: permisos } = await supabase
-      .from("permisos_rol")
-      .select("modulo, solo_lectura")
-      .eq("rol_id", rol.id);
-    modulos = (permisos ?? []).map((p) => p.modulo);
-    modulosSoloLectura = (permisos ?? []).filter((p) => p.solo_lectura).map((p) => p.modulo);
+    if (Array.isArray(rol.permisos_rol)) {
+      permisos = rol.permisos_rol;
+    } else {
+      const { data } = await supabase.from("permisos_rol").select("modulo, solo_lectura").eq("rol_id", rol.id);
+      permisos = data ?? [];
+    }
   }
 
   return {
@@ -49,10 +75,10 @@ export async function getUsuarioActual(): Promise<UsuarioActual | null> {
     avatarUrl: perfil.avatar_url,
     rolId: rol?.id ?? null,
     rolNombre: rol?.nombre ?? null,
-    modulos,
-    modulosSoloLectura,
+    modulos: permisos.map((p) => p.modulo),
+    modulosSoloLectura: permisos.filter((p) => p.solo_lectura).map((p) => p.modulo),
   };
-}
+});
 
 /** Exige sesión activa y acceso al módulo dado; redirige si no se cumple. */
 export async function requireModulo(clave: string): Promise<UsuarioActual> {

@@ -43,21 +43,23 @@ export default async function RetiroDetallePage({
   const { correlativo_cambio } = await searchParams;
   const supabase = createServiceClient();
 
-  const { data: retiro } = await supabase
-    .from("retiros")
-    .select(
-      "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, consolidado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, a_recibir, fecha_limite, estado_dropi, dropi_id, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
-    )
-    .eq("id", id)
-    .maybeSingle();
+  // El historial se pide por el id de la dirección, sin esperar al retiro (si no existe, sobra una consulta y ya).
+  const [{ data: retiro }, { data: eventos }] = await Promise.all([
+    supabase
+      .from("retiros")
+      .select(
+        "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, estado, consolidado, fecha, fecha_cierre, notas, soporte_numero, comprobante_path, pais_id, a_recibir, fecha_limite, estado_dropi, dropi_id, plataformas(nombre), cuentas_retiro(nombre, tipo, detalle), paises(codigo), perfiles(nombre, email)"
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("retiro_eventos")
+      .select("id, evento, creado_en")
+      .eq("retiro_id", id)
+      .order("creado_en", { ascending: false }),
+  ]);
 
   if (!retiro) notFound();
-
-  const { data: eventos } = await supabase
-    .from("retiro_eventos")
-    .select("id, evento, creado_en")
-    .eq("retiro_id", id)
-    .order("creado_en", { ascending: false });
 
   const plataforma = retiro.plataformas as unknown as { nombre: string } | null;
   const cuenta = retiro.cuentas_retiro as unknown as { nombre: string; tipo: string; detalle: string | null } | null;

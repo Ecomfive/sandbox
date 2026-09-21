@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
+import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
 import { requireModulo } from "@/lib/auth";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
@@ -50,10 +51,8 @@ export default async function PedidosDropiPage({
   const coincideEstado = (estado: string) => estados.length === 0 || estados.includes(estado);
 
   const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-
-  const { data: plataformaDropi } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").single();
-  const plataformaId = plataformaDropi?.id ?? "";
+  const [pais, plataformaDropiId] = await Promise.all([getPaisActual(supabase), obtenerPlataformaDropiId(supabase)]);
+  const plataformaId = plataformaDropiId ?? "";
 
   /** Las órdenes de la tabla (hasta 500): las del período, más el filtro de estados o solo las referencias dadas. */
   const consultarOrdenes = (referencias?: string[]) => {
