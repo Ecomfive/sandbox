@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CerrarIcon, LapizIcon, MasIcon } from "@/lib/nav-icons";
+import {
+  BANCOS_BINANCE,
+  PAISES_BINANCE,
+  TIPOS_CUENTA_BINANCE,
+  TIPOS_IDENTIFICACION,
+  datosBinanceDeLaBase,
+  paisComoEnDropi,
+} from "@/lib/retiros/datos-binance";
 
 const TIPOS = [
   { valor: "banco", etiqueta: "Banco" },
@@ -30,17 +38,30 @@ interface CuentaExistente {
   comision_tipo: string | null;
   comision_porcentaje: number | null;
   comision_monto_fijo: number | null;
+  /** Solo las cuentas Binance (migración 0039). */
+  datos_binance?: unknown;
 }
 
 /** Ventana para crear o modificar una cuenta de retiro — mismo patrón que "+ Agregar" retiro
  * en Conciliación de Retiros (botón, ventana modal, Escape cierra, foco atrapado adentro),
  * para que ambas pantallas se sientan iguales. Sin `cuenta` es "crear" (botón + Agregar);
  * con `cuenta` es "modificar" (ícono de lápiz por fila). */
-export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta?: CuentaExistente }) {
+export function VentanaCuentaRetiro({
+  paisId,
+  paisNombre,
+  cuenta,
+}: {
+  paisId: string;
+  /** El país de la página: es el que sugiere el formulario de una cuenta Binance. */
+  paisNombre: string;
+  cuenta?: CuentaExistente;
+}) {
   const [abierto, setAbierto] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [comisionTipo, setComisionTipo] = useState(cuenta?.comision_tipo ?? "");
+  const [tipoCuenta, setTipoCuenta] = useState(cuenta?.tipo ?? "banco");
+  const datosBinance = datosBinanceDeLaBase(cuenta?.datos_binance);
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
   const editando = !!cuenta;
@@ -49,6 +70,7 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
   function abrirVentana() {
     setError(null);
     setComisionTipo(cuenta?.comision_tipo ?? "");
+    setTipoCuenta(cuenta?.tipo ?? "banco");
     setAbierto(true);
   }
 
@@ -94,11 +116,11 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
     setError(null);
     startTransition(async () => {
       try {
-        if (editando) await actualizarCuentaRetiro(formData);
-        else await crearCuentaRetiro(formData);
-        setAbierto(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo guardar.");
+        const resultado = editando ? await actualizarCuentaRetiro(formData) : await crearCuentaRetiro(formData);
+        if (resultado?.error) setError(resultado.error);
+        else setAbierto(false);
+      } catch {
+        setError("No se pudo guardar. Inténtalo de nuevo.");
       }
     });
   }
@@ -146,6 +168,9 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
             <form onSubmit={alEnviar} aria-busy={pending}>
               {!editando && <input type="hidden" name="pais_id" value={paisId} />}
               {editando && <input type="hidden" name="id" value={cuenta.id} />}
+              {/* Ya tenía datos de Binance: si el tipo cambia, el servidor sabe que hay que quitarlos. Va fuera del
+                  bloque de Binance porque ese bloque desaparece justo al cambiar el tipo. */}
+              {editando && datosBinance && <input type="hidden" name="binance_previo" value="1" />}
 
               <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
                 <span id={tituloId} className="text-sm font-semibold">
@@ -186,7 +211,8 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
                     id="campo-tipo-cuenta"
                     name="tipo"
                     required
-                    defaultValue={cuenta?.tipo ?? "banco"}
+                    value={tipoCuenta}
+                    onChange={(e) => setTipoCuenta(e.target.value)}
                     className={fieldClassSm}
                   >
                     {TIPOS.map((t) => (
@@ -196,19 +222,130 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
                     ))}
                   </select>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm} htmlFor="campo-cuenta-cuenta">
-                    Cuenta
-                  </label>
-                  <input
-                    id="campo-cuenta-cuenta"
-                    type="text"
-                    name="detalle"
-                    defaultValue={cuenta?.detalle ?? ""}
-                    placeholder="Ej: cuenta 04-01-23-00123-4"
-                    className={fieldClassSm}
-                  />
-                </div>
+
+                {tipoCuenta === "binance" ? (
+                  <fieldset className="flex flex-col gap-3 rounded-lg border border-border p-3">
+                    <legend className="px-1 text-xs font-medium text-muted-foreground">
+                      Datos de la cuenta, como los pide Dropi
+                    </legend>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClassSm} htmlFor="binance-pais">
+                        País
+                      </label>
+                      <input
+                        id="binance-pais"
+                        type="text"
+                        name="binance_pais"
+                        list="binance-paises"
+                        defaultValue={datosBinance?.pais || paisComoEnDropi(paisNombre)}
+                        className={fieldClassSm}
+                      />
+                      <datalist id="binance-paises">
+                        {PAISES_BINANCE.map((p) => (
+                          <option key={p} value={p} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClassSm} htmlFor="binance-banco">
+                        Banco
+                      </label>
+                      <input
+                        id="binance-banco"
+                        type="text"
+                        name="binance_banco"
+                        list="binance-bancos"
+                        defaultValue={datosBinance?.banco || BANCOS_BINANCE[0]}
+                        className={fieldClassSm}
+                      />
+                      <datalist id="binance-bancos">
+                        {BANCOS_BINANCE.map((b) => (
+                          <option key={b} value={b} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClassSm} htmlFor="binance-tipo-identificacion">
+                        Tipo de identificación<span aria-hidden="true" className="text-destructive"> *</span>
+                      </label>
+                      <input
+                        id="binance-tipo-identificacion"
+                        type="text"
+                        name="binance_tipo_identificacion"
+                        list="binance-tipos-identificacion"
+                        required
+                        defaultValue={datosBinance?.tipo_identificacion}
+                        placeholder="Ej: CE"
+                        className={fieldClassSm}
+                      />
+                      <datalist id="binance-tipos-identificacion">
+                        {TIPOS_IDENTIFICACION.map((t) => (
+                          <option key={t} value={t} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClassSm} htmlFor="binance-numero-identificacion">
+                        Número de identificación
+                      </label>
+                      <input
+                        id="binance-numero-identificacion"
+                        type="text"
+                        name="binance_numero_identificacion"
+                        defaultValue={datosBinance?.numero_identificacion}
+                        className={fieldClassSm}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClassSm} htmlFor="binance-tipo-cuenta">
+                        Tipo de cuenta
+                      </label>
+                      <input
+                        id="binance-tipo-cuenta"
+                        type="text"
+                        name="binance_tipo_cuenta"
+                        list="binance-tipos-cuenta"
+                        defaultValue={datosBinance?.tipo_cuenta || TIPOS_CUENTA_BINANCE[0]}
+                        className={fieldClassSm}
+                      />
+                      <datalist id="binance-tipos-cuenta">
+                        {TIPOS_CUENTA_BINANCE.map((t) => (
+                          <option key={t} value={t} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelClassSm} htmlFor="binance-numero-cuenta">
+                        Número de cuenta<span aria-hidden="true" className="text-destructive"> *</span>
+                      </label>
+                      <input
+                        id="binance-numero-cuenta"
+                        type="text"
+                        name="binance_numero_cuenta"
+                        required
+                        autoComplete="off"
+                        spellCheck={false}
+                        defaultValue={datosBinance?.numero_cuenta ?? cuenta?.detalle ?? ""}
+                        placeholder="Dirección de la billetera (ej: T…)"
+                        className={`${fieldClassSm} font-mono`}
+                      />
+                    </div>
+                  </fieldset>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <label className={labelClassSm} htmlFor="campo-cuenta-cuenta">
+                      Cuenta
+                    </label>
+                    <input
+                      id="campo-cuenta-cuenta"
+                      type="text"
+                      name="detalle"
+                      defaultValue={cuenta?.detalle ?? ""}
+                      placeholder="Ej: cuenta 04-01-23-00123-4"
+                      className={fieldClassSm}
+                    />
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-comision-tipo">

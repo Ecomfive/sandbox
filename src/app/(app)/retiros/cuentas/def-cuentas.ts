@@ -27,6 +27,8 @@ export interface FilaCuenta {
   comision_tipo: string | null;
   comision_porcentaje: number | null;
   comision_monto_fijo: number | null;
+  /** Solo las cuentas Binance: los datos en el formato de Dropi (migración 0039). */
+  datos_binance?: unknown;
 }
 
 /** Filtros y agrupación de las cuentas de retiro; «Inactivas» es lo cerrado, pero por defecto se ven todas. */

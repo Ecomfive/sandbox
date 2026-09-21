@@ -96,6 +96,19 @@ convenciones técnicas del código.
   el ancho entre varios grupos, usa bases pequeñas dentro de un `flex flex-wrap` y
   calcúlalas pensando en pantallas de ~1 200 px de contenido, no en 1 900: un mínimo de
   39rem por grupo las apilaba en las pantallas del equipo.
+- **Cuentas destino de tipo Binance.** Al elegir «Binance» en la ventana de una cuenta
+  destino (`retiros/cuentas/ventana-cuenta-retiro.tsx`), el campo «Cuenta» se cambia por
+  los datos en el formato del formulario de Dropi: País, Banco (la red, p. ej.
+  `USDT(RED=TRC-20)`), Tipo de identificación (obligatorio), Número de identificación,
+  Tipo de cuenta y Número de cuenta (la dirección de la billetera, obligatorio). Se
+  guardan en `cuentas_retiro.datos_binance` (jsonb, migración 0039; lógica y pruebas en
+  `src/lib/retiros/datos-binance.ts`) y el número de cuenta también va en `detalle`, que
+  es lo que muestran las listas. Los campos con sugerencias (`datalist`) aceptan otro
+  texto. Las acciones `crearCuentaRetiro` y `actualizarCuentaRetiro` devuelven el error
+  **como valor** (`{ error }`), porque en producción Next.js oculta el mensaje de una
+  excepción; sin la migración, las cuentas que no son Binance siguen funcionando y la
+  lista se consulta sin esa columna. Cambiar una cuenta de Binance a otro tipo borra sus
+  datos (`binance_previo`).
 - **Botón «Crear» de la barra.** `MenuCrear` (`src/components/menu-crear.tsx`, en
   `NavBar`) lista lo que se crea a menudo desde cualquier página; las opciones salen de
   `ACCIONES_CREAR` (`src/lib/crear-global.ts`) y solo aparecen las de módulos que la
