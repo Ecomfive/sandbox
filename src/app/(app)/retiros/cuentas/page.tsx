@@ -25,6 +25,11 @@ export default async function CuentasRetiroPage() {
   const conBinance = await consultar(`${COLUMNAS}, datos_binance`);
   const cuentas = (conBinance.error ? (await consultar(COLUMNAS)).data : conBinance.data) as unknown as FilaCuenta[] | null;
 
+  // El "numero" que se guarda solo sirve para mantener el orden de creación (no se reutiliza si se
+  // borra una cuenta vieja); el que se ve siempre es su posición 1, 2, 3... sin huecos, aunque haya
+  // cuentas eliminadas hace tiempo. Si en el futuro se puede reordenar la lista a mano, esto se cae.
+  const cuentasNumeradas = (cuentas ?? []).map((c, i) => ({ ...c, numero: i + 1 }));
+
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Cuentas destino" oculto />
@@ -34,7 +39,7 @@ export default async function CuentasRetiroPage() {
         </div>
       )}
 
-      <TablaCuentas cuentas={cuentas ?? []} paisId={pais.id} paisNombre={pais.nombre} puedeEscribir={puedeEscribir} />
+      <TablaCuentas cuentas={cuentasNumeradas} paisId={pais.id} paisNombre={pais.nombre} puedeEscribir={puedeEscribir} />
     </Pagina>
   );
 }
