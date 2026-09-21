@@ -10,9 +10,13 @@ const atajoDeEstado = (estado: string): AtajoFiltro => ({
   etiqueta: ETIQUETA_ESTADO[estado] ?? estado,
   ayuda: `Filtrar la tabla: ${(ETIQUETA_ESTADO[estado] ?? estado).toLowerCase()}`,
   filtro: { campo: "estado", valor: { tipo: "seleccion", valores: [estado] } },
+  suma: true,
 });
 
-/** Las tarjetas «Propuestos / En revisión / Aprobados» del catálogo: al pulsar una filtran la tabla de SKU por ese estado. */
+/**
+ * Las tarjetas «Propuestos / En revisión / Aprobados» del catálogo: al pulsar una filtran la tabla de SKU por ese estado.
+ * Se pueden juntar (propuestos O en revisión) y pulsar una otra vez la quita; sin ninguna la tabla queda sin filtrar.
+ */
 export function TarjetasEstadoCatalogo({ conteo }: { conteo: { propuesto: number; en_revision: number; aprobado: number } }) {
   return (
     <KpiGrid>

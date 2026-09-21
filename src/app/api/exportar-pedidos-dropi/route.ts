@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
   };
   const desde = searchParams.get("desde") || haceNDias(6);
   const hasta = searchParams.get("hasta") || hoy;
-  // Opcional: solo las órdenes de ese estado (lo que filtra la tarjeta del resumen en la página).
-  const estado = searchParams.get("estado") || null;
+  // Opcional: solo las órdenes de esos estados, repetidos en la dirección (lo que filtran las tarjetas del resumen).
+  const estados = [...new Set(searchParams.getAll("estado").filter((e) => e !== ""))].slice(0, 30);
 
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       .eq("plataforma_id", plataformaId)
       .gte("fecha", desde)
       .lte("fecha", hasta);
-    if (estado) consulta = consulta.eq("estado", estado);
+    if (estados.length > 0) consulta = consulta.in("estado", estados);
     return consulta.order("fecha", { ascending: false }).range(rDesde, rHasta);
   });
 
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="pedidos-dropi-${pais.codigo}-${desde}_a_${hasta}${
-        estado ? `-${estado.replace(/[^A-Za-z0-9_-]+/g, "_")}` : ""
+        estados.length > 0 ? `-${estados.map((e) => e.replace(/[^A-Za-z0-9_-]+/g, "_")).join("+")}` : ""
       }.csv"`,
     },
   });

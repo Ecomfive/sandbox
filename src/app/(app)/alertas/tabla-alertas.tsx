@@ -16,6 +16,8 @@ import { CalendarioIcon, EstadoIcon, InventarioIcon, ProductoIcon } from "@/lib/
 import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
 import type { Grupo } from "@/lib/tabla/vista";
 import { actualizarEstadoAlerta, actualizarEstadoAlertasMasivo } from "./actions";
+import { KpiGrid } from "@/components/ui/kpi-card";
+import { KpiFiltro } from "@/components/ui/kpi-filtro";
 import { DEF_ALERTAS } from "./def-alertas";
 
 const ESTADO_TONO = {
@@ -35,6 +37,13 @@ export interface AlertaFila {
 }
 
 const NOMBRE_FILAS: NombreFilas = { singular: "alerta", plural: "alertas" };
+
+/** Los estados como los dicen las tarjetas de recuento («4 Abiertas»). */
+const PLURAL_ESTADO: Record<AlertaFila["estado"], string> = {
+  abierta: "Abiertas",
+  reclamada: "Reclamadas",
+  resuelta: "Resueltas",
+};
 
 const ICONOS: Record<string, IconoComp> = {
   estado: EstadoIcon,
@@ -189,6 +198,29 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
   return (
     <div>
       <h2 className="text-sm font-semibold tracking-tight">Alertas</h2>
+      {alertas.length > 0 && (
+        // Las tarjetas de estado filtran esta tabla; se pueden juntar y pulsar otra vez las quita.
+        <div className="mt-3">
+          <KpiGrid compacta>
+            {(Object.keys(ESTADO_TONO) as AlertaFila["estado"][]).map((estado) => (
+              <KpiFiltro
+                key={estado}
+                def={DEF_ALERTAS}
+                compacta
+                atajo={{
+                  id: `estado-${estado}`,
+                  etiqueta: PLURAL_ESTADO[estado],
+                  ayuda: `Filtrar la tabla: ${PLURAL_ESTADO[estado].toLowerCase()}`,
+                  filtro: { campo: "estado", valor: { tipo: "seleccion", valores: [estado] } },
+                  suma: true,
+                }}
+                titulo={PLURAL_ESTADO[estado]}
+                valor={alertas.filter((a) => a.estado === estado).length}
+              />
+            ))}
+          </KpiGrid>
+        </div>
+      )}
       <div className="mt-3 min-w-0 rounded-xl border border-border bg-card">
         <BarraHerramientas
           def={DEF_ALERTAS}

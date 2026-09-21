@@ -7,7 +7,8 @@ import { DEF_GASTOS } from "./def-gastos";
 
 /**
  * Las tarjetas de «Este mes»: el total y una por categoría. Al pulsar una filtran la tabla de gastos de abajo por
- * ese mes (y por esa categoría); la del total, solo por el mes. Pulsarla otra vez quita el filtro.
+ * ese mes (y por esa categoría); la del total, solo por el mes. Las categorías se pueden juntar (nómina O alquiler)
+ * y pulsar una otra vez la quita; al quitar la última se va también el mes y la tabla queda sin filtrar.
  */
 export function TarjetasGastosMes({
   total,
@@ -42,6 +43,7 @@ export function TarjetasGastosMes({
             ayuda: `Filtrar la tabla: ${c.etiqueta.toLowerCase()} de este mes`,
             filtro: { campo: "categoria", valor: { tipo: "seleccion", valores: [c.valor] } },
             ademas: [delMes],
+            suma: true,
           }}
           titulo={c.etiqueta}
           valor={c.monto}

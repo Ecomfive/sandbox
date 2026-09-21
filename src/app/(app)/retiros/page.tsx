@@ -125,10 +125,11 @@ export default async function RetirosPage() {
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Conciliación de Retiros" oculto />
 
-      {/* Saldos y resumen en una sola franja: lado a lado cuando caben, uno sobre otro si no. */}
+      {/* Saldos y resumen en una sola línea desde unos 830 px de ancho (con tarjetas compactas); en pantallas más
+          angostas envuelven, uno sobre otro, sin recortar nada. */}
       <div className="flex flex-wrap gap-3">
         <KpiGroup
-          className="flex-[3_1_39rem]"
+          className="flex-[1_1_22rem]"
           titulo="Saldo de wallet"
           accion={
             <span className="flex items-center gap-2 font-normal">
@@ -154,13 +155,14 @@ export default async function RetirosPage() {
             </span>
           }
         >
-          <KpiGrid>
+          <KpiGrid compacta>
             {(plataformas ?? []).map((p) => {
               const ultimo = ultimoSaldoPorPlataforma.get(p.id);
               const esAutomatico = p.nombre === "Dropi";
               return (
                 <KpiCard
                   key={p.id}
+                  compacta
                   titulo={esAutomatico ? null : p.nombre}
                   valor={
                     <span className="inline-flex items-center gap-1.5">
@@ -175,7 +177,7 @@ export default async function RetirosPage() {
           </KpiGrid>
         </KpiGroup>
 
-        <KpiGroup titulo="Resumen de retiros" className="flex-[2_1_39rem]">
+        <KpiGroup titulo="Resumen de retiros" className="flex-[2_1_30rem]">
           <TarjetasResumenRetiros
             abiertos={abiertos}
             conNovedad={conNovedad}
