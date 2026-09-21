@@ -257,9 +257,11 @@ convenciones técnicas del código.
   `BarraLote` (`src/app/(app)/retiros/barra-lote.tsx`) fija abajo: pasar a
   Abierto, Novedad o Cerrado y descargar solo lo marcado. Cuenta únicamente lo que
   está en pantalla (una acción nunca toca un retiro que la persona no tiene
-  delante; los grupos contraídos no cuentan). **Alcance a propósito**: son los
-  mismos estados que ya se cambian uno a uno (solo mueve la etiqueta; no registra
-  monto recibido ni comprobante), y los cancelados no se tocan. Eliminar, cancelar
+  delante; los grupos contraídos no cuentan). **La columna Estado de la tabla es de
+  solo lectura** (una insignia, no un desplegable): el estado cambia al conciliar,
+  cancelar o con esta barra, que es la única forma de moverlo a mano. **Alcance a
+  propósito**: solo mueve la etiqueta (no registra monto recibido ni comprobante) y
+  los cancelados no se tocan. Eliminar, cancelar
   y conciliar **no** van en lote: no se deshacen o piden datos de cada retiro.
   Pedir confirmación va en la misma barra (sin ventana) y dice cuántos cambian y
   cuántos se omiten. Máximo 100 por vez (`MAX_LOTE`: los ids viajan en la

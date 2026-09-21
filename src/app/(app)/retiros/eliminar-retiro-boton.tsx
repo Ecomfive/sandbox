@@ -10,7 +10,7 @@ import { mensajeErrorAlEliminar } from "@/lib/retiros/errores";
 
 /** Ícono de eliminar por fila en Conciliación de Retiros — mismo patrón que EliminarCuentaBoton en cuentas destino:
  * confirm() antes de borrar, y `relative z-10` + stopPropagation porque la fila entera es un enlace estirado (ver
- * ConsolidadoToggle/EstadoSelect). Si no se puede eliminar, el error sale como aviso (toast), no como una caja pegada
+ * ConsolidadoToggle). Si no se puede eliminar, el error sale como aviso (toast), no como una caja pegada
  * a la fila: dentro de la tabla tapaba las filas de abajo y sus botones. */
 export function EliminarRetiroBoton({ id, correlativo }: { id: string; correlativo: number }) {
   const [pending, startTransition] = useTransition();

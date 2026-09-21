@@ -11,12 +11,6 @@ import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
-/** Estados que se pueden elegir a mano desde la columna Estado de la tabla. "cancelado"
- * queda afuera a propósito: sigue siendo una acción aparte (botón Cancelar), no un valor
- * más del desplegable, porque es un cierre distinto al de la conciliación normal. */
-const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
-type EstadoEditable = (typeof ESTADOS_EDITABLES)[number];
-
 async function registrarEvento(supabase: ReturnType<typeof createServiceClient>, retiroId: string, evento: string) {
   await supabase.from("retiro_eventos").insert({ retiro_id: retiroId, evento });
 }
@@ -308,7 +302,7 @@ export async function cancelarRetiro(formData: FormData) {
 
 /** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado
  * por, monto, comisión, fechas o nota — todo junto, desde la ficha de "Modificar". No toca el
- * estado (eso lo hace cambiarEstadoRetiro) ni el correlativo. */
+ * estado (eso lo hacen cerrarRetiro/conciliarRetiro/cancelarRetiro y la barra en lote) ni el correlativo. */
 export async function actualizarRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
@@ -389,9 +383,9 @@ export async function eliminarRetiro(formData: FormData): Promise<{ error?: stri
 }
 
 /**
- * Pasa a varios retiros a Abierto, Novedad o Cerrado desde la barra de acciones de la tabla. Es el mismo cambio
- * manual que `cambiarEstadoRetiro` (solo mueve la etiqueta; no toca monto recibido ni comprobante), con los mismos
- * permisos: hace falta acceso de escritura a Retiros. Los cancelados no se tocan. La lógica está en
+ * Pasa a varios retiros a Abierto, Novedad o Cerrado desde la barra de acciones de la tabla: es la única forma de
+ * mover el estado a mano (la columna Estado es de solo lectura). Solo mueve la etiqueta; no toca monto recibido ni
+ * comprobante. Hace falta acceso de escritura a Retiros. Los cancelados no se tocan. La lógica está en
  * `cambiarEstadoEnLote` (`src/lib/retiros/en-lote.ts`); aquí solo se comprueba el permiso y se refresca la página.
  * Devuelve el error como valor, porque en producción Next.js oculta el mensaje de cualquier excepción.
  */
@@ -410,47 +404,4 @@ export async function cambiarEstadoRetirosEnLote(ids: string[], nuevoEstado: str
   const resultado = await cambiarEstadoEnLote(createServiceClient(), ids, nuevoEstado, registrarAuditoriaLote);
   if (resultado.cambiados > 0) revalidatePath("/retiros");
   return resultado;
-}
-
-/** Cambio manual y directo del estado desde la columna de la tabla — a diferencia de
- * cerrarRetiro(), no toca monto recibido ni comprobante: solo mueve la etiqueta. Sirve para
- * marcar a mano una novedad detectada en Dropi, o archivar un retiro como cerrado sin pasar
- * por el formulario de conciliación. */
-export async function cambiarEstadoRetiro(formData: FormData) {
-  await requireModuloEscritura("retiros");
-  const id = formData.get("id") as string;
-  const nuevoEstado = formData.get("estado") as string;
-
-  if (!ESTADOS_EDITABLES.includes(nuevoEstado as EstadoEditable)) {
-    throw new Error(`Estado inválido: ${nuevoEstado}`);
-  }
-
-  const supabase = createServiceClient();
-  const { data: retiro, error: errorRetiro } = await supabase
-    .from("retiros")
-    .select("estado")
-    .eq("id", id)
-    .single();
-  if (errorRetiro) throw new Error(errorRetiro.message);
-
-  if (retiro.estado === nuevoEstado) return;
-
-  const { error } = await supabase.from("retiros").update({ estado: nuevoEstado }).eq("id", id);
-  if (error) throw new Error(error.message);
-
-  await registrarEvento(
-    supabase,
-    id,
-    `Estado cambiado a mano: ${ETIQUETA_ESTADO[retiro.estado] ?? retiro.estado} → ${ETIQUETA_ESTADO[nuevoEstado] ?? nuevoEstado}`
-  );
-  await registrarAuditoria({
-    accion: "cambiar_estado_retiro",
-    entidad: "retiros",
-    entidadId: id,
-    antes: { Estado: ETIQUETA_ESTADO[retiro.estado] ?? retiro.estado },
-    despues: { Estado: ETIQUETA_ESTADO[nuevoEstado] ?? nuevoEstado },
-  });
-
-  revalidatePath("/retiros");
-  revalidatePath(`/retiros/${id}`);
 }

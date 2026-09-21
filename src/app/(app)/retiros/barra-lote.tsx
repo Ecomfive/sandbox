@@ -20,7 +20,7 @@ import { cambiarEstadoRetirosEnLote } from "./actions";
 import { DEF_RETIROS } from "./filtros";
 import type { FilaRetiro } from "./tabla-retiros";
 
-/** Los mismos colores de la columna Estado (ver EstadoSelect), para que cada botón se lea como el estado al que lleva. */
+/** Los mismos colores de la columna Estado (insignias de `tabla-retiros.tsx`), para que cada botón se lea como el estado al que lleva. */
 const CLASE_ESTADO: Record<EstadoEnLote, string> = {
   abierto: "bg-accent text-accent-foreground hover:bg-accent-hover",
   novedad: "bg-destructive-soft text-destructive hover:brightness-95",
