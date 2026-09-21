@@ -7,7 +7,9 @@ import { POR_PAGINA, useIrAPaginaArriba } from "@/components/tabla/usar-pagina-a
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { anilloFoco } from "@/components/ui/field";
 import { linkClass } from "@/components/ui/link";
+import { Tooltip } from "@/components/ui/tooltip";
 import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
@@ -34,6 +36,7 @@ import { BarraLote } from "./barra-lote";
 import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
 import { EditarRetiroPanel } from "./editar-retiro-panel";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
+import { VistaRapidaIcon, VistaRapidaRetiro } from "./vista-rapida-retiro";
 
 export interface FilaRetiro {
   id: string;
@@ -192,6 +195,9 @@ export function TablaRetiros({
   // nunca toca un retiro que la persona no tiene delante. Un retiro marcado que un filtro esconde sigue marcado
   // y reaparece marcado cuando el filtro se quita.
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  // El retiro que se ve en la vista rápida (el panel de la derecha); se busca por id para que, si la fila cambia
+  // (un estado nuevo), el panel muestre lo de ahora.
+  const [vistaRapidaId, setVistaRapidaId] = useState<string | null>(null);
   const filasEnPantalla = agrupado ? grupos.filter((g) => !contraidos.has(g.clave)).flatMap((g) => g.filas) : visibles;
   const filasMarcadas = puedeEscribir ? filasEnPantalla.filter((f) => marcados.has(f.id)) : [];
   const todasMarcadas = filasEnPantalla.length > 0 && filasMarcadas.length === filasEnPantalla.length;
@@ -251,6 +257,18 @@ export function TablaRetiros({
         }`}
       >
         <div className="flex items-center justify-center gap-1">
+          {/* `relative z-10`: la fila entera es un enlace estirado (ver el número #), el botón debe quedar encima. */}
+          <Tooltip texto="Vista rápida">
+            <button
+              type="button"
+              onClick={() => setVistaRapidaId(fila.id)}
+              aria-label={`Vista rápida del retiro #${String(fila.numeroCorrelativo).padStart(4, "0")}`}
+              aria-haspopup="dialog"
+              className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+            >
+              <VistaRapidaIcon className="h-4 w-4" />
+            </button>
+          </Tooltip>
           <ConciliarRetiroPanel
             retiro={{
               id: fila.id,
@@ -409,6 +427,11 @@ export function TablaRetiros({
             }${!resultado.cerradosVisibles && resultado.cerradosOcultos > 0 ? `, ${resultado.cerradosOcultos} cerrados ocultos` : ""}`
           : ""}
       </p>
+      <VistaRapidaRetiro
+        fila={retiros.find((r) => r.id === vistaRapidaId) ?? null}
+        codigoPais={codigoPais}
+        alCerrar={() => setVistaRapidaId(null)}
+      />
       {retiros.length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
       {retiros.length > 0 && visibles.length === 0 && (
         <EstadoVacio

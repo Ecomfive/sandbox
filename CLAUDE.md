@@ -117,6 +117,16 @@ convenciones técnicas del código.
   páginas sale del menú y de las pestañas de cada módulo
   (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
+- **Vista rápida de un retiro.** El botón de la columna de acciones de Retiros
+  («Vista rápida») abre un panel a la derecha (`<Ventana lado="derecha">`,
+  `retiros/vista-rapida-retiro.tsx`) con lo esencial del retiro y su **actividad**,
+  sin salir de la tabla; «Abrir ficha completa» lleva a la ficha. Lo que muestra sale de
+  la fila ya cargada (se busca por id, así que si la fila cambia el panel se actualiza);
+  solo la actividad se pide al abrir, con la acción de lectura `obtenerActividadRetiro`
+  (`retiros/actividad.ts`: basta poder abrir Retiros, devuelve el error como valor, trae
+  los 30 eventos más recientes). Para dar la misma vista a otra tabla: un componente
+  como este + un botón en su columna de acciones (con `relative z-10` si la fila es un
+  enlace estirado).
 - **Atajos de teclado y ventanas.** `AtajosTeclado` (`src/components/atajos-teclado.tsx`,
   en la barra de arriba) da atajos de una tecla al estilo ClickUp: `g` y luego una
   letra va a una página (solo las que la persona puede abrir; la lista y las letras
