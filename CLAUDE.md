@@ -86,12 +86,16 @@ convenciones técnicas del código.
   pantalla y la descripción sigue visible); si dice algo que las migas no
   dicen («Cargar extracto bancario»), va visible con su ícono. Un dato secundario
   de un grupo de indicadores (la fecha de actualización) va en la franja del
-  `KpiGroup` (`accion`), no en una fila aparte; varios grupos comparten fila con
-  bases pequeñas dentro de un `flex flex-wrap` (Retiros: `flex-[1_1_22rem]` el saldo y
-  `flex-[2_1_30rem]` el resumen, con `KpiGrid compacta` y tarjetas `compacta`: una
-  sola línea desde unos 845 px de contenido, y por debajo envuelven sin recortar).
-  Calcula el ancho de las bases pensando en pantallas de ~1 200 px de contenido, no
-  en 1 900: un mínimo de 39rem por grupo las apilaba en las pantallas del equipo.
+  `KpiGroup` (`accion`), no en una fila aparte. Varios indicadores que se leen juntos
+  van en **una sola barra** (un `KpiGroup` con un `KpiGrid compacta` de tarjetas
+  `compacta`): Retiros tiene la barra «Dashboard» con el saldo de wallet, retiros
+  abiertos, con novedad, cerrados este mes (monto y cuántos), cerrados y el total, todas
+  hermanas en una misma fila que envuelve sin recortar si no caben. Un componente de
+  cliente que aporta varias tarjetas (`TarjetasResumenRetiros`) devuelve un fragmento,
+  no su propio `KpiGrid`, para no anidar contenedores. Si aun así hiciera falta repartir
+  el ancho entre varios grupos, usa bases pequeñas dentro de un `flex flex-wrap` y
+  calcúlalas pensando en pantallas de ~1 200 px de contenido, no en 1 900: un mínimo de
+  39rem por grupo las apilaba en las pantallas del equipo.
 - **Botón «Crear» de la barra.** `MenuCrear` (`src/components/menu-crear.tsx`, en
   `NavBar`) lista lo que se crea a menudo desde cualquier página; las opciones salen de
   `ACCIONES_CREAR` (`src/lib/crear-global.ts`) y solo aparecen las de módulos que la
