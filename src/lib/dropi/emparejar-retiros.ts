@@ -39,6 +39,8 @@ export interface RetiroLocal {
   dropiId: number | null;
   estadoDropi: EstadoDropi | null;
   monto: number;
+  /** Estado interno actual del retiro (abierto/novedad/cerrado/cancelado). */
+  estado: string;
 }
 
 export interface Actualizacion {
@@ -49,6 +51,9 @@ export interface Actualizacion {
   estadoDropi: EstadoDropi;
   vinculadoAhora: boolean;
   cambioEstado: boolean;
+  /** Dropi rechazó (o canceló) el retiro y seguía abierto acá: se marca como novedad para
+   * revisarlo a mano. Nunca se cancela solo — cancelar sigue siendo una acción manual. */
+  marcarNovedad: boolean;
   montoDropi: number;
   montoRetiro: number;
 }
@@ -67,7 +72,9 @@ export interface ResultadoEmparejar {
 export function mapearEstadoDropi(status: string): EstadoDropi {
   const normalizado = status.trim().toUpperCase();
   if (normalizado === "APROBADO") return "aprobado";
-  if (normalizado === "RECHAZADO") return "rechazado";
+  // Dropi puede reportar un retiro como rechazado o como cancelado — para nosotros es lo mismo:
+  // el dinero no salió, hay que revisarlo. No hay un estado_dropi aparte para "cancelado".
+  if (normalizado === "RECHAZADO" || normalizado === "CANCELADO") return "rechazado";
   return "pendiente";
 }
 
@@ -117,6 +124,7 @@ export function emparejarRetiros(dropi: RetiroDropi[], locales: RetiroLocal[]): 
       estadoDropi: retiro.estado,
       vinculadoAhora: local.dropiId === null,
       cambioEstado: local.estadoDropi !== retiro.estado,
+      marcarNovedad: retiro.estado === "rechazado" && local.estado === "abierto",
       montoDropi: retiro.monto,
       montoRetiro: local.monto,
     });
