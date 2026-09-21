@@ -30,9 +30,6 @@ import type { Grupo } from "@/lib/tabla/vista";
 import { DEF_RETIROS, ESTADO_ETIQUETA } from "./filtros";
 import { CrearRetiroPanel, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 import { BarraLote } from "./barra-lote";
-import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
-import { EditarRetiroPanel } from "./editar-retiro-panel";
-import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 import { VistaRapidaRetiro } from "./vista-rapida-retiro";
 
 export interface FilaRetiro {
@@ -102,7 +99,7 @@ const COLUMNAS: (ColumnaDef & { id: ColumnaId; claseCelda?: string })[] = [
 ];
 const COLUMNAS_POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]));
 
-/** Fondo opaco de una fila marcada (también el de su celda de acciones, que queda fija a la derecha). */
+/** Fondo opaco de una fila marcada. */
 const FONDO_MARCADA = "bg-[color-mix(in_oklab,var(--accent)_45%,var(--card))]";
 
 function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string, alAbrir: (id: string) => void) {
@@ -254,52 +251,6 @@ export function TablaRetiros({
           {renderCelda(columna.id, fila, codigoPais, setVistaRapidaId)}
         </td>
       ))}
-      <td
-        className={`sticky right-0 z-10 px-2 py-3 ${
-          marcados.has(fila.id) ? FONDO_MARCADA : "bg-card group-hover:bg-muted/50"
-        }`}
-      >
-        <div className="flex items-center justify-center gap-1">
-          {/* `relative z-10`: la fila entera es un enlace estirado (ver el número #), el botón debe quedar encima. */}
-          <ConciliarRetiroPanel
-            retiro={{
-              id: fila.id,
-              numeroCorrelativo: fila.numeroCorrelativo,
-              plataformaNombre: fila.plataformaNombre,
-              destino: fila.destino,
-              gestionadoPor: fila.gestionadoPor,
-              monto: fila.monto,
-              fecha: fila.fecha,
-              fechaLimite: fila.fechaLimite,
-              comision: fila.comision,
-              aRecibir: fila.aRecibir,
-              notas: fila.notas,
-              soporteNumero: fila.soporteNumero,
-              montoRecibido: fila.montoRecibido,
-            }}
-            paisId={paisId}
-          />
-          <EditarRetiroPanel
-            retiro={{
-              id: fila.id,
-              numeroCorrelativo: fila.numeroCorrelativo,
-              plataformaId: fila.plataformaId,
-              cuentaRetiroId: fila.cuentaRetiroId,
-              destino: fila.destino,
-              gestionadoPor: fila.gestionadoPor,
-              monto: fila.monto,
-              comision: fila.comision,
-              fecha: fila.fecha,
-              fechaLimite: fila.fechaLimite,
-              notas: fila.notas,
-              estado: fila.estado,
-            }}
-            plataformas={plataformas}
-            cuentas={cuentas}
-          />
-          <EliminarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
-        </div>
-      </td>
     </tr>
   );
 
@@ -374,12 +325,6 @@ export function TablaRetiros({
                   </span>
                 </th>
               ))}
-              <th
-                scope="col"
-                className="sticky right-0 z-10 bg-muted px-2 py-3 text-center text-xs font-semibold tracking-wide uppercase"
-              >
-                Acciones
-              </th>
             </tr>
           </thead>
           {vista.agrupar ? (
@@ -388,7 +333,7 @@ export function TablaRetiros({
               return (
                 <tbody key={grupo.clave}>
                   <EncabezadoGrupo
-                    columnas={columnasVisibles.length + (puedeEscribir ? 2 : 1)}
+                    columnas={columnasVisibles.length + (puedeEscribir ? 1 : 0)}
                     contraido={contraido}
                     alAlternar={() => tabla.alternarGrupo(grupo.clave)}
                     etiqueta={etiquetaGrupo(vista.agrupar!, grupo)}
