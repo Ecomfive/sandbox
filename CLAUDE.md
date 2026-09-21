@@ -112,6 +112,17 @@ convenciones técnicas del código.
   (el layout persiste): se ven al día tras recargar o al refrescar la ruta. La
   pastilla dice «3 pendientes» a los lectores de pantalla (texto oculto, no una
   región en vivo).
+- **Riel del menú colapsado.** Con el menú colapsado (solo íconos), pulsar el ícono
+  de una sección (Proveeduría, Tiendas, Catálogo, Recursos Humanos) abre a su
+  derecha un **panel** con las páginas de esa sección y sus contadores
+  (`PanelSeccion`, `src/components/sidebar-panel.tsx`), para ir a ellas sin
+  desplegar el menú. Va por portal a `<body>`; el foco pasa a la primera página;
+  se cierra con Escape (el foco vuelve al ícono), al pulsar fuera, al pulsar el
+  mismo ícono o al elegir una página, y Tab más allá de la última página lo cierra
+  y sigue desde el ícono. El ícono lleva `data-panel-abridor` y `aria-expanded`.
+  Todo control del riel debe tener nombre accesible aunque no muestre texto
+  (`aria-label` cuando `!expanded`). Con el menú desplegado nada cambia (las
+  secciones se abren en el propio menú).
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y
@@ -166,8 +177,13 @@ convenciones técnicas del código.
   (`src/lib/tabla/csv.ts`). Salen todos los `campos` de la definición, con los
   nombres que se ven; lo que sea un identificador y no un campo de filtro (el
   número de un retiro) va en `csvAntes`. Un texto que empieza por `=`, `+`, `-` o
-  `@` se escribe con comilla para que Excel no lo ejecute. Las descargas del
-  servidor de un período completo (`/api/exportar-*`) siguen aparte.
+  `@` se escribe con comilla para que Excel no lo ejecute. **Un solo botón de
+  descarga por tabla**: no pongas un enlace «Descargar CSV» al lado. Si la tabla
+  solo tiene cargada una parte de los datos (500 de 1 790 órdenes; los últimos 10
+  extractos) y el servidor sabe armar el total (`/api/exportar-*`), la página pasa
+  `descargaCompleta={{ href, etiqueta, detalle }}` (a `TablaDatos` o a
+  `BarraHerramientas`) y el mismo botón abre un menú con «Lo que se ve» y esa
+  descarga completa. Si la tabla ya trae todo (Alertas), el botón basta.
 - **Acciones en lote (Retiros).** La tabla de Retiros tiene una casilla por fila
   y una en el encabezado («seleccionar los que se ven»); al marcar aparece
   `BarraLote` (`src/app/(app)/retiros/barra-lote.tsx`) fija abajo: pasar a
@@ -211,6 +227,18 @@ convenciones técnicas del código.
   totales que no filtran nada (saldos de wallet, Inteligencia competitiva) no son
   pulsables. Las de «Pendientes de hoy» del Dashboard llevan a su módulo; la de
   Novedad no filtra porque cuenta todas las fechas y Pedidos muestra un período.
+- **Paginación de las tablas.** Una tabla larga se pagina en el cliente:
+  `useTablaInteractiva(def, filas, { porPagina: 50 })` (`src/components/tabla/usar-tabla.ts`)
+  deja en `visibles` solo la página actual y expone `paginacion` (página, total,
+  rango) e `irAPagina`; se dibuja con `<Paginacion>`
+  (`src/components/tabla/paginacion.tsx`: «Mostrando 51–100 de 136», flechas y
+  botones numerados con la página actual marcada con `aria-current="page"`). La
+  cuenta de páginas y los botones con «…» salen de `src/lib/tabla/paginacion.ts`.
+  **Solo se pagina sin filtros ni grupos**: con filtros o agrupando se ven todos los
+  resultados (los grupos y el «N de M» del pie ya orientan). La página se olvida al
+  cambiar los filtros, la agrupación o los cerrados. Hoy la usa Retiros; las demás
+  tablas siguen con `limiteSinFiltros` (un tope con aviso) hasta que se pidan. Lo
+  que esté marcado (acciones en lote) cuenta solo en la página que se ve.
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
   y la `<table>` lleva la clase `tabla-datos`; los estilos están en
@@ -221,7 +249,9 @@ convenciones técnicas del código.
   que su tarjeta se desplaza de lado (como región con teclado) y el encabezado no
   se fija, porque un encabezado fijo no funciona dentro de una caja que se
   desplaza de lado. No pongas `overflow-hidden` en una tarjeta que contenga una
-  tabla: rompe lo fijo.
+  tabla: rompe lo fijo. El encabezado fijo tiene `z-index: 15` (`globals.css`): lo
+  que una fila eleve con `z-10` (casillas, desplegables, la celda de acciones fija)
+  no debe pasar de 10 o se verá por encima del encabezado al bajar.
 - **Borde de los campos de formulario.** Los `input`, `select` y `textarea` usan
   `fieldClass` / `fieldClassSm` (`src/components/ui/field.ts`), que llevan
   `border-border-control` (`--border-control`: 3:1 contra el fondo, WCAG 1.4.11).

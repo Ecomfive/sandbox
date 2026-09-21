@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
+import { Paginacion } from "@/components/tabla/paginacion";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -56,8 +57,9 @@ export interface FilaRetiro {
   soporteNumero: string | null;
 }
 
-// Sin filtros ni grupos se ven los más recientes; con filtros o agrupando se trabaja sobre todos los retiros cargados.
-const LIMITE_SIN_FILTROS = 50;
+// Sin filtros ni grupos se ve una página de 50 (los más recientes primero); con filtros o agrupando se trabaja sobre
+// todos los retiros cargados.
+const POR_PAGINA = 50;
 
 const NOMBRE_FILAS: NombreFilas = { singular: "retiro", plural: "retiros" };
 
@@ -179,9 +181,18 @@ export function TablaRetiros({
   /** Solo quien puede modificar retiros ve las casillas y la barra de acciones en lote. */
   puedeEscribir: boolean;
 }) {
-  const tabla = useTablaInteractiva(DEF_RETIROS, retiros, { limiteSinFiltros: LIMITE_SIN_FILTROS });
+  const tabla = useTablaInteractiva(DEF_RETIROS, retiros, { porPagina: POR_PAGINA });
   const [columnasGuardadas, cambiarColumnas] = useColumnas("retiros", COLUMNAS);
-  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado } = tabla;
+  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
+
+  // Al cambiar de página se vuelve al principio de la tabla (si quien pulsó estaba abajo, no se queda mirando el final).
+  const raiz = useRef<HTMLDivElement>(null);
+  function irAPagina(pagina: number) {
+    tabla.irAPagina(pagina);
+    if (raiz.current && raiz.current.getBoundingClientRect().top < 0) {
+      requestAnimationFrame(() => raiz.current?.scrollIntoView({ block: "start" }));
+    }
+  }
 
   // Lo marcado. Solo cuenta lo que se ve ahora (filas de los grupos abiertos, o las de la lista): así una acción
   // nunca toca un retiro que la persona no tiene delante. Un retiro marcado que un filtro esconde sigue marcado
@@ -292,7 +303,6 @@ export function TablaRetiros({
     visibles: visibles.length,
     base: resultado.base.length,
     grupos: grupos.length,
-    limiteSinFiltros: LIMITE_SIN_FILTROS,
     nombre: NOMBRE_FILAS,
     cerradosVisibles: resultado.cerradosVisibles,
     cerradosOcultos: resultado.cerradosOcultos,
@@ -300,7 +310,7 @@ export function TablaRetiros({
   });
 
   return (
-    <div className="mt-3 min-w-0 rounded-xl border border-border bg-card">
+    <div ref={raiz} className="mt-3 min-w-0 rounded-xl border border-border bg-card">
       <BarraHerramientas
         def={DEF_RETIROS}
         filas={retiros}
@@ -386,6 +396,7 @@ export function TablaRetiros({
           )}
         </table>
       </ContenedorTabla>
+      {paginacion && <Paginacion pagina={paginacion} nombre={NOMBRE_FILAS} alIrA={irAPagina} />}
       {filasMarcadas.length > 0 && (
         <BarraLote
           filas={filasMarcadas}
@@ -397,7 +408,9 @@ export function TablaRetiros({
       {/* Anuncia a lectores de pantalla cuántos retiros se ven cuando cambian los filtros, los grupos o los cerrados. */}
       <p role="status" className="sr-only">
         {retiros.length > 0
-          ? `${visibles.length} ${visibles.length === 1 ? "retiro" : "retiros"}${
+          ? `${paginacion ? paginacion.total : visibles.length} ${
+              (paginacion ? paginacion.total : visibles.length) === 1 ? "retiro" : "retiros"
+            }${paginacion && paginacion.totalPaginas > 1 ? `, página ${paginacion.pagina} de ${paginacion.totalPaginas}` : ""}${
               agrupado ? ` en ${grupos.length} ${grupos.length === 1 ? "grupo" : "grupos"}` : ""
             }${!resultado.cerradosVisibles && resultado.cerradosOcultos > 0 ? `, ${resultado.cerradosOcultos} cerrados ocultos` : ""}`
           : ""}

@@ -155,17 +155,6 @@ export default async function PedidosDropiPage({
           <FiltroFechas />
           <OrdenSelect actual={ordenClave} />
         </div>
-        {/* Con el filtro de alertas no hay descarga completa: las alertas caben todas en la tabla y sale con «Descargar». */}
-        {!soloAlertas && (
-          <a
-            href={`/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}${
-              filtroEstado ? `&estado=${encodeURIComponent(filtroEstado)}` : ""
-            }`}
-            className={`${linkClass} ml-auto`}
-          >
-            Descargar CSV ({totalFiltrado.toLocaleString("es")} órdenes)
-          </a>
-        )}
       </div>
 
       {totalOrdenes === 0 ? (
@@ -224,11 +213,27 @@ export default async function PedidosDropiPage({
                 Mostrando {todas.length} de {totalFiltrado.toLocaleString("es")} órdenes
               </strong>{" "}
               en la tabla (el resumen de arriba sí las cuenta a todas). Achica el rango de fechas
-              {hayFiltro ? "" : " o pulsa un estado del resumen"} para verlas todas, o descarga el CSV completo arriba.
+              {hayFiltro ? "" : " o pulsa un estado del resumen"} para verlas todas, o usa «Descargar» en la tabla y
+              elige «{filtroEstado ? "Todas las de este estado" : "Todo el período"}».
             </div>
           )}
 
-          <TablaPedidos pedidos={filasPedido} codigoPais={pais.codigo} />
+          <TablaPedidos
+            pedidos={filasPedido}
+            codigoPais={pais.codigo}
+            // Con el filtro de alertas no hay descarga completa: caben todas en la tabla y salen con «Lo que se ve».
+            descargaCompleta={
+              soloAlertas
+                ? undefined
+                : {
+                    href: `/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}${
+                      filtroEstado ? `&estado=${encodeURIComponent(filtroEstado)}` : ""
+                    }`,
+                    etiqueta: filtroEstado ? "Todas las de este estado" : "Todo el período",
+                    detalle: `${totalFiltrado.toLocaleString("es")} órdenes`,
+                  }
+            }
+          />
         </>
       )}
     </Pagina>
