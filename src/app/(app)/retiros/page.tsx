@@ -9,7 +9,6 @@ import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/l
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
 import { CrearRetiroPanel } from "./crear-retiro-panel";
-import { DropiSinVincular } from "./dropi-sin-vincular";
 import { TarjetasResumenRetiros } from "./tarjetas-resumen";
 
 export const metadata = { title: "Conciliación de Retiros" };
@@ -29,7 +28,6 @@ export default async function RetirosPage() {
     { data: retiros },
     { data: cuentasRetiro },
     { data: perfiles },
-    { data: sinVincular },
   ] =
     await Promise.all([
       supabase
@@ -56,12 +54,6 @@ export default async function RetirosPage() {
         .eq("activa", true)
         .order("nombre"),
       supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre"),
-      supabase
-        .from("dropi_retiros_sin_vincular")
-        .select("id, dropi_id, monto, fecha, estado_dropi, banco, concepto, motivo")
-        .eq("pais_id", pais.id)
-        .order("fecha", { ascending: false })
-        .limit(200),
     ]);
 
   const plataformas = (plataformasPais ?? [])
@@ -209,8 +201,6 @@ export default async function RetirosPage() {
           puedeEscribir={!usuario.modulosSoloLectura.includes("retiros")}
         />
       </div>
-
-      <DropiSinVincular filas={sinVincular ?? []} codigoPais={pais.codigo} />
     </Pagina>
   );
 }
