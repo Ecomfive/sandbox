@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { alternarActivaCuenta } from "./actions";
 import { etiquetaComision, etiquetaTipoCuenta, type FilaCuenta } from "./def-cuentas";
 import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
@@ -11,7 +11,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { EstadoIcon, ExtractoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, LapizIcon, WalletIcon } from "@/lib/nav-icons";
+import { EstadoIcon, ExtractoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 import { datosBinanceDeLaBase } from "@/lib/retiros/datos-binance";
 
 function Dato({ etiqueta, children, ancho }: { etiqueta: string; children: ReactNode; ancho?: boolean }) {
@@ -25,8 +25,8 @@ function Dato({ etiqueta, children, ancho }: { etiqueta: string; children: React
 
 const SIN_DATO = <span className="text-muted-foreground">—</span>;
 
-/** Botón de la cabecera para pasar a la cuenta anterior o siguiente. Sin adonde ir (o con el formulario abierto) queda
- * apagado con `aria-disabled` y no con `disabled`, para no soltar el foco en medio de la navegación con teclado. */
+/** Botón de la cabecera para pasar a la cuenta anterior o siguiente. Sin adonde ir (o mientras guarda) queda apagado
+ * con `aria-disabled` y no con `disabled`, para no soltar el foco en medio de la navegación con teclado. */
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
   texto: string;
   icono: typeof FlechaArribaIcon;
@@ -76,13 +76,63 @@ function AlternarActivaBoton({ cuenta }: { cuenta: FilaCuenta }) {
   );
 }
 
+/** Los datos de la cuenta solo para leer: lo que ve quien no tiene permiso de escritura en Retiros. */
+function DatosDeLaCuenta({ cuenta }: { cuenta: FilaCuenta }) {
+  const datosBinance = datosBinanceDeLaBase(cuenta.datos_binance);
+  return (
+    <div className="flex flex-col divide-y divide-border p-5">
+      <Seccion icono={WalletIcon} titulo="Cuenta">
+        <dl className="flex flex-col gap-3">
+          <Dato etiqueta="Nombre">{cuenta.nombre}</Dato>
+          <Dato etiqueta="Tipo">{etiquetaTipoCuenta(cuenta.tipo)}</Dato>
+          {cuenta.tipo !== "binance" && <Dato etiqueta="Cuenta">{cuenta.detalle || SIN_DATO}</Dato>}
+        </dl>
+      </Seccion>
+
+      {cuenta.tipo === "binance" && (
+        <Seccion icono={ExtractoIcon} titulo="Datos de la cuenta">
+          {datosBinance ? (
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Dato etiqueta="País">{datosBinance.pais || SIN_DATO}</Dato>
+              <Dato etiqueta="Banco">{datosBinance.banco || SIN_DATO}</Dato>
+              <Dato etiqueta="Tipo de identificación">{datosBinance.tipo_identificacion || SIN_DATO}</Dato>
+              <Dato etiqueta="Número de identificación">{datosBinance.numero_identificacion || SIN_DATO}</Dato>
+              <Dato etiqueta="Número de cuenta" ancho>
+                <span className="font-mono">{datosBinance.numero_cuenta || SIN_DATO}</span>
+              </Dato>
+            </dl>
+          ) : (
+            <dl>
+              <Dato etiqueta="Número de cuenta">
+                <span className="font-mono">{cuenta.detalle || SIN_DATO}</span>
+              </Dato>
+            </dl>
+          )}
+        </Seccion>
+      )}
+
+      <Seccion icono={GastoIcon} titulo="Comisión sugerida">
+        <dl className="flex flex-col gap-3">
+          <Dato etiqueta="Comisión">
+            {cuenta.comision_tipo
+              ? etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)
+              : "Sin comisión"}
+          </Dato>
+        </dl>
+      </Seccion>
+    </div>
+  );
+}
+
 /**
  * Ficha de una cuenta destino: el panel a la derecha que se abre al pulsar su fila. Arriba, el título con su número y
- * estado, las flechas para pasar a la cuenta de arriba o de abajo (en el orden en que se ven en la tabla) y cerrar;
- * luego las acciones (modificar, desactivar, eliminar) y los datos en bloques con ícono. «Modificar» cambia los bloques
- * por el formulario, en el mismo panel, y al guardar vuelve a la ficha. Lo que muestra sale de la fila ya cargada, así
- * que se actualiza sola al guardar o al eliminarla (que la desactiva, no la borra): la ficha queda abierta con su
- * nuevo estado, aunque la fila haya salido de la tabla de abajo por el filtro de «Eliminadas».
+ * estado, las flechas para pasar a la cuenta de arriba o de abajo (en el orden en que se ven en la tabla) y cerrar.
+ * Con permiso de escritura la ficha **ya es el formulario**: no hay un botón «Modificar»; se cambian los campos, se
+ * pulsa «Guardar cambios» (que cierra la ficha) y las acciones Desactivar y Eliminar están arriba de los campos. Si hay
+ * cambios sin guardar, cerrar o pasar a otra cuenta pide confirmación. Sin permiso de escritura solo se leen los datos.
+ * Lo que muestra sale de la fila ya cargada, así que se actualiza sola al guardar o al eliminarla (que la desactiva, no
+ * la borra): la ficha queda abierta con su nuevo estado, aunque la fila haya salido de la tabla de abajo por el filtro
+ * de «Eliminadas».
  */
 export function FichaCuenta({
   cuenta,
@@ -93,7 +143,7 @@ export function FichaCuenta({
   alIr,
   alCerrar,
 }: {
-  /** La cuenta que se ve; sin ella (no abierta, o ya eliminada) el panel está cerrado. */
+  /** La cuenta que se ve; sin ella (no abierta, o ya no está en la lista) el panel está cerrado. */
   cuenta: FilaCuenta | undefined;
   /** Las claves de las cuentas en el orden de la tabla. */
   orden: string[];
@@ -103,32 +153,37 @@ export function FichaCuenta({
   alIr: (id: string) => void;
   alCerrar: () => void;
 }) {
-  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const raiz = useRef<HTMLDivElement>(null);
-  const editando = !!cuenta && editandoId === cuenta.id;
+  // De qué cuenta hay cambios sin guardar (el id, para que no pase a otra cuenta ni sobreviva a una eliminada).
+  const [sinGuardarId, setSinGuardarId] = useState<string | null>(null);
+  const sinGuardar = !!cuenta && sinGuardarId === cuenta.id;
 
-  // Al pasar de la ficha al formulario (y de vuelta) el foco va al primer control de lo nuevo: el botón que tenía se
-  // desmonta. (Al abrir el panel, de eso se encarga `Ventana`.)
-  useEffect(() => {
-    raiz.current?.querySelector<HTMLElement>("[data-enfocar]")?.focus();
-  }, [editando]);
+  /** Pide confirmación si se van a perder cambios; devuelve si se puede seguir. */
+  function puedeDescartar() {
+    return !sinGuardar || confirm("Hay cambios sin guardar. ¿Descartarlos?");
+  }
 
   function cerrar() {
-    if (guardando) return;
-    setEditandoId(null);
+    if (guardando || !puedeDescartar()) return;
+    setSinGuardarId(null);
     alCerrar();
   }
 
-  function terminarEdicion() {
+  function irA(id: string) {
+    if (guardando || !puedeDescartar()) return;
+    setSinGuardarId(null);
+    alIr(id);
+  }
+
+  function alGuardar() {
     setGuardando(false); // el formulario se desmonta: ya no avisará que terminó
-    setEditandoId(null);
+    setSinGuardarId(null);
+    alCerrar();
   }
 
   const indice = cuenta ? orden.indexOf(cuenta.id) : -1;
   const anterior = indice > 0 ? orden[indice - 1] : null;
   const siguiente = indice >= 0 && indice < orden.length - 1 ? orden[indice + 1] : null;
-  const datosBinance = datosBinanceDeLaBase(cuenta?.datos_binance);
   const numero = cuenta?.numero != null ? ` #${cuenta.numero}` : "";
 
   return (
@@ -140,7 +195,7 @@ export function FichaCuenta({
       titulo={
         cuenta && (
           <>
-            <span className="text-lg font-semibold">{editando ? `Modificar cuenta${numero}` : `Cuenta${numero}`}</span>
+            <span className="text-lg font-semibold">{`Cuenta${numero}`}</span>
             <Badge tone="neutral">{etiquetaTipoCuenta(cuenta.tipo)}</Badge>
             <Badge tone={cuenta.activa ? "success" : "neutral"}>{cuenta.activa ? "Activa" : "Inactiva"}</Badge>
           </>
@@ -151,93 +206,40 @@ export function FichaCuenta({
           <BotonNavegar
             texto="Cuenta anterior"
             icono={FlechaArribaIcon}
-            activo={!!anterior && !editando}
-            alHacerClic={() => anterior && alIr(anterior)}
+            activo={!!anterior && !guardando}
+            alHacerClic={() => anterior && irA(anterior)}
           />
           <BotonNavegar
             texto="Cuenta siguiente"
             icono={FlechaAbajoIcon}
-            activo={!!siguiente && !editando}
-            alHacerClic={() => siguiente && alIr(siguiente)}
+            activo={!!siguiente && !guardando}
+            alHacerClic={() => siguiente && irA(siguiente)}
           />
         </>
       }
     >
-      {cuenta && (
-        <div ref={raiz} className="flex flex-1 flex-col">
-          {editando ? (
+      {cuenta &&
+        (puedeEscribir ? (
+          <div className="flex flex-1 flex-col">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2 border-b border-border p-5">
+              <AlternarActivaBoton cuenta={cuenta} />
+              <EliminarCuentaBoton id={cuenta.id} nombre={cuenta.nombre} />
+            </div>
+            {/* Con `key`, al pasar a otra cuenta el formulario arranca con los datos de esa cuenta. */}
             <FormularioCuenta
+              key={cuenta.id}
               paisId={paisId}
               paisNombre={paisNombre}
               cuenta={cuenta}
-              alGuardar={terminarEdicion}
-              alCancelar={() => !guardando && terminarEdicion()}
+              alGuardar={alGuardar}
+              alCancelar={cerrar}
               alCambiarGuardando={setGuardando}
+              alModificar={() => setSinGuardarId(cuenta.id)}
             />
-          ) : (
-            <div className="flex flex-col gap-5 p-5">
-              <p className="text-sm text-muted-foreground">
-                {paisNombre} ·{" "}
-                {cuenta.comision_tipo
-                  ? `Comisión sugerida ${etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)}`
-                  : "Sin comisión sugerida"}
-              </p>
-
-              {puedeEscribir && (
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2">
-                  <BotonAccion icono={LapizIcon} tono="oscuro" data-enfocar onClick={() => setEditandoId(cuenta.id)}>
-                    Modificar
-                  </BotonAccion>
-                  <AlternarActivaBoton cuenta={cuenta} />
-                  <EliminarCuentaBoton id={cuenta.id} nombre={cuenta.nombre} />
-                </div>
-              )}
-
-              <div className="flex flex-col divide-y divide-border border-t border-border pt-5">
-                <Seccion icono={WalletIcon} titulo="Cuenta">
-                  <dl className="flex flex-col gap-3">
-                    <Dato etiqueta="Nombre">{cuenta.nombre}</Dato>
-                    <Dato etiqueta="Tipo">{etiquetaTipoCuenta(cuenta.tipo)}</Dato>
-                    {cuenta.tipo !== "binance" && <Dato etiqueta="Cuenta">{cuenta.detalle || SIN_DATO}</Dato>}
-                  </dl>
-                </Seccion>
-
-                {cuenta.tipo === "binance" && (
-                  <Seccion icono={ExtractoIcon} titulo="Datos de la cuenta">
-                    {datosBinance ? (
-                      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Dato etiqueta="País">{datosBinance.pais || SIN_DATO}</Dato>
-                        <Dato etiqueta="Banco">{datosBinance.banco || SIN_DATO}</Dato>
-                        <Dato etiqueta="Tipo de identificación">{datosBinance.tipo_identificacion || SIN_DATO}</Dato>
-                        <Dato etiqueta="Número de identificación">{datosBinance.numero_identificacion || SIN_DATO}</Dato>
-                        <Dato etiqueta="Número de cuenta" ancho>
-                          <span className="font-mono">{datosBinance.numero_cuenta || SIN_DATO}</span>
-                        </Dato>
-                      </dl>
-                    ) : (
-                      <dl>
-                        <Dato etiqueta="Número de cuenta">
-                          <span className="font-mono">{cuenta.detalle || SIN_DATO}</span>
-                        </Dato>
-                      </dl>
-                    )}
-                  </Seccion>
-                )}
-
-                <Seccion icono={GastoIcon} titulo="Comisión sugerida">
-                  <dl className="flex flex-col gap-3">
-                    <Dato etiqueta="Comisión">
-                      {cuenta.comision_tipo
-                        ? etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)
-                        : "Sin comisión"}
-                    </Dato>
-                  </dl>
-                </Seccion>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <DatosDeLaCuenta cuenta={cuenta} />
+        ))}
     </Ventana>
   );
 }
