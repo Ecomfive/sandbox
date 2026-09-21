@@ -179,7 +179,7 @@ export function TablaRetiros({
   cuentas: Cuenta[];
   /** Cómo aparece la persona que tiene la sesión en «Persona asignada»; con él sale «Mis retiros». */
   miNombre?: string | null;
-  /** Solo quien puede modificar retiros ve las casillas y la barra de acciones en lote. */
+  /** Solo quien puede modificar retiros ve las casillas y la barra de selección. */
   puedeEscribir: boolean;
 }) {
   const tabla = useTablaInteractiva(DEF_RETIROS, retiros, { porPagina: POR_PAGINA });
@@ -412,14 +412,7 @@ export function TablaRetiros({
         </table>
       </ContenedorTabla>
       {paginacion && <Paginacion pagina={paginacion} nombre={NOMBRE_FILAS} alIrA={irAPagina} />}
-      {filasMarcadas.length > 0 && (
-        <BarraLote
-          filas={filasMarcadas}
-          cerradosOcultos={!vista.mostrarCerrados}
-          alQuitar={() => setMarcados(new Set())}
-          alTerminar={() => setMarcados(new Set())}
-        />
-      )}
+      {filasMarcadas.length > 0 && <BarraLote filas={filasMarcadas} alQuitar={() => setMarcados(new Set())} />}
       {/* Anuncia a lectores de pantalla cuántos retiros se ven cuando cambian los filtros, los grupos o los cerrados. */}
       <p role="status" className="sr-only">
         {retiros.length > 0

@@ -3,15 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
-import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
+import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { insertarConCorrelativo, leerCorrelativo } from "@/lib/retiros/correlativo";
-import { cambiarEstadoEnLote, type ResultadoLote } from "@/lib/retiros/en-lote";
 import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
-/** Estados que se pueden elegir a mano desde la ficha de "Modificar" o la barra en lote.
+/** Estados que se pueden elegir a mano desde la ficha de "Modificar".
  * "cancelado" queda afuera a propósito: sigue siendo una acción aparte (botón Cancelar), no un
  * valor más del selector, porque es un cierre distinto al de la conciliación normal. */
 const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
@@ -308,8 +307,8 @@ export async function cancelarRetiro(formData: FormData) {
 
 /** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado
  * por, monto, comisión, fechas, nota y estado — todo junto, desde la ficha de "Modificar". El
- * estado ya no se edita directo en la columna de la tabla: solo cambia desde acá, al conciliar,
- * al cancelar o con la barra de acciones en lote. No toca el correlativo. */
+ * estado ya no se edita directo en la columna de la tabla ni en lote: solo cambia desde acá, al
+ * conciliar o al cancelar. No toca el correlativo. */
 export async function actualizarRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
@@ -405,26 +404,3 @@ export async function eliminarRetiro(formData: FormData): Promise<{ error?: stri
   return {};
 }
 
-/**
- * Pasa a varios retiros a Abierto, Novedad o Cerrado desde la barra de acciones de la tabla. Es el mismo cambio
- * manual que se hace de a uno desde "Modificar" (solo mueve la etiqueta; no toca monto recibido ni comprobante),
- * con los mismos permisos: hace falta acceso de escritura a Retiros. Los cancelados no se tocan. La lógica está en
- * `cambiarEstadoEnLote` (`src/lib/retiros/en-lote.ts`); aquí solo se comprueba el permiso y se refresca la página.
- * Devuelve el error como valor, porque en producción Next.js oculta el mensaje de cualquier excepción.
- */
-export async function cambiarEstadoRetirosEnLote(ids: string[], nuevoEstado: string): Promise<ResultadoLote> {
-  try {
-    await requireModuloEscritura("retiros");
-  } catch (e) {
-    return {
-      cambiados: 0,
-      yaEstaban: 0,
-      cancelados: 0,
-      noEncontrados: 0,
-      error: e instanceof Error ? e.message : "No tienes permiso para cambiar retiros.",
-    };
-  }
-  const resultado = await cambiarEstadoEnLote(createServiceClient(), ids, nuevoEstado, registrarAuditoriaLote);
-  if (resultado.cambiados > 0) revalidatePath("/retiros");
-  return resultado;
-}
