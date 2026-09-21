@@ -18,17 +18,6 @@ import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 const ESTADO_TONO = { abierto: "info", cancelado: "neutral", novedad: "destructive", cerrado: "success" } as const;
 const GESTIONADO_ETIQUETA: Record<string, string> = { plataforma: "Plataforma", correo: "Correo" };
 
-/** Ícono del botón «Vista rápida» de cada fila: un panel con un lado resaltado. */
-export function VistaRapidaIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-      <path d="M14.5 4.5v15" />
-      <path d="M17 9h.01M17 12h.01M17 15h.01" />
-    </svg>
-  );
-}
-
 const numeroDe = (fila: FilaRetiro) => `#${String(fila.numeroCorrelativo).padStart(4, "0")}`;
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {

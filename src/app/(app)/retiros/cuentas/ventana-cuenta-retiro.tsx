@@ -364,10 +364,13 @@ export function VentanaCuentaRetiro({
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-muted-foreground">
-                    Se sugiere sola al elegir esta cuenta en &quot;+ Agregar&quot; retiro. Cambiarla no
-                    afecta los retiros ya creados.
-                  </p>
+                  {/* Al modificar una cuenta ya no se repite la nota: se ve solo al crearla. */}
+                  {!editando && (
+                    <p className="text-xs text-muted-foreground">
+                      Se sugiere sola al elegir esta cuenta en &quot;+ Agregar&quot; retiro. Cambiarla no
+                      afecta los retiros ya creados.
+                    </p>
+                  )}
                 </div>
 
                 {(comisionTipo === "porcentaje" || comisionTipo === "ambos") && (
