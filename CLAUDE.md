@@ -265,30 +265,20 @@ convenciones técnicas del código.
   `descargaCompleta={{ href, etiqueta, detalle }}` (a `TablaDatos` o a
   `BarraHerramientas`) y el mismo botón abre un menú con «Lo que se ve» y esa
   descarga completa. Si la tabla ya trae todo (Alertas), el botón basta.
-- **Acciones en lote (Retiros).** La tabla de Retiros tiene una casilla por fila
+- **Selección de retiros (Retiros).** La tabla de Retiros tiene una casilla por fila
   y una en el encabezado («seleccionar los que se ven»); al marcar aparece
-  `BarraLote` (`src/app/(app)/retiros/barra-lote.tsx`) fija abajo: pasar a
-  Abierto, Novedad o Cerrado y descargar solo lo marcado. Cuenta únicamente lo que
-  está en pantalla (una acción nunca toca un retiro que la persona no tiene
-  delante; los grupos contraídos no cuentan). **La columna Estado de la tabla es de
-  solo lectura** (una insignia, no un desplegable): el estado se mueve a mano desde
-  la ficha de "Modificar" (`editar-retiro-panel.tsx`, junto a "Gestionado por") o
-  con esta barra, además de cambiar solo al conciliar o cancelar. **Alcance a
-  propósito**: solo mueve la etiqueta (no registra monto recibido ni comprobante) y
-  los cancelados no se tocan. Eliminar, cancelar
-  y conciliar **no** van en lote: no se deshacen o piden datos de cada retiro.
-  Pedir confirmación va en la misma barra (sin ventana) y dice cuántos cambian y
-  cuántos se omiten. Máximo 100 por vez (`MAX_LOTE`: los ids viajan en la
-  dirección de la consulta). Permisos: hace falta escritura en Retiros; con solo
-  lectura no se dibujan ni casillas ni barra (`puedeEscribir`), y el servidor lo
-  vuelve a comprobar. La lógica y su escritura viven en `src/lib/retiros/en-lote.ts`
-  (`cambiarEstadoEnLote`, con cliente de Supabase inyectado para probarla): una sola
-  actualización, y por cada retiro que cambió, su evento en `retiro_eventos` y su
-  fila de auditoría (misma acción `cambiar_estado_retiro`, con «En lote» en el
-  detalle) con `registrarAuditoriaLote`, que consulta a la persona una vez y
-  guarda todo de una. La acción del servidor devuelve el error como valor. Para
-  otra acción en lote: agrégala a `barra-lote.tsx` y su lógica a `en-lote.ts`
-  siguiendo el mismo patrón (planear, confirmar, una escritura, auditoría por fila).
+  `BarraLote` (`src/app/(app)/retiros/barra-lote.tsx`) fija abajo: dice cuántos
+  hay seleccionados, deja descargar solo lo marcado y quitar la selección. **No
+  cambia ningún dato**: no hay acciones en lote (se quitó el «Pasar a Abierto /
+  Novedad / Cerrado»; el estado de un retiro cambia al conciliar, al cancelar o desde
+  la ficha de «Modificar», junto a «Gestionado por»). La columna Estado de la tabla también es de solo lectura
+  (una insignia, no un desplegable). Cuenta únicamente lo que está en pantalla (los
+  grupos contraídos no cuentan). Con solo lectura en Retiros no se dibujan ni casillas
+  ni barra (`puedeEscribir`). Si algún día vuelve una acción en lote: agrégala a
+  `barra-lote.tsx` con su acción de servidor (permiso de escritura comprobado en el
+  servidor, una sola escritura, un evento y una fila de auditoría por retiro con
+  `registrarAuditoriaLote`, que consulta a la persona una vez) y pide confirmación
+  en la misma barra, sin ventana.
 - **Tarjetas de resumen que se pueden pulsar.** Una tarjeta de indicador (`KpiCard`,
   `src/components/ui/kpi-card.tsx`) que resume algo que la tabla de abajo lista
   **debe poder filtrar esa tabla** (o llevar a ella); no la dejes como caja muerta.
