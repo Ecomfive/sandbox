@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { pideCrear } from "@/lib/crear-global";
 import { crearRetiro, verSiguienteCorrelativo } from "./actions";
@@ -58,7 +57,6 @@ export function CrearRetiroPanel({
   plataformas: Plataforma[];
   cuentas: Cuenta[];
 }) {
-  const [menuAbierto, setMenuAbierto] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const [monto, setMonto] = useState("");
   const [comisionValor, setComisionValor] = useState("0");
@@ -69,7 +67,6 @@ export function CrearRetiroPanel({
   const [correlativo, setCorrelativo] = useState<number | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [enviando, setEnviando] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
 
@@ -78,29 +75,11 @@ export function CrearRetiroPanel({
   const pathname = usePathname();
   const yaAbrio = useRef(false);
 
-  // El menú de "+ Agregar" se cierra al hacer clic afuera o con Escape.
-  useEffect(() => {
-    if (!menuAbierto) return;
-    function alHacerClicFuera(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
-    }
-    function alPresionarEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuAbierto(false);
-    }
-    document.addEventListener("mousedown", alHacerClicFuera);
-    document.addEventListener("keydown", alPresionarEscape);
-    return () => {
-      document.removeEventListener("mousedown", alHacerClicFuera);
-      document.removeEventListener("keydown", alPresionarEscape);
-    };
-  }, [menuAbierto]);
-
   // Al abrir se MUESTRA el siguiente correlativo, sin gastarlo: solo se asigna al crear el retiro.
   // Se consulta en cada apertura (otra persona pudo crear uno mientras tanto) y, si no se guardó
   // nada, siempre sale el mismo número. También se limpia todo lo escrito la vez anterior: si se
   // canceló a medio llenar, la próxima vez que se abra debe empezar en blanco.
   async function abrirVentana() {
-    setMenuAbierto(false);
     setEnviando(false);
     setMonto("");
     setComisionValor("0");
@@ -211,42 +190,17 @@ export function CrearRetiroPanel({
 
   return (
     <>
-      <div ref={menuRef} className="relative">
-        <Button
-          ref={botonAbrirRef}
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={menuAbierto}
-          onClick={() => setMenuAbierto((v) => !v)}
-          className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
-        >
-          <MasIcon className="mr-1 h-4 w-4" />
-          Agregar
-        </Button>
-        {menuAbierto && (
-          <div
-            role="menu"
-            className="absolute top-full right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-card p-1 shadow-lg"
-          >
-            <button
-              role="menuitem"
-              type="button"
-              onClick={abrirVentana}
-              className="block w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
-            >
-              Nuevo retiro
-            </button>
-            <Link
-              role="menuitem"
-              href="/retiros/cuentas"
-              onClick={() => setMenuAbierto(false)}
-              className="block w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
-            >
-              Cuenta destino
-            </Link>
-          </div>
-        )}
-      </div>
+      {/* «Agregar» abre directo la ficha de nuevo retiro; las cuentas destino se agregan en su propia pestaña. */}
+      <Button
+        ref={botonAbrirRef}
+        type="button"
+        aria-haspopup="dialog"
+        onClick={abrirVentana}
+        className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
+      >
+        <MasIcon className="mr-1 h-4 w-4" />
+        Agregar
+      </Button>
 
       {abierto && (
         <div
