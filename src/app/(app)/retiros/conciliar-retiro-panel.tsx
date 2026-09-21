@@ -35,7 +35,17 @@ const campoBloqueado = `${fieldClassSm} w-full min-w-0 cursor-not-allowed bg-mut
  * cargada queda bloqueada (no se puede tocar) — solo se completa la sección de abajo
  * (referencia, soporte y monto recibido). A diferencia del formulario de cierre de la ficha del
  * retiro, acá NO deja guardar si el monto recibido se aleja del esperado más de lo tolerado. */
-export function ConciliarRetiroPanel({ retiro, paisId }: { retiro: RetiroParaConciliar; paisId: string }) {
+export function ConciliarRetiroPanel({
+  retiro,
+  paisId,
+  variante = "icono",
+}: {
+  retiro: RetiroParaConciliar;
+  paisId: string;
+  /** "boton": botón grande con texto, para la fila de acciones de la ficha del retiro. Por
+   * defecto es solo el ícono, para la fila de la tabla. */
+  variante?: "icono" | "boton";
+}) {
   const [abierto, setAbierto] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -97,17 +107,29 @@ export function ConciliarRetiroPanel({ retiro, paisId }: { retiro: RetiroParaCon
 
   return (
     <>
-      <Tooltip texto="Conciliar retiro">
+      {variante === "boton" ? (
         <button
           ref={botonAbrirRef}
           type="button"
           onClick={abrirVentana}
-          aria-label="Conciliar retiro"
-          className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+          className={`inline-flex items-center gap-1.5 rounded-md bg-[#202020] px-3 py-2 text-sm font-medium text-white hover:bg-[#2d2d2d] ${anilloFoco}`}
         >
           <ConciliarIcon className="h-4 w-4" />
+          Conciliar
         </button>
-      </Tooltip>
+      ) : (
+        <Tooltip texto="Conciliar retiro">
+          <button
+            ref={botonAbrirRef}
+            type="button"
+            onClick={abrirVentana}
+            aria-label="Conciliar retiro"
+            className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+          >
+            <ConciliarIcon className="h-4 w-4" />
+          </button>
+        </Tooltip>
+      )}
 
       {abierto &&
         createPortal(

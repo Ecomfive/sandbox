@@ -47,10 +47,14 @@ export function EditarRetiroPanel({
   retiro,
   plataformas,
   cuentas,
+  variante = "icono",
 }: {
   retiro: RetiroExistente;
   plataformas: Plataforma[];
   cuentas: Cuenta[];
+  /** "boton": botón grande con texto, para la fila de acciones de la ficha del retiro. Por
+   * defecto es solo el ícono, para la fila de la tabla. */
+  variante?: "icono" | "boton";
 }) {
   const [abierto, setAbierto] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -170,17 +174,29 @@ export function EditarRetiroPanel({
 
   return (
     <>
-      <Tooltip texto="Modificar retiro">
+      {variante === "boton" ? (
         <button
           ref={botonAbrirRef}
           type="button"
           onClick={abrirVentana}
-          aria-label="Modificar retiro"
-          className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+          className={`inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}
         >
           <LapizIcon className="h-4 w-4" />
+          Modificar
         </button>
-      </Tooltip>
+      ) : (
+        <Tooltip texto="Modificar retiro">
+          <button
+            ref={botonAbrirRef}
+            type="button"
+            onClick={abrirVentana}
+            aria-label="Modificar retiro"
+            className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+          >
+            <LapizIcon className="h-4 w-4" />
+          </button>
+        </Tooltip>
+      )}
 
       {abierto &&
         createPortal(

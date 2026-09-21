@@ -7,9 +7,7 @@ import { POR_PAGINA, useIrAPaginaArriba } from "@/components/tabla/usar-pagina-a
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { anilloFoco } from "@/components/ui/field";
 import { linkClass } from "@/components/ui/link";
-import { Tooltip } from "@/components/ui/tooltip";
 import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
@@ -35,7 +33,7 @@ import { BarraLote } from "./barra-lote";
 import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
 import { EditarRetiroPanel } from "./editar-retiro-panel";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
-import { VistaRapidaIcon, VistaRapidaRetiro } from "./vista-rapida-retiro";
+import { VistaRapidaRetiro } from "./vista-rapida-retiro";
 
 export interface FilaRetiro {
   id: string;
@@ -107,12 +105,19 @@ const COLUMNAS_POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]));
 /** Fondo opaco de una fila marcada (también el de su celda de acciones, que queda fija a la derecha). */
 const FONDO_MARCADA = "bg-[color-mix(in_oklab,var(--accent)_45%,var(--card))]";
 
-function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string) {
+function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string, alAbrir: (id: string) => void) {
   switch (id) {
     case "correlativo":
       return (
         <Link
           href={`/retiros/${fila.id}`}
+          onClick={(e) => {
+            // Ctrl/Cmd/Shift-clic o clic central: se deja abrir en pestaña nueva como cualquier
+            // enlace. Un clic normal abre la ficha acá mismo, sin salir de la tabla.
+            if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+            e.preventDefault();
+            alAbrir(fila.id);
+          }}
           className={`${linkClass} after:absolute after:inset-0 after:content-['']`}
         >
           #{String(fila.numeroCorrelativo).padStart(4, "0")}
@@ -246,7 +251,7 @@ export function TablaRetiros({
       )}
       {columnasVisibles.map((columna) => (
         <td key={columna.id} className={`border-r border-border/40 px-4 py-3 ${columna.claseCelda ?? ""}`}>
-          {renderCelda(columna.id, fila, codigoPais)}
+          {renderCelda(columna.id, fila, codigoPais, setVistaRapidaId)}
         </td>
       ))}
       <td
@@ -256,17 +261,6 @@ export function TablaRetiros({
       >
         <div className="flex items-center justify-center gap-1">
           {/* `relative z-10`: la fila entera es un enlace estirado (ver el número #), el botón debe quedar encima. */}
-          <Tooltip texto="Vista rápida">
-            <button
-              type="button"
-              onClick={() => setVistaRapidaId(fila.id)}
-              aria-label={`Vista rápida del retiro #${String(fila.numeroCorrelativo).padStart(4, "0")}`}
-              aria-haspopup="dialog"
-              className={`relative z-10 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-            >
-              <VistaRapidaIcon className="h-4 w-4" />
-            </button>
-          </Tooltip>
           <ConciliarRetiroPanel
             retiro={{
               id: fila.id,
@@ -426,6 +420,9 @@ export function TablaRetiros({
       <VistaRapidaRetiro
         fila={retiros.find((r) => r.id === vistaRapidaId) ?? null}
         codigoPais={codigoPais}
+        paisId={paisId}
+        plataformas={plataformas}
+        cuentas={cuentas}
         alCerrar={() => setVistaRapidaId(null)}
       />
       {retiros.length === 0 && <EstadoVacio mensaje="Todavía no hay retiros registrados." />}
