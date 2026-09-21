@@ -11,6 +11,7 @@ import { FiltroFechas } from "@/components/filtro-fechas";
 import { OrdenSelect } from "./orden-select";
 import { TablaPedidos, type FilaPedido } from "./tabla-pedidos";
 import { resolverPeriodo } from "@/lib/dashboard/periodo";
+import Link from "next/link";
 import { linkClass } from "@/components/ui/link";
 import { AyudaContextual } from "@/components/ui/ayuda-contextual";
 
@@ -38,13 +39,35 @@ export default async function PedidosDropiPage({
   const ordenClave = typeof sp.orden === "string" && sp.orden in OPCIONES_ORDEN ? sp.orden : "fecha_desc";
   const orden = OPCIONES_ORDEN[ordenClave as keyof typeof OPCIONES_ORDEN];
 
+  // Filtros que ponen las tarjetas del resumen (van en la dirección, para que la tabla traiga todas las de ese
+  // estado y no solo las que caben en las primeras 500): un estado, o «liquidado sin marcar entregado».
+  const filtroEstado = typeof sp.estado === "string" && sp.estado !== "" ? sp.estado : null;
+  const soloAlertas = sp.alertas === "1";
+
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
   const { data: plataformaDropi } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").single();
   const plataformaId = plataformaDropi?.id ?? "";
 
-  const [resumen, { data: ordenes }, carteraGanancia] = await Promise.all([
+  /** Las órdenes de la tabla (hasta 500): las del período, más el filtro de estado o solo las referencias dadas. */
+  const consultarOrdenes = (referencias?: string[]) => {
+    let consulta = supabase
+      .from("ordenes")
+      .select("referencia_externa, cantidad, monto, estado, fecha, fecha_hora, productos(sku, nombre)")
+      .eq("pais_id", pais.id)
+      .eq("plataforma_id", plataformaId)
+      .gte("fecha", desde)
+      .lte("fecha", hasta);
+    if (filtroEstado) consulta = consulta.eq("estado", filtroEstado);
+    if (referencias) consulta = consulta.in("referencia_externa", referencias);
+    return consulta
+      .order(orden.columna, { ascending: orden.ascending })
+      .order("referencia_externa", { ascending: orden.ascending })
+      .limit(500);
+  };
+
+  const [resumen, ordenesGenerales, carteraGanancia] = await Promise.all([
     traerTodasLasFilas<{ monto: number; estado: string; referencia_externa: string }>((rDesde, rHasta) =>
       supabase
         .from("ordenes")
@@ -55,16 +78,7 @@ export default async function PedidosDropiPage({
         .lte("fecha", hasta)
         .range(rDesde, rHasta)
     ),
-    supabase
-      .from("ordenes")
-      .select("referencia_externa, cantidad, monto, estado, fecha, fecha_hora, productos(sku, nombre)")
-      .eq("pais_id", pais.id)
-      .eq("plataforma_id", plataformaId)
-      .gte("fecha", desde)
-      .lte("fecha", hasta)
-      .order(orden.columna, { ascending: orden.ascending })
-      .order("referencia_externa", { ascending: orden.ascending })
-      .limit(500),
+    soloAlertas ? Promise.resolve({ data: null }) : consultarOrdenes(),
     traerTodasLasFilas<{ orden_referencia_externa: string | null }>((rDesde, rHasta) =>
       supabase
         .from("historial_cartera")
@@ -78,14 +92,28 @@ export default async function PedidosDropiPage({
 
   const totalOrdenes = resumen.length;
   const totalMonto = resumen.reduce((acc, o) => acc + Number(o.monto), 0);
-  const todas = ordenes ?? [];
 
   const referenciasLiquidadas = new Set(
     (carteraGanancia ?? []).map((c) => c.orden_referencia_externa).filter((r): r is string => r !== null)
   );
   const esAlerta = (referencia: string, estado: string) =>
     referenciasLiquidadas.has(referencia) && !estado.toUpperCase().includes("ENTREGAD");
-  const totalAlertas = resumen.filter((o) => esAlerta(o.referencia_externa, o.estado)).length;
+  const alertas = resumen.filter((o) => esAlerta(o.referencia_externa, o.estado));
+  const totalAlertas = alertas.length;
+
+  // Con el filtro de alertas, las órdenes de la tabla son las de esas referencias (no se sabían antes de mirar la cartera).
+  let ordenes = ordenesGenerales.data;
+  if (soloAlertas) {
+    const referencias = alertas.map((o) => o.referencia_externa).slice(0, 300);
+    ordenes = referencias.length > 0 ? (await consultarOrdenes(referencias)).data : [];
+  }
+  const todas = ordenes ?? [];
+  // Cuántas órdenes tiene el filtro puesto (la tabla trae como máximo 500 de ellas).
+  const totalFiltrado = soloAlertas
+    ? totalAlertas
+    : filtroEstado
+      ? resumen.filter((o) => o.estado === filtroEstado).length
+      : totalOrdenes;
 
   const filasPedido: FilaPedido[] = todas.map((o) => ({
     referencia: o.referencia_externa,
@@ -102,6 +130,20 @@ export default async function PedidosDropiPage({
   for (const o of resumen) porEstado.set(o.estado, (porEstado.get(o.estado) ?? 0) + 1);
   const estadosOrdenados = Array.from(porEstado.entries()).sort((a, b) => b[1] - a[1]);
 
+  // Las tarjetas del resumen son enlaces a esta misma página con el filtro puesto; conservan el período y el orden.
+  const hrefConFiltro = (filtro: Record<string, string> = {}) => {
+    const parametros = new URLSearchParams();
+    for (const clave of ["preset", "desde", "hasta", "orden"]) {
+      const valor = sp[clave];
+      if (typeof valor === "string") parametros.set(clave, valor);
+    }
+    for (const [clave, valor] of Object.entries(filtro)) parametros.set(clave, valor);
+    const texto = parametros.toString();
+    return texto ? `/pedidos-dropi?${texto}` : "/pedidos-dropi";
+  };
+  const hayFiltro = soloAlertas || filtroEstado !== null;
+  const nombreFiltro = soloAlertas ? "liquidado sin marcar entregado" : filtroEstado;
+
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Pedidos Dropi" oculto>
@@ -113,45 +155,76 @@ export default async function PedidosDropiPage({
           <FiltroFechas />
           <OrdenSelect actual={ordenClave} />
         </div>
-        <a
-          href={`/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}`}
-          className={`${linkClass} ml-auto`}
-        >
-          Descargar CSV ({totalOrdenes.toLocaleString("es")} órdenes)
-        </a>
+        {/* Con el filtro de alertas no hay descarga completa: las alertas caben todas en la tabla y sale con «Descargar». */}
+        {!soloAlertas && (
+          <a
+            href={`/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}${
+              filtroEstado ? `&estado=${encodeURIComponent(filtroEstado)}` : ""
+            }`}
+            className={`${linkClass} ml-auto`}
+          >
+            Descargar CSV ({totalFiltrado.toLocaleString("es")} órdenes)
+          </a>
+        )}
       </div>
 
       {totalOrdenes === 0 ? (
         <EstadoVacio mensaje={`No hay órdenes de Dropi para ${pais.nombre} entre ${desde} y ${hasta}.`} />
       ) : (
         <>
-          <KpiGroup titulo="Resumen del período">
+          <KpiGroup
+            titulo="Resumen del período"
+            accion={
+              hayFiltro && (
+                <span className="flex items-center gap-2 font-normal">
+                  Tabla filtrada por «{nombreFiltro}»
+                  <Link href={hrefConFiltro()} scroll={false} className={linkClass}>
+                    Quitar filtro
+                  </Link>
+                </span>
+              )
+            }
+          >
             <KpiGrid>
-              <KpiCard titulo="Órdenes en el rango" valor={totalOrdenes} />
+              <KpiCard
+                titulo="Órdenes en el rango"
+                valor={totalOrdenes}
+                href={hrefConFiltro()}
+                activa={!hayFiltro}
+                ayudaLectores="Ver todas, sin filtrar la tabla"
+              />
               <KpiCard titulo="Monto total" valor={formatearMoneda(totalMonto, pais.codigo)} />
               <KpiCard
-                titulo={
-                  <>
-                    Alertas: liquidado sin marcar entregado
-                    <AyudaContextual texto="Dropi ya registró la ganancia de este pedido en la cartera, pero el pedido todavía no aparece como ENTREGADO — normalmente significa que hay que actualizar su estado a mano en Dropi." />
-                  </>
+                titulo="Alertas: liquidado sin marcar entregado"
+                ayuda={
+                  <AyudaContextual texto="Dropi ya registró la ganancia de este pedido en la cartera, pero el pedido todavía no aparece como ENTREGADO — normalmente significa que hay que actualizar su estado a mano en Dropi." />
                 }
                 valor={totalAlertas}
                 tono={totalAlertas > 0 ? "destructive" : "neutral"}
+                href={totalAlertas > 0 ? hrefConFiltro({ alertas: "1" }) : undefined}
+                activa={soloAlertas}
+                ayudaLectores="Filtrar la tabla por estas alertas"
               />
               {estadosOrdenados.map(([estado, cantidad]) => (
-                <KpiCard key={estado} titulo={estado} valor={cantidad} />
+                <KpiCard
+                  key={estado}
+                  titulo={estado}
+                  valor={cantidad}
+                  href={hrefConFiltro({ estado })}
+                  activa={filtroEstado === estado}
+                  ayudaLectores={`Filtrar la tabla por ${estado}`}
+                />
               ))}
             </KpiGrid>
           </KpiGroup>
 
-          {todas.length < totalOrdenes && (
+          {todas.length < totalFiltrado && (
             <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm text-warning">
               <strong className="font-semibold">
-                Mostrando {todas.length} de {totalOrdenes.toLocaleString("es")} órdenes
+                Mostrando {todas.length} de {totalFiltrado.toLocaleString("es")} órdenes
               </strong>{" "}
-              en la tabla (el resumen de arriba sí las cuenta a todas). Achica el rango de fechas para
-              verlas todas, o descarga el CSV completo arriba.
+              en la tabla (el resumen de arriba sí las cuenta a todas). Achica el rango de fechas
+              {hayFiltro ? "" : " o pulsa un estado del resumen"} para verlas todas, o descarga el CSV completo arriba.
             </div>
           )}
 

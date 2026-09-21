@@ -189,6 +189,28 @@ convenciones técnicas del código.
   guarda todo de una. La acción del servidor devuelve el error como valor. Para
   otra acción en lote: agrégala a `barra-lote.tsx` y su lógica a `en-lote.ts`
   siguiendo el mismo patrón (planear, confirmar, una escritura, auditoría por fila).
+- **Tarjetas de resumen que se pueden pulsar.** Una tarjeta de indicador (`KpiCard`,
+  `src/components/ui/kpi-card.tsx`) que resume algo que la tabla de abajo lista
+  **debe poder filtrar esa tabla** (o llevar a ella); no la dejes como caja muerta.
+  Hay tres formas: (1) con `href` es un enlace, con resalte, anillo de foco y
+  `activa` (`aria-current`) para la que está filtrando; si lleva un botón de ayuda
+  («?») se pasa como `ayuda` y la tarjeta se vuelve un enlace extendido (un botón
+  no puede ir dentro de un enlace). (2) **`KpiFiltro`** (`kpi-filtro.tsx`) es un
+  botón con `aria-pressed` que pone o quita un filtro en la tabla **de la misma
+  página**, sin recargar, compartiendo el almacén de filtros de la tabla; va en un
+  componente de cliente del módulo (`retiros/tarjetas-resumen.tsx`,
+  `catalogo-maestro/tarjetas-estado.tsx`, `gastos/tarjetas-mes.tsx`) porque una
+  `DefTabla` con funciones no cruza de servidor a cliente. El filtro es un
+  `AtajoFiltro` (`src/lib/tabla/atajos.ts`), que puede llevar `ademas` (filtros de
+  otros campos: «cerrados» + el mes que suma la tarjeta). (3) Si la tabla solo
+  trae una parte de los datos (Pedidos Dropi: 500 de miles), el filtro va **en el
+  servidor**, en la dirección (`?estado=ENTREGADO`, `?alertas=1`), para que la
+  tabla traiga todo lo de ese estado y el número de la tarjeta coincida; las
+  tarjetas conservan el período y el orden. El número de una tarjeta debe ser el
+  de lo que filtra (si suma el mes, el filtro incluye el mes). Las tarjetas de
+  totales que no filtran nada (saldos de wallet, Inteligencia competitiva) no son
+  pulsables. Las de «Pendientes de hoy» del Dashboard llevan a su módulo; la de
+  Novedad no filtra porque cuenta todas las fechas y Pedidos muestra un período.
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
   y la `<table>` lleva la clase `tabla-datos`; los estilos están en

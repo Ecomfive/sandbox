@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
   };
   const desde = searchParams.get("desde") || haceNDias(6);
   const hasta = searchParams.get("hasta") || hoy;
+  // Opcional: solo las órdenes de ese estado (lo que filtra la tarjeta del resumen en la página).
+  const estado = searchParams.get("estado") || null;
 
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -38,17 +40,17 @@ export async function GET(request: NextRequest) {
     monto: number;
     estado: string;
     productos: { sku: string; nombre: string } | { sku: string; nombre: string }[] | null;
-  }>((rDesde, rHasta) =>
-    supabase
+  }>((rDesde, rHasta) => {
+    let consulta = supabase
       .from("ordenes")
       .select("referencia_externa, fecha, fecha_hora, cantidad, monto, estado, productos(sku, nombre)")
       .eq("pais_id", pais.id)
       .eq("plataforma_id", plataformaId)
       .gte("fecha", desde)
-      .lte("fecha", hasta)
-      .order("fecha", { ascending: false })
-      .range(rDesde, rHasta)
-  );
+      .lte("fecha", hasta);
+    if (estado) consulta = consulta.eq("estado", estado);
+    return consulta.order("fecha", { ascending: false }).range(rDesde, rHasta);
+  });
 
   const encabezado = ["Orden", "Fecha", "Fecha y hora", "SKU", "Producto", "Cantidad", "Monto", "Estado"];
   const lineas = [encabezado.join(",")];
@@ -71,7 +73,9 @@ export async function GET(request: NextRequest) {
   return new NextResponse(lineas.join("\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="pedidos-dropi-${pais.codigo}-${desde}_a_${hasta}.csv"`,
+      "Content-Disposition": `attachment; filename="pedidos-dropi-${pais.codigo}-${desde}_a_${hasta}${
+        estado ? `-${estado.replace(/[^A-Za-z0-9_-]+/g, "_")}` : ""
+      }.csv"`,
     },
   });
 }

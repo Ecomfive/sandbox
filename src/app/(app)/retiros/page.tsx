@@ -10,6 +10,7 @@ import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
 import { CrearRetiroPanel } from "./crear-retiro-panel";
 import { DropiSinVincular } from "./dropi-sin-vincular";
+import { TarjetasResumenRetiros } from "./tarjetas-resumen";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,7 @@ export default async function RetirosPage() {
   );
 
   const mesActual = hoy().slice(0, 7);
+  const ultimoDiaDelMes = `${mesActual}-${String(new Date(Number(mesActual.slice(0, 4)), Number(mesActual.slice(5, 7)), 0).getDate()).padStart(2, "0")}`;
   const abiertos = (retiros ?? []).filter((r) => r.estado === "abierto").length;
   const conNovedad = (retiros ?? []).filter((r) => r.estado === "novedad").length;
   const totalCerradoMes = (retiros ?? [])
@@ -174,11 +176,13 @@ export default async function RetirosPage() {
         </KpiGroup>
 
         <KpiGroup titulo="Resumen de retiros" className="flex-[2_1_39rem]">
-          <KpiGrid>
-            <KpiCard titulo="Abiertos" valor={abiertos} />
-            <KpiCard titulo="Con novedad" valor={conNovedad} tono={conNovedad > 0 ? "destructive" : "neutral"} />
-            <KpiCard titulo="Cerrados este mes" valor={formatearMoneda(totalCerradoMes, pais.codigo)} />
-          </KpiGrid>
+          <TarjetasResumenRetiros
+            abiertos={abiertos}
+            conNovedad={conNovedad}
+            cerradosDelMes={formatearMoneda(totalCerradoMes, pais.codigo)}
+            mesDesde={`${mesActual}-01`}
+            mesHasta={ultimoDiaDelMes}
+          />
         </KpiGroup>
       </div>
 

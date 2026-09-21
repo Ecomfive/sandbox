@@ -15,7 +15,6 @@ import { formatearMoneda } from "@/lib/formato";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -207,31 +206,31 @@ export default async function Home({
           <KpiGroup titulo="Pendientes de hoy">
             <KpiGrid>
               {pendientesHoy.alertasInventario > 0 && (
-                <Link href="/alertas">
-                  <KpiCard
-                    titulo="Alertas de inventario abiertas"
-                    valor={pendientesHoy.alertasInventario}
-                    tono="destructive"
-                  />
-                </Link>
+                <KpiCard
+                  titulo="Alertas de inventario abiertas"
+                  valor={pendientesHoy.alertasInventario}
+                  tono="destructive"
+                  href="/alertas"
+                  ayudaLectores="Ir a Alertas de inventario"
+                />
               )}
               {pendientesHoy.pedidosConNovedad > 0 && (
-                <Link href="/pedidos-dropi">
-                  <KpiCard
-                    titulo="Pedidos Dropi en Novedad"
-                    valor={pendientesHoy.pedidosConNovedad}
-                    tono="destructive"
-                  />
-                </Link>
+                <KpiCard
+                  titulo="Pedidos Dropi en Novedad"
+                  valor={pendientesHoy.pedidosConNovedad}
+                  tono="destructive"
+                  href="/pedidos-dropi"
+                  ayudaLectores="Ir a Pedidos Dropi"
+                />
               )}
               {pendientesHoy.saldosSinRegistrar > 0 && (
-                <Link href="/retiros">
-                  <KpiCard
-                    titulo="Saldos de wallet sin registrar"
-                    valor={pendientesHoy.saldosSinRegistrar}
-                    tono="destructive"
-                  />
-                </Link>
+                <KpiCard
+                  titulo="Saldos de wallet sin registrar"
+                  valor={pendientesHoy.saldosSinRegistrar}
+                  tono="destructive"
+                  href="/retiros"
+                  ayudaLectores="Ir a Conciliación de Retiros"
+                />
               )}
             </KpiGrid>
           </KpiGroup>
