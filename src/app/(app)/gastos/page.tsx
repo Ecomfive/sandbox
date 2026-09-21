@@ -5,13 +5,14 @@ import { getPaisActual } from "@/lib/pais";
 import { registrarGasto } from "./actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
+import { KpiGroup } from "@/components/ui/kpi-card";
 import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { FormularioConToast } from "@/components/ui/toast";
 import { CATEGORIAS } from "./def-gastos";
 import { TablaGastos } from "./tabla-gastos";
+import { TarjetasGastosMes } from "./tarjetas-mes";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function GastosPage() {
     .limit(100);
 
   const mesActual = hoy().slice(0, 7);
+  const ultimoDiaDelMes = `${mesActual}-${String(new Date(Number(mesActual.slice(0, 4)), Number(mesActual.slice(5, 7)), 0).getDate()).padStart(2, "0")}`;
   const gastosMes = (gastos ?? []).filter((g) => g.fecha.slice(0, 7) === mesActual);
   const totalMes = gastosMes.reduce((acc, g) => acc + Number(g.monto), 0);
 
@@ -52,16 +54,16 @@ export default async function GastosPage() {
           </>
         ) : (
           <KpiGroup titulo="Este mes">
-            <KpiGrid>
-              <KpiCard titulo="Total del mes" valor={formatearMoneda(totalMes, pais.codigo)} />
-              {CATEGORIAS.filter((c) => totalesPorCategoria.has(c.valor)).map((c) => (
-                <KpiCard
-                  key={c.valor}
-                  titulo={c.etiqueta}
-                  valor={formatearMoneda(totalesPorCategoria.get(c.valor) ?? 0, pais.codigo)}
-                />
-              ))}
-            </KpiGrid>
+            <TarjetasGastosMes
+              total={formatearMoneda(totalMes, pais.codigo)}
+              categorias={CATEGORIAS.filter((c) => totalesPorCategoria.has(c.valor)).map((c) => ({
+                valor: c.valor,
+                etiqueta: c.etiqueta,
+                monto: formatearMoneda(totalesPorCategoria.get(c.valor) ?? 0, pais.codigo),
+              }))}
+              mesDesde={`${mesActual}-01`}
+              mesHasta={ultimoDiaDelMes}
+            />
           </KpiGroup>
         )}
       </div>

@@ -3,7 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
+import { KpiGroup } from "@/components/ui/kpi-card";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { crearSkuSimple, crearCombo } from "./actions";
 import { ComboBuilder } from "./combo-builder";
@@ -11,6 +11,7 @@ import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { CatalogoIcon } from "@/lib/nav-icons";
 import type { FilaSku } from "./def-catalogo";
 import { TablaCatalogo } from "./tabla-catalogo";
+import { TarjetasEstadoCatalogo } from "./tarjetas-estado";
 
 export const dynamic = "force-dynamic";
 
@@ -76,11 +77,7 @@ export default async function CatalogoMaestroPage() {
       </EncabezadoPagina>
 
       <KpiGroup titulo="Estado del catálogo">
-        <KpiGrid>
-          <KpiCard titulo="Propuestos" valor={conteo.propuesto} />
-          <KpiCard titulo="En revisión" valor={conteo.en_revision} />
-          <KpiCard titulo="Aprobados" valor={conteo.aprobado} />
-        </KpiGrid>
+        <TarjetasEstadoCatalogo conteo={conteo} />
       </KpiGroup>
 
       <div className="grid max-w-5xl gap-6 md:grid-cols-2">
