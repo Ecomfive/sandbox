@@ -421,9 +421,10 @@ final se dice cuáles se usaron.
 
 - [RENDIMIENTO-PENDIENTE.md](RENDIMIENTO-PENDIENTE.md): diagnóstico de
   rendimiento de navegación entre páginas, con plan de arreglo priorizado.
-  Los puntos 2 y 3 (caché de país/plataformas y consultas en paralelo) ya están
-  aplicados; **el punto 1 (Pedidos Dropi: agregar en Postgres) sigue sin aplicar**
-  — no implementarlo sin confirmar con Hernán primero.
+  Los puntos 1 (Pedidos Dropi: el resumen se agrega en Postgres, migración 0037),
+  2 y 3 (caché de país/plataformas y consultas en paralelo) ya están aplicados
+  (Hernán confirmó el punto 1 el 21 sept 2026); queda el 4 (límite a los rangos de
+  fechas personalizados).
 
 ## Flujo de trabajo con git
 
