@@ -99,12 +99,14 @@ convenciones técnicas del código.
 - **Cuentas destino de tipo Binance.** Al elegir «Binance» en la ventana de una cuenta
   destino (`retiros/cuentas/ventana-cuenta-retiro.tsx`), el campo «Cuenta» se cambia por
   los datos en el formato del formulario de Dropi: País, Banco (la red, p. ej.
-  `USDT(RED=TRC-20)`), Tipo de identificación (obligatorio), Número de identificación,
-  Tipo de cuenta y Número de cuenta (la dirección de la billetera, obligatorio). Se
-  guardan en `cuentas_retiro.datos_binance` (jsonb, migración 0039; lógica y pruebas en
-  `src/lib/retiros/datos-binance.ts`) y el número de cuenta también va en `detalle`, que
-  es lo que muestran las listas. Los campos con sugerencias (`datalist`) aceptan otro
-  texto. Las acciones `crearCuentaRetiro` y `actualizarCuentaRetiro` devuelven el error
+  `USDT(RED=TRC-20)`), Tipo de identificación (obligatorio), Número de identificación y
+  Número de cuenta (la dirección de la billetera, obligatorio); **no** se pide «Tipo de
+  cuenta». Se guardan en `cuentas_retiro.datos_binance` (jsonb, migración 0039; lógica y
+  pruebas en `src/lib/retiros/datos-binance.ts`) y el número de cuenta también va en
+  `detalle`, que es lo que muestran las listas. País y Tipo de identificación son listas
+  desplegables (`SelectorDeLista`: un clic y se elige otra, sin borrar antes; un campo de
+  texto con `datalist` solo ofrece lo que coincide con lo escrito, y con un valor puesto
+  no muestra el resto); el Banco es texto con una sugerencia. Las acciones `crearCuentaRetiro` y `actualizarCuentaRetiro` devuelven el error
   **como valor** (`{ error }`), porque en producción Next.js oculta el mensaje de una
   excepción; sin la migración, las cuentas que no son Binance siguen funcionando y la
   lista se consulta sin esa columna. Cambiar una cuenta de Binance a otro tipo borra sus
@@ -386,6 +388,11 @@ convenciones técnicas del código.
   `border-border` (1.28:1) es solo para divisores y tarjetas: nunca lo pongas en
   un campo. Un campo con clases propias (como el buscador global) usa también
   `border-border-control`.
+- **Sin textos descriptivos.** No agregues notas, subtítulos ni textos de ayuda que
+  expliquen un bloque o un campo («como los pide Dropi», «se sugiere al crear un retiro»):
+  la interfaz se entiende por sus títulos y etiquetas. Un aviso solo se muestra cuando
+  algo falló o cuando la persona tiene que decidir algo (un error, una confirmación).
+  El título de un bloque de una ficha lleva solo su ícono y su nombre (`Seccion`).
 - **Carga de las páginas: qué se repite, qué se guarda y qué va en paralelo.**
   Cada consulta a Supabase cuesta un viaje de red, y una cadena de ellas es lo
   que hace lenta una página. Tres reglas:

@@ -9,7 +9,6 @@ import { ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 import {
   BANCOS_BINANCE,
   PAISES_BINANCE,
-  TIPOS_CUENTA_BINANCE,
   TIPOS_IDENTIFICACION,
   datosBinanceDeLaBase,
   paisComoEnDropi,
@@ -29,31 +28,58 @@ const COMISIONES = [
   { valor: "ambos", etiqueta: "Porcentaje + monto fijo" },
 ] as const;
 
-/** Un bloque de la ficha: ícono y título a la izquierda, una nota corta a la derecha, y sus campos debajo. */
+/** Un bloque de la ficha: ícono y título, y sus campos debajo. */
 export function Seccion({
   icono: Icono,
   titulo,
-  nota,
   children,
 }: {
   icono: ComponentType<{ className?: string }>;
   titulo: string;
-  nota?: string;
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3 py-5 first:pt-0 last:pb-0">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <Icono className="h-4 w-4" />
-          </span>
-          {titulo}
-        </h3>
-        {nota && <span className="text-xs text-muted-foreground">{nota}</span>}
-      </div>
+      <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Icono className="h-4 w-4" />
+        </span>
+        {titulo}
+      </h3>
       {children}
     </section>
+  );
+}
+
+/**
+ * Lista desplegable para un dato que se elige entre pocas opciones: con un clic se ve toda la lista y se cambia,
+ * sin borrar antes lo que había (un campo de texto con sugerencias solo muestra las que coinciden con lo escrito).
+ * Si el valor guardado no está en la lista (una cuenta anterior), se conserva como una opción más. Con `obligatorio`
+ * arranca sin elegir y el formulario no se envía hasta que se elija una.
+ */
+function SelectorDeLista({
+  id,
+  name,
+  opciones,
+  valorInicial,
+  obligatorio,
+}: {
+  id: string;
+  name: string;
+  opciones: readonly string[];
+  valorInicial: string;
+  obligatorio?: boolean;
+}) {
+  const lista = valorInicial && !opciones.includes(valorInicial) ? [valorInicial, ...opciones] : opciones;
+  return (
+    <select id={id} name={name} required={obligatorio} defaultValue={valorInicial} className={fieldClass}>
+      {obligatorio && <option value="">Selecciona</option>}
+      {lista.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -170,22 +196,15 @@ export function FormularioCuenta({
         </Seccion>
 
         {tipoCuenta === "binance" && (
-          <Seccion icono={ExtractoIcon} titulo="Datos de la cuenta" nota="como los pide Dropi">
+          <Seccion icono={ExtractoIcon} titulo="Datos de la cuenta">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Campo etiqueta="País" id="binance-pais">
-                <input
+                <SelectorDeLista
                   id="binance-pais"
-                  type="text"
                   name="binance_pais"
-                  list="binance-paises"
-                  defaultValue={datosBinance?.pais || paisComoEnDropi(paisNombre)}
-                  className={fieldClass}
+                  opciones={PAISES_BINANCE}
+                  valorInicial={datosBinance?.pais || paisComoEnDropi(paisNombre)}
                 />
-                <datalist id="binance-paises">
-                  {PAISES_BINANCE.map((p) => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
               </Campo>
               <Campo etiqueta="Banco" id="binance-banco">
                 <input
@@ -203,21 +222,13 @@ export function FormularioCuenta({
                 </datalist>
               </Campo>
               <Campo etiqueta="Tipo de identificación" id="binance-tipo-identificacion" obligatorio>
-                <input
+                <SelectorDeLista
                   id="binance-tipo-identificacion"
-                  type="text"
                   name="binance_tipo_identificacion"
-                  list="binance-tipos-identificacion"
-                  required
-                  defaultValue={datosBinance?.tipo_identificacion}
-                  placeholder="Ej: CE"
-                  className={fieldClass}
+                  opciones={TIPOS_IDENTIFICACION}
+                  valorInicial={datosBinance?.tipo_identificacion ?? ""}
+                  obligatorio
                 />
-                <datalist id="binance-tipos-identificacion">
-                  {TIPOS_IDENTIFICACION.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
               </Campo>
               <Campo etiqueta="Número de identificación" id="binance-numero-identificacion">
                 <input
@@ -227,21 +238,6 @@ export function FormularioCuenta({
                   defaultValue={datosBinance?.numero_identificacion}
                   className={fieldClass}
                 />
-              </Campo>
-              <Campo etiqueta="Tipo de cuenta" id="binance-tipo-cuenta">
-                <input
-                  id="binance-tipo-cuenta"
-                  type="text"
-                  name="binance_tipo_cuenta"
-                  list="binance-tipos-cuenta"
-                  defaultValue={datosBinance?.tipo_cuenta || TIPOS_CUENTA_BINANCE[0]}
-                  className={fieldClass}
-                />
-                <datalist id="binance-tipos-cuenta">
-                  {TIPOS_CUENTA_BINANCE.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
               </Campo>
             </div>
             <Campo etiqueta="Número de cuenta" id="binance-numero-cuenta" obligatorio>
@@ -260,7 +256,7 @@ export function FormularioCuenta({
           </Seccion>
         )}
 
-        <Seccion icono={GastoIcon} titulo="Comisión sugerida" nota={editando ? undefined : "se sugiere al crear un retiro"}>
+        <Seccion icono={GastoIcon} titulo="Comisión sugerida">
           <Campo etiqueta="Tipo de comisión" id="campo-comision-tipo">
             <select
               id="campo-comision-tipo"
