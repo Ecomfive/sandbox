@@ -17,7 +17,8 @@ import type { TablaInteractiva } from "./usar-tabla";
 /**
  * Barra de herramientas común de las tablas, igual en todos los módulos y con el orden de ClickUp:
  * Agrupar, filas cerradas, Filtros y Columnas (cada una solo si la tabla la tiene). Mismas pastillas,
- * mismo lugar, mismos tooltips. `extra` va a la izquierda (p. ej. un botón propio del módulo).
+ * mismo lugar, mismos tooltips. `extra` va a la izquierda (p. ej. un botón propio del módulo);
+ * `accionPrincipal` va al final de la derecha, después de Descargar (p. ej. «+ Agregar»).
  */
 export function BarraHerramientas<F>({
   def,
@@ -29,6 +30,7 @@ export function BarraHerramientas<F>({
   atajos,
   extra,
   descargaCompleta,
+  accionPrincipal,
 }: {
   def: DefTabla<F>;
   /** Todas las filas de la tabla, sin filtrar (de ahí salen las opciones de los filtros). */
@@ -43,6 +45,8 @@ export function BarraHerramientas<F>({
   extra?: ReactNode;
   /** Si la tabla tiene cargada solo una parte y el servidor arma el total: el botón Descargar ofrece las dos opciones. */
   descargaCompleta?: DescargaCompleta;
+  /** Botón principal del módulo (p. ej. «+ Agregar»), al final de la derecha, después de Descargar. */
+  accionPrincipal?: ReactNode;
 }) {
   const agrupables = camposAgrupables(def).map((id) => ({ id, etiqueta: def.campos.find((c) => c.id === id)!.etiqueta }));
   const { vista, cambiarVista, resultado, filtros, cambiarFiltros, grupos } = tabla;
@@ -120,6 +124,7 @@ export function BarraHerramientas<F>({
         />
         {columnas && <MenuColumnas columnas={columnas.defs} estado={columnas.estado} alCambiar={columnas.cambiar} />}
         <BotonDescargar def={def} filas={filasParaDescargar} nombreFilas={nombreFilas} completa={descargaCompleta} />
+        {accionPrincipal}
       </div>
     </div>
   );

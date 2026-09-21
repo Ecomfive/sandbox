@@ -196,7 +196,7 @@ export function CrearRetiroPanel({
         type="button"
         aria-haspopup="dialog"
         onClick={abrirVentana}
-        className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
+        className="!bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
       >
         <MasIcon className="mr-1 h-4 w-4" />
         Agregar

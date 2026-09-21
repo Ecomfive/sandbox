@@ -8,7 +8,6 @@ import { requireModulo } from "@/lib/auth";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
-import { CrearRetiroPanel } from "./crear-retiro-panel";
 import { TarjetasResumenRetiros } from "./tarjetas-resumen";
 
 export const metadata = { title: "Conciliación de Retiros" };
@@ -183,14 +182,6 @@ export default async function RetirosPage() {
       </div>
 
       <div>
-        <div className="flex justify-end">
-          <CrearRetiroPanel
-            paisId={pais.id}
-            plataformas={plataformasParaCrear}
-            cuentas={cuentasRetiro ?? []}
-          />
-        </div>
-
         <TablaRetiros
           retiros={filasRetiro}
           codigoPais={pais.codigo}

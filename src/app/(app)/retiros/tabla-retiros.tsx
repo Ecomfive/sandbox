@@ -31,7 +31,7 @@ import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
 import type { Grupo } from "@/lib/tabla/vista";
 import { DEF_RETIROS, ESTADO_ETIQUETA } from "./filtros";
 import { EstadoSelect } from "./estado-select";
-import type { Cuenta, Plataforma } from "./crear-retiro-panel";
+import { CrearRetiroPanel, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 import { BarraLote } from "./barra-lote";
 import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
 import { EditarRetiroPanel } from "./editar-retiro-panel";
@@ -318,7 +318,7 @@ export function TablaRetiros({
     nombre: NOMBRE_FILAS,
     cerradosVisibles: resultado.cerradosVisibles,
     cerradosOcultos: resultado.cerradosOcultos,
-    etiquetaCerrados: DEF_RETIROS.cerrados?.etiqueta,
+    // Sin nota de "N cerrados sin mostrar": el botón "Cerrados" de la barra ya lo indica.
   });
 
   return (
@@ -341,6 +341,9 @@ export function TablaRetiros({
                 },
               ]
             : undefined
+        }
+        accionPrincipal={
+          puedeEscribir ? <CrearRetiroPanel paisId={paisId} plataformas={plataformas} cuentas={cuentas} /> : undefined
         }
       />
 
