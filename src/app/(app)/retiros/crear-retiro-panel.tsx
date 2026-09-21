@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { pideCrear } from "@/lib/crear-global";
 import { crearRetiro, verSiguienteCorrelativo } from "./actions";
@@ -202,9 +203,10 @@ export function CrearRetiroPanel({
         Agregar
       </Button>
 
-      {abierto && (
+      {abierto &&
+        createPortal(
         <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
           onClick={cerrarVentana}
         >
           <div
@@ -445,7 +447,7 @@ export function CrearRetiroPanel({
             </form>
           </div>
         </div>
-      )}
+        , document.body)}
     </>
   );
 }

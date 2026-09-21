@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { crearCuentaRetiro, actualizarCuentaRetiro } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
@@ -128,9 +129,10 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
         </Button>
       )}
 
-      {abierto && (
+      {abierto &&
+        createPortal(
         <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
           onClick={cerrarVentana}
         >
           <div
@@ -289,7 +291,7 @@ export function VentanaCuentaRetiro({ paisId, cuenta }: { paisId: string; cuenta
             </form>
           </div>
         </div>
-      )}
+        , document.body)}
     </>
   );
 }
