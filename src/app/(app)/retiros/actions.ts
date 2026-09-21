@@ -327,8 +327,8 @@ const MAX_NOVEDAD = 500;
 
 /**
  * Agrega una novedad a un retiro abierto: lo pasa a «novedad» y deja la nota en su historial («Novedad: …») y en la
- * auditoría. Es el botón «Novedad» de la ficha; después, como en cualquier retiro con novedad, aparece «Abrir» para
- * resolverla (`reabrirRetiro`). Solo actúa sobre un retiro abierto (no pisa un cierre ni una cancelación que haya pasado
+ * auditoría. Es el botón «Novedad» de la ficha; después, como en cualquier retiro con novedad, aparece «Abrir», que
+ * lleva a la nota y a su botón «Resuelto» (`reabrirRetiro`). Solo actúa sobre un retiro abierto (no pisa un cierre ni una cancelación que haya pasado
  * mientras la ficha estaba abierta). Devuelve el error como valor, porque en producción Next.js oculta el mensaje de una
  * excepción.
  */
@@ -362,21 +362,21 @@ export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?
   return {};
 }
 
-/** Quita la novedad y vuelve a dejar el retiro "abierto" — el atajo de un clic desde la ficha para
- * lo que, si no, habría que hacer abriendo "Modificar" y cambiando el Estado a mano. Solo actúa si
- * de verdad está en novedad (evita pisar un cierre o una cancelación que haya pasado mientras la
- * ficha estaba abierta). */
-export async function reabrirRetiro(formData: FormData) {
+/** Quita la novedad y vuelve a dejar el retiro "abierto": es el botón «Resuelto» de la sección de la novedad (a la
+ * que lleva «Abrir»); nada quita la novedad hasta que alguien pulsa «Resuelto». Solo actúa si de verdad está en
+ * novedad (evita pisar un cierre o una cancelación que haya pasado mientras la ficha estaba abierta). Devuelve el error
+ * como valor, porque en producción Next.js oculta el mensaje de una excepción. */
+export async function reabrirRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();
   const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
-  if (errorRetiro) throw new Error(errorRetiro.message);
-  if (retiro.estado !== "novedad") return;
+  if (errorRetiro) return { error: errorRetiro.message };
+  if (retiro.estado !== "novedad") return {};
 
   const { error } = await supabase.from("retiros").update({ estado: "abierto" }).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   await registrarEvento(supabase, id, "Novedad resuelta: el retiro vuelve a abierto");
   await registrarAuditoria({
@@ -389,6 +389,7 @@ export async function reabrirRetiro(formData: FormData) {
 
   revalidatePath("/retiros");
   revalidatePath(`/retiros/${id}`);
+  return {};
 }
 
 /** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado

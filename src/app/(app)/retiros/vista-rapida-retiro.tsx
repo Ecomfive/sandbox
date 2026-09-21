@@ -11,13 +11,13 @@ import { AlertaIcon, CheckIcon, CerrarIcon, ConciliarIcon } from "@/lib/nav-icon
 import { ESTADO_ETIQUETA } from "./filtros";
 import type { FilaRetiro } from "./tabla-retiros";
 import type { Cuenta, Plataforma } from "./crear-retiro-panel";
-import { AbrirNovedadBoton } from "./abrir-novedad-boton";
 import { CancelarRetiroBoton } from "./cancelar-retiro-boton";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 import { FormularioEditarRetiro } from "./formulario-editar-retiro";
 import { HistorialRetiro } from "./historial-retiro";
 import { SeccionConciliarRetiro } from "./seccion-conciliar-retiro";
 import { SeccionNovedadRetiro } from "./seccion-novedad-retiro";
+import { SeccionResolverNovedad } from "./seccion-resolver-novedad";
 
 const ESTADO_TONO = { abierto: "info", cancelado: "neutral", novedad: "destructive", cerrado: "success" } as const;
 
@@ -107,8 +107,9 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
   );
 }
 
-/** Qué sección de abajo está desplegada: la que pide lo necesario para conciliar o la de la nota de una novedad. */
-type PanelAbajo = "conciliar" | "novedad";
+/** Qué sección de abajo está desplegada: la que pide lo necesario para conciliar, la de la nota de una novedad nueva o
+ * la de una novedad que ya tiene el retiro (su nota y el botón «Resuelto»). */
+type PanelAbajo = "conciliar" | "novedad" | "resolver";
 
 /**
  * Ficha de un retiro: el panel a la derecha que se abre al pulsar su fila, con su barra de pasos, sus acciones y
@@ -118,11 +119,12 @@ type PanelAbajo = "conciliar" | "novedad";
  * guardar, cerrar la ficha pide confirmación. Lo que muestra sale de la fila ya cargada, así que se actualiza sola
  * al guardar.
  *
- * **«Conciliar» y «Novedad» no abren una ventana en el medio**: despliegan una sección al final de la misma ficha
- * (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`), la ficha baja hasta ella y el foco entra en su primer campo. Solo
- * hay una desplegada a la vez. **El historial (`HistorialRetiro`) es siempre lo último**: con una sección desplegada, queda
- * debajo de ella. «Novedad» solo está en un retiro abierto; al agregarla el retiro pasa a novedad y
- * aparece «Abrir» en su lugar.
+ * **«Conciliar», «Novedad» y «Abrir» no abren una ventana en el medio**: despliegan una sección al final de la misma
+ * ficha (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`, `SeccionResolverNovedad`), la ficha baja hasta ella y el foco
+ * entra en su primer campo. Solo hay una desplegada a la vez. **El historial (`HistorialRetiro`) es siempre lo último**:
+ * con una sección desplegada, queda debajo de ella. «Novedad» solo está en un retiro abierto; al agregarla el retiro
+ * pasa a novedad y aparece «Abrir» en su lugar. **«Abrir» no reabre el retiro**: lleva a la nota de la novedad, y ahí el
+ * botón «Resuelto» es el que quita la novedad y lo deja abierto.
  */
 export function VistaRapidaRetiro({
   fila,
@@ -185,7 +187,9 @@ export function VistaRapidaRetiro({
       if (!seccion) return;
       const reducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       seccion.scrollIntoView({ block: "start", behavior: reducido ? "auto" : "smooth" });
-      seccion.querySelector<HTMLElement>("input:not([type=hidden]):not([readonly]), textarea")?.focus({ preventScroll: true });
+      seccion
+        .querySelector<HTMLElement>("input:not([type=hidden]):not([readonly]), textarea, [data-foco-panel]")
+        ?.focus({ preventScroll: true });
     });
   }
 
@@ -248,7 +252,18 @@ export function VistaRapidaRetiro({
                     Novedad
                   </button>
                 )}
-                {fila.estado === "novedad" && <AbrirNovedadBoton id={fila.id} />}
+                {fila.estado === "novedad" && (
+                  <button
+                    type="button"
+                    onClick={() => irAlPanel("resolver")}
+                    aria-expanded={panel === "resolver"}
+                    aria-controls={`panel-retiro-${fila.id}`}
+                    className={`inline-flex items-center gap-1.5 rounded-md border border-success/30 px-3 py-2 text-sm font-medium text-success hover:bg-success-soft ${anilloFoco}`}
+                  >
+                    <CheckIcon className="h-4 w-4" />
+                    Abrir
+                  </button>
+                )}
                 {fila.estado !== "cancelado" && (
                   <CancelarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
                 )}
@@ -280,6 +295,14 @@ export function VistaRapidaRetiro({
               id={fila.id}
               alCancelar={() => setPanel(null)}
               alAgregada={() => alTerminarPanel("Novedad agregada")}
+            />
+          )}
+          {panel === "resolver" && fila.estado === "novedad" && (
+            <SeccionResolverNovedad
+              id={fila.id}
+              codigoPais={codigoPais}
+              alCancelar={() => setPanel(null)}
+              alResuelta={() => alTerminarPanel("Novedad resuelta")}
             />
           )}
 

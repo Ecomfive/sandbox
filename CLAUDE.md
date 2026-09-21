@@ -150,9 +150,10 @@ convenciones técnicas del código.
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
   grandes de Conciliar, Novedad (solo en un retiro abierto), Abrir (solo en novedad),
   Cancelar y Eliminar, aparecen "Guardar cambios" y "Cancelar" — que solo se ven con
-  cambios sin guardar. Guardar no cierra la ficha. **«Conciliar» y «Novedad» no abren una
-  ventana en el medio**: despliegan una sección al final de la misma ficha, **encima del
-  historial** (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`; solo una a la vez), la ficha
+  cambios sin guardar. Guardar no cierra la ficha. **«Conciliar», «Novedad» y «Abrir» no
+  abren una ventana en el medio**: despliegan una sección al final de la misma ficha,
+  **encima del historial** (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`,
+  `SeccionResolverNovedad`; solo una a la vez), la ficha
   baja hasta ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco
   entra en su primer campo. Conciliar pide **tres datos, todos obligatorios**: **Recibido**
   (si se aleja de «A recibir» más de lo tolerado, `conciliarRetiro` no concilia y lo dice),
@@ -165,7 +166,12 @@ convenciones técnicas del código.
   `useFaltantes` baje hasta él y le dé el foco. Novedad pide una
   **nota** (obligatoria, hasta 500 caracteres): `agregarNovedadRetiro` pasa el retiro a
   novedad y deja la nota en su historial («Novedad: …») y en la auditoría; entonces aparece
-  «Abrir» (`reabrirRetiro`). Las dos secciones usan el botón grande de `BotonCrear` y
+  «Abrir». **«Abrir» no reabre el retiro**: baja a una sección con **la nota de la novedad**
+  (`SeccionResolverNovedad`, que la saca del historial con `novedadVigente`,
+  `src/lib/retiros/novedad.ts`: la nota más reciente que no esté ya resuelta ni sustituida
+  por un estado puesto a mano; sin nota lo dice) y el botón **«Resuelto»**, que es lo único
+  que quita la novedad (`reabrirRetiro`: el retiro vuelve a abierto). Las secciones de
+  Conciliar y Novedad usan el botón grande de `BotonCrear` y
   `useFaltantes` (apagado hasta llenar lo obligatorio; pulsarlo así lleva al dato que
   falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir.
   El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma de
