@@ -86,9 +86,10 @@ export default async function RetirosPage() {
   const ultimoDiaDelMes = `${mesActual}-${String(new Date(Number(mesActual.slice(0, 4)), Number(mesActual.slice(5, 7)), 0).getDate()).padStart(2, "0")}`;
   const abiertos = (retiros ?? []).filter((r) => r.estado === "abierto").length;
   const conNovedad = (retiros ?? []).filter((r) => r.estado === "novedad").length;
-  const totalCerradoMes = (retiros ?? [])
-    .filter((r) => r.estado === "cerrado" && r.fecha.slice(0, 7) === mesActual)
-    .reduce((acc, r) => acc + Number(r.monto), 0);
+  const cerradosDelMes = (retiros ?? []).filter((r) => r.estado === "cerrado" && r.fecha.slice(0, 7) === mesActual);
+  const totalCerradoMes = cerradosDelMes.reduce((acc, r) => acc + Number(r.monto), 0);
+  const cerrados = (retiros ?? []).filter((r) => r.estado === "cerrado").length;
+  const totalRetiros = (retiros ?? []).length;
 
   const nombrePerfil = new Map((perfiles ?? []).map((p) => [p.id, p.nombre ?? p.email]));
   const filasRetiro: FilaRetiro[] = (retiros ?? []).map((r) => ({
@@ -118,68 +119,65 @@ export default async function RetirosPage() {
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Conciliación de Retiros" oculto />
 
-      {/* Saldos y resumen en una sola línea desde unos 830 px de ancho (con tarjetas compactas); en pantallas más
-          angostas envuelven, uno sobre otro, sin recortar nada. */}
-      <div className="flex flex-wrap gap-3">
-        <KpiGroup
-          className="flex-[1_1_22rem]"
-          titulo="Saldo de wallet"
-          accion={
-            <span className="flex items-center gap-2 font-normal">
-              {ultimaActualizacion && (
-                <span>
-                  Última actualización:{" "}
-                  <span className="tabular-nums">
-                    {formatearFechaHoraCompleta(ultimaActualizacion, pais.codigo)}
-                  </span>
+      {/* Una sola barra «Dashboard»: el saldo de wallet y el resumen de retiros son tarjetas hermanas de una misma
+          fila (compactas); si no caben, envuelven a otra línea sin recortar nada. */}
+      <KpiGroup
+        titulo="Dashboard"
+        accion={
+          <span className="flex items-center gap-2 font-normal">
+            {ultimaActualizacion && (
+              <span>
+                Última actualización:{" "}
+                <span className="tabular-nums">
+                  {formatearFechaHoraCompleta(ultimaActualizacion, pais.codigo)}
                 </span>
-              )}
-              <Tooltip texto="Actualizar desde Dropi">
-                <a
-                  href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Actualizar retiros desde Dropi"
-                  className="inline-flex items-center justify-center rounded-md border border-border bg-card p-1 text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  <ActualizarIcon className="h-3.5 w-3.5" />
-                </a>
-              </Tooltip>
-            </span>
-          }
-        >
-          <KpiGrid compacta>
-            {(plataformas ?? []).map((p) => {
-              const ultimo = ultimoSaldoPorPlataforma.get(p.id);
-              const esAutomatico = p.nombre === "Dropi";
-              return (
-                <KpiCard
-                  key={p.id}
-                  compacta
-                  titulo={esAutomatico ? null : p.nombre}
-                  valor={
-                    <span className="inline-flex items-center gap-1.5">
-                      {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
-                      {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
-                    </span>
-                  }
-                  subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
-                />
-              );
-            })}
-          </KpiGrid>
-        </KpiGroup>
-
-        <KpiGroup titulo="Resumen de retiros" className="flex-[2_1_30rem]">
+              </span>
+            )}
+            <Tooltip texto="Actualizar desde Dropi">
+              <a
+                href={`http://localhost:4321/actualizar-saldo-rapido?pais=${pais.codigo.toLowerCase()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Actualizar retiros desde Dropi"
+                className="inline-flex items-center justify-center rounded-md border border-border bg-card p-1 text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <ActualizarIcon className="h-3.5 w-3.5" />
+              </a>
+            </Tooltip>
+          </span>
+        }
+      >
+        <KpiGrid compacta>
+          {(plataformas ?? []).map((p) => {
+            const ultimo = ultimoSaldoPorPlataforma.get(p.id);
+            const esAutomatico = p.nombre === "Dropi";
+            return (
+              <KpiCard
+                key={p.id}
+                compacta
+                titulo={esAutomatico ? "Saldo de wallet" : `Saldo de ${p.nombre}`}
+                valor={
+                  <span className="inline-flex items-center gap-1.5">
+                    {esAutomatico && <WalletIcon className="h-4 w-4 text-muted-foreground" />}
+                    {ultimo ? formatearMoneda(ultimo.monto, pais.codigo) : "Sin registrar"}
+                  </span>
+                }
+                subtexto={esAutomatico ? undefined : ultimo ? `al ${formatearFecha(ultimo.fecha)}` : undefined}
+              />
+            );
+          })}
           <TarjetasResumenRetiros
             abiertos={abiertos}
             conNovedad={conNovedad}
             cerradosDelMes={formatearMoneda(totalCerradoMes, pais.codigo)}
+            cantidadCerradosDelMes={cerradosDelMes.length}
+            cerrados={cerrados}
+            totalRetiros={totalRetiros}
             mesDesde={`${mesActual}-01`}
             mesHasta={ultimoDiaDelMes}
           />
-        </KpiGroup>
-      </div>
+        </KpiGrid>
+      </KpiGroup>
 
       <div>
         <TablaRetiros
