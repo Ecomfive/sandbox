@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import type { IconoComp } from "@/components/tabla/botones-vista";
+import type { DescargaCompleta } from "@/components/tabla/boton-descargar";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, EstadoIcon, ExtractoIcon, GastoIcon, TiendaIcon } from "@/lib/nav-icons";
@@ -47,10 +48,13 @@ export function TablaMovimientosBanco({
   movimientos,
   codigoPais,
   plataformas,
+  descargaCompleta,
 }: {
   movimientos: FilaMovimientoBanco[];
   codigoPais: string;
   plataformas: { id: string; nombre: string }[];
+  /** Todos los movimientos de todos los extractos, que arma el servidor (la tabla solo trae los últimos 10 extractos). */
+  descargaCompleta?: DescargaCompleta;
 }) {
   return (
     <TablaDatos
@@ -61,6 +65,7 @@ export function TablaMovimientosBanco({
       iconos={ICONOS}
       nombre={NOMBRE}
       claveFila={(m) => m.id}
+      descargaCompleta={descargaCompleta}
       ariaLabel="Movimientos de los últimos extractos"
       vacio="Todavía no hay extractos cargados."
     />

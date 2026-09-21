@@ -6,6 +6,7 @@ import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
+import type { DescargaCompleta } from "@/components/tabla/boton-descargar";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
 import { useColumnas, type ColumnaDef } from "@/components/tabla/ganchos";
@@ -64,7 +65,16 @@ function etiquetaGrupo(campo: string, grupo: Grupo<FilaPedido>) {
  * Tabla de órdenes de Dropi con la barra de herramientas común. Trabaja sobre las órdenes ya cargadas
  * (el período y el orden se eligen arriba, en el servidor).
  */
-export function TablaPedidos({ pedidos, codigoPais }: { pedidos: FilaPedido[]; codigoPais: string }) {
+export function TablaPedidos({
+  pedidos,
+  codigoPais,
+  descargaCompleta,
+}: {
+  pedidos: FilaPedido[];
+  codigoPais: string;
+  /** Todas las órdenes del período, que arma el servidor (la tabla solo trae las primeras). */
+  descargaCompleta?: DescargaCompleta;
+}) {
   const tabla = useTablaInteractiva(DEF_PEDIDOS, pedidos);
   const [columnasGuardadas, cambiarColumnas] = useColumnas("pedidos-dropi", COLUMNAS);
   const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado } = tabla;
@@ -160,6 +170,7 @@ export function TablaPedidos({ pedidos, codigoPais }: { pedidos: FilaPedido[]; c
         iconos={ICONOS}
         nombreFilas="órdenes"
         columnas={{ defs: COLUMNAS, estado: columnasGuardadas, cambiar: cambiarColumnas }}
+        descargaCompleta={descargaCompleta}
       />
       <ContenedorTabla ariaLabel="Tabla de órdenes de Dropi">
         <table className="tabla-datos w-full min-w-[52rem] border-collapse text-sm">

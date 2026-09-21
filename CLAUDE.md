@@ -177,8 +177,13 @@ convenciones técnicas del código.
   (`src/lib/tabla/csv.ts`). Salen todos los `campos` de la definición, con los
   nombres que se ven; lo que sea un identificador y no un campo de filtro (el
   número de un retiro) va en `csvAntes`. Un texto que empieza por `=`, `+`, `-` o
-  `@` se escribe con comilla para que Excel no lo ejecute. Las descargas del
-  servidor de un período completo (`/api/exportar-*`) siguen aparte.
+  `@` se escribe con comilla para que Excel no lo ejecute. **Un solo botón de
+  descarga por tabla**: no pongas un enlace «Descargar CSV» al lado. Si la tabla
+  solo tiene cargada una parte de los datos (500 de 1 790 órdenes; los últimos 10
+  extractos) y el servidor sabe armar el total (`/api/exportar-*`), la página pasa
+  `descargaCompleta={{ href, etiqueta, detalle }}` (a `TablaDatos` o a
+  `BarraHerramientas`) y el mismo botón abre un menú con «Lo que se ve» y esa
+  descarga completa. Si la tabla ya trae todo (Alertas), el botón basta.
 - **Acciones en lote (Retiros).** La tabla de Retiros tiene una casilla por fila
   y una en el encabezado («seleccionar los que se ven»); al marcar aparece
   `BarraLote` (`src/app/(app)/retiros/barra-lote.tsx`) fija abajo: pasar a

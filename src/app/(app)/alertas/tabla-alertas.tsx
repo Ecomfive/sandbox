@@ -5,7 +5,6 @@ import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { linkClass } from "@/components/ui/link";
 import { useToast } from "@/components/ui/toast";
 import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -189,12 +188,7 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">Alertas</h2>
-        <a href="/api/exportar-alertas" className={linkClass}>
-          Descargar CSV
-        </a>
-      </div>
+      <h2 className="text-sm font-semibold tracking-tight">Alertas</h2>
       <div className="mt-3 min-w-0 rounded-xl border border-border bg-card">
         <BarraHerramientas
           def={DEF_ALERTAS}

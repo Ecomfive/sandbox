@@ -6,7 +6,6 @@ import { ExtractoUploader } from "./uploader";
 import type { FilaMovimientoBanco } from "./def-movimientos";
 import { TablaMovimientosBanco } from "./tabla-movimientos";
 import { requireModulo } from "@/lib/auth";
-import { linkClass } from "@/components/ui/link";
 import { ExtractoIcon } from "@/lib/nav-icons";
 
 export const dynamic = "force-dynamic";
@@ -63,17 +62,17 @@ export default async function ExtractosPage() {
       </div>
 
       <div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-tight">Extractos cargados</h2>
-          <a href="/api/exportar-extractos" className={linkClass}>
-            Descargar CSV
-          </a>
-        </div>
+        <h2 className="text-sm font-semibold tracking-tight">Extractos cargados</h2>
         <div className="mt-3">
           <TablaMovimientosBanco
             movimientos={movimientos}
             codigoPais={pais.codigo}
             plataformas={plataformas ?? []}
+            descargaCompleta={{
+              href: "/api/exportar-extractos",
+              etiqueta: "Todos los extractos",
+              detalle: "historial completo",
+            }}
           />
         </div>
       </div>

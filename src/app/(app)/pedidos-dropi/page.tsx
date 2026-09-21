@@ -11,7 +11,6 @@ import { FiltroFechas } from "@/components/filtro-fechas";
 import { OrdenSelect } from "./orden-select";
 import { TablaPedidos, type FilaPedido } from "./tabla-pedidos";
 import { resolverPeriodo } from "@/lib/dashboard/periodo";
-import { linkClass } from "@/components/ui/link";
 import { AyudaContextual } from "@/components/ui/ayuda-contextual";
 
 export const dynamic = "force-dynamic";
@@ -113,12 +112,6 @@ export default async function PedidosDropiPage({
           <FiltroFechas />
           <OrdenSelect actual={ordenClave} />
         </div>
-        <a
-          href={`/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}`}
-          className={`${linkClass} ml-auto`}
-        >
-          Descargar CSV ({totalOrdenes.toLocaleString("es")} órdenes)
-        </a>
       </div>
 
       {totalOrdenes === 0 ? (
@@ -151,11 +144,19 @@ export default async function PedidosDropiPage({
                 Mostrando {todas.length} de {totalOrdenes.toLocaleString("es")} órdenes
               </strong>{" "}
               en la tabla (el resumen de arriba sí las cuenta a todas). Achica el rango de fechas para
-              verlas todas, o descarga el CSV completo arriba.
+              verlas todas, o usa «Descargar» en la tabla y elige «Todo el período».
             </div>
           )}
 
-          <TablaPedidos pedidos={filasPedido} codigoPais={pais.codigo} />
+          <TablaPedidos
+            pedidos={filasPedido}
+            codigoPais={pais.codigo}
+            descargaCompleta={{
+              href: `/api/exportar-pedidos-dropi?desde=${desde}&hasta=${hasta}`,
+              etiqueta: "Todo el período",
+              detalle: `${totalOrdenes.toLocaleString("es")} órdenes`,
+            }}
+          />
         </>
       )}
     </Pagina>

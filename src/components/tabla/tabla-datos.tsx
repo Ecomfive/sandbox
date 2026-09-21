@@ -8,6 +8,7 @@ import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
 import type { Grupo } from "@/lib/tabla/vista";
 import { BarraHerramientas } from "./barra-herramientas";
 import type { IconoComp } from "./botones-vista";
+import type { DescargaCompleta } from "./boton-descargar";
 import { EncabezadoGrupo } from "./encabezado-grupo";
 import { useColumnas, type ColumnaDef } from "./ganchos";
 import { useTablaInteractiva } from "./usar-tabla";
@@ -40,6 +41,7 @@ export function TablaDatos<F, C = undefined>({
   ariaLabel,
   anchoMinimo = "36rem",
   limiteSinFiltros,
+  descargaCompleta,
   vacio,
 }: {
   def: DefTabla<F>;
@@ -62,6 +64,8 @@ export function TablaDatos<F, C = undefined>({
   ariaLabel: string;
   anchoMinimo?: string;
   limiteSinFiltros?: number;
+  /** Descarga que arma el servidor con más filas que las cargadas; el botón Descargar la ofrece junto a «Lo que se ve». */
+  descargaCompleta?: DescargaCompleta;
   /** Mensaje cuando no hay filas cargadas. */
   vacio: string;
 }) {
@@ -116,6 +120,7 @@ export function TablaDatos<F, C = undefined>({
         iconos={iconos}
         nombreFilas={nombre.plural}
         columnas={{ defs: columnas, estado: guardadas, cambiar: cambiarColumnas }}
+        descargaCompleta={descargaCompleta}
       />
       <ContenedorTabla ariaLabel={ariaLabel}>
         <table className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
