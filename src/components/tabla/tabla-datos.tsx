@@ -221,7 +221,9 @@ export function TablaDatos<F, C = undefined>({
           mensaje={
             hayFiltros
               ? `Ninguna coincide con los filtros.`
-              : `Todas están ocultas. Pulsa «${def.cerrados?.etiqueta ?? "Cerrados"}» para ver las ${resultado.cerradosOcultos}.`
+              : def.cerrados?.exclusivo && vista.mostrarCerrados
+                ? `No hay ninguna en «${def.cerrados.etiqueta}». Vuelve a pulsar el botón para ver las demás.`
+                : `Todas están ocultas. Pulsa «${def.cerrados?.etiqueta ?? "Cerrados"}» para ver las ${resultado.cerradosOcultos}.`
           }
         />
       )}
