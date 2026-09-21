@@ -86,7 +86,13 @@ export function aplicarVista<F>(
   const cerrados = def.cerrados;
   const forzadoPorFiltro = !mostrarCerrados && filtroPideCerrados(def, filtros);
   const cerradosVisibles = !cerrados || mostrarCerrados || forzadoPorFiltro;
-  const base = cerradosVisibles || !cerrados ? filas : filas.filter((fila) => !cerrados.esCerrado(fila));
+  const base = !cerrados
+    ? filas
+    : cerrados.exclusivo
+      ? filas.filter((fila) => cerrados.esCerrado(fila) === cerradosVisibles)
+      : cerradosVisibles
+        ? filas
+        : filas.filter((fila) => !cerrados.esCerrado(fila));
   return {
     filas: filtrarFilas(def, base, filtros),
     base,

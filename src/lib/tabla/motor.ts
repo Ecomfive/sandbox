@@ -68,6 +68,13 @@ export interface DefTabla<F> {
     campoEstado: string;
     valoresCerrados: string[] | ((valor: string) => boolean);
     ocultosPorDefecto: boolean;
+    /**
+     * Por defecto el botón AGREGA los cerrados a los que ya se ven (como "Mostrar completadas" de
+     * ClickUp). Con `exclusivo: true` el botón AÍSLA: apagado se ven solo las abiertas, encendido
+     * se ven solo las cerradas — nunca las dos juntas (para listas de estado binario como "Activa/
+     * Inactiva", donde mezclarlas no tiene sentido).
+     */
+    exclusivo?: boolean;
   };
   /** Cantidad que se suma por grupo (monto, unidades...). Sin esto los grupos solo cuentan filas. */
   total?: (fila: F) => number;

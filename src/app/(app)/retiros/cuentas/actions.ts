@@ -130,6 +130,10 @@ export async function eliminarCuentaRetiro(formData: FormData): Promise<{ error?
     };
   }
 
+  // Se guarda el nombre antes de borrar: la fila desaparece de `cuentas_retiro`, así que el
+  // historial de abajo (que lee `historial_auditoria`) necesita su propia copia para mostrarlo.
+  const { data: cuenta } = await supabase.from("cuentas_retiro").select("nombre").eq("id", id).maybeSingle();
+
   const { error } = await supabase.from("cuentas_retiro").delete().eq("id", id);
   if (error) return { error: error.message };
 
@@ -137,7 +141,8 @@ export async function eliminarCuentaRetiro(formData: FormData): Promise<{ error?
     accion: "eliminar_cuenta_retiro",
     entidad: "cuentas_retiro",
     entidadId: id,
-    detalle: "Cuenta de retiro eliminada",
+    detalle: cuenta?.nombre ? `Cuenta "${cuenta.nombre}" eliminada.` : "Cuenta de retiro eliminada.",
+    antes: cuenta?.nombre ? { Nombre: cuenta.nombre } : undefined,
   });
 
   revalidatePath("/retiros/cuentas");

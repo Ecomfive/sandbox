@@ -31,7 +31,7 @@ export interface FilaCuenta {
   datos_binance?: unknown;
 }
 
-/** Filtros y agrupación de las cuentas de retiro; «Inactivas» es lo cerrado, pero por defecto se ven todas. */
+/** Filtros y agrupación de las cuentas de retiro; por defecto se ven solo las activas, y «Inactivas» aísla las inactivas (nunca mezcladas). */
 export const DEF_CUENTAS: DefTabla<FilaCuenta> = {
   clave: "cuentas-destino",
   campos: [
@@ -63,7 +63,9 @@ export const DEF_CUENTAS: DefTabla<FilaCuenta> = {
     esCerrado: (c) => !c.activa,
     campoEstado: "estado",
     valoresCerrados: ["inactiva"],
-    ocultosPorDefecto: false,
+    ocultosPorDefecto: true,
+    // Aisladas: apagado solo activas, encendido solo inactivas — nunca mezcladas.
+    exclusivo: true,
   },
 };
 
