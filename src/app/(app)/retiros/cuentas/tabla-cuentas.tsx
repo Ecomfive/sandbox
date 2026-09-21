@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { EstadoIcon, WalletIcon } from "@/lib/nav-icons";
@@ -12,8 +13,7 @@ import {
   etiquetaTipoCuenta,
   type FilaCuenta,
 } from "./def-cuentas";
-import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
-import { VentanaCuentaRetiro } from "./ventana-cuenta-retiro";
+import { FichaCuenta } from "./ficha-cuenta";
 
 const NOMBRE: NombreFilas = { singular: "cuenta", plural: "cuentas" };
 const ICONOS: Record<string, IconoComp> = {
@@ -68,30 +68,54 @@ const COLUMNAS_CONFIGURACION: ColumnaTabla<FilaCuenta, unknown>[] = [
   COLUMNA_ESTADO,
 ];
 
-/** Cuentas destino de Retiros, con la barra de herramientas común y las acciones fijas a la derecha. */
-export function TablaCuentas({ cuentas, paisId, paisNombre }: { cuentas: FilaCuenta[]; paisId: string; paisNombre: string }) {
+/**
+ * Cuentas destino de Retiros, con la barra de herramientas común. Toda la fila se puede pulsar: abre la ficha de la
+ * cuenta (panel a la derecha), donde se modifica, se desactiva o se elimina. El interruptor de estado de la fila sigue
+ * funcionando por sí solo.
+ */
+export function TablaCuentas({
+  cuentas,
+  paisId,
+  paisNombre,
+  puedeEscribir,
+}: {
+  cuentas: FilaCuenta[];
+  paisId: string;
+  paisNombre: string;
+  puedeEscribir: boolean;
+}) {
+  // Qué cuenta está abierta y en qué orden se veían las filas al abrirla (para las flechas de anterior y siguiente).
+  // Se guarda el id y no la fila: al guardar, la ficha muestra los datos nuevos de la lista.
+  const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
+  const cuenta = abierta ? cuentas.find((c) => c.id === abierta.id) : undefined;
+
   return (
-    <TablaDatos
-      def={DEF_CUENTAS}
-      filas={cuentas}
-      columnas={COLUMNAS_DESTINO}
-      iconos={ICONOS}
-      nombre={NOMBRE}
-      claveFila={(c) => c.id}
-      anchoMinimo="50rem"
-      accion={{
-        etiqueta: "Acciones",
-        fija: true,
-        render: (c) => (
-          <div className="flex items-center justify-center gap-1">
-            <VentanaCuentaRetiro paisId={paisId} paisNombre={paisNombre} cuenta={c} />
-            <EliminarCuentaBoton id={c.id} nombre={c.nombre} />
-          </div>
-        ),
-      }}
-      ariaLabel="Cuentas destino de retiros"
-      vacio="Todavía no hay cuentas de retiro registradas."
-    />
+    <>
+      <TablaDatos
+        def={DEF_CUENTAS}
+        filas={cuentas}
+        columnas={COLUMNAS_DESTINO}
+        iconos={ICONOS}
+        nombre={NOMBRE}
+        claveFila={(c) => c.id}
+        anchoMinimo="44rem"
+        abrirFila={{
+          etiqueta: (c) => `Abrir la ficha de la cuenta ${c.nombre}`,
+          alAbrir: (c, orden) => setAbierta({ id: c.id, orden }),
+        }}
+        ariaLabel="Cuentas destino de retiros"
+        vacio="Todavía no hay cuentas de retiro registradas."
+      />
+      <FichaCuenta
+        cuenta={cuenta}
+        orden={abierta?.orden ?? []}
+        paisId={paisId}
+        paisNombre={paisNombre}
+        puedeEscribir={puedeEscribir}
+        alIr={(id) => setAbierta((a) => (a ? { ...a, id } : a))}
+        alCerrar={() => setAbierta(null)}
+      />
+    </>
   );
 }
 

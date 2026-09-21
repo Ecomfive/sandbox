@@ -157,10 +157,24 @@ convenciones técnicas del código.
   donde estaba (el foco entra en el campo con `data-enfocar`, o en el primero).
   Un panel a la derecha (`lado="derecha"`) sale con una animación corta
   (`animate-entrar-derecha`, sin movimiento si la persona pide menos animación).
-  **La ficha de una cuenta destino** (`retiros/cuentas/ventana-cuenta-retiro.tsx`,
-  crear y modificar) es ese panel: cabecera con el título, cuerpo en bloques con
-  ícono (`Seccion`: Cuenta, Datos de la cuenta si es Binance, Comisión sugerida) y
-  botones fijos abajo; úsala como modelo para otra ficha lateral. Las ventanas de
+  **Las fichas de una cuenta destino** son ese panel y sirven de modelo para otra
+  ficha lateral. Toda la fila de la tabla se pulsa (`abrirFila` de `TablaDatos`:
+  un clic en un botón, enlace o campo de la fila, como el interruptor de estado, no
+  la abre; el contenido de la primera columna es además un botón real, para teclado
+  y lectores de pantalla, y el clic en la fila le pasa el foco para que al cerrar
+  vuelva ahí). Se abre `FichaCuenta` (`retiros/cuentas/ficha-cuenta.tsx`): cabecera
+  con el título («Cuenta #3») y sus insignias de tipo y estado, las flechas de
+  cuenta anterior y siguiente (en el orden en que se ven las filas; `Ventana` recibe
+  esos botones en `navegacion`) y cerrar; debajo, una fila de acciones (`BotonAccion`,
+  ícono arriba y texto abajo: Modificar, Desactivar o Reactivar, Eliminar; solo con
+  permiso de escritura) y los datos en bloques con ícono (`Seccion`: Cuenta, Datos de
+  la cuenta si es Binance, Comisión sugerida). «Modificar» cambia los bloques por el
+  formulario en el mismo panel (`FormularioCuenta`, con botones fijos abajo) y al
+  guardar vuelve a la ficha; la ficha lee la cuenta de la lista por su id, así que se
+  actualiza sola y, si la cuenta se elimina, se cierra. **No pongas íconos de acción
+  en las filas** (la tabla no tiene columna de acciones): lo que se hace con una
+  cuenta se hace desde su ficha. «Nueva cuenta destino» (`ventana-cuenta-retiro.tsx`,
+  el botón Agregar) usa el mismo `FormularioCuenta`. Las ventanas de
   Retiros (crear, editar, conciliar) tienen su propia copia de la lógica de `Ventana`.
   **Toda ventana modal o globo flotante se dibuja en `<body>` con `createPortal`**
   (`Ventana`, `AyudaContextual`, `Tooltip`, y las ventanas de Retiros y Cuentas): un
