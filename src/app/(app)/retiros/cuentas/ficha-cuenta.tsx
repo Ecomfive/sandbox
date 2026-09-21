@@ -202,31 +202,23 @@ export function FichaCuenta({
                 </Seccion>
 
                 {cuenta.tipo === "binance" && (
-                  <Seccion icono={ExtractoIcon} titulo="Datos de la cuenta" nota="como los pide Dropi">
+                  <Seccion icono={ExtractoIcon} titulo="Datos de la cuenta">
                     {datosBinance ? (
                       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Dato etiqueta="País">{datosBinance.pais || SIN_DATO}</Dato>
                         <Dato etiqueta="Banco">{datosBinance.banco || SIN_DATO}</Dato>
                         <Dato etiqueta="Tipo de identificación">{datosBinance.tipo_identificacion || SIN_DATO}</Dato>
                         <Dato etiqueta="Número de identificación">{datosBinance.numero_identificacion || SIN_DATO}</Dato>
-                        <Dato etiqueta="Tipo de cuenta">{datosBinance.tipo_cuenta || SIN_DATO}</Dato>
                         <Dato etiqueta="Número de cuenta" ancho>
                           <span className="font-mono">{datosBinance.numero_cuenta || SIN_DATO}</span>
                         </Dato>
                       </dl>
                     ) : (
-                      <>
-                        <dl>
-                          <Dato etiqueta="Número de cuenta">
-                            <span className="font-mono">{cuenta.detalle || SIN_DATO}</span>
-                          </Dato>
-                        </dl>
-                        {puedeEscribir && (
-                          <p className="text-xs text-muted-foreground">
-                            Todavía no tiene los datos que pide Dropi. Complétalos con «Modificar».
-                          </p>
-                        )}
-                      </>
+                      <dl>
+                        <Dato etiqueta="Número de cuenta">
+                          <span className="font-mono">{cuenta.detalle || SIN_DATO}</span>
+                        </Dato>
+                      </dl>
                     )}
                   </Seccion>
                 )}

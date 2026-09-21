@@ -1,12 +1,11 @@
 // Los datos que Dropi pide para una cuenta Binance (una billetera USDT): país, banco (la red), tipo y número de
-// identificación, tipo de cuenta y número de cuenta (la dirección de la billetera). Sin React, para poder probarlo.
+// identificación y número de cuenta (la dirección de la billetera). Sin React, para poder probarlo.
 
 export interface DatosBinance {
   pais: string;
   banco: string;
   tipo_identificacion: string;
   numero_identificacion: string;
-  tipo_cuenta: string;
   numero_cuenta: string;
 }
 
@@ -16,16 +15,14 @@ export const CAMPOS_BINANCE = [
   "banco",
   "tipo_identificacion",
   "numero_identificacion",
-  "tipo_cuenta",
   "numero_cuenta",
 ] as const satisfies readonly (keyof DatosBinance)[];
 
-/** Sugerencias (el campo acepta también otro texto, como en Dropi). Lo que se ve en el formulario de Dropi:
- * PANAMA, USDT(RED=TRC-20), CE y AHORRO; el resto son las opciones habituales. */
+/** Opciones habituales: el país y el tipo de identificación se eligen de la lista; el banco (la red) es texto libre
+ * con esta sugerencia. En Dropi se ven PANAMA, USDT(RED=TRC-20) y CE; el resto son las opciones habituales. */
 export const PAISES_BINANCE = ["COSTA RICA", "PANAMA"] as const;
 export const BANCOS_BINANCE = ["USDT(RED=TRC-20)"] as const;
 export const TIPOS_IDENTIFICACION = ["CC", "CE", "NIT", "PP"] as const;
-export const TIPOS_CUENTA_BINANCE = ["AHORRO", "CORRIENTE"] as const;
 
 const MAX_LARGO = 200;
 
@@ -43,7 +40,8 @@ interface Formulario {
 }
 
 /**
- * Lee los datos de una cuenta Binance del formulario. Piden dato el tipo de identificación (lleva asterisco en Dropi)
+ * Lee los datos de una cuenta Binance del formulario (los guardados antes con «tipo de cuenta» se quedan sin él al
+ * volver a guardar). Piden dato el tipo de identificación (lleva asterisco en Dropi)
  * y el número de cuenta (sin la dirección la cuenta no sirve); el resto puede quedar vacío. Quita los espacios de las
  * puntas y no acepta textos largos: un servidor de acciones es una entrada pública.
  */
