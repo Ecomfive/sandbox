@@ -50,8 +50,8 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
   );
 }
 
-/** Desactivar o reactivar la cuenta: no borra nada, y es lo que hay que hacer cuando ya tiene retiros y no se puede
- * eliminar. */
+/** Desactivar o reactivar la cuenta a mano, sin pedir confirmación — al revés de «Eliminar», que solo desactiva
+ * (con su propio aviso) y no deja volver a activarla desde ahí. */
 function AlternarActivaBoton({ cuenta }: { cuenta: FilaCuenta }) {
   const [pending, startTransition] = useTransition();
   const { mostrarToast } = useToast();
