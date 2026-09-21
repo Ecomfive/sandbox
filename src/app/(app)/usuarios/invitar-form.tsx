@@ -20,16 +20,16 @@ export function InvitarForm({ roles }: { roles: Rol[] }) {
       action={formAction}
       className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
     >
-      <div className="flex flex-col gap-1">
-        <label className={labelClass}>Correo</label>
+      <label className="flex flex-col gap-1">
+        <span className={labelClass}>Correo</span>
         <input type="email" name="email" required className={`${fieldClass} w-56`} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className={labelClass}>Nombre</label>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelClass}>Nombre</span>
         <input type="text" name="nombre" className={fieldClass} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className={labelClass}>Rol</label>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelClass}>Rol</span>
         <select name="rol_id" className={fieldClass}>
           <option value="">Sin rol</option>
           {roles.map((r) => (
@@ -38,7 +38,7 @@ export function InvitarForm({ roles }: { roles: Rol[] }) {
             </option>
           ))}
         </select>
-      </div>
+      </label>
       <Button type="submit" disabled={pending}>
         {pending ? "Invitando…" : "Invitar"}
       </Button>

@@ -23,11 +23,14 @@ function EyeOffIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export function PasswordInput({
+  id,
   name,
   required,
   minLength,
   autoComplete,
 }: {
+  /** Para que la etiqueta lo señale con `htmlFor`. */
+  id?: string;
   name: string;
   required?: boolean;
   minLength?: number;
@@ -38,6 +41,7 @@ export function PasswordInput({
   return (
     <div className="relative">
       <input
+        id={id}
         type={visible ? "text" : "password"}
         name={name}
         required={required}

@@ -48,7 +48,8 @@ export function KpiFiltro<F>({
         valor={valor}
         subtexto={subtexto}
         tono={tono}
-        ayudaLectores={activo ? `Filtrando la tabla: ${atajo.etiqueta}. Pulsa para quitar el filtro.` : atajo.ayuda}
+        // Presionada, el lector ya dice «presionado» (aria-pressed): solo se explica qué hace cuando está apagada.
+        ayudaLectores={activo ? undefined : atajo.ayuda}
       >
         {children}
       </ContenidoKpi>

@@ -13,6 +13,8 @@ import type { FilaSku } from "./def-catalogo";
 import { TablaCatalogo } from "./tabla-catalogo";
 import { TarjetasEstadoCatalogo } from "./tarjetas-estado";
 
+export const metadata = { title: "SKU maestro" };
+
 export const dynamic = "force-dynamic";
 
 interface SkuMaestro {
@@ -83,14 +85,14 @@ export default async function CatalogoMaestroPage() {
       <div className="grid max-w-5xl gap-6 md:grid-cols-2">
         <form action={crearSkuSimple} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Proponer SKU simple</h2>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Nombre</label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Nombre</span>
             <input type="text" name="nombre" required className={fieldClass} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Código (opcional, se genera uno si lo dejas vacío)</label>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Código (opcional, se genera uno si lo dejas vacío)</span>
             <input type="text" name="codigo" className={fieldClass} />
-          </div>
+          </label>
           <Button type="submit" className="self-start">
             Proponer
           </Button>
@@ -98,16 +100,16 @@ export default async function CatalogoMaestroPage() {
 
         <form action={crearCombo} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Proponer combo</h2>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Nombre</label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Nombre</span>
             <input type="text" name="nombre" required className={fieldClass} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Código (opcional)</label>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Código (opcional)</span>
             <input type="text" name="codigo" className={fieldClass} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Componentes</label>
+          </label>
+          <div role="group" aria-labelledby="etiqueta-componentes" className="flex flex-col gap-1">
+            <span id="etiqueta-componentes" className={labelClass}>Componentes</span>
             {opcionesSimples.length === 0 ? (
               <EstadoVacio
                 mensaje="Todavía no hay SKUs simples aprobados para armar un combo. Aprueba al menos uno primero."

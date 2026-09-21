@@ -9,11 +9,23 @@ interface Rol {
   nombre: string;
 }
 
-export function RolSelect({ perfilId, rolIdActual, roles }: { perfilId: string; rolIdActual: string | null; roles: Rol[] }) {
+export function RolSelect({
+  perfilId,
+  rolIdActual,
+  roles,
+  usuario,
+}: {
+  perfilId: string;
+  rolIdActual: string | null;
+  roles: Rol[];
+  /** Nombre de la persona, para que el nombre del campo diga a quién se le cambia el rol. */
+  usuario?: string | null;
+}) {
   const [pending, startTransition] = useTransition();
 
   return (
     <select
+      aria-label={usuario ? `Rol de ${usuario}` : "Rol del usuario"}
       className={`${fieldClassSm} disabled:opacity-50`}
       defaultValue={rolIdActual ?? ""}
       disabled={pending}

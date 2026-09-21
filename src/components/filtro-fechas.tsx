@@ -88,6 +88,7 @@ export function FiltroFechas({ presets = PRESETS_FECHA_ESTANDAR }: { presets?: P
           <input
             ref={desdeRef}
             type="date"
+            aria-label="Desde"
             defaultValue={searchParams.get("desde") ?? ""}
             onChange={aplicarPersonalizado}
             className={fieldClassSm}
@@ -96,6 +97,7 @@ export function FiltroFechas({ presets = PRESETS_FECHA_ESTANDAR }: { presets?: P
           <input
             ref={hastaRef}
             type="date"
+            aria-label="Hasta"
             defaultValue={searchParams.get("hasta") ?? ""}
             onChange={aplicarPersonalizado}
             className={fieldClassSm}

@@ -10,6 +10,8 @@ import { TIPOS_INTERACCION, type FilaDropshipper, type FilaInteraccion } from ".
 import { ListaDropshippers } from "./lista-dropshippers";
 import { TablaInteracciones } from "./tabla-interacciones";
 
+export const metadata = { title: "CRM Dropshippers" };
+
 export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
@@ -65,18 +67,18 @@ export default async function CrmDropshippersPage() {
           className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Nombre</label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Nombre</span>
             <input type="text" name="nombre" required className={fieldClass} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Correo</label>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Correo</span>
             <input type="email" name="contacto_email" className={fieldClass} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Teléfono</label>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Teléfono</span>
             <input type="text" name="contacto_telefono" className={fieldClass} />
-          </div>
+          </label>
           <Button type="submit">Agregar</Button>
         </form>
       </div>
@@ -99,8 +101,8 @@ export default async function CrmDropshippersPage() {
             action={registrarInteraccion}
             className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
           >
-            <div className="flex flex-col gap-1">
-              <label className={labelClass}>Dropshipper</label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClass}>Dropshipper</span>
               <select name="dropshipper_id" required className={fieldClass}>
                 {(dropshippers ?? []).map((d) => (
                   <option key={d.id} value={d.id}>
@@ -108,9 +110,9 @@ export default async function CrmDropshippersPage() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClass}>Tipo</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClass}>Tipo</span>
               <select name="tipo" defaultValue="whatsapp" className={fieldClass}>
                 {TIPOS_INTERACCION.map((t) => (
                   <option key={t.valor} value={t.valor}>
@@ -118,15 +120,15 @@ export default async function CrmDropshippersPage() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClass}>Fecha</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClass}>Fecha</span>
               <input type="date" name="fecha" defaultValue={hoy()} required className={fieldClass} />
-            </div>
-            <div className="flex min-w-[14rem] flex-1 flex-col gap-1">
-              <label className={labelClass}>Nota</label>
+            </label>
+            <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
+              <span className={labelClass}>Nota</span>
               <input type="text" name="nota" required className={fieldClass} />
-            </div>
+            </label>
             <Button type="submit">Registrar</Button>
           </form>
         )}

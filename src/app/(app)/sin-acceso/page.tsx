@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { linkClass } from "@/components/ui/link";
 
+export const metadata = { title: "Sin acceso" };
+
 export default function SinAccesoPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-col items-center gap-3 px-6 py-24 text-center">

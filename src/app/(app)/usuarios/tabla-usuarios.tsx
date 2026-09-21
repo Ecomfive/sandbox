@@ -24,7 +24,7 @@ interface Rol {
 const COLUMNAS: ColumnaTabla<FilaUsuario, Rol[]>[] = [
   { id: "correo", label: "Correo", ocultable: false, clase: "font-medium", render: (u) => u.email },
   { id: "nombre", label: "Nombre", ocultable: true, clase: "text-muted-foreground", render: (u) => u.nombre ?? "—" },
-  { id: "rol", label: "Rol", ocultable: true, render: (u, roles) => <RolSelect perfilId={u.id} rolIdActual={u.rolId} roles={roles} /> },
+  { id: "rol", label: "Rol", ocultable: true, render: (u, roles) => <RolSelect perfilId={u.id} rolIdActual={u.rolId} roles={roles} usuario={u.nombre ?? u.email} /> },
   { id: "estado", label: "Estado", ocultable: true, render: (u) => <ActivoToggle perfilId={u.id} activo={u.activo} /> },
 ];
 

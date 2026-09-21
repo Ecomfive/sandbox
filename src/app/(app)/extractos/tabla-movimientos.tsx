@@ -35,7 +35,12 @@ const COLUMNAS: ColumnaTabla<FilaMovimientoBanco, Contexto>[] = [
     label: "Plataforma",
     ocultable: true,
     render: (m, c) => (
-      <AsignarPlataformaSelect movimientoId={m.id} plataformaIdActual={m.plataformaId} plataformas={c.plataformas} />
+      <AsignarPlataformaSelect
+        movimientoId={m.id}
+        plataformaIdActual={m.plataformaId}
+        plataformas={c.plataformas}
+        movimiento={m.descripcion}
+      />
     ),
   },
 ];

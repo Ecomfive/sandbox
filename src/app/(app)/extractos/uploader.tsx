@@ -69,15 +69,16 @@ export function ExtractoUploader({ pais }: { pais: Pais }) {
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       <input type="hidden" name="pais_id" value={pais.id} />
       <div className="flex flex-col gap-1">
-        <label className={labelClass}>País</label>
+        <span className={labelClass}>País</span>
         <p className="text-sm text-muted-foreground">
           {pais.nombre} — cambia el país activo desde la barra superior.
         </p>
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className={labelClass}>Archivo (CSV o Excel)</label>
+        <label htmlFor="archivo-extracto" className={labelClass}>Archivo (CSV o Excel)</label>
         <input
+          id="archivo-extracto"
           type="file"
           name="archivo"
           accept=".csv,.xlsx,.xls"
@@ -100,24 +101,24 @@ export function ExtractoUploader({ pais }: { pais: Pais }) {
         <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
           <p className="text-sm font-medium">Mapeo de columnas</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Fecha *</label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Fecha *</span>
               {columnaSelect("fecha", true)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Monto *</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Monto *</span>
               {columnaSelect("monto", true)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Descripción</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Descripción</span>
               {columnaSelect("descripcion", false)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>
                 Tipo (depósito/retiro) — si no hay columna, se infiere del signo del monto
-              </label>
+              </span>
               {columnaSelect("tipo", false)}
-            </div>
+            </label>
           </div>
 
           {preview.length > 0 && (

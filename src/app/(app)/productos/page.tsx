@@ -11,6 +11,8 @@ import { margenActual, type ProductoFila } from "@/lib/margen";
 import { TablaProductos } from "./tabla-productos";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
+export const metadata = { title: "Productos y márgenes" };
+
 export const dynamic = "force-dynamic";
 
 export default async function ProductosPage({
@@ -98,8 +100,8 @@ export default async function ProductosPage({
       ) : (
         <>
           <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4">
-            <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
-              <label className={labelClassSm}>Buscar por nombre o SKU</label>
+            <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
+              <span className={labelClassSm}>Buscar por nombre o SKU</span>
               <input
                 type="text"
                 name="buscar"
@@ -107,7 +109,7 @@ export default async function ProductosPage({
                 placeholder="Ej: aceite, MSK-0001…"
                 className={fieldClass}
               />
-            </div>
+            </label>
             <Button type="submit">Buscar</Button>
           </form>
 
@@ -139,7 +141,12 @@ export default async function ProductosPage({
                 <div className="min-w-[10rem] flex-1 text-sm">
                   {p.nombre} <span className="text-xs text-muted-foreground">({p.sku})</span>
                 </div>
-                <select name="sku_maestro_id" defaultValue={p.sku_maestro_id ?? ""} className={`${fieldClass} w-64`}>
+                <select
+                  name="sku_maestro_id"
+                  aria-label={`SKU maestro de ${p.nombre}`}
+                  defaultValue={p.sku_maestro_id ?? ""}
+                  className={`${fieldClass} w-64`}
+                >
                   <option value="">Sin vincular</option>
                   {(skusMaestrosDisponibles ?? []).map((s) => (
                     <option key={s.id} value={s.id}>
@@ -147,7 +154,7 @@ export default async function ProductosPage({
                     </option>
                   ))}
                 </select>
-                <Button type="submit" variant="secondary" className="text-xs">
+                <Button type="submit" variant="secondary" className="text-xs" aria-label={`Guardar el vínculo de ${p.nombre}`}>
                   Guardar
                 </Button>
               </form>

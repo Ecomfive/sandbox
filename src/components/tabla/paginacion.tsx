@@ -32,7 +32,8 @@ export function Paginacion({
       aria-label={`Paginación de ${nombre.plural}`}
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-2"
     >
-      <p className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
+      {/* Sin aria-live: al cambiar de página ya lo anuncia el aviso oculto de la tabla («136 retiros, página 2 de 3»). */}
+      <p className="text-xs text-muted-foreground tabular-nums">
         Mostrando {pagina.desde}–{pagina.hasta} de {pagina.total} {nombre.plural}
       </p>
       <ul className="flex flex-wrap items-center gap-1">

@@ -12,6 +12,8 @@ import { CrearRetiroPanel } from "./crear-retiro-panel";
 import { DropiSinVincular } from "./dropi-sin-vincular";
 import { TarjetasResumenRetiros } from "./tarjetas-resumen";
 
+export const metadata = { title: "Conciliación de Retiros" };
+
 export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);

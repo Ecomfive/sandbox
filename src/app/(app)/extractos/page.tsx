@@ -8,6 +8,8 @@ import { TablaMovimientosBanco } from "./tabla-movimientos";
 import { requireModulo } from "@/lib/auth";
 import { ExtractoIcon } from "@/lib/nav-icons";
 
+export const metadata = { title: "Extractos bancarios" };
+
 export const dynamic = "force-dynamic";
 
 export default async function ExtractosPage() {

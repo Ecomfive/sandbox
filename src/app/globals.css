@@ -5,7 +5,8 @@
   --foreground: #18181b;
   --card: #ffffff;
   --muted: #eeeeee;
-  --muted-foreground: #6b6b6b;
+  /* Texto secundario: ≥ 4.5:1 sobre el fondo, la tarjeta, --muted y --accent (la superficie de lo seleccionado). */
+  --muted-foreground: #636363;
   --border: #e3e3e3;
   /* Borde de los campos de formulario (input, select): el contorno es lo que delimita el campo, así que
      necesita 3:1 contra el fondo (WCAG 1.4.11). --border (1.28:1) queda para divisores y tarjetas. */
@@ -57,7 +58,7 @@
   --foreground: #f4f4f5;
   --card: #232326;
   --muted: #2a2a2e;
-  --muted-foreground: #a1a1aa;
+  --muted-foreground: #adadb5;
   --border: #38383d;
   --border-control: #71717a;
   --accent: #3f3f46;
@@ -114,6 +115,8 @@ table.tabla-datos thead th {
    al enfocar una fila, el navegador deja este margen libre arriba. */
 html {
   scroll-padding-top: 6rem;
+  /* Y abajo, por la barra de acciones en lote de las tablas, que también queda fija. */
+  scroll-padding-bottom: 5rem;
 }
 
 /* Encabezado fijo bajo la barra de herramientas mientras se baja la página. */

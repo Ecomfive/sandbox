@@ -38,8 +38,8 @@ function FichaDropshipper({ d }: { d: FilaDropshipper }) {
           {d.email ?? "—"} {d.telefono ? `· ${d.telefono}` : ""}
         </p>
       </div>
-      <div className="flex flex-col gap-1">
-        <label className={labelClassSm}>Estado</label>
+      <label className="flex flex-col gap-1">
+        <span className={labelClassSm}>Estado</span>
         <select name="estado" defaultValue={d.estado} className={fieldClassSm}>
           {ESTADOS.map((e) => (
             <option key={e.valor} value={e.valor}>
@@ -47,9 +47,9 @@ function FichaDropshipper({ d }: { d: FilaDropshipper }) {
             </option>
           ))}
         </select>
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className={labelClassSm}>Volumen mensual est.</label>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelClassSm}>Volumen mensual est.</span>
         <input
           type="number"
           step="0.01"
@@ -58,11 +58,11 @@ function FichaDropshipper({ d }: { d: FilaDropshipper }) {
           defaultValue={d.volumen ?? ""}
           className={`${fieldClassSm} w-32 tabular-nums`}
         />
-      </div>
-      <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
-        <label className={labelClassSm}>Notas</label>
+      </label>
+      <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
+        <span className={labelClassSm}>Notas</span>
         <input type="text" name="notas" defaultValue={d.notas ?? ""} className={fieldClassSm} />
-      </div>
+      </label>
       <Badge tone={toneEstado[d.estado] ?? "neutral"}>{etiquetaEstado(d.estado)}</Badge>
       <Button type="submit" variant="secondary" className="text-xs">
         Guardar

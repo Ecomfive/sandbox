@@ -7,6 +7,8 @@ import { requireModulo } from "@/lib/auth";
 import { InventarioIcon } from "@/lib/nav-icons";
 import { TablaMovimientos } from "./tabla-movimientos";
 
+export const metadata = { title: "Inventario" };
+
 export const dynamic = "force-dynamic";
 
 export default async function InventarioPage() {

@@ -70,8 +70,9 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
         </span>
         {marcados.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
-            <label className={labelClassSm}>Nuevo margen mínimo %</label>
+            <label htmlFor="margen-masivo" className={labelClassSm}>Nuevo margen mínimo %</label>
             <input
+              id="margen-masivo"
               type="number"
               step="0.1"
               min="0"
@@ -126,41 +127,44 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
                 {p.sku} {p.plataforma_nombre ? `· ${p.plataforma_nombre}` : ""}
               </p>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Costo</label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Costo</span>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 name="costo"
+                aria-label={`Costo de ${p.nombre}`}
                 defaultValue={p.costo ?? ""}
                 className={`${fieldClassSm} w-24 tabular-nums`}
               />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Precio venta</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Precio venta</span>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 name="precio_actual"
+                aria-label={`Precio de venta de ${p.nombre}`}
                 defaultValue={p.precio_actual ?? ""}
                 className={`${fieldClassSm} w-24 tabular-nums`}
               />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelClassSm}>Mínimo %</label>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Mínimo %</span>
               <input
                 type="number"
                 step="0.1"
                 min="0"
                 max="100"
                 name="margen_minimo"
+                aria-label={`Margen mínimo de ${p.nombre}`}
                 defaultValue={p.margen_minimo}
                 required
                 className={`${fieldClassSm} w-20 tabular-nums`}
               />
-            </div>
+            </label>
             <div className="flex flex-col gap-1">
               <p className={labelClassSm}>Margen actual</p>
               {margen === null ? (
@@ -171,7 +175,7 @@ export function TablaProductos({ productos }: { productos: ProductoFila[] }) {
                 <Badge tone="success">{margen.toFixed(1)}%</Badge>
               )}
             </div>
-            <Button type="submit" variant="secondary" className="text-xs">
+            <Button type="submit" variant="secondary" className="text-xs" aria-label={`Guardar ${p.nombre}`}>
               Guardar
             </Button>
           </FormularioConToast>

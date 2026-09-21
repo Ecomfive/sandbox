@@ -14,9 +14,15 @@ export function ComboBuilder({ opciones }: { opciones: OpcionSimple[] }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {filas.map((key) => (
+      {filas.map((key, i) => (
         <div key={key} className="flex items-center gap-2">
-          <select name="componente_id" className={`${fieldClass} flex-1`} required defaultValue="">
+          <select
+            name="componente_id"
+            aria-label={`SKU del componente ${i + 1}`}
+            className={`${fieldClass} flex-1`}
+            required
+            defaultValue=""
+          >
             <option value="" disabled>
               Selecciona un SKU simple aprobado
             </option>
@@ -29,6 +35,7 @@ export function ComboBuilder({ opciones }: { opciones: OpcionSimple[] }) {
           <input
             type="number"
             name="cantidad"
+            aria-label={`Cantidad del componente ${i + 1}`}
             min={1}
             defaultValue={1}
             className={`${fieldClass} w-20`}
@@ -38,6 +45,7 @@ export function ComboBuilder({ opciones }: { opciones: OpcionSimple[] }) {
             <button
               type="button"
               onClick={() => setFilas((f) => f.filter((k) => k !== key))}
+              aria-label={`Quitar el componente ${i + 1}`}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
               Quitar

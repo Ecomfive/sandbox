@@ -6,6 +6,8 @@ import { requireModulo } from "@/lib/auth";
 import { VentanaCuentaRetiro } from "./ventana-cuenta-retiro";
 import { TablaCuentas } from "./tabla-cuentas";
 
+export const metadata = { title: "Cuentas destino" };
+
 export const dynamic = "force-dynamic";
 
 export default async function CuentasRetiroPage() {

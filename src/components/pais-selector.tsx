@@ -9,6 +9,7 @@ export function PaisSelector({ actual }: { actual: string }) {
 
   return (
     <select
+      aria-label="País"
       className="rounded-full border border-border-control bg-card px-3 py-1 text-sm disabled:opacity-50"
       value={actual}
       disabled={pending}

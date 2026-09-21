@@ -14,6 +14,8 @@ import { CATEGORIAS } from "./def-gastos";
 import { TablaGastos } from "./tabla-gastos";
 import { TarjetasGastosMes } from "./tarjetas-mes";
 
+export const metadata = { title: "Nómina y gastos" };
+
 export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
@@ -76,8 +78,8 @@ export default async function GastosPage() {
           className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
         >
           <input type="hidden" name="pais_id" value={pais.id} />
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Categoría</label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Categoría</span>
             <select name="categoria" required className={fieldClass}>
               {CATEGORIAS.map((c) => (
                 <option key={c.valor} value={c.valor}>
@@ -85,13 +87,13 @@ export default async function GastosPage() {
                 </option>
               ))}
             </select>
-          </div>
-          <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
-            <label className={labelClass}>Descripción</label>
+          </label>
+          <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
+            <span className={labelClass}>Descripción</span>
             <input type="text" name="descripcion" required className={fieldClass} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Monto</label>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Monto</span>
             <input
               type="number"
               step="0.01"
@@ -100,11 +102,11 @@ export default async function GastosPage() {
               required
               className={`${fieldClass} w-32 tabular-nums`}
             />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Fecha</label>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Fecha</span>
             <input type="date" name="fecha" defaultValue={hoy()} required className={fieldClass} />
-          </div>
+          </label>
           <Button type="submit">Registrar gasto</Button>
         </FormularioConToast>
       </div>
