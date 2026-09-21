@@ -312,6 +312,46 @@ export async function cancelarRetiro(formData: FormData) {
   revalidatePath(`/retiros/${id}`);
 }
 
+/** Cuántos caracteres admite la nota de una novedad. */
+const MAX_NOVEDAD = 500;
+
+/**
+ * Agrega una novedad a un retiro abierto: lo pasa a «novedad» y deja la nota en su historial («Novedad: …») y en la
+ * auditoría. Es el botón «Novedad» de la ficha; después, como en cualquier retiro con novedad, aparece «Abrir» para
+ * resolverla (`reabrirRetiro`). Solo actúa sobre un retiro abierto (no pisa un cierre ni una cancelación que haya pasado
+ * mientras la ficha estaba abierta). Devuelve el error como valor, porque en producción Next.js oculta el mensaje de una
+ * excepción.
+ */
+export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+  const texto = String(formData.get("novedad") ?? "").trim();
+  if (!texto) return { error: "Escribe la novedad." };
+  if (texto.length > MAX_NOVEDAD) return { error: `La novedad es muy larga (máximo ${MAX_NOVEDAD} caracteres).` };
+
+  const supabase = createServiceClient();
+  const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
+  if (errorRetiro) return { error: errorRetiro.message };
+  if (retiro.estado !== "abierto") return { error: "Solo se puede agregar una novedad a un retiro abierto." };
+
+  const { error } = await supabase.from("retiros").update({ estado: "novedad" }).eq("id", id);
+  if (error) return { error: error.message };
+
+  await registrarEvento(supabase, id, `Novedad: ${texto}`);
+  await registrarAuditoria({
+    accion: "agregar_novedad_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    detalle: texto,
+    antes: { Estado: ETIQUETA_ESTADO.abierto },
+    despues: { Estado: ETIQUETA_ESTADO.novedad },
+  });
+
+  revalidatePath("/retiros");
+  revalidatePath(`/retiros/${id}`);
+  return {};
+}
+
 /** Quita la novedad y vuelve a dejar el retiro "abierto" — el atajo de un clic desde la ficha para
  * lo que, si no, habría que hacer abriendo "Modificar" y cambiando el Estado a mano. Solo actúa si
  * de verdad está en novedad (evita pisar un cierre o una cancelación que haya pasado mientras la

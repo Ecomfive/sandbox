@@ -148,9 +148,20 @@ convenciones técnicas del código.
   `pasosDelRetiro`) y las pestañas Detalle e Historial. **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
-  grandes de Conciliar, Abrir (solo en novedad), Cancelar y Eliminar, aparecen "Guardar
-  cambios" y "Cancelar" — que solo se ven con cambios sin guardar. Guardar no cierra la
-  ficha. El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma
+  grandes de Conciliar, Novedad (solo en un retiro abierto), Abrir (solo en novedad),
+  Cancelar y Eliminar, aparecen "Guardar cambios" y "Cancelar" — que solo se ven con
+  cambios sin guardar. Guardar no cierra la ficha. **«Conciliar» y «Novedad» no abren una
+  ventana en el medio**: despliegan una sección al final de la misma ficha
+  (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`; solo una a la vez), la ficha baja hasta
+  ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco entra en su
+  primer campo. Conciliar pide **Recibido** (obligatorio; si se aleja de «A recibir» más de
+  lo tolerado, `conciliarRetiro` no concilia y lo dice), **ID / Referencia** y **Soporte**
+  (opcionales) y, al conciliar, deja el retiro cerrado y consolidado. Novedad pide una
+  **nota** (obligatoria, hasta 500 caracteres): `agregarNovedadRetiro` pasa el retiro a
+  novedad y deja la nota en su historial («Novedad: …») y en la auditoría; entonces aparece
+  «Abrir» (`reabrirRetiro`). Las dos secciones usan el botón grande de `BotonCrear` y
+  `useFaltantes` (apagado hasta llenar lo obligatorio; pulsarlo así lleva al dato que
+  falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir. El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma
   de reabrirlo. Las dos pestañas quedan montadas a la vez (una se oculta con `hidden`, no
   se desmonta): pasar a Historial y volver no pierde lo que se estaba escribiendo. Con
   cambios sin guardar, cerrar la ficha pide confirmación. **La tabla no tiene columna de
@@ -220,8 +231,9 @@ convenciones técnicas del código.
   servidor. En «Nueva cuenta destino», el nombre, el tipo, la cuenta (o, si es Binance, el
   tipo de identificación, el número de identificación y el número de cuenta); la cuenta y
   el número de identificación solo se exigen **al crear**, para no bloquear la
-  modificación de una cuenta guardada antes sin ese dato. Las ventanas de
-  Retiros de **editar** y **conciliar** todavía tienen su propia copia de la lógica de `Ventana`.
+  modificación de una cuenta guardada antes sin ese dato. (Ya no queda ninguna ventana de
+  Retiros con su propia copia de la lógica de `Ventana`: crear, editar y conciliar son
+  el panel lateral o una sección de él.)
   **Toda ventana modal o globo flotante se dibuja en `<body>` con `createPortal`**
   (`Ventana`, `AyudaContextual`, `Tooltip`, y las ventanas de Retiros y Cuentas): un
   `position: fixed` dentro de la tabla queda atrapado en el contexto de apilamiento

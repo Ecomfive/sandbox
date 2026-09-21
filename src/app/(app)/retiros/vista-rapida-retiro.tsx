@@ -2,19 +2,21 @@
 
 import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { anilloFoco } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { ETIQUETA_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
-import { CheckIcon, CerrarIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CheckIcon, CerrarIcon, ConciliarIcon } from "@/lib/nav-icons";
 import { ESTADO_ETIQUETA } from "./filtros";
 import type { FilaRetiro } from "./tabla-retiros";
 import type { Cuenta, Plataforma } from "./crear-retiro-panel";
-import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
 import { AbrirNovedadBoton } from "./abrir-novedad-boton";
 import { CancelarRetiroBoton } from "./cancelar-retiro-boton";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 import { FormularioEditarRetiro } from "./formulario-editar-retiro";
+import { SeccionConciliarRetiro } from "./seccion-conciliar-retiro";
+import { SeccionNovedadRetiro } from "./seccion-novedad-retiro";
 
 const ESTADO_TONO = { abierto: "info", cancelado: "neutral", novedad: "destructive", cerrado: "success" } as const;
 
@@ -104,13 +106,21 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
   );
 }
 
+/** Qué sección de abajo está desplegada: la que pide lo necesario para conciliar o la de la nota de una novedad. */
+type PanelAbajo = "conciliar" | "novedad";
+
 /**
  * Ficha de un retiro: el panel a la derecha que se abre al pulsar su fila, con su barra de pasos, sus acciones y
  * sus datos, sin salir de la tabla — reemplaza a la página completa que había antes en `/retiros/[id]`. **La
  * ficha ya es el formulario** (no hay un botón «Modificar», ver `FormularioEditarRetiro`): se cambia un campo y
- * arriba, junto a Conciliar/Abrir/Cancelar/Eliminar, aparecen «Guardar cambios» y «Cancelar». Con cambios sin
+ * arriba, junto a Conciliar/Novedad/Abrir/Cancelar/Eliminar, aparecen «Guardar cambios» y «Cancelar». Con cambios sin
  * guardar, cerrar la ficha pide confirmación. Lo que muestra sale de la fila ya cargada, así que se actualiza sola
  * al guardar.
+ *
+ * **«Conciliar» y «Novedad» no abren una ventana en el medio**: despliegan una sección al final de la misma ficha
+ * (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`), la ficha baja hasta ella y el foco entra en su primer campo. Solo
+ * hay una desplegada a la vez. «Novedad» solo está en un retiro abierto; al agregarla el retiro pasa a novedad y
+ * aparece «Abrir» en su lugar.
  */
 export function VistaRapidaRetiro({
   fila,
@@ -134,6 +144,9 @@ export function VistaRapidaRetiro({
   const [sinGuardarId, setSinGuardarId] = useState<string | null>(null);
   // Sube al cancelar: con otra `key` el formulario se monta de nuevo con los datos del retiro y suelta lo escrito.
   const [version, setVersion] = useState(0);
+  const [panel, setPanel] = useState<PanelAbajo | null>(null);
+  // Sube al conciliar o agregar una novedad, para que el historial de la ficha se vuelva a pedir.
+  const [versionHistorial, setVersionHistorial] = useState(0);
   const sinGuardar = !!fila && sinGuardarId === fila.id;
 
   /** Pide confirmación si se van a perder cambios; devuelve si se puede seguir. */
@@ -144,6 +157,7 @@ export function VistaRapidaRetiro({
   function cerrar() {
     if (guardando || !puedeDescartar()) return;
     setSinGuardarId(null);
+    setPanel(null);
     alCerrar();
   }
 
@@ -156,6 +170,27 @@ export function VistaRapidaRetiro({
   function alCancelarEdicion() {
     setSinGuardarId(null);
     setVersion((v) => v + 1);
+  }
+
+  /** Despliega la sección de abajo, baja hasta ella (sin movimiento suave si la persona pidió menos animación) y
+   * pone el foco en su primer campo. El botón de la fila queda arriba, sin foco: la ficha ya no lo necesita. */
+  function irAlPanel(cual: PanelAbajo) {
+    if (!fila) return;
+    setPanel(cual);
+    const id = `panel-retiro-${fila.id}`;
+    requestAnimationFrame(() => {
+      const seccion = document.getElementById(id);
+      if (!seccion) return;
+      const reducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      seccion.scrollIntoView({ block: "start", behavior: reducido ? "auto" : "smooth" });
+      seccion.querySelector<HTMLElement>("input:not([type=hidden]):not([readonly]), textarea")?.focus({ preventScroll: true });
+    });
+  }
+
+  function alTerminarPanel(mensaje: string) {
+    setPanel(null);
+    setVersionHistorial((v) => v + 1);
+    mostrarToast(mensaje);
   }
 
   return (
@@ -187,27 +222,31 @@ export function VistaRapidaRetiro({
             codigoPais={codigoPais}
             plataformas={plataformas}
             cuentas={cuentas}
+            versionHistorial={versionHistorial}
             acciones={
               <>
-                <ConciliarRetiroPanel
-                  retiro={{
-                    id: fila.id,
-                    numeroCorrelativo: fila.numeroCorrelativo,
-                    plataformaNombre: fila.plataformaNombre,
-                    destino: fila.destino,
-                    gestionadoPor: fila.gestionadoPor,
-                    monto: fila.monto,
-                    fecha: fila.fecha,
-                    fechaLimite: fila.fechaLimite,
-                    comision: fila.comision,
-                    aRecibir: fila.aRecibir,
-                    notas: fila.notas,
-                    soporteNumero: fila.soporteNumero,
-                    montoRecibido: fila.montoRecibido,
-                  }}
-                  paisId={paisId}
-                  variante="boton"
-                />
+                <button
+                  type="button"
+                  onClick={() => irAlPanel("conciliar")}
+                  aria-expanded={panel === "conciliar"}
+                  aria-controls={`panel-retiro-${fila.id}`}
+                  className={`inline-flex items-center gap-1.5 rounded-md bg-[#202020] px-3 py-2 text-sm font-medium text-white hover:bg-[#2d2d2d] ${anilloFoco}`}
+                >
+                  <ConciliarIcon className="h-4 w-4" />
+                  Conciliar
+                </button>
+                {fila.estado === "abierto" && (
+                  <button
+                    type="button"
+                    onClick={() => irAlPanel("novedad")}
+                    aria-expanded={panel === "novedad"}
+                    aria-controls={`panel-retiro-${fila.id}`}
+                    className={`inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive-soft ${anilloFoco}`}
+                  >
+                    <AlertaIcon className="h-4 w-4" />
+                    Novedad
+                  </button>
+                )}
                 {fila.estado === "novedad" && <AbrirNovedadBoton id={fila.id} />}
                 {fila.estado !== "cancelado" && (
                   <CancelarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
@@ -220,6 +259,28 @@ export function VistaRapidaRetiro({
             alCambiarGuardando={setGuardando}
             alModificar={() => setSinGuardarId(fila.id)}
           />
+
+          {panel === "conciliar" && (
+            <SeccionConciliarRetiro
+              key={fila.id}
+              id={fila.id}
+              paisId={paisId}
+              codigoPais={codigoPais}
+              aRecibir={fila.aRecibir}
+              soporteNumero={fila.soporteNumero}
+              montoRecibido={fila.montoRecibido}
+              alCancelar={() => setPanel(null)}
+              alConciliado={() => alTerminarPanel("Retiro conciliado")}
+            />
+          )}
+          {panel === "novedad" && fila.estado === "abierto" && (
+            <SeccionNovedadRetiro
+              key={fila.id}
+              id={fila.id}
+              alCancelar={() => setPanel(null)}
+              alAgregada={() => alTerminarPanel("Novedad agregada")}
+            />
+          )}
         </div>
       )}
     </Ventana>

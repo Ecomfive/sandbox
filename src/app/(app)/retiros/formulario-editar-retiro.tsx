@@ -59,6 +59,7 @@ export function FormularioEditarRetiro({
   alCancelar,
   alCambiarGuardando,
   alModificar,
+  versionHistorial = 0,
 }: {
   fila: FilaRetiro;
   codigoPais: string;
@@ -73,6 +74,9 @@ export function FormularioEditarRetiro({
   alCambiarGuardando?: (guardando: boolean) => void;
   /** Se llama cuando la persona cambia cualquier campo (para saber si hay cambios sin guardar). */
   alModificar?: () => void;
+  /** Sube cuando algo de la ficha registra actividad nueva (conciliar, agregar una novedad): el historial se vuelve a
+   * pedir, sin tocar lo que se esté escribiendo en los campos. */
+  versionHistorial?: number;
 }) {
   const [pestana, setPestana] = useState<Pestana>("detalle");
   const [eventos, setEventos] = useState<EventoRetiro[] | null | undefined>(undefined);
@@ -84,9 +88,10 @@ export function FormularioEditarRetiro({
     return () => {
       vigente = false;
     };
-    // Solo al montar: este componente ya se vuelve a montar por completo con `key={fila.id}-...}`.
+    // Al montar (este componente ya se vuelve a montar por completo con `key={fila.id}-...}`) y cada vez que sube
+    // `versionHistorial`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [versionHistorial]);
   const cargandoHistorial = eventos === undefined;
 
   const [modificado, setModificado] = useState(false);
