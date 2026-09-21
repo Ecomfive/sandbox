@@ -291,6 +291,7 @@ export function TablaRetiros({
               numeroCorrelativo: fila.numeroCorrelativo,
               plataformaId: fila.plataformaId,
               cuentaRetiroId: fila.cuentaRetiroId,
+              destino: fila.destino,
               gestionadoPor: fila.gestionadoPor,
               monto: fila.monto,
               comision: fila.comision,

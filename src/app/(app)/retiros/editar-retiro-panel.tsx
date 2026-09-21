@@ -27,6 +27,10 @@ export interface RetiroExistente {
   numeroCorrelativo: number;
   plataformaId: string | null;
   cuentaRetiroId: string | null;
+  /** Lo que ya se muestra como destino (nombre de la cuenta, o el banco de texto libre de un
+   * retiro importado sin cuenta vinculada) — para poder mostrarlo como opción cuando
+   * `cuentaRetiroId` es null, sin obligar a elegir una cuenta real para poder guardar. */
+  destino: string;
   gestionadoPor: string;
   estado: string;
   monto: number;
@@ -57,9 +61,9 @@ export function EditarRetiroPanel({
     retiro.monto > 0 ? ((retiro.comision / retiro.monto) * 100).toFixed(2) : "0"
   );
   const [comisionManual, setComisionManual] = useState(true);
-  const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState(
-    retiro.cuentaRetiroId ?? cuentas[0]?.id ?? ""
-  );
+  // Sin cuenta[0] como respaldo: un retiro importado sin cuenta vinculada debe poder guardarse
+  // sin que el selector salte solo a la primera cuenta de la lista (le cambiaría el destino).
+  const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState(retiro.cuentaRetiroId ?? "");
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
   const tituloId = `titulo-editar-retiro-${retiro.id}`;
@@ -72,7 +76,7 @@ export function EditarRetiroPanel({
     setComisionValor(retiro.comision.toFixed(2));
     setComisionPorcentaje(retiro.monto > 0 ? ((retiro.comision / retiro.monto) * 100).toFixed(2) : "0");
     setComisionManual(true);
-    setCuentaSeleccionadaId(retiro.cuentaRetiroId ?? cuentas[0]?.id ?? "");
+    setCuentaSeleccionadaId(retiro.cuentaRetiroId ?? "");
     setAbierto(true);
   }
 
@@ -234,16 +238,17 @@ export function EditarRetiroPanel({
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <label className={labelClassSm} htmlFor={`campo-cuenta-${retiro.id}`}>
                       Cuenta destino
-                      <Obligatorio />
                     </label>
                     <select
                       id={`campo-cuenta-${retiro.id}`}
                       name="cuenta_retiro_id"
-                      required
                       value={cuentaSeleccionadaId}
                       onChange={(e) => alElegirCuenta(e.target.value)}
                       className={`${fieldClassSm} w-full min-w-0`}
                     >
+                      {!retiro.cuentaRetiroId && (
+                        <option value="">{retiro.destino} (sin cuenta asignada)</option>
+                      )}
                       {cuentas.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.nombre}
