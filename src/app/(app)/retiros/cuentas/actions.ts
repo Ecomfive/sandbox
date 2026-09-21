@@ -111,38 +111,26 @@ export async function actualizarCuentaRetiro(formData: FormData): Promise<{ erro
   return {};
 }
 
-/** Borra la cuenta, salvo que ya tenga retiros asociados — ahí se bloquea con un mensaje claro
- * en vez de romper el historial de esos retiros (que muestran su destino desde esta tabla).
- * Devuelve el error como valor en vez de lanzarlo: en producción, Next.js oculta el mensaje
- * de cualquier excepción de un server action, y este mensaje sí lo necesita ver la persona. */
+/** "Eliminar" una cuenta no la borra de la base: la desactiva, igual que el interruptor de Estado.
+ * Así el historial de los retiros que ya la usaron como destino nunca se rompe, y no hace falta
+ * bloquear la eliminación cuando tiene retiros asociados (antes sí, porque borrarla de verdad sí
+ * los hubiera dejado sin destino). Queda como una acción aparte (con su propio texto de
+ * confirmación) para quien piensa en "eliminar" en vez de "desactivar", pero el resultado es el
+ * mismo: la cuenta cae en el balde de «Eliminadas» de la barra de herramientas. */
 export async function eliminarCuentaRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();
-  const { count } = await supabase
-    .from("retiros")
-    .select("id", { count: "exact", head: true })
-    .eq("cuenta_retiro_id", id);
-  if (count && count > 0) {
-    return {
-      error: `No se puede eliminar: tiene ${count} retiro${count === 1 ? "" : "s"} asociado${count === 1 ? "" : "s"}. Desactívala en vez de eliminarla.`,
-    };
-  }
-
-  // Se guarda el nombre antes de borrar: la fila desaparece de `cuentas_retiro`, así que el
-  // historial de abajo (que lee `historial_auditoria`) necesita su propia copia para mostrarlo.
-  const { data: cuenta } = await supabase.from("cuentas_retiro").select("nombre").eq("id", id).maybeSingle();
-
-  const { error } = await supabase.from("cuentas_retiro").delete().eq("id", id);
+  const { error } = await supabase.from("cuentas_retiro").update({ activa: false }).eq("id", id);
   if (error) return { error: error.message };
 
   await registrarAuditoria({
     accion: "eliminar_cuenta_retiro",
     entidad: "cuentas_retiro",
     entidadId: id,
-    detalle: cuenta?.nombre ? `Cuenta "${cuenta.nombre}" eliminada.` : "Cuenta de retiro eliminada.",
-    antes: cuenta?.nombre ? { Nombre: cuenta.nombre } : undefined,
+    antes: { Estado: "Activa" },
+    despues: { Estado: "Inactiva" },
   });
 
   revalidatePath("/retiros/cuentas");

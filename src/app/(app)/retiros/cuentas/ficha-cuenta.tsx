@@ -81,7 +81,8 @@ function AlternarActivaBoton({ cuenta }: { cuenta: FilaCuenta }) {
  * estado, las flechas para pasar a la cuenta de arriba o de abajo (en el orden en que se ven en la tabla) y cerrar;
  * luego las acciones (modificar, desactivar, eliminar) y los datos en bloques con ícono. «Modificar» cambia los bloques
  * por el formulario, en el mismo panel, y al guardar vuelve a la ficha. Lo que muestra sale de la fila ya cargada, así
- * que se actualiza sola al guardar, y si la cuenta se elimina deja de existir y el panel se cierra.
+ * que se actualiza sola al guardar o al eliminarla (que la desactiva, no la borra): la ficha queda abierta con su
+ * nuevo estado, aunque la fila haya salido de la tabla de abajo por el filtro de «Eliminadas».
  */
 export function FichaCuenta({
   cuenta,

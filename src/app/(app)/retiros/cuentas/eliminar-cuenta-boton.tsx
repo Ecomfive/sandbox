@@ -7,8 +7,9 @@ import { useToast } from "@/components/ui/toast";
 import { PapeleraIcon } from "@/lib/nav-icons";
 import { mensajeErrorAlEliminar } from "@/lib/retiros/errores";
 
-/** Eliminar una cuenta destino, desde su ficha. Pide confirmación; si no se puede (tiene retiros), el error sale como
- * aviso (toast). Al borrarse, la fila desaparece de la lista y la ficha se cierra sola. */
+/** Eliminar una cuenta destino, desde su ficha. Pide confirmación; en realidad la desactiva (no borra la fila, ver
+ * `eliminarCuentaRetiro`), así que la ficha queda abierta mostrando su nuevo estado y solo desaparece de la tabla
+ * si el filtro «Eliminadas» está apagado. Si Supabase falla, el error sale como aviso (toast). */
 export function EliminarCuentaBoton({ id, nombre }: { id: string; nombre: string }) {
   const [pending, startTransition] = useTransition();
   const { mostrarToast } = useToast();
