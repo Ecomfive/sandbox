@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CerrarIcon, LapizIcon } from "@/lib/nav-icons";
+import { ESTADO_ETIQUETA } from "@/lib/retiros/estados";
 import { calcularComisionSugerida, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 
 const Obligatorio = () => (
@@ -16,12 +17,18 @@ const Obligatorio = () => (
   </span>
 );
 
+// El estado ya no se edita directo en la columna de la tabla: solo se cambia desde acá.
+// "Cancelado" queda afuera a propósito — sigue siendo aparte (el botón Cancelar de la ficha),
+// así que un retiro cancelado no se puede reabrir eligiendo otro estado en este formulario.
+const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
+
 export interface RetiroExistente {
   id: string;
   numeroCorrelativo: number;
   plataformaId: string | null;
   cuentaRetiroId: string | null;
   gestionadoPor: string;
+  estado: string;
   monto: number;
   comision: number;
   fecha: string;
@@ -246,21 +253,54 @@ export function EditarRetiroPanel({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className={labelClassSm} htmlFor={`campo-gestionado-por-${retiro.id}`}>
-                    Gestionado por
-                    <Obligatorio />
-                  </label>
-                  <select
-                    id={`campo-gestionado-por-${retiro.id}`}
-                    name="gestionado_por"
-                    required
-                    defaultValue={retiro.gestionadoPor}
-                    className={`${fieldClassSm} w-40`}
-                  >
-                    <option value="plataforma">Plataforma</option>
-                    <option value="correo">Correo</option>
-                  </select>
+                <div className="flex gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className={labelClassSm} htmlFor={`campo-gestionado-por-${retiro.id}`}>
+                      Gestionado por
+                      <Obligatorio />
+                    </label>
+                    <select
+                      id={`campo-gestionado-por-${retiro.id}`}
+                      name="gestionado_por"
+                      required
+                      defaultValue={retiro.gestionadoPor}
+                      className={`${fieldClassSm} w-40`}
+                    >
+                      <option value="plataforma">Plataforma</option>
+                      <option value="correo">Correo</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className={labelClassSm} htmlFor={`campo-estado-${retiro.id}`}>
+                      Estado
+                      {ESTADOS_EDITABLES.includes(retiro.estado as (typeof ESTADOS_EDITABLES)[number]) && (
+                        <Obligatorio />
+                      )}
+                    </label>
+                    {ESTADOS_EDITABLES.includes(retiro.estado as (typeof ESTADOS_EDITABLES)[number]) ? (
+                      <select
+                        id={`campo-estado-${retiro.id}`}
+                        name="estado"
+                        required
+                        defaultValue={retiro.estado}
+                        className={`${fieldClassSm} w-40`}
+                      >
+                        {ESTADOS_EDITABLES.map((valor) => (
+                          <option key={valor} value={valor}>
+                            {ESTADO_ETIQUETA[valor]}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={`campo-estado-${retiro.id}`}
+                        type="text"
+                        disabled
+                        value={ESTADO_ETIQUETA[retiro.estado] ?? retiro.estado}
+                        className={`${fieldClassSm} w-40 cursor-not-allowed bg-muted`}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-2">

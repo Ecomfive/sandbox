@@ -11,6 +11,12 @@ import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
+/** Estados que se pueden elegir a mano desde la ficha de "Modificar" o la barra en lote.
+ * "cancelado" queda afuera a propósito: sigue siendo una acción aparte (botón Cancelar), no un
+ * valor más del selector, porque es un cierre distinto al de la conciliación normal. */
+const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
+type EstadoEditable = (typeof ESTADOS_EDITABLES)[number];
+
 async function registrarEvento(supabase: ReturnType<typeof createServiceClient>, retiroId: string, evento: string) {
   await supabase.from("retiro_eventos").insert({ retiro_id: retiroId, evento });
 }
@@ -301,8 +307,9 @@ export async function cancelarRetiro(formData: FormData) {
 }
 
 /** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado
- * por, monto, comisión, fechas o nota — todo junto, desde la ficha de "Modificar". No toca el
- * estado (eso lo hacen cerrarRetiro/conciliarRetiro/cancelarRetiro y la barra en lote) ni el correlativo. */
+ * por, monto, comisión, fechas, nota y estado — todo junto, desde la ficha de "Modificar". El
+ * estado ya no se edita directo en la columna de la tabla: solo cambia desde acá, al conciliar,
+ * al cancelar o con la barra de acciones en lote. No toca el correlativo. */
 export async function actualizarRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
@@ -317,42 +324,58 @@ export async function actualizarRetiro(formData: FormData) {
   const a_recibir = monto - comision;
   const gestionadoPorTexto = formData.get("gestionado_por") as string;
   const gestionado_por = gestionadoPorTexto === "correo" ? "correo" : "plataforma";
+  const estadoTexto = formData.get("estado") as string | null;
 
   const supabase = createServiceClient();
   const { data: antes, error: errorAntes } = await supabase
     .from("retiros")
-    .select("monto, comision")
+    .select("monto, comision, estado")
     .eq("id", id)
     .single();
   if (errorAntes) throw new Error(errorAntes.message);
 
-  const { error } = await supabase
-    .from("retiros")
-    .update({
-      plataforma_id,
-      cuenta_retiro_id,
-      monto,
-      comision,
-      a_recibir,
-      fecha,
-      notas,
-      fecha_limite,
-      gestionado_por,
-    })
-    .eq("id", id);
+  // El estado solo se toca si viene en el formulario y es uno editable a mano — la ficha no lo
+  // manda para un retiro cancelado, así que uno cancelado nunca se reabre desde acá.
+  const estadoValido = estadoTexto !== null && ESTADOS_EDITABLES.includes(estadoTexto as EstadoEditable);
+  const cambios: Record<string, unknown> = {
+    plataforma_id,
+    cuenta_retiro_id,
+    monto,
+    comision,
+    a_recibir,
+    fecha,
+    notas,
+    fecha_limite,
+    gestionado_por,
+  };
+  if (estadoValido) cambios.estado = estadoTexto;
+
+  const { error } = await supabase.from("retiros").update(cambios).eq("id", id);
   if (error) throw new Error(error.message);
 
+  const cambioEstado = estadoValido && estadoTexto !== antes.estado;
   await registrarEvento(
     supabase,
     id,
-    `Retiro modificado: monto ${Number(antes.monto).toFixed(2)} → ${monto.toFixed(2)}`
+    `Retiro modificado: monto ${Number(antes.monto).toFixed(2)} → ${monto.toFixed(2)}` +
+      (cambioEstado
+        ? `, estado ${ETIQUETA_ESTADO[antes.estado] ?? antes.estado} → ${ETIQUETA_ESTADO[estadoTexto!] ?? estadoTexto}`
+        : "")
   );
   await registrarAuditoria({
     accion: "editar_retiro",
     entidad: "retiros",
     entidadId: id,
-    antes: { Monto: Number(antes.monto).toFixed(2), Comisión: Number(antes.comision).toFixed(2) },
-    despues: { Monto: monto.toFixed(2), Comisión: comision.toFixed(2) },
+    antes: {
+      Monto: Number(antes.monto).toFixed(2),
+      Comisión: Number(antes.comision).toFixed(2),
+      ...(cambioEstado ? { Estado: ETIQUETA_ESTADO[antes.estado] ?? antes.estado } : {}),
+    },
+    despues: {
+      Monto: monto.toFixed(2),
+      Comisión: comision.toFixed(2),
+      ...(cambioEstado ? { Estado: ETIQUETA_ESTADO[estadoTexto!] ?? estadoTexto } : {}),
+    },
   });
 
   revalidatePath("/retiros");
@@ -383,9 +406,9 @@ export async function eliminarRetiro(formData: FormData): Promise<{ error?: stri
 }
 
 /**
- * Pasa a varios retiros a Abierto, Novedad o Cerrado desde la barra de acciones de la tabla: es la única forma de
- * mover el estado a mano (la columna Estado es de solo lectura). Solo mueve la etiqueta; no toca monto recibido ni
- * comprobante. Hace falta acceso de escritura a Retiros. Los cancelados no se tocan. La lógica está en
+ * Pasa a varios retiros a Abierto, Novedad o Cerrado desde la barra de acciones de la tabla. Es el mismo cambio
+ * manual que se hace de a uno desde "Modificar" (solo mueve la etiqueta; no toca monto recibido ni comprobante),
+ * con los mismos permisos: hace falta acceso de escritura a Retiros. Los cancelados no se tocan. La lógica está en
  * `cambiarEstadoEnLote` (`src/lib/retiros/en-lote.ts`); aquí solo se comprueba el permiso y se refresca la página.
  * Devuelve el error como valor, porque en producción Next.js oculta el mensaje de cualquier excepción.
  */

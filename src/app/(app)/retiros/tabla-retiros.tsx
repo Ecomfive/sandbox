@@ -297,6 +297,7 @@ export function TablaRetiros({
               fecha: fila.fecha,
               fechaLimite: fila.fechaLimite,
               notas: fila.notas,
+              estado: fila.estado,
             }}
             plataformas={plataformas}
             cuentas={cuentas}
