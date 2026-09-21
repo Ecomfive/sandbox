@@ -53,7 +53,6 @@ export function VentanaCuentaRetiro({ paisId, paisNombre }: { paisId: string; pa
           paisId={paisId}
           paisNombre={paisNombre}
           alGuardar={cerrar}
-          alCancelar={cerrarVentana}
           alCambiarGuardando={setGuardando}
         />
       </Ventana>

@@ -181,19 +181,15 @@ convenciones técnicas del código.
   vuelva ahí). Se abre `FichaCuenta` (`retiros/cuentas/ficha-cuenta.tsx`): cabecera
   con el título («Cuenta #3») y sus insignias de tipo y estado (Activa o Eliminada),
   las flechas de cuenta anterior y siguiente (en el orden en que se ven las filas;
-  `Ventana` recibe esos botones en `navegacion`) y cerrar; el país con la comisión; y la
-  **línea de tiempo** (`LineaDeTiempoCuenta`: Creada, con su fecha y hora, y Eliminada,
-  gris y sin fecha mientras está activa, roja y con fecha cuando ya se eliminó). La fecha
-  de creación es `cuentas_retiro.creado_en`; la de eliminación no se guarda en la cuenta
-  («Eliminar» solo desactiva) y `page.tsx` la saca del historial de auditoría (la última
-  vez que se eliminó o desactivó), sin fecha si no hay registro. **Con permiso de
+  `Ventana` recibe esos botones en `navegacion`) y cerrar; y el país con la comisión (la
+  ficha **no lleva línea de tiempo**: se quitó a pedido). **Con permiso de
   escritura la ficha ya es el formulario** (`FormularioCuenta` con `botonesArriba`: no
   hay un botón «Modificar» ni botones abajo): una fila de botones (`BotonAccion`: del
   mismo tamaño, rellenos de color, ícono arriba y texto abajo) tiene «Eliminar» (gris y
   apagado si ya está eliminada) y, **solo cuando se cambia un campo**, «Guardar cambios»
   y «Cancelar» (que descarta lo escrito), pegada bajo la cabecera al desplazarse (`Ventana`
   publica el alto de la cabecera como `--alto-cabecera`); luego los datos en bloques con
-  ícono (`Seccion`: Cuenta, Datos de la cuenta si es Binance, Comisión sugerida). Guardar
+  ícono (`Seccion`, `src/components/ui/seccion-ficha.tsx`: Cuenta, Datos de la cuenta si es Binance, Comisión sugerida). Guardar
   no cierra la ficha: los botones vuelven a ser solo «Eliminar» y sale un aviso. Con
   cambios sin guardar, cerrar (X, Escape, clic fuera) o pasar a otra cuenta con las
   flechas pide confirmación; el formulario lleva `key` con el id de la cuenta para que al
@@ -204,8 +200,21 @@ convenciones técnicas del código.
   reactivarla se hace con el interruptor de la columna Estado. **No pongas íconos de acción
   en las filas** (la tabla no tiene columna de acciones): lo que se hace con una
   cuenta se hace desde su ficha. «Nueva cuenta destino» (`ventana-cuenta-retiro.tsx`,
-  el botón Agregar) usa el mismo `FormularioCuenta`. Las ventanas de
-  Retiros (crear, editar, conciliar) tienen su propia copia de la lógica de `Ventana`.
+  el botón Agregar) usa el mismo `FormularioCuenta`. **Los formularios de creación**
+  (la ficha de «Nuevo retiro», `retiros/crear-retiro-panel.tsx`, y «Nueva cuenta
+  destino») son un panel lateral (`Ventana`) con bloques (`Seccion`) y siguen esta
+  receta: (1) los campos vacíos llevan un **ejemplo ficticio** del formato del dato
+  (`placeholder="Ej: 1500.00"`; nunca datos de una cuenta real); (2) al final va **un botón
+  grande de crear** (`BotonCrear`, `src/components/ui/boton-crear.tsx`) que se ve
+  apagado mientras falte un dato obligatorio y **no envía el formulario**, pero al
+  pulsarlo lleva la página al primer dato que falta (lo centra, le da el foco, borde
+  rojo y «Falta este dato» debajo, con `AvisoFaltante`); es `aria-disabled` y no
+  `disabled` para poder recibir ese clic. Todo eso lo da `useFaltantes()`
+  (`src/components/ui/usar-faltantes.ts`): `formRef`, `completo`, `faltante`,
+  `revisar` (en `onInput` y `onChange`) y `señalarFaltante`; cada campo obligatorio
+  necesita `id`, `required` y `aria-invalid={faltante === id || undefined}`
+  (`fieldClass` pinta el borde). Las ventanas de
+  Retiros de **editar** y **conciliar** todavía tienen su propia copia de la lógica de `Ventana`.
   **Toda ventana modal o globo flotante se dibuja en `<body>` con `createPortal`**
   (`Ventana`, `AyudaContextual`, `Tooltip`, y las ventanas de Retiros y Cuentas): un
   `position: fixed` dentro de la tabla queda atrapado en el contexto de apilamiento

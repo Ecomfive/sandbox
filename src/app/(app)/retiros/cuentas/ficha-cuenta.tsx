@@ -3,10 +3,10 @@
 import { useRef, useState, type ReactNode } from "react";
 import { etiquetaComision, etiquetaTipoCuenta, type FilaCuenta } from "./def-cuentas";
 import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
-import { FormularioCuenta, Seccion } from "./formulario-cuenta";
-import { LineaDeTiempoCuenta } from "./linea-de-tiempo-cuenta";
+import { FormularioCuenta } from "./formulario-cuenta";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
@@ -49,23 +49,15 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
   );
 }
 
-/** Lo primero de la ficha, sobre los botones: el país con la comisión y la línea de tiempo (creada y eliminada). */
-function EncabezadoFicha({ cuenta, paisNombre, codigoPais }: { cuenta: FilaCuenta; paisNombre: string; codigoPais: string }) {
+/** Lo primero de la ficha, sobre los botones: el país con la comisión. */
+function EncabezadoFicha({ cuenta, paisNombre }: { cuenta: FilaCuenta; paisNombre: string }) {
   return (
-    <div className="flex flex-col gap-5 p-5">
-      <p className="text-sm text-muted-foreground">
-        {paisNombre} ·{" "}
-        {cuenta.comision_tipo
-          ? `Comisión sugerida ${etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)}`
-          : "Sin comisión sugerida"}
-      </p>
-      <LineaDeTiempoCuenta
-        creadaEn={cuenta.creado_en}
-        eliminadaEn={cuenta.eliminada_en}
-        eliminada={!cuenta.activa}
-        codigoPais={codigoPais}
-      />
-    </div>
+    <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">
+      {paisNombre} ·{" "}
+      {cuenta.comision_tipo
+        ? `Comisión sugerida ${etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)}`
+        : "Sin comisión sugerida"}
+    </p>
   );
 }
 
@@ -120,8 +112,7 @@ function DatosDeLaCuenta({ cuenta }: { cuenta: FilaCuenta }) {
 /**
  * Ficha de una cuenta destino: el panel a la derecha que se abre al pulsar su fila, con la estructura de la ficha de un
  * pedido: cabecera con el título, sus insignias, las flechas para pasar a la cuenta de arriba o de abajo (en el orden en
- * que se ven en la tabla) y cerrar; el país y la comisión; la línea de tiempo (creada y eliminada, con sus fechas); una
- * fila de botones; y los datos en bloques con ícono.
+ * que se ven en la tabla) y cerrar; el país y la comisión; una fila de botones; y los datos en bloques con ícono.
  *
  * Con permiso de escritura la ficha **ya es el formulario** (no hay un botón «Modificar»), y **no tiene botones abajo**:
  * la fila de botones tiene «Eliminar» y, cuando se cambia un campo, aparecen ahí mismo «Guardar cambios» y «Cancelar»
@@ -136,7 +127,6 @@ export function FichaCuenta({
   orden,
   paisId,
   paisNombre,
-  codigoPais,
   puedeEscribir,
   alIr,
   alCerrar,
@@ -147,8 +137,6 @@ export function FichaCuenta({
   orden: string[];
   paisId: string;
   paisNombre: string;
-  /** Para mostrar las horas de la línea de tiempo en la hora del país. */
-  codigoPais: string;
   puedeEscribir: boolean;
   alIr: (id: string) => void;
   alCerrar: () => void;
@@ -244,7 +232,7 @@ export function FichaCuenta({
               paisNombre={paisNombre}
               cuenta={cuenta}
               botonesArriba
-              encabezado={<EncabezadoFicha cuenta={cuenta} paisNombre={paisNombre} codigoPais={codigoPais} />}
+              encabezado={<EncabezadoFicha cuenta={cuenta} paisNombre={paisNombre} />}
               acciones={<EliminarCuentaBoton id={cuenta.id} nombre={cuenta.nombre} yaEliminada={!cuenta.activa} />}
               alGuardar={alGuardar}
               alCancelar={alCancelar}
@@ -253,7 +241,7 @@ export function FichaCuenta({
             />
           ) : (
             <>
-              <EncabezadoFicha cuenta={cuenta} paisNombre={paisNombre} codigoPais={codigoPais} />
+              <EncabezadoFicha cuenta={cuenta} paisNombre={paisNombre} />
               <DatosDeLaCuenta cuenta={cuenta} />
             </>
           )}
