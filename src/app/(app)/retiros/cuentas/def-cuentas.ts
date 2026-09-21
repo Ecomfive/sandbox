@@ -29,6 +29,10 @@ export interface FilaCuenta {
   comision_monto_fijo: number | null;
   /** Solo las cuentas Binance: los datos en el formato de Dropi (migración 0039). */
   datos_binance?: unknown;
+  /** Cuándo se creó la cuenta (timestamptz). */
+  creado_en?: string | null;
+  /** Cuándo se eliminó (se desactivó), sacado del historial de auditoría; solo si está eliminada y hay registro. */
+  eliminada_en?: string | null;
 }
 
 /** Filtros y agrupación de las cuentas de retiro; por defecto se ven solo las activas, y «Eliminadas» aísla las inactivas (nunca mezcladas). */

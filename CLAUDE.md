@@ -165,21 +165,29 @@ convenciones técnicas del código.
   la abre; el contenido de la primera columna es además un botón real, para teclado
   y lectores de pantalla, y el clic en la fila le pasa el foco para que al cerrar
   vuelva ahí). Se abre `FichaCuenta` (`retiros/cuentas/ficha-cuenta.tsx`): cabecera
-  con el título («Cuenta #3») y sus insignias de tipo y estado, las flechas de
-  cuenta anterior y siguiente (en el orden en que se ven las filas; `Ventana` recibe
-  esos botones en `navegacion`) y cerrar. **Con permiso de escritura la ficha ya es el
-  formulario** (`FormularioCuenta`: no hay un botón «Modificar» ni un modo de solo
-  lectura que haya que salir): debajo de la cabecera, una fila con las acciones
-  (`BotonAccion`, ícono arriba y texto abajo: Desactivar o Reactivar, Eliminar), luego
-  los datos en bloques con ícono (`Seccion`: Cuenta, Datos de la cuenta si es Binance,
-  Comisión sugerida) y los botones fijos abajo (Cancelar, Guardar cambios, que cierra la
-  ficha). Con cambios sin guardar, cerrar (X, Escape, clic fuera, Cancelar) o pasar a
-  otra cuenta con las flechas pide confirmación; el formulario lleva `key` con el id de
-  la cuenta para que al pasar a otra arranque con sus datos. Sin permiso de escritura
-  solo se leen los datos (`DatosDeLaCuenta`, sin acciones). La ficha lee la cuenta de
-  la lista por su id, así que se actualiza sola; «Eliminar» solo desactiva la cuenta
-  (la ficha queda abierta con el estado nuevo, aunque la fila salga de la tabla por
-  el filtro «Eliminadas»). **No pongas íconos de acción
+  con el título («Cuenta #3») y sus insignias de tipo y estado (Activa o Eliminada),
+  las flechas de cuenta anterior y siguiente (en el orden en que se ven las filas;
+  `Ventana` recibe esos botones en `navegacion`) y cerrar; el país con la comisión; y la
+  **línea de tiempo** (`LineaDeTiempoCuenta`: Creada, con su fecha y hora, y Eliminada,
+  gris y sin fecha mientras está activa, roja y con fecha cuando ya se eliminó). La fecha
+  de creación es `cuentas_retiro.creado_en`; la de eliminación no se guarda en la cuenta
+  («Eliminar» solo desactiva) y `page.tsx` la saca del historial de auditoría (la última
+  vez que se eliminó o desactivó), sin fecha si no hay registro. **Con permiso de
+  escritura la ficha ya es el formulario** (`FormularioCuenta` con `botonesArriba`: no
+  hay un botón «Modificar» ni botones abajo): una fila de botones (`BotonAccion`: del
+  mismo tamaño, rellenos de color, ícono arriba y texto abajo) tiene «Eliminar» (gris y
+  apagado si ya está eliminada) y, **solo cuando se cambia un campo**, «Guardar cambios»
+  y «Cancelar» (que descarta lo escrito), pegada bajo la cabecera al desplazarse (`Ventana`
+  publica el alto de la cabecera como `--alto-cabecera`); luego los datos en bloques con
+  ícono (`Seccion`: Cuenta, Datos de la cuenta si es Binance, Comisión sugerida). Guardar
+  no cierra la ficha: los botones vuelven a ser solo «Eliminar» y sale un aviso. Con
+  cambios sin guardar, cerrar (X, Escape, clic fuera) o pasar a otra cuenta con las
+  flechas pide confirmación; el formulario lleva `key` con el id de la cuenta para que al
+  pasar a otra arranque con sus datos. Sin permiso de escritura solo se leen los datos
+  (`DatosDeLaCuenta`, sin acciones). La ficha lee la cuenta de la lista por su id, así
+  que se actualiza sola; «Eliminar» solo desactiva la cuenta (la ficha queda abierta con
+  el estado nuevo, aunque la fila salga de la tabla por el filtro «Eliminadas»);
+  reactivarla se hace con el interruptor de la columna Estado. **No pongas íconos de acción
   en las filas** (la tabla no tiene columna de acciones): lo que se hace con una
   cuenta se hace desde su ficha. «Nueva cuenta destino» (`ventana-cuenta-retiro.tsx`,
   el botón Agregar) usa el mismo `FormularioCuenta`. Las ventanas de
