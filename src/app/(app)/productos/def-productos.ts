@@ -37,6 +37,17 @@ export const DEF_PRODUCTOS: DefTabla<ProductoFila> = {
       etiquetaSinValor: "Sin plataforma",
       agrupable: true,
     },
+    {
+      id: "vinculo",
+      etiqueta: "Catálogo maestro",
+      tipo: "seleccion",
+      valores: (p) => [p.sku_maestro_id ? "vinculado" : "sin-vincular"],
+      opciones: () => [
+        { valor: "sin-vincular", etiqueta: "Sin vincular" },
+        { valor: "vinculado", etiqueta: "Vinculado" },
+      ],
+      agrupable: true,
+    },
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (p) => p.nombre },
     { id: "sku", etiqueta: "SKU", tipo: "texto", valor: (p) => p.sku },
     { id: "costo", etiqueta: "Costo", tipo: "numero", valor: (p) => p.costo },

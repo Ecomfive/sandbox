@@ -1,8 +1,7 @@
-import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
+﻿import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
-import { vincularProductoASku } from "../catalogo-maestro/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
@@ -20,7 +19,10 @@ export default async function ProductosPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await requireModulo("productos");
+  const usuario = await requireModulo("productos");
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("productos");
+  // Vincular a un SKU maestro es una acción del catálogo maestro: pide escritura allí, no en Productos.
+  const puedeVincular = usuario.modulos.includes("catalogo-maestro") && !usuario.modulosSoloLectura.includes("catalogo-maestro");
   const sp = await searchParams;
   const buscar = typeof sp.buscar === "string" ? sp.buscar.trim() : "";
 
@@ -85,7 +87,8 @@ export default async function ProductosPage({
   return (
     <Pagina ancho="ancha">
       <EncabezadoPagina titulo="Productos y márgenes" oculto className="mb-2">
-        {pais.nombre} — costo, precio de venta y margen mínimo por producto.
+        {pais.nombre} — costo, precio de venta y margen mínimo por producto. Con «Editar» también se vincula al SKU
+        maestro del catálogo, para que el inventario cuadre entre plataformas.
       </EncabezadoPagina>
       {bajoMargen > 0 && (
         <p className="mb-4 text-sm">
@@ -121,51 +124,15 @@ export default async function ProductosPage({
           {productosFiltrados.length === 0 ? (
             <EstadoVacio mensaje="Ningún producto coincide con ese filtro." />
           ) : (
-            <TablaProductos productos={productosFiltrados} />
+            <TablaProductos
+              productos={productosFiltrados}
+              codigoPais={pais.codigo}
+              skusMaestros={skusMaestrosDisponibles ?? []}
+              puedeEscribir={puedeEscribir}
+              puedeVincular={puedeVincular}
+            />
           )}
         </>
-      )}
-
-      {skusMaestrosDisponibles !== null && productosFiltrados.length > 0 && (
-        <div className="mt-8 flex flex-col gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">Vincular al catálogo maestro de SKU</h2>
-            <p className="text-xs text-muted-foreground">
-              Une esta fila (específica de una plataforma) con el SKU maestro que representa el
-              mismo producto físico, para que el inventario cuadre entre plataformas.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            {productosFiltrados.map((p) => (
-              <form
-                key={p.id}
-                action={vincularProductoASku}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3"
-              >
-                <input type="hidden" name="producto_id" value={p.id} />
-                <div className="min-w-[10rem] flex-1 text-sm">
-                  {p.nombre} <span className="text-xs text-muted-foreground">({p.sku})</span>
-                </div>
-                <select
-                  name="sku_maestro_id"
-                  aria-label={`SKU maestro de ${p.nombre}`}
-                  defaultValue={p.sku_maestro_id ?? ""}
-                  className={`${fieldClass} w-64`}
-                >
-                  <option value="">Sin vincular</option>
-                  {(skusMaestrosDisponibles ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.codigo} — {s.nombre}
-                    </option>
-                  ))}
-                </select>
-                <Button type="submit" variant="secondary" className="text-xs" aria-label={`Guardar el vínculo de ${p.nombre}`}>
-                  Guardar
-                </Button>
-              </form>
-            ))}
-          </div>
-        </div>
       )}
     </Pagina>
   );

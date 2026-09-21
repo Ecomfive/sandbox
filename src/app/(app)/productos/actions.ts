@@ -12,13 +12,28 @@ export async function actualizarProducto(formData: FormData) {
   const precioRaw = formData.get("precio_actual") as string;
   const margenMinimoRaw = formData.get("margen_minimo") as string;
 
+  // Una acción del servidor es un punto de entrada público: no basta con lo que valida el navegador.
+  const costo = costoRaw === "" ? null : Number(costoRaw);
+  const precio = precioRaw === "" ? null : Number(precioRaw);
+  const margenMinimo = Number(margenMinimoRaw);
+  if (!id) throw new Error("Falta el producto.");
+  // Un campo ausente no es un campo vacío: sin esto, un formulario sin «costo» lo dejaría en 0.
+  if (!formData.has("costo") || !formData.has("precio_actual") || !formData.has("margen_minimo")) {
+    throw new Error("Faltan datos del producto.");
+  }
+  if (costo !== null && (!Number.isFinite(costo) || costo < 0)) throw new Error("El costo no es válido.");
+  if (precio !== null && (!Number.isFinite(precio) || precio < 0)) throw new Error("El precio no es válido.");
+  if (margenMinimoRaw === "" || !Number.isFinite(margenMinimo) || margenMinimo < 0 || margenMinimo > 100) {
+    throw new Error("El margen mínimo debe estar entre 0 y 100.");
+  }
+
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("productos")
     .update({
-      costo: costoRaw === "" ? null : Number(costoRaw),
-      precio_actual: precioRaw === "" ? null : Number(precioRaw),
-      margen_minimo: Number(margenMinimoRaw),
+      costo,
+      precio_actual: precio,
+      margen_minimo: margenMinimo,
       ultima_modificacion_precio: new Date().toISOString().slice(0, 10),
     })
     .eq("id", id);
