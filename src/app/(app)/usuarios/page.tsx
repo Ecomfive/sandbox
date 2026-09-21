@@ -7,9 +7,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { InvitarForm } from "./invitar-form";
 import { TablaUsuarios } from "./tabla-usuarios";
 import { PermisoCheckbox } from "./permiso-checkbox";
-import { crearRol } from "./actions";
-import { Button } from "@/components/ui/button";
-import { fieldClass, labelClass } from "@/components/ui/field";
+import { CrearRolPanel } from "./crear-rol-panel";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
 export const metadata = { title: "Usuarios y roles" };
@@ -59,19 +57,11 @@ export default async function UsuariosPage() {
     }
   }
 
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("usuarios");
+
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Usuarios y roles" oculto>
-        Invita personas al sistema y define qué módulos puede ver cada rol — y si puede solo
-        verlos o también crear y modificar cosas ahí.
-      </EncabezadoPagina>
-
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight">Invitar usuario</h2>
-        <div className="mt-3">
-          <InvitarForm roles={roles ?? []} />
-        </div>
-      </div>
+      <EncabezadoPagina titulo="Usuarios y roles" oculto />
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Usuarios</h2>
@@ -86,53 +76,52 @@ export default async function UsuariosPage() {
               activo: p.activo,
             }))}
             roles={roles ?? []}
+            puedeEscribir={puedeEscribir}
           />
         </div>
       </div>
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Roles y permisos</h2>
-        <form action={crearRol} className="mt-3 flex items-end gap-3">
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Nuevo rol</span>
-            <input type="text" name="nombre" required className={fieldClass} placeholder="Ej. Finanzas" />
-          </label>
-          <Button type="submit" variant="secondary">
-            Crear rol
-          </Button>
-        </form>
-
-        <div className="mt-4 min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[40rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th className="py-2 pr-3 pl-4 font-medium">Rol</th>
-                {MODULOS.map((m) => (
-                  <th key={m.clave} className="py-2 pr-3 text-center font-medium whitespace-nowrap">
-                    {m.etiqueta}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(roles ?? []).map((r) => (
-                <tr key={r.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 font-medium">{r.nombre}</td>
+        <div className="mt-3 min-w-0 rounded-xl border border-border bg-card">
+          {puedeEscribir && (
+            // La misma franja de botones que la barra de una tabla, con el «Agregar» al final.
+            <div className="flex items-center justify-end gap-2 border-b border-border px-2 py-1.5">
+              <CrearRolPanel />
+            </div>
+          )}
+          <div className="min-w-0 overflow-x-auto">
+            <table className="w-full min-w-[40rem] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+                  <th className="py-2 pr-3 pl-4 font-medium">Rol</th>
                   {MODULOS.map((m) => (
-                    <td key={m.clave} className="py-2 pr-3 text-center">
-                      <PermisoCheckbox
-                        rolId={r.id}
-                        modulo={m.clave}
-                        etiqueta={m.etiqueta}
-                        activo={permisosPorRol.get(r.id)?.has(m.clave) ?? false}
-                        soloLectura={soloLecturaPorRol.get(r.id)?.has(m.clave) ?? false}
-                      />
-                    </td>
+                    <th key={m.clave} className="py-2 pr-3 text-center font-medium whitespace-nowrap">
+                      {m.etiqueta}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(roles ?? []).map((r) => (
+                  <tr key={r.id} className="border-b border-border/60 last:border-0">
+                    <td className="py-2 pr-3 pl-4 font-medium">{r.nombre}</td>
+                    {MODULOS.map((m) => (
+                      <td key={m.clave} className="py-2 pr-3 text-center">
+                        <PermisoCheckbox
+                          rolId={r.id}
+                          modulo={m.clave}
+                          etiqueta={m.etiqueta}
+                          activo={permisosPorRol.get(r.id)?.has(m.clave) ?? false}
+                          soloLectura={soloLecturaPorRol.get(r.id)?.has(m.clave) ?? false}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {(roles ?? []).length === 0 && <EstadoVacio mensaje="Todavía no hay roles creados." />}
         </div>
       </div>

@@ -46,6 +46,7 @@ export function TablaDatos<F, C = undefined>({
   limiteSinFiltros,
   porPagina = POR_PAGINA,
   descargaCompleta,
+  accionPrincipal,
   vacio,
 }: {
   def: DefTabla<F>;
@@ -79,6 +80,8 @@ export function TablaDatos<F, C = undefined>({
   porPagina?: number;
   /** Descarga que arma el servidor con más filas que las cargadas; el botón Descargar la ofrece junto a «Lo que se ve». */
   descargaCompleta?: DescargaCompleta;
+  /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
+  accionPrincipal?: ReactNode;
   /** Mensaje cuando no hay filas cargadas. */
   vacio: string;
 }) {
@@ -164,6 +167,7 @@ export function TablaDatos<F, C = undefined>({
         nombreFilas={nombre.plural}
         columnas={{ defs: columnas, estado: guardadas, cambiar: cambiarColumnas }}
         descargaCompleta={descargaCompleta}
+        accionPrincipal={accionPrincipal}
       />
       <ContenedorTabla ariaLabel={ariaLabel}>
         <table className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>

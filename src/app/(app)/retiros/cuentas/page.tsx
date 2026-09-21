@@ -3,7 +3,6 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { VentanaCuentaRetiro } from "./ventana-cuenta-retiro";
 import { TablaCuentas } from "./tabla-cuentas";
 import type { FilaCuenta } from "./def-cuentas";
 
@@ -33,11 +32,6 @@ export default async function CuentasRetiroPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Cuentas destino" oculto />
-      {puedeEscribir && (
-        <div className="flex justify-end">
-          <VentanaCuentaRetiro paisId={pais.id} paisNombre={pais.nombre} />
-        </div>
-      )}
 
       <TablaCuentas cuentas={cuentasNumeradas} paisId={pais.id} paisNombre={pais.nombre} puedeEscribir={puedeEscribir} />
     </Pagina>

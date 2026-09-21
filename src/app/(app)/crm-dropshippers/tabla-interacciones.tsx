@@ -7,6 +7,7 @@ import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, DropshipperIcon, PersonaIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { DEF_INTERACCIONES, etiquetaTipo, type FilaInteraccion } from "./def-crm";
+import { RegistrarInteraccionPanel } from "./registrar-interaccion-panel";
 
 const NOMBRE: NombreFilas = { singular: "interacción", plural: "interacciones" };
 const ICONOS: Record<string, IconoComp> = {
@@ -23,8 +24,16 @@ const COLUMNAS: ColumnaTabla<FilaInteraccion>[] = [
   { id: "nota", label: "Nota", ocultable: true, clase: "text-muted-foreground", render: (i) => i.nota },
 ];
 
-/** Bitácora de interacciones recientes con la barra de herramientas común (agrupar, filtros y columnas). */
-export function TablaInteracciones({ interacciones }: { interacciones: FilaInteraccion[] }) {
+/** Bitácora de interacciones recientes con la barra de herramientas común (agrupar, filtros, columnas y «Agregar»). */
+export function TablaInteracciones({
+  interacciones,
+  dropshippers,
+  puedeEscribir,
+}: {
+  interacciones: FilaInteraccion[];
+  dropshippers: { id: string; nombre: string }[];
+  puedeEscribir: boolean;
+}) {
   return (
     <TablaDatos
       def={DEF_INTERACCIONES}
@@ -33,6 +42,7 @@ export function TablaInteracciones({ interacciones }: { interacciones: FilaInter
       iconos={ICONOS}
       nombre={NOMBRE}
       claveFila={(i) => i.id}
+      accionPrincipal={puedeEscribir ? <RegistrarInteraccionPanel dropshippers={dropshippers} /> : undefined}
       ariaLabel="Interacciones recientes"
       vacio="Todavía no hay interacciones registradas."
     />

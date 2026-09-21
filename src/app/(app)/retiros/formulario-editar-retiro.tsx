@@ -161,7 +161,7 @@ export function FormularioEditarRetiro({
               <button
                 type="submit"
                 disabled={pending}
-                className={`inline-flex items-center gap-1.5 rounded-md bg-[#202020] px-3 py-2 text-sm font-medium text-white hover:bg-[#2d2d2d] disabled:opacity-50 ${anilloFoco}`}
+                className={`inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:bg-foreground/85 disabled:opacity-50 ${anilloFoco}`}
               >
                 <CheckIcon className="h-4 w-4" />
                 {pending ? "Guardando..." : "Guardar cambios"}

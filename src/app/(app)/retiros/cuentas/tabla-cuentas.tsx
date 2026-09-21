@@ -14,6 +14,7 @@ import {
   type FilaCuenta,
 } from "./def-cuentas";
 import { FichaCuenta } from "./ficha-cuenta";
+import { VentanaCuentaRetiro } from "./ventana-cuenta-retiro";
 
 const NOMBRE: NombreFilas = { singular: "cuenta", plural: "cuentas" };
 const ICONOS: Record<string, IconoComp> = {
@@ -69,16 +70,25 @@ const COLUMNAS_CONFIGURACION: ColumnaTabla<FilaCuenta, unknown>[] = [
 ];
 
 /**
- * Cuentas destino de Retiros, con la barra de herramientas común. Toda la fila se puede pulsar: abre la ficha de la
- * cuenta (panel a la derecha), donde se modifica, se desactiva o se elimina. El interruptor de estado de la fila sigue
- * funcionando por sí solo.
+ * La tabla de cuentas de retiro con la barra de herramientas común. Toda la fila se puede pulsar: abre la ficha de la
+ * cuenta (panel a la derecha), donde se modifica, se desactiva o se elimina; el interruptor de estado de la fila sigue
+ * funcionando por sí solo. El botón «Agregar» (ficha de «Nueva cuenta destino») va en la misma fila de botones de la
+ * barra, junto a Descargar. Lo comparten Cuentas destino y Configuración: solo cambian las columnas.
  */
-export function TablaCuentas({
+function TablaDeCuentas({
+  def,
+  columnas,
+  ariaLabel,
+  anchoMinimo,
   cuentas,
   paisId,
   paisNombre,
   puedeEscribir,
 }: {
+  def: typeof DEF_CUENTAS;
+  columnas: ColumnaTabla<FilaCuenta, unknown>[];
+  ariaLabel: string;
+  anchoMinimo: string;
   cuentas: FilaCuenta[];
   paisId: string;
   paisNombre: string;
@@ -92,18 +102,19 @@ export function TablaCuentas({
   return (
     <>
       <TablaDatos
-        def={DEF_CUENTAS}
+        def={def}
         filas={cuentas}
-        columnas={COLUMNAS_DESTINO}
+        columnas={columnas}
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(c) => c.id}
-        anchoMinimo="44rem"
+        anchoMinimo={anchoMinimo}
         abrirFila={{
           etiqueta: (c) => `Abrir la ficha de la cuenta ${c.nombre}`,
           alAbrir: (c, orden) => setAbierta({ id: c.id, orden }),
         }}
-        ariaLabel="Cuentas destino de retiros"
+        accionPrincipal={puedeEscribir ? <VentanaCuentaRetiro paisId={paisId} paisNombre={paisNombre} /> : undefined}
+        ariaLabel={ariaLabel}
         vacio="Todavía no hay cuentas de retiro registradas."
       />
       <FichaCuenta
@@ -119,19 +130,22 @@ export function TablaCuentas({
   );
 }
 
-/** Las mismas cuentas en Configuración (solo lectura y activar o desactivar), con la barra común. */
-export function TablaCuentasConfiguracion({ cuentas }: { cuentas: FilaCuenta[] }) {
+type PropsTablaCuentas = { cuentas: FilaCuenta[]; paisId: string; paisNombre: string; puedeEscribir: boolean };
+
+/** Cuentas destino de Retiros. */
+export function TablaCuentas(props: PropsTablaCuentas) {
+  return <TablaDeCuentas def={DEF_CUENTAS} columnas={COLUMNAS_DESTINO} ariaLabel="Cuentas destino de retiros" anchoMinimo="44rem" {...props} />;
+}
+
+/** Las mismas cuentas en Configuración, con las columnas esenciales y la misma ficha y el mismo «Agregar». */
+export function TablaCuentasConfiguracion(props: PropsTablaCuentas) {
   return (
-    <TablaDatos
+    <TablaDeCuentas
       def={DEF_CUENTAS_CONFIGURACION}
-      filas={cuentas}
       columnas={COLUMNAS_CONFIGURACION}
-      iconos={ICONOS}
-      nombre={NOMBRE}
-      claveFila={(c) => c.id}
-      anchoMinimo="36rem"
       ariaLabel="Cuentas de retiro"
-      vacio="Todavía no hay cuentas de retiro registradas."
+      anchoMinimo="36rem"
+      {...props}
     />
   );
 }

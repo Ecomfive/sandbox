@@ -2,13 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
 import { KpiGroup } from "@/components/ui/kpi-card";
-import { fieldClass, labelClass } from "@/components/ui/field";
-import { crearSkuSimple, crearCombo } from "./actions";
-import { ComboBuilder } from "./combo-builder";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { CatalogoIcon } from "@/lib/nav-icons";
 import type { FilaSku } from "./def-catalogo";
 import { TablaCatalogo } from "./tabla-catalogo";
 import { TarjetasEstadoCatalogo } from "./tarjetas-estado";
@@ -28,7 +22,7 @@ interface SkuMaestro {
 }
 
 export default async function CatalogoMaestroPage() {
-  await requireModulo("catalogo-maestro");
+  const usuario = await requireModulo("catalogo-maestro");
   const supabase = createServiceClient();
 
   const { data: skus } = await supabase
@@ -72,60 +66,17 @@ export default async function CatalogoMaestroPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Catálogo maestro de SKU" icono={CatalogoIcon}>
-        Un SKU maestro representa un producto físico, sin importar en qué plataforma se venda.
-        Los combos se arman con varios SKU maestros simples y una cantidad de cada uno. Todo pasa
-        por revisión antes de quedar aprobado.
-      </EncabezadoPagina>
+      <EncabezadoPagina titulo="Catálogo maestro de SKU" oculto />
 
       <KpiGroup titulo="Estado del catálogo">
         <TarjetasEstadoCatalogo conteo={conteo} />
       </KpiGroup>
 
-      <div className="grid max-w-5xl gap-6 md:grid-cols-2">
-        <form action={crearSkuSimple} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold">Proponer SKU simple</h2>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Nombre</span>
-            <input type="text" name="nombre" required className={fieldClass} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Código (opcional, se genera uno si lo dejas vacío)</span>
-            <input type="text" name="codigo" className={fieldClass} />
-          </label>
-          <Button type="submit" className="self-start">
-            Proponer
-          </Button>
-        </form>
-
-        <form action={crearCombo} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold">Proponer combo</h2>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Nombre</span>
-            <input type="text" name="nombre" required className={fieldClass} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Código (opcional)</span>
-            <input type="text" name="codigo" className={fieldClass} />
-          </label>
-          <div role="group" aria-labelledby="etiqueta-componentes" className="flex flex-col gap-1">
-            <span id="etiqueta-componentes" className={labelClass}>Componentes</span>
-            {opcionesSimples.length === 0 ? (
-              <EstadoVacio
-                mensaje="Todavía no hay SKUs simples aprobados para armar un combo. Aprueba al menos uno primero."
-                className="p-2"
-              />
-            ) : (
-              <ComboBuilder opciones={opcionesSimples} />
-            )}
-          </div>
-          <Button type="submit" disabled={opcionesSimples.length === 0} className="self-start">
-            Proponer combo
-          </Button>
-        </form>
-      </div>
-
-      <TablaCatalogo skus={filas} />
+      <TablaCatalogo
+        skus={filas}
+        opcionesSimples={opcionesSimples.map((s) => ({ id: s.id, codigo: s.codigo, nombre: s.nombre }))}
+        puedeEscribir={!usuario.modulosSoloLectura.includes("catalogo-maestro")}
+      />
     </Pagina>
   );
 }

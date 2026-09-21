@@ -53,6 +53,12 @@ export async function invitarUsuario(
   return { status: "success", mensaje: `Invitación enviada a ${email}.` };
 }
 
+/** «Invitar usuario» de la ficha: lo mismo que `invitarUsuario`, con el error como valor (`{ error }`) que espera `FichaCrear`. */
+export async function invitarDesdeFicha(formData: FormData): Promise<{ error?: string }> {
+  const resultado = await invitarUsuario({ status: "idle" }, formData);
+  return resultado.status === "error" ? { error: resultado.mensaje ?? "No se pudo invitar al usuario." } : {};
+}
+
 export async function cambiarRolUsuario(formData: FormData) {
   await requireModuloEscritura("usuarios");
   const id = formData.get("id") as string;
@@ -73,14 +79,16 @@ export async function cambiarActivoUsuario(formData: FormData) {
   revalidatePath("/usuarios");
 }
 
-export async function crearRol(formData: FormData) {
+/** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
+export async function crearRol(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("usuarios");
-  const nombre = (formData.get("nombre") as string)?.trim();
-  if (!nombre) throw new Error("Falta el nombre del rol.");
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { error: "Escribe el nombre del rol." };
   const supabase = createServiceClient();
   const { error } = await supabase.from("roles").insert({ nombre });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/usuarios");
+  return {};
 }
 
 export async function togglePermiso(formData: FormData) {

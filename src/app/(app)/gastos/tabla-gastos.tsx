@@ -7,6 +7,7 @@ import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, GastoIcon, PedidoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { eliminarGasto } from "./actions";
+import { CrearGastoPanel } from "./crear-gasto-panel";
 import { DEF_GASTOS, etiquetaCategoria, type FilaGasto } from "./def-gastos";
 
 const NOMBRE: NombreFilas = { singular: "gasto", plural: "gastos" };
@@ -24,8 +25,18 @@ const COLUMNAS: ColumnaTabla<FilaGasto, string>[] = [
   { id: "monto", label: "Monto", ocultable: true, clase: "tabular-nums", render: (g, codigoPais) => formatearMoneda(g.monto, codigoPais) },
 ];
 
-/** Tabla de gastos recientes con la barra de herramientas común (agrupar por categoría, filtros y columnas). */
-export function TablaGastos({ gastos, codigoPais }: { gastos: FilaGasto[]; codigoPais: string }) {
+/** Tabla de gastos recientes con la barra de herramientas común (agrupar por categoría, filtros, columnas y «Agregar»). */
+export function TablaGastos({
+  gastos,
+  codigoPais,
+  paisId,
+  puedeEscribir,
+}: {
+  gastos: FilaGasto[];
+  codigoPais: string;
+  paisId: string;
+  puedeEscribir: boolean;
+}) {
   return (
     <TablaDatos
       def={DEF_GASTOS}
@@ -36,17 +47,22 @@ export function TablaGastos({ gastos, codigoPais }: { gastos: FilaGasto[]; codig
       nombre={NOMBRE}
       claveFila={(g) => g.id}
       formatearTotal={(total) => formatearMoneda(total, codigoPais)}
-      accion={{
-        etiqueta: "Acciones",
-        render: (g) => (
-          <form action={eliminarGasto}>
-            <input type="hidden" name="id" value={g.id} />
-            <Button type="submit" variant="ghost" className="text-xs">
-              Eliminar
-            </Button>
-          </form>
-        ),
-      }}
+      accionPrincipal={puedeEscribir ? <CrearGastoPanel paisId={paisId} /> : undefined}
+      accion={
+        puedeEscribir
+          ? {
+              etiqueta: "Acciones",
+              render: (g) => (
+                <form action={eliminarGasto}>
+                  <input type="hidden" name="id" value={g.id} />
+                  <Button type="submit" variant="ghost" className="text-xs">
+                    Eliminar
+                  </Button>
+                </form>
+              ),
+            }
+          : undefined
+      }
       ariaLabel="Tabla de gastos recientes"
       vacio="Todavía no hay gastos registrados."
     />

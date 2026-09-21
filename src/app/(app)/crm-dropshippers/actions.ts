@@ -4,21 +4,23 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModuloEscritura } from "@/lib/auth";
 
-export async function crearDropshipper(formData: FormData) {
+/** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
+export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("crm-dropshippers");
   const pais_id = formData.get("pais_id") as string;
-  const nombre = (formData.get("nombre") as string)?.trim();
+  const nombre = String(formData.get("nombre") ?? "").trim();
   const contacto_email = (formData.get("contacto_email") as string) || null;
   const contacto_telefono = (formData.get("contacto_telefono") as string) || null;
 
-  if (!nombre) throw new Error("Falta el nombre del dropshipper.");
+  if (!nombre) return { error: "Escribe el nombre del dropshipper." };
 
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("dropshippers")
     .insert({ pais_id, nombre, contacto_email, contacto_telefono });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/crm-dropshippers");
+  return {};
 }
 
 export async function actualizarDropshipper(formData: FormData) {
@@ -41,19 +43,22 @@ export async function actualizarDropshipper(formData: FormData) {
   revalidatePath("/crm-dropshippers");
 }
 
-export async function registrarInteraccion(formData: FormData) {
+/** Devuelve el error como valor, no lo lanza (ver `crearDropshipper`). */
+export async function registrarInteraccion(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("crm-dropshippers");
   const dropshipper_id = formData.get("dropshipper_id") as string;
   const fecha = formData.get("fecha") as string;
   const tipo = formData.get("tipo") as string;
-  const nota = (formData.get("nota") as string)?.trim();
+  const nota = String(formData.get("nota") ?? "").trim();
 
-  if (!nota) throw new Error("Falta la nota de la interacción.");
+  if (!dropshipper_id) return { error: "Elige el dropshipper." };
+  if (!nota) return { error: "Escribe la nota de la interacción." };
 
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("interacciones_dropshipper")
     .insert({ dropshipper_id, fecha, tipo, nota });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/crm-dropshippers");
+  return {};
 }

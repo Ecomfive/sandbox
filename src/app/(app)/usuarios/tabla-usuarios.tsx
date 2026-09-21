@@ -6,6 +6,7 @@ import { EstadoIcon, PersonaIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { ActivoToggle } from "./activo-toggle";
 import { DEF_USUARIOS, type FilaUsuario } from "./def-usuarios";
+import { InvitarUsuarioPanel } from "./invitar-usuario-panel";
 import { RolSelect } from "./rol-select";
 
 const NOMBRE: NombreFilas = { singular: "usuario", plural: "usuarios" };
@@ -28,8 +29,16 @@ const COLUMNAS: ColumnaTabla<FilaUsuario, Rol[]>[] = [
   { id: "estado", label: "Estado", ocultable: true, render: (u) => <ActivoToggle perfilId={u.id} activo={u.activo} /> },
 ];
 
-/** Tabla de usuarios con la barra de herramientas común (agrupar por rol o estado, inactivos, filtros y columnas). */
-export function TablaUsuarios({ usuarios, roles }: { usuarios: FilaUsuario[]; roles: Rol[] }) {
+/** Tabla de usuarios con la barra de herramientas común (agrupar por rol o estado, inactivos, filtros, columnas y «Agregar»). */
+export function TablaUsuarios({
+  usuarios,
+  roles,
+  puedeEscribir,
+}: {
+  usuarios: FilaUsuario[];
+  roles: Rol[];
+  puedeEscribir: boolean;
+}) {
   return (
     <TablaDatos
       def={DEF_USUARIOS}
@@ -39,6 +48,7 @@ export function TablaUsuarios({ usuarios, roles }: { usuarios: FilaUsuario[]; ro
       iconos={ICONOS}
       nombre={NOMBRE}
       claveFila={(u) => u.id}
+      accionPrincipal={puedeEscribir ? <InvitarUsuarioPanel roles={roles} /> : undefined}
       ariaLabel="Tabla de usuarios"
       vacio="Todavía no hay usuarios invitados."
     />

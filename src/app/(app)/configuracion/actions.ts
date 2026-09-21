@@ -5,11 +5,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 
-export async function crearPlataforma(formData: FormData) {
+/** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
+export async function crearPlataforma(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("configuracion");
   const pais_id = formData.get("pais_id") as string;
-  const nombre = (formData.get("nombre") as string)?.trim();
-  if (!nombre) throw new Error("El nombre de la plataforma es obligatorio.");
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { error: "El nombre de la plataforma es obligatorio." };
 
   const supabase = createServiceClient();
 
@@ -18,7 +19,7 @@ export async function crearPlataforma(formData: FormData) {
     .select("id")
     .eq("nombre", nombre)
     .maybeSingle();
-  if (errorBuscar) throw new Error(errorBuscar.message);
+  if (errorBuscar) return { error: errorBuscar.message };
 
   let plataforma_id = existente?.id as string | undefined;
   if (!plataforma_id) {
@@ -27,7 +28,7 @@ export async function crearPlataforma(formData: FormData) {
       .insert({ nombre })
       .select("id")
       .single();
-    if (errorCrear) throw new Error(errorCrear.message);
+    if (errorCrear || !nueva) return { error: errorCrear?.message ?? "No se pudo crear la plataforma." };
     plataforma_id = nueva.id;
   }
 
@@ -37,7 +38,7 @@ export async function crearPlataforma(formData: FormData) {
       { pais_id, plataforma_id, disponible_para_retiro: true },
       { onConflict: "pais_id,plataforma_id" }
     );
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   await registrarAuditoria({
     accion: "crear_plataforma",
@@ -48,6 +49,7 @@ export async function crearPlataforma(formData: FormData) {
 
   revalidatePath("/configuracion");
   revalidatePath("/retiros");
+  return {};
 }
 
 export async function alternarDisponiblePlataforma(formData: FormData) {

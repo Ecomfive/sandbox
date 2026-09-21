@@ -235,7 +235,7 @@ export function VistaRapidaRetiro({
                   onClick={() => irAlPanel("conciliar")}
                   aria-expanded={panel === "conciliar"}
                   aria-controls={`panel-retiro-${fila.id}`}
-                  className={`inline-flex items-center gap-1.5 rounded-md bg-[#202020] px-3 py-2 text-sm font-medium text-white hover:bg-[#2d2d2d] ${anilloFoco}`}
+                  className={`inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:bg-foreground/85 ${anilloFoco}`}
                 >
                   <ConciliarIcon className="h-4 w-4" />
                   Conciliar

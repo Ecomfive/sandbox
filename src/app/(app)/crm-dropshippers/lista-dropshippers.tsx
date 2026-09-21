@@ -8,6 +8,7 @@ import { ListaDatos } from "@/components/tabla/lista-datos";
 import { EstadoIcon, PersonaIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { actualizarDropshipper } from "./actions";
+import { CrearDropshipperPanel } from "./crear-dropshipper-panel";
 import { DEF_DROPSHIPPERS, ESTADOS, etiquetaEstado, type FilaDropshipper } from "./def-crm";
 
 const NOMBRE: NombreFilas = { singular: "dropshipper", plural: "dropshippers" };
@@ -71,8 +72,18 @@ function FichaDropshipper({ d }: { d: FilaDropshipper }) {
   );
 }
 
-/** Directorio de dropshippers con la barra de herramientas común (agrupar por estado, inactivos y filtros). */
-export function ListaDropshippers({ dropshippers, pais }: { dropshippers: FilaDropshipper[]; pais: string }) {
+/** Directorio de dropshippers con la barra de herramientas común (agrupar por estado, inactivos, filtros y «Agregar»). */
+export function ListaDropshippers({
+  dropshippers,
+  pais,
+  paisId,
+  puedeEscribir,
+}: {
+  dropshippers: FilaDropshipper[];
+  pais: string;
+  paisId: string;
+  puedeEscribir: boolean;
+}) {
   return (
     <ListaDatos
       def={DEF_DROPSHIPPERS}
@@ -80,6 +91,7 @@ export function ListaDropshippers({ dropshippers, pais }: { dropshippers: FilaDr
       iconos={ICONOS}
       nombre={NOMBRE}
       claveFila={(d) => d.id}
+      accionPrincipal={puedeEscribir ? <CrearDropshipperPanel paisId={paisId} /> : undefined}
       renderFila={(d) => <FichaDropshipper d={d} />}
       etiquetaGrupo={(_campo, grupo) => (
         <Badge tone={toneEstado[grupo.clave] ?? "neutral"}>{grupo.etiqueta}</Badge>
