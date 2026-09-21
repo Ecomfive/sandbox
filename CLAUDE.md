@@ -177,7 +177,9 @@ convenciones técnicas del código.
   otra cuenta con las flechas pide confirmación; el formulario lleva `key` con el id de
   la cuenta para que al pasar a otra arranque con sus datos. Sin permiso de escritura
   solo se leen los datos (`DatosDeLaCuenta`, sin acciones). La ficha lee la cuenta de
-  la lista por su id, así que se actualiza sola y, si la cuenta se elimina, se cierra. **No pongas íconos de acción
+  la lista por su id, así que se actualiza sola; «Eliminar» solo desactiva la cuenta
+  (la ficha queda abierta con el estado nuevo, aunque la fila salga de la tabla por
+  el filtro «Eliminadas»). **No pongas íconos de acción
   en las filas** (la tabla no tiene columna de acciones): lo que se hace con una
   cuenta se hace desde su ficha. «Nueva cuenta destino» (`ventana-cuenta-retiro.tsx`,
   el botón Agregar) usa el mismo `FormularioCuenta`. Las ventanas de

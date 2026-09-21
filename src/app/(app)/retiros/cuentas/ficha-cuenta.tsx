@@ -50,8 +50,8 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
   );
 }
 
-/** Desactivar o reactivar la cuenta: no borra nada, y es lo que hay que hacer cuando ya tiene retiros y no se puede
- * eliminar. */
+/** Desactivar o reactivar la cuenta a mano, sin pedir confirmación — al revés de «Eliminar», que solo desactiva
+ * (con su propio aviso) y no deja volver a activarla desde ahí. */
 function AlternarActivaBoton({ cuenta }: { cuenta: FilaCuenta }) {
   const [pending, startTransition] = useTransition();
   const { mostrarToast } = useToast();
@@ -130,8 +130,9 @@ function DatosDeLaCuenta({ cuenta }: { cuenta: FilaCuenta }) {
  * Con permiso de escritura la ficha **ya es el formulario**: no hay un botón «Modificar»; se cambian los campos, se
  * pulsa «Guardar cambios» (que cierra la ficha) y las acciones Desactivar y Eliminar están arriba de los campos. Si hay
  * cambios sin guardar, cerrar o pasar a otra cuenta pide confirmación. Sin permiso de escritura solo se leen los datos.
- * Lo que muestra sale de la fila ya cargada, así que se actualiza sola, y si la cuenta se elimina deja de existir y el
- * panel se cierra.
+ * Lo que muestra sale de la fila ya cargada, así que se actualiza sola al guardar o al eliminarla (que la desactiva, no
+ * la borra): la ficha queda abierta con su nuevo estado, aunque la fila haya salido de la tabla de abajo por el filtro
+ * de «Eliminadas».
  */
 export function FichaCuenta({
   cuenta,
@@ -142,7 +143,7 @@ export function FichaCuenta({
   alIr,
   alCerrar,
 }: {
-  /** La cuenta que se ve; sin ella (no abierta, o ya eliminada) el panel está cerrado. */
+  /** La cuenta que se ve; sin ella (no abierta, o ya no está en la lista) el panel está cerrado. */
   cuenta: FilaCuenta | undefined;
   /** Las claves de las cuentas en el orden de la tabla. */
   orden: string[];
