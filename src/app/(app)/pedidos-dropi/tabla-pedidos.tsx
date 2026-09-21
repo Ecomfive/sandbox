@@ -10,6 +10,8 @@ import type { DescargaCompleta } from "@/components/tabla/boton-descargar";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
 import { useColumnas, type ColumnaDef } from "@/components/tabla/ganchos";
+import { Paginacion } from "@/components/tabla/paginacion";
+import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "@/components/tabla/usar-pagina-arriba";
 import { useTablaInteractiva } from "@/components/tabla/usar-tabla";
 import { toneEstadoPedido } from "@/lib/estados-pedido";
 import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
@@ -75,9 +77,10 @@ export function TablaPedidos({
   /** Todas las órdenes del período, que arma el servidor (la tabla solo trae las primeras). */
   descargaCompleta?: DescargaCompleta;
 }) {
-  const tabla = useTablaInteractiva(DEF_PEDIDOS, pedidos);
+  const tabla = useTablaInteractiva(DEF_PEDIDOS, pedidos, { porPagina: POR_PAGINA });
   const [columnasGuardadas, cambiarColumnas] = useColumnas("pedidos-dropi", COLUMNAS);
-  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado } = tabla;
+  const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
+  const { raiz, alIrA } = useIrAPaginaArriba(tabla.irAPagina);
 
   const columnasVisibles = columnasGuardadas.orden
     .filter((id) => !columnasGuardadas.ocultas.has(id))
@@ -162,7 +165,7 @@ export function TablaPedidos({
   });
 
   return (
-    <div className="min-w-0 rounded-xl border border-border bg-card">
+    <div ref={raiz} className="min-w-0 rounded-xl border border-border bg-card">
       <BarraHerramientas
         def={DEF_PEDIDOS}
         filas={pedidos}
@@ -206,6 +209,7 @@ export function TablaPedidos({
           )}
         </table>
       </ContenedorTabla>
+      {paginacion && <Paginacion pagina={paginacion} nombre={NOMBRE_FILAS} alIrA={alIrA} />}
       {pedidos.length > 0 && visibles.length === 0 && (
         <EstadoVacio
           mensaje={
@@ -216,7 +220,7 @@ export function TablaPedidos({
         />
       )}
       <p role="status" className="sr-only">
-        {pedidos.length > 0 ? `${visibles.length} ${visibles.length === 1 ? "orden" : "órdenes"}` : ""}
+        {pedidos.length > 0 ? textoEstadoTabla(NOMBRE_FILAS, paginacion ? paginacion.total : visibles.length, paginacion) : ""}
       </p>
       {notas.length > 0 && (
         <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">{notas.join(" · ")}</p>
