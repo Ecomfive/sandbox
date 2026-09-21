@@ -13,6 +13,7 @@ import { FormularioConToast } from "@/components/ui/toast";
 import { CATEGORIAS } from "./def-gastos";
 import { TablaGastos } from "./tabla-gastos";
 import { TarjetasGastosMes } from "./tarjetas-mes";
+import { pideCrear } from "@/lib/crear-global";
 
 export const metadata = { title: "Nómina y gastos" };
 
@@ -20,8 +21,14 @@ export const dynamic = "force-dynamic";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
-export default async function GastosPage() {
+export default async function GastosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   await requireModulo("gastos");
+  // El botón «Crear» de la barra llega con `?nuevo=1`: el cursor cae en el primer campo del formulario.
+  const enfocarFormulario = pideCrear((await searchParams).nuevo);
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
@@ -80,7 +87,7 @@ export default async function GastosPage() {
           <input type="hidden" name="pais_id" value={pais.id} />
           <label className="flex flex-col gap-1">
             <span className={labelClass}>Categoría</span>
-            <select name="categoria" required className={fieldClass}>
+            <select name="categoria" required autoFocus={enfocarFormulario} className={fieldClass}>
               {CATEGORIAS.map((c) => (
                 <option key={c.valor} value={c.valor}>
                   {c.etiqueta}

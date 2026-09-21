@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { pideCrear } from "@/lib/crear-global";
 import { crearRetiro, verSiguienteCorrelativo } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
@@ -71,6 +73,11 @@ export function CrearRetiroPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
 
+  const parametros = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const yaAbrio = useRef(false);
+
   // El menú de "+ Agregar" se cierra al hacer clic afuera o con Escape.
   useEffect(() => {
     if (!menuAbierto) return;
@@ -109,6 +116,17 @@ export function CrearRetiroPanel({
     setCorrelativo(await verSiguienteCorrelativo().catch(() => null));
     setConsultando(false);
   }
+
+  // El botón «Crear» de la barra de arriba llega con `?nuevo=1`: se abre el formulario de una vez y se quita el
+  // parámetro de la dirección (para que recargar o volver atrás no lo abra otra vez).
+  useEffect(() => {
+    if (!pideCrear(parametros.get("nuevo")) || yaAbrio.current) return;
+    yaAbrio.current = true;
+    router.replace(pathname, { scroll: false });
+    void abrirVentana();
+    // Solo al llegar: abrirVentana lee el estado de este momento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parametros]);
 
   // Mientras se guarda no se cierra: la ventana queda abierta con el botón en "Creando..." hasta pasar a la ficha.
   function cerrarVentana() {

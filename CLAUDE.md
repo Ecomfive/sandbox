@@ -92,6 +92,14 @@ convenciones técnicas del código.
   sola línea desde unos 845 px de contenido, y por debajo envuelven sin recortar).
   Calcula el ancho de las bases pensando en pantallas de ~1 200 px de contenido, no
   en 1 900: un mínimo de 39rem por grupo las apilaba en las pantallas del equipo.
+- **Botón «Crear» de la barra.** `MenuCrear` (`src/components/menu-crear.tsx`, en
+  `NavBar`) lista lo que se crea a menudo desde cualquier página; las opciones salen de
+  `ACCIONES_CREAR` (`src/lib/crear-global.ts`) y solo aparecen las de módulos que la
+  persona puede abrir **y modificar**. Cada opción lleva a donde se crea; una que abre
+  un formulario llega con `?nuevo=1` y la página lo abre sola (Retiros abre su ventana
+  y limpia el parámetro con `router.replace`; Gastos pone el cursor en el primer campo
+  con `pideCrear`). Para sumar una opción: agrégala a `ACCIONES_CREAR` y, si abre un
+  formulario, haz que su página atienda `?nuevo=1`.
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
