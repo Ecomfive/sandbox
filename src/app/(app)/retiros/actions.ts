@@ -305,6 +305,35 @@ export async function cancelarRetiro(formData: FormData) {
   revalidatePath(`/retiros/${id}`);
 }
 
+/** Quita la novedad y vuelve a dejar el retiro "abierto" — el atajo de un clic desde la ficha para
+ * lo que, si no, habría que hacer abriendo "Modificar" y cambiando el Estado a mano. Solo actúa si
+ * de verdad está en novedad (evita pisar un cierre o una cancelación que haya pasado mientras la
+ * ficha estaba abierta). */
+export async function reabrirRetiro(formData: FormData) {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+
+  const supabase = createServiceClient();
+  const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
+  if (errorRetiro) throw new Error(errorRetiro.message);
+  if (retiro.estado !== "novedad") return;
+
+  const { error } = await supabase.from("retiros").update({ estado: "abierto" }).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await registrarEvento(supabase, id, "Novedad resuelta: el retiro vuelve a abierto");
+  await registrarAuditoria({
+    accion: "cambiar_estado_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    antes: { Estado: ETIQUETA_ESTADO.novedad },
+    despues: { Estado: ETIQUETA_ESTADO.abierto },
+  });
+
+  revalidatePath("/retiros");
+  revalidatePath(`/retiros/${id}`);
+}
+
 /** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado
  * por, monto, comisión, fechas, nota y estado — todo junto, desde la ficha de "Modificar". El
  * estado ya no se edita directo en la columna de la tabla ni en lote: solo cambia desde acá, al

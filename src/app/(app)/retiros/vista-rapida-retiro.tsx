@@ -12,6 +12,7 @@ import type { FilaRetiro } from "./tabla-retiros";
 import type { Cuenta, Plataforma } from "./crear-retiro-panel";
 import { ConciliarRetiroPanel } from "./conciliar-retiro-panel";
 import { EditarRetiroPanel } from "./editar-retiro-panel";
+import { AbrirNovedadBoton } from "./abrir-novedad-boton";
 import { CancelarRetiroBoton } from "./cancelar-retiro-boton";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 
@@ -222,6 +223,7 @@ export function VistaRapidaRetiro({
               cuentas={cuentas}
               variante="boton"
             />
+            {fila.estado === "novedad" && <AbrirNovedadBoton id={fila.id} />}
             {fila.estado !== "cancelado" && (
               <CancelarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
             )}
