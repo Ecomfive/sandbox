@@ -51,4 +51,17 @@ miles de filas completas a JavaScript.
    ficha de Retiros.
 4. Poner un límite razonable a los rangos de fechas personalizados.
 
-**Estado: sin aplicar — el usuario pidió guardar esto para después.**
+## Estado
+
+- **Punto 1 (Pedidos Dropi, agregaciones en Postgres): sin aplicar.** Espera
+  confirmación de Hernán antes de tocarlo.
+- **Puntos 2 y 3: aplicados** (rama `rendimiento-carga`). País, plataformas del
+  país y la plataforma Dropi se guardan en memoria unos minutos
+  (`src/lib/cache-ttl.ts`); el perfil de la persona y sus permisos se piden en
+  una sola consulta y se comparten dentro de la petición (`cache` de React,
+  `src/lib/auth.ts`); el layout pide todo a la vez; Conciliaciones, Productos,
+  la ficha de Retiros, la ficha de un proveedor y Usuarios paralelizan sus
+  consultas. Medido en un banco local con latencia simulada de 80 ms por consulta
+  (no contra la base real): la primera respuesta de las páginas pasó de ~930–1050
+  ms a ~440–490 ms y las consultas por página, de 13–18 a 9–14.
+- **Punto 4 (límite a rangos personalizados): sin aplicar.**

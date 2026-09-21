@@ -25,21 +25,26 @@ export default async function ProductosPage({
   const buscar = typeof sp.buscar === "string" ? sp.buscar.trim() : "";
 
   const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
+  const paisP = getPaisActual(supabase);
 
-  const { data } = await supabase
-    .from("productos")
-    .select(
-      "id, sku, nombre, costo, precio_actual, margen_minimo, ultima_modificacion_precio, sku_maestro_id, plataformas(nombre)"
-    )
-    .eq("pais_id", pais.id);
-
-  const { data: skusMaestrosDisponibles } = await supabase
-    .from("skus_maestros")
-    .select("id, codigo, nombre")
-    .eq("tipo", "simple")
-    .eq("estado", "aprobado")
-    .order("codigo");
+  // Los SKUs maestros no dependen del país: se piden a la vez que el país y los productos, no después.
+  const [pais, { data }, { data: skusMaestrosDisponibles }] = await Promise.all([
+    paisP,
+    paisP.then((p) =>
+      supabase
+        .from("productos")
+        .select(
+          "id, sku, nombre, costo, precio_actual, margen_minimo, ultima_modificacion_precio, sku_maestro_id, plataformas(nombre)"
+        )
+        .eq("pais_id", p.id)
+    ),
+    supabase
+      .from("skus_maestros")
+      .select("id, codigo, nombre")
+      .eq("tipo", "simple")
+      .eq("estado", "aprobado")
+      .order("codigo"),
+  ]);
 
   const productos: ProductoFila[] = (data ?? []).map((p) => ({
     id: p.id,

@@ -288,6 +288,30 @@ convenciones técnicas del código.
   `border-border` (1.28:1) es solo para divisores y tarjetas: nunca lo pongas en
   un campo. Un campo con clases propias (como el buscador global) usa también
   `border-border-control`.
+- **Carga de las páginas: qué se repite, qué se guarda y qué va en paralelo.**
+  Cada consulta a Supabase cuesta un viaje de red, y una cadena de ellas es lo
+  que hace lenta una página. Tres reglas:
+  1. *Dentro de una petición* lo compartido se envuelve en `cache()` de React
+     (`getUsuarioActual`, `getUsuarioIdSesion` en `src/lib/auth.ts`): el layout,
+     la página y las acciones comparten una sola respuesta. El perfil trae el rol
+     y sus permisos en **una** consulta (si la base no devuelve el embebido, cae a
+     pedirlos aparte: el acceso nunca depende de eso).
+  2. *Entre peticiones* solo se guarda en memoria lo que casi nunca cambia y es
+     igual para todos, con `conTtl` (`src/lib/cache-ttl.ts`): el país
+     (`getPaisActual`, 10 min), las plataformas de un país
+     (`obtenerPlataformasPais`, 1 min) y el id de Dropi (`obtenerPlataformaDropiId`,
+     10 min). Cada instancia del servidor vence por su cuenta, así que un cambio
+     hecho a mano en la base tarda hasta ese tiempo en verse. **Nunca guardes así
+     lo que es de una persona** (sesión, permisos, favoritos): un dato viejo ahí
+     es un fallo de seguridad o un menú equivocado.
+  3. *Consultas independientes* van en `Promise.all`, no una tras otra. Si una
+     depende de otra (las plataformas del país), encadénala con `.then` dentro
+     del mismo `Promise.all` en vez de esperar antes. El layout de `(app)` es el
+     ejemplo: usuario, país, plataformas y favoritos arrancan a la vez y los
+     contadores del menú no se esperan.
+  Para medir, no hay que adivinar: un servidor de Supabase falso que anota cada
+  consulta y le suma latencia, con la app real apuntando a él, muestra cuántas
+  hace cada página y en qué orden.
 - Columnas calculadas se definen en la propia migración de SQL con
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.
@@ -331,7 +355,9 @@ final se dice cuáles se usaron.
 
 - [RENDIMIENTO-PENDIENTE.md](RENDIMIENTO-PENDIENTE.md): diagnóstico de
   rendimiento de navegación entre páginas, con plan de arreglo priorizado.
-  **Sin aplicar todavía** — no implementar sin confirmar con Hernán primero.
+  Los puntos 2 y 3 (caché de país/plataformas y consultas en paralelo) ya están
+  aplicados; **el punto 1 (Pedidos Dropi: agregar en Postgres) sigue sin aplicar**
+  — no implementarlo sin confirmar con Hernán primero.
 
 ## Flujo de trabajo con git
 

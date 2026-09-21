@@ -28,19 +28,20 @@ export default async function DetalleProveedorCompetenciaPage({
   const { id } = await params;
   const supabase = createServiceClient();
 
-  const { data: proveedor } = await supabase
-    .from("proveedores_competencia")
-    .select("id, nombre, tienda, ciudad, categorias, primera_vez_visto")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: proveedor }, { data: historial }] = await Promise.all([
+    supabase
+      .from("proveedores_competencia")
+      .select("id, nombre, tienda, ciudad, categorias, primera_vez_visto")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("snapshots_proveedor_competencia")
+      .select("fecha, productos_count")
+      .eq("proveedor_id", id)
+      .order("fecha", { ascending: false }),
+  ]);
 
   if (!proveedor) notFound();
-
-  const { data: historial } = await supabase
-    .from("snapshots_proveedor_competencia")
-    .select("fecha, productos_count")
-    .eq("proveedor_id", id)
-    .order("fecha", { ascending: false });
 
   const snapshots = historial ?? [];
   const actual = snapshots[0] ?? null;

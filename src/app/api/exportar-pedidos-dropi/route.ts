@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
+import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
 import { getUsuarioActual } from "@/lib/auth";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 
@@ -28,9 +29,8 @@ export async function GET(request: NextRequest) {
   const estados = [...new Set(searchParams.getAll("estado").filter((e) => e !== ""))].slice(0, 30);
 
   const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  const { data: plataformaDropi } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").single();
-  const plataformaId = plataformaDropi?.id ?? "";
+  const [pais, plataformaDropiId] = await Promise.all([getPaisActual(supabase), obtenerPlataformaDropiId(supabase)]);
+  const plataformaId = plataformaDropiId ?? "";
 
   const filas = await traerTodasLasFilas<{
     referencia_externa: string;

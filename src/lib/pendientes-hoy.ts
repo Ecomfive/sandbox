@@ -1,10 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
 
 export interface PendientesHoy {
   alertasInventario: number;
   saldosSinRegistrar: number;
   pedidosConNovedad: number;
   retirosDropiSinVincular: number;
+}
+
+async function contarNovedades(supabase: SupabaseClient, paisId: string): Promise<{ count: number | null }> {
+  const plataformaId = await obtenerPlataformaDropiId(supabase);
+  if (!plataformaId) return { count: 0 };
+  const { count } = await supabase
+    .from("ordenes")
+    .select("*", { count: "exact", head: true })
+    .eq("pais_id", paisId)
+    .eq("plataforma_id", plataformaId)
+    .eq("estado", "NOVEDAD");
+  return { count };
 }
 
 /**
@@ -18,7 +31,7 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     { count: alertasInventario },
     { data: plataformasPais },
     { data: saldos },
-    { data: plataformaDropi },
+    { count: pedidosConNovedad },
     { count: retirosDropiSinVincular },
   ] = await Promise.all([
     supabase
@@ -28,7 +41,8 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
       .eq("estado", "abierta"),
     supabase.from("pais_plataformas").select("plataforma_id").eq("pais_id", paisId),
     supabase.from("saldos_wallet").select("plataforma_id").eq("pais_id", paisId),
-    supabase.from("plataformas").select("id").eq("nombre", "Dropi").single(),
+    // El id de Dropi está guardado en memoria: el conteo de pedidos ya no espera una consulta más, va con las demás.
+    contarNovedades(supabase, paisId),
     supabase.from("dropi_retiros_sin_vincular").select("*", { count: "exact", head: true }).eq("pais_id", paisId),
   ]);
 
@@ -37,21 +51,10 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     (p) => !plataformasConSaldo.has(p.plataforma_id)
   ).length;
 
-  let pedidosConNovedad = 0;
-  if (plataformaDropi) {
-    const { count } = await supabase
-      .from("ordenes")
-      .select("*", { count: "exact", head: true })
-      .eq("pais_id", paisId)
-      .eq("plataforma_id", plataformaDropi.id)
-      .eq("estado", "NOVEDAD");
-    pedidosConNovedad = count ?? 0;
-  }
-
   return {
     alertasInventario: alertasInventario ?? 0,
     saldosSinRegistrar,
-    pedidosConNovedad,
+    pedidosConNovedad: pedidosConNovedad ?? 0,
     retirosDropiSinVincular: retirosDropiSinVincular ?? 0,
   };
 }
