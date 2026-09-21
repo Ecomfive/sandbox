@@ -15,6 +15,7 @@ import { AbrirNovedadBoton } from "./abrir-novedad-boton";
 import { CancelarRetiroBoton } from "./cancelar-retiro-boton";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 import { FormularioEditarRetiro } from "./formulario-editar-retiro";
+import { HistorialRetiro } from "./historial-retiro";
 import { SeccionConciliarRetiro } from "./seccion-conciliar-retiro";
 import { SeccionNovedadRetiro } from "./seccion-novedad-retiro";
 
@@ -119,7 +120,8 @@ type PanelAbajo = "conciliar" | "novedad";
  *
  * **«Conciliar» y «Novedad» no abren una ventana en el medio**: despliegan una sección al final de la misma ficha
  * (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`), la ficha baja hasta ella y el foco entra en su primer campo. Solo
- * hay una desplegada a la vez. «Novedad» solo está en un retiro abierto; al agregarla el retiro pasa a novedad y
+ * hay una desplegada a la vez. **El historial (`HistorialRetiro`) es siempre lo último**: con una sección desplegada, queda
+ * debajo de ella. «Novedad» solo está en un retiro abierto; al agregarla el retiro pasa a novedad y
  * aparece «Abrir» en su lugar.
  */
 export function VistaRapidaRetiro({
@@ -222,7 +224,6 @@ export function VistaRapidaRetiro({
             codigoPais={codigoPais}
             plataformas={plataformas}
             cuentas={cuentas}
-            versionHistorial={versionHistorial}
             acciones={
               <>
                 <button
@@ -281,6 +282,9 @@ export function VistaRapidaRetiro({
               alAgregada={() => alTerminarPanel("Novedad agregada")}
             />
           )}
+
+          {/* Siempre lo último de la ficha: con Conciliar o Novedad desplegadas, el historial queda debajo de ellas. */}
+          <HistorialRetiro key={fila.id} id={fila.id} codigoPais={codigoPais} version={versionHistorial} />
         </div>
       )}
     </Ventana>
