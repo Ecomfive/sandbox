@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { actualizarRetiro } from "./actions";
 import { Button } from "@/components/ui/button";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
@@ -170,8 +171,9 @@ export function EditarRetiroPanel({
         </button>
       </Tooltip>
 
-      {abierto && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={cerrarVentana}>
+      {abierto &&
+        createPortal(
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={cerrarVentana}>
           <div
             ref={panelRef}
             role="dialog"
@@ -398,7 +400,7 @@ export function EditarRetiroPanel({
             </form>
           </div>
         </div>
-      )}
+        , document.body)}
     </>
   );
 }

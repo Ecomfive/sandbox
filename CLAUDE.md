@@ -141,8 +141,18 @@ convenciones técnicas del código.
   `ATAJOS_IR` (y una prueba de que no choca). Para una ventana modal nueva usa
   `<Ventana>` (`src/components/ui/ventana.tsx`, al centro o como panel a la derecha):
   `role="dialog"`, foco atrapado, Escape y clic fuera la cierran y el foco vuelve a
-  donde estaba. Las ventanas de Retiros (crear, editar, conciliar) tienen su propia
-  copia de esa lógica.
+  donde estaba. Las ventanas de Retiros (crear, editar, conciliar) y la de cuentas
+  destino tienen su propia copia de esa lógica.
+  **Toda ventana modal o globo flotante se dibuja en `<body>` con `createPortal`**
+  (`Ventana`, `AyudaContextual`, `Tooltip`, y las ventanas de Retiros y Cuentas): un
+  `position: fixed` dentro de la tabla queda atrapado en el contexto de apilamiento
+  de la celda (`sticky ... z-10`) y la barra de herramientas fija (`z-20`) y el
+  encabezado (`z-15`) se ven **por encima** de la ventana; y un globo `absolute`
+  dentro de una tarjeta con `overflow-hidden` se recorta. Escala de capas: filas
+  `z-10`, encabezado de tabla `z-15`, barra de herramientas `z-20`, menús desplegables
+  de la barra `z-20`/`z-30`, ventanas modales `z-40`, avisos y tooltips `z-50`. Un
+  error al eliminar una fila **no** va en una caja pegada a la celda (tapa las filas de
+  abajo): va como aviso (`useToast`, `mensajeErrorAlEliminar`).
 - **Contadores en el menú lateral.** Las páginas donde se resuelve un pendiente
   (Alertas de inventario, Pedidos Dropi, Conciliación de Retiros) muestran una
   pastilla con cuántos hay, y el grupo o la sección cerrados muestran la suma de

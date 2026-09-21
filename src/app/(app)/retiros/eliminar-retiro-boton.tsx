@@ -1,29 +1,31 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { eliminarRetiro } from "./actions";
 import { anilloFoco } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PapeleraIcon } from "@/lib/nav-icons";
+import { mensajeErrorAlEliminar } from "@/lib/retiros/errores";
 
-/** Ícono de eliminar por fila en Conciliación de Retiros — mismo patrón que EliminarCuentaBoton
- * en cuentas destino: confirm() antes de borrar, y `relative z-10` + stopPropagation porque la
- * fila entera es un enlace estirado (ver ConsolidadoToggle/EstadoSelect). */
+/** Ícono de eliminar por fila en Conciliación de Retiros — mismo patrón que EliminarCuentaBoton en cuentas destino:
+ * confirm() antes de borrar, y `relative z-10` + stopPropagation porque la fila entera es un enlace estirado (ver
+ * ConsolidadoToggle/EstadoSelect). Si no se puede eliminar, el error sale como aviso (toast), no como una caja pegada
+ * a la fila: dentro de la tabla tapaba las filas de abajo y sus botones. */
 export function EliminarRetiroBoton({ id, correlativo }: { id: string; correlativo: number }) {
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { mostrarToast } = useToast();
   const numero = `#${String(correlativo).padStart(4, "0")}`;
 
   function alHacerClic(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (!confirm(`¿Está seguro de que desea eliminar el retiro ${numero}?`)) return;
-    setError(null);
     const formData = new FormData();
     formData.set("id", id);
     startTransition(async () => {
-      const resultado = await eliminarRetiro(formData);
-      if (resultado?.error) setError(resultado.error);
+      const resultado = await eliminarRetiro(formData).catch(() => ({ error: "Inténtalo de nuevo." }));
+      if (resultado?.error) mostrarToast(mensajeErrorAlEliminar(`el retiro ${numero}`, resultado.error), "destructive");
     });
   }
 
@@ -40,14 +42,6 @@ export function EliminarRetiroBoton({ id, correlativo }: { id: string; correlati
           <PapeleraIcon className="h-4 w-4" />
         </button>
       </Tooltip>
-      {error && (
-        <span
-          role="alert"
-          className="absolute top-full right-0 z-10 mt-1 w-56 rounded-md border border-destructive/30 bg-card p-2 text-xs text-destructive shadow-md"
-        >
-          {error}
-        </span>
-      )}
     </span>
   );
 }
