@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { actualizarRetiro } from "./actions";
-import { obtenerActividadRetiro, type EventoRetiro } from "./actividad";
 import { calcularComisionSugerida, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 import { ESTADO_ETIQUETA } from "./filtros";
 import type { FilaRetiro } from "./tabla-retiros";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
-import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
+import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CheckIcon, CerrarIcon } from "@/lib/nav-icons";
 
 const Obligatorio = () => (
@@ -36,11 +35,12 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
 /**
  * El cuerpo de la ficha de un retiro, debajo de su barra de pasos: los campos editables (mismo patrón visual que
  * «Nuevo retiro»), los datos que no se editan a mano (Recibido, Cierre, Persona asignada, Consolidación, Estado en
- * Dropi, Soporte) y, al final, el historial de actividad — todo en una sola vista, sin pestañas. **No hay un botón
- * «Modificar»**: se cambia un campo y arriba, junto a las `acciones` de la ficha (Conciliar, Abrir, Cancelar,
- * Eliminar), aparecen «Guardar cambios» y «Cancelar» — que solo se ven cuando se cambió algo. Guardar no cierra la
- * ficha. Con `key={fila.id}-versión}` en quien lo usa, cancelar (o pasar a otro retiro) lo vuelve a montar con los
- * datos de la fila, sin arrastrar lo escrito.
+ * Dropi, Soporte), sin pestañas. **No hay un botón «Modificar»**: se cambia un campo y arriba, junto a las
+ * `acciones` de la ficha (Conciliar, Novedad, Abrir, Cancelar, Eliminar), aparecen «Guardar cambios» y «Cancelar» —
+ * que solo se ven cuando se cambió algo. Guardar no cierra la ficha. Con `key={fila.id}-versión}` en quien lo usa,
+ * cancelar (o pasar a otro retiro) lo vuelve a montar con los datos de la fila, sin arrastrar lo escrito. El historial
+ * de actividad **no** está aquí: va al final de la ficha (`HistorialRetiro`), debajo de las secciones de Conciliar y
+ * Novedad.
  */
 export function FormularioEditarRetiro({
   fila,
@@ -52,7 +52,6 @@ export function FormularioEditarRetiro({
   alCancelar,
   alCambiarGuardando,
   alModificar,
-  versionHistorial = 0,
 }: {
   fila: FilaRetiro;
   codigoPais: string;
@@ -67,25 +66,7 @@ export function FormularioEditarRetiro({
   alCambiarGuardando?: (guardando: boolean) => void;
   /** Se llama cuando la persona cambia cualquier campo (para saber si hay cambios sin guardar). */
   alModificar?: () => void;
-  /** Sube cuando algo de la ficha registra actividad nueva (conciliar, agregar una novedad): el historial se vuelve a
-   * pedir, sin tocar lo que se esté escribiendo en los campos. */
-  versionHistorial?: number;
 }) {
-  const [eventos, setEventos] = useState<EventoRetiro[] | null | undefined>(undefined);
-  useEffect(() => {
-    let vigente = true;
-    obtenerActividadRetiro(fila.id)
-      .then((r) => vigente && setEventos("eventos" in r ? r.eventos : null))
-      .catch(() => vigente && setEventos(null));
-    return () => {
-      vigente = false;
-    };
-    // Al montar (este componente ya se vuelve a montar por completo con `key={fila.id}-...}`) y cada vez que sube
-    // `versionHistorial`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versionHistorial]);
-  const cargandoHistorial = eventos === undefined;
-
   const [modificado, setModificado] = useState(false);
   const [pending, startTransition] = useTransition();
   useEffect(() => {
@@ -435,31 +416,6 @@ export function FormularioEditarRetiro({
           <Dato etiqueta="Soporte">{fila.soporteNumero ?? "—"}</Dato>
         </div>
       </div>
-
-      <section aria-labelledby={`actividad-retiro-${fila.id}`} aria-busy={cargandoHistorial} className="border-t border-border p-4">
-        <h3 id={`actividad-retiro-${fila.id}`} className="mb-3 text-sm font-semibold">
-          Historial
-        </h3>
-        {cargandoHistorial ? (
-          <p className="text-sm text-muted-foreground">Cargando…</p>
-        ) : eventos === null ? (
-          <p className="text-sm text-destructive">No se pudo cargar la actividad. Vuelve a intentarlo.</p>
-        ) : eventos.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Todavía no hay actividad registrada.</p>
-        ) : (
-          <ol className="flex flex-col gap-3 text-sm">
-            {eventos.map((e) => (
-              <li key={e.id} className="flex items-start gap-2">
-                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
-                <div>
-                  <p>{e.evento}</p>
-                  <p className="text-xs text-muted-foreground">{formatearFechaHoraCompleta(e.creadoEn, codigoPais)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
     </form>
   );
 }

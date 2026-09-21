@@ -441,6 +441,18 @@ export function ConciliarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Un documento con la esquina doblada y un clip al costado: adjuntar un archivo (el soporte de una conciliación). */
+export function AdjuntoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M10.5 4.5H15.5L20 9v10.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V13.5" />
+      <path d="M15.5 4.5V8a1 1 0 0 0 1 1H20" />
+      <path d="M7.25 9.5V5.25a1.875 1.875 0 0 0-3.75 0V9.5a1.875 1.875 0 0 0 3.75 0" />
+      <path d="M5.375 6.75v2.5" />
+    </Icon>
+  );
+}
+
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   Proveeduría: ProveeduriaIcon,
   Tiendas: TiendaIcon,
