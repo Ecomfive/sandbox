@@ -126,7 +126,7 @@ export function ConciliarRetiroPanel({ retiro, paisId }: { retiro: RetiroParaCon
 
               <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
                 <span id={tituloId} className="flex items-center gap-2 text-sm font-semibold">
-                  Conciliar retiro
+                  Retiro
                   <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium tabular-nums">
                     #{String(retiro.numeroCorrelativo).padStart(4, "0")}
                   </span>
