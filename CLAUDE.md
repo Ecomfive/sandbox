@@ -258,8 +258,9 @@ convenciones técnicas del código.
   Abierto, Novedad o Cerrado y descargar solo lo marcado. Cuenta únicamente lo que
   está en pantalla (una acción nunca toca un retiro que la persona no tiene
   delante; los grupos contraídos no cuentan). **La columna Estado de la tabla es de
-  solo lectura** (una insignia, no un desplegable): el estado cambia al conciliar,
-  cancelar o con esta barra, que es la única forma de moverlo a mano. **Alcance a
+  solo lectura** (una insignia, no un desplegable): el estado se mueve a mano desde
+  la ficha de "Modificar" (`editar-retiro-panel.tsx`, junto a "Gestionado por") o
+  con esta barra, además de cambiar solo al conciliar o cancelar. **Alcance a
   propósito**: solo mueve la etiqueta (no registra monto recibido ni comprobante) y
   los cancelados no se tocan. Eliminar, cancelar
   y conciliar **no** van en lote: no se deshacen o piden datos de cada retiro.
