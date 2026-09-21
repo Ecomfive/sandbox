@@ -145,26 +145,28 @@ convenciones técnicas del código.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
   de pasos (Creado, Aprobado, Recibido — no es lo mismo que `estado`, ver
-  `pasosDelRetiro`) y las pestañas Detalle e Historial. **La ficha ya es el formulario**
+  `pasosDelRetiro`). **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
   grandes de Conciliar, Novedad (solo en un retiro abierto), Abrir (solo en novedad),
   Cancelar y Eliminar, aparecen "Guardar cambios" y "Cancelar" — que solo se ven con
   cambios sin guardar. Guardar no cierra la ficha. **«Conciliar» y «Novedad» no abren una
-  ventana en el medio**: despliegan una sección al final de la misma ficha
-  (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`; solo una a la vez), la ficha baja hasta
-  ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco entra en su
-  primer campo. Conciliar pide **Recibido** (obligatorio; si se aleja de «A recibir» más de
+  ventana en el medio**: despliegan una sección al final de la misma ficha, debajo del
+  historial (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`; solo una a la vez), la ficha
+  baja hasta ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco
+  entra en su primer campo. Conciliar pide **Recibido** (obligatorio; si se aleja de «A recibir» más de
   lo tolerado, `conciliarRetiro` no concilia y lo dice), **ID / Referencia** y **Soporte**
   (opcionales) y, al conciliar, deja el retiro cerrado y consolidado. Novedad pide una
   **nota** (obligatoria, hasta 500 caracteres): `agregarNovedadRetiro` pasa el retiro a
   novedad y deja la nota en su historial («Novedad: …») y en la auditoría; entonces aparece
   «Abrir» (`reabrirRetiro`). Las dos secciones usan el botón grande de `BotonCrear` y
   `useFaltantes` (apagado hasta llenar lo obligatorio; pulsarlo así lleva al dato que
-  falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir. El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma
-  de reabrirlo. Las dos pestañas quedan montadas a la vez (una se oculta con `hidden`, no
-  se desmonta): pasar a Historial y volver no pierde lo que se estaba escribiendo. Con
-  cambios sin guardar, cerrar la ficha pide confirmación. **La tabla no tiene columna de
+  falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir.
+  El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma de
+  reabrirlo. Sin pestañas: los campos, los datos que no se editan (Recibido, Cierre,
+  Persona asignada, Consolidación, Estado en Dropi, Soporte) y el historial de actividad
+  van todos seguidos, uno debajo del otro. Con cambios sin guardar, cerrar la ficha pide
+  confirmación. **La tabla no tiene columna de
   acciones**: lo que se hace con un retiro se hace desde su ficha. Ctrl/Cmd/Shift-clic o
   clic central en el `#` abren la página completa (`retiros/[id]/`) en una pestaña nueva,
   como cualquier enlace. Lo que muestra la ficha sale de la fila ya cargada (se busca por
