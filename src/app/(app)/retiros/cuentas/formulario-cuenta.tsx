@@ -107,6 +107,7 @@ export function FormularioCuenta({
   alGuardar,
   alCancelar,
   alCambiarGuardando,
+  alModificar,
 }: {
   paisId: string;
   /** El país de la página: es el que sugiere el formulario de una cuenta Binance. */
@@ -117,6 +118,8 @@ export function FormularioCuenta({
   alCancelar: () => void;
   /** Avisa si está guardando, para que la ventana no se cierre a mitad de camino. */
   alCambiarGuardando?: (guardando: boolean) => void;
+  /** Se llama cuando la persona cambia cualquier campo (para saber si hay cambios sin guardar). */
+  alModificar?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   useEffect(() => {
@@ -144,7 +147,7 @@ export function FormularioCuenta({
   }
 
   return (
-    <form onSubmit={alEnviar} aria-busy={pending} className="flex flex-1 flex-col">
+    <form onSubmit={alEnviar} onChange={alModificar} aria-busy={pending} className="flex flex-1 flex-col">
       {!editando && <input type="hidden" name="pais_id" value={paisId} />}
       {editando && <input type="hidden" name="id" value={cuenta.id} />}
       {/* Ya tenía datos de Binance: si el tipo cambia, el servidor sabe que hay que quitarlos. Va fuera del

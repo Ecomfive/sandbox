@@ -167,13 +167,17 @@ convenciones técnicas del código.
   vuelva ahí). Se abre `FichaCuenta` (`retiros/cuentas/ficha-cuenta.tsx`): cabecera
   con el título («Cuenta #3») y sus insignias de tipo y estado, las flechas de
   cuenta anterior y siguiente (en el orden en que se ven las filas; `Ventana` recibe
-  esos botones en `navegacion`) y cerrar; debajo, una fila de acciones (`BotonAccion`,
-  ícono arriba y texto abajo: Modificar, Desactivar o Reactivar, Eliminar; solo con
-  permiso de escritura) y los datos en bloques con ícono (`Seccion`: Cuenta, Datos de
-  la cuenta si es Binance, Comisión sugerida). «Modificar» cambia los bloques por el
-  formulario en el mismo panel (`FormularioCuenta`, con botones fijos abajo) y al
-  guardar vuelve a la ficha; la ficha lee la cuenta de la lista por su id, así que se
-  actualiza sola y, si la cuenta se elimina, se cierra. **No pongas íconos de acción
+  esos botones en `navegacion`) y cerrar. **Con permiso de escritura la ficha ya es el
+  formulario** (`FormularioCuenta`: no hay un botón «Modificar» ni un modo de solo
+  lectura que haya que salir): debajo de la cabecera, una fila con las acciones
+  (`BotonAccion`, ícono arriba y texto abajo: Desactivar o Reactivar, Eliminar), luego
+  los datos en bloques con ícono (`Seccion`: Cuenta, Datos de la cuenta si es Binance,
+  Comisión sugerida) y los botones fijos abajo (Cancelar, Guardar cambios, que cierra la
+  ficha). Con cambios sin guardar, cerrar (X, Escape, clic fuera, Cancelar) o pasar a
+  otra cuenta con las flechas pide confirmación; el formulario lleva `key` con el id de
+  la cuenta para que al pasar a otra arranque con sus datos. Sin permiso de escritura
+  solo se leen los datos (`DatosDeLaCuenta`, sin acciones). La ficha lee la cuenta de
+  la lista por su id, así que se actualiza sola y, si la cuenta se elimina, se cierra. **No pongas íconos de acción
   en las filas** (la tabla no tiene columna de acciones): lo que se hace con una
   cuenta se hace desde su ficha. «Nueva cuenta destino» (`ventana-cuenta-retiro.tsx`,
   el botón Agregar) usa el mismo `FormularioCuenta`. Las ventanas de
