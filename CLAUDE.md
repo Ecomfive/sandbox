@@ -92,6 +92,13 @@ convenciones técnicas del código.
   sola línea desde unos 845 px de contenido, y por debajo envuelven sin recortar).
   Calcula el ancho de las bases pensando en pantallas de ~1 200 px de contenido, no
   en 1 900: un mínimo de 39rem por grupo las apilaba en las pantallas del equipo.
+- **País de cada persona.** `getPaisActual` (`src/lib/pais.ts`) resuelve el país con
+  este orden: la cookie `pais_actual` de este navegador; si no hay, el último país que
+  la persona eligió (`perfiles.pais_preferido`, migración 0038, que `setPaisActual`
+  guarda al cambiar de país); y si tampoco, Costa Rica. La consulta a `perfiles` solo
+  se hace **sin cookie** (otro equipo, cookies borradas), para no sumar un viaje a
+  cada página; con cookie manda la cookie aunque en otro equipo se haya elegido otro
+  país. Sin la migración todo sigue como antes (cookie o Costa Rica).
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
