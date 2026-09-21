@@ -245,12 +245,6 @@ export function CrearRetiroPanel({
               </div>
 
               <div className="flex flex-col gap-3 p-4">
-                {correlativo !== null && (
-                  <p className="text-xs text-muted-foreground">
-                    Escribe este correlativo en el concepto del retiro en Dropi para que se concilie. Se confirma al
-                    crear el retiro.
-                  </p>
-                )}
                 <div className="flex gap-2">
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <label className={labelClassSm} htmlFor="campo-plataforma">
