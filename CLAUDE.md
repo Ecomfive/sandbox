@@ -102,6 +102,18 @@ convenciones técnicas del código.
   páginas sale del menú y de las pestañas de cada módulo
   (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
+- **Atajos de teclado y ventanas.** `AtajosTeclado` (`src/components/atajos-teclado.tsx`,
+  en la barra de arriba) da atajos de una tecla al estilo ClickUp: `g` y luego una
+  letra va a una página (solo las que la persona puede abrir; la lista y las letras
+  están en `src/lib/atajos.ts`), `/` abre el buscador y `?` lista los atajos. **Nunca
+  actúan mientras se escribe en un campo ni con una ventana abierta**, y se pueden
+  apagar en la propia ayuda (`atajos-teclado-v1`; WCAG 2.1.4): apagados, `?` y Ctrl K
+  siguen. Una página nueva del menú no gana atajo sola: agrégale su letra en
+  `ATAJOS_IR` (y una prueba de que no choca). Para una ventana modal nueva usa
+  `<Ventana>` (`src/components/ui/ventana.tsx`, al centro o como panel a la derecha):
+  `role="dialog"`, foco atrapado, Escape y clic fuera la cierran y el foco vuelve a
+  donde estaba. Las ventanas de Retiros (crear, editar, conciliar) tienen su propia
+  copia de esa lógica.
 - **Contadores en el menú lateral.** Las páginas donde se resuelve un pendiente
   (Alertas de inventario, Pedidos Dropi, Conciliación de Retiros) muestran una
   pastilla con cuántos hay, y el grupo o la sección cerrados muestran la suma de
