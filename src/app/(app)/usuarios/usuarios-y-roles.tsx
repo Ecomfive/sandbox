@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CrearRolPanel } from "./crear-rol-panel";
 import { CrearUsuarioPanel } from "./crear-usuario-panel";
 import type { FilaUsuario, Rol } from "./def-usuarios";
@@ -27,8 +28,18 @@ export function UsuariosYRoles({
   soloLecturaPorRol: Map<string, Set<string>>;
   miId: string;
 }) {
+  const router = useRouter();
   const [pestana, setPestana] = useState<Pestana>("personas");
   const [busqueda, setBusqueda] = useState("");
+
+  // Quién está "Activo" es de otras personas, así que no basta con calcularlo en el cliente a partir de lo que
+  // ya se cargó: mientras se está viendo la pestaña de Personas, se vuelve a pedir la lista cada 20s (lo mismo
+  // que tarda `LatidoPresencia` en mandar un latido nuevo), para que se note cuando alguien entra o se va.
+  useEffect(() => {
+    if (pestana !== "personas") return;
+    const id = setInterval(() => router.refresh(), 20_000);
+    return () => clearInterval(id);
+  }, [pestana, router]);
 
   const personasFiltradas = useMemo(() => {
     const q = normalizar(busqueda);

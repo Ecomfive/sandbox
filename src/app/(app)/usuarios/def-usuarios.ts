@@ -22,6 +22,8 @@ export interface FilaUsuario {
   primerIngresoEn: string | null;
   /** Del lado de auth.users, no de `perfiles`: cuándo entró por última vez (null si nunca). */
   ultimoIngresoEn: string | null;
+  /** El último "estoy aquí" de `LatidoPresencia` — con qué `EstadoPresencia` decide si está "Activo" ahora. */
+  ultimaActividadEn: string | null;
   /** Última vez que se le pidió la foto desde su ficha ("Recordar otra vez") — solo para mostrarlo, no manda nada. */
   fotoRecordadaEn: string | null;
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
+import { LatidoPresencia } from "@/components/latido-presencia";
 import { NavBar } from "@/components/nav";
 import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
@@ -47,6 +48,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <ToastProvider>
+      {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
         <Sidebar

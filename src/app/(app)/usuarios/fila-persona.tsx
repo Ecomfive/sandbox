@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { AvatarPersona } from "./avatar-persona";
 import type { FilaUsuario, Rol } from "./def-usuarios";
+import { EstadoPresencia } from "./estado-presencia";
 import { EstadoDeAlta, FichaPersona } from "./ficha-persona";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
-import { formatearTiempoRelativo } from "@/lib/formato";
 
 /** Una fila de la lista de Personas: clic en cualquier parte abre su ficha. */
 export function FilaPersona({ persona, roles, miId }: { persona: FilaUsuario; roles: Rol[]; miId: string }) {
@@ -25,10 +25,8 @@ export function FilaPersona({ persona, roles, miId }: { persona: FilaUsuario; ro
           <p className="truncate text-xs text-muted-foreground">{persona.rolNombre ?? "Sin rol"}</p>
           {!persona.activo ? <Badge tone="neutral">Suspendida</Badge> : <EstadoDeAlta persona={persona} />}
         </div>
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {persona.ultimoIngresoEn ? formatearTiempoRelativo(persona.ultimoIngresoEn) : (
-            <span className="text-warning">Nunca entró</span>
-          )}
+        <span className="shrink-0">
+          <EstadoPresencia ultimaActividadEn={persona.ultimaActividadEn} ultimoIngresoEn={persona.ultimoIngresoEn} />
         </span>
       </button>
 

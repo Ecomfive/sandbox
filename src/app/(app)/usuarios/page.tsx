@@ -41,7 +41,9 @@ export default async function UsuariosPage() {
     supabase.from("roles").select("id, nombre, descripcion").order("nombre"),
     supabase
       .from("perfiles")
-      .select("id, email, nombre, avatar_url, activo, rol_id, creado_en, primer_ingreso_en, foto_recordada_en")
+      .select(
+        "id, email, nombre, avatar_url, activo, rol_id, creado_en, primer_ingreso_en, foto_recordada_en, ultima_actividad_en"
+      )
       .order("email"),
     supabase.from("permisos_rol").select("rol_id, modulo, solo_lectura"),
     // El último ingreso vive en auth.users, no en `perfiles` — se trae una sola vez para toda la lista.
@@ -74,6 +76,7 @@ export default async function UsuariosPage() {
     creadoEn: p.creado_en,
     primerIngresoEn: p.primer_ingreso_en,
     ultimoIngresoEn: ultimoIngresoPorId.get(p.id) ?? null,
+    ultimaActividadEn: p.ultima_actividad_en,
     fotoRecordadaEn: p.foto_recordada_en,
   }));
 
