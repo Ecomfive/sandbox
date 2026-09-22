@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { requireModuloEscritura } from "@/lib/auth";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
+import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { ETIQUETA_ESTADO } from "./def-catalogo";
 
 function generarCodigo(prefijo: "MSK" | "CMB") {
   return `${prefijo}-${Date.now().toString(36).toUpperCase()}`;
@@ -13,17 +16,22 @@ export async function crearSkuSimple(formData: FormData) {
 
   const nombre = (formData.get("nombre") as string).trim();
   const codigoManual = (formData.get("codigo") as string)?.trim();
+  const codigo = codigoManual || generarCodigo("MSK");
 
   const supabase = createServiceClient();
-  const { error } = await supabase.from("skus_maestros").insert({
-    codigo: codigoManual || generarCodigo("MSK"),
-    nombre,
-    tipo: "simple",
-    estado: "propuesto",
-    creado_por: usuario.id,
-  });
+  const { data, error } = await supabase
+    .from("skus_maestros")
+    .insert({ codigo, nombre, tipo: "simple", estado: "propuesto", creado_por: usuario.id })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+  await registrarAuditoria({
+    accion: "crear_sku",
+    entidad: "skus_maestros",
+    entidadId: data.id,
+    detalle: `código=${codigo}`,
+  });
   revalidatePath("/catalogo-maestro");
 }
 
@@ -43,16 +51,11 @@ export async function crearCombo(formData: FormData) {
     throw new Error("Un combo necesita al menos un componente con cantidad mayor a cero.");
   }
 
+  const codigo = codigoManual || generarCodigo("CMB");
   const supabase = createServiceClient();
   const { data: combo, error } = await supabase
     .from("skus_maestros")
-    .insert({
-      codigo: codigoManual || generarCodigo("CMB"),
-      nombre,
-      tipo: "combo",
-      estado: "propuesto",
-      creado_por: usuario.id,
-    })
+    .insert({ codigo, nombre, tipo: "combo", estado: "propuesto", creado_por: usuario.id })
     .select("id")
     .single();
 
@@ -67,6 +70,12 @@ export async function crearCombo(formData: FormData) {
   );
 
   if (errorComponentes) throw new Error(errorComponentes.message);
+  await registrarAuditoria({
+    accion: "crear_sku",
+    entidad: "skus_maestros",
+    entidadId: combo.id,
+    detalle: `código=${codigo}, ${componentes.length} componente(s)`,
+  });
   revalidatePath("/catalogo-maestro");
 }
 
@@ -111,7 +120,34 @@ export async function cambiarEstadoSku(formData: FormData) {
     .eq("id", id);
 
   if (error) throw new Error(error.message);
+  await registrarAuditoria({
+    accion: "cambiar_estado_sku",
+    entidad: "skus_maestros",
+    entidadId: id,
+    antes: { Estado: ETIQUETA_ESTADO[actual.estado] ?? actual.estado },
+    despues: { Estado: ETIQUETA_ESTADO[nuevoEstado] ?? nuevoEstado },
+  });
   revalidatePath("/catalogo-maestro");
+}
+
+/** La actividad de un SKU (propuesto, cambios de estado...) para su ficha. Es una lectura, así que basta poder
+ * abrir Catálogo. Devuelve el error como valor, no lo lanza. */
+export async function obtenerHistorialSku(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
+  await requireModulo("catalogo-maestro");
+  if (typeof id !== "string" || !/^[0-9a-fA-F-]{8,64}$/.test(id)) return { error: "SKU no válido." };
+
+  const { data, error } = await createServiceClient()
+    .from("historial_auditoria")
+    .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
+    .eq("entidad", "skus_maestros")
+    .eq("entidad_id", id)
+    .order("creado_en", { ascending: false })
+    .limit(30);
+  if (error) return { error: "No se pudo cargar la actividad." };
+
+  return {
+    eventos: (data ?? []).map((e) => ({ id: e.id, evento: formatearEventoAuditoria(e), creadoEn: e.creado_en })),
+  };
 }
 
 export async function vincularProductoASku(formData: FormData) {

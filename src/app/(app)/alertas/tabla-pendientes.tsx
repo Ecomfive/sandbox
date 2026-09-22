@@ -18,7 +18,7 @@ const COLUMNAS: ColumnaTabla<FilaPendiente>[] = [
 ];
 
 /** Inventario pendiente de retorno con la barra de herramientas común (filtros, columnas y descarga). */
-export function TablaPendientes({ pendientes }: { pendientes: FilaPendiente[] }) {
+export function TablaPendientes({ pendientes, puedeEscribir }: { pendientes: FilaPendiente[]; puedeEscribir: boolean }) {
   return (
     <TablaDatos
       def={DEF_PENDIENTES}
@@ -28,19 +28,23 @@ export function TablaPendientes({ pendientes }: { pendientes: FilaPendiente[] })
       nombre={NOMBRE}
       claveFila={(p) => p.productoId}
       anchoMinimo="32rem"
-      accion={{
-        etiqueta: "Acción",
-        render: (p) => (
-          <form action={generarAlerta} className="text-right">
-            <input type="hidden" name="pais_id" value={p.paisId} />
-            <input type="hidden" name="producto_id" value={p.productoId} />
-            <input type="hidden" name="cantidad" value={p.pendiente} />
-            <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
-              Generar alerta
-            </Button>
-          </form>
-        ),
-      }}
+      accion={
+        puedeEscribir
+          ? {
+              etiqueta: "Acción",
+              render: (p) => (
+                <form action={generarAlerta} className="text-right">
+                  <input type="hidden" name="pais_id" value={p.paisId} />
+                  <input type="hidden" name="producto_id" value={p.productoId} />
+                  <input type="hidden" name="cantidad" value={p.pendiente} />
+                  <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                    Generar alerta
+                  </Button>
+                </form>
+              ),
+            }
+          : undefined
+      }
       ariaLabel="Inventario pendiente de retorno"
       vacio="No hay inventario pendiente por ahora."
     />

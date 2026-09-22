@@ -43,11 +43,12 @@ export async function calcularPendientes(
   return Array.from(mapa.values()).filter((p) => p.pendiente > 0);
 }
 
-/** Crea la alerta si no hay una abierta para ese producto, o actualiza la cantidad si ya existe. */
+/** Crea la alerta si no hay una abierta para ese producto, o actualiza la cantidad si ya existe. Devuelve su id,
+ * para dejar constancia en la auditoría de quién la generó a mano (el cron no la usa). */
 export async function upsertAlerta(
   supabase: SupabaseClient,
   p: Pick<Pendiente, "pais_id" | "producto_id" | "pendiente">
-) {
+): Promise<string | null> {
   const { data: existente } = await supabase
     .from("alertas_inventario_no_retornado")
     .select("id")
@@ -60,9 +61,12 @@ export async function upsertAlerta(
       .from("alertas_inventario_no_retornado")
       .update({ cantidad: p.pendiente, fecha_deteccion: new Date().toISOString().slice(0, 10) })
       .eq("id", existente.id);
-  } else {
-    await supabase
-      .from("alertas_inventario_no_retornado")
-      .insert({ pais_id: p.pais_id, producto_id: p.producto_id, cantidad: p.pendiente });
+    return existente.id;
   }
+  const { data: nueva } = await supabase
+    .from("alertas_inventario_no_retornado")
+    .insert({ pais_id: p.pais_id, producto_id: p.producto_id, cantidad: p.pendiente })
+    .select("id")
+    .single();
+  return nueva?.id ?? null;
 }

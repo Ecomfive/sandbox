@@ -9,6 +9,13 @@ import { useToast } from "@/components/ui/toast";
 import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
+import {
+  claseCeldaCasilla,
+  claseCeldaColumna,
+  claseEncabezadoCasilla,
+  claseEncabezadoColumna,
+  claseFilaEncabezado,
+} from "@/components/tabla/estilos-tabla";
 import { useColumnas, type ColumnaDef } from "@/components/tabla/ganchos";
 import { Paginacion } from "@/components/tabla/paginacion";
 import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "@/components/tabla/usar-pagina-arriba";
@@ -17,7 +24,8 @@ import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
 import type { Grupo } from "@/lib/tabla/vista";
-import { actualizarEstadoAlerta, actualizarEstadoAlertasMasivo } from "./actions";
+import { actualizarEstadoAlertasMasivo } from "./actions";
+import { FichaAlerta } from "./ficha-alerta";
 import { KpiGrid } from "@/components/ui/kpi-card";
 import { KpiFiltro } from "@/components/ui/kpi-filtro";
 import { DEF_ALERTAS } from "./def-alertas";
@@ -56,7 +64,7 @@ const ICONOS: Record<string, IconoComp> = {
   reclamada: CalendarioIcon,
 };
 
-type ColumnaId = "sku" | "producto" | "cantidad" | "detectada" | "reclamada" | "estado" | "acciones";
+type ColumnaId = "sku" | "producto" | "cantidad" | "detectada" | "reclamada" | "estado";
 
 const COLUMNAS: (ColumnaDef & { id: ColumnaId })[] = [
   { id: "sku", label: "SKU", ocultable: false },
@@ -65,7 +73,6 @@ const COLUMNAS: (ColumnaDef & { id: ColumnaId })[] = [
   { id: "detectada", label: "Detectada", ocultable: true },
   { id: "reclamada", label: "Reclamada", ocultable: true },
   { id: "estado", label: "Estado", ocultable: true },
-  { id: "acciones", label: "Acciones", ocultable: false },
 ];
 const COLUMNAS_POR_ID = new Map(COLUMNAS.map((c) => [c.id, c]));
 
@@ -77,8 +84,18 @@ function etiquetaGrupo(campo: string, grupo: Grupo<AlertaFila>) {
   return <span className="font-semibold">{grupo.etiqueta}</span>;
 }
 
-export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
+export function TablaAlertas({
+  alertas,
+  codigoPais,
+  puedeEscribir,
+}: {
+  alertas: AlertaFila[];
+  codigoPais: string;
+  puedeEscribir: boolean;
+}) {
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
+  // Qué alerta está abierta y en qué orden se veían las filas al abrirla (para las flechas de anterior y siguiente).
+  const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
   const [pending, startTransition] = useTransition();
   const { mostrarToast } = useToast();
   const tabla = useTablaInteractiva(DEF_ALERTAS, alertas, { porPagina: POR_PAGINA });
@@ -132,29 +149,6 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
         return a.fecha_reclamo ? formatearFecha(a.fecha_reclamo) : "—";
       case "estado":
         return <Badge tone={ESTADO_TONO[a.estado]}>{a.estado}</Badge>;
-      case "acciones":
-        return (
-          <div className="flex justify-end gap-2">
-            {a.estado === "abierta" && (
-              <form action={actualizarEstadoAlerta}>
-                <input type="hidden" name="id" value={a.id} />
-                <input type="hidden" name="estado" value="reclamada" />
-                <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
-                  Marcar reclamada
-                </Button>
-              </form>
-            )}
-            {a.estado !== "resuelta" && (
-              <form action={actualizarEstadoAlerta}>
-                <input type="hidden" name="id" value={a.id} />
-                <input type="hidden" name="estado" value="resuelta" />
-                <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
-                  Marcar resuelta
-                </Button>
-              </form>
-            )}
-          </div>
-        );
     }
   }
 
@@ -165,22 +159,47 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
     detectada: "",
     reclamada: "",
     estado: "",
-    acciones: "pr-4",
   };
 
+  // Las claves en el orden en que se ven, para las flechas de anterior y siguiente de la ficha.
+  const ordenEnPantalla = () =>
+    (vista.agrupar ? grupos.filter((g) => !contraidos.has(g.clave)).flatMap((g) => g.filas) : visibles).map((a) => a.id);
+
   const filaAlerta = (a: AlertaFila) => (
-    <tr key={a.id} className="border-b border-border/60 last:border-0">
-      <td className="py-2 pr-2 pl-4">
-        <input
-          type="checkbox"
-          checked={seleccionadas.has(a.id)}
-          onChange={() => alternar(a.id)}
-          aria-label={`Seleccionar alerta de ${a.nombre}`}
-        />
-      </td>
-      {columnasVisibles.map((columna) => (
-        <td key={columna.id} className={`py-2 pr-3 ${claseCelda[columna.id]}`}>
-          {celda(columna.id, a)}
+    <tr
+      key={a.id}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button, a, input, select, textarea, label")) return;
+        e.currentTarget.querySelector<HTMLElement>("button[aria-haspopup='dialog']")?.focus({ preventScroll: true });
+        setAbierta({ id: a.id, orden: ordenEnPantalla() });
+      }}
+      className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-muted/50"
+    >
+      {puedeEscribir && (
+        <td className={claseCeldaCasilla}>
+          <input
+            type="checkbox"
+            checked={seleccionadas.has(a.id)}
+            onChange={() => alternar(a.id)}
+            aria-label={`Seleccionar alerta de ${a.nombre}`}
+          />
+        </td>
+      )}
+      {columnasVisibles.map((columna, i) => (
+        <td key={columna.id} className={`${claseCeldaColumna} ${claseCelda[columna.id]}`}>
+          {i === 0 ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-label={`Abrir la ficha de la alerta de ${a.nombre}`}
+              onClick={() => setAbierta({ id: a.id, orden: ordenEnPantalla() })}
+              className="-mx-1 rounded px-1 text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+            >
+              {celda(columna.id, a)}
+            </button>
+          ) : (
+            celda(columna.id, a)
+          )}
         </td>
       ))}
     </tr>
@@ -233,7 +252,7 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
           nombreFilas="alertas"
           columnas={{ defs: COLUMNAS, estado: columnasGuardadas, cambiar: cambiarColumnas }}
         />
-        {idsSeleccionados.length > 0 && (
+        {puedeEscribir && idsSeleccionados.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted px-4 py-2 text-sm">
             <span>
               {idsSeleccionados.length} seleccionada{idsSeleccionados.length === 1 ? "" : "s"}
@@ -261,18 +280,20 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
         <ContenedorTabla ariaLabel="Tabla de alertas">
           <table className="tabla-datos w-full min-w-[46rem] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                <th scope="col" className="py-2 pr-2 pl-4">
-                  <input
-                    type="checkbox"
-                    checked={todasSeleccionadas}
-                    onChange={alternarTodas}
-                    aria-label="Seleccionar todas"
-                  />
-                </th>
+              <tr className={claseFilaEncabezado}>
+                {puedeEscribir && (
+                  <th scope="col" className={claseEncabezadoCasilla}>
+                    <input
+                      type="checkbox"
+                      checked={todasSeleccionadas}
+                      onChange={alternarTodas}
+                      aria-label="Seleccionar todas"
+                    />
+                  </th>
+                )}
                 {columnasVisibles.map((columna) => (
-                  <th key={columna.id} scope="col" className="py-2 pr-3 font-medium">
-                    {columna.id === "acciones" ? <span className="sr-only">Acciones</span> : columna.label}
+                  <th key={columna.id} scope="col" className={claseEncabezadoColumna}>
+                    {columna.label}
                   </th>
                 ))}
               </tr>
@@ -283,7 +304,7 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
                 return (
                   <tbody key={grupo.clave}>
                     <EncabezadoGrupo
-                      columnas={columnasVisibles.length + 1}
+                      columnas={columnasVisibles.length + (puedeEscribir ? 1 : 0)}
                       contraido={contraido}
                       alAlternar={() => tabla.alternarGrupo(grupo.clave)}
                       etiqueta={etiquetaGrupo(vista.agrupar!, grupo)}
@@ -320,6 +341,14 @@ export function TablaAlertas({ alertas }: { alertas: AlertaFila[] }) {
           <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">{notas.join(" · ")}</p>
         )}
       </div>
+      <FichaAlerta
+        alerta={abierta ? alertas.find((a) => a.id === abierta.id) : undefined}
+        orden={abierta?.orden ?? []}
+        codigoPais={codigoPais}
+        puedeEscribir={puedeEscribir}
+        alIr={(id) => setAbierta((a) => (a ? { ...a, id } : a))}
+        alCerrar={() => setAbierta(null)}
+      />
     </div>
   );
 }

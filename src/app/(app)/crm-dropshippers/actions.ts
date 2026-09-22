@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { requireModuloEscritura } from "@/lib/auth";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
+import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { etiquetaEstado } from "./def-crm";
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
@@ -15,10 +18,13 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
   if (!nombre) return { error: "Escribe el nombre del dropshipper." };
 
   const supabase = createServiceClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("dropshippers")
-    .insert({ pais_id, nombre, contacto_email, contacto_telefono });
+    .insert({ pais_id, nombre, contacto_email, contacto_telefono })
+    .select("id")
+    .single();
   if (error) return { error: error.message };
+  await registrarAuditoria({ accion: "crear_dropshipper", entidad: "dropshippers", entidadId: data.id, detalle: `nombre=${nombre}` });
   revalidatePath("/crm-dropshippers");
   return {};
 }
@@ -31,6 +37,7 @@ export async function actualizarDropshipper(formData: FormData) {
   const notas = (formData.get("notas") as string) || null;
 
   const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("dropshippers").select("estado").eq("id", id).single();
   const { error } = await supabase
     .from("dropshippers")
     .update({
@@ -40,7 +47,37 @@ export async function actualizarDropshipper(formData: FormData) {
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
+
+  if (actual && actual.estado !== estado) {
+    await registrarAuditoria({
+      accion: "cambiar_estado_dropshipper",
+      entidad: "dropshippers",
+      entidadId: id,
+      antes: { Estado: etiquetaEstado(actual.estado) },
+      despues: { Estado: etiquetaEstado(estado) },
+    });
+  }
   revalidatePath("/crm-dropshippers");
+}
+
+/** La actividad de un dropshipper (agregado, cambios de estado...) para su tarjeta. Es una lectura, así que basta
+ * poder abrir CRM Dropshippers. Devuelve el error como valor, no lo lanza. */
+export async function obtenerHistorialDropshipper(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
+  await requireModulo("crm-dropshippers");
+  if (typeof id !== "string" || !/^[0-9a-fA-F-]{8,64}$/.test(id)) return { error: "Dropshipper no válido." };
+
+  const { data, error } = await createServiceClient()
+    .from("historial_auditoria")
+    .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
+    .eq("entidad", "dropshippers")
+    .eq("entidad_id", id)
+    .order("creado_en", { ascending: false })
+    .limit(30);
+  if (error) return { error: "No se pudo cargar la actividad." };
+
+  return {
+    eventos: (data ?? []).map((e) => ({ id: e.id, evento: formatearEventoAuditoria(e), creadoEn: e.creado_en })),
+  };
 }
 
 /** Devuelve el error como valor, no lo lanza (ver `crearDropshipper`). */

@@ -3,6 +3,7 @@
 import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
@@ -219,11 +220,11 @@ function Bitacora({ eventos, codigoPais }: { eventos: EventoAuditoria[]; codigoP
       <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[48rem] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              <th className="py-2 pr-3 pl-4 font-medium">Fecha</th>
-              <th className="py-2 pr-3 font-medium">Usuario</th>
-              <th className="py-2 pr-3 font-medium">Acción</th>
-              <th className="py-2 pr-3 font-medium">Detalle</th>
+            <tr className={claseFilaEncabezado}>
+              <th className={claseEncabezadoColumna}>Fecha</th>
+              <th className={claseEncabezadoColumna}>Usuario</th>
+              <th className={claseEncabezadoColumna}>Acción</th>
+              <th className={claseEncabezadoColumna}>Detalle</th>
             </tr>
           </thead>
           <tbody>
@@ -231,12 +232,12 @@ function Bitacora({ eventos, codigoPais }: { eventos: EventoAuditoria[]; codigoP
               const cambios = calcularCambios(e.antes, e.despues);
               return (
                 <tr key={e.id} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 whitespace-nowrap align-top">
+                  <td className={`${claseCeldaColumna} align-top whitespace-nowrap`}>
                     {formatearFechaHoraCompleta(e.creado_en, codigoPais)}
                   </td>
-                  <td className="py-2 pr-3 font-medium align-top">{e.usuario_nombre ?? "—"}</td>
-                  <td className="py-2 pr-3 align-top">{ETIQUETA_ACCION[e.accion] ?? e.accion}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">
+                  <td className={`${claseCeldaColumna} align-top font-medium`}>{e.usuario_nombre ?? "—"}</td>
+                  <td className={`${claseCeldaColumna} align-top`}>{ETIQUETA_ACCION[e.accion] ?? e.accion}</td>
+                  <td className={`${claseCeldaColumna} text-muted-foreground`}>
                     {cambios.length > 0 ? (
                       <ul className="flex flex-col gap-0.5">
                         {cambios.map((c) => (
@@ -288,12 +289,12 @@ function SincronizacionDropi({ sesiones, codigoPais }: { sesiones: SesionDropi[]
       <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[40rem] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              <th className="py-2 pr-3 pl-4 font-medium">País</th>
-              <th className="py-2 pr-3 font-medium">Sesión</th>
-              <th className="py-2 pr-3 font-medium">Última renovación</th>
-              <th className="py-2 pr-3 font-medium">Estado</th>
-              <th className="py-2 pr-3 font-medium">Mensaje</th>
+            <tr className={claseFilaEncabezado}>
+              <th className={claseEncabezadoColumna}>País</th>
+              <th className={claseEncabezadoColumna}>Sesión</th>
+              <th className={claseEncabezadoColumna}>Última renovación</th>
+              <th className={claseEncabezadoColumna}>Estado</th>
+              <th className={claseEncabezadoColumna}>Mensaje</th>
             </tr>
           </thead>
           <tbody>
@@ -302,12 +303,12 @@ function SincronizacionDropi({ sesiones, codigoPais }: { sesiones: SesionDropi[]
               const atrasada = horas > 8;
               return (
                 <tr key={`${s.pais_codigo}-${s.tipo}`} className="border-b border-border/60 last:border-0">
-                  <td className="py-2 pr-3 pl-4 align-top font-medium">{s.pais_codigo}</td>
-                  <td className="py-2 pr-3 align-top">{ETIQUETA_TIPO_SESION[s.tipo] ?? s.tipo}</td>
-                  <td className="py-2 pr-3 align-top whitespace-nowrap">
+                  <td className={`${claseCeldaColumna} align-top font-medium`}>{s.pais_codigo}</td>
+                  <td className={`${claseCeldaColumna} align-top`}>{ETIQUETA_TIPO_SESION[s.tipo] ?? s.tipo}</td>
+                  <td className={`${claseCeldaColumna} align-top whitespace-nowrap`}>
                     {formatearFechaHoraCompleta(s.renovada_en, codigoPais)}
                   </td>
-                  <td className="py-2 pr-3 align-top">
+                  <td className={`${claseCeldaColumna} align-top`}>
                     {!s.ok ? (
                       <Badge tone="destructive">Expiró</Badge>
                     ) : atrasada ? (
@@ -316,7 +317,7 @@ function SincronizacionDropi({ sesiones, codigoPais }: { sesiones: SesionDropi[]
                       <Badge tone="success">Activa</Badge>
                     )}
                   </td>
-                  <td className="py-2 pr-3 align-top text-muted-foreground">{s.mensaje ?? "—"}</td>
+                  <td className={`${claseCeldaColumna} align-top text-muted-foreground`}>{s.mensaje ?? "—"}</td>
                 </tr>
               );
             })}

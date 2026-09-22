@@ -38,4 +38,28 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   suspender_usuario: "Cambió el estado de un usuario",
   eliminar_usuario: "Eliminó un usuario",
   generar_contrasena_temporal: "Generó una contraseña temporal",
+  crear_dropshipper: "Agregó el dropshipper",
+  cambiar_estado_dropshipper: "Cambió el estado",
+  crear_sku: "Propuso el SKU",
+  cambiar_estado_sku: "Cambió el estado",
+  vincular_producto_sku: "Vinculó un producto",
+  generar_alerta: "Generó la alerta",
+  cambiar_estado_alerta: "Cambió el estado",
 };
+
+/** Una línea del historial a partir de una fila de `historial_auditoria`: quién, qué acción y, si cambió algún
+ * campo puntual (`antes`/`despues`), "Campo: antes → después"; si no, el `detalle` libre. La comparten las fichas
+ * de detalle que muestran la actividad de un registro (dropshipper, SKU, alerta...). */
+export function formatearEventoAuditoria(entrada: {
+  accion: string;
+  usuario_nombre: string | null;
+  detalle: string | null;
+  antes: Record<string, string> | null;
+  despues: Record<string, string> | null;
+}): string {
+  const etiqueta = ETIQUETA_ACCION[entrada.accion] ?? entrada.accion;
+  const cambios = calcularCambios(entrada.antes, entrada.despues);
+  const detalle = cambios.length > 0 ? cambios.map((c) => `${c.campo} ${c.antes} → ${c.despues}`).join(", ") : entrada.detalle;
+  const quien = entrada.usuario_nombre ? `${entrada.usuario_nombre}: ` : "";
+  return detalle ? `${quien}${etiqueta}: ${detalle}` : `${quien}${etiqueta}`;
+}
