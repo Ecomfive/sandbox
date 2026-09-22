@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { ETIQUETA_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { AlertaIcon, CheckIcon, CerrarIcon, ConciliarIcon } from "@/lib/nav-icons";
+import { ESTADO_TONO } from "@/lib/retiros/estados";
 import { ESTADO_ETIQUETA } from "./filtros";
 import type { FilaRetiro } from "./tabla-retiros";
 import type { Cuenta, Plataforma } from "./crear-retiro-panel";
@@ -20,25 +21,35 @@ import { SeccionConciliarRetiro } from "./seccion-conciliar-retiro";
 import { SeccionNovedadRetiro } from "./seccion-novedad-retiro";
 import { SeccionResolverNovedad } from "./seccion-resolver-novedad";
 
-const ESTADO_TONO = { abierto: "info", cancelado: "neutral", novedad: "destructive", cerrado: "success" } as const;
-
 const numeroDe = (fila: FilaRetiro) => `#${String(fila.numeroCorrelativo).padStart(4, "0")}`;
 
 type EstadoPaso = "completo" | "actual" | "pendiente" | "error";
 
-/** A qué paso llegó el retiro en su recorrido real (no el `estado` interno de seguimiento):
- * se crea acá, Dropi lo aprueba (o lo rechaza), y por último se recibe el dinero (o hay una
- * diferencia). Un retiro cancelado se queda en "Creado" — no tiene sentido seguir avanzando. */
-function pasosDelRetiro(fila: FilaRetiro): { aprobado: EstadoPaso; recibido: EstadoPaso } {
-  if (fila.estado === "cancelado") return { aprobado: "pendiente", recibido: "pendiente" };
+/** A qué paso llegó el retiro en su recorrido real (no el `estado` interno de seguimiento): se crea acá, Dropi
+ * decide (aprueba o rechaza), se recibe el dinero y por último se concilia (queda consolidado). Un retiro
+ * cancelado, o una novedad ya resuelta, se quedan ahí — **no siguen el flujo normal**: Recibido y Conciliado
+ * quedan pendientes (grises), aunque haya habido un monto recibido antes de la novedad. */
+function pasosDelRetiro(fila: FilaRetiro): { decision: EstadoPaso; recibido: EstadoPaso; conciliado: EstadoPaso } {
+  const decision: EstadoPaso =
+    fila.estado === "cancelado"
+      ? "error"
+      : fila.estadoDropi === "aprobado"
+        ? "completo"
+        : fila.estadoDropi === "rechazado"
+          ? "error"
+          : "actual";
 
-  const aprobado: EstadoPaso =
-    fila.estadoDropi === "aprobado" ? "completo" : fila.estadoDropi === "rechazado" ? "error" : "actual";
+  // Cancelado o con la novedad ya resuelta: el ciclo termina ahí, no sigue a Recibido/Conciliado.
+  if (fila.estado === "cancelado" || fila.estado === "novedad_resuelta") {
+    return { decision, recibido: "pendiente", conciliado: "pendiente" };
+  }
 
   const recibido: EstadoPaso =
-    fila.estado === "cerrado" ? "completo" : fila.estado === "novedad" ? "error" : aprobado === "completo" ? "actual" : "pendiente";
+    fila.montoRecibido !== null ? (fila.estado === "novedad" ? "error" : "completo") : decision === "completo" ? "actual" : "pendiente";
 
-  return { aprobado, recibido };
+  const conciliado: EstadoPaso = fila.consolidado ? "completo" : recibido === "completo" ? "actual" : "pendiente";
+
+  return { decision, recibido, conciliado };
 }
 
 function claseNodo(estado: EstadoPaso): string {
@@ -54,30 +65,41 @@ function claseNodo(estado: EstadoPaso): string {
   }
 }
 
-/** Los tres pasos del recorrido de un retiro: Creado (siempre, ya existe), Aprobado (por
- * Dropi) y Recibido (el dinero, conciliado). No es el `estado` de seguimiento interno
- * (abierto/novedad/cerrado/cancelado) — ese ya se ve en la insignia del título. */
+/** Las cuatro etapas del recorrido de un retiro: Creado (siempre, ya existe), Decisión (Dropi aprueba,
+ * rechaza, o se cancela a mano), Recibido (llega el dinero) y Conciliado (queda consolidado). No es el
+ * `estado` de seguimiento interno (abierto/novedad/cerrado/cancelado/novedad_resuelta) — ese ya se ve
+ * en la insignia del título. */
 function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string }) {
-  const { aprobado, recibido } = pasosDelRetiro(fila);
+  const { decision, recibido, conciliado } = pasosDelRetiro(fila);
+  const detenido = fila.estado === "cancelado" || fila.estado === "novedad_resuelta";
+  const fecha = (iso: string | null) => (iso ? formatearFecha(iso) : null);
+
+  const subtextoDecision = () => {
+    if (fila.estado === "cancelado") return ["Cancelado", fecha(fila.fechaCierre)].filter(Boolean).join(" · ");
+    if (fila.estadoDropi && fila.estadoDropi in ETIQUETA_ESTADO_DROPI) {
+      return [ETIQUETA_ESTADO_DROPI[fila.estadoDropi as EstadoDropi], fecha(fila.fechaDecision)].filter(Boolean).join(" · ");
+    }
+    return "En espera de Dropi";
+  };
+
   const pasos: { etiqueta: string; estado: EstadoPaso; subtexto: string }[] = [
     { etiqueta: "Creado", estado: "completo", subtexto: formatearFecha(fila.fecha) },
-    {
-      etiqueta: "Aprobado",
-      estado: aprobado,
-      subtexto:
-        fila.estadoDropi && fila.estadoDropi in ETIQUETA_ESTADO_DROPI
-          ? ETIQUETA_ESTADO_DROPI[fila.estadoDropi as EstadoDropi]
-          : "En espera de Dropi",
-    },
+    { etiqueta: "Decisión", estado: decision, subtexto: subtextoDecision() },
     {
       etiqueta: "Recibido",
       estado: recibido,
-      subtexto:
-        fila.montoRecibido !== null
-          ? formatearMoneda(fila.montoRecibido, codigoPais)
+      subtexto: detenido
+        ? "—"
+        : fila.montoRecibido !== null
+          ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaCierre)].filter(Boolean).join(" · ")
           : recibido === "error"
             ? "Diferencia de monto"
             : "Sin registrar",
+    },
+    {
+      etiqueta: "Conciliado",
+      estado: conciliado,
+      subtexto: detenido ? "—" : fila.consolidado ? (fecha(fila.fechaCierre) ?? "Consolidado") : "Pendiente",
     },
   ];
 
@@ -116,16 +138,19 @@ type PanelAbajo = "conciliar" | "novedad" | "resolver";
  * Ficha de un retiro: el panel a la derecha que se abre al pulsar su fila, con su barra de pasos, sus acciones y
  * sus datos, sin salir de la tabla — reemplaza a la página completa que había antes en `/retiros/[id]`. **La
  * ficha ya es el formulario** (no hay un botón «Modificar», ver `FormularioEditarRetiro`): se cambia un campo y
- * arriba, junto a Conciliar/Novedad/Abrir/Cancelar/Eliminar, aparecen «Guardar cambios» y «Cancelar». Con cambios sin
- * guardar, cerrar la ficha pide confirmación. Lo que muestra sale de la fila ya cargada, así que se actualiza sola
+ * arriba, junto a Conciliar/Novedad/Ver novedad/Cancelar/Eliminar, aparecen «Guardar cambios» y «Cancelar». Con cambios
+ * sin guardar, cerrar la ficha pide confirmación. Lo que muestra sale de la fila ya cargada, así que se actualiza sola
  * al guardar.
  *
- * **«Conciliar», «Novedad» y «Abrir» no abren una ventana en el medio**: despliegan una sección al final de la misma
- * ficha (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`, `SeccionResolverNovedad`), la ficha baja hasta ella y el foco
- * entra en su primer campo. Solo hay una desplegada a la vez. **El historial (`HistorialGenerico`) es siempre lo último**:
- * con una sección desplegada, queda debajo de ella. «Novedad» solo está en un retiro abierto; al agregarla el retiro
- * pasa a novedad y aparece «Abrir» en su lugar. **«Abrir» no reabre el retiro**: lleva a la nota de la novedad, y ahí el
- * botón «Resuelto» es el que quita la novedad y lo deja abierto.
+ * **«Conciliar», «Novedad» y «Ver novedad» no abren una ventana en el medio**: despliegan una sección al final de la
+ * misma ficha (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`, `SeccionResolverNovedad`), la ficha baja hasta ella y
+ * el foco entra en su primer campo. Solo hay una desplegada a la vez. **El historial (`HistorialGenerico`) es siempre
+ * lo último**: con una sección desplegada, queda debajo de ella. «Novedad» solo está en un retiro abierto (no exige
+ * texto: se puede crear rápido, sin nota, y escribirla después); al agregarla el retiro pasa a «novedad» y aparece
+ * «Ver novedad» en su lugar, sin el botón Conciliar. **«Ver novedad» no resuelve nada por sí solo**: lleva a la nota
+ * de la novedad (editable ahí mismo) y a su botón «Resolver», que es lo único que la quita — y, a diferencia de
+ * antes, el retiro ya no vuelve a «abierto»: queda en el estado aparte «Novedad resuelta», sin seguir el flujo normal
+ * de conciliación (ver `pasosDelRetiro`).
  */
 export function VistaRapidaRetiro({
   fila,
@@ -231,15 +256,18 @@ export function VistaRapidaRetiro({
             cuentas={cuentas}
             acciones={
               <>
-                <BotonAccion
-                  icono={ConciliarIcon}
-                  tono="oscuro"
-                  onClick={() => irAlPanel("conciliar")}
-                  aria-expanded={panel === "conciliar"}
-                  aria-controls={`panel-retiro-${fila.id}`}
-                >
-                  Conciliar
-                </BotonAccion>
+                {/* Un cancelado o una novedad resuelta no siguen el flujo normal: el ciclo termina en la Decisión. */}
+                {fila.estado !== "novedad_resuelta" && fila.estado !== "cancelado" && (
+                  <BotonAccion
+                    icono={ConciliarIcon}
+                    tono="oscuro"
+                    onClick={() => irAlPanel("conciliar")}
+                    aria-expanded={panel === "conciliar"}
+                    aria-controls={`panel-retiro-${fila.id}`}
+                  >
+                    Conciliar
+                  </BotonAccion>
+                )}
                 {fila.estado === "abierto" && (
                   <BotonAccion
                     icono={AlertaIcon}
@@ -259,7 +287,7 @@ export function VistaRapidaRetiro({
                     aria-expanded={panel === "resolver"}
                     aria-controls={`panel-retiro-${fila.id}`}
                   >
-                    Abrir
+                    Ver novedad
                   </BotonAccion>
                 )}
                 {fila.estado !== "cancelado" && (
@@ -300,6 +328,7 @@ export function VistaRapidaRetiro({
               id={fila.id}
               codigoPais={codigoPais}
               alCancelar={() => setPanel(null)}
+              alNotaGuardada={() => setVersionHistorial((v) => v + 1)}
               alResuelta={() => alTerminarPanel("Novedad resuelta")}
             />
           )}

@@ -18,10 +18,12 @@ const Obligatorio = () => (
   </span>
 );
 
-// Igual que en "Nuevo retiro": "cancelado" queda afuera del selector a propósito — cancelar
-// sigue siendo una acción aparte (el botón Cancelar de la ficha), no un valor más para elegir acá.
-// El selector se ve siempre, incluso en un retiro ya cancelado: es la forma de reabrirlo.
+// Igual que en "Nuevo retiro": "cancelado" y "novedad_resuelta" quedan afuera del selector a
+// propósito — cada uno es una acción aparte (botón Cancelar; botón Resolver de la novedad), no un
+// valor más para elegir acá. El selector se ve siempre, incluso en un retiro ya cancelado: es la
+// forma de reabrirlo.
 const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
+type EstadoEditable = (typeof ESTADOS_EDITABLES)[number];
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
@@ -257,6 +259,12 @@ export function FormularioEditarRetiro({
               defaultValue={fila.estado}
               className={`${fieldClassSm} w-40`}
             >
+              {/* Un estado que no está en la lista (cancelado, novedad resuelta) necesita su propia opción: si no,
+                  el <select> cae solo en la primera ("Abierto") y guardar cualquier otro campo lo reabriría sin
+                  querer. Elegir otro de la lista sigue siendo la forma de sacarlo de ahí. */}
+              {!ESTADOS_EDITABLES.includes(fila.estado as EstadoEditable) && (
+                <option value={fila.estado}>{ESTADO_ETIQUETA[fila.estado] ?? fila.estado}</option>
+              )}
               {ESTADOS_EDITABLES.map((valor) => (
                 <option key={valor} value={valor}>
                   {ESTADO_ETIQUETA[valor]}

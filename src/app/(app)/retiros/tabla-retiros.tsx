@@ -34,6 +34,7 @@ import {
 import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
 import type { Grupo } from "@/lib/tabla/vista";
 import { DEF_RETIROS, ESTADO_ETIQUETA } from "./filtros";
+import { ESTADO_TONO } from "@/lib/retiros/estados";
 import { CrearRetiroPanel, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 import { BarraLote } from "./barra-lote";
 import { VistaRapidaRetiro } from "./vista-rapida-retiro";
@@ -53,6 +54,8 @@ export interface FilaRetiro {
   aRecibir: number;
   montoRecibido: number | null;
   fechaCierre: string | null;
+  /** Cuándo Dropi aprobó o rechazó (paso "Decisión" de la barra de pasos); null sin la migración 0042 o si sigue pendiente. */
+  fechaDecision: string | null;
   fechaLimite: string | null;
   asignadoNombre: string | null;
   estadoDropi: string | null;
@@ -65,13 +68,6 @@ export interface FilaRetiro {
 // todos los retiros cargados.
 
 const NOMBRE_FILAS: NombreFilas = { singular: "retiro", plural: "retiros" };
-
-const ESTADO_TONO = {
-  abierto: "info",
-  cancelado: "neutral",
-  novedad: "destructive",
-  cerrado: "success",
-} as const;
 
 /** Ícono de cada campo en los menús de agrupar y de filtros. */
 const ICONOS: Record<string, IconoComp> = {
