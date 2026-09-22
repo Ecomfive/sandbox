@@ -59,7 +59,7 @@ export function lineasFicha(ficha: FichaRetiro): LineaFicha[] {
     { campo: "País", valor: ficha.pais },
     { campo: "Plataforma", valor: ficha.plataforma },
     { campo: "Destino", valor: destinoCompleto(ficha) },
-    { campo: "Persona asignada", valor: ficha.asignado ?? "Sin asignar" },
+    { campo: "Creado por", valor: ficha.asignado ?? "Desconocido" },
     { campo: "Fecha de creación", valor: formatearFecha(ficha.fecha) },
   ];
   if (ficha.fechaLimite) lineas.push({ campo: "Fecha límite", valor: formatearFecha(ficha.fechaLimite) });

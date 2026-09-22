@@ -125,8 +125,8 @@ export default async function RetiroDetallePage({
           <p className="font-medium">{formatearFecha(retiro.fecha)}</p>
         </div>
         <div>
-          <p className="text-muted-foreground">Persona asignada</p>
-          <p className="font-medium">{asignado?.nombre || asignado?.email || "Sin asignar"}</p>
+          <p className="text-muted-foreground">Creado por</p>
+          <p className="font-medium">{asignado?.nombre || asignado?.email || "Desconocido"}</p>
         </div>
         <div>
           <p className="text-muted-foreground">Fecha límite</p>

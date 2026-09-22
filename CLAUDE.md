@@ -233,7 +233,8 @@ convenciones técnicas del código.
   falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir.
   El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma de
   reabrirlo. Sin pestañas: los campos y los datos que no se editan (Recibido, Cierre,
-  Persona asignada, Consolidación, Estado en Dropi, Soporte) van seguidos, y **el historial
+  Creado por —quien creó el retiro, no se reasigna—, Consolidación, Estado en Dropi,
+  Soporte) van seguidos, y **el historial
   de actividad (`HistorialGenerico`, con `obtener={obtenerActividadRetiro}`) es siempre lo
   último de la ficha**, debajo de Conciliar o Novedad cuando están desplegadas; por eso no
   vive dentro del formulario. **No le pongas `key` a `HistorialGenerico`** en la ficha: con

@@ -69,10 +69,10 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
     },
     {
       id: "asignado",
-      etiqueta: "Persona asignada",
+      etiqueta: "Creado por",
       tipo: "seleccion",
       valores: (f) => [f.asignadoNombre ?? SIN_VALOR],
-      etiquetaSinValor: "Sin asignar",
+      etiquetaSinValor: "Desconocido",
       agrupable: true,
     },
     { id: "creacion", etiqueta: "Fecha de creación", tipo: "fecha", valor: (f) => f.fecha },

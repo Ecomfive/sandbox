@@ -185,7 +185,7 @@ export function TablaRetiros({
   paisId: string;
   plataformas: Plataforma[];
   cuentas: Cuenta[];
-  /** Cómo aparece la persona que tiene la sesión en «Persona asignada»; con él sale «Mis retiros». */
+  /** Cómo aparece la persona que tiene la sesión en «Creado por»; con él sale «Mis retiros». */
   miNombre?: string | null;
   /** Solo quien puede modificar retiros ve las casillas y la barra de selección. */
   puedeEscribir: boolean;

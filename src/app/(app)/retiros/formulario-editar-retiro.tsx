@@ -34,7 +34,7 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
 
 /**
  * El cuerpo de la ficha de un retiro, debajo de su barra de pasos: los campos editables (mismo patrón visual que
- * «Nuevo retiro»), los datos que no se editan a mano (Recibido, Cierre, Persona asignada, Consolidación, Estado en
+ * «Nuevo retiro»), los datos que no se editan a mano (Recibido, Cierre, Creado por, Consolidación, Estado en
  * Dropi, Soporte), sin pestañas. **No hay un botón «Modificar»**: se cambia un campo y arriba, junto a las
  * `acciones` de la ficha (Conciliar, Novedad, Abrir, Cancelar, Eliminar), aparecen «Guardar cambios» y «Cancelar» —
  * que solo se ven cuando se cambió algo. Guardar no cierra la ficha. Con `key={fila.id}-versión}` en quien lo usa,
@@ -400,7 +400,7 @@ export function FormularioEditarRetiro({
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-3">
           <Dato etiqueta="Creación">{formatearFecha(fila.fecha)}</Dato>
           <Dato etiqueta="Cierre">{fila.fechaCierre ? formatearFecha(fila.fechaCierre) : "—"}</Dato>
-          <Dato etiqueta="Persona asignada">{fila.asignadoNombre ?? "—"}</Dato>
+          <Dato etiqueta="Creado por">{fila.asignadoNombre ?? "—"}</Dato>
           <Dato etiqueta="Consolidación">
             <Badge tone={fila.consolidado ? "success" : "warning"}>{fila.consolidado ? "Consolidado" : "Pendiente"}</Badge>
           </Dato>

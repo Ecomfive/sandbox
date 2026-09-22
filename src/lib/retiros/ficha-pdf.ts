@@ -111,7 +111,7 @@ export async function fichaAPdf(ficha: FichaRetiro): Promise<Uint8Array> {
   yIzquierda = dato("País", ficha.pais, MARGEN, yIzquierda, anchoColumna);
   let yDerecha = y;
   yDerecha = dato("Estado", ficha.estado, xDerecha, yDerecha, anchoColumna);
-  yDerecha = dato("Persona asignada", ficha.asignado ?? "Sin asignar", xDerecha, yDerecha, anchoColumna);
+  yDerecha = dato("Creado por", ficha.asignado ?? "Desconocido", xDerecha, yDerecha, anchoColumna);
   yDerecha = dato("Fecha de creación", formatearFecha(ficha.fecha), xDerecha, yDerecha, anchoColumna);
   if (ficha.fechaLimite) yDerecha = dato("Fecha límite", formatearFecha(ficha.fechaLimite), xDerecha, yDerecha, anchoColumna);
   yDerecha = dato("Estado en Dropi", estadoDropiCompleto(ficha), xDerecha, yDerecha, anchoColumna);
