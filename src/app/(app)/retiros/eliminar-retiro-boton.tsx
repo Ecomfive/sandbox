@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { eliminarRetiro } from "./actions";
+import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -41,15 +42,9 @@ export function EliminarRetiroBoton({
 
   if (variante === "boton") {
     return (
-      <button
-        type="button"
-        onClick={alHacerClic}
-        disabled={pending}
-        className={`inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive-soft disabled:opacity-50 ${anilloFoco}`}
-      >
-        <PapeleraIcon className="h-4 w-4" />
+      <BotonAccion icono={PapeleraIcon} tono="peligro" onClick={alHacerClic} disabled={pending}>
         {pending ? "Eliminando..." : "Eliminar"}
-      </button>
+      </BotonAccion>
     );
   }
 

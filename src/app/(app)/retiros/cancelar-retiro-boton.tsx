@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { cancelarRetiro } from "./actions";
-import { anilloFoco } from "@/components/ui/field";
+import { BotonAccion } from "@/components/ui/boton-accion";
 import { useToast } from "@/components/ui/toast";
 import { CerrarIcon } from "@/lib/nav-icons";
 
@@ -28,14 +28,8 @@ export function CancelarRetiroBoton({ id, correlativo }: { id: string; correlati
   }
 
   return (
-    <button
-      type="button"
-      onClick={alHacerClic}
-      disabled={pending}
-      className={`inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive-soft disabled:opacity-50 ${anilloFoco}`}
-    >
-      <CerrarIcon className="h-4 w-4" />
+    <BotonAccion icono={CerrarIcon} tono="peligro" onClick={alHacerClic} disabled={pending}>
       {pending ? "Cancelando..." : "Cancelar"}
-    </button>
+    </BotonAccion>
   );
 }

@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { anilloFoco } from "@/components/ui/field";
+import { BotonAccion } from "@/components/ui/boton-accion";
 import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
@@ -87,19 +87,19 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
           {i > 0 && (
             <div
               aria-hidden="true"
-              className={`mt-3.5 h-0.5 flex-1 ${pasos[i - 1].estado === "completo" ? "bg-success" : "bg-border"}`}
+              className={`mt-4 h-0.5 flex-1 ${pasos[i - 1].estado === "completo" ? "bg-success" : "bg-border"}`}
             />
           )}
-          <div className="flex w-20 shrink-0 flex-col items-center gap-1 text-center">
+          <div className="flex w-24 shrink-0 flex-col items-center gap-1 text-center">
             <span
               aria-hidden="true"
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${claseNodo(paso.estado)}`}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${claseNodo(paso.estado)}`}
             >
-              {paso.estado === "completo" && <CheckIcon className="h-3.5 w-3.5" />}
-              {paso.estado === "error" && <CerrarIcon className="h-3.5 w-3.5" />}
+              {paso.estado === "completo" && <CheckIcon className="h-4 w-4" />}
+              {paso.estado === "error" && <CerrarIcon className="h-4 w-4" />}
             </span>
-            <span className="text-xs font-medium">{paso.etiqueta}</span>
-            <span className="text-[11px] text-muted-foreground">{paso.subtexto}</span>
+            <span className="text-sm font-semibold">{paso.etiqueta}</span>
+            <span className="text-xs text-muted-foreground">{paso.subtexto}</span>
           </div>
         </Fragment>
       ))}
@@ -230,39 +230,36 @@ export function VistaRapidaRetiro({
             cuentas={cuentas}
             acciones={
               <>
-                <button
-                  type="button"
+                <BotonAccion
+                  icono={ConciliarIcon}
+                  tono="oscuro"
                   onClick={() => irAlPanel("conciliar")}
                   aria-expanded={panel === "conciliar"}
                   aria-controls={`panel-retiro-${fila.id}`}
-                  className={`inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:bg-foreground/85 ${anilloFoco}`}
                 >
-                  <ConciliarIcon className="h-4 w-4" />
                   Conciliar
-                </button>
+                </BotonAccion>
                 {fila.estado === "abierto" && (
-                  <button
-                    type="button"
+                  <BotonAccion
+                    icono={AlertaIcon}
+                    tono="alerta"
                     onClick={() => irAlPanel("novedad")}
                     aria-expanded={panel === "novedad"}
                     aria-controls={`panel-retiro-${fila.id}`}
-                    className={`inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive-soft ${anilloFoco}`}
                   >
-                    <AlertaIcon className="h-4 w-4" />
                     Novedad
-                  </button>
+                  </BotonAccion>
                 )}
                 {fila.estado === "novedad" && (
-                  <button
-                    type="button"
+                  <BotonAccion
+                    icono={CheckIcon}
+                    tono="exito"
                     onClick={() => irAlPanel("resolver")}
                     aria-expanded={panel === "resolver"}
                     aria-controls={`panel-retiro-${fila.id}`}
-                    className={`inline-flex items-center gap-1.5 rounded-md border border-success/30 px-3 py-2 text-sm font-medium text-success hover:bg-success-soft ${anilloFoco}`}
                   >
-                    <CheckIcon className="h-4 w-4" />
                     Abrir
-                  </button>
+                  </BotonAccion>
                 )}
                 {fila.estado !== "cancelado" && (
                   <CancelarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
