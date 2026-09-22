@@ -248,9 +248,11 @@ convenciones técnicas del código.
   consolidado** (como al conciliar): ya no tiene más pasos pendientes, así que su
   Consolidación no se queda en «Pendiente» para siempre. No sigue el flujo normal de
   conciliación y por eso queda oculto por defecto junto con «Cerrado» detrás del
-  interruptor «Cerrados» (`retiros/filtros.ts`). El estado `novedad_resuelta` lo exige
-  el `check` de la columna `estado` en la base: **la migración 0043 es obligatoria** —
-  sin correrla, «Resolver» falla con el error crudo de Postgres. Las secciones de
+  interruptor «Cerrados» (`retiros/filtros.ts`, `exclusivo: true` como Cuentas destino:
+  el botón aísla, nunca mezcla cerrados con abiertos). El estado `novedad_resuelta` lo
+  exige el `check` de la columna `estado` en la base: **la migración 0043 es
+  obligatoria** — sin correrla, «Resolver» falla con el error crudo de Postgres. Las
+  secciones de
   Conciliar y Novedad usan el botón grande de `BotonCrear` y
   `useFaltantes` (apagado hasta llenar lo obligatorio; pulsarlo así lleva al dato que
   falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir.

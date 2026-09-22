@@ -93,6 +93,9 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
     campoEstado: "estado",
     valoresCerrados: ["cerrado", "novedad_resuelta"],
     ocultosPorDefecto: true,
+    // Aislado, como Cuentas destino: el botón «Cerrados» muestra solo lo cerrado (o solo lo abierto),
+    // nunca los dos juntos.
+    exclusivo: true,
   },
   total: (f) => f.monto,
 };
