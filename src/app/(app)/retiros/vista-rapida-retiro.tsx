@@ -24,15 +24,10 @@ const numeroDe = (fila: FilaRetiro) => `#${String(fila.numeroCorrelativo).padSta
 
 type EstadoPaso = "completo" | "actual" | "pendiente" | "error";
 
-/** A qué paso llegó el retiro en su recorrido real (no el `estado` interno de seguimiento): se recibe el
- * dinero y por último se concilia (queda consolidado). Con la novedad ya resuelta, el retiro se queda ahí
- * — **no sigue el flujo normal**: Recibido y Conciliado quedan pendientes (grises), aunque haya habido un
- * monto recibido antes de la novedad. Un retiro cancelado no llega a calcular esto: ver `BarraPasos`. */
+/** A qué paso llegó el retiro en su recorrido real, cuando sigue el camino normal (no cancelado ni con la
+ * novedad ya resuelta — esos terminan la barra antes de llegar acá, ver `BarraPasos`): se recibe el
+ * dinero y por último se concilia (queda consolidado). */
 function pasosDelRetiro(fila: FilaRetiro): { recibido: EstadoPaso; conciliado: EstadoPaso } {
-  if (fila.estado === "novedad_resuelta") {
-    return { recibido: "pendiente", conciliado: "pendiente" };
-  }
-
   const recibido: EstadoPaso = fila.montoRecibido !== null ? (fila.estado === "novedad" ? "error" : "completo") : "actual";
 
   const conciliado: EstadoPaso = fila.consolidado ? "completo" : recibido === "completo" ? "actual" : "pendiente";
@@ -53,13 +48,22 @@ function claseNodo(estado: EstadoPaso): string {
   }
 }
 
-/** Los pasos del recorrido de un retiro: Creado (siempre, ya existe), Recibido (llega el dinero) y Conciliado
- * (queda consolidado) — cada uno con su fecha debajo, igual que Creado. No es el `estado` de seguimiento
- * interno (abierto/novedad/cerrado/cancelado/novedad_resuelta) — ese ya se ve en la insignia del título.
- * **Cancelado** reemplaza el resto de la barra por su propio paso (rojo, con su fecha): el ciclo termina
- * ahí, no tiene sentido seguir mostrando Recibido/Conciliado. **Rechazado** (por Dropi) no detiene el
- * flujo — sigue marcando Novedad, se resuelve o se concilia igual — así que se agrega como un paso más
- * antes de Recibido, sin quitar los demás. */
+/** La barra muestra **lo que de verdad le pasó al retiro, en orden, cada paso con su fecha debajo** (igual
+ * que Creado) — no una plantilla fija de pasos: el largo varía según el camino que siguió. No es el
+ * `estado` de seguimiento interno (abierto/novedad/cerrado/cancelado/novedad_resuelta) — ese ya se ve en
+ * la insignia del título.
+ * - **Cancelado** reemplaza el resto de la barra por su propio paso (rojo, con la fecha de
+ *   `cancelarRetiro`): el ciclo termina ahí, no tiene sentido seguir mostrando lo demás.
+ * - **Aprobado** o **Rechazado** (por Dropi) se agregan según cuál haya pasado (`fecha_aprobado` o
+ *   `fecha_rechazo`, migraciones 0044/0045); ninguno de los dos detiene el flujo — Rechazado solo marca
+ *   Novedad para revisar, sigue el conteo normal después.
+ * - **Novedad** se agrega si el retiro tiene o tuvo una (`fecha_novedad`), tanto si se creó a mano como si
+ *   la generó un rechazo de Dropi.
+ * - Con la novedad **resuelta**, la barra termina ahí con dos pasos más — «Novedad resuelta» y
+ *   «Consolidado» (mismo `fecha_cierre` para ambos: `resolverNovedadRetiro` marca las dos cosas a la vez)
+ *   — en vez de seguir a Recibido/Conciliado, que no aplican por ese camino.
+ * - Si no hubo novedad sin resolver ni cancelación, sigue el camino normal: **Recibido** (llega el dinero)
+ *   y **Conciliado** (queda consolidado). */
 function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string }) {
   const fecha = (iso: string | null) => (iso ? formatearFecha(iso) : null);
 
@@ -70,29 +74,38 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
   if (fila.estado === "cancelado") {
     pasos.push({ etiqueta: "Cancelado", estado: "error", subtexto: fecha(fila.fechaCierre) ?? "—" });
   } else {
-    if (fila.estadoDropi === "rechazado") {
+    if (fila.estadoDropi === "aprobado") {
+      pasos.push({ etiqueta: "Aprobado", estado: "completo", subtexto: fecha(fila.fechaAprobado) ?? "—" });
+    } else if (fila.estadoDropi === "rechazado") {
       pasos.push({ etiqueta: "Rechazado", estado: "error", subtexto: fecha(fila.fechaRechazo) ?? "—" });
     }
 
-    const { recibido, conciliado } = pasosDelRetiro(fila);
-    const detenido = fila.estado === "novedad_resuelta";
+    if (fila.estado === "novedad" || fila.estado === "novedad_resuelta") {
+      pasos.push({ etiqueta: "Novedad", estado: "error", subtexto: fecha(fila.fechaNovedad) ?? "—" });
+    }
 
-    pasos.push({
-      etiqueta: "Recibido",
-      estado: recibido,
-      subtexto: detenido
-        ? "—"
-        : fila.montoRecibido !== null
-          ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaCierre)].filter(Boolean).join(" · ")
-          : recibido === "error"
-            ? "Diferencia de monto"
-            : "Sin registrar",
-    });
-    pasos.push({
-      etiqueta: "Conciliado",
-      estado: conciliado,
-      subtexto: detenido ? "—" : fila.consolidado ? (fecha(fila.fechaCierre) ?? "Consolidado") : "Pendiente",
-    });
+    if (fila.estado === "novedad_resuelta") {
+      pasos.push({ etiqueta: "Novedad resuelta", estado: "completo", subtexto: fecha(fila.fechaCierre) ?? "—" });
+      pasos.push({ etiqueta: "Consolidado", estado: "completo", subtexto: fecha(fila.fechaCierre) ?? "—" });
+    } else {
+      const { recibido, conciliado } = pasosDelRetiro(fila);
+
+      pasos.push({
+        etiqueta: "Recibido",
+        estado: recibido,
+        subtexto:
+          fila.montoRecibido !== null
+            ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaCierre)].filter(Boolean).join(" · ")
+            : recibido === "error"
+              ? "Diferencia de monto"
+              : "Sin registrar",
+      });
+      pasos.push({
+        etiqueta: "Conciliado",
+        estado: conciliado,
+        subtexto: fila.consolidado ? (fecha(fila.fechaCierre) ?? "Consolidado") : "Pendiente",
+      });
+    }
   }
 
   return (
