@@ -205,21 +205,27 @@ convenciones técnicas del código.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
   de pasos (`BarraPasos`; no es lo mismo que `estado`, que se ve aparte en la insignia del
-  título), **de largo variable** según lo que le haya pasado al retiro — cada paso muestra
-  su fecha debajo, igual que Creado:
-  - Lo normal: **Creado, Recibido, Conciliado** (tres pasos). No hay un paso «Decisión»
-    genérico: si Dropi aprobó, ya se ve avanzar por Recibido/Conciliado sin nada aparte.
-  - **Rechazado** por Dropi (`estado_dropi`) no detiene el flujo (sigue marcando Novedad,
-    se puede resolver o conciliar igual — ver el punto de Novedad más abajo): se agrega un
-    paso «Rechazado» (rojo, con `fecha_rechazo`, migración 0044) **antes** de Recibido, sin
-    quitar los demás: Creado, Rechazado, Recibido, Conciliado.
-  - **Cancelado** sí detiene el flujo: reemplaza el resto de la barra por su propio paso
-    «Cancelado» (rojo, con la fecha de `cancelarRetiro`) — Creado, Cancelado, nada más; no
-    tiene sentido seguir mostrando Recibido/Conciliado si el retiro no va a llegar ahí.
-  - **Novedad resuelta** sigue con los tres pasos normales, pero Recibido y Conciliado
-    quedan en «—» (`detenido` en `pasosDelRetiro`), aunque haya habido un monto recibido
-    antes de la novedad: tampoco sigue el flujo normal, pero por su propia cuenta, no
-    porque Dropi haya rechazado nada.
+  título): muestra **lo que de verdad le pasó al retiro, en orden**, no una plantilla fija
+  — el largo varía según el camino que siguió, y cada paso muestra su fecha debajo, igual
+  que Creado (nunca solo la etiqueta sin fecha):
+  - **Creado** va siempre, primero.
+  - Después, **Aprobado** o **Rechazado** por Dropi, el que haya pasado (`estado_dropi` +
+    `fecha_aprobado`/`fecha_rechazo`, migraciones 0044/0045); si sigue pendiente, no se
+    agrega nada — no hay un paso «Decisión» genérico esperando. Ninguno de los dos detiene
+    el flujo: Rechazado solo marca Novedad para revisar, sigue el conteo normal después.
+  - Si el retiro tiene o tuvo una novedad (a mano o generada por un rechazo), se agrega
+    **Novedad** con `fecha_novedad` (migración 0045; la sella `agregarNovedadRetiro` o,
+    si la generó Dropi, `scripts/dropi-ingerir-retiros.ts`).
+  - Con la novedad **resuelta**, la barra termina ahí con dos pasos más — **Novedad
+    resuelta** y **Consolidado** (la misma `fecha_cierre` para ambos: `resolverNovedadRetiro`
+    marca las dos cosas a la vez) — en vez de seguir a Recibido/Conciliado, que ya no
+    aplican por ese camino.
+  - Si no hay novedad sin resolver, sigue el camino normal: **Recibido** (llega el dinero)
+    y **Conciliado** (queda consolidado, con la fecha de `conciliarRetiro`).
+  - **Cancelado** es la excepción que corta todo lo anterior: reemplaza el resto de la
+    barra por su propio paso (rojo, con la fecha de `cancelarRetiro`) — Creado, Cancelado,
+    nada más; no tiene sentido seguir mostrando Aprobado/Novedad/Recibido/Conciliado si el
+    retiro no va a llegar ahí.
   **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
@@ -245,9 +251,15 @@ convenciones técnicas del código.
   en verde y su nombre queda en el tooltip), pero no bloquea conciliar si no se adjunta uno
   — ni en la ficha ni en el servidor (`conciliarRetiro`). Al conciliar, deja el retiro
   cerrado y consolidado y **la fecha de recibido la pone el sistema** (`fecha_cierre` = hoy;
-  no hay un campo de fecha aparte que llenar a mano). **Novedad no exige texto**: se crea
-  rápido, sin nota (`agregarNovedadRetiro` acepta la nota vacía), el retiro pasa a «novedad»
-  y aparece «Ver novedad» en su lugar. **«Ver novedad» lleva a la nota, editable ahí
+  no hay un campo de fecha aparte que llenar a mano); además de la línea «Retiro conciliado:
+  …» del historial, se registra una línea aparte «Consolidado» (mismo patrón que
+  `resolverNovedadRetiro` más abajo), porque la Consolidación es su propio hecho, no un dato
+  suelto dentro de otro texto. **Novedad no exige texto**: se crea rápido, sin nota
+  (`agregarNovedadRetiro` acepta la nota vacía), el retiro pasa a «novedad» y aparece «Ver
+  novedad» en su lugar; sella `fecha_novedad` (migración 0045, con plan B si no se ha
+  corrido) para el paso «Novedad» de la barra de pasos — la misma columna que sella
+  `scripts/dropi-ingerir-retiros.ts` cuando la novedad la generó un rechazo de Dropi en vez
+  de una persona. **«Ver novedad» lleva a la nota, editable ahí
   mismo** (`SeccionResolverNovedad`, que la saca del historial con `novedadVigente`,
   `src/lib/retiros/novedad.ts`: la nota más reciente que no esté ya resuelta ni sustituida
   por un estado puesto a mano; sin nota lo dice), con un botón «Guardar nota»
@@ -256,7 +268,12 @@ convenciones técnicas del código.
   (`resolverNovedadRetiro`). **A diferencia de antes, el retiro no vuelve a «abierto»**:
   pasa al estado aparte **`novedad_resuelta`** («Novedad resuelta», tono ámbar) y **queda
   consolidado** (como al conciliar): ya no tiene más pasos pendientes, así que su
-  Consolidación no se queda en «Pendiente» para siempre. No sigue el flujo normal de
+  Consolidación no se queda en «Pendiente» para siempre. `resolverNovedadRetiro` sella
+  `fecha_cierre` (la misma columna que usan `conciliarRetiro` y `cancelarRetiro` para
+  «cuándo se cerró la historia de este retiro») y registra **dos** líneas en el historial
+  — «Novedad resuelta: …» y, aparte, «Consolidado» — para que ambos hechos se vean con su
+  propia fecha; son también los pasos «Novedad resuelta» y «Consolidado» de la barra de
+  pasos. No sigue el flujo normal de
   conciliación y por eso queda oculto por defecto junto con «Cerrado» detrás del
   interruptor «Cerrados» (`retiros/filtros.ts`, `exclusivo: true` como Cuentas destino:
   el botón aísla, nunca mezcla cerrados con abiertos). El estado `novedad_resuelta` lo

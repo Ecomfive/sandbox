@@ -120,37 +120,48 @@ async function main() {
 
   const advertencias: string[] = [];
   const hoyLocal = fechaLocal(new Date().toISOString());
-  // Sin la migración 0044 (columna fecha_rechazo), Postgres rechaza el update con 42703: se
-  // reintenta sin esa columna en vez de tumbar toda la corrida por un retiro.
-  let hayFechaRechazo = true;
+  // Sin las migraciones 0044/0045 (columnas fecha_rechazo, fecha_aprobado, fecha_novedad), Postgres
+  // rechaza el update con 42703: se reintenta sin esas columnas en vez de tumbar toda la corrida.
+  const columnasOpcionales = { fecha_rechazo: true, fecha_aprobado: true, fecha_novedad: true };
   for (const a of actualizaciones) {
     const cambios: Record<string, unknown> = { banco: a.banco, estado_dropi: a.estadoDropi };
     if (a.vinculadoAhora) cambios.dropi_id = a.dropiId;
     // Dropi rechazó o canceló un retiro que seguía abierto acá: se marca como novedad para que
     // se revise a mano. Nunca se cancela solo — cancelar sigue siendo una acción manual.
     if (a.marcarNovedad) cambios.estado = "novedad";
-    // La fecha del paso "Rechazado" de la barra de pasos: cuándo detectamos que Dropi rechazó. No se
-    // guarda para "aprobado" — ese es el camino normal, sin paso aparte en la barra.
-    if (hayFechaRechazo && a.estadoDropi === "rechazado" && (a.vinculadoAhora || a.cambioEstado)) {
-      cambios.fecha_rechazo = hoyLocal;
+    // Las fechas de los pasos "Aprobado"/"Rechazado" de la barra de pasos: cuándo detectamos el cambio.
+    if (a.vinculadoAhora || a.cambioEstado) {
+      if (columnasOpcionales.fecha_aprobado && a.estadoDropi === "aprobado") cambios.fecha_aprobado = hoyLocal;
+      if (columnasOpcionales.fecha_rechazo && a.estadoDropi === "rechazado") cambios.fecha_rechazo = hoyLocal;
     }
+    // La fecha del paso "Novedad": cuándo Dropi la generó (no cuando se agrega a mano, eso lo sella
+    // agregarNovedadRetiro).
+    if (columnasOpcionales.fecha_novedad && a.marcarNovedad) cambios.fecha_novedad = hoyLocal;
+
     let { error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId);
-    if (error?.code === "42703" && "fecha_rechazo" in cambios) {
-      console.warn("Falta correr la migración 0044 (fecha_rechazo) — se sigue sin esa fecha por ahora.");
-      hayFechaRechazo = false;
-      delete cambios.fecha_rechazo;
-      ({ error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId));
+    if (error?.code === "42703") {
+      const presentes = (Object.keys(columnasOpcionales) as (keyof typeof columnasOpcionales)[]).filter(
+        (c) => c in cambios
+      );
+      for (const c of presentes) {
+        columnasOpcionales[c] = false;
+        delete cambios[c];
+      }
+      if (presentes.length > 0) {
+        console.warn(`Falta correr la migración 0044/0045 (${presentes.join(", ")}) — se sigue sin esas fechas por ahora.`);
+        ({ error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId));
+      }
     }
     if (error) throw new Error(`Error actualizando el retiro #${a.correlativo}: ${error.message}`);
 
     if (a.vinculadoAhora || a.cambioEstado || a.marcarNovedad) {
+      // La línea de tiempo del retiro necesita el estado de Dropi como su propia palabra ("Aprobado",
+      // "Rechazado"), no enterrado dentro de otra frase, para que se lea igual que los demás eventos.
+      const etiqueta = ETIQUETA_ESTADO_DROPI[a.estadoDropi];
+      const base = a.vinculadoAhora ? `Vinculado con Dropi #${a.dropiId}: ${etiqueta}` : etiqueta;
       await supabase.from("retiro_eventos").insert({
         retiro_id: a.retiroId,
-        evento: a.vinculadoAhora
-          ? `Vinculado con Dropi #${a.dropiId} (${ETIQUETA_ESTADO_DROPI[a.estadoDropi]})`
-          : a.marcarNovedad
-            ? `Dropi reporta: ${ETIQUETA_ESTADO_DROPI[a.estadoDropi]} — se marca como novedad para revisar`
-            : `Dropi reporta: ${ETIQUETA_ESTADO_DROPI[a.estadoDropi]}`,
+        evento: a.marcarNovedad ? `${base} — se marca como novedad para revisar` : base,
       });
     }
     if (Math.abs(a.montoDropi - a.montoRetiro) >= 0.005) {
