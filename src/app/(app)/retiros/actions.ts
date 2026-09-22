@@ -143,9 +143,10 @@ export async function crearRetiro(formData: FormData) {
   });
 
   revalidatePath("/retiros");
-  // Si otra persona ocupó primero el número que se mostró, la ficha del retiro lo avisa.
+  // Al crear, se vuelve a la lista (no a la ficha del retiro recién creado). Si otra persona ocupó primero el
+  // número que se mostró, se avisa con un aviso en la lista misma (ver CrearRetiroPanel).
   const cambio = correlativoPedido !== null && correlativoPedido !== correlativoFinal;
-  redirect(`/retiros/${data.id}${cambio ? `?correlativo_cambio=${correlativoPedido}` : ""}`);
+  redirect(`/retiros${cambio ? `?correlativo_cambio=${correlativoPedido}&correlativo_final=${correlativoFinal}` : ""}`);
 }
 
 export async function cerrarRetiro(formData: FormData) {

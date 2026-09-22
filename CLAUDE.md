@@ -305,7 +305,11 @@ convenciones técnicas del código.
   (**sin ninguna preelegida**: hay que escoger una), el monto (**mayor a cero**, `min="0.01"`)
   y la comisión (hay que escribirla, aunque sea 0; arranca vacía y solo la rellena la
   comisión sugerida de la cuenta que se elija); `crearRetiro` lo vuelve a comprobar en el
-  servidor. En «Nueva cuenta destino», el nombre, el tipo, la cuenta (o, si es Binance, el
+  servidor. Al guardar, `crearRetiro` manda de vuelta a `/retiros` (la lista), **no** a la
+  ficha del retiro recién creado; si otra persona ocupó primero el número que se vio al
+  abrir la ficha, llega como `?correlativo_cambio=X&correlativo_final=Y` y `CrearRetiroPanel`
+  lo avisa con un `mostrarToast` (tono `info`) y limpia la dirección. En «Nueva cuenta
+  destino», el nombre, el tipo, la cuenta (o, si es Binance, el
   tipo de identificación, el número de identificación y el número de cuenta); la cuenta y
   el número de identificación solo se exigen **al crear**, para no bloquear la
   modificación de una cuenta guardada antes sin ese dato. (Ya no queda ninguna ventana de

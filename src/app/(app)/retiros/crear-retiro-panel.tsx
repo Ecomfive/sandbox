@@ -8,10 +8,14 @@ import { BotonAgregar } from "@/components/ui/boton-agregar";
 import { AvisoFaltante, BotonCrear } from "@/components/ui/boton-crear";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
+import { useToast } from "@/components/ui/toast";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
+import { leerCorrelativo } from "@/lib/retiros/correlativo";
+
+const formatoCorrelativo = (numero: number) => `#${String(numero).padStart(4, "0")}`;
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -54,7 +58,8 @@ export function calcularComisionSugerida(cuenta: Cuenta, montoNum: number): numb
  * fichas), en vez de navegar a una página aparte. La plataforma se elige dentro de la ficha.
  * La persona asignada no se pide: la pone el sistema con quien crea el retiro.
  * Al final hay un botón grande de crear: apagado mientras falte un dato obligatorio, y al pulsarlo así lleva al dato
- * que falta (ver `useFaltantes`). */
+ * que falta (ver `useFaltantes`). Al guardar, `crearRetiro` manda de vuelta a la lista (`/retiros`), no a la ficha
+ * del retiro recién creado; si el número mostrado ya lo había ocupado otro retiro, avisa con un toast. */
 export function CrearRetiroPanel({
   paisId,
   plataformas,
@@ -83,6 +88,8 @@ export function CrearRetiroPanel({
   const router = useRouter();
   const pathname = usePathname();
   const yaAbrio = useRef(false);
+  const yaAvisoCambio = useRef(false);
+  const { mostrarToast } = useToast();
 
   // Al abrir se MUESTRA el siguiente correlativo, sin gastarlo: solo se asigna al crear el retiro.
   // Se consulta en cada apertura (otra persona pudo crear uno mientras tanto) y, si no se guardó
@@ -112,6 +119,22 @@ export function CrearRetiroPanel({
     router.replace(pathname, { scroll: false });
     void abrirVentana();
     // Solo al llegar: abrirVentana lee el estado de este momento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parametros]);
+
+  // Al crear, `crearRetiro` manda de vuelta a la lista (ya no a la ficha del retiro). Si otra persona ocupó
+  // primero el número que se vio al abrir la ficha, llega como `?correlativo_cambio=X&correlativo_final=Y`:
+  // se avisa con un aviso y se quita de la dirección, igual que `nuevo`.
+  useEffect(() => {
+    const pedido = leerCorrelativo(parametros.get("correlativo_cambio"));
+    const final = leerCorrelativo(parametros.get("correlativo_final"));
+    if (pedido === null || final === null || yaAvisoCambio.current) return;
+    yaAvisoCambio.current = true;
+    router.replace(pathname, { scroll: false });
+    mostrarToast(
+      `Otra persona creó primero el retiro ${formatoCorrelativo(pedido)}. Este quedó como ${formatoCorrelativo(final)}: escribe ${formatoCorrelativo(final)} en el concepto del retiro en Dropi.`,
+      "info"
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parametros]);
 
