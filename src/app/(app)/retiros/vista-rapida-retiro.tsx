@@ -308,7 +308,13 @@ export function VistaRapidaRetiro({
               Sin `key`: con una `key={fila.id}` aquí, al conciliar o agregar una novedad la sección se quedaba en
               «Conciliando…» y no se cerraba (el estado pendiente de la acción nunca terminaba). No hace falta: al
               cerrar la ficha `Ventana` desmonta todo, así que cada retiro empieza con su historial nuevo. */}
-          <HistorialGenerico id={fila.id} codigoPais={codigoPais} version={versionHistorial} obtener={obtenerActividadRetiro} />
+          <HistorialGenerico
+            id={fila.id}
+            codigoPais={codigoPais}
+            version={versionHistorial}
+            titulo="Historial"
+            obtener={obtenerActividadRetiro}
+          />
         </div>
       )}
     </Ventana>
