@@ -207,10 +207,10 @@ convenciones técnicas del código.
   de **cuatro pasos** — Creado, Decisión, Recibido, Conciliado (`BarraPasos`,
   `pasosDelRetiro`; no es lo mismo que `estado`, que se ve aparte en la insignia del
   título). **Decisión** es donde Dropi aprueba o rechaza (`estado_dropi` + `fecha_decision`,
-  columna de la migración 0042) o donde el equipo cancela a mano; un **Cancelado** o una
+  columna de la migración 0043) o donde el equipo cancela a mano; un **Cancelado** o una
   **Novedad resuelta** paran el recorrido ahí mismo — Recibido y Conciliado quedan en «—»,
   aunque haya habido un monto recibido antes de la novedad (`detenido` en `pasosDelRetiro`).
-  `fecha_decision` es opcional en la base: sin la migración 0042 la página cae a consultar
+  `fecha_decision` es opcional en la base: sin la migración 0043 la página cae a consultar
   sin esa columna (`consultarRetiros` en `retiros/page.tsx`) y el paso Decisión muestra solo
   la etiqueta, sin fecha. **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
@@ -249,7 +249,7 @@ convenciones técnicas del código.
   pasa al estado aparte **`novedad_resuelta`** («Novedad resuelta», tono ámbar), que no
   sigue el flujo normal de conciliación y por eso queda oculto por defecto junto con
   «Cerrado» detrás del interruptor «Cerrados» (`retiros/filtros.ts`). Ese valor lo exige
-  el `check` de la columna `estado` en la base: **la migración 0042 es obligatoria** para
+  el `check` de la columna `estado` en la base: **la migración 0043 es obligatoria** para
   `resolverNovedadRetiro` (a diferencia de `fecha_decision`, no tiene plan B — sin
   correrla, «Resolver» falla con el error crudo de Postgres). Las secciones de
   Conciliar y Novedad usan el botón grande de `BotonCrear` y

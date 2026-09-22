@@ -54,7 +54,7 @@ export interface FilaRetiro {
   aRecibir: number;
   montoRecibido: number | null;
   fechaCierre: string | null;
-  /** Cuándo Dropi aprobó o rechazó (paso "Decisión" de la barra de pasos); null sin la migración 0042 o si sigue pendiente. */
+  /** Cuándo Dropi aprobó o rechazó (paso "Decisión" de la barra de pasos); null sin la migración 0043 o si sigue pendiente. */
   fechaDecision: string | null;
   fechaLimite: string | null;
   asignadoNombre: string | null;
