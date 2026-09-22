@@ -13,14 +13,15 @@ import { ConciliarIcon } from "@/lib/nav-icons";
 
 /**
  * Lo que se pide para conciliar un retiro, al final de su ficha (el botón «Conciliar» lleva hasta aquí; ya no se abre
- * una ventana en el medio). Lo demás (plataforma, cuenta destino, montos, fechas) ya está en la ficha. **Los tres datos
- * son obligatorios**:
+ * una ventana en el medio). Lo demás (plataforma, cuenta destino, montos, fechas) ya está en la ficha. **Recibido** e
+ * **ID / Referencia** son obligatorios:
  *  - **Recibido**: lo que llegó de verdad. Se compara con «A recibir»; si se aleja más de lo tolerado, el servidor no
  *    concilia y lo dice (`conciliarRetiro`).
  *  - **ID / Referencia**: el número de la transferencia.
- *  - **Soporte** (comprobante, imagen o PDF): se adjunta con un botón que es solo un ícono, sin texto (`BotonAdjuntar`).
- * El botón grande de abajo sigue la misma regla que los de crear (`useFaltantes`): apagado mientras falte alguno y, al
- * pulsarlo así, lleva al primero que falta. Al conciliar el retiro queda cerrado y consolidado.
+ * **Soporte** (comprobante, imagen o PDF) es opcional: se adjunta con un botón que es solo un ícono, sin texto
+ * (`BotonAdjuntar`), pero no bloquea conciliar si no se adjunta uno.
+ * El botón grande de abajo sigue la misma regla que los de crear (`useFaltantes`): apagado mientras falte Recibido o
+ * la Referencia y, al pulsarlo así, lleva al primero que falta. Al conciliar el retiro queda cerrado y consolidado.
  */
 export function SeccionConciliarRetiro({
   id,
@@ -120,17 +121,9 @@ export function SeccionConciliarRetiro({
             <AvisoFaltante id={idReferencia} faltante={faltante} />
           </div>
 
-          {/* El soporte se adjunta con solo un ícono (sin texto): imagen o PDF. Obligatorio. */}
+          {/* El soporte se adjunta con solo un ícono (sin texto): imagen o PDF. Opcional. */}
           <div className="flex flex-col gap-1">
-            <BotonAdjuntar
-              id={idSoporte}
-              name="comprobante"
-              accept="image/*,application/pdf"
-              nombreAccesible="Adjuntar soporte"
-              obligatorio
-              invalido={faltante === idSoporte}
-            />
-            <AvisoFaltante id={idSoporte} faltante={faltante} mensaje="Falta adjuntar el soporte" />
+            <BotonAdjuntar id={idSoporte} name="comprobante" accept="image/*,application/pdf" nombreAccesible="Adjuntar soporte" />
           </div>
 
           {error && (

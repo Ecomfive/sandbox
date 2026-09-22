@@ -213,15 +213,12 @@ convenciones técnicas del código.
   **encima del historial** (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`,
   `SeccionResolverNovedad`; solo una a la vez), la ficha
   baja hasta ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco
-  entra en su primer campo. Conciliar pide **tres datos, todos obligatorios**: **Recibido**
-  (si se aleja de «A recibir» más de lo tolerado, `conciliarRetiro` no concilia y lo dice),
-  **ID / Referencia** y el **soporte** (se adjunta con un botón que es **solo un ícono**,
-  sin texto: `BotonAdjuntar` con `AdjuntoIcon`; sin archivo lleva un asterisco rojo, ya con
-  archivo se marca en verde y su nombre queda en el tooltip). `conciliarRetiro` también los
-  exige en el servidor (un soporte que el retiro ya tenía guardado cuenta como adjunto) y,
-  al conciliar, deja el retiro cerrado y consolidado. Un campo oculto detrás de un botón
-  (el `<input type="file">`) indica con `data-destino` el elemento que sí se ve, para que
-  `useFaltantes` baje hasta él y le dé el foco. Novedad pide una
+  entra en su primer campo. Conciliar pide **Recibido** e **ID / Referencia, obligatorios**
+  (Recibido: si se aleja de «A recibir» más de lo tolerado, `conciliarRetiro` no concilia y
+  lo dice). El **soporte** es **opcional**: se adjunta con un botón que es **solo un
+  ícono**, sin texto (`BotonAdjuntar` con `AdjuntoIcon`; ya con archivo se marca en verde y
+  su nombre queda en el tooltip), pero no bloquea conciliar si no se adjunta uno — ni en la
+  ficha ni en el servidor (`conciliarRetiro`). Novedad pide una
   **nota** (obligatoria, hasta 500 caracteres): `agregarNovedadRetiro` pasa el retiro a
   novedad y deja la nota en su historial («Novedad: …») y en la auditoría; entonces aparece
   «Abrir». **«Abrir» no reabre el retiro**: baja a una sección con **la nota de la novedad**
