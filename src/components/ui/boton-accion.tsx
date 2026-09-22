@@ -29,7 +29,7 @@ export const BotonAccion = forwardRef<
     <button
       ref={ref}
       type="button"
-      className={`flex h-16 w-24 shrink-0 flex-col items-center justify-center gap-1 border px-2 py-1.5 text-center text-xs leading-tight font-medium transition-colors disabled:pointer-events-none disabled:border-transparent disabled:bg-muted disabled:text-muted-foreground ${TONOS[tono]} ${anilloFoco} !rounded-lg ${className}`}
+      className={`flex h-16 w-24 shrink-0 flex-col items-center justify-center gap-1 border px-2 py-1.5 text-center text-xs leading-tight font-bold transition-colors disabled:pointer-events-none disabled:border-transparent disabled:bg-muted disabled:text-muted-foreground ${TONOS[tono]} ${anilloFoco} !rounded-lg ${className}`}
       {...props}
     >
       <Icono className="h-4 w-4" />
