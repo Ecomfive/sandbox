@@ -15,7 +15,10 @@ export interface FilaUsuario {
   rolNombre: string | null;
   activo: boolean;
   creadoEn: string;
-  /** Primer ingreso real (no la invitación) — null si nunca entró. Lo marca solo un trigger de la base. */
+  /** Primer ingreso real (no la invitación) — null si nunca entró. Lo marca un trigger de la base la primera
+   * vez que cambia `last_sign_in_at`, así que una cuenta que ya había entrado antes de que existiera esta
+   * columna se queda sin este dato: por eso "ya entró" se decide con `primerIngresoEn || ultimoIngresoEn`,
+   * nunca con este campo solo. */
   primerIngresoEn: string | null;
   /** Del lado de auth.users, no de `perfiles`: cuándo entró por última vez (null si nunca). */
   ultimoIngresoEn: string | null;
@@ -25,9 +28,9 @@ export interface FilaUsuario {
 
 /** Qué le falta a una persona para estar completa: cuenta creada (siempre), primer ingreso, foto y
  * rol de trabajo. "Listo" cuando no falta nada. */
-export function faltantesDePersona(u: Pick<FilaUsuario, "primerIngresoEn" | "avatarUrl" | "rolId">): string[] {
+export function faltantesDePersona(u: Pick<FilaUsuario, "primerIngresoEn" | "ultimoIngresoEn" | "avatarUrl" | "rolId">): string[] {
   const faltantes: string[] = [];
-  if (!u.primerIngresoEn) faltantes.push("primer ingreso");
+  if (!u.primerIngresoEn && !u.ultimoIngresoEn) faltantes.push("primer ingreso");
   if (!u.avatarUrl) faltantes.push("foto");
   if (!u.rolId) faltantes.push("rol de trabajo");
   return faltantes;

@@ -187,7 +187,7 @@ export function FichaPersona({
               <h3 className="mb-3 text-sm font-semibold">Alta</h3>
               <div className="rounded-lg border border-border">
                 <FilaAlta etiqueta="Cuenta creada" completo />
-                <FilaAlta etiqueta="Primer ingreso" completo={!!persona.primerIngresoEn} />
+                <FilaAlta etiqueta="Primer ingreso" completo={!!(persona.primerIngresoEn || persona.ultimoIngresoEn)} />
                 <FilaAlta etiqueta="Foto" completo={!!persona.avatarUrl}>
                   {!persona.avatarUrl && (
                     <span className="text-right">
