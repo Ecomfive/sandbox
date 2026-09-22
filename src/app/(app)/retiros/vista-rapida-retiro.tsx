@@ -250,16 +250,13 @@ export function VistaRapidaRetiro({
     >
       {fila && (
         <div className="flex flex-1 flex-col">
-          <div className="flex flex-col gap-4 p-4">
-            <BarraPasos fila={fila} codigoPais={codigoPais} />
-          </div>
-
           <FormularioEditarRetiro
             key={`${fila.id}-${version}`}
             fila={fila}
             codigoPais={codigoPais}
             plataformas={plataformas}
             cuentas={cuentas}
+            pasos={<BarraPasos fila={fila} codigoPais={codigoPais} />}
             acciones={
               <>
                 {/* Un cancelado o una novedad resuelta no siguen el flujo normal: su ciclo ya terminó. */}

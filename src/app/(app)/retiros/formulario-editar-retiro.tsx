@@ -35,20 +35,22 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
 }
 
 /**
- * El cuerpo de la ficha de un retiro, debajo de su barra de pasos: los campos editables (mismo patrón visual que
- * «Nuevo retiro»), los datos que no se editan a mano (Recibido, Cierre, Creado por, Consolidación, Estado en
- * Dropi, Soporte), sin pestañas. **No hay un botón «Modificar»**: se cambia un campo y arriba, junto a las
- * `acciones` de la ficha (Conciliar, Novedad, Abrir, Cancelar, Eliminar), aparecen «Guardar cambios» y «Cancelar» —
- * que solo se ven cuando se cambió algo. Guardar no cierra la ficha. Con `key={fila.id}-versión}` en quien lo usa,
- * cancelar (o pasar a otro retiro) lo vuelve a montar con los datos de la fila, sin arrastrar lo escrito. El historial
- * de actividad **no** está aquí: va al final de la ficha (`HistorialGenerico`), debajo de las secciones de Conciliar y
- * Novedad.
+ * El cuerpo de la ficha de un retiro: la barra de pasos (`pasos`) y las `acciones` de arriba (Conciliar, Novedad,
+ * Abrir, Cancelar, Eliminar) van **fijas**, pegadas bajo la cabecera del panel (sticky, no se pierden de vista);
+ * lo único que se desplaza es lo de abajo: los campos editables (mismo patrón visual que «Nuevo retiro»), los datos
+ * que no se editan a mano (Recibido, Cierre, Creado por, Consolidación, Estado en Dropi, Soporte), sin pestañas.
+ * **No hay un botón «Modificar»**: se cambia un campo y junto a `acciones` aparecen «Guardar cambios» y
+ * «Cancelar» — que solo se ven cuando se cambió algo. Guardar no cierra la ficha. Con `key={fila.id}-versión}` en
+ * quien lo usa, cancelar (o pasar a otro retiro) lo vuelve a montar con los datos de la fila, sin arrastrar lo
+ * escrito. El historial de actividad **no** está aquí: va al final de la ficha (`HistorialGenerico`), debajo de
+ * las secciones de Conciliar y Novedad.
  */
 export function FormularioEditarRetiro({
   fila,
   codigoPais,
   plataformas,
   cuentas,
+  pasos,
   acciones,
   alGuardar,
   alCancelar,
@@ -59,6 +61,8 @@ export function FormularioEditarRetiro({
   codigoPais: string;
   plataformas: Plataforma[];
   cuentas: Cuenta[];
+  /** La barra de pasos (`BarraPasos`), fija junto con las acciones — no se pierde de vista al bajar a los datos. */
+  pasos: ReactNode;
   /** Botones propios de la ficha (Conciliar, Abrir, Cancelar, Eliminar), junto a Guardar y Cancelar. */
   acciones: ReactNode;
   /** Se llama cuando el servidor guardó sin error. */
@@ -154,9 +158,10 @@ export function FormularioEditarRetiro({
     >
       <input type="hidden" name="id" value={fila.id} />
 
-      {/* Pegada bajo la cabecera del panel (su alto lo publica `Ventana` como --alto-cabecera) para que Guardar
-          siga a la vista aunque se esté cambiando un campo de más abajo. */}
-      <div className="sticky top-[var(--alto-cabecera,3.8rem)] z-[5] flex flex-col gap-2 border-y border-border bg-card px-4 py-3">
+      {/* Pegada bajo la cabecera del panel (su alto lo publica `Ventana` como --alto-cabecera): la barra de pasos y
+          los botones no se pierden de vista al bajar a los datos, que son lo único que se desplaza. */}
+      <div className="sticky top-[var(--alto-cabecera,3.8rem)] z-[5] flex flex-col gap-3 border-y border-border bg-card px-4 py-3">
+        {pasos}
         <div className="flex flex-wrap gap-2">
           {modificado && (
             <>

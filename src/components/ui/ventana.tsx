@@ -41,6 +41,17 @@ export function Ventana({
     cerrarRef.current = alCerrar;
   });
 
+  // Con la ventana abierta, la página de atrás no se puede desplazar: sin esto quedaban dos barras de scroll
+  // (la de la ventana y la de la página), y desplazar una a veces movía la otra por debajo.
+  useEffect(() => {
+    if (!abierto) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = anterior;
+    };
+  }, [abierto]);
+
   useEffect(() => {
     if (!abierto) return;
     const anterior = document.activeElement as HTMLElement | null;
