@@ -34,7 +34,7 @@ import {
 import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
 import type { Grupo } from "@/lib/tabla/vista";
 import { DEF_RETIROS, ESTADO_ETIQUETA } from "./filtros";
-import { ESTADO_TONO } from "@/lib/retiros/estados";
+import { ESTADO_TONO, estadoConsolidacion } from "@/lib/retiros/estados";
 import { CrearRetiroPanel, type Cuenta, type Plataforma } from "./crear-retiro-panel";
 import { BarraLote } from "./barra-lote";
 import { VistaRapidaRetiro } from "./vista-rapida-retiro";
@@ -57,14 +57,17 @@ export interface FilaRetiro {
   fechaLimite: string | null;
   asignadoNombre: string | null;
   estadoDropi: string | null;
-  /** Cuándo Dropi aprobó el retiro (paso "Aprobado" de la barra de pasos); null si nunca fue aprobado o
-   * sigue pendiente de que Dropi decida. */
+  /** Cuándo Dropi aprobó el retiro (2.º paso de la barra de pasos); null si sigue pendiente de que
+   * Dropi decida o Dropi reportó otra cosa. */
   fechaAprobado: string | null;
-  /** Cuándo Dropi rechazó el retiro (paso "Rechazado" de la barra de pasos); null si nunca fue rechazado o
-   * sigue pendiente de que Dropi decida. */
+  /** Cuándo Dropi rechazó el retiro (2.º paso de la barra de pasos); null si sigue pendiente de que
+   * Dropi decida o Dropi reportó otra cosa. */
   fechaRechazo: string | null;
-  /** Cuándo se creó la novedad vigente (paso "Novedad" de la barra de pasos); null si el retiro nunca tuvo
-   * una novedad. */
+  /** Cuándo Dropi reportó el retiro como cancelado (2.º paso de la barra de pasos, migración 0046);
+   * null si sigue pendiente de que Dropi decida o Dropi reportó otra cosa. */
+  fechaCanceladoDropi: string | null;
+  /** Cuándo se creó la novedad vigente del retiro; null si nunca tuvo una. No se ve en la barra de
+   * pasos (esa siempre son los mismos cuatro pasos) — solo se usa en el historial y en la nota. */
   fechaNovedad: string | null;
   gestionadoPor: string;
   notas: string | null;
@@ -137,12 +140,10 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string, alAbri
       return fila.destino;
     case "monto":
       return formatearMoneda(fila.monto, codigoPais);
-    case "consolidado":
-      return (
-        <Badge tone={fila.consolidado ? "success" : "warning"}>
-          {fila.consolidado ? "Consolidado" : "Pendiente"}
-        </Badge>
-      );
+    case "consolidado": {
+      const { texto, tono } = estadoConsolidacion(fila);
+      return <Badge tone={tono}>{texto}</Badge>;
+    }
     case "estado":
       // Solo lectura: el estado no se cambia desde la tabla (cambia al conciliar, cancelar o editar el retiro).
       return (

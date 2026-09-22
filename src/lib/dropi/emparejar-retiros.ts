@@ -2,18 +2,20 @@
 // Dropi nunca crea retiros: solo se vincula al retiro cuyo correlativo (#0007)
 // aparece en el concepto que Dropi devuelve.
 
-export type EstadoDropi = "pendiente" | "aprobado" | "rechazado";
+export type EstadoDropi = "pendiente" | "aprobado" | "rechazado" | "cancelado";
 
 export const ETIQUETA_ESTADO_DROPI: Record<EstadoDropi, string> = {
   pendiente: "Pendiente",
   aprobado: "Aprobado",
   rechazado: "Rechazado",
+  cancelado: "Cancelado",
 };
 
 export const TONO_ESTADO_DROPI: Record<EstadoDropi, "info" | "success" | "destructive"> = {
   pendiente: "info",
   aprobado: "success",
   rechazado: "destructive",
+  cancelado: "destructive",
 };
 
 export type MotivoSinVincular = "sin_correlativo" | "no_existe" | "duplicado";
@@ -72,9 +74,8 @@ export interface ResultadoEmparejar {
 export function mapearEstadoDropi(status: string): EstadoDropi {
   const normalizado = status.trim().toUpperCase();
   if (normalizado === "APROBADO") return "aprobado";
-  // Dropi puede reportar un retiro como rechazado o como cancelado — para nosotros es lo mismo:
-  // el dinero no salió, hay que revisarlo. No hay un estado_dropi aparte para "cancelado".
-  if (normalizado === "RECHAZADO" || normalizado === "CANCELADO") return "rechazado";
+  if (normalizado === "RECHAZADO") return "rechazado";
+  if (normalizado === "CANCELADO") return "cancelado";
   return "pendiente";
 }
 
@@ -124,7 +125,7 @@ export function emparejarRetiros(dropi: RetiroDropi[], locales: RetiroLocal[]): 
       estadoDropi: retiro.estado,
       vinculadoAhora: local.dropiId === null,
       cambioEstado: local.estadoDropi !== retiro.estado,
-      marcarNovedad: retiro.estado === "rechazado" && local.estado === "abierto",
+      marcarNovedad: (retiro.estado === "rechazado" || retiro.estado === "cancelado") && local.estado === "abierto",
       montoDropi: retiro.monto,
       montoRetiro: local.monto,
     });

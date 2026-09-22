@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { estadoConsolidacion } from "@/lib/retiros/estados";
 import { CheckIcon, CerrarIcon } from "@/lib/nav-icons";
 
 const Obligatorio = () => (
@@ -415,7 +416,10 @@ export function FormularioEditarRetiro({
           <Dato etiqueta="Cierre">{fila.fechaCierre ? formatearFecha(fila.fechaCierre) : "—"}</Dato>
           <Dato etiqueta="Creado por">{fila.asignadoNombre ?? "—"}</Dato>
           <Dato etiqueta="Consolidación">
-            <Badge tone={fila.consolidado ? "success" : "warning"}>{fila.consolidado ? "Consolidado" : "Pendiente"}</Badge>
+            {(() => {
+              const { texto, tono } = estadoConsolidacion(fila);
+              return <Badge tone={tono}>{texto}</Badge>;
+            })()}
           </Dato>
           <Dato etiqueta="Estado en Dropi">
             {fila.estadoDropi && fila.estadoDropi in TONO_ESTADO_DROPI ? (
