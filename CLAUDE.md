@@ -204,12 +204,22 @@ convenciones técnicas del código.
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
-  de **tres pasos** — Creado, Recibido, Conciliado (`BarraPasos`, `pasosDelRetiro`; no es
-  lo mismo que `estado`, que se ve aparte en la insignia del título). No hay un paso
-  «Decisión»: si Dropi aprobó o rechazó ya se ve en el dato «Estado en Dropi» de la ficha
-  (`formulario-editar-retiro.tsx`), sin duplicarlo en la barra. Un **Cancelado** o una
-  **Novedad resuelta** paran el recorrido ahí mismo — Recibido y Conciliado quedan en «—»,
-  aunque haya habido un monto recibido antes de la novedad (`detenido` en `pasosDelRetiro`).
+  de pasos (`BarraPasos`; no es lo mismo que `estado`, que se ve aparte en la insignia del
+  título), **de largo variable** según lo que le haya pasado al retiro — cada paso muestra
+  su fecha debajo, igual que Creado:
+  - Lo normal: **Creado, Recibido, Conciliado** (tres pasos). No hay un paso «Decisión»
+    genérico: si Dropi aprobó, ya se ve avanzar por Recibido/Conciliado sin nada aparte.
+  - **Rechazado** por Dropi (`estado_dropi`) no detiene el flujo (sigue marcando Novedad,
+    se puede resolver o conciliar igual — ver el punto de Novedad más abajo): se agrega un
+    paso «Rechazado» (rojo, con `fecha_rechazo`, migración 0044) **antes** de Recibido, sin
+    quitar los demás: Creado, Rechazado, Recibido, Conciliado.
+  - **Cancelado** sí detiene el flujo: reemplaza el resto de la barra por su propio paso
+    «Cancelado» (rojo, con la fecha de `cancelarRetiro`) — Creado, Cancelado, nada más; no
+    tiene sentido seguir mostrando Recibido/Conciliado si el retiro no va a llegar ahí.
+  - **Novedad resuelta** sigue con los tres pasos normales, pero Recibido y Conciliado
+    quedan en «—» (`detenido` en `pasosDelRetiro`), aunque haya habido un monto recibido
+    antes de la novedad: tampoco sigue el flujo normal, pero por su propia cuenta, no
+    porque Dropi haya rechazado nada.
   **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
