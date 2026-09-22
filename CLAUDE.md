@@ -204,15 +204,13 @@ convenciones técnicas del código.
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
-  de **cuatro pasos** — Creado, Decisión, Recibido, Conciliado (`BarraPasos`,
-  `pasosDelRetiro`; no es lo mismo que `estado`, que se ve aparte en la insignia del
-  título). **Decisión** es donde Dropi aprueba o rechaza (`estado_dropi` + `fecha_decision`,
-  columna de la migración 0043) o donde el equipo cancela a mano; un **Cancelado** o una
+  de **tres pasos** — Creado, Recibido, Conciliado (`BarraPasos`, `pasosDelRetiro`; no es
+  lo mismo que `estado`, que se ve aparte en la insignia del título). No hay un paso
+  «Decisión»: si Dropi aprobó o rechazó ya se ve en el dato «Estado en Dropi» de la ficha
+  (`formulario-editar-retiro.tsx`), sin duplicarlo en la barra. Un **Cancelado** o una
   **Novedad resuelta** paran el recorrido ahí mismo — Recibido y Conciliado quedan en «—»,
   aunque haya habido un monto recibido antes de la novedad (`detenido` en `pasosDelRetiro`).
-  `fecha_decision` es opcional en la base: sin la migración 0043 la página cae a consultar
-  sin esa columna (`consultarRetiros` en `retiros/page.tsx`) y el paso Decisión muestra solo
-  la etiqueta, sin fecha. **La ficha ya es el formulario**
+  **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
   grandes de Conciliar, Novedad (solo en un retiro abierto), Ver novedad (solo en
@@ -225,7 +223,7 @@ convenciones técnicas del código.
   silencio a «Abierto» al guardar cualquier otro campo. **Un retiro cancelado o con la
   novedad ya resuelta no ofrecen «Conciliar»** (ni en la ficha ni, como respaldo, en el
   propio `conciliarRetiro`, que devuelve `{ error }` si igual se invoca): su ciclo ya
-  terminó en la Decisión. **«Conciliar», «Novedad» y «Ver novedad» no
+  terminó. **«Conciliar», «Novedad» y «Ver novedad» no
   abren una ventana en el medio**: despliegan una sección al final de la misma ficha,
   **encima del historial** (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`,
   `SeccionResolverNovedad`; solo una a la vez), la ficha
@@ -246,12 +244,13 @@ convenciones técnicas del código.
   (`actualizarNovedadRetiro`, que deja otra línea «Novedad: …» en el historial y en la
   auditoría) y el botón **«Resolver»**, que es lo único que la quita
   (`resolverNovedadRetiro`). **A diferencia de antes, el retiro no vuelve a «abierto»**:
-  pasa al estado aparte **`novedad_resuelta`** («Novedad resuelta», tono ámbar), que no
-  sigue el flujo normal de conciliación y por eso queda oculto por defecto junto con
-  «Cerrado» detrás del interruptor «Cerrados» (`retiros/filtros.ts`). Ese valor lo exige
-  el `check` de la columna `estado` en la base: **la migración 0043 es obligatoria** para
-  `resolverNovedadRetiro` (a diferencia de `fecha_decision`, no tiene plan B — sin
-  correrla, «Resolver» falla con el error crudo de Postgres). Las secciones de
+  pasa al estado aparte **`novedad_resuelta`** («Novedad resuelta», tono ámbar) y **queda
+  consolidado** (como al conciliar): ya no tiene más pasos pendientes, así que su
+  Consolidación no se queda en «Pendiente» para siempre. No sigue el flujo normal de
+  conciliación y por eso queda oculto por defecto junto con «Cerrado» detrás del
+  interruptor «Cerrados» (`retiros/filtros.ts`). El estado `novedad_resuelta` lo exige
+  el `check` de la columna `estado` en la base: **la migración 0043 es obligatoria** —
+  sin correrla, «Resolver» falla con el error crudo de Postgres. Las secciones de
   Conciliar y Novedad usan el botón grande de `BotonCrear` y
   `useFaltantes` (apagado hasta llenar lo obligatorio; pulsarlo así lleva al dato que
   falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir.

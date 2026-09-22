@@ -7,7 +7,6 @@ import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
-import { ETIQUETA_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { AlertaIcon, CheckIcon, CerrarIcon, ConciliarIcon } from "@/lib/nav-icons";
 import { ESTADO_TONO } from "@/lib/retiros/estados";
 import { ESTADO_ETIQUETA } from "./filtros";
@@ -25,31 +24,21 @@ const numeroDe = (fila: FilaRetiro) => `#${String(fila.numeroCorrelativo).padSta
 
 type EstadoPaso = "completo" | "actual" | "pendiente" | "error";
 
-/** A qué paso llegó el retiro en su recorrido real (no el `estado` interno de seguimiento): se crea acá, Dropi
- * decide (aprueba o rechaza), se recibe el dinero y por último se concilia (queda consolidado). Un retiro
- * cancelado, o una novedad ya resuelta, se quedan ahí — **no siguen el flujo normal**: Recibido y Conciliado
- * quedan pendientes (grises), aunque haya habido un monto recibido antes de la novedad. */
-function pasosDelRetiro(fila: FilaRetiro): { decision: EstadoPaso; recibido: EstadoPaso; conciliado: EstadoPaso } {
-  const decision: EstadoPaso =
-    fila.estado === "cancelado"
-      ? "error"
-      : fila.estadoDropi === "aprobado"
-        ? "completo"
-        : fila.estadoDropi === "rechazado"
-          ? "error"
-          : "actual";
-
+/** A qué paso llegó el retiro en su recorrido real (no el `estado` interno de seguimiento): se crea acá, se
+ * recibe el dinero y por último se concilia (queda consolidado). Un retiro cancelado, o una novedad ya
+ * resuelta, se quedan ahí — **no siguen el flujo normal**: Recibido y Conciliado quedan pendientes (grises),
+ * aunque haya habido un monto recibido antes de la novedad. */
+function pasosDelRetiro(fila: FilaRetiro): { recibido: EstadoPaso; conciliado: EstadoPaso } {
   // Cancelado o con la novedad ya resuelta: el ciclo termina ahí, no sigue a Recibido/Conciliado.
   if (fila.estado === "cancelado" || fila.estado === "novedad_resuelta") {
-    return { decision, recibido: "pendiente", conciliado: "pendiente" };
+    return { recibido: "pendiente", conciliado: "pendiente" };
   }
 
-  const recibido: EstadoPaso =
-    fila.montoRecibido !== null ? (fila.estado === "novedad" ? "error" : "completo") : decision === "completo" ? "actual" : "pendiente";
+  const recibido: EstadoPaso = fila.montoRecibido !== null ? (fila.estado === "novedad" ? "error" : "completo") : "actual";
 
   const conciliado: EstadoPaso = fila.consolidado ? "completo" : recibido === "completo" ? "actual" : "pendiente";
 
-  return { decision, recibido, conciliado };
+  return { recibido, conciliado };
 }
 
 function claseNodo(estado: EstadoPaso): string {
@@ -65,26 +54,17 @@ function claseNodo(estado: EstadoPaso): string {
   }
 }
 
-/** Las cuatro etapas del recorrido de un retiro: Creado (siempre, ya existe), Decisión (Dropi aprueba,
- * rechaza, o se cancela a mano), Recibido (llega el dinero) y Conciliado (queda consolidado). No es el
- * `estado` de seguimiento interno (abierto/novedad/cerrado/cancelado/novedad_resuelta) — ese ya se ve
- * en la insignia del título. */
+/** Las tres etapas del recorrido de un retiro: Creado (siempre, ya existe), Recibido (llega el dinero) y
+ * Conciliado (queda consolidado). No es el `estado` de seguimiento interno
+ * (abierto/novedad/cerrado/cancelado/novedad_resuelta) — ese ya se ve en la insignia del título, y la decisión
+ * de Dropi (aprobado/rechazado) se ve en el dato «Estado en Dropi» de la ficha, no acá. */
 function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string }) {
-  const { decision, recibido, conciliado } = pasosDelRetiro(fila);
+  const { recibido, conciliado } = pasosDelRetiro(fila);
   const detenido = fila.estado === "cancelado" || fila.estado === "novedad_resuelta";
   const fecha = (iso: string | null) => (iso ? formatearFecha(iso) : null);
 
-  const subtextoDecision = () => {
-    if (fila.estado === "cancelado") return ["Cancelado", fecha(fila.fechaCierre)].filter(Boolean).join(" · ");
-    if (fila.estadoDropi && fila.estadoDropi in ETIQUETA_ESTADO_DROPI) {
-      return [ETIQUETA_ESTADO_DROPI[fila.estadoDropi as EstadoDropi], fecha(fila.fechaDecision)].filter(Boolean).join(" · ");
-    }
-    return "En espera de Dropi";
-  };
-
   const pasos: { etiqueta: string; estado: EstadoPaso; subtexto: string }[] = [
     { etiqueta: "Creado", estado: "completo", subtexto: formatearFecha(fila.fecha) },
-    { etiqueta: "Decisión", estado: decision, subtexto: subtextoDecision() },
     {
       etiqueta: "Recibido",
       estado: recibido,
@@ -150,7 +130,8 @@ type PanelAbajo = "conciliar" | "novedad" | "resolver";
  * «Ver novedad» en su lugar, sin el botón Conciliar. **«Ver novedad» no resuelve nada por sí solo**: lleva a la nota
  * de la novedad (editable ahí mismo) y a su botón «Resolver», que es lo único que la quita — y, a diferencia de
  * antes, el retiro ya no vuelve a «abierto»: queda en el estado aparte «Novedad resuelta», sin seguir el flujo normal
- * de conciliación (ver `pasosDelRetiro`).
+ * de conciliación (ver `pasosDelRetiro`); al resolverla, también queda consolidado (`resolverNovedadRetiro`), como
+ * un retiro conciliado, para que la Consolidación de la ficha no se quede en «Pendiente» sin poder cambiarla más.
  */
 export function VistaRapidaRetiro({
   fila,
@@ -256,7 +237,7 @@ export function VistaRapidaRetiro({
             cuentas={cuentas}
             acciones={
               <>
-                {/* Un cancelado o una novedad resuelta no siguen el flujo normal: el ciclo termina en la Decisión. */}
+                {/* Un cancelado o una novedad resuelta no siguen el flujo normal: su ciclo ya terminó. */}
                 {fila.estado !== "novedad_resuelta" && fila.estado !== "cancelado" && (
                   <BotonAccion
                     icono={ConciliarIcon}

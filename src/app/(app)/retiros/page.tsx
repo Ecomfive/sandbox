@@ -19,25 +19,13 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 const COLUMNAS_RETIROS =
   "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, a_recibir, asignado_a, notas, soporte_numero, banco, estado_dropi, plataforma_id, cuenta_retiro_id, gestionado_por, plataformas(nombre), cuentas_retiro(nombre)";
 
-/** `fecha_decision` (migración 0043) es la fecha del paso "Decisión" de la barra de pasos; sin la
- * migración, se sigue sirviendo la página consultando sin esa columna. */
 function consultarRetiros(supabase: ReturnType<typeof createServiceClient>, paisId: string) {
   return supabase
     .from("retiros")
-    .select(`${COLUMNAS_RETIROS}, fecha_decision`)
+    .select(COLUMNAS_RETIROS)
     .eq("pais_id", paisId)
     .order("fecha", { ascending: false })
-    .limit(1000)
-    .then((resultado) =>
-      resultado.error
-        ? supabase
-            .from("retiros")
-            .select(COLUMNAS_RETIROS)
-            .eq("pais_id", paisId)
-            .order("fecha", { ascending: false })
-            .limit(1000)
-        : resultado
-    );
+    .limit(1000);
 }
 
 export default async function RetirosPage() {
@@ -124,8 +112,6 @@ export default async function RetirosPage() {
     aRecibir: Number(r.a_recibir ?? r.monto_neto),
     montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido),
     fechaCierre: r.fecha_cierre,
-    // `fecha_decision` (migración 0043) puede no venir en el tipo inferido si la consulta cayó al plan B sin ella.
-    fechaDecision: (r as { fecha_decision?: string | null }).fecha_decision ?? null,
     fechaLimite: r.fecha_limite,
     asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,
     estadoDropi: r.estado_dropi,
