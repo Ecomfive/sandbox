@@ -241,8 +241,8 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
     .single();
   if (errorRetiro) return { error: errorRetiro.message };
 
-  // Un cancelado o una novedad resuelta ya terminaron su ciclo en la Decisión: no siguen a Conciliado (se
-  // vuelve a comprobar aquí porque un server action se puede invocar sin pasar por la ficha, que ya oculta el botón).
+  // Un cancelado o una novedad resuelta ya terminaron su ciclo: no siguen a Conciliado (se vuelve a comprobar
+  // aquí porque un server action se puede invocar sin pasar por la ficha, que ya oculta el botón).
   if (retiro.estado === "cancelado" || retiro.estado === "novedad_resuelta") {
     return { error: "Este retiro no sigue el flujo normal de conciliación." };
   }
@@ -311,9 +311,8 @@ export async function cancelarRetiro(formData: FormData) {
   const supabase = createServiceClient();
   const { data: retiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
 
-  // `fecha_cierre` marca acá la fecha de cancelación (no solo la de un cierre normal): es la fecha
-  // que muestra el paso "Decisión" de la barra de pasos cuando el retiro queda cancelado. No choca
-  // con el bloque "Cierre" de la ficha completa porque ese solo se ve con un monto recibido, que un
+  // `fecha_cierre` marca acá la fecha de cancelación (no solo la de un cierre normal): el dato "Cierre" de
+  // la ficha (`formulario-editar-retiro.tsx`) la muestra igual, sin necesitar un monto recibido, que un
   // retiro cancelado nunca tiene.
   const { error } = await supabase
     .from("retiros")
@@ -407,9 +406,10 @@ export async function actualizarNovedadRetiro(formData: FormData): Promise<{ err
 /** Marca la novedad como resuelta: es el botón «Resolver» de la sección de la novedad (a la que lleva «Ver
  * novedad»); nada la quita hasta que alguien lo pulsa. **El retiro ya no vuelve a "abierto"**: queda en el estado
  * aparte «Novedad resuelta», que no sigue el flujo normal de conciliación (no cuenta como pendiente ni como
- * conciliado — ver `pasosDelRetiro` en `vista-rapida-retiro.tsx`). Solo actúa si de verdad está en novedad (evita
- * pisar un cierre o una cancelación que haya pasado mientras la ficha estaba abierta). Devuelve el error como valor,
- * porque en producción Next.js oculta el mensaje de una excepción. */
+ * conciliado — ver `pasosDelRetiro` en `vista-rapida-retiro.tsx`), y **queda consolidado** (como al conciliar): ya
+ * no hay más pasos pendientes sobre él, así que su Consolidación no puede quedar en «Pendiente» para siempre. Solo
+ * actúa si de verdad está en novedad (evita pisar un cierre o una cancelación que haya pasado mientras la ficha
+ * estaba abierta). Devuelve el error como valor, porque en producción Next.js oculta el mensaje de una excepción. */
 export async function resolverNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
@@ -419,7 +419,10 @@ export async function resolverNovedadRetiro(formData: FormData): Promise<{ error
   if (errorRetiro) return { error: errorRetiro.message };
   if (retiro.estado !== "novedad") return {};
 
-  const { error } = await supabase.from("retiros").update({ estado: "novedad_resuelta" }).eq("id", id);
+  const { error } = await supabase
+    .from("retiros")
+    .update({ estado: "novedad_resuelta", consolidado: true })
+    .eq("id", id);
   if (error) return { error: error.message };
 
   await registrarEvento(supabase, id, "Novedad resuelta: el retiro queda como «Novedad resuelta», sin seguir el flujo normal");
@@ -427,8 +430,8 @@ export async function resolverNovedadRetiro(formData: FormData): Promise<{ error
     accion: "cambiar_estado_retiro",
     entidad: "retiros",
     entidadId: id,
-    antes: { Estado: ETIQUETA_ESTADO.novedad },
-    despues: { Estado: ETIQUETA_ESTADO.novedad_resuelta },
+    antes: { Estado: ETIQUETA_ESTADO.novedad, Consolidación: "Pendiente" },
+    despues: { Estado: ETIQUETA_ESTADO.novedad_resuelta, Consolidación: "Consolidado" },
   });
 
   revalidatePath("/retiros");
