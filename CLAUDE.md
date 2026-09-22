@@ -204,44 +204,67 @@ convenciones técnicas del código.
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
-  de pasos (Creado, Aprobado, Recibido — no es lo mismo que `estado`, ver
-  `pasosDelRetiro`). **La ficha ya es el formulario**
+  de **cuatro pasos** — Creado, Decisión, Recibido, Conciliado (`BarraPasos`,
+  `pasosDelRetiro`; no es lo mismo que `estado`, que se ve aparte en la insignia del
+  título). **Decisión** es donde Dropi aprueba o rechaza (`estado_dropi` + `fecha_decision`,
+  columna de la migración 0042) o donde el equipo cancela a mano; un **Cancelado** o una
+  **Novedad resuelta** paran el recorrido ahí mismo — Recibido y Conciliado quedan en «—»,
+  aunque haya habido un monto recibido antes de la novedad (`detenido` en `pasosDelRetiro`).
+  `fecha_decision` es opcional en la base: sin la migración 0042 la página cae a consultar
+  sin esa columna (`consultarRetiros` en `retiros/page.tsx`) y el paso Decisión muestra solo
+  la etiqueta, sin fecha. **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
-  grandes de Conciliar, Novedad (solo en un retiro abierto), Abrir (solo en novedad),
-  Cancelar y Eliminar, aparecen "Guardar cambios" y "Cancelar" — que solo se ven con
-  cambios sin guardar. Guardar no cierra la ficha. **«Conciliar», «Novedad» y «Abrir» no
+  grandes de Conciliar, Novedad (solo en un retiro abierto), Ver novedad (solo en
+  novedad), Cancelar y Eliminar, aparecen "Guardar cambios" y "Cancelar" — que solo se ven
+  con cambios sin guardar. Guardar no cierra la ficha. El selector de Estado (`ESTADO_TONO`
+  y `ESTADO_ETIQUETA`, centralizados en `src/lib/retiros/estados.ts` para no duplicarlos
+  entre la tabla, la ficha y `retiros/[id]/`) siempre muestra el valor real aunque no esté
+  en `ESTADOS_EDITABLES` (una opción extra se agrega al vuelo en el `<select>`, ver
+  `formulario-editar-retiro.tsx`): sin eso, un valor fuera de la lista revertía en
+  silencio a «Abierto» al guardar cualquier otro campo. **Un retiro cancelado o con la
+  novedad ya resuelta no ofrecen «Conciliar»** (ni en la ficha ni, como respaldo, en el
+  propio `conciliarRetiro`, que devuelve `{ error }` si igual se invoca): su ciclo ya
+  terminó en la Decisión. **«Conciliar», «Novedad» y «Ver novedad» no
   abren una ventana en el medio**: despliegan una sección al final de la misma ficha,
   **encima del historial** (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`,
   `SeccionResolverNovedad`; solo una a la vez), la ficha
   baja hasta ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco
-  entra en su primer campo. Conciliar pide **Recibido** e **ID / Referencia, obligatorios**
-  (Recibido: si se aleja de «A recibir» más de lo tolerado, `conciliarRetiro` no concilia y
-  lo dice). El **soporte** es **opcional**: se adjunta con un botón que es **solo un
-  ícono**, sin texto (`BotonAdjuntar` con `AdjuntoIcon`; ya con archivo se marca en verde y
-  su nombre queda en el tooltip), pero no bloquea conciliar si no se adjunta uno — ni en la
-  ficha ni en el servidor (`conciliarRetiro`). Novedad pide una
-  **nota opcional** (hasta 500 caracteres, sin bloquear el botón si se deja vacía):
-  `agregarNovedadRetiro` pasa el retiro a novedad y, si hay texto, deja la nota en su
-  historial («Novedad: …») y en la auditoría; entonces aparece
-  «Abrir». **«Abrir» no reabre el retiro**: baja a una sección con **la nota de la novedad**
-  (`SeccionResolverNovedad`, que la saca del historial con `novedadVigente`,
+  entra en su primer campo. Conciliar pide **Recibido** e **ID / Referencia**, ambos
+  obligatorios (Recibido: si se aleja de «A recibir» más de lo tolerado, `conciliarRetiro`
+  no concilia y lo dice). El **soporte** es **opcional**: se adjunta con un botón que es
+  **solo un ícono**, sin texto (`BotonAdjuntar` con `AdjuntoIcon`; ya con archivo se marca
+  en verde y su nombre queda en el tooltip), pero no bloquea conciliar si no se adjunta uno
+  — ni en la ficha ni en el servidor (`conciliarRetiro`). Al conciliar, deja el retiro
+  cerrado y consolidado y **la fecha de recibido la pone el sistema** (`fecha_cierre` = hoy;
+  no hay un campo de fecha aparte que llenar a mano). **Novedad no exige texto**: se crea
+  rápido, sin nota (`agregarNovedadRetiro` acepta la nota vacía), el retiro pasa a «novedad»
+  y aparece «Ver novedad» en su lugar. **«Ver novedad» lleva a la nota, editable ahí
+  mismo** (`SeccionResolverNovedad`, que la saca del historial con `novedadVigente`,
   `src/lib/retiros/novedad.ts`: la nota más reciente que no esté ya resuelta ni sustituida
-  por un estado puesto a mano; sin nota lo dice) y el botón **«Resuelto»**, que es lo único
-  que quita la novedad (`reabrirRetiro`: el retiro vuelve a abierto). Las secciones de
+  por un estado puesto a mano; sin nota lo dice), con un botón «Guardar nota»
+  (`actualizarNovedadRetiro`, que deja otra línea «Novedad: …» en el historial y en la
+  auditoría) y el botón **«Resolver»**, que es lo único que la quita
+  (`resolverNovedadRetiro`). **A diferencia de antes, el retiro no vuelve a «abierto»**:
+  pasa al estado aparte **`novedad_resuelta`** («Novedad resuelta», tono ámbar), que no
+  sigue el flujo normal de conciliación y por eso queda oculto por defecto junto con
+  «Cerrado» detrás del interruptor «Cerrados» (`retiros/filtros.ts`). Ese valor lo exige
+  el `check` de la columna `estado` en la base: **la migración 0042 es obligatoria** para
+  `resolverNovedadRetiro` (a diferencia de `fecha_decision`, no tiene plan B — sin
+  correrla, «Resolver» falla con el error crudo de Postgres). Las secciones de
   Conciliar y Novedad usan el botón grande de `BotonCrear` y
   `useFaltantes` (apagado hasta llenar lo obligatorio; pulsarlo así lleva al dato que
   falta), y al terminar suben `versionHistorial` para que el historial se vuelva a pedir.
-  El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma de
-  reabrirlo. Sin pestañas: los campos y los datos que no se editan (Recibido, Cierre,
-  Creado por —quien creó el retiro, no se reasigna—, Consolidación, Estado en Dropi,
-  Soporte) van seguidos, y **el historial
-  de actividad (`HistorialGenerico`, con `obtener={obtenerActividadRetiro}`) es siempre lo
-  último de la ficha**, debajo de Conciliar o Novedad cuando están desplegadas; por eso no
-  vive dentro del formulario. **No le pongas `key` a `HistorialGenerico`** en la ficha: con
-  una `key={fila.id}` al conciliar o agregar una novedad la sección se quedaba en
-  «Conciliando…» y no se cerraba (el estado pendiente de la acción no terminaba). Con
-  cambios sin guardar, cerrar la ficha pide confirmación.
+  El selector de Estado se ve siempre, hasta en un retiro cancelado o con novedad resuelta:
+  es la forma de corregirlo a mano. Sin pestañas: los campos y los datos que no se editan
+  (Recibido, Cierre, Creado por —quien creó el retiro, no se reasigna—, Consolidación,
+  Estado en Dropi, Soporte) van seguidos, y **el historial de actividad (`HistorialGenerico`,
+  con `obtener={obtenerActividadRetiro}`) es siempre lo último de la ficha**, debajo de
+  Conciliar o Novedad cuando están desplegadas; por eso no vive dentro del formulario.
+  **No le pongas `key` a `HistorialGenerico`** en la ficha: con una `key={fila.id}` al
+  conciliar o agregar una novedad la sección se quedaba en «Conciliando…» y no se cerraba
+  (el estado pendiente de la acción no terminaba). Con cambios sin guardar, cerrar la ficha
+  pide confirmación.
   **La tabla no tiene columna de acciones**: lo que se hace con un retiro se hace desde
   su ficha. Ctrl/Cmd/Shift-clic o
   clic central en el `#` abren la página completa (`retiros/[id]/`) en una pestaña nueva,

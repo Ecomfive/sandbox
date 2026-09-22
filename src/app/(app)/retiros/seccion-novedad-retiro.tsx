@@ -2,17 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { agregarNovedadRetiro } from "./actions";
-import { BotonCrear } from "@/components/ui/boton-crear";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { AlertaIcon } from "@/lib/nav-icons";
 
+/** Cuántos caracteres admite la nota — igual que en el servidor (`agregarNovedadRetiro`). */
+const MAX_NOVEDAD = 500;
+
 /**
  * La nota de una novedad, al final de la ficha de un retiro abierto (el botón «Novedad» de la fila de acciones lo
- * despliega y lleva hasta aquí). Al agregarla el retiro pasa a «novedad» y, si se escribió algo, la nota queda en su
- * historial; entonces aparece «Abrir», como en cualquier retiro con novedad. La nota es opcional: se puede marcar la
- * novedad sin escribirla (`SeccionResolverNovedad` avisa cuando no hay una).
+ * despliega y lleva hasta aquí). **La nota no es obligatoria**: creación rápida, se puede marcar la novedad sin
+ * escribir nada y agregarla después (o corregirla) desde «Ver novedad» — sus campos son editables, no quedan
+ * bloqueados (`SeccionResolverNovedad`). Al agregarla el retiro pasa a «novedad» y la nota (si la hay) queda en su
+ * historial; entonces aparece «Ver novedad» en el lugar de este botón.
  */
 export function SeccionNovedadRetiro({
   id,
@@ -52,7 +55,7 @@ export function SeccionNovedadRetiro({
               id={idNota}
               name="novedad"
               rows={4}
-              maxLength={500}
+              maxLength={MAX_NOVEDAD}
               placeholder="Ej: El banco devolvió la transferencia por número de cuenta incorrecto"
               className={`${fieldClass} w-full resize-y`}
             />
@@ -64,7 +67,9 @@ export function SeccionNovedadRetiro({
             </p>
           )}
 
-          <BotonCrear puede enviando={pending} etiqueta="Agregar novedad" etiquetaEnviando="Agregando..." alPulsarSinCompletar={() => {}} />
+          <Button type="submit" disabled={pending}>
+            {pending ? "Agregando..." : "Agregar novedad"}
+          </Button>
           <Button type="button" variant="secondary" onClick={alCancelar} disabled={pending}>
             Cancelar
           </Button>

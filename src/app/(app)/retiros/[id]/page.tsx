@@ -13,24 +13,11 @@ import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
 import { HistorialIcon } from "@/lib/nav-icons";
+import { ESTADO_ETIQUETA, ESTADO_TONO } from "@/lib/retiros/estados";
 
 export const metadata = { title: "Ficha de retiro" };
 
 export const dynamic = "force-dynamic";
-
-const ESTADO_TONO = {
-  abierto: "info",
-  cancelado: "neutral",
-  novedad: "destructive",
-  cerrado: "success",
-} as const;
-
-const ESTADO_ETIQUETA: Record<string, string> = {
-  abierto: "Abierto",
-  cancelado: "Cancelado",
-  novedad: "Novedad",
-  cerrado: "Cerrado",
-};
 
 export default async function RetiroDetallePage({
   params,

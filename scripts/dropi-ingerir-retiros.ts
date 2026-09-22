@@ -119,13 +119,28 @@ async function main() {
   const { actualizaciones, sinVincular } = emparejarRetiros(dropi, locales);
 
   const advertencias: string[] = [];
+  const hoyLocal = fechaLocal(new Date().toISOString());
+  // Sin la migración 0041 (columna fecha_decision), Postgres rechaza el update con 42703: se
+  // reintenta sin esa columna en vez de tumbar toda la corrida por un retiro.
+  let hayFechaDecision = true;
   for (const a of actualizaciones) {
     const cambios: Record<string, unknown> = { banco: a.banco, estado_dropi: a.estadoDropi };
     if (a.vinculadoAhora) cambios.dropi_id = a.dropiId;
     // Dropi rechazó o canceló un retiro que seguía abierto acá: se marca como novedad para que
     // se revise a mano. Nunca se cancela solo — cancelar sigue siendo una acción manual.
     if (a.marcarNovedad) cambios.estado = "novedad";
-    const { error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId);
+    // La fecha de la "Decisión" de la barra de pasos: cuándo detectamos que Dropi ya aprobó o
+    // rechazó (no la pone mientras sigue "pendiente").
+    if (hayFechaDecision && a.estadoDropi !== "pendiente" && (a.vinculadoAhora || a.cambioEstado)) {
+      cambios.fecha_decision = hoyLocal;
+    }
+    let { error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId);
+    if (error?.code === "42703" && "fecha_decision" in cambios) {
+      console.warn("Falta correr la migración 0041 (fecha_decision) — se sigue sin esa fecha por ahora.");
+      hayFechaDecision = false;
+      delete cambios.fecha_decision;
+      ({ error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId));
+    }
     if (error) throw new Error(`Error actualizando el retiro #${a.correlativo}: ${error.message}`);
 
     if (a.vinculadoAhora || a.cambioEstado || a.marcarNovedad) {

@@ -38,7 +38,7 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
       opciones: () => Object.entries(ESTADO_ETIQUETA).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
       // Para agrupar, por urgencia de conciliación y no alfabéticamente.
-      ordenGrupos: ["abierto", "novedad", "cerrado", "cancelado"],
+      ordenGrupos: ["abierto", "novedad", "cerrado", "novedad_resuelta", "cancelado"],
     },
     {
       id: "plataforma",
@@ -87,9 +87,11 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
   ],
   cerrados: {
     etiqueta: "Cerrados",
-    esCerrado: (f) => f.estado === "cerrado",
+    // Una novedad resuelta no sigue el flujo normal (no cuenta como pendiente ni como conciliado):
+    // se oculta por defecto junto con lo cerrado, para no dejar el listado lleno de novedades viejas.
+    esCerrado: (f) => f.estado === "cerrado" || f.estado === "novedad_resuelta",
     campoEstado: "estado",
-    valoresCerrados: ["cerrado"],
+    valoresCerrados: ["cerrado", "novedad_resuelta"],
     ocultosPorDefecto: true,
   },
   total: (f) => f.monto,

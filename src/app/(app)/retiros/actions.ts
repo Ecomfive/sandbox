@@ -11,9 +11,9 @@ import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
 const TOLERANCIA_DISCREPANCIA = 3;
 
 /** Estados que se pueden elegir a mano desde el selector de Estado de la ficha (se ve siempre,
- * hasta en un retiro cancelado: es la forma de reabrirlo). "cancelado" queda afuera del selector
- * a propósito: sigue siendo una acción aparte (botón Cancelar), porque es un cierre distinto al
- * de la conciliación normal. */
+ * hasta en un retiro cancelado: es la forma de reabrirlo). "cancelado" y "novedad_resuelta" quedan
+ * afuera del selector a propósito: son un cierre distinto al de la conciliación normal, cada uno con
+ * su propia acción (botón Cancelar; botón Resolver dentro de la novedad). */
 const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
 type EstadoEditable = (typeof ESTADOS_EDITABLES)[number];
 
@@ -241,6 +241,12 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
     .single();
   if (errorRetiro) return { error: errorRetiro.message };
 
+  // Un cancelado o una novedad resuelta ya terminaron su ciclo en la Decisión: no siguen a Conciliado (se
+  // vuelve a comprobar aquí porque un server action se puede invocar sin pasar por la ficha, que ya oculta el botón).
+  if (retiro.estado === "cancelado" || retiro.estado === "novedad_resuelta") {
+    return { error: "Este retiro no sigue el flujo normal de conciliación." };
+  }
+
   // Lo recibido y la referencia son obligatorios (lo que la ficha ya exige; se vuelve a comprobar aquí porque un
   // server action se puede invocar sin pasar por la ficha). El soporte es opcional: se guarda si se adjunta uno,
   // pero no bloquea conciliar.
@@ -305,7 +311,14 @@ export async function cancelarRetiro(formData: FormData) {
   const supabase = createServiceClient();
   const { data: retiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
 
-  const { error } = await supabase.from("retiros").update({ estado: "cancelado" }).eq("id", id);
+  // `fecha_cierre` marca acá la fecha de cancelación (no solo la de un cierre normal): es la fecha
+  // que muestra el paso "Decisión" de la barra de pasos cuando el retiro queda cancelado. No choca
+  // con el bloque "Cierre" de la ficha completa porque ese solo se ve con un monto recibido, que un
+  // retiro cancelado nunca tiene.
+  const { error } = await supabase
+    .from("retiros")
+    .update({ estado: "cancelado", fecha_cierre: new Date().toISOString().slice(0, 10) })
+    .eq("id", id);
   if (error) throw new Error(error.message);
 
   await registrarEvento(supabase, id, "Retiro cancelado");
@@ -326,8 +339,10 @@ const MAX_NOVEDAD = 500;
 
 /**
  * Agrega una novedad a un retiro abierto: lo pasa a «novedad» y deja la nota en su historial («Novedad: …») y en la
- * auditoría. Es el botón «Novedad» de la ficha; después, como en cualquier retiro con novedad, aparece «Abrir», que
- * lleva a la nota y a su botón «Resuelto» (`reabrirRetiro`). Solo actúa sobre un retiro abierto (no pisa un cierre ni una cancelación que haya pasado
+ * auditoría. La nota **no es obligatoria** — creación rápida: se puede marcar la novedad sin redactar nada y
+ * escribirla después (o nunca) desde «Ver novedad» (`actualizarNovedadRetiro`). Es el botón «Novedad» de la ficha;
+ * después, como en cualquier retiro con novedad, aparece «Ver novedad», que lleva a la nota y a su botón «Resolver»
+ * (`resolverNovedadRetiro`). Solo actúa sobre un retiro abierto (no pisa un cierre ni una cancelación que haya pasado
  * mientras la ficha estaba abierta). Devuelve el error como valor, porque en producción Next.js oculta el mensaje de una
  * excepción.
  */
@@ -351,7 +366,7 @@ export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?
     accion: "agregar_novedad_retiro",
     entidad: "retiros",
     entidadId: id,
-    detalle: texto || "Sin nota",
+    detalle: texto || "(sin nota)",
     antes: { Estado: ETIQUETA_ESTADO.abierto },
     despues: { Estado: ETIQUETA_ESTADO.novedad },
   });
@@ -361,11 +376,41 @@ export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?
   return {};
 }
 
-/** Quita la novedad y vuelve a dejar el retiro "abierto": es el botón «Resuelto» de la sección de la novedad (a la
- * que lleva «Abrir»); nada quita la novedad hasta que alguien pulsa «Resuelto». Solo actúa si de verdad está en
- * novedad (evita pisar un cierre o una cancelación que haya pasado mientras la ficha estaba abierta). Devuelve el error
- * como valor, porque en producción Next.js oculta el mensaje de una excepción. */
-export async function reabrirRetiro(formData: FormData): Promise<{ error?: string }> {
+/** Corrige o completa la nota de una novedad ya creada, desde «Ver novedad» (sus campos son editables, no quedan
+ * bloqueados). Deja otra línea «Novedad: …» en el historial — `novedadVigente` siempre toma la más reciente, así que
+ * la nueva nota reemplaza a la anterior sin borrar el rastro de la edición. Solo actúa mientras el retiro sigue en
+ * «novedad» (no pisa una resolución que haya pasado mientras la ficha estaba abierta). Devuelve el error como valor. */
+export async function actualizarNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
+  await requireModuloEscritura("retiros");
+  const id = formData.get("id") as string;
+  const texto = String(formData.get("novedad") ?? "").trim();
+  if (texto.length > MAX_NOVEDAD) return { error: `La novedad es muy larga (máximo ${MAX_NOVEDAD} caracteres).` };
+
+  const supabase = createServiceClient();
+  const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
+  if (errorRetiro) return { error: errorRetiro.message };
+  if (retiro.estado !== "novedad") return { error: "Esta novedad ya no está activa." };
+
+  await registrarEvento(supabase, id, `Novedad: ${texto}`);
+  await registrarAuditoria({
+    accion: "editar_novedad_retiro",
+    entidad: "retiros",
+    entidadId: id,
+    detalle: texto || "(sin nota)",
+  });
+
+  revalidatePath("/retiros");
+  revalidatePath(`/retiros/${id}`);
+  return {};
+}
+
+/** Marca la novedad como resuelta: es el botón «Resolver» de la sección de la novedad (a la que lleva «Ver
+ * novedad»); nada la quita hasta que alguien lo pulsa. **El retiro ya no vuelve a "abierto"**: queda en el estado
+ * aparte «Novedad resuelta», que no sigue el flujo normal de conciliación (no cuenta como pendiente ni como
+ * conciliado — ver `pasosDelRetiro` en `vista-rapida-retiro.tsx`). Solo actúa si de verdad está en novedad (evita
+ * pisar un cierre o una cancelación que haya pasado mientras la ficha estaba abierta). Devuelve el error como valor,
+ * porque en producción Next.js oculta el mensaje de una excepción. */
+export async function resolverNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
@@ -374,16 +419,16 @@ export async function reabrirRetiro(formData: FormData): Promise<{ error?: strin
   if (errorRetiro) return { error: errorRetiro.message };
   if (retiro.estado !== "novedad") return {};
 
-  const { error } = await supabase.from("retiros").update({ estado: "abierto" }).eq("id", id);
+  const { error } = await supabase.from("retiros").update({ estado: "novedad_resuelta" }).eq("id", id);
   if (error) return { error: error.message };
 
-  await registrarEvento(supabase, id, "Novedad resuelta: el retiro vuelve a abierto");
+  await registrarEvento(supabase, id, "Novedad resuelta: el retiro queda como «Novedad resuelta», sin seguir el flujo normal");
   await registrarAuditoria({
     accion: "cambiar_estado_retiro",
     entidad: "retiros",
     entidadId: id,
     antes: { Estado: ETIQUETA_ESTADO.novedad },
-    despues: { Estado: ETIQUETA_ESTADO.abierto },
+    despues: { Estado: ETIQUETA_ESTADO.novedad_resuelta },
   });
 
   revalidatePath("/retiros");
@@ -394,8 +439,8 @@ export async function reabrirRetiro(formData: FormData): Promise<{ error?: strin
 /** Edita a mano cualquier dato de un retiro ya creado — plataforma, cuenta destino, gestionado
  * por, monto, comisión, fechas, nota y estado — todo junto, desde su propia ficha (que ya es el
  * formulario, sin un botón "Modificar" aparte). El estado no se edita directo en la columna de la
- * tabla ni en lote: solo cambia desde acá (o al conciliar, al cancelar, o con "Abrir" para quitar
- * una novedad). No toca el correlativo. */
+ * tabla ni en lote: solo cambia desde acá (o al conciliar, al cancelar, o con «Resolver» para
+ * resolver una novedad). No toca el correlativo. */
 export async function actualizarRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
