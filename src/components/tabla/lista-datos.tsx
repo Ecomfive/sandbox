@@ -28,6 +28,7 @@ export function ListaDatos<F>({
   formatearTotal,
   encima,
   porPagina = POR_PAGINA,
+  accionPrincipal,
   vacio,
 }: {
   def: DefTabla<F>;
@@ -42,6 +43,8 @@ export function ListaDatos<F>({
   encima?: (visibles: F[]) => ReactNode;
   /** Tarjetas por página cuando no hay filtros ni grupos (50 por defecto); con menos que eso no se ve la paginación. */
   porPagina?: number;
+  /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
+  accionPrincipal?: ReactNode;
   vacio: string;
 }) {
   const tabla = useTablaInteractiva(def, filas, { porPagina });
@@ -63,7 +66,14 @@ export function ListaDatos<F>({
   return (
     <div ref={raiz} className="flex flex-col gap-3">
       <div className="min-w-0 rounded-xl border border-border bg-card [&>div]:border-b-0">
-        <BarraHerramientas def={def} filas={filas} tabla={tabla} iconos={iconos} nombreFilas={nombre.plural} />
+        <BarraHerramientas
+          def={def}
+          filas={filas}
+          tabla={tabla}
+          iconos={iconos}
+          nombreFilas={nombre.plural}
+          accionPrincipal={accionPrincipal}
+        />
       </div>
 
       {visibles.length > 0 && encima?.(visibles)}

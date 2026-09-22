@@ -4,8 +4,9 @@ import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { crearCuentaRetiro, actualizarCuentaRetiro } from "./actions";
 import { tiposParaElegir, type FilaCuenta } from "./def-cuentas";
 import { BotonAccion } from "@/components/ui/boton-accion";
-import { AvisoFaltante, BotonCrear } from "@/components/ui/boton-crear";
-import { fieldClass, labelClassSm } from "@/components/ui/field";
+import { BotonCrear } from "@/components/ui/boton-crear";
+import { Campo } from "@/components/ui/campo-ficha";
+import { fieldClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { CerrarIcon, CheckIcon, ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
@@ -56,32 +57,6 @@ function SelectorDeLista({
         </option>
       ))}
     </select>
-  );
-}
-
-function Campo({
-  etiqueta,
-  id,
-  obligatorio,
-  faltante,
-  children,
-}: {
-  etiqueta: string;
-  id: string;
-  obligatorio?: boolean;
-  /** El `id` del dato obligatorio que se está señalando (ver `useFaltantes`): si es este, se avisa debajo. */
-  faltante?: string | null;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className={labelClassSm} htmlFor={id}>
-        {etiqueta}
-        {obligatorio && <span aria-hidden="true" className="text-destructive"> *</span>}
-      </label>
-      {children}
-      {obligatorio && <AvisoFaltante id={id} faltante={faltante ?? null} />}
-    </div>
   );
 }
 

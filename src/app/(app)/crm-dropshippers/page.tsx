@@ -3,10 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { crearDropshipper, registrarInteraccion } from "./actions";
-import { Button } from "@/components/ui/button";
-import { fieldClass, labelClass } from "@/components/ui/field";
-import { TIPOS_INTERACCION, type FilaDropshipper, type FilaInteraccion } from "./def-crm";
+import type { FilaDropshipper, FilaInteraccion } from "./def-crm";
 import { ListaDropshippers } from "./lista-dropshippers";
 import { TablaInteracciones } from "./tabla-interacciones";
 
@@ -14,10 +11,9 @@ export const metadata = { title: "CRM Dropshippers" };
 
 export const dynamic = "force-dynamic";
 
-const hoy = () => new Date().toISOString().slice(0, 10);
-
 export default async function CrmDropshippersPage() {
-  await requireModulo("crm-dropshippers");
+  const usuario = await requireModulo("crm-dropshippers");
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
@@ -55,89 +51,28 @@ export default async function CrmDropshippersPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="CRM Dropshippers" oculto>
-        {pais.nombre} — directorio y bitácora de comunicación con dropshippers. El volumen de
-        ventas se ingresa a mano hasta conectar las órdenes de Dropi.
-      </EncabezadoPagina>
-
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight">Agregar dropshipper</h2>
-        <form
-          action={crearDropshipper}
-          className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
-        >
-          <input type="hidden" name="pais_id" value={pais.id} />
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Nombre</span>
-            <input type="text" name="nombre" required className={fieldClass} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Correo</span>
-            <input type="email" name="contacto_email" className={fieldClass} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Teléfono</span>
-            <input type="text" name="contacto_telefono" className={fieldClass} />
-          </label>
-          <Button type="submit">Agregar</Button>
-        </form>
-      </div>
+      <EncabezadoPagina titulo="CRM Dropshippers" oculto />
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Dropshippers</h2>
         <div className="mt-3">
-          <ListaDropshippers dropshippers={filasDropshippers} pais={pais.nombre} />
+          <ListaDropshippers
+            dropshippers={filasDropshippers}
+            pais={pais.nombre}
+            paisId={pais.id}
+            puedeEscribir={puedeEscribir}
+          />
         </div>
-      </div>
-
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight">Registrar interacción</h2>
-        {(dropshippers ?? []).length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Agrega al menos un dropshipper para poder registrar interacciones.
-          </p>
-        ) : (
-          <form
-            action={registrarInteraccion}
-            className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4"
-          >
-            <label className="flex flex-col gap-1">
-              <span className={labelClass}>Dropshipper</span>
-              <select name="dropshipper_id" required className={fieldClass}>
-                {(dropshippers ?? []).map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={labelClass}>Tipo</span>
-              <select name="tipo" defaultValue="whatsapp" className={fieldClass}>
-                {TIPOS_INTERACCION.map((t) => (
-                  <option key={t.valor} value={t.valor}>
-                    {t.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={labelClass}>Fecha</span>
-              <input type="date" name="fecha" defaultValue={hoy()} required className={fieldClass} />
-            </label>
-            <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
-              <span className={labelClass}>Nota</span>
-              <input type="text" name="nota" required className={fieldClass} />
-            </label>
-            <Button type="submit">Registrar</Button>
-          </form>
-        )}
       </div>
 
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Interacciones recientes</h2>
         <div className="mt-3">
-          <TablaInteracciones interacciones={filasInteracciones} />
+          <TablaInteracciones
+            interacciones={filasInteracciones}
+            dropshippers={(dropshippers ?? []).map((d) => ({ id: d.id, nombre: d.nombre }))}
+            puedeEscribir={puedeEscribir}
+          />
         </div>
       </div>
     </Pagina>

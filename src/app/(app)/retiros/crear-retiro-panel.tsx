@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { pideCrear } from "@/lib/crear-global";
 import { crearRetiro, verSiguienteCorrelativo } from "./actions";
+import { BotonAgregar } from "@/components/ui/boton-agregar";
 import { AvisoFaltante, BotonCrear } from "@/components/ui/boton-crear";
-import { Button } from "@/components/ui/button";
 import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { Ventana } from "@/components/ui/ventana";
-import { CalendarioIcon, ExtractoIcon, GastoIcon, MasIcon, WalletIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -176,16 +176,7 @@ export function CrearRetiroPanel({
   return (
     <>
       {/* «Agregar» abre directo la ficha de nuevo retiro; las cuentas destino se agregan en su propia pestaña. */}
-      <Button
-        ref={botonAbrirRef}
-        type="button"
-        aria-haspopup="dialog"
-        onClick={abrirVentana}
-        className="!bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
-      >
-        <MasIcon className="mr-1 h-4 w-4" />
-        Agregar
-      </Button>
+      <BotonAgregar ref={botonAbrirRef} onClick={abrirVentana} />
 
       <Ventana
         abierto={abierto}

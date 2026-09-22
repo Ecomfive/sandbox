@@ -7,6 +7,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CalendarioIcon, CatalogoIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { cambiarEstadoSku } from "./actions";
+import { CrearSkuPanel } from "./crear-sku-panel";
 import { DEF_CATALOGO, ETIQUETA_ESTADO, ETIQUETA_TIPO, TONO_ESTADO, type FilaSku } from "./def-catalogo";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
@@ -44,8 +45,16 @@ function siguientes(estado: string): { etiqueta: string; valor: string }[] {
   return [{ etiqueta: "Regresar a revisión", valor: "en_revision" }];
 }
 
-/** Catálogo de SKU maestros con la barra de herramientas común (agrupar por estado o tipo, aprobados y filtros). */
-export function TablaCatalogo({ skus }: { skus: FilaSku[] }) {
+/** Catálogo de SKU maestros con la barra de herramientas común (agrupar por estado o tipo, aprobados, filtros y «Agregar»). */
+export function TablaCatalogo({
+  skus,
+  opcionesSimples,
+  puedeEscribir,
+}: {
+  skus: FilaSku[];
+  opcionesSimples: { id: string; codigo: string; nombre: string }[];
+  puedeEscribir: boolean;
+}) {
   return (
     <TablaDatos
       def={DEF_CATALOGO}
@@ -55,22 +64,27 @@ export function TablaCatalogo({ skus }: { skus: FilaSku[] }) {
       nombre={NOMBRE}
       claveFila={(s) => s.id}
       anchoMinimo="48rem"
-      accion={{
-        etiqueta: "Acción",
-        render: (s) => (
-          <div className="flex flex-wrap gap-2">
-            {siguientes(s.estado).map((paso) => (
-              <form key={paso.valor} action={cambiarEstadoSku}>
-                <input type="hidden" name="id" value={s.id} />
-                <input type="hidden" name="nuevo_estado" value={paso.valor} />
-                <Button type="submit" variant="secondary" className="text-xs">
-                  {paso.etiqueta}
-                </Button>
-              </form>
-            ))}
-          </div>
-        ),
-      }}
+      accionPrincipal={puedeEscribir ? <CrearSkuPanel opcionesSimples={opcionesSimples} /> : undefined}
+      accion={
+        puedeEscribir
+          ? {
+              etiqueta: "Acción",
+              render: (s) => (
+                <div className="flex flex-wrap gap-2">
+                  {siguientes(s.estado).map((paso) => (
+                    <form key={paso.valor} action={cambiarEstadoSku}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="nuevo_estado" value={paso.valor} />
+                      <Button type="submit" variant="secondary" className="text-xs">
+                        {paso.etiqueta}
+                      </Button>
+                    </form>
+                  ))}
+                </div>
+              ),
+            }
+          : undefined
+      }
       ariaLabel="Catálogo de SKU maestros"
       vacio="Todavía no hay SKUs maestros propuestos."
     />

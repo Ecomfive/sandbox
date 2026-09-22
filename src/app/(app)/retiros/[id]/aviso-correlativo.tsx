@@ -11,7 +11,8 @@ export function AvisoCorrelativo({ pedido, actual }: { pedido: string | undefine
   const numeroPedido = leerCorrelativo(pedido);
   if (numeroPedido === null || numeroPedido === actual) return null;
   return (
-    <p role="status" className="rounded-xl border border-border bg-warning-soft px-4 py-3 text-sm text-foreground">
+    <p role="status" className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground">
+      <span aria-hidden="true" className="mr-2 inline-block h-2 w-2 rounded-full bg-warning align-middle" />
       Otra persona creó primero el retiro <span className="font-semibold tabular-nums">{formato(numeroPedido)}</span>. Este
       quedó como <span className="font-semibold tabular-nums">{formato(actual)}</span>: escribe{" "}
       <span className="font-semibold tabular-nums">{formato(actual)}</span> en el concepto del retiro en Dropi.

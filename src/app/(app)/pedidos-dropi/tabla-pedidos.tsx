@@ -96,18 +96,16 @@ export function TablaPedidos({
         return (
           <>
             {p.alerta && (
-              <>
-                <Tooltip texto="Liquidado en cartera, sin marcar ENTREGADO en Dropi">
-                  <span
-                    role="img"
-                    aria-label="Alerta: liquidado en cartera, sin marcar ENTREGADO en Dropi"
-                    tabIndex={0}
-                    className={anilloFoco}
-                  >
-                    ⚠️
-                  </span>
-                </Tooltip>{" "}
-              </>
+              // La alerta se marca con un punto rojo antes de la referencia (igual que las tarjetas de resumen), no con
+              // el renglón entero teñido de rojo.
+              <Tooltip texto="Liquidado en cartera, sin marcar ENTREGADO en Dropi">
+                <span
+                  role="img"
+                  aria-label="Alerta: liquidado en cartera, sin marcar ENTREGADO en Dropi"
+                  tabIndex={0}
+                  className={`mr-2 inline-block h-2 w-2 rounded-full bg-destructive align-middle ${anilloFoco}`}
+                />
+              </Tooltip>
             )}
             {p.referencia}
           </>
@@ -124,24 +122,10 @@ export function TablaPedidos({
   }
 
   const fila = (p: FilaPedido) => (
-    <tr
-      key={p.referencia}
-      className={`border-b last:border-0 ${
-        p.alerta ? "border-destructive/30 bg-destructive-soft text-destructive" : "border-border/60"
-      }`}
-    >
+    <tr key={p.referencia} className="border-b border-border/60 last:border-0">
       {columnasVisibles.map((columna, i) => {
         const base = `py-2 pr-3 ${i === 0 ? "pl-4" : ""}`;
-        const color =
-          columna.id === "fechaHora"
-            ? p.alerta
-              ? "text-destructive"
-              : "text-muted-foreground"
-            : columna.id === "producto"
-              ? p.alerta
-                ? ""
-                : "text-muted-foreground"
-              : "";
+        const color = columna.id === "fechaHora" || columna.id === "producto" ? "text-muted-foreground" : "";
         const tipo = columna.id === "orden" ? "font-medium" : columna.id === "cantidad" || columna.id === "monto" ? "tabular-nums" : "";
         return (
           <td key={columna.id} className={`${base} ${color} ${tipo}`}>

@@ -121,10 +121,47 @@ convenciones técnicas del código.
   `NavBar`) lista lo que se crea a menudo desde cualquier página; las opciones salen de
   `ACCIONES_CREAR` (`src/lib/crear-global.ts`) y solo aparecen las de módulos que la
   persona puede abrir **y modificar**. Cada opción lleva a donde se crea; una que abre
-  un formulario llega con `?nuevo=1` y la página lo abre sola (Retiros abre su ventana
-  y limpia el parámetro con `router.replace`; Gastos pone el cursor en el primer campo
-  con `pideCrear`). Para sumar una opción: agrégala a `ACCIONES_CREAR` y, si abre un
-  formulario, haz que su página atienda `?nuevo=1`.
+  un formulario llega con `?nuevo=1` y la página lo abre sola (Retiros abre su ficha y
+  limpia el parámetro con `router.replace`; Gastos hace lo mismo con
+  `<FichaCrear abrirConNuevo>`). Para sumar una opción: agrégala a `ACCIONES_CREAR` y, si
+  abre un formulario, haz que su página atienda `?nuevo=1`.
+- **Botón «Agregar» y fichas de crear (todas las áreas, como Retiros).** Lo que se crea
+  en una tabla se crea desde **«Agregar», el botón oscuro al final de la misma fila de
+  botones de su barra de herramientas** (`accionPrincipal` de `BarraHerramientas`,
+  `TablaDatos` y `ListaDatos`; `BotonAgregar`, `src/components/ui/boton-agregar.tsx`), y
+  abre una **ficha lateral**, no un formulario suelto encima de la tabla ni una fila de
+  campos con su botón. La ficha de un módulo es un componente de cliente de su carpeta
+  (`crear-gasto-panel.tsx`, `crear-dropshipper-panel.tsx`, …) que usa `FichaCrear`
+  (`src/components/ui/ficha-crear.tsx`): pone el botón, el panel, los bloques (`Seccion`),
+  el «* Obligatorio» y el botón grande de crear apagado hasta llenar lo obligatorio
+  (`useFaltantes`, `BotonCrear`); el módulo solo aporta su `action`, sus campos (`Campo`,
+  `src/components/ui/campo-ficha.tsx`, con ejemplos ficticios en los vacíos) y lo que
+  viaja oculto (`ocultos`, p. ej. `pais_id`). Los campos van como función
+  (`{({ faltante, invalido }) => …}`) para señalar el dato que falta: por eso viven en un
+  Client Component y no en la página. La acción devuelve `{ error }` como valor, sin
+  lanzarlo; sin error la ficha se cierra y sale un aviso, con error se ve dentro de ella y
+  no se cierra. Con `alAbrir` se reinicia lo que la ficha guarda en su estado (el tipo de
+  SKU) y con `puedeExtra` se apaga el botón por algo que no es un campo (no hay
+  dropshippers a quien registrar una interacción). Con solo lectura en el módulo no se
+  dibuja «Agregar» ni el botón «Eliminar» de la fila (`puedeEscribir`). Ya la usan Gastos,
+  CRM (dropshipper e interacción), Catálogo (un solo «Nuevo SKU» con el tipo Simple o
+  Combo), Configuración (plataformas y **la misma ficha de cuenta destino** de Retiros),
+  Patrones bancarios y Cuentas destino. (Usuarios y roles tiene su propia versión, con
+  ficha de persona y de rol, y no usa `FichaCrear`.) En una página con una sola tabla no
+  lleva título suelto (`EncabezadoPagina oculto`, sin descripción); con dos tablas
+  (Configuración, CRM) cada una lleva su `h2` con el nombre, sin texto explicativo.
+- **Color: un punto, no una caja.** Lo que está en estado de alerta se marca con **un
+  punto de color** junto a su título (tarjetas de resumen, `KpiCard tono`), no con el
+  borde ni el fondo de toda la caja o de toda la fila: la alerta de un pedido es un
+  punto rojo antes de su referencia, el aviso «Mostrando N de M» y el de correlativo son
+  cajas neutras con un punto ámbar, el bloque «Cierre» del retiro lleva su punto rojo en
+  el título. Las superficies son blancas (`card`) con borde `border`; el gris (`muted`)
+  es solo para las franjas de encabezado (la del grupo de tarjetas y la fila de títulos
+  de la tabla); el negro (`foreground`) es solo para la acción principal (Agregar,
+  Crear) y lo seleccionado. Los rellenos oscuros salen de los tokens
+  (`bg-foreground text-background`), **nunca un `#202020` fijo**: en el tema oscuro se
+  invierten (un negro fijo quedaba casi invisible sobre la tarjeta oscura). El color
+  pleno queda para las insignias de estado (`Badge`) y los avisos de éxito o error.
 - **País de cada persona.** `getPaisActual` (`src/lib/pais.ts`) resuelve el país con
   este orden: la cookie `pais_actual` de este navegador; si no hay, el último país que
   la persona eligió (`perfiles.pais_preferido`, migración 0038, que `setPaisActual`
@@ -232,7 +269,8 @@ convenciones técnicas del código.
   cuenta se hace desde su ficha. «Nueva cuenta destino» (`ventana-cuenta-retiro.tsx`,
   el botón Agregar) usa el mismo `FormularioCuenta`. **Los formularios de creación**
   (la ficha de «Nuevo retiro», `retiros/crear-retiro-panel.tsx`, y «Nueva cuenta
-  destino») son un panel lateral (`Ventana`) con bloques (`Seccion`) y siguen esta
+  destino»; los demás módulos usan `FichaCrear`, ver «Botón «Agregar» y fichas de
+  crear») son un panel lateral (`Ventana`) con bloques (`Seccion`) y siguen esta
   receta: (1) los campos vacíos llevan un **ejemplo ficticio** del formato del dato
   (`placeholder="Ej: 1500.00"`; nunca datos de una cuenta real); (2) al final va **un botón
   grande de crear** (`BotonCrear`, `src/components/ui/boton-crear.tsx`) que se ve

@@ -153,12 +153,11 @@ export default async function RetiroDetallePage({
       </div>
 
       {retiro.monto_recibido !== null && (
-        <div
-          className={`rounded-lg border p-5 text-sm ${
-            retiro.estado === "novedad" ? "border-destructive/40 bg-destructive-soft" : "border-border bg-card"
-          }`}
-        >
-          <h2 className="mb-3 text-sm font-semibold tracking-tight">Cierre</h2>
+        <div className="rounded-xl border border-border bg-card p-5 text-sm">
+          <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+            {retiro.estado === "novedad" && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-destructive" />}
+            Cierre
+          </h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-muted-foreground">Monto recibido</p>

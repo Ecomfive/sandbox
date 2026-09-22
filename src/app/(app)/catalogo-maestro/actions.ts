@@ -70,6 +70,19 @@ export async function crearCombo(formData: FormData) {
   revalidatePath("/catalogo-maestro");
 }
 
+/** «Nuevo SKU» de la ficha: crea un SKU simple o un combo según el `tipo`, con el error como valor (`{ error }`). */
+export async function proponerSku(formData: FormData): Promise<{ error?: string }> {
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { error: "Escribe el nombre del SKU." };
+  try {
+    if (formData.get("tipo") === "combo") await crearCombo(formData);
+    else await crearSkuSimple(formData);
+    return {};
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo guardar el SKU." };
+  }
+}
+
 const TRANSICIONES: Record<string, string[]> = {
   propuesto: ["en_revision"],
   en_revision: ["propuesto", "aprobado"],

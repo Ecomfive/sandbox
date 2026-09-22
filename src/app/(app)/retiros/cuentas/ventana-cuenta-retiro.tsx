@@ -2,9 +2,8 @@
 
 import { useRef, useState } from "react";
 import { FormularioCuenta } from "./formulario-cuenta";
-import { Button } from "@/components/ui/button";
+import { BotonAgregar } from "@/components/ui/boton-agregar";
 import { Ventana } from "@/components/ui/ventana";
-import { MasIcon } from "@/lib/nav-icons";
 
 /**
  * Botón «Agregar» y la ficha para crear una cuenta destino: un panel que sale por la derecha (como la ficha de un
@@ -32,15 +31,7 @@ export function VentanaCuentaRetiro({ paisId, paisNombre }: { paisId: string; pa
 
   return (
     <>
-      <Button
-        ref={botonAbrirRef}
-        type="button"
-        onClick={() => setAbierto(true)}
-        className="!rounded-full !bg-[#202020] !text-white hover:!bg-[#2d2d2d]"
-      >
-        <MasIcon className="mr-1 h-4 w-4" />
-        Agregar
-      </Button>
+      <BotonAgregar ref={botonAbrirRef} onClick={() => setAbierto(true)} />
 
       <Ventana
         abierto={abierto}

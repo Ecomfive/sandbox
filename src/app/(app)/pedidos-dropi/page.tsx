@@ -196,7 +196,8 @@ export default async function PedidosDropiPage({
           </KpiGroup>
 
           {todas.length < totalFiltrado && (
-            <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm text-warning">
+            <div className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+              <span aria-hidden="true" className="mr-2 inline-block h-2 w-2 rounded-full bg-warning align-middle" />
               <strong className="font-semibold">
                 Mostrando {todas.length} de {totalFiltrado.toLocaleString("es")} órdenes
               </strong>{" "}
