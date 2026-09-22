@@ -226,6 +226,14 @@ convenciones técnicas del código.
     barra por su propio paso (rojo, con la fecha de `cancelarRetiro`) — Creado, Cancelado,
     nada más; no tiene sentido seguir mostrando Aprobado/Novedad/Recibido/Conciliado si el
     retiro no va a llegar ahí.
+  Los círculos son chicos (`h-3.5 w-3.5`, borde fino) unidos por **una línea continua de
+  1 px** (`bg-success` en el tramo ya completo, `bg-border` en el resto, como un rastreo de
+  envíos): nada de círculos grandes ni línea gruesa, que se ven pesados con hasta cinco
+  pasos en la barra. Un retiro que ya pasó por Aprobado/Rechazado/Novedad/Novedad resuelta
+  **antes** de que existieran esas columnas (migraciones 0044/0045) se queda con «—» en
+  esos pasos — nada las rellena solo. `scripts/backfill-fechas-retiros.ts` las rellena una
+  vez, sacando la fecha del evento correspondiente que ya estaba en `retiro_eventos`
+  (sin `--aplicar` solo dice qué encontraría).
   **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones

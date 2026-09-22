@@ -115,19 +115,19 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
           {i > 0 && (
             <div
               aria-hidden="true"
-              className={`mt-4 h-0.5 flex-1 ${pasos[i - 1].estado === "completo" ? "bg-success" : "bg-border"}`}
+              className={`mt-[7px] h-px flex-1 ${pasos[i - 1].estado === "completo" ? "bg-success" : "bg-border"}`}
             />
           )}
-          <div className="flex w-24 shrink-0 flex-col items-center gap-1 text-center">
+          <div className="flex w-16 shrink-0 flex-col items-center gap-1 text-center">
             <span
               aria-hidden="true"
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${claseNodo(paso.estado)}`}
+              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${claseNodo(paso.estado)}`}
             >
-              {paso.estado === "completo" && <CheckIcon className="h-4 w-4" />}
-              {paso.estado === "error" && <CerrarIcon className="h-4 w-4" />}
+              {paso.estado === "completo" && <CheckIcon className="h-2 w-2" />}
+              {paso.estado === "error" && <CerrarIcon className="h-2 w-2" />}
             </span>
-            <span className="text-sm font-semibold">{paso.etiqueta}</span>
-            <span className="text-xs text-muted-foreground">{paso.subtexto}</span>
+            <span className="text-xs font-medium leading-tight">{paso.etiqueta}</span>
+            <span className="text-[11px] leading-tight text-muted-foreground">{paso.subtexto}</span>
           </div>
         </Fragment>
       ))}
