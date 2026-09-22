@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import {
   ETIQUETA_ESTADO_DROPI,
@@ -43,9 +44,9 @@ export function DropiSinVincular({ filas, codigoPais }: { filas: FilaSinVincular
           <table className="w-full min-w-[42rem] border-collapse text-sm">
             <caption className="sr-only">Retiros de Dropi sin vincular a un retiro creado</caption>
             <thead>
-              <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+              <tr className={claseFilaEncabezado}>
                 {["Dropi", "Fecha", "Monto", "Estado", "Banco", "Concepto", "Motivo"].map((titulo) => (
-                  <th key={titulo} scope="col" className="px-4 py-3 text-xs font-semibold tracking-wide uppercase">
+                  <th key={titulo} scope="col" className={claseEncabezadoColumna}>
                     {titulo}
                   </th>
                 ))}
@@ -54,17 +55,17 @@ export function DropiSinVincular({ filas, codigoPais }: { filas: FilaSinVincular
             <tbody>
               {filas.map((fila) => (
                 <tr key={fila.id} className="border-b border-border/60 last:border-0">
-                  <td className="px-4 py-3 font-medium tabular-nums">#{fila.dropi_id}</td>
-                  <td className="px-4 py-3">{formatearFechaNumerica(fila.fecha)}</td>
-                  <td className="px-4 py-3 font-semibold tabular-nums">
+                  <td className={`${claseCeldaColumna} font-medium tabular-nums`}>#{fila.dropi_id}</td>
+                  <td className={claseCeldaColumna}>{formatearFechaNumerica(fila.fecha)}</td>
+                  <td className={`${claseCeldaColumna} font-semibold tabular-nums`}>
                     {formatearMoneda(Number(fila.monto), codigoPais)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className={claseCeldaColumna}>
                     <Badge tone={TONO_ESTADO_DROPI[fila.estado_dropi]}>{ETIQUETA_ESTADO_DROPI[fila.estado_dropi]}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{fila.banco ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{fila.concepto ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{ETIQUETA_MOTIVO[fila.motivo]}</td>
+                  <td className={`${claseCeldaColumna} text-muted-foreground`}>{fila.banco ?? "—"}</td>
+                  <td className={`${claseCeldaColumna} text-muted-foreground`}>{fila.concepto ?? "—"}</td>
+                  <td className={`${claseCeldaColumna} text-muted-foreground`}>{ETIQUETA_MOTIVO[fila.motivo]}</td>
                 </tr>
               ))}
             </tbody>

@@ -60,6 +60,7 @@ export default async function CrmDropshippersPage() {
             dropshippers={filasDropshippers}
             pais={pais.nombre}
             paisId={pais.id}
+            codigoPais={pais.codigo}
             puedeEscribir={puedeEscribir}
           />
         </div>

@@ -4,6 +4,7 @@ import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
+import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { fechaHaceMeses, snapshotMasCercano } from "@/lib/inteligencia/agregados";
 import { formatearFecha } from "@/lib/formato";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -73,10 +74,10 @@ export default async function DetalleProveedorCompetenciaPage({
           <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[28rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                  <th className="py-2 pr-3 pl-4 font-medium">Período</th>
-                  <th className="py-2 pr-3 font-medium">Productos hace ese tiempo</th>
-                  <th className="py-2 pr-3 font-medium">Cambio en productos</th>
+                <tr className={claseFilaEncabezado}>
+                  <th className={claseEncabezadoColumna}>Período</th>
+                  <th className={claseEncabezadoColumna}>Productos hace ese tiempo</th>
+                  <th className={claseEncabezadoColumna}>Cambio en productos</th>
                 </tr>
               </thead>
               <tbody>
@@ -86,11 +87,11 @@ export default async function DetalleProveedorCompetenciaPage({
                   const cambio = pasado ? actual.productos_count - pasado.productos_count : null;
                   return (
                     <tr key={etiqueta} className="border-b border-border/60 last:border-0">
-                      <td className="py-2 pr-3 pl-4 font-medium">{etiqueta}</td>
-                      <td className="py-2 pr-3 tabular-nums text-muted-foreground">
+                      <td className={`${claseCeldaColumna} font-medium`}>{etiqueta}</td>
+                      <td className={`${claseCeldaColumna} tabular-nums text-muted-foreground`}>
                         {pasado ? `${pasado.productos_count} (${formatearFecha(pasado.fecha)})` : "Sin dato"}
                       </td>
-                      <td className="py-2 pr-3">
+                      <td className={claseCeldaColumna}>
                         {cambio === null ? (
                           <span className="text-xs text-muted-foreground">Sin historial suficiente</span>
                         ) : cambio === 0 ? (
@@ -116,16 +117,16 @@ export default async function DetalleProveedorCompetenciaPage({
           <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[20rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-                  <th className="py-2 pr-3 pl-4 font-medium">Fecha</th>
-                  <th className="py-2 pr-3 font-medium">Productos</th>
+                <tr className={claseFilaEncabezado}>
+                  <th className={claseEncabezadoColumna}>Fecha</th>
+                  <th className={claseEncabezadoColumna}>Productos</th>
                 </tr>
               </thead>
               <tbody>
                 {snapshots.map((s) => (
                   <tr key={s.fecha} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 pl-4">{formatearFecha(s.fecha)}</td>
-                    <td className="py-2 pr-3 tabular-nums">{s.productos_count}</td>
+                    <td className={claseCeldaColumna}>{formatearFecha(s.fecha)}</td>
+                    <td className={`${claseCeldaColumna} tabular-nums`}>{s.productos_count}</td>
                   </tr>
                 ))}
               </tbody>

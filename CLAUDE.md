@@ -162,6 +162,27 @@ convenciones técnicas del código.
   (`bg-foreground text-background`), **nunca un `#202020` fijo**: en el tema oscuro se
   invierten (un negro fijo quedaba casi invisible sobre la tarjeta oscura). El color
   pleno queda para las insignias de estado (`Badge`) y los avisos de éxito o error.
+- **Fichas de detalle con línea de tiempo (Catálogo, Alertas; CRM aparte).** Un registro
+  con estados que cambian (un SKU, una alerta de inventario) se abre en un panel lateral
+  con la misma estructura que `FichaCuenta`: cabecera con sus insignias, flechas de
+  anterior/siguiente, una fila de `BotonAccion` para pasar de estado y los datos en
+  bloques con ícono; **la tabla no tiene columna de acciones** (`abrirFila` de
+  `TablaDatos`, como Cuentas destino). La actividad va al final con
+  `HistorialGenerico` (`src/components/ui/historial-generico.tsx`, la misma
+  `HistorialRetiro` pero genérica: recibe `obtener`, la acción de lectura propia del
+  módulo, como prop — vale porque los dos son de cliente, no cruza de servidor).
+  Cada módulo define su `obtenerHistorialX(id)` (basta poder abrir el módulo,
+  devuelve el error como valor, id validado con forma de UUID) que lee
+  `historial_auditoria` filtrado por `entidad`/`entidad_id` y arma cada línea con
+  `formatearEventoAuditoria` (`src/lib/auditoria-cambios.ts`: `usuario_nombre` +
+  `ETIQUETA_ACCION[accion]` + «Campo antes → después» si `antes`/`despues` traen algo,
+  si no el `detalle` libre). Para que haya algo que mostrar, la acción que cambia el
+  estado llama a `registrarAuditoria` con el valor de antes (leído con un `select`
+  previo) y el de después — ver `cambiarEstadoSku` y `actualizarEstadoAlerta`. **CRM
+  Dropshippers no usa este panel**: su lista es `ListaDatos` (tarjeta con su propio
+  formulario, no una tabla), así que la actividad se despliega **dentro de la misma
+  tarjeta** con un botón «Ver actividad» (`crm-dropshippers/lista-dropshippers.tsx`),
+  reutilizando el mismo `HistorialGenerico`.
 - **País de cada persona.** `getPaisActual` (`src/lib/pais.ts`) resuelve el país con
   este orden: la cookie `pais_actual` de este navegador; si no hay, el último país que
   la persona eligió (`perfiles.pais_preferido`, migración 0038, que `setPaisActual`
@@ -360,7 +381,18 @@ convenciones técnicas del código.
   siempre la misma, como `defMovimientosBanco`). En la definición, `vistaInicial`
   hace que la tabla arranque agrupada (quien ya eligió una vista no la pierde) y
   `formatearValor` da un nombre legible a valores que ordenan bien pero se leen
-  mal (una fecha ISO). No pongas `total` si sumar mezclaría cosas distintas
+  mal (una fecha ISO). **El encabezado y las celdas de una tabla usan las clases
+  compartidas de `src/components/tabla/estilos-tabla.ts`** (`claseFilaEncabezado`,
+  `claseEncabezadoColumna`, `claseCeldaColumna` y, para una columna de casilla de
+  selección, `claseEncabezadoCasilla`/`claseCeldaCasilla`): mayúsculas pequeñas en
+  el nombre de columna y un filete vertical entre columnas, estilo que antes solo
+  tenía Retiros. `TablaDatos` ya las trae; las tablas que arman la suya
+  (`retiros/tabla-retiros.tsx`, `pedidos-dropi/tabla-pedidos.tsx`,
+  `alertas/tabla-alertas.tsx`, `productos/tabla-productos.tsx`,
+  `retiros/dropi-sin-vincular.tsx`, el detalle de un proveedor en Inteligencia
+  competitiva y las dos tablas del Centro de notificaciones) las importan en vez
+  de repetir las clases a mano. No pongas un ícono de arrastrar decorativo en el
+  encabezado: no arrastra nada (reordenar columnas es el menú «Columnas»). No pongas `total` si sumar mezclaría cosas distintas
   (entradas y salidas). Un filtro de un toque («Mis retiros») se pasa a
   `<BarraHerramientas atajos={[...]}>` (`AtajoFiltro`, `src/lib/tabla/atajos.ts`): es un
   filtro de selección que el botón enciende o apaga sin tocar los de otros campos.

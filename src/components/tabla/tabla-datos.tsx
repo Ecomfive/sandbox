@@ -10,6 +10,7 @@ import { BarraHerramientas } from "./barra-herramientas";
 import type { IconoComp } from "./botones-vista";
 import type { DescargaCompleta } from "./boton-descargar";
 import { EncabezadoGrupo } from "./encabezado-grupo";
+import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "./estilos-tabla";
 import { useColumnas, type ColumnaDef } from "./ganchos";
 import { Paginacion } from "./paginacion";
 import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "./usar-pagina-arriba";
@@ -114,7 +115,7 @@ export function TablaDatos<F, C = undefined>({
       className={`group border-b border-border/60 last:border-0 ${abrirFila ? "cursor-pointer hover:bg-muted/50" : ""} ${claseFila?.(f) ?? ""}`}
     >
       {visibles_.map((c, i) => (
-        <td key={c.id} className={`py-2 pr-3 ${i === 0 ? "pl-4" : ""} ${c.clase ?? ""}`}>
+        <td key={c.id} className={`${claseCeldaColumna} ${c.clase ?? ""}`}>
           {abrirFila && i === 0 ? (
             <button
               type="button"
@@ -134,8 +135,8 @@ export function TablaDatos<F, C = undefined>({
         <td
           className={
             accion.fija
-              ? "sticky right-0 z-10 border-l border-border/60 bg-card py-2 pr-4 pl-3 group-hover:bg-muted/50"
-              : "py-2 pr-3"
+              ? "sticky right-0 z-10 border-l border-border/60 bg-card py-3 pr-4 pl-3 group-hover:bg-muted/50"
+              : "py-3 pr-3"
           }
         >
           {accion.render(f)}
@@ -172,9 +173,9 @@ export function TablaDatos<F, C = undefined>({
       <ContenedorTabla ariaLabel={ariaLabel}>
         <table className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
           <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              {visibles_.map((c, i) => (
-                <th key={c.id} scope="col" className={`py-2 pr-3 font-medium ${i === 0 ? "pl-4" : ""}`}>
+            <tr className={claseFilaEncabezado}>
+              {visibles_.map((c) => (
+                <th key={c.id} scope="col" className={claseEncabezadoColumna}>
                   {c.label}
                 </th>
               ))}
@@ -183,8 +184,8 @@ export function TablaDatos<F, C = undefined>({
                   scope="col"
                   className={
                     accion.fija
-                      ? "sticky right-0 z-10 bg-muted py-2 pr-4 pl-3 text-center font-medium"
-                      : "py-2 pr-3 font-medium"
+                      ? "sticky right-0 z-10 bg-muted px-4 py-3 text-center text-xs font-semibold tracking-wide uppercase"
+                      : "py-3 pr-3 font-medium"
                   }
                 >
                   {accion.fija ? accion.etiqueta : <span className="sr-only">{accion.etiqueta}</span>}

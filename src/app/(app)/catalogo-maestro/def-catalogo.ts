@@ -14,6 +14,19 @@ export const TONO_ESTADO: Record<string, "warning" | "info" | "success"> = {
 
 export const ETIQUETA_TIPO: Record<string, string> = { simple: "Simple", combo: "Combo" };
 
+/** Pasos que se pueden dar desde cada estado (todo pasa por revisión antes de aprobarse) — la misma lista de
+ * `cambiarEstadoSku` valida en el servidor; esta es la que ofrece los botones en la ficha del SKU. */
+export function siguientesEstados(estado: string): { etiqueta: string; valor: string }[] {
+  if (estado === "propuesto") return [{ etiqueta: "Enviar a revisión", valor: "en_revision" }];
+  if (estado === "en_revision") {
+    return [
+      { etiqueta: "Aprobar", valor: "aprobado" },
+      { etiqueta: "Regresar a propuesto", valor: "propuesto" },
+    ];
+  }
+  return [{ etiqueta: "Regresar a revisión", valor: "en_revision" }];
+}
+
 export interface FilaSku {
   id: string;
   codigo: string;

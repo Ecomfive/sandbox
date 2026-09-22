@@ -1,20 +1,18 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { calcularPendientes } from "@/lib/alertas/pendientes";
 import { TablaAlertas, type AlertaFila } from "./tabla-alertas";
 import { TablaPendientes } from "./tabla-pendientes";
 import { requireModulo } from "@/lib/auth";
-import { linkClass } from "@/components/ui/link";
 
 export const metadata = { title: "Alertas de inventario" };
 
 export const dynamic = "force-dynamic";
 
 export default async function AlertasPage() {
-  await requireModulo("alertas");
+  const usuario = await requireModulo("alertas");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
@@ -41,16 +39,13 @@ export default async function AlertasPage() {
     };
   });
 
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("alertas");
+
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Alertas de inventario" oculto />
+
       <div>
-        <EncabezadoPagina titulo="Alertas de inventario" oculto className="mb-4">
-          Salidas menos entradas por producto, según lo cargado en{" "}
-          <Link href="/inventario" className={linkClass}>
-            Inventario
-          </Link>
-          . Generar una alerta la deja lista para el reclamo quincenal a la plataforma.
-        </EncabezadoPagina>
         <h2 className="mb-3 text-sm font-semibold tracking-tight">Pendiente de retorno</h2>
         <TablaPendientes
           pendientes={pendientes.map((p) => ({
@@ -60,10 +55,11 @@ export default async function AlertasPage() {
             nombre: p.nombre,
             pendiente: p.pendiente,
           }))}
+          puedeEscribir={puedeEscribir}
         />
       </div>
 
-      <TablaAlertas alertas={alertas} />
+      <TablaAlertas alertas={alertas} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} />
     </Pagina>
   );
 }

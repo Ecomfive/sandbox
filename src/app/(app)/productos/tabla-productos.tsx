@@ -11,6 +11,13 @@ import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
+import {
+  claseCeldaCasilla,
+  claseCeldaColumna,
+  claseEncabezadoCasilla,
+  claseEncabezadoColumna,
+  claseFilaEncabezado,
+} from "@/components/tabla/estilos-tabla";
 import { useColumnas, type ColumnaDef } from "@/components/tabla/ganchos";
 import { Paginacion } from "@/components/tabla/paginacion";
 import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "@/components/tabla/usar-pagina-arriba";
@@ -280,7 +287,7 @@ export function TablaProductos({
         }`}
       >
         {puedeEscribir && (
-          <td className="w-10 py-2 pr-2 pl-4">
+          <td className={claseCeldaCasilla}>
             <label className="-my-1 flex h-6 w-6 cursor-pointer items-center justify-center">
               <input
                 type="checkbox"
@@ -292,14 +299,14 @@ export function TablaProductos({
             </label>
           </td>
         )}
-        {columnasVisibles.map((columna, i) => (
-          <td key={columna.id} className={`py-2 pr-3 ${i === 0 && !puedeEscribir ? "pl-4" : ""} ${claseCelda[columna.id]}`}>
+        {columnasVisibles.map((columna) => (
+          <td key={columna.id} className={`${claseCeldaColumna} ${claseCelda[columna.id]}`}>
             {celda(columna.id, p, editando)}
           </td>
         ))}
         {puedeEscribir && (
           <td
-            className={`sticky right-0 z-10 border-l border-border/60 py-2 pr-3 pl-3 ${
+            className={`sticky right-0 z-10 border-l border-border/60 py-3 pr-4 pl-3 ${
               editando || seleccionados.has(p.id) ? FONDO_EDITANDO : "bg-card group-hover:bg-muted/50"
             }`}
           >
@@ -435,9 +442,9 @@ export function TablaProductos({
       <ContenedorTabla ariaLabel="Tabla de productos y márgenes">
         <table className="tabla-datos w-full min-w-[52rem] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+            <tr className={claseFilaEncabezado}>
               {puedeEscribir && (
-                <th scope="col" className="w-10 py-2 pr-2 pl-4">
+                <th scope="col" className={claseEncabezadoCasilla}>
                   <label className="-my-1 flex h-6 w-6 cursor-pointer items-center justify-center">
                     <input
                       type="checkbox"
@@ -453,17 +460,16 @@ export function TablaProductos({
                   </label>
                 </th>
               )}
-              {columnasVisibles.map((columna, i) => (
-                <th
-                  key={columna.id}
-                  scope="col"
-                  className={`py-2 pr-3 font-medium ${i === 0 && !puedeEscribir ? "pl-4" : ""}`}
-                >
+              {columnasVisibles.map((columna) => (
+                <th key={columna.id} scope="col" className={claseEncabezadoColumna}>
                   {columna.label}
                 </th>
               ))}
               {puedeEscribir && (
-                <th scope="col" className="sticky right-0 z-10 bg-muted py-2 pr-3 pl-3 text-center font-medium">
+                <th
+                  scope="col"
+                  className="sticky right-0 z-10 bg-muted px-4 py-3 text-center text-xs font-semibold tracking-wide uppercase"
+                >
                   Acciones
                 </th>
               )}

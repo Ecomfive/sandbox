@@ -11,12 +11,18 @@ import { linkClass } from "@/components/ui/link";
 import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
+import {
+  claseCeldaCasilla,
+  claseCeldaColumna,
+  claseEncabezadoCasilla,
+  claseEncabezadoColumna,
+  claseFilaEncabezado,
+} from "@/components/tabla/estilos-tabla";
 import { useColumnas, type ColumnaDef } from "@/components/tabla/ganchos";
 import { useTablaInteractiva } from "@/components/tabla/usar-tabla";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFechaNumerica, formatearMoneda } from "@/lib/formato";
 import {
-  ArrastrarIcon,
   CalendarioIcon,
   EstadoIcon,
   ExtractoIcon,
@@ -234,7 +240,7 @@ export function TablaRetiros({
     >
       {puedeEscribir && (
         // `relative z-10`: la fila entera es un enlace estirado (ver el número #), la casilla debe quedar encima.
-        <td className="relative z-10 w-10 border-r border-border/40 px-2 py-3">
+        <td className={claseCeldaCasilla}>
           <label className="-my-2 flex h-8 w-8 cursor-pointer items-center justify-center">
             <input
               type="checkbox"
@@ -247,7 +253,7 @@ export function TablaRetiros({
         </td>
       )}
       {columnasVisibles.map((columna) => (
-        <td key={columna.id} className={`border-r border-border/40 px-4 py-3 ${columna.claseCelda ?? ""}`}>
+        <td key={columna.id} className={`${claseCeldaColumna} ${columna.claseCelda ?? ""}`}>
           {renderCelda(columna.id, fila, codigoPais, setVistaRapidaId)}
         </td>
       ))}
@@ -295,9 +301,9 @@ export function TablaRetiros({
       <ContenedorTabla ariaLabel="Tabla de retiros">
         <table className="tabla-datos w-full min-w-[42rem] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+            <tr className={claseFilaEncabezado}>
               {puedeEscribir && (
-                <th scope="col" className="w-10 border-r border-border/60 px-2 py-3">
+                <th scope="col" className={claseEncabezadoCasilla}>
                   <label className="-my-2 flex h-8 w-8 cursor-pointer items-center justify-center">
                     <input
                       type="checkbox"
@@ -314,15 +320,8 @@ export function TablaRetiros({
                 </th>
               )}
               {columnasVisibles.map((columna) => (
-                <th
-                  key={columna.id}
-                  scope="col"
-                  className="border-r border-border/60 px-4 py-3 text-xs font-semibold tracking-wide uppercase"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <ArrastrarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-                    {columna.label}
-                  </span>
+                <th key={columna.id} scope="col" className={claseEncabezadoColumna}>
+                  {columna.label}
                 </th>
               ))}
             </tr>

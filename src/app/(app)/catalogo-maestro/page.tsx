@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
+import { getPaisActual } from "@/lib/pais";
 import { KpiGroup } from "@/components/ui/kpi-card";
 import type { FilaSku } from "./def-catalogo";
 import { TablaCatalogo } from "./tabla-catalogo";
@@ -24,6 +25,8 @@ interface SkuMaestro {
 export default async function CatalogoMaestroPage() {
   const usuario = await requireModulo("catalogo-maestro");
   const supabase = createServiceClient();
+  // El SKU maestro es igual para todos los países; el país solo da formato a las fechas de su actividad.
+  const pais = await getPaisActual(supabase);
 
   const { data: skus } = await supabase
     .from("skus_maestros")
@@ -75,6 +78,7 @@ export default async function CatalogoMaestroPage() {
       <TablaCatalogo
         skus={filas}
         opcionesSimples={opcionesSimples.map((s) => ({ id: s.id, codigo: s.codigo, nombre: s.nombre }))}
+        codigoPais={pais.codigo}
         puedeEscribir={!usuario.modulosSoloLectura.includes("catalogo-maestro")}
       />
     </Pagina>

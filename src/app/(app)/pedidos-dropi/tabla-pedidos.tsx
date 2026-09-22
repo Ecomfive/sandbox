@@ -9,6 +9,7 @@ import { BarraHerramientas } from "@/components/tabla/barra-herramientas";
 import type { DescargaCompleta } from "@/components/tabla/boton-descargar";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EncabezadoGrupo } from "@/components/tabla/encabezado-grupo";
+import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { useColumnas, type ColumnaDef } from "@/components/tabla/ganchos";
 import { Paginacion } from "@/components/tabla/paginacion";
 import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "@/components/tabla/usar-pagina-arriba";
@@ -123,12 +124,11 @@ export function TablaPedidos({
 
   const fila = (p: FilaPedido) => (
     <tr key={p.referencia} className="border-b border-border/60 last:border-0">
-      {columnasVisibles.map((columna, i) => {
-        const base = `py-2 pr-3 ${i === 0 ? "pl-4" : ""}`;
+      {columnasVisibles.map((columna) => {
         const color = columna.id === "fechaHora" || columna.id === "producto" ? "text-muted-foreground" : "";
         const tipo = columna.id === "orden" ? "font-medium" : columna.id === "cantidad" || columna.id === "monto" ? "tabular-nums" : "";
         return (
-          <td key={columna.id} className={`${base} ${color} ${tipo}`}>
+          <td key={columna.id} className={`${claseCeldaColumna} ${color} ${tipo}`}>
             {celda(columna.id, p)}
           </td>
         );
@@ -162,9 +162,9 @@ export function TablaPedidos({
       <ContenedorTabla ariaLabel="Tabla de órdenes de Dropi">
         <table className="tabla-datos w-full min-w-[52rem] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
-              {columnasVisibles.map((columna, i) => (
-                <th key={columna.id} scope="col" className={`py-2 pr-3 font-medium ${i === 0 ? "pl-4" : ""}`}>
+            <tr className={claseFilaEncabezado}>
+              {columnasVisibles.map((columna) => (
+                <th key={columna.id} scope="col" className={claseEncabezadoColumna}>
                   {columna.label}
                 </th>
               ))}
