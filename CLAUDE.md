@@ -221,8 +221,9 @@ convenciones técnicas del código.
   ícono**, sin texto (`BotonAdjuntar` con `AdjuntoIcon`; ya con archivo se marca en verde y
   su nombre queda en el tooltip), pero no bloquea conciliar si no se adjunta uno — ni en la
   ficha ni en el servidor (`conciliarRetiro`). Novedad pide una
-  **nota** (obligatoria, hasta 500 caracteres): `agregarNovedadRetiro` pasa el retiro a
-  novedad y deja la nota en su historial («Novedad: …») y en la auditoría; entonces aparece
+  **nota opcional** (hasta 500 caracteres, sin bloquear el botón si se deja vacía):
+  `agregarNovedadRetiro` pasa el retiro a novedad y, si hay texto, deja la nota en su
+  historial («Novedad: …») y en la auditoría; entonces aparece
   «Abrir». **«Abrir» no reabre el retiro**: baja a una sección con **la nota de la novedad**
   (`SeccionResolverNovedad`, que la saca del historial con `novedadVigente`,
   `src/lib/retiros/novedad.ts`: la nota más reciente que no esté ya resuelta ni sustituida

@@ -334,8 +334,8 @@ const MAX_NOVEDAD = 500;
 export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
+  // La nota es opcional: se puede marcar la novedad sin explicarla todavía.
   const texto = String(formData.get("novedad") ?? "").trim();
-  if (!texto) return { error: "Escribe la novedad." };
   if (texto.length > MAX_NOVEDAD) return { error: `La novedad es muy larga (máximo ${MAX_NOVEDAD} caracteres).` };
 
   const supabase = createServiceClient();
@@ -351,7 +351,7 @@ export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?
     accion: "agregar_novedad_retiro",
     entidad: "retiros",
     entidadId: id,
-    detalle: texto,
+    detalle: texto || "Sin nota",
     antes: { Estado: ETIQUETA_ESTADO.abierto },
     despues: { Estado: ETIQUETA_ESTADO.novedad },
   });
