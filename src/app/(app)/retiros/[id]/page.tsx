@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { linkClass } from "@/components/ui/link";
 import { ETIQUETA_ESTADO_DROPI, TONO_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/lib/formato";
+import { HistorialIcon } from "@/lib/nav-icons";
 
 export const metadata = { title: "Ficha de retiro" };
 
@@ -209,7 +210,13 @@ export default async function RetiroDetallePage({
       )}
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <h2 className="mb-3 text-sm font-semibold tracking-tight">Historial</h2>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+            <HistorialIcon className="h-4 w-4" />
+            Historial
+          </h2>
+          <span className="text-xs text-muted-foreground">del más nuevo al más viejo</span>
+        </div>
         <div className="flex flex-col gap-3 text-sm">
           {(eventos ?? []).map((e) => (
             <div key={e.id} className="flex items-start gap-2">

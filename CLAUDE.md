@@ -168,9 +168,11 @@ convenciones técnicas del código.
   anterior/siguiente, una fila de `BotonAccion` para pasar de estado y los datos en
   bloques con ícono; **la tabla no tiene columna de acciones** (`abrirFila` de
   `TablaDatos`, como Cuentas destino). La actividad va al final con
-  `HistorialGenerico` (`src/components/ui/historial-generico.tsx`, la misma
-  `HistorialRetiro` pero genérica: recibe `obtener`, la acción de lectura propia del
-  módulo, como prop — vale porque los dos son de cliente, no cruza de servidor).
+  `HistorialGenerico` (`src/components/ui/historial-generico.tsx`, también la de
+  Retiros: recibe `obtener`, la acción de lectura propia del módulo, como prop —
+  vale porque los dos son de cliente, no cruza de servidor). Su cabecera lleva
+  `HistorialIcon` junto al título y, a la derecha, «del más nuevo al más viejo»
+  (los `obtener` siempre piden `ascending: false`).
   Cada módulo define su `obtenerHistorialX(id)` (basta poder abrir el módulo,
   devuelve el error como valor, id validado con forma de UUID) que lee
   `historial_auditoria` filtrado por `entidad`/`entidad_id` y arma cada línea con
@@ -232,12 +234,12 @@ convenciones técnicas del código.
   El selector de Estado se ve siempre, hasta en un retiro cancelado: es la forma de
   reabrirlo. Sin pestañas: los campos y los datos que no se editan (Recibido, Cierre,
   Persona asignada, Consolidación, Estado en Dropi, Soporte) van seguidos, y **el historial
-  de actividad (`HistorialRetiro`, `retiros/historial-retiro.tsx`) es siempre lo último de
-  la ficha**, debajo de Conciliar o Novedad cuando están desplegadas; por eso no vive
-  dentro del formulario. **No le pongas `key` a `HistorialRetiro`** en la ficha: con una
-  `key={fila.id}` al conciliar o agregar una novedad la sección se quedaba en «Conciliando…»
-  y no se cerraba (el estado pendiente de la acción no terminaba). Con cambios sin guardar,
-  cerrar la ficha pide confirmación.
+  de actividad (`HistorialGenerico`, con `obtener={obtenerActividadRetiro}`) es siempre lo
+  último de la ficha**, debajo de Conciliar o Novedad cuando están desplegadas; por eso no
+  vive dentro del formulario. **No le pongas `key` a `HistorialGenerico`** en la ficha: con
+  una `key={fila.id}` al conciliar o agregar una novedad la sección se quedaba en
+  «Conciliando…» y no se cerraba (el estado pendiente de la acción no terminaba). Con
+  cambios sin guardar, cerrar la ficha pide confirmación.
   **La tabla no tiene columna de acciones**: lo que se hace con un retiro se hace desde
   su ficha. Ctrl/Cmd/Shift-clic o
   clic central en el `#` abren la página completa (`retiros/[id]/`) en una pestaña nueva,

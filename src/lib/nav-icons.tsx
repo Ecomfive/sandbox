@@ -453,6 +453,17 @@ export function AdjuntoIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Un reloj con una flecha que da la vuelta: el historial de actividad de una ficha. */
+export function HistorialIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 12a8 8 0 1 0 2.5-5.8" />
+      <path d="M4 4v4h4" />
+      <path d="M12 8v4l3 2" />
+    </Icon>
+  );
+}
+
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   Proveeduría: ProveeduriaIcon,
   Tiendas: TiendaIcon,

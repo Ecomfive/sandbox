@@ -39,7 +39,7 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
  * `acciones` de la ficha (Conciliar, Novedad, Abrir, Cancelar, Eliminar), aparecen «Guardar cambios» y «Cancelar» —
  * que solo se ven cuando se cambió algo. Guardar no cierra la ficha. Con `key={fila.id}-versión}` en quien lo usa,
  * cancelar (o pasar a otro retiro) lo vuelve a montar con los datos de la fila, sin arrastrar lo escrito. El historial
- * de actividad **no** está aquí: va al final de la ficha (`HistorialRetiro`), debajo de las secciones de Conciliar y
+ * de actividad **no** está aquí: va al final de la ficha (`HistorialGenerico`), debajo de las secciones de Conciliar y
  * Novedad.
  */
 export function FormularioEditarRetiro({

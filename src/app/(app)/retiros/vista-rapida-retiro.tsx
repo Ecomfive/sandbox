@@ -3,6 +3,7 @@
 import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
+import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
@@ -11,10 +12,10 @@ import { AlertaIcon, CheckIcon, CerrarIcon, ConciliarIcon } from "@/lib/nav-icon
 import { ESTADO_ETIQUETA } from "./filtros";
 import type { FilaRetiro } from "./tabla-retiros";
 import type { Cuenta, Plataforma } from "./crear-retiro-panel";
+import { obtenerActividadRetiro } from "./actividad";
 import { CancelarRetiroBoton } from "./cancelar-retiro-boton";
 import { EliminarRetiroBoton } from "./eliminar-retiro-boton";
 import { FormularioEditarRetiro } from "./formulario-editar-retiro";
-import { HistorialRetiro } from "./historial-retiro";
 import { SeccionConciliarRetiro } from "./seccion-conciliar-retiro";
 import { SeccionNovedadRetiro } from "./seccion-novedad-retiro";
 import { SeccionResolverNovedad } from "./seccion-resolver-novedad";
@@ -121,7 +122,7 @@ type PanelAbajo = "conciliar" | "novedad" | "resolver";
  *
  * **«Conciliar», «Novedad» y «Abrir» no abren una ventana en el medio**: despliegan una sección al final de la misma
  * ficha (`SeccionConciliarRetiro`, `SeccionNovedadRetiro`, `SeccionResolverNovedad`), la ficha baja hasta ella y el foco
- * entra en su primer campo. Solo hay una desplegada a la vez. **El historial (`HistorialRetiro`) es siempre lo último**:
+ * entra en su primer campo. Solo hay una desplegada a la vez. **El historial (`HistorialGenerico`) es siempre lo último**:
  * con una sección desplegada, queda debajo de ella. «Novedad» solo está en un retiro abierto; al agregarla el retiro
  * pasa a novedad y aparece «Abrir» en su lugar. **«Abrir» no reabre el retiro**: lleva a la nota de la novedad, y ahí el
  * botón «Resuelto» es el que quita la novedad y lo deja abierto.
@@ -307,7 +308,7 @@ export function VistaRapidaRetiro({
               Sin `key`: con una `key={fila.id}` aquí, al conciliar o agregar una novedad la sección se quedaba en
               «Conciliando…» y no se cerraba (el estado pendiente de la acción nunca terminaba). No hace falta: al
               cerrar la ficha `Ventana` desmonta todo, así que cada retiro empieza con su historial nuevo. */}
-          <HistorialRetiro id={fila.id} codigoPais={codigoPais} version={versionHistorial} />
+          <HistorialGenerico id={fila.id} codigoPais={codigoPais} version={versionHistorial} obtener={obtenerActividadRetiro} />
         </div>
       )}
     </Ventana>

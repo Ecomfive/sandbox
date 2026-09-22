@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
+import { HistorialIcon } from "@/lib/nav-icons";
 
 export interface EventoHistorial {
   id: string;
@@ -10,11 +11,12 @@ export interface EventoHistorial {
 }
 
 /**
- * La línea de tiempo de un registro (dropshipper, SKU, alerta...), igual que `HistorialRetiro`: siempre al final
- * de la ficha, un punto por evento con su texto y fecha. Pide los eventos al montarse y cada vez que sube
- * `version` (algo de la ficha registró actividad nueva); mientras se vuelve a pedir se sigue viendo la lista
- * anterior, sin parpadeo. `obtener` es la acción de lectura del propio módulo (basta poder abrir la sección;
- * devuelve el error como valor) — se le pasa como prop porque este componente ya es de cliente.
+ * La línea de tiempo de un registro (retiro, dropshipper, SKU, alerta...): siempre al final de la ficha, con un
+ * ícono y «del más nuevo al más viejo» junto al título, y un punto por evento con su texto y fecha. Pide los
+ * eventos al montarse y cada vez que sube `version` (algo de la ficha registró actividad nueva); mientras se
+ * vuelve a pedir se sigue viendo la lista anterior, sin parpadeo. `obtener` es la acción de lectura del propio
+ * módulo (basta poder abrir la sección; devuelve el error como valor) — se le pasa como prop porque este
+ * componente ya es de cliente.
  */
 export function HistorialGenerico({
   id,
@@ -46,9 +48,13 @@ export function HistorialGenerico({
 
   return (
     <section aria-labelledby={`actividad-${id}`} aria-busy={cargando} className="border-t border-border p-5">
-      <h3 id={`actividad-${id}`} className="mb-3 text-sm font-semibold">
-        {titulo}
-      </h3>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 id={`actividad-${id}`} className="flex items-center gap-1.5 text-sm font-semibold">
+          <HistorialIcon className="h-4 w-4" />
+          {titulo}
+        </h3>
+        <span className="text-xs text-muted-foreground">del más nuevo al más viejo</span>
+      </div>
       {cargando ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
       ) : eventos === null ? (
