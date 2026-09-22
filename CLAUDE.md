@@ -146,10 +146,10 @@ convenciones técnicas del código.
   dibuja «Agregar» ni el botón «Eliminar» de la fila (`puedeEscribir`). Ya la usan Gastos,
   CRM (dropshipper e interacción), Catálogo (un solo «Nuevo SKU» con el tipo Simple o
   Combo), Configuración (plataformas y **la misma ficha de cuenta destino** de Retiros),
-  Usuarios (invitar y nuevo rol; los roles llevan la franja de botones sobre su tabla),
-  Patrones bancarios y Cuentas destino. En una página con una sola tabla no lleva título
-  suelto (`EncabezadoPagina oculto`, sin descripción); con dos tablas (Configuración,
-  CRM, Usuarios) cada una lleva su `h2` con el nombre, sin texto explicativo.
+  Patrones bancarios y Cuentas destino. (Usuarios y roles tiene su propia versión, con
+  ficha de persona y de rol, y no usa `FichaCrear`.) En una página con una sola tabla no
+  lleva título suelto (`EncabezadoPagina oculto`, sin descripción); con dos tablas
+  (Configuración, CRM) cada una lleva su `h2` con el nombre, sin texto explicativo.
 - **Color: un punto, no una caja.** Lo que está en estado de alerta se marca con **un
   punto de color** junto a su título (tarjetas de resumen, `KpiCard tono`), no con el
   borde ni el fondo de toda la caja o de toda la fila: la alerta de un pedido es un

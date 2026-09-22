@@ -58,3 +58,17 @@ export function formatearFechaHoraCompleta(isoConZona: string, codigoPais: strin
     minute: "2-digit",
   }).format(new Date(isoConZona));
 }
+
+/** "hace 7 h", "hace 5 d", "hace 1 min" — para actividad reciente (último ingreso, historial de
+ * una ficha). Con más de 30 días muestra la fecha corta en vez de seguir contando semanas o meses. */
+export function formatearTiempoRelativo(isoConZona: string): string {
+  const segundos = Math.max(0, (Date.now() - new Date(isoConZona).getTime()) / 1000);
+  if (segundos < 60) return "hace un momento";
+  const minutos = Math.floor(segundos / 60);
+  if (minutos < 60) return `hace ${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return `hace ${horas} h`;
+  const dias = Math.floor(horas / 24);
+  if (dias < 30) return `hace ${dias} d`;
+  return formatearFecha(isoConZona.slice(0, 10));
+}
