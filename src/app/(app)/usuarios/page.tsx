@@ -30,7 +30,12 @@ export default async function UsuariosPage() {
           Todavía no hay ningún usuario. Crea la primera cuenta (normalmente con rol Administrador)
           para empezar a usar el sistema con login.
         </p>
-        <CrearUsuarioPanel roles={(roles ?? []) as Rol[]} />
+        <CrearUsuarioPanel
+          roles={(roles ?? []) as Rol[]}
+          modulosPorRol={new Map()}
+          soloLecturaPorRol={new Map()}
+          personasPorRol={new Map()}
+        />
       </main>
     );
   }

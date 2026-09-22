@@ -89,7 +89,16 @@ export function UsuariosYRoles({
             </button>
           ))}
         </div>
-        {pestana === "personas" ? <CrearUsuarioPanel roles={roles} /> : <CrearRolPanel />}
+        {pestana === "personas" ? (
+          <CrearUsuarioPanel
+            roles={roles}
+            modulosPorRol={modulosPorRol}
+            soloLecturaPorRol={soloLecturaPorRol}
+            personasPorRol={personasPorRol}
+          />
+        ) : (
+          <CrearRolPanel />
+        )}
       </div>
 
       <input
