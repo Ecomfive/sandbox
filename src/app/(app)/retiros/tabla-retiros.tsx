@@ -97,7 +97,7 @@ const COLUMNAS: (ColumnaDef & { id: ColumnaId; claseCelda?: string })[] = [
   { id: "correlativo", label: "#", ocultable: false, claseCelda: "font-semibold" },
   { id: "fecha", label: "Creación", ocultable: true },
   { id: "plataforma", label: "Plataforma", ocultable: true, claseCelda: "text-muted-foreground" },
-  { id: "destino", label: "Destino", ocultable: true, claseCelda: "text-muted-foreground" },
+  { id: "destino", label: "Cuenta destino", ocultable: true, claseCelda: "text-muted-foreground" },
   { id: "monto", label: "Monto", ocultable: true, claseCelda: "tabular-nums font-semibold" },
   { id: "consolidado", label: "Consolidación", ocultable: true },
   { id: "estado", label: "Estado", ocultable: true },

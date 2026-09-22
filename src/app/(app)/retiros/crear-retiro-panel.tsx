@@ -10,6 +10,7 @@ import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { Ventana } from "@/components/ui/ventana";
+import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
@@ -382,19 +383,18 @@ export function CrearRetiroPanel({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex min-w-0 flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-fecha">
-                    Fecha
-                    <Obligatorio />
+                    Fecha de creación
                   </label>
                   <input
                     id="campo-fecha"
-                    type="date"
-                    name="fecha"
-                    defaultValue={hoy()}
-                    required
-                    aria-invalid={invalido("campo-fecha")}
-                    className={`${fieldClass} w-full min-w-0`}
+                    type="text"
+                    readOnly
+                    tabIndex={-1}
+                    value={formatearFecha(hoy())}
+                    className={`${fieldClass} w-full min-w-0 cursor-not-allowed bg-muted`}
                   />
-                  <AvisoFaltante id="campo-fecha" faltante={faltante} />
+                  {/* Siempre es el día de hoy: no se elige a mano, así que va como oculto en vez de en el `<input>` de arriba. */}
+                  <input type="hidden" name="fecha" value={hoy()} />
                 </div>
                 <div className="flex min-w-0 flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-fecha-limite">
