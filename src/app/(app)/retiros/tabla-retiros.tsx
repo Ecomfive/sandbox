@@ -57,6 +57,9 @@ export interface FilaRetiro {
   fechaLimite: string | null;
   asignadoNombre: string | null;
   estadoDropi: string | null;
+  /** Cuándo Dropi rechazó el retiro (paso "Rechazado" de la barra de pasos); null si nunca fue rechazado o
+   * sigue pendiente de que Dropi decida. */
+  fechaRechazo: string | null;
   gestionadoPor: string;
   notas: string | null;
   soporteNumero: string | null;

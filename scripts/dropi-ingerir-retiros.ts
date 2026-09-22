@@ -119,13 +119,28 @@ async function main() {
   const { actualizaciones, sinVincular } = emparejarRetiros(dropi, locales);
 
   const advertencias: string[] = [];
+  const hoyLocal = fechaLocal(new Date().toISOString());
+  // Sin la migración 0044 (columna fecha_rechazo), Postgres rechaza el update con 42703: se
+  // reintenta sin esa columna en vez de tumbar toda la corrida por un retiro.
+  let hayFechaRechazo = true;
   for (const a of actualizaciones) {
     const cambios: Record<string, unknown> = { banco: a.banco, estado_dropi: a.estadoDropi };
     if (a.vinculadoAhora) cambios.dropi_id = a.dropiId;
     // Dropi rechazó o canceló un retiro que seguía abierto acá: se marca como novedad para que
     // se revise a mano. Nunca se cancela solo — cancelar sigue siendo una acción manual.
     if (a.marcarNovedad) cambios.estado = "novedad";
-    const { error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId);
+    // La fecha del paso "Rechazado" de la barra de pasos: cuándo detectamos que Dropi rechazó. No se
+    // guarda para "aprobado" — ese es el camino normal, sin paso aparte en la barra.
+    if (hayFechaRechazo && a.estadoDropi === "rechazado" && (a.vinculadoAhora || a.cambioEstado)) {
+      cambios.fecha_rechazo = hoyLocal;
+    }
+    let { error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId);
+    if (error?.code === "42703" && "fecha_rechazo" in cambios) {
+      console.warn("Falta correr la migración 0044 (fecha_rechazo) — se sigue sin esa fecha por ahora.");
+      hayFechaRechazo = false;
+      delete cambios.fecha_rechazo;
+      ({ error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId));
+    }
     if (error) throw new Error(`Error actualizando el retiro #${a.correlativo}: ${error.message}`);
 
     if (a.vinculadoAhora || a.cambioEstado || a.marcarNovedad) {
