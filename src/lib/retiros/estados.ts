@@ -17,3 +17,16 @@ export const ESTADO_TONO: Record<string, "info" | "neutral" | "destructive" | "s
   cerrado: "success",
   novedad_resuelta: "warning",
 };
+
+/** La columna «Consolidación» (tabla y ficha) tiene tres estados posibles — no es solo el booleano
+ * `consolidado`: mientras el retiro tiene una novedad ya resuelta, se llama «Novedad resuelta» en
+ * vez de saltar directo a «Consolidado», aunque por dentro `consolidado` ya esté en `true` (ver
+ * `resolverNovedadRetiro`). El mismo texto de la etiqueta del `estado` (ver arriba), reutilizado
+ * para no tener un tercer mapa suelto. */
+export function estadoConsolidacion(fila: {
+  estado: string;
+  consolidado: boolean;
+}): { texto: string; tono: "warning" | "success" } {
+  if (fila.estado === "novedad_resuelta") return { texto: ESTADO_ETIQUETA.novedad_resuelta, tono: "warning" };
+  return fila.consolidado ? { texto: "Consolidado", tono: "success" } : { texto: "Pendiente", tono: "warning" };
+}

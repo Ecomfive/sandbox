@@ -19,13 +19,13 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 const COLUMNAS_RETIROS =
   "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, a_recibir, asignado_a, notas, soporte_numero, banco, estado_dropi, plataforma_id, cuenta_retiro_id, gestionado_por, plataformas(nombre), cuentas_retiro(nombre)";
 
-/** `fecha_rechazo`, `fecha_aprobado` y `fecha_novedad` (migraciones 0044 y 0045) son las fechas de los
- * pasos de la barra de pasos que no siempre existen; sin esas migraciones, se sigue sirviendo la página
- * consultando sin esas columnas. */
+/** `fecha_rechazo`, `fecha_aprobado`, `fecha_cancelado_dropi` y `fecha_novedad` (migraciones
+ * 0044-0046) son las fechas de los pasos de la barra de pasos que no siempre existen; sin esas
+ * migraciones, se sigue sirviendo la página consultando sin esas columnas. */
 function consultarRetiros(supabase: ReturnType<typeof createServiceClient>, paisId: string) {
   return supabase
     .from("retiros")
-    .select(`${COLUMNAS_RETIROS}, fecha_rechazo, fecha_aprobado, fecha_novedad`)
+    .select(`${COLUMNAS_RETIROS}, fecha_rechazo, fecha_aprobado, fecha_cancelado_dropi, fecha_novedad`)
     .eq("pais_id", paisId)
     .order("fecha", { ascending: false })
     .limit(1000)
@@ -131,6 +131,7 @@ export default async function RetirosPage() {
     // Pueden no venir en el tipo inferido si la consulta cayó al plan B sin esas columnas.
     fechaAprobado: (r as { fecha_aprobado?: string | null }).fecha_aprobado ?? null,
     fechaRechazo: (r as { fecha_rechazo?: string | null }).fecha_rechazo ?? null,
+    fechaCanceladoDropi: (r as { fecha_cancelado_dropi?: string | null }).fecha_cancelado_dropi ?? null,
     fechaNovedad: (r as { fecha_novedad?: string | null }).fecha_novedad ?? null,
     gestionadoPor: r.gestionado_por,
     notas: r.notas,

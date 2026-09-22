@@ -120,25 +120,38 @@ async function main() {
 
   const advertencias: string[] = [];
   const hoyLocal = fechaLocal(new Date().toISOString());
-  // Sin las migraciones 0044/0045 (columnas fecha_rechazo, fecha_aprobado, fecha_novedad), Postgres
-  // rechaza el update con 42703: se reintenta sin esas columnas en vez de tumbar toda la corrida.
-  const columnasOpcionales = { fecha_rechazo: true, fecha_aprobado: true, fecha_novedad: true };
+  // Sin las migraciones 0044/0045/0046 (columnas fecha_rechazo, fecha_aprobado, fecha_novedad,
+  // fecha_cancelado_dropi), Postgres rechaza el update con 42703: se reintenta sin esas columnas en
+  // vez de tumbar toda la corrida.
+  const columnasOpcionales = { fecha_rechazo: true, fecha_aprobado: true, fecha_novedad: true, fecha_cancelado_dropi: true };
+  // Sin la migración 0046, el `check` de estado_dropi todavía no admite "cancelado": se reintenta
+  // guardándolo como "rechazado" (lo mismo que hacía antes) en vez de tumbar toda la corrida.
+  let hayEstadoCancelado = true;
   for (const a of actualizaciones) {
-    const cambios: Record<string, unknown> = { banco: a.banco, estado_dropi: a.estadoDropi };
+    const estadoDropiAGuardar = !hayEstadoCancelado && a.estadoDropi === "cancelado" ? "rechazado" : a.estadoDropi;
+    const cambios: Record<string, unknown> = { banco: a.banco, estado_dropi: estadoDropiAGuardar };
     if (a.vinculadoAhora) cambios.dropi_id = a.dropiId;
     // Dropi rechazó o canceló un retiro que seguía abierto acá: se marca como novedad para que
     // se revise a mano. Nunca se cancela solo — cancelar sigue siendo una acción manual.
     if (a.marcarNovedad) cambios.estado = "novedad";
-    // Las fechas de los pasos "Aprobado"/"Rechazado" de la barra de pasos: cuándo detectamos el cambio.
+    // Las fechas de los pasos "Aprobado"/"Rechazado"/"Cancelado" de la barra de pasos: cuándo
+    // detectamos el cambio.
     if (a.vinculadoAhora || a.cambioEstado) {
       if (columnasOpcionales.fecha_aprobado && a.estadoDropi === "aprobado") cambios.fecha_aprobado = hoyLocal;
       if (columnasOpcionales.fecha_rechazo && a.estadoDropi === "rechazado") cambios.fecha_rechazo = hoyLocal;
+      if (columnasOpcionales.fecha_cancelado_dropi && a.estadoDropi === "cancelado") cambios.fecha_cancelado_dropi = hoyLocal;
     }
     // La fecha del paso "Novedad": cuándo Dropi la generó (no cuando se agrega a mano, eso lo sella
     // agregarNovedadRetiro).
     if (columnasOpcionales.fecha_novedad && a.marcarNovedad) cambios.fecha_novedad = hoyLocal;
 
     let { error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId);
+    if (error?.code === "23514" && hayEstadoCancelado && cambios.estado_dropi === "cancelado") {
+      console.warn('Falta correr la migración 0046 (estado_dropi "cancelado") — se guarda como "rechazado" por ahora.');
+      hayEstadoCancelado = false;
+      cambios.estado_dropi = "rechazado";
+      ({ error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId));
+    }
     if (error?.code === "42703") {
       const presentes = (Object.keys(columnasOpcionales) as (keyof typeof columnasOpcionales)[]).filter(
         (c) => c in cambios
@@ -148,7 +161,7 @@ async function main() {
         delete cambios[c];
       }
       if (presentes.length > 0) {
-        console.warn(`Falta correr la migración 0044/0045 (${presentes.join(", ")}) — se sigue sin esas fechas por ahora.`);
+        console.warn(`Falta correr la migración 0044/0045/0046 (${presentes.join(", ")}) — se sigue sin esas fechas por ahora.`);
         ({ error } = await supabase.from("retiros").update(cambios).eq("id", a.retiroId));
       }
     }

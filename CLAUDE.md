@@ -205,35 +205,37 @@ convenciones técnicas del código.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
   de pasos (`BarraPasos`; no es lo mismo que `estado`, que se ve aparte en la insignia del
-  título): muestra **lo que de verdad le pasó al retiro, en orden**, no una plantilla fija
-  — el largo varía según el camino que siguió, y cada paso muestra su fecha debajo, igual
-  que Creado (nunca solo la etiqueta sin fecha):
-  - **Creado** va siempre, primero.
-  - Después, **Aprobado** o **Rechazado** por Dropi, el que haya pasado (`estado_dropi` +
-    `fecha_aprobado`/`fecha_rechazo`, migraciones 0044/0045); si sigue pendiente, no se
-    agrega nada — no hay un paso «Decisión» genérico esperando. Ninguno de los dos detiene
-    el flujo: Rechazado solo marca Novedad para revisar, sigue el conteo normal después.
-  - Si el retiro tiene o tuvo una novedad (a mano o generada por un rechazo), se agrega
-    **Novedad** con `fecha_novedad` (migración 0045; la sella `agregarNovedadRetiro` o,
-    si la generó Dropi, `scripts/dropi-ingerir-retiros.ts`).
-  - Con la novedad **resuelta**, la barra termina ahí con dos pasos más — **Novedad
-    resuelta** y **Consolidado** (la misma `fecha_cierre` para ambos: `resolverNovedadRetiro`
-    marca las dos cosas a la vez) — en vez de seguir a Recibido/Conciliado, que ya no
-    aplican por ese camino.
-  - Si no hay novedad sin resolver, sigue el camino normal: **Recibido** (llega el dinero)
-    y **Conciliado** (queda consolidado, con la fecha de `conciliarRetiro`).
-  - **Cancelado** es la excepción que corta todo lo anterior: reemplaza el resto de la
-    barra por su propio paso (rojo, con la fecha de `cancelarRetiro`) — Creado, Cancelado,
-    nada más; no tiene sentido seguir mostrando Aprobado/Novedad/Recibido/Conciliado si el
-    retiro no va a llegar ahí.
+  título): **siempre son los mismos cuatro pasos**, cada uno con su fecha debajo, igual que
+  Creado (nunca solo la etiqueta sin fecha) — no se agregan ni se quitan pasos según lo que
+  le pasó al retiro:
+  1. **Creado**, con `fecha`.
+  2. La decisión de Dropi: **Aprobado**, **Rechazado** o **Cancelado** — el único paso que
+     cambia, según `estado_dropi` (`fecha_aprobado`/`fecha_rechazo`/`fecha_cancelado_dropi`,
+     migraciones 0044-0046). Mientras Dropi no decide, este paso queda «En espera», sin
+     fecha. Ninguno de los tres detiene los pasos siguientes — ni Rechazado ni Cancelado
+     paran el conteo: los cuatro pasos se ven siempre, así el retiro haya sido rechazado o
+     cancelado por Dropi.
+  3. **Recibido**, cuando llega el dinero.
+  4. **Consolidado**, con la fecha de `conciliarRetiro`.
+  **Novedad y Novedad resuelta no son pasos de esta barra**: se ven en el dato
+  «Consolidación» de la ficha (`estadoConsolidacion()`, `src/lib/retiros/estados.ts`), que
+  tiene tres estados — «Pendiente» (al crear), «Novedad resuelta» (al resolver una novedad
+  con el botón «Resolver» — `resolverNovedadRetiro` deja `consolidado = true` por dentro,
+  pero el dato sigue diciendo «Novedad resuelta», no «Consolidado», mientras `estado` sea
+  `novedad_resuelta`) y «Consolidado» (al conciliar por el camino normal, sin pasar por una
+  novedad). "Cancelado" del segundo paso es el estado que reporta **Dropi**
+  (`mapearEstadoDropi`, antes se unía con "Rechazado" — ver `src/lib/dropi/emparejar-retiros.ts`);
+  no tiene relación con la cancelación manual del equipo (`cancelarRetiro`, botón
+  «Cancelar»), que sigue siendo su propia acción y se ve en la insignia del título, no en
+  este paso.
   Los círculos son chicos (`h-3.5 w-3.5`, borde fino) unidos por **una línea continua de
   1 px** (`bg-success` en el tramo ya completo, `bg-border` en el resto, como un rastreo de
-  envíos): nada de círculos grandes ni línea gruesa, que se ven pesados con hasta cinco
-  pasos en la barra. Un retiro que ya pasó por Aprobado/Rechazado/Novedad/Novedad resuelta
-  **antes** de que existieran esas columnas (migraciones 0044/0045) se queda con «—» en
-  esos pasos — nada las rellena solo. `scripts/backfill-fechas-retiros.ts` las rellena una
-  vez, sacando la fecha del evento correspondiente que ya estaba en `retiro_eventos`
-  (sin `--aplicar` solo dice qué encontraría).
+  envíos): nada de círculos grandes ni línea gruesa. Un retiro que ya pasó por
+  Aprobado/Rechazado/Cancelado **antes** de que existieran esas columnas (migraciones
+  0044-0046) se queda con «—» en ese paso — nada las rellena solo.
+  `scripts/backfill-fechas-retiros.ts` las rellena una vez, sacando la fecha del evento
+  correspondiente que ya estaba en `retiro_eventos` (sin `--aplicar` solo dice qué
+  encontraría).
   **La ficha ya es el formulario**
   (`retiros/formulario-editar-retiro.tsx`, sin un botón "Modificar" aparte, mismo patrón
   que la ficha de cuenta destino): se cambia un campo y arriba, junto a los botones
@@ -265,9 +267,10 @@ convenciones técnicas del código.
   suelto dentro de otro texto. **Novedad no exige texto**: se crea rápido, sin nota
   (`agregarNovedadRetiro` acepta la nota vacía), el retiro pasa a «novedad» y aparece «Ver
   novedad» en su lugar; sella `fecha_novedad` (migración 0045, con plan B si no se ha
-  corrido) para el paso «Novedad» de la barra de pasos — la misma columna que sella
-  `scripts/dropi-ingerir-retiros.ts` cuando la novedad la generó un rechazo de Dropi en vez
-  de una persona. **«Ver novedad» lleva a la nota, editable ahí
+  corrido — la misma columna que sella `scripts/dropi-ingerir-retiros.ts` cuando la novedad
+  la generó un rechazo de Dropi en vez de una persona), aunque hoy solo quede guardada para
+  el historial: no hay un paso «Novedad» en la barra de pasos (siempre son los mismos
+  cuatro, ver `BarraPasos`). **«Ver novedad» lleva a la nota, editable ahí
   mismo** (`SeccionResolverNovedad`, que la saca del historial con `novedadVigente`,
   `src/lib/retiros/novedad.ts`: la nota más reciente que no esté ya resuelta ni sustituida
   por un estado puesto a mano; sin nota lo dice), con un botón «Guardar nota»
@@ -280,8 +283,8 @@ convenciones técnicas del código.
   `fecha_cierre` (la misma columna que usan `conciliarRetiro` y `cancelarRetiro` para
   «cuándo se cerró la historia de este retiro») y registra **dos** líneas en el historial
   — «Novedad resuelta: …» y, aparte, «Consolidado» — para que ambos hechos se vean con su
-  propia fecha; son también los pasos «Novedad resuelta» y «Consolidado» de la barra de
-  pasos. No sigue el flujo normal de
+  propia fecha; en la ficha se ve como el dato «Consolidación» pasando a «Novedad resuelta»
+  (`estadoConsolidacion()`), no como un paso en la barra. No sigue el flujo normal de
   conciliación y por eso queda oculto por defecto junto con «Cerrado» detrás del
   interruptor «Cerrados» (`retiros/filtros.ts`, `exclusivo: true` como Cuentas destino:
   el botón aísla, nunca mezcla cerrados con abiertos). El estado `novedad_resuelta` lo

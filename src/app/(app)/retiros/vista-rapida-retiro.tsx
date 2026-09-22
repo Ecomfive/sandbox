@@ -24,15 +24,13 @@ const numeroDe = (fila: FilaRetiro) => `#${String(fila.numeroCorrelativo).padSta
 
 type EstadoPaso = "completo" | "actual" | "pendiente" | "error";
 
-/** A qué paso llegó el retiro en su recorrido real, cuando sigue el camino normal (no cancelado ni con la
- * novedad ya resuelta — esos terminan la barra antes de llegar acá, ver `BarraPasos`): se recibe el
- * dinero y por último se concilia (queda consolidado). */
-function pasosDelRetiro(fila: FilaRetiro): { recibido: EstadoPaso; conciliado: EstadoPaso } {
+/** El 3.º y 4.º paso de la barra: se recibe el dinero y por último se consolida. */
+function pasosDelRetiro(fila: FilaRetiro): { recibido: EstadoPaso; consolidado: EstadoPaso } {
   const recibido: EstadoPaso = fila.montoRecibido !== null ? (fila.estado === "novedad" ? "error" : "completo") : "actual";
 
-  const conciliado: EstadoPaso = fila.consolidado ? "completo" : recibido === "completo" ? "actual" : "pendiente";
+  const consolidado: EstadoPaso = fila.consolidado ? "completo" : recibido === "completo" ? "actual" : "pendiente";
 
-  return { recibido, conciliado };
+  return { recibido, consolidado };
 }
 
 function claseNodo(estado: EstadoPaso): string {
@@ -48,65 +46,46 @@ function claseNodo(estado: EstadoPaso): string {
   }
 }
 
-/** La barra muestra **lo que de verdad le pasó al retiro, en orden, cada paso con su fecha debajo** (igual
- * que Creado) — no una plantilla fija de pasos: el largo varía según el camino que siguió. No es el
- * `estado` de seguimiento interno (abierto/novedad/cerrado/cancelado/novedad_resuelta) — ese ya se ve en
- * la insignia del título.
- * - **Cancelado** reemplaza el resto de la barra por su propio paso (rojo, con la fecha de
- *   `cancelarRetiro`): el ciclo termina ahí, no tiene sentido seguir mostrando lo demás.
- * - **Aprobado** o **Rechazado** (por Dropi) se agregan según cuál haya pasado (`fecha_aprobado` o
- *   `fecha_rechazo`, migraciones 0044/0045); ninguno de los dos detiene el flujo — Rechazado solo marca
- *   Novedad para revisar, sigue el conteo normal después.
- * - **Novedad** se agrega si el retiro tiene o tuvo una (`fecha_novedad`), tanto si se creó a mano como si
- *   la generó un rechazo de Dropi.
- * - Con la novedad **resuelta**, la barra termina ahí con dos pasos más — «Novedad resuelta» y
- *   «Consolidado» (mismo `fecha_cierre` para ambos: `resolverNovedadRetiro` marca las dos cosas a la vez)
- *   — en vez de seguir a Recibido/Conciliado, que no aplican por ese camino.
- * - Si no hubo novedad sin resolver ni cancelación, sigue el camino normal: **Recibido** (llega el dinero)
- *   y **Conciliado** (queda consolidado). */
+/** La barra **siempre tiene cuatro pasos fijos**, cada uno con su fecha debajo (igual que Creado):
+ * Creado, la decisión de Dropi (Aprobado, Rechazado o Cancelado — el único que cambia, según
+ * `estado_dropi`), Recibido y Consolidado. No es el `estado` de seguimiento interno
+ * (abierto/novedad/cerrado/cancelado/novedad_resuelta) — ese se ve en la insignia del título, y
+ * Novedad/Novedad resuelta ya no van acá: se ven en el dato «Consolidación», con
+ * `estadoConsolidacion()` (`src/lib/retiros/estados.ts`). Mientras Dropi no ha decidido, el segundo
+ * paso queda «En espera» sin fecha; los tres primeros pasos no detienen a los siguientes — los
+ * cuatro se muestran siempre, aunque el segundo sea Rechazado o Cancelado. */
 function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string }) {
   const fecha = (iso: string | null) => (iso ? formatearFecha(iso) : null);
+  const { recibido, consolidado } = pasosDelRetiro(fila);
+
+  const decision: { etiqueta: string; estado: EstadoPaso; subtexto: string } =
+    fila.estadoDropi === "aprobado"
+      ? { etiqueta: "Aprobado", estado: "completo", subtexto: fecha(fila.fechaAprobado) ?? "—" }
+      : fila.estadoDropi === "rechazado"
+        ? { etiqueta: "Rechazado", estado: "error", subtexto: fecha(fila.fechaRechazo) ?? "—" }
+        : fila.estadoDropi === "cancelado"
+          ? { etiqueta: "Cancelado", estado: "error", subtexto: fecha(fila.fechaCanceladoDropi) ?? "—" }
+          : { etiqueta: "En espera", estado: "actual", subtexto: "Dropi" };
 
   const pasos: { etiqueta: string; estado: EstadoPaso; subtexto: string }[] = [
     { etiqueta: "Creado", estado: "completo", subtexto: formatearFecha(fila.fecha) },
+    decision,
+    {
+      etiqueta: "Recibido",
+      estado: recibido,
+      subtexto:
+        fila.montoRecibido !== null
+          ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaCierre)].filter(Boolean).join(" · ")
+          : recibido === "error"
+            ? "Diferencia de monto"
+            : "Sin registrar",
+    },
+    {
+      etiqueta: "Consolidado",
+      estado: consolidado,
+      subtexto: fila.consolidado ? (fecha(fila.fechaCierre) ?? "Consolidado") : "Pendiente",
+    },
   ];
-
-  if (fila.estado === "cancelado") {
-    pasos.push({ etiqueta: "Cancelado", estado: "error", subtexto: fecha(fila.fechaCierre) ?? "—" });
-  } else {
-    if (fila.estadoDropi === "aprobado") {
-      pasos.push({ etiqueta: "Aprobado", estado: "completo", subtexto: fecha(fila.fechaAprobado) ?? "—" });
-    } else if (fila.estadoDropi === "rechazado") {
-      pasos.push({ etiqueta: "Rechazado", estado: "error", subtexto: fecha(fila.fechaRechazo) ?? "—" });
-    }
-
-    if (fila.estado === "novedad" || fila.estado === "novedad_resuelta") {
-      pasos.push({ etiqueta: "Novedad", estado: "error", subtexto: fecha(fila.fechaNovedad) ?? "—" });
-    }
-
-    if (fila.estado === "novedad_resuelta") {
-      pasos.push({ etiqueta: "Novedad resuelta", estado: "completo", subtexto: fecha(fila.fechaCierre) ?? "—" });
-      pasos.push({ etiqueta: "Consolidado", estado: "completo", subtexto: fecha(fila.fechaCierre) ?? "—" });
-    } else {
-      const { recibido, conciliado } = pasosDelRetiro(fila);
-
-      pasos.push({
-        etiqueta: "Recibido",
-        estado: recibido,
-        subtexto:
-          fila.montoRecibido !== null
-            ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaCierre)].filter(Boolean).join(" · ")
-            : recibido === "error"
-              ? "Diferencia de monto"
-              : "Sin registrar",
-      });
-      pasos.push({
-        etiqueta: "Conciliado",
-        estado: conciliado,
-        subtexto: fila.consolidado ? (fecha(fila.fechaCierre) ?? "Consolidado") : "Pendiente",
-      });
-    }
-  }
 
   return (
     <div className="flex items-start">
@@ -154,9 +133,10 @@ type PanelAbajo = "conciliar" | "novedad" | "resolver";
  * texto: se puede crear rápido, sin nota, y escribirla después); al agregarla el retiro pasa a «novedad» y aparece
  * «Ver novedad» en su lugar, sin el botón Conciliar. **«Ver novedad» no resuelve nada por sí solo**: lleva a la nota
  * de la novedad (editable ahí mismo) y a su botón «Resolver», que es lo único que la quita — y, a diferencia de
- * antes, el retiro ya no vuelve a «abierto»: queda en el estado aparte «Novedad resuelta», sin seguir el flujo normal
- * de conciliación (ver `pasosDelRetiro`); al resolverla, también queda consolidado (`resolverNovedadRetiro`), como
- * un retiro conciliado, para que la Consolidación de la ficha no se quede en «Pendiente» sin poder cambiarla más.
+ * antes, el retiro ya no vuelve a «abierto»: queda en el estado aparte «Novedad resuelta». Ni la novedad ni su
+ * resolución aparecen en la barra de pasos (siempre son los mismos cuatro, ver `BarraPasos`): se ven en el dato
+ * «Consolidación» (`estadoConsolidacion()`), que pasa de «Pendiente» a «Novedad resuelta» al resolverla — y a
+ * «Consolidado» si el retiro llega a conciliarse por el camino normal en vez de por una novedad.
  */
 export function VistaRapidaRetiro({
   fila,
