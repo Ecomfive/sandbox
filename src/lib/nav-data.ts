@@ -4,9 +4,18 @@ export interface NavItem {
   pronto?: boolean;
 }
 
+export interface NavGroup {
+  label: string;
+  pronto: boolean;
+  items: NavItem[];
+}
+
+/** Una sección fija del menú puede tener páginas sueltas (`items`), grupos de un nivel más (`groups`, como
+ * "Compras › PA") o ambos a la vez — las sueltas se ven primero, los grupos debajo. */
 export interface NavSection {
   title: string;
-  items: NavItem[];
+  items?: NavItem[];
+  groups?: NavGroup[];
 }
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -17,6 +26,13 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Sistema WMS",
     items: [{ label: "Ficha producto Shopify", href: "/wms-productos" }],
+    groups: [
+      {
+        label: "Compras",
+        pronto: false,
+        items: [{ label: "PA", pronto: true }],
+      },
+    ],
   },
   {
     title: "Recursos Humanos",
@@ -39,12 +55,6 @@ const MODULOS_DROPI: NavItem[] = [
   { label: "CRM Dropshippers", href: "/crm-dropshippers" },
   { label: "Inteligencia competitiva", href: "/inteligencia-competitiva" },
 ];
-
-export interface NavGroup {
-  label: string;
-  pronto: boolean;
-  items: NavItem[];
-}
 
 export interface NavSectionAnidada {
   title: string;
@@ -111,8 +121,13 @@ export function encontrarSeccionActiva(
     }
   }
   for (const seccion of navSections) {
-    if (seccion.items.some((item) => item.href === pathname)) {
+    if (seccion.items?.some((item) => item.href === pathname)) {
       return { seccionTitle: seccion.title, grupoLabel: null };
+    }
+    for (const grupo of seccion.groups ?? []) {
+      if (grupo.items.some((item) => item.href === pathname)) {
+        return { seccionTitle: seccion.title, grupoLabel: grupo.label };
+      }
     }
   }
   return null;

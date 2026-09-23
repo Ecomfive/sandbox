@@ -9,6 +9,7 @@ import {
   moduloDeHref,
   encontrarSeccionActiva,
   type NavSectionAnidada,
+  type NavGroup,
   type NavItem,
 } from "@/lib/nav-data";
 import { DashboardIcon, ChevronRightIcon, NotificacionesIcon, SECTION_ICONS } from "@/lib/nav-icons";
@@ -76,6 +77,96 @@ function ItemHoja({
         <ContadorMenu cantidad={cantidad} />
       </Link>
       <FavoritoToggle href={item.href} activo={esFavorito} />
+    </div>
+  );
+}
+
+/** Los grupos de una sección desplegada (p. ej. las plataformas de "Gestión Proveeduría", o "Compras" en
+ * "Sistema WMS"): cada uno se abre por separado y, sin páginas todavía, se ve como una fila "Pronto". Usado
+ * tanto por las secciones por plataforma como por las fijas de `NAV_SECTIONS` que tienen `groups`. */
+function GruposDesplegados({
+  itemsSueltos = [],
+  grupos,
+  grupoAbierto,
+  alAlternarGrupo,
+  modulosPermitidos,
+  contadores,
+  pathname,
+  favoritos,
+  onNavigate,
+}: {
+  /** Páginas sueltas de la sección (sin grupo), si tiene: se ven primero, arriba de los grupos. */
+  itemsSueltos?: NavItem[];
+  grupos: NavGroup[];
+  grupoAbierto: string | null;
+  alAlternarGrupo: (label: string) => void;
+  modulosPermitidos?: string[] | null;
+  contadores: PendientesMenu["contadores"];
+  pathname: string;
+  favoritos: string[];
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
+      {itemsSueltos
+        .filter((item) => puedeVer(modulosPermitidos, item.href))
+        .map((item) => (
+          <ItemHoja
+            key={item.label}
+            item={item}
+            activo={pathname === item.href}
+            esFavorito={!!item.href && favoritos.includes(item.href)}
+            cantidad={item.href ? contadores[item.href] : 0}
+            onNavigate={onNavigate}
+          />
+        ))}
+      {grupos.map((grupo) => {
+        if (grupo.items.length === 0) {
+          return (
+            <span
+              key={grupo.label}
+              className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground/60"
+            >
+              {grupo.label}
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
+            </span>
+          );
+        }
+        const itemsVisibles = grupo.items.filter((item) => puedeVer(modulosPermitidos, item.href));
+        if (itemsVisibles.length === 0) return null;
+        const grupoOpen = grupoAbierto === grupo.label;
+        return (
+          <div key={grupo.label}>
+            <button
+              type="button"
+              onClick={() => alAlternarGrupo(grupo.label)}
+              className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              <span>{grupo.label}</span>
+              <span className="flex items-center gap-2">
+                {!grupoOpen && <ContadorMenu cantidad={sumaDeItems(itemsVisibles, contadores)} />}
+                <ChevronRightIcon
+                  className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${grupoOpen ? "rotate-90" : ""}`}
+                />
+              </span>
+            </button>
+            {grupoOpen && (
+              <div className="ml-2 flex flex-col gap-0.5 border-l border-border pl-2">
+                {itemsVisibles.map((item) => (
+                  <ItemHoja
+                    key={item.label}
+                    item={item}
+                    activo={pathname === item.href}
+                    esFavorito={!!item.href && favoritos.includes(item.href)}
+                    cantidad={item.href ? contadores[item.href] : 0}
+                    onNavigate={onNavigate}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -175,12 +266,21 @@ function SidebarContents({
         .filter((g) => g.pronto || g.items.length > 0);
     }
     const plana = NAV_SECTIONS.find((s) => s.title === titulo);
-    return plana ? [{ label: null, pronto: false, items: plana.items.filter((item) => puedeVer(modulosPermitidos, item.href)) }] : [];
+    if (!plana) return [];
+    const itemsSueltos = (plana.items ?? []).filter((item) => puedeVer(modulosPermitidos, item.href));
+    const gruposMapeados = (plana.groups ?? [])
+      .map((g) => ({
+        label: g.label,
+        pronto: g.pronto || g.items.length === 0,
+        items: g.items.filter((item) => puedeVer(modulosPermitidos, item.href)),
+      }))
+      .filter((g) => g.pronto || g.items.length > 0);
+    return itemsSueltos.length > 0 ? [{ label: null, pronto: false, items: itemsSueltos }, ...gruposMapeados] : gruposMapeados;
   }
 
   const todosLosItems: NavItem[] = [
     ...seccionesPlataforma.flatMap((s) => s.groups.flatMap((g) => g.items)),
-    ...NAV_SECTIONS.flatMap((s) => s.items),
+    ...NAV_SECTIONS.flatMap((s) => [...(s.items ?? []), ...(s.groups ?? []).flatMap((g) => g.items)]),
   ];
   const favoritosVisibles = favoritos
     .map((href) => todosLosItems.find((i) => i.href === href))
@@ -296,69 +396,28 @@ function SidebarContents({
               alAbrirPanel={alternarPanel(section.title)}
             />
             {expanded && isOpen && (
-              <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
-                {section.groups.map((grupo) => {
-                  if (grupo.items.length === 0) {
-                    return (
-                      <span
-                        key={grupo.label}
-                        className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground/60"
-                      >
-                        {grupo.label}
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                          Pronto
-                        </span>
-                      </span>
-                    );
-                  }
-                  const itemsVisibles = grupo.items.filter((item) => puedeVer(modulosPermitidos, item.href));
-                  if (itemsVisibles.length === 0) return null;
-                  const grupoOpen = grupoAbierto === grupo.label;
-                  return (
-                    <div key={grupo.label}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setGrupoAbierto((prev) => (prev === grupo.label ? null : grupo.label))
-                        }
-                        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-muted transition-colors"
-                      >
-                        <span>{grupo.label}</span>
-                        <span className="flex items-center gap-2">
-                          {!grupoOpen && <ContadorMenu cantidad={sumaDeItems(itemsVisibles, contadores)} />}
-                          <ChevronRightIcon
-                            className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${grupoOpen ? "rotate-90" : ""}`}
-                          />
-                        </span>
-                      </button>
-                      {grupoOpen && (
-                        <div className="ml-2 flex flex-col gap-0.5 border-l border-border pl-2">
-                          {itemsVisibles.map((item) => (
-                            <ItemHoja
-                              key={item.label}
-                              item={item}
-                              activo={pathname === item.href}
-                              esFavorito={!!item.href && favoritos.includes(item.href)}
-                              cantidad={item.href ? contadores[item.href] : 0}
-                              onNavigate={onNavigate}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <GruposDesplegados
+                grupos={section.groups}
+                grupoAbierto={grupoAbierto}
+                alAlternarGrupo={(label) => setGrupoAbierto((prev) => (prev === label ? null : label))}
+                modulosPermitidos={modulosPermitidos}
+                contadores={contadores}
+                pathname={pathname}
+                favoritos={favoritos}
+                onNavigate={onNavigate}
+              />
             )}
           </div>
         );
       })}
 
       {NAV_SECTIONS.map((section) => {
-        const itemsVisibles = section.items.filter((item) => puedeVer(modulosPermitidos, item.href));
-        if (itemsVisibles.length === 0) return null;
+        const itemsVisibles = (section.items ?? []).filter((item) => puedeVer(modulosPermitidos, item.href));
+        const grupos = section.groups ?? [];
+        if (itemsVisibles.length === 0 && grupos.length === 0) return null;
 
         const isOpen = expanded && seccionAbierta === section.title;
+        const cantidad = sumaDeItems([...itemsVisibles, ...grupos.flatMap((g) => g.items)], contadores);
 
         return (
           <div key={section.title} className={expanded ? "" : "py-0.5"}>
@@ -366,24 +425,23 @@ function SidebarContents({
               titulo={section.title}
               expanded={expanded}
               abierta={isOpen}
-              cantidad={sumaDeItems(itemsVisibles, contadores)}
+              cantidad={cantidad}
               panelAbierto={panel?.titulo === section.title}
               alAlternar={() => setSeccionAbierta((prev) => (prev === section.title ? null : section.title))}
               alAbrirPanel={alternarPanel(section.title)}
             />
             {expanded && isOpen && (
-              <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
-                {itemsVisibles.map((item) => (
-                  <ItemHoja
-                    key={item.label}
-                    item={item}
-                    activo={pathname === item.href}
-                    esFavorito={!!item.href && favoritos.includes(item.href)}
-                    cantidad={item.href ? contadores[item.href] : 0}
-                    onNavigate={onNavigate}
-                  />
-                ))}
-              </div>
+              <GruposDesplegados
+                itemsSueltos={section.items ?? []}
+                grupos={grupos}
+                grupoAbierto={grupoAbierto}
+                alAlternarGrupo={(label) => setGrupoAbierto((prev) => (prev === label ? null : label))}
+                modulosPermitidos={modulosPermitidos}
+                contadores={contadores}
+                pathname={pathname}
+                favoritos={favoritos}
+                onNavigate={onNavigate}
+              />
             )}
           </div>
         );

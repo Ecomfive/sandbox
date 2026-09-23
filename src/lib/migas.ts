@@ -50,8 +50,13 @@ function modulosDeNav(seccionesPlataforma: NavSectionAnidada[], navSections: Nav
     }
   }
   for (const seccion of navSections) {
-    for (const item of seccion.items) {
+    for (const item of seccion.items ?? []) {
       if (item.href) lista.push({ href: item.href, label: item.label, seccion: seccion.title, grupo: null });
+    }
+    for (const grupo of seccion.groups ?? []) {
+      for (const item of grupo.items) {
+        if (item.href) lista.push({ href: item.href, label: item.label, seccion: seccion.title, grupo: grupo.label });
+      }
     }
   }
   return lista;

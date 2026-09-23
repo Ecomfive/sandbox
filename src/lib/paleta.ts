@@ -46,8 +46,13 @@ export function paginasBuscables(
     }
   }
   for (const seccion of navSections) {
-    for (const item of seccion.items) {
+    for (const item of seccion.items ?? []) {
       if (item.href && !item.pronto) agregar({ etiqueta: item.label, href: item.href, contexto: seccion.title });
+    }
+    for (const grupo of seccion.groups ?? []) {
+      for (const item of grupo.items) {
+        if (item.href && !item.pronto) agregar({ etiqueta: item.label, href: item.href, contexto: `${seccion.title} › ${grupo.label}` });
+      }
     }
   }
   // Subpáginas (las pestañas del módulo): siguen el permiso del módulo al que pertenecen.
