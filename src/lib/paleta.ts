@@ -8,7 +8,7 @@ import { PESTANAS_POR_MODULO } from "@/lib/pestanas";
 export interface PaginaBuscable {
   etiqueta: string;
   href: string;
-  /** Dónde está en el menú ("Proveeduría › Dropi"), para distinguir y para buscar. */
+  /** Dónde está en el menú ("Gestión Proveeduría › Dropi"), para distinguir y para buscar. */
   contexto: string;
 }
 

@@ -43,7 +43,7 @@
   --color-warning-soft: var(--warning-soft);
   --color-destructive: var(--destructive);
   --color-destructive-soft: var(--destructive-soft);
-  --font-sans: var(--font-manrope);
+  --font-sans: var(--font-inter);
 }
 
 :root {

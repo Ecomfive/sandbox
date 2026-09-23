@@ -55,7 +55,7 @@ function ItemHoja({
 }) {
   if (item.pronto || !item.href) {
     return (
-      <span className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground/60">
+      <span className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground/60">
         {item.label}
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
       </span>
@@ -68,8 +68,8 @@ function ItemHoja({
         onClick={onNavigate}
         className={
           activo
-            ? "flex flex-1 items-center justify-between gap-2 rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-            : "flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
+            ? "flex flex-1 items-center justify-between gap-2 rounded-md bg-accent px-3 py-1.5 text-[13px] text-accent-foreground"
+            : "flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] text-foreground hover:bg-muted transition-colors"
         }
       >
         {item.label}
@@ -113,7 +113,7 @@ function CabeceraSeccion({
         aria-expanded={expanded ? abierta : panelAbierto}
         onClick={(e) => (expanded ? alAlternar() : alAbrirPanel(e.currentTarget.getBoundingClientRect(), e.currentTarget))}
         aria-label={expanded ? undefined : cantidad > 0 ? `${titulo}, ${textoPendientes(cantidad)}` : titulo}
-        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-bold text-foreground hover:bg-muted transition-colors"
       >
         <span className="relative inline-flex shrink-0">
           <Icono className="h-5 w-5" />
@@ -302,7 +302,7 @@ function SidebarContents({
                     return (
                       <span
                         key={grupo.label}
-                        className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm text-muted-foreground/60"
+                        className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground/60"
                       >
                         {grupo.label}
                         <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -321,7 +321,7 @@ function SidebarContents({
                         onClick={() =>
                           setGrupoAbierto((prev) => (prev === grupo.label ? null : grupo.label))
                         }
-                        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-muted transition-colors"
                       >
                         <span>{grupo.label}</span>
                         <span className="flex items-center gap-2">

@@ -51,7 +51,7 @@ export interface NavSectionAnidada {
   groups: NavGroup[];
 }
 
-/** Agrupa las plataformas de un país en las secciones "Proveeduría" y "Tiendas" del sidebar. */
+/** Agrupa las plataformas de un país en las secciones "Gestión Proveeduría" y "Tiendas" del sidebar. */
 export function construirSeccionesPlataforma(
   plataformasPais: { nombre: string; tipoOperacion: "proveeduria" | "tienda"; tieneDatos: boolean }[]
 ): NavSectionAnidada[] {
@@ -63,7 +63,7 @@ export function construirSeccionesPlataforma(
 
   const secciones: NavSectionAnidada[] = [];
   const proveeduria = plataformasPais.filter((p) => p.tipoOperacion === "proveeduria").map(aGrupo);
-  if (proveeduria.length > 0) secciones.push({ title: "Proveeduría", groups: proveeduria });
+  if (proveeduria.length > 0) secciones.push({ title: "Gestión Proveeduría", groups: proveeduria });
 
   const tiendas = plataformasPais.filter((p) => p.tipoOperacion === "tienda").map(aGrupo);
   if (tiendas.length > 0) secciones.push({ title: "Tiendas", groups: tiendas });

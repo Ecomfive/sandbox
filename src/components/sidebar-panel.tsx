@@ -124,7 +124,7 @@ export function PanelSeccion({
             <div key={grupo.label ?? "sin-grupo"} className="flex flex-col gap-0.5">
               {grupo.label &&
                 (grupo.pronto || grupo.items.length === 0 ? (
-                  <span className="flex items-center justify-between px-3 py-1.5 text-sm text-muted-foreground/60">
+                  <span className="flex items-center justify-between px-3 py-1.5 text-[13px] text-muted-foreground/60">
                     {grupo.label}
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
                   </span>
@@ -141,7 +141,7 @@ export function PanelSeccion({
                       alNavegar?.();
                       alCerrar();
                     }}
-                    className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none ${
+                    className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-[13px] transition-colors focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none ${
                       pathname === item.href
                         ? "bg-accent text-accent-foreground"
                         : "text-foreground hover:bg-muted"
@@ -153,7 +153,7 @@ export function PanelSeccion({
                 ) : (
                   <span
                     key={item.label}
-                    className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground/60"
+                    className="flex items-center justify-between rounded-md px-3 py-2 text-[13px] text-muted-foreground/60"
                   >
                     {item.label}
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
