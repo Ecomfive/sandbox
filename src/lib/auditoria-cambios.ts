@@ -43,6 +43,10 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_sku: "Propuso el SKU",
   cambiar_estado_sku: "Cambió el estado",
   vincular_producto_sku: "Vinculó un producto",
+  crear_producto_wms: "Creó el producto",
+  editar_producto_wms: "Modificó el producto",
+  duplicar_producto_wms: "Duplicó el producto",
+  eliminar_producto_wms: "Eliminó el producto",
   generar_alerta: "Generó la alerta",
   cambiar_estado_alerta: "Cambió el estado",
 };
