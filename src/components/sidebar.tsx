@@ -113,7 +113,7 @@ function CabeceraSeccion({
         aria-expanded={expanded ? abierta : panelAbierto}
         onClick={(e) => (expanded ? alAlternar() : alAbrirPanel(e.currentTarget.getBoundingClientRect(), e.currentTarget))}
         aria-label={expanded ? undefined : cantidad > 0 ? `${titulo}, ${textoPendientes(cantidad)}` : titulo}
-        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-bold text-foreground hover:bg-muted transition-colors"
+        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-bold text-foreground-soft hover:bg-muted transition-colors"
       >
         <span className="relative inline-flex shrink-0">
           <Icono className="h-5 w-5" />
