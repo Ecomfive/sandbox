@@ -10,8 +10,8 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-/** Una sección fija del menú puede tener páginas sueltas (`items`), grupos de un nivel más (`groups`, como
- * "Compras › PA") o ambos a la vez — las sueltas se ven primero, los grupos debajo. */
+/** Una sección fija del menú puede tener páginas sueltas (`items`), grupos de un nivel más (`groups`, para
+ * cuando una página suelta no alcanza) o ambos a la vez — las sueltas se ven primero, los grupos debajo. */
 export interface NavSection {
   title: string;
   items?: NavItem[];
@@ -25,13 +25,9 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "Sistema WMS",
-    items: [{ label: "Ficha producto Shopify", href: "/wms-productos" }],
-    groups: [
-      {
-        label: "Compras",
-        pronto: false,
-        items: [{ label: "PA", pronto: true }],
-      },
+    items: [
+      { label: "Ficha producto Shopify", href: "/wms-productos" },
+      { label: "Compras", pronto: true },
     ],
   },
   {
