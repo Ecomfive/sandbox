@@ -192,6 +192,21 @@ convenciones técnicas del código.
   se hace **sin cookie** (otro equipo, cookies borradas), para no sumar un viaje a
   cada página; con cookie manda la cookie aunque en otro equipo se haya elegido otro
   país. Sin la migración todo sigue como antes (cookie o Costa Rica).
+- **Sistema WMS: «Ficha producto Shopify»** (`/wms-productos`, módulo `wms-productos`,
+  migración 0049). Réplica de la ficha de producto del admin de Shopify. La lista es un
+  `TablaDatos` (toda la fila abre la ficha; «Agregar» lleva a `/wms-productos/nuevo`) y la
+  ficha es una **página de dos columnas** (`ficha-producto-shopify.tsx`, no un panel):
+  título, descripción (editor enriquecido propio, `editor-descripcion.tsx`, HTML que el
+  servidor vuelve a limpiar con `sanitizarHtml`), multimedia, categoría, precio, inventario,
+  envío, variantes, metacampos y vista previa SEO a la izquierda; estado, publicación,
+  organización y plantilla a la derecha. «Guardar» y «Descartar» aparecen solo con cambios;
+  sin permiso de escritura la ficha queda deshabilitada (`fieldset disabled`). Un producto
+  siempre tiene al menos una variante (sin opciones es la única) y ahí viven precio, SKU,
+  peso e inventario por sucursal (`en_existencia` = suma de las tres cantidades). Las
+  imágenes suben **directo a Storage** con una dirección firmada (`prepararSubidaMedio`)
+  para no chocar con el límite de tamaño de las acciones; al guardar solo viaja su ruta.
+  La lógica pura y la validación viven en `src/lib/wms/producto.ts`. No incluye las ventas
+  de los últimos 90 días ni el precio unitario de Shopify (no hay de dónde sacarlos).
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
