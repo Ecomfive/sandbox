@@ -6,7 +6,7 @@ import { BotonAccion } from "@/components/ui/boton-accion";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
-import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { formatearFecha } from "@/lib/formato";
 import { AlertaIcon, CheckIcon, CerrarIcon, ConciliarIcon } from "@/lib/nav-icons";
 import { ESTADO_TONO } from "@/lib/retiros/estados";
 import { ESTADO_ETIQUETA } from "./filtros";
@@ -56,7 +56,7 @@ function claseNodo(estado: EstadoPaso): string {
  * cuatro se muestran siempre, aunque el segundo sea Rechazado o Cancelado. **Recibido** usa su propia
  * `fecha_recibido` (se escribe a mano al conciliar, puede ser otro día que hoy), distinta de la de
  * **Consolidado** (`fecha_cierre`: cuándo se hizo la conciliación en el sistema). */
-function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string }) {
+function BarraPasos({ fila }: { fila: FilaRetiro }) {
   const fecha = (iso: string | null) => (iso ? formatearFecha(iso) : null);
   const { recibido, consolidado } = pasosDelRetiro(fila);
 
@@ -77,7 +77,7 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
       estado: recibido,
       subtexto:
         fila.montoRecibido !== null
-          ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaRecibido)].filter(Boolean).join(" · ")
+          ? (fecha(fila.fechaRecibido) ?? "—")
           : recibido === "error"
             ? "Diferencia de monto"
             : "Sin registrar",
@@ -238,7 +238,7 @@ export function VistaRapidaRetiro({
             codigoPais={codigoPais}
             plataformas={plataformas}
             cuentas={cuentas}
-            pasos={<BarraPasos fila={fila} codigoPais={codigoPais} />}
+            pasos={<BarraPasos fila={fila} />}
             acciones={
               <>
                 {/* Un cancelado o una novedad resuelta no siguen el flujo normal: su ciclo ya terminó. */}
