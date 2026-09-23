@@ -66,6 +66,28 @@ export function RecursosHumanosIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Bolsa de compras: la sección "Gestión de Tiendas" (distinta del ícono de vitrina de "Tiendas"). */
+export function GestionTiendasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+      <path d="M6 8h12l1 12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1L6 8Z" />
+    </Icon>
+  );
+}
+
+/** Nave con techo a dos aguas y una franja de carga: la sección "Sistema WMS" (bodega/almacén). */
+export function WmsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 10.5 12 4l9 6.5" />
+      <path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10" />
+      <path d="M9 11h6" />
+      <path d="M9 21v-5.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V21" />
+    </Icon>
+  );
+}
+
 export function AlertaIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
@@ -467,6 +489,7 @@ export function HistorialIcon(props: SVGProps<SVGSVGElement>) {
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   Proveeduría: ProveeduriaIcon,
   Tiendas: TiendaIcon,
-  Catálogo: CatalogoIcon,
+  "Gestión de Tiendas": GestionTiendasIcon,
+  "Sistema WMS": WmsIcon,
   "Recursos Humanos": RecursosHumanosIcon,
 };

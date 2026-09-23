@@ -11,8 +11,12 @@ export interface NavSection {
 
 export const NAV_SECTIONS: NavSection[] = [
   {
-    title: "Catálogo",
-    items: [{ label: "SKU maestro", href: "/catalogo-maestro" }],
+    title: "Gestión de Tiendas",
+    items: [{ label: "Próximamente", pronto: true }],
+  },
+  {
+    title: "Sistema WMS",
+    items: [{ label: "Próximamente", pronto: true }],
   },
   {
     title: "Recursos Humanos",
