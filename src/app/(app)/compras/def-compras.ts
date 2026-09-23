@@ -4,6 +4,7 @@ export interface FilaCompra {
   id: string;
   nombre: string;
   etapa: string;
+  estado: string;
   proveedor: string | null;
   cliente: string | null;
   tienda: string | null;
@@ -61,6 +62,36 @@ export const ETAPA_ETIQUETA: Record<string, string> = Object.fromEntries(
 
 export const etiquetaEtapa = (valor: string) => ETAPA_ETIQUETA[valor] ?? valor;
 
+/** El «Estado» de ClickUp: un semáforo aparte de la «Etapa», más simple — no sigue el mismo orden ni las
+ * mismas 14 paradas, es la columna que estaba entre «Etapa» y «Proveedor» en la lista de ClickUp. */
+export const ESTADOS_COMPRA = [
+  { valor: "backlog", etiqueta: "Backlog" },
+  { valor: "pendiente", etiqueta: "Pendiente" },
+  { valor: "en_gestion", etiqueta: "En Gestión" },
+  { valor: "hecho", etiqueta: "Hecho" },
+  { valor: "en_revision", etiqueta: "En Revisión" },
+  { valor: "aprobado", etiqueta: "Aprobado" },
+  { valor: "rechazado", etiqueta: "Rechazado" },
+  { valor: "completado", etiqueta: "Completado" },
+] as const;
+
+const ESTADO_ETIQUETA: Record<string, string> = Object.fromEntries(ESTADOS_COMPRA.map((e) => [e.valor, e.etiqueta]));
+
+export const etiquetaEstado = (valor: string) => ESTADO_ETIQUETA[valor] ?? valor;
+
+const TONO_ESTADO: Record<string, "neutral" | "success" | "warning" | "destructive" | "info"> = {
+  backlog: "neutral",
+  pendiente: "warning",
+  en_gestion: "info",
+  hecho: "success",
+  en_revision: "warning",
+  aprobado: "info",
+  rechazado: "destructive",
+  completado: "success",
+};
+
+export const tonoEstado = (valor: string) => TONO_ESTADO[valor] ?? "neutral";
+
 /** El ciclo termina en «Completado» o «Descartado»: como Cerrados en Retiros, se ocultan por defecto. */
 const ETAPAS_CERRADAS = ["completado", "descartado"];
 
@@ -80,6 +111,15 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       opciones: () => ETAPAS_COMPRA.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
       agrupable: true,
       ordenGrupos: ETAPAS_COMPRA.map((e) => e.valor),
+    },
+    {
+      id: "estado",
+      etiqueta: "Estado",
+      tipo: "seleccion",
+      valores: (c) => [c.estado],
+      opciones: () => ESTADOS_COMPRA.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
+      agrupable: true,
+      ordenGrupos: ESTADOS_COMPRA.map((e) => e.valor),
     },
     {
       id: "proveedor",

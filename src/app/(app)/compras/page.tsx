@@ -19,7 +19,7 @@ export default async function ComprasPage() {
   const { data: compras } = await supabase
     .from("wms_compras")
     .select(
-      "id, nombre, etapa, proveedor, cliente, tienda, track_id, orden, producto_relacionado, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, pago_pendiente, cobrado_cliente, pendiente_cliente, pago_cliente, cuenta_receptora, factura, financiamiento, revisado_aa, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, inconveniente, planificacion, documentos, notas, creado_en, perfiles(nombre, email)"
+      "id, nombre, etapa, estado, proveedor, cliente, tienda, track_id, orden, producto_relacionado, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, pago_pendiente, cobrado_cliente, pendiente_cliente, pago_cliente, cuenta_receptora, factura, financiamiento, revisado_aa, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, inconveniente, planificacion, documentos, notas, creado_en, perfiles(nombre, email)"
     )
     .eq("pais_id", pais.id)
     .order("creado_en", { ascending: false })
@@ -31,6 +31,7 @@ export default async function ComprasPage() {
       id: c.id,
       nombre: c.nombre,
       etapa: c.etapa,
+      estado: c.estado,
       proveedor: c.proveedor,
       cliente: c.cliente,
       tienda: c.tienda,

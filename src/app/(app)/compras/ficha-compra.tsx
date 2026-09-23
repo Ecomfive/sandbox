@@ -9,7 +9,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
-import { etiquetaEtapa, valorUnitario, type FilaCompra } from "./def-compras";
+import { etiquetaEstado, etiquetaEtapa, tonoEstado, valorUnitario, type FilaCompra } from "./def-compras";
 import { EliminarCompraBoton } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
 
@@ -55,6 +55,9 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
     <div className="flex flex-col divide-y divide-border border-t border-border p-5">
       <Seccion icono={ComprasIcon} titulo="Compra">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Dato etiqueta="Estado">
+            <Badge tone={tonoEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
+          </Dato>
           <Dato etiqueta="Proveedor">{compra.proveedor || SIN_DATO}</Dato>
           <Dato etiqueta="Cliente">{compra.cliente || SIN_DATO}</Dato>
           <Dato etiqueta="Tienda">{compra.tienda || SIN_DATO}</Dato>
@@ -193,6 +196,7 @@ export function FichaCompra({
           <>
             <span className="text-lg font-semibold">{compra.nombre}</span>
             <Badge tone="neutral">{etiquetaEtapa(compra.etapa)}</Badge>
+            <Badge tone={tonoEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
           </>
         )
       }

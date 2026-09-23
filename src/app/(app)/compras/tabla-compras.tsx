@@ -8,12 +8,13 @@ import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EstadoIcon, GastoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearCompraPanel } from "./crear-compra-panel";
-import { DEF_COMPRAS, etiquetaEtapa, valorUnitario, type FilaCompra } from "./def-compras";
+import { DEF_COMPRAS, etiquetaEstado, etiquetaEtapa, tonoEstado, valorUnitario, type FilaCompra } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
 
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
 const ICONOS: Record<string, IconoComp> = {
   etapa: EstadoIcon,
+  estado: EstadoIcon,
   proveedor: ProductoIcon,
   tienda: ComprasIcon,
   cliente: ProductoIcon,
@@ -45,6 +46,7 @@ const toneEtapa = (etapa: string): "success" | "destructive" | "neutral" =>
 const COLUMNAS: ColumnaTabla<FilaCompra, string>[] = [
   { id: "nombre", label: "Nombre", ocultable: false, clase: "font-medium", render: (c) => c.nombre },
   { id: "etapa", label: "Etapa", ocultable: true, render: (c) => <Badge tone={toneEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge> },
+  { id: "estado", label: "Estado", ocultable: true, render: (c) => <Badge tone={tonoEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge> },
   { id: "proveedor", label: "Proveedor", ocultable: true, clase: "text-muted-foreground", render: (c) => c.proveedor || "—" },
   { id: "tienda", label: "Tienda", ocultable: true, clase: "text-muted-foreground", render: (c) => c.tienda || "—" },
   { id: "qtyTotal", label: "QTY Total", ocultable: true, clase: "tabular-nums", render: (c) => c.qtyTotal ?? "—" },

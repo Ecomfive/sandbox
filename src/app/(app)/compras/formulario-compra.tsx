@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarCompra, crearCompra } from "./actions";
-import { ETAPAS_COMPRA, type FilaCompra } from "./def-compras";
+import { ESTADOS_COMPRA, ETAPAS_COMPRA, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { Campo } from "@/components/ui/campo-ficha";
@@ -143,22 +143,40 @@ export function FormularioCompra({
               className={fieldClass}
             />
           </Campo>
-          <Campo etiqueta="Etapa" id="campo-etapa" obligatorio faltante={faltante}>
-            <select
-              id="campo-etapa"
-              name="etapa"
-              required
-              aria-invalid={invalido("campo-etapa")}
-              defaultValue={compra?.etapa ?? "backlog"}
-              className={fieldClass}
-            >
-              {ETAPAS_COMPRA.map((e) => (
-                <option key={e.valor} value={e.valor}>
-                  {e.etiqueta}
-                </option>
-              ))}
-            </select>
-          </Campo>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Campo etiqueta="Etapa" id="campo-etapa" obligatorio faltante={faltante}>
+              <select
+                id="campo-etapa"
+                name="etapa"
+                required
+                aria-invalid={invalido("campo-etapa")}
+                defaultValue={compra?.etapa ?? "backlog"}
+                className={fieldClass}
+              >
+                {ETAPAS_COMPRA.map((e) => (
+                  <option key={e.valor} value={e.valor}>
+                    {e.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo etiqueta="Estado" id="campo-estado" obligatorio faltante={faltante}>
+              <select
+                id="campo-estado"
+                name="estado"
+                required
+                aria-invalid={invalido("campo-estado")}
+                defaultValue={compra?.estado ?? "backlog"}
+                className={fieldClass}
+              >
+                {ESTADOS_COMPRA.map((e) => (
+                  <option key={e.valor} value={e.valor}>
+                    {e.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta="Proveedor" id="campo-proveedor">
               <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />

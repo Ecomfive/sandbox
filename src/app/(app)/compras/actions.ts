@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
-import { ETAPAS_COMPRA } from "./def-compras";
+import { ESTADOS_COMPRA, ETAPAS_COMPRA } from "./def-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
+const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
 
 const numeroOptativo = (formData: FormData, campo: string): number | null => {
   const texto = formData.get(campo) as string | null;
@@ -60,14 +61,16 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string 
   const pais_id = formData.get("pais_id") as string;
   const nombre = (formData.get("nombre") as string).trim();
   const etapa = (formData.get("etapa") as string) || "backlog";
+  const estado = (formData.get("estado") as string) || "backlog";
 
   if (!nombre) return { error: "Escribe el nombre de la compra." };
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
+  if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("wms_compras")
-    .insert({ pais_id, nombre, etapa, ...leerCambios(formData) })
+    .insert({ pais_id, nombre, etapa, estado, ...leerCambios(formData) })
     .select("id")
     .single();
   if (error) return { error: error.message };
@@ -83,14 +86,16 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   const id = formData.get("id") as string;
   const nombre = (formData.get("nombre") as string).trim();
   const etapa = formData.get("etapa") as string;
+  const estado = formData.get("estado") as string;
 
   if (!nombre) return { error: "Escribe el nombre de la compra." };
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
+  if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("wms_compras")
-    .update({ nombre, etapa, ...leerCambios(formData) })
+    .update({ nombre, etapa, estado, ...leerCambios(formData) })
     .eq("id", id);
   if (error) return { error: error.message };
 
