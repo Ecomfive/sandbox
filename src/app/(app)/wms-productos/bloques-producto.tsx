@@ -47,10 +47,30 @@ export function BloqueMultimedia({
   medios,
   alCambiar,
   archivos,
+  titulo = "Multimedia",
+  aceptar = "image/*,video/*",
+  conAlt = true,
+  etiquetaBoton = "Agregar archivos",
+  ayudaArrastrar = "o arrastrar imágenes y videos aquí",
+  envolver = true,
+  maxBytes,
+  alRechazar,
 }: {
   medios: MedioDatos[];
   alCambiar: (m: MedioDatos[]) => void;
   archivos: MutableRefObject<Map<string, File>>;
+  titulo?: string;
+  /** Lo que admite el selector de archivos (`accept`); solo esos tipos se agregan. */
+  aceptar?: string;
+  /** La ficha de Dropi no lleva texto alternativo. */
+  conAlt?: boolean;
+  etiquetaBoton?: string;
+  ayudaArrastrar?: string;
+  /** Con falso, se dibuja sin su tarjeta (la ficha de Dropi ya está dentro de una). */
+  envolver?: boolean;
+  /** Tamaño máximo por archivo; uno más grande no se agrega y se avisa con `alRechazar`. */
+  maxBytes?: number;
+  alRechazar?: (nombre: string) => void;
 }) {
   // Vista previa (URL local) de cada archivo recién elegido, por su `tempId`.
   const [previas, setPrevias] = useState<Record<string, string>>({});
@@ -71,7 +91,11 @@ export function BloqueMultimedia({
     const urls: Record<string, string> = {};
     for (const archivo of Array.from(lista)) {
       const esVideo = archivo.type.startsWith("video/");
-      if (!esVideo && !archivo.type.startsWith("image/")) continue;
+      if (esVideo ? !aceptar.includes("video") : !archivo.type.startsWith("image/") || !aceptar.includes("image")) continue;
+      if (maxBytes && archivo.size > maxBytes) {
+        alRechazar?.(archivo.name);
+        continue;
+      }
       const tempId = crypto.randomUUID();
       archivos.current.set(tempId, archivo);
       urls[tempId] = URL.createObjectURL(archivo);
@@ -109,8 +133,8 @@ export function BloqueMultimedia({
 
   const origen = (m: MedioDatos) => (m.tempId ? previas[m.tempId] : m.ruta ? urlPublica(m.ruta) : undefined);
 
-  return (
-    <Tarjeta titulo="Multimedia">
+  const contenido = (
+    <>
       {medios.length > 0 && (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {medios.map((m, i) => (
@@ -126,15 +150,17 @@ export function BloqueMultimedia({
                   <span className="absolute left-1.5 top-1.5 rounded bg-foreground px-1.5 py-0.5 text-[11px] font-medium text-background">Portada</span>
                 )}
               </div>
-              <input
-                type="text"
-                value={m.alt}
-                onChange={(e) => alCambiar(medios.map((x, k) => (k === i ? { ...x, alt: e.target.value } : x)))}
-                aria-label={`Texto alternativo del archivo ${i + 1}`}
-                placeholder="Texto alternativo"
-                maxLength={512}
-                className={`${fieldClassSm} w-full`}
-              />
+              {conAlt && (
+                <input
+                  type="text"
+                  value={m.alt}
+                  onChange={(e) => alCambiar(medios.map((x, k) => (k === i ? { ...x, alt: e.target.value } : x)))}
+                  aria-label={`Texto alternativo del archivo ${i + 1}`}
+                  placeholder="Texto alternativo"
+                  maxLength={512}
+                  className={`${fieldClassSm} w-full`}
+                />
+              )}
               <div className="flex items-center gap-1">
                 <Tooltip texto="Mover antes">
                   <button type="button" onClick={() => mover(i, -1)} disabled={i === 0} aria-label={`Mover antes el archivo ${i + 1}`} className={`flex h-7 w-7 items-center justify-center hover:bg-muted disabled:opacity-30 ${anilloFoco}`}>
@@ -176,13 +202,14 @@ export function BloqueMultimedia({
           className={`inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted ${anilloFoco}`}
         >
           <MasIcon className="h-4 w-4" />
-          Agregar archivos
+          {etiquetaBoton}
         </button>
-        <span className="text-xs text-muted-foreground">o arrastrar imágenes y videos aquí</span>
-        <input ref={entrada} type="file" accept="image/*,video/*" multiple onChange={(e) => agregar(e.target.files)} aria-label="Elegir imágenes o videos" className="sr-only" />
+        <span className="text-xs text-muted-foreground">{ayudaArrastrar}</span>
+        <input ref={entrada} type="file" accept={aceptar} multiple onChange={(e) => agregar(e.target.files)} aria-label={etiquetaBoton} className="sr-only" />
       </div>
-    </Tarjeta>
+    </>
   );
+  return envolver ? <Tarjeta titulo={titulo}>{contenido}</Tarjeta> : <div className="flex flex-col gap-3">{contenido}</div>;
 }
 
 // ─── Categoría ────────────────────────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { sanitizarHtml } from "@/lib/wms/producto";
@@ -32,7 +32,19 @@ const BLOQUES = [
  * otra vez (`sanitizarHtml`) antes de guardarlo. La zona editable es un `contentEditable` que solo se reescribe
  * desde afuera cuando el valor cambia por otra vía (p. ej. al descartar los cambios).
  */
-export function EditorDescripcion({ valor, alCambiar }: { valor: string; alCambiar: (html: string) => void }) {
+export function EditorDescripcion({
+  valor,
+  alCambiar,
+  etiqueta = "Descripción",
+  invalido,
+}: {
+  valor: string;
+  alCambiar: (html: string) => void;
+  /** El nombre del campo (la ficha de Dropi tiene dos descripciones). */
+  etiqueta?: string;
+  invalido?: boolean;
+}) {
+  const idEtiqueta = useId();
   const zona = useRef<HTMLDivElement>(null);
   const [verCodigo, setVerCodigo] = useState(false);
   const ultimo = useRef(valor);
@@ -71,10 +83,13 @@ export function EditorDescripcion({ valor, alCambiar }: { valor: string; alCambi
 
   return (
     <div className="flex flex-col gap-1">
-      <span className={labelClass} id="etiqueta-descripcion">
-        Descripción
+      <span className={labelClass} id={idEtiqueta}>
+        {etiqueta}
       </span>
-      <div className="overflow-hidden rounded-md border border-border-control bg-card focus-within:ring-2 focus-within:ring-foreground">
+      <div
+        aria-invalid={invalido || undefined}
+        className="overflow-hidden rounded-md border border-border-control bg-card focus-within:ring-2 focus-within:ring-foreground aria-invalid:border-destructive"
+      >
         <div role="toolbar" aria-label="Formato de la descripción" className="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted px-1.5 py-1">
           <select
             aria-label="Tipo de bloque"
@@ -128,7 +143,7 @@ export function EditorDescripcion({ valor, alCambiar }: { valor: string; alCambi
         </div>
         {verCodigo ? (
           <textarea
-            aria-labelledby="etiqueta-descripcion"
+            aria-labelledby={idEtiqueta}
             value={valor}
             onChange={(e) => {
               ultimo.current = e.target.value;
@@ -143,7 +158,7 @@ export function EditorDescripcion({ valor, alCambiar }: { valor: string; alCambi
             ref={zona}
             role="textbox"
             aria-multiline="true"
-            aria-labelledby="etiqueta-descripcion"
+            aria-labelledby={idEtiqueta}
             contentEditable
             suppressContentEditableWarning
             onInput={emitir}
