@@ -66,6 +66,17 @@ export function RecursosHumanosIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Carrito de compras: el módulo "Compras" (distinto de la bolsa de "Gestión de Tiendas"). */
+export function ComprasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="9" cy="20" r="1" />
+      <circle cx="18" cy="20" r="1" />
+      <path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.8h7.2a2 2 0 0 0 2-1.6L20.5 8H6" />
+    </Icon>
+  );
+}
+
 /** Bolsa de compras: la sección "Gestión de Tiendas" (distinta del ícono de vitrina de "Tiendas"). */
 export function GestionTiendasIcon(props: SVGProps<SVGSVGElement>) {
   return (

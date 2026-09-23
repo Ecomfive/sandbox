@@ -20,6 +20,10 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Cargar extracto", href: "/extractos" },
     { etiqueta: "Diccionario de patrones bancarios", href: "/extractos/patrones" },
   ],
+  "/compras": [
+    { etiqueta: "Productos", href: "/compras" },
+    { etiqueta: "Filtros", href: "/compras/filtros" },
+  ],
 };
 
 /** Pestañas del módulo (vacío si no tiene subpáginas: entonces no se dibuja la franja). */

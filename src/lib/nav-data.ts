@@ -27,7 +27,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Sistema WMS",
     items: [
       { label: "Ficha producto Shopify", href: "/wms-productos" },
-      { label: "Compras", pronto: true },
+      { label: "Compras", href: "/compras" },
     ],
   },
   {
