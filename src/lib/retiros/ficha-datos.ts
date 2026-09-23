@@ -9,7 +9,7 @@ export async function cargarFicha(id: string, generadoPor: string): Promise<Fich
   const { data: retiro } = await supabase
     .from("retiros")
     .select(
-      "numero_correlativo, monto, comision, monto_neto, a_recibir, monto_recibido, estado, fecha, fecha_cierre, fecha_limite, notas, soporte_numero, estado_dropi, dropi_id, plataformas(nombre), cuentas_retiro(nombre, detalle), paises(codigo, nombre), perfiles(nombre, email)"
+      "numero_correlativo, monto, comision, monto_neto, a_recibir, monto_recibido, estado, fecha, fecha_recibido, fecha_cierre, fecha_limite, notas, soporte_numero, estado_dropi, dropi_id, plataformas(nombre), cuentas_retiro(nombre, detalle), paises(codigo, nombre), perfiles(nombre, email)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -38,6 +38,7 @@ export async function cargarFicha(id: string, generadoPor: string): Promise<Fich
     aRecibir: Number(retiro.a_recibir ?? retiro.monto_neto),
     montoRecibido: retiro.monto_recibido === null ? null : Number(retiro.monto_recibido),
     soporte: retiro.soporte_numero,
+    fechaRecibido: retiro.fecha_recibido,
     fechaCierre: retiro.fecha_cierre,
     notas: retiro.notas,
     generadoPor,

@@ -53,6 +53,9 @@ export interface FilaRetiro {
   comision: number;
   aRecibir: number;
   montoRecibido: number | null;
+  /** Cuándo llegó de verdad el dinero al banco (se escribe a mano al conciliar) — distinta de `fechaCierre`
+   * (cuándo se conciliá/consolidó el retiro en el sistema, que puede ser otro día). */
+  fechaRecibido: string | null;
   fechaCierre: string | null;
   fechaLimite: string | null;
   asignadoNombre: string | null;

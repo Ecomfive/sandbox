@@ -21,6 +21,8 @@ export interface FichaRetiro {
   aRecibir: number;
   montoRecibido: number | null;
   soporte: string | null;
+  /** Cuándo llegó de verdad el dinero al banco (se escribe a mano al conciliar) — distinta de `fechaCierre`. */
+  fechaRecibido: string | null;
   fechaCierre: string | null;
   notas: string | null;
   generadoPor: string;
@@ -71,6 +73,7 @@ export function lineasFicha(ficha: FichaRetiro): LineaFicha[] {
     lineas.push({ campo: "Monto recibido", valor: ficha.montoRecibido, monto: true });
     lineas.push({ campo: "Diferencia", valor: ficha.montoRecibido - ficha.aRecibir, monto: true });
   }
+  if (ficha.fechaRecibido) lineas.push({ campo: "Fecha de recibido", valor: formatearFecha(ficha.fechaRecibido) });
   if (ficha.fechaCierre) lineas.push({ campo: "Fecha de cierre", valor: formatearFecha(ficha.fechaCierre) });
   if (ficha.soporte) lineas.push({ campo: "N.º de soporte", valor: ficha.soporte });
   if (ficha.notas) lineas.push({ campo: "Notas", valor: ficha.notas });

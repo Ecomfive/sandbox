@@ -11,17 +11,23 @@ import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { formatearMoneda } from "@/lib/formato";
 import { ConciliarIcon } from "@/lib/nav-icons";
 
+const hoy = () => new Date().toISOString().slice(0, 10);
+
 /**
  * Lo que se pide para conciliar un retiro, al final de su ficha (el botón «Conciliar» lleva hasta aquí; ya no se abre
- * una ventana en el medio). Lo demás (plataforma, cuenta destino, montos, fechas) ya está en la ficha. **Recibido** e
- * **ID / Referencia** son obligatorios:
+ * una ventana en el medio). Lo demás (plataforma, cuenta destino, montos, fechas) ya está en la ficha. **Recibido**,
+ * **Fecha de recibido** e **ID / Referencia** son obligatorios:
  *  - **Recibido**: lo que llegó de verdad. Se compara con «A recibir»; si se aleja más de lo tolerado, el servidor no
  *    concilia y lo dice (`conciliarRetiro`).
+ *  - **Fecha de recibido**: cuándo llegó de verdad el dinero al banco — arranca en hoy, pero se puede cambiar a mano
+ *    al validarlo contra el banco (puede ser otro día que cuando se hace la conciliación). Distinta de la fecha de
+ *    consolidado (`fecha_cierre`, siempre hoy, la pone el servidor): esa es cuándo se concilió el retiro en el
+ *    sistema, no cuándo llegó el dinero.
  *  - **ID / Referencia**: el número de la transferencia.
  * **Soporte** (comprobante, imagen o PDF) es opcional: se adjunta con un botón que es solo un ícono, sin texto
  * (`BotonAdjuntar`), pero no bloquea conciliar si no se adjunta uno.
- * El botón grande de abajo sigue la misma regla que los de crear (`useFaltantes`): apagado mientras falte Recibido o
- * la Referencia y, al pulsarlo así, lleva al primero que falta. Al conciliar el retiro queda cerrado y consolidado.
+ * El botón grande de abajo sigue la misma regla que los de crear (`useFaltantes`): apagado mientras falte algo
+ * obligatorio y, al pulsarlo así, lleva al primero que falta. Al conciliar el retiro queda cerrado y consolidado.
  */
 export function SeccionConciliarRetiro({
   id,
@@ -30,6 +36,7 @@ export function SeccionConciliarRetiro({
   aRecibir,
   soporteNumero,
   montoRecibido,
+  fechaRecibido,
   alCancelar,
   alConciliado,
 }: {
@@ -40,6 +47,7 @@ export function SeccionConciliarRetiro({
   aRecibir: number;
   soporteNumero: string | null;
   montoRecibido: number | null;
+  fechaRecibido: string | null;
   alCancelar: () => void;
   alConciliado: () => void;
 }) {
@@ -47,6 +55,7 @@ export function SeccionConciliarRetiro({
   const [error, setError] = useState<string | null>(null);
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const idRecibido = `campo-recibido-${id}`;
+  const idFechaRecibido = `campo-fecha-recibido-${id}`;
   const idReferencia = `campo-referencia-${id}`;
   const idSoporte = `campo-soporte-${id}`;
 
@@ -101,6 +110,23 @@ export function SeccionConciliarRetiro({
               />
             </div>
             <AvisoFaltante id={idRecibido} faltante={faltante} />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className={labelClassSm} htmlFor={idFechaRecibido}>
+              Fecha de recibido
+              <span aria-hidden="true" className="text-destructive"> *</span>
+            </label>
+            <input
+              id={idFechaRecibido}
+              type="date"
+              name="fecha_recibido"
+              required
+              aria-invalid={faltante === idFechaRecibido || undefined}
+              defaultValue={fechaRecibido ?? hoy()}
+              className={`${fieldClass} w-full min-w-0`}
+            />
+            <AvisoFaltante id={idFechaRecibido} faltante={faltante} />
           </div>
 
           <div className="flex flex-col gap-1">

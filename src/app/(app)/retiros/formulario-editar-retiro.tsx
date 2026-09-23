@@ -392,6 +392,11 @@ export function FormularioEditarRetiro({
                     {moneda(diferencia)})
                   </span>
                 )}
+                {fila.fechaRecibido && (
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {formatearFecha(fila.fechaRecibido)}
+                  </span>
+                )}
               </span>
             )}
           </Dato>

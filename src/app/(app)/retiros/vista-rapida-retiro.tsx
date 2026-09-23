@@ -53,7 +53,9 @@ function claseNodo(estado: EstadoPaso): string {
  * Novedad/Novedad resuelta ya no van acá: se ven en el dato «Consolidación», con
  * `estadoConsolidacion()` (`src/lib/retiros/estados.ts`). Mientras Dropi no ha decidido, el segundo
  * paso queda «En espera» sin fecha; los tres primeros pasos no detienen a los siguientes — los
- * cuatro se muestran siempre, aunque el segundo sea Rechazado o Cancelado. */
+ * cuatro se muestran siempre, aunque el segundo sea Rechazado o Cancelado. **Recibido** usa su propia
+ * `fecha_recibido` (se escribe a mano al conciliar, puede ser otro día que hoy), distinta de la de
+ * **Consolidado** (`fecha_cierre`: cuándo se hizo la conciliación en el sistema). */
 function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string }) {
   const fecha = (iso: string | null) => (iso ? formatearFecha(iso) : null);
   const { recibido, consolidado } = pasosDelRetiro(fila);
@@ -75,7 +77,7 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
       estado: recibido,
       subtexto:
         fila.montoRecibido !== null
-          ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaCierre)].filter(Boolean).join(" · ")
+          ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaRecibido)].filter(Boolean).join(" · ")
           : recibido === "error"
             ? "Diferencia de monto"
             : "Sin registrar",
@@ -294,6 +296,7 @@ export function VistaRapidaRetiro({
               aRecibir={fila.aRecibir}
               soporteNumero={fila.soporteNumero}
               montoRecibido={fila.montoRecibido}
+              fechaRecibido={fila.fechaRecibido}
               alCancelar={() => setPanel(null)}
               alConciliado={() => alTerminarPanel("Retiro conciliado")}
             />

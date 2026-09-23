@@ -156,6 +156,7 @@ export async function fichaAPdf(ficha: FichaRetiro): Promise<Uint8Array> {
 
   // Cierre
   const cierre: [string, string][] = [];
+  if (ficha.fechaRecibido) cierre.push(["Fecha de recibido", formatearFecha(ficha.fechaRecibido)]);
   if (ficha.fechaCierre) cierre.push(["Fecha de cierre", formatearFecha(ficha.fechaCierre)]);
   if (ficha.soporte) cierre.push(["N.º de soporte", ficha.soporte]);
   if (cierre.length > 0) {

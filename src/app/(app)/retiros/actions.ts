@@ -224,6 +224,9 @@ export async function cerrarRetiro(formData: FormData) {
  * recibido se aleja de lo esperado más de TOLERANCIA_DISCREPANCIA — hay que corregirlo o
  * investigarlo antes de poder conciliar. Al conciliar, además de cerrar el retiro, marca la
  * bandera de consolidación (antes editable a mano, ahora solo se activa desde acá).
+ * `fecha_recibido` la escribe quien concilia (arranca en hoy, pero se puede cambiar al validarla
+ * contra el banco) y es distinta de `fecha_cierre` (siempre hoy, la pone el servidor: cuándo se
+ * hizo la conciliación en el sistema, no cuándo llegó el dinero).
  */
 export async function conciliarRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
@@ -231,6 +234,7 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
   const pais_id = formData.get("pais_id") as string;
   const soporte_numero = (formData.get("soporte_numero") as string) || null;
   const montoRecibido = Number(formData.get("monto_recibido"));
+  const fecha_recibido = (formData.get("fecha_recibido") as string) || null;
   const comprobante = formData.get("comprobante") as File | null;
 
   const supabase = createServiceClient();
@@ -253,6 +257,7 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
   if (!(montoRecibido >= 0) || String(formData.get("monto_recibido") ?? "").trim() === "") {
     return { error: "Falta el monto recibido." };
   }
+  if (!fecha_recibido) return { error: "Falta la fecha de recibido." };
   if (!soporte_numero?.trim()) return { error: "Falta el ID / referencia." };
 
   const esperado = Number(retiro.a_recibir ?? retiro.monto_neto);
@@ -280,6 +285,7 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
       soporte_numero,
       comprobante_path,
       monto_recibido: montoRecibido,
+      fecha_recibido,
       fecha_cierre: new Date().toISOString().slice(0, 10),
       consolidado: true,
     })
