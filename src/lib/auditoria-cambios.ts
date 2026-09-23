@@ -47,6 +47,12 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   editar_producto_wms: "Modificó el producto",
   duplicar_producto_wms: "Duplicó el producto",
   eliminar_producto_wms: "Eliminó el producto",
+  crear_producto_dropi: "Creó el producto",
+  editar_producto_dropi: "Modificó el producto",
+  duplicar_producto_dropi: "Duplicó el producto",
+  eliminar_producto_dropi: "Eliminó el producto",
+  archivar_producto_dropi: "Cambió el estado del producto",
+  ajustar_stock_dropi: "Ajustó el stock",
   generar_alerta: "Generó la alerta",
   cambiar_estado_alerta: "Cambió el estado",
 };

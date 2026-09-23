@@ -207,6 +207,23 @@ convenciones técnicas del código.
   para no chocar con el límite de tamaño de las acciones; al guardar solo viaja su ruta.
   La lógica pura y la validación viven en `src/lib/wms/producto.ts`. No incluye las ventas
   de los últimos 90 días ni el precio unitario de Shopify (no hay de dónde sacarlos).
+- **Sistema WMS: «Ficha producto Dropi»** (`/wms-productos-dropi`, módulo `wms-productos-dropi`,
+  migración 0050). Réplica de los productos de Dropi. **La lista no lleva los íconos de
+  acción de la fila de Dropi**: toda la fila abre una **ficha lateral** (`Ventana`, como
+  Retiros; «Agregar» abre la misma ficha vacía) que carga el producto al abrirse
+  (`obtenerProductoDropi`; la lista solo trae lo justo para sus filas). La ficha junta como
+  bloques lo que Dropi reparte en pestañas (General, Stock o Variables y stock, Imagen del
+  producto, Videos, Recursos adicionales, Productos privados, Garantías) y pone como botones
+  las opciones de la fila: Historial de existencia (los ajustes de stock quedan en la
+  auditoría como `ajustar_stock_dropi`), Duplicar, Archivar/Restaurar y Eliminar. «Crear
+  orden» y «Generar formato de órdenes masivas» de Dropi no están (no hay creación de
+  pedidos ni ese formato aquí). «Archivados» es el botón de filas cerradas de la tabla
+  (`exclusivo`). Las bodegas salen de `wms_bodegas` por país y se agregan desde la sección
+  Stock. Reglas de Dropi que se validan al guardar (`faltantesDropi`,
+  `src/lib/wms/producto-dropi.ts`): peso y medidas, precio y precio sugerido, categoría,
+  descripción de 200 caracteres como mínimo y, si el producto es público, una bodega con
+  100 unidades y 3 imágenes. Peso en gramos, medidas en centímetros. No incluye Carga masiva,
+  Actualización masiva ni las descargas en Excel de Dropi.
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
