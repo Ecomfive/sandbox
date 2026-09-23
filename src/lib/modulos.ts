@@ -18,6 +18,7 @@ export const MODULOS: Modulo[] = [
   { clave: "catalogo-maestro", etiqueta: "Catálogo maestro de SKU" },
   { clave: "wms-productos", etiqueta: "Ficha producto Shopify (WMS)" },
   { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi (WMS)" },
+  { clave: "compras", etiqueta: "Compras (WMS)" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
   { clave: "configuracion", etiqueta: "Configuración del sistema" },
   { clave: "notificaciones", etiqueta: "Centro de notificaciones" },
