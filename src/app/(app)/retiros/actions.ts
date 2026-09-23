@@ -403,10 +403,13 @@ export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?
   // `fecha_novedad` (migración 0045) es la fecha del paso "Novedad" de la barra de pasos; si la
   // migración no se ha corrido, el update cae a guardar sin ella en vez de fallar por completo.
   const hoy = new Date().toISOString().slice(0, 10);
-  let { error } = await supabase.from("retiros").update({ estado: "novedad", fecha_novedad: hoy }).eq("id", id);
-  if (error?.code === "42703") {
-    ({ error } = await supabase.from("retiros").update({ estado: "novedad" }).eq("id", id));
-  }
+  // Una novedad nueva no mueve la etapa y deja la Consolidación en «Pendiente».
+  const { error } = await actualizarTolerante(
+    supabase,
+    id,
+    { estado: "novedad", consolidado: false, novedad_resuelta: false, fecha_novedad: hoy },
+    ["fecha_novedad", "novedad_resuelta"]
+  );
   if (error) return { error: error.message };
 
   await registrarEvento(supabase, id, `Novedad: ${texto}`);
@@ -548,9 +551,19 @@ export async function actualizarRetiro(formData: FormData) {
     fecha_limite,
     gestionado_por,
   };
-  if (estadoValido) cambios.estado = estadoTexto;
+  if (estadoValido) {
+    cambios.estado = estadoTexto;
+    // La Consolidación sigue al Estado: Abierto y Novedad están pendientes; Cerrado está consolidado. Sin esto, pasar a
+    // mano un retiro cerrado a «Novedad» lo dejaba con la Consolidación en «Consolidado».
+    if (estadoTexto !== antes.estado) {
+      cambios.consolidado = estadoTexto === "cerrado";
+      if (estadoTexto !== "cerrado") cambios.novedad_resuelta = false;
+    }
+  }
 
-  const { error } = await supabase.from("retiros").update(cambios).eq("id", id);
+  const { error } = (await actualizarTolerante(supabase, id, cambios, ["novedad_resuelta"])) as {
+    error: { message: string } | null;
+  };
   if (error) throw new Error(error.message);
 
   const cambioEstado = estadoValido && estadoTexto !== antes.estado;
