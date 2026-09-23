@@ -14,22 +14,28 @@ import { novedadVigente } from "@/lib/retiros/novedad";
 /** Cuántos caracteres admite la nota — igual que en el servidor. */
 const MAX_NOVEDAD = 500;
 
+const hoy = () => new Date().toISOString().slice(0, 10);
+
 /**
  * Lo que hay al final de la ficha de un retiro con novedad cuando se pulsa «Ver novedad»: **la nota de la novedad**
  * (sacada de su historial), editable ahí mismo — no queda bloqueada — con su propio botón «Guardar»
  * (`actualizarNovedadRetiro`, deja otra línea en el historial sin borrar el rastro de la edición), y el botón
- * **«Resolver»**. Nada quita la novedad hasta que alguien pulsa «Resolver» (`resolverNovedadRetiro`): a diferencia
- * de antes, el retiro ya no vuelve a estar «abierto» — queda en el estado aparte «Novedad resuelta».
+ * **«Resolver»**. Nada quita la novedad hasta que alguien pulsa «Resolver» (`resolverNovedadRetiro`): el retiro queda
+ * «Cerrado», con la etapa Recibido y Consolidado y la Consolidación «Novedad resuelta». Para eso pide dos fechas: la de
+ * recibido (cuándo llegó el dinero) y la de consolidación (arranca en hoy), ambas editables.
  */
 export function SeccionResolverNovedad({
   id,
   codigoPais,
+  fechaRecibido: fechaRecibidaInicial,
   alCancelar,
   alNotaGuardada,
   alResuelta,
 }: {
   id: string;
   codigoPais: string;
+  /** La fecha de recibido que ya tenga el retiro; sin ella arranca en hoy. */
+  fechaRecibido: string | null;
   alCancelar: () => void;
   /** Se llama al guardar la nota sin resolver la novedad (la sección sigue abierta): para que el historial de la
    * ficha se vuelva a pedir. */
@@ -43,6 +49,8 @@ export function SeccionResolverNovedad({
   const [pending, startTransition] = useTransition();
   const [pendingGuardar, startTransitionGuardar] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fechaRecibido, setFechaRecibido] = useState(fechaRecibidaInicial ?? hoy());
+  const [fechaConsolidacion, setFechaConsolidacion] = useState(hoy());
 
   useEffect(() => {
     let vigente = true;
@@ -82,6 +90,12 @@ export function SeccionResolverNovedad({
     setError(null);
     const formData = new FormData();
     formData.set("id", id);
+    formData.set("fecha_recibido", fechaRecibido);
+    formData.set("fecha_cierre", fechaConsolidacion);
+    if (!fechaRecibido || !fechaConsolidacion) {
+      setError(!fechaRecibido ? "Falta la fecha de recibido." : "Falta la fecha de consolidación.");
+      return;
+    }
     startTransition(async () => {
       const resultado = await resolverNovedadRetiro(formData).catch(() => ({ error: "No se pudo resolver la novedad. Inténtalo de nuevo." }));
       if (resultado?.error) setError(resultado.error);
@@ -129,7 +143,35 @@ export function SeccionResolverNovedad({
           </p>
         )}
 
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-3 flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className={labelClassSm}>
+              Fecha de recibido
+              <span aria-hidden="true" className="text-destructive"> *</span>
+            </span>
+            <input
+              type="date"
+              required
+              value={fechaRecibido}
+              disabled={ocupado}
+              onChange={(e) => setFechaRecibido(e.target.value)}
+              className={`${fieldClass} w-full min-w-0`}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelClassSm}>
+              Fecha de consolidación
+              <span aria-hidden="true" className="text-destructive"> *</span>
+            </span>
+            <input
+              type="date"
+              required
+              value={fechaConsolidacion}
+              disabled={ocupado}
+              onChange={(e) => setFechaConsolidacion(e.target.value)}
+              className={`${fieldClass} w-full min-w-0`}
+            />
+          </label>
           <Button type="button" onClick={alResolver} disabled={cargando || ocupado}>
             {pending ? "Resolviendo..." : "Resolver"}
           </Button>

@@ -202,6 +202,24 @@ convenciones técnicas del código.
   páginas sale del menú y de las pestañas de cada módulo
   (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede
   buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
+- **Flujo Etapa / Estado / Consolidación de un retiro (manda sobre lo que sigue).** La
+  barra de pasos de arriba de la ficha se llama **«Etapa»**; el **Estado** es la insignia
+  (Abierto / Novedad / Cerrado) y la **Consolidación** es el dato (Pendiente / Novedad
+  resuelta / Consolidado). Mapa: crear → Creado, Abierto, Pendiente · Dropi aprueba →
+  Aprobado, Abierto, Pendiente · Dropi cancela o rechaza (o el botón manual «Cancelar»,
+  que se comporta igual y guarda `estado_dropi = 'cancelado'`) → etapa Cancelado/Rechazado y
+  el sistema abre solo una novedad («Novedad: Dropi reportó…» en el historial), Estado
+  Novedad, Pendiente · Conciliar (soporte, ID/referencia, **fecha de recibido** y **fecha de
+  consolidación**, esta arranca en hoy y se edita; `fecha_cierre`) → etapa Recibido y
+  Consolidado con sus fechas, Cerrado, Consolidado · Novedad manual → la etapa no se mueve,
+  Novedad, Pendiente · «Resolver» novedad (pide fecha de recibido y de consolidación,
+  editables) → etapa Recibido + Consolidado, Estado **Cerrado**, Consolidación «Novedad
+  resuelta». Ya no hay estado propio `novedad_resuelta`: se guarda con la bandera
+  `retiros.novedad_resuelta` (migración 0048, que además convierte las filas viejas); sin
+  correrla, el código cae al estado antiguo y todo se sigue leyendo igual
+  (`estadoConsolidacion`, `resuelta()`). Los retiros que ya tenían `estado = 'cancelado'`
+  lo conservan. Donde más abajo diga que «Resolver» deja el estado `novedad_resuelta`, léase
+  Cerrado + bandera.
 - **Ficha de un retiro.** Un clic en su `#` abre un panel a la derecha
   (`<Ventana lado="derecha" ancho="lg">`, `retiros/vista-rapida-retiro.tsx`) con su barra
   de pasos (`BarraPasos`; no es lo mismo que `estado`, que se ve aparte en la insignia del

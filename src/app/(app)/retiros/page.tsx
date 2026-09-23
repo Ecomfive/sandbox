@@ -20,13 +20,13 @@ const COLUMNAS_RETIROS =
   "id, numero_correlativo, monto, comision, monto_neto, monto_recibido, fecha, fecha_cierre, fecha_limite, estado, consolidado, a_recibir, asignado_a, notas, soporte_numero, banco, estado_dropi, plataforma_id, cuenta_retiro_id, gestionado_por, plataformas(nombre), cuentas_retiro(nombre)";
 
 /** `fecha_rechazo`, `fecha_aprobado`, `fecha_cancelado_dropi`, `fecha_novedad` (migraciones 0044-0046)
- * y `fecha_recibido` (migración 0047) son fechas que no siempre existen; sin esas migraciones, se sigue
+ * `fecha_recibido` (migración 0047) y `novedad_resuelta` (0048) son fechas que no siempre existen; sin esas migraciones, se sigue
  * sirviendo la página consultando sin esas columnas. */
 function consultarRetiros(supabase: ReturnType<typeof createServiceClient>, paisId: string) {
   return supabase
     .from("retiros")
     .select(
-      `${COLUMNAS_RETIROS}, fecha_rechazo, fecha_aprobado, fecha_cancelado_dropi, fecha_novedad, fecha_recibido`
+      `${COLUMNAS_RETIROS}, fecha_rechazo, fecha_aprobado, fecha_cancelado_dropi, fecha_novedad, fecha_recibido, novedad_resuelta`
     )
     .eq("pais_id", paisId)
     .order("fecha", { ascending: false })
@@ -127,6 +127,7 @@ export default async function RetirosPage() {
     aRecibir: Number(r.a_recibir ?? r.monto_neto),
     montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido),
     fechaRecibido: (r as { fecha_recibido?: string | null }).fecha_recibido ?? null,
+    novedadResuelta: (r as { novedad_resuelta?: boolean | null }).novedad_resuelta === true,
     fechaCierre: r.fecha_cierre,
     fechaLimite: r.fecha_limite,
     asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,

@@ -56,6 +56,8 @@ export interface FilaRetiro {
   /** Cuándo llegó de verdad el dinero al banco (se escribe a mano al conciliar) — distinta de `fechaCierre`
    * (cuándo se conciliá/consolidó el retiro en el sistema, que puede ser otro día). */
   fechaRecibido: string | null;
+  /** La novedad se resolvió a mano (migración 0048): el estado es «Cerrado» y la Consolidación dice «Novedad resuelta». */
+  novedadResuelta: boolean;
   fechaCierre: string | null;
   fechaLimite: string | null;
   asignadoNombre: string | null;
