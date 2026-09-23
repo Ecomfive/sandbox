@@ -20,9 +20,9 @@ const hoy = () => new Date().toISOString().slice(0, 10);
  *  - **Recibido**: lo que llegó de verdad. Se compara con «A recibir»; si se aleja más de lo tolerado, el servidor no
  *    concilia y lo dice (`conciliarRetiro`).
  *  - **Fecha de recibido**: cuándo llegó de verdad el dinero al banco — arranca en hoy, pero se puede cambiar a mano
- *    al validarlo contra el banco (puede ser otro día que cuando se hace la conciliación). Distinta de la fecha de
- *    consolidado (`fecha_cierre`, siempre hoy, la pone el servidor): esa es cuándo se concilió el retiro en el
- *    sistema, no cuándo llegó el dinero.
+ *    al validarlo contra el banco (puede ser otro día que cuando se hace la conciliación).
+ *  - **Fecha de consolidación** (`fecha_cierre`): el día en que se marca como consolidado — arranca en hoy y también se
+ *    puede cambiar a mano. Es cuándo se concilió el retiro en el sistema, no cuándo llegó el dinero.
  *  - **ID / Referencia**: el número de la transferencia.
  * **Soporte** (comprobante, imagen o PDF) es opcional: se adjunta con un botón que es solo un ícono, sin texto
  * (`BotonAdjuntar`), pero no bloquea conciliar si no se adjunta uno.
@@ -56,6 +56,7 @@ export function SeccionConciliarRetiro({
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const idRecibido = `campo-recibido-${id}`;
   const idFechaRecibido = `campo-fecha-recibido-${id}`;
+  const idFechaConsolidacion = `campo-fecha-consolidacion-${id}`;
   const idReferencia = `campo-referencia-${id}`;
   const idSoporte = `campo-soporte-${id}`;
 
@@ -127,6 +128,23 @@ export function SeccionConciliarRetiro({
               className={`${fieldClass} w-full min-w-0`}
             />
             <AvisoFaltante id={idFechaRecibido} faltante={faltante} />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className={labelClassSm} htmlFor={idFechaConsolidacion}>
+              Fecha de consolidación
+              <span aria-hidden="true" className="text-destructive"> *</span>
+            </label>
+            <input
+              id={idFechaConsolidacion}
+              type="date"
+              name="fecha_cierre"
+              required
+              aria-invalid={faltante === idFechaConsolidacion || undefined}
+              defaultValue={hoy()}
+              className={`${fieldClass} w-full min-w-0`}
+            />
+            <AvisoFaltante id={idFechaConsolidacion} faltante={faltante} />
           </div>
 
           <div className="flex flex-col gap-1">

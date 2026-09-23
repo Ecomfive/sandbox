@@ -132,7 +132,7 @@ async function main() {
     const cambios: Record<string, unknown> = { banco: a.banco, estado_dropi: estadoDropiAGuardar };
     if (a.vinculadoAhora) cambios.dropi_id = a.dropiId;
     // Dropi rechazó o canceló un retiro que seguía abierto acá: se marca como novedad para que
-    // se revise a mano. Nunca se cancela solo — cancelar sigue siendo una acción manual.
+    // se revise a mano (la etapa pasa a Rechazado/Cancelado por `estado_dropi`; el estado, a Novedad).
     if (a.marcarNovedad) cambios.estado = "novedad";
     // Las fechas de los pasos "Aprobado"/"Rechazado"/"Cancelado" de la barra de pasos: cuándo
     // detectamos el cambio.
@@ -172,10 +172,15 @@ async function main() {
       // "Rechazado"), no enterrado dentro de otra frase, para que se lea igual que los demás eventos.
       const etiqueta = ETIQUETA_ESTADO_DROPI[a.estadoDropi];
       const base = a.vinculadoAhora ? `Vinculado con Dropi #${a.dropiId}: ${etiqueta}` : etiqueta;
-      await supabase.from("retiro_eventos").insert({
-        retiro_id: a.retiroId,
-        evento: a.marcarNovedad ? `${base} — se marca como novedad para revisar` : base,
-      });
+      await supabase.from("retiro_eventos").insert({ retiro_id: a.retiroId, evento: base });
+      // La novedad se crea sola, como si alguien pulsara «Novedad» en la ficha: con su nota «Novedad: …»
+      // (es la que lee `novedadVigente` para mostrarla en «Ver novedad»).
+      if (a.marcarNovedad) {
+        await supabase.from("retiro_eventos").insert({
+          retiro_id: a.retiroId,
+          evento: `Novedad: Dropi reportó el retiro como ${etiqueta.toLowerCase()}`,
+        });
+      }
     }
     if (Math.abs(a.montoDropi - a.montoRetiro) >= 0.005) {
       advertencias.push(

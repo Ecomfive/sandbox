@@ -21,6 +21,28 @@ async function registrarEvento(supabase: ReturnType<typeof createServiceClient>,
   await supabase.from("retiro_eventos").insert({ retiro_id: retiroId, evento });
 }
 
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+const esFechaISO = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/** Actualiza un retiro tolerando columnas que aún no existen (migraciones sin correr): si Postgres dice que falta
+ * una de las `opcionales`, se reintenta sin ella. Devuelve el error final y los cambios que sí se guardaron. */
+async function actualizarTolerante(
+  supabase: ReturnType<typeof createServiceClient>,
+  id: string,
+  cambios: Record<string, unknown>,
+  opcionales: string[]
+) {
+  const c = { ...cambios };
+  for (let i = 0; i <= opcionales.length; i++) {
+    const { error } = await supabase.from("retiros").update(c).eq("id", id);
+    if (error?.code !== "42703") return { error, cambios: c };
+    const quitar = opcionales.filter((o) => o in c && error.message.includes(o));
+    if (quitar.length === 0) return { error, cambios: c };
+    for (const q of quitar) delete c[q];
+  }
+  return { error: null, cambios: c };
+}
+
 export async function alternarConsolidado(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
@@ -235,19 +257,18 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
   const soporte_numero = (formData.get("soporte_numero") as string) || null;
   const montoRecibido = Number(formData.get("monto_recibido"));
   const fecha_recibido = (formData.get("fecha_recibido") as string) || null;
+  // Fecha de consolidación: arranca en hoy (el día en que se marca como consolidado) pero se puede cambiar a mano.
+  const fecha_cierre = ((formData.get("fecha_cierre") as string) || hoyISO()).trim();
   const comprobante = formData.get("comprobante") as File | null;
 
   const supabase = createServiceClient();
-  const { data: retiro, error: errorRetiro } = await supabase
-    .from("retiros")
-    .select("estado, a_recibir, monto_neto, comprobante_path")
-    .eq("id", id)
-    .single();
+  // `*` y no una lista: `novedad_resuelta` (migración 0048) puede no existir todavía.
+  const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("*").eq("id", id).single();
   if (errorRetiro) return { error: errorRetiro.message };
 
   // Un cancelado o una novedad resuelta ya terminaron su ciclo: no siguen a Conciliado (se vuelve a comprobar
   // aquí porque un server action se puede invocar sin pasar por la ficha, que ya oculta el botón).
-  if (retiro.estado === "cancelado" || retiro.estado === "novedad_resuelta") {
+  if (retiro.estado === "cancelado" || retiro.estado === "novedad_resuelta" || retiro.novedad_resuelta === true) {
     return { error: "Este retiro no sigue el flujo normal de conciliación." };
   }
 
@@ -258,6 +279,7 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
     return { error: "Falta el monto recibido." };
   }
   if (!fecha_recibido) return { error: "Falta la fecha de recibido." };
+  if (!esFechaISO(fecha_cierre)) return { error: "La fecha de consolidación no es válida." };
   if (!soporte_numero?.trim()) return { error: "Falta el ID / referencia." };
 
   const esperado = Number(retiro.a_recibir ?? retiro.monto_neto);
@@ -286,7 +308,7 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
       comprobante_path,
       monto_recibido: montoRecibido,
       fecha_recibido,
-      fecha_cierre: new Date().toISOString().slice(0, 10),
+      fecha_cierre,
       consolidado: true,
     })
     .eq("id", id);
@@ -318,24 +340,36 @@ export async function cancelarRetiro(formData: FormData) {
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();
-  const { data: retiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
+  const { data: retiro } = await supabase.from("retiros").select("estado, estado_dropi").eq("id", id).single();
+  // Solo un retiro en curso se cancela; uno cerrado o ya cancelado no cambia.
+  if (retiro && retiro.estado !== "abierto" && retiro.estado !== "novedad") return;
 
-  // `fecha_cierre` marca acá la fecha de cancelación (no solo la de un cierre normal): el dato "Cierre" de
-  // la ficha (`formulario-editar-retiro.tsx`) la muestra igual, sin necesitar un monto recibido, que un
-  // retiro cancelado nunca tiene.
-  const { error } = await supabase
-    .from("retiros")
-    .update({ estado: "cancelado", fecha_cierre: new Date().toISOString().slice(0, 10) })
-    .eq("id", id);
+  // Igual que cuando Dropi reporta el retiro como cancelado: la etapa pasa a «Cancelado» (`estado_dropi` y su fecha)
+  // y el sistema abre solo una novedad dentro de la ficha (Estado «Novedad», Consolidación «Pendiente»), como si se
+  // hubiera pulsado «Novedad». Ya no existe el estado propio «Cancelado» (los retiros que ya lo tenían lo conservan).
+  const hoy = hoyISO();
+  let cambios: Record<string, unknown> = {
+    estado: "novedad",
+    estado_dropi: "cancelado",
+    fecha_cancelado_dropi: hoy,
+    ...(retiro?.estado === "abierto" ? { fecha_novedad: hoy } : {}),
+  };
+  let { error } = await actualizarTolerante(supabase, id, cambios, ["fecha_cancelado_dropi", "fecha_novedad"]);
+  if (error?.code === "23514") {
+    // Sin la migración 0046 la base no admite «cancelado» en `estado_dropi`: se guarda sin él.
+    cambios = { estado: "novedad" };
+    ({ error } = await actualizarTolerante(supabase, id, cambios, []));
+  }
   if (error) throw new Error(error.message);
 
   await registrarEvento(supabase, id, "Retiro cancelado");
+  await registrarEvento(supabase, id, "Novedad: el retiro fue cancelado");
   await registrarAuditoria({
     accion: "cancelar_retiro",
     entidad: "retiros",
     entidadId: id,
     antes: { Estado: ETIQUETA_ESTADO[retiro?.estado ?? ""] ?? retiro?.estado ?? "—" },
-    despues: { Estado: "Cancelado" },
+    despues: { Etapa: "Cancelado", Estado: ETIQUETA_ESTADO.novedad, Consolidación: "Pendiente" },
   });
 
   revalidatePath("/retiros");
@@ -428,22 +462,32 @@ export async function actualizarNovedadRetiro(formData: FormData): Promise<{ err
 export async function resolverNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
+  // Cuándo llegó el dinero (obligatoria) y cuándo se consolida (arranca en hoy, editable): las dos fechas de la etapa.
+  const fecha_recibido = String(formData.get("fecha_recibido") ?? "").trim();
+  const fecha_cierre = String(formData.get("fecha_cierre") ?? "").trim() || hoyISO();
+  if (!esFechaISO(fecha_recibido)) return { error: "Falta la fecha de recibido." };
+  if (!esFechaISO(fecha_cierre)) return { error: "La fecha de consolidación no es válida." };
 
   const supabase = createServiceClient();
   const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
   if (errorRetiro) return { error: errorRetiro.message };
   if (retiro.estado !== "novedad") return {};
 
-  // `fecha_cierre` marca acá cuándo se resolvió la novedad (y, con ella, cuándo quedó consolidado): son
-  // los pasos "Novedad resuelta" y "Consolidado" de la barra de pasos. Reutiliza el mismo campo que usan
-  // conciliarRetiro y cancelarRetiro para "cuándo se cerró la historia de este retiro".
-  const { error } = await supabase
-    .from("retiros")
-    .update({ estado: "novedad_resuelta", consolidado: true, fecha_cierre: new Date().toISOString().slice(0, 10) })
-    .eq("id", id);
+  // El retiro queda «Cerrado» y consolidado, con la etapa Recibido + Consolidado (cada una con su fecha) y la
+  // Consolidación «Novedad resuelta» (`novedad_resuelta`, migración 0048). Sin la migración se guarda con el estado
+  // antiguo «novedad_resuelta», que la ficha y la tabla entienden igual.
+  let { error, cambios } = await actualizarTolerante(
+    supabase,
+    id,
+    { estado: "cerrado", consolidado: true, novedad_resuelta: true, fecha_recibido, fecha_cierre },
+    ["novedad_resuelta", "fecha_recibido"]
+  );
+  if (!error && !("novedad_resuelta" in cambios)) {
+    ({ error } = await supabase.from("retiros").update({ estado: "novedad_resuelta" }).eq("id", id));
+  }
   if (error) return { error: error.message };
 
-  await registrarEvento(supabase, id, "Novedad resuelta: el retiro queda como «Novedad resuelta», sin seguir el flujo normal");
+  await registrarEvento(supabase, id, "Novedad resuelta");
   // Línea aparte en la línea de tiempo: resolver la novedad también consolida el retiro — se registra
   // como su propio hecho, con su propia fecha, no solo como un dato dentro del texto de arriba.
   await registrarEvento(supabase, id, "Consolidado");
@@ -452,7 +496,7 @@ export async function resolverNovedadRetiro(formData: FormData): Promise<{ error
     entidad: "retiros",
     entidadId: id,
     antes: { Estado: ETIQUETA_ESTADO.novedad, Consolidación: "Pendiente" },
-    despues: { Estado: ETIQUETA_ESTADO.novedad_resuelta, Consolidación: "Consolidado" },
+    despues: { Etapa: "Consolidado", Estado: ETIQUETA_ESTADO.cerrado, Consolidación: "Novedad resuelta" },
   });
 
   revalidatePath("/retiros");

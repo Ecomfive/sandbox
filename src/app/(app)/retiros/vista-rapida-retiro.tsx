@@ -24,9 +24,20 @@ const numeroDe = (fila: FilaRetiro) => `#${String(fila.numeroCorrelativo).padSta
 
 type EstadoPaso = "completo" | "actual" | "pendiente" | "error";
 
+/** La novedad ya se resolvió (modelo de la migración 0048, o el estado antiguo «novedad_resuelta»). */
+const resuelta = (fila: FilaRetiro) => fila.novedadResuelta || fila.estado === "novedad_resuelta";
+
 /** El 3.º y 4.º paso de la barra: se recibe el dinero y por último se consolida. */
 function pasosDelRetiro(fila: FilaRetiro): { recibido: EstadoPaso; consolidado: EstadoPaso } {
-  const recibido: EstadoPaso = fila.montoRecibido !== null ? (fila.estado === "novedad" ? "error" : "completo") : "actual";
+  // Una novedad resuelta a mano no trae monto: su Recibido se da por hecho con la fecha que se escribió al resolverla.
+  const recibido: EstadoPaso =
+    fila.montoRecibido !== null
+      ? fila.estado === "novedad"
+        ? "error"
+        : "completo"
+      : resuelta(fila) && fila.fechaRecibido
+        ? "completo"
+        : "actual";
 
   const consolidado: EstadoPaso = fila.consolidado ? "completo" : recibido === "completo" ? "actual" : "pendiente";
 
@@ -80,7 +91,7 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
           ? [formatearMoneda(fila.montoRecibido, codigoPais), fecha(fila.fechaRecibido)].filter(Boolean).join(" · ")
           : recibido === "error"
             ? "Diferencia de monto"
-            : "Sin registrar",
+            : (recibido === "completo" && fecha(fila.fechaRecibido)) || "Sin registrar",
     },
     {
       etiqueta: "Consolidado",
@@ -90,7 +101,9 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
   ];
 
   return (
-    <div className="flex items-start">
+    <div role="group" aria-label="Etapa">
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etapa</p>
+      <div className="flex items-start">
       {pasos.map((paso, i) => (
         <Fragment key={paso.etiqueta}>
           {i > 0 && (
@@ -112,6 +125,7 @@ function BarraPasos({ fila, codigoPais }: { fila: FilaRetiro; codigoPais: string
           </div>
         </Fragment>
       ))}
+      </div>
     </div>
   );
 }
@@ -242,7 +256,7 @@ export function VistaRapidaRetiro({
             acciones={
               <>
                 {/* Un cancelado o una novedad resuelta no siguen el flujo normal: su ciclo ya terminó. */}
-                {fila.estado !== "novedad_resuelta" && fila.estado !== "cancelado" && (
+                {!resuelta(fila) && fila.estado !== "cancelado" && (
                   <BotonAccion
                     icono={ConciliarIcon}
                     tono="oscuro"
@@ -275,7 +289,7 @@ export function VistaRapidaRetiro({
                     Ver novedad
                   </BotonAccion>
                 )}
-                {fila.estado !== "cancelado" && (
+                {(fila.estado === "abierto" || fila.estado === "novedad") && fila.estadoDropi !== "cancelado" && (
                   <CancelarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} />
                 )}
                 <EliminarRetiroBoton id={fila.id} correlativo={fila.numeroCorrelativo} variante="boton" />
@@ -313,6 +327,7 @@ export function VistaRapidaRetiro({
             <SeccionResolverNovedad
               id={fila.id}
               codigoPais={codigoPais}
+              fechaRecibido={fila.fechaRecibido}
               alCancelar={() => setPanel(null)}
               alNotaGuardada={() => setVersionHistorial((v) => v + 1)}
               alResuelta={() => alTerminarPanel("Novedad resuelta")}

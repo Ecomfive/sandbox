@@ -26,7 +26,10 @@ export const ESTADO_TONO: Record<string, "info" | "neutral" | "destructive" | "s
 export function estadoConsolidacion(fila: {
   estado: string;
   consolidado: boolean;
+  /** Migración 0048: la novedad se resolvió a mano (el estado ya es «Cerrado»). */
+  novedadResuelta?: boolean;
 }): { texto: string; tono: "warning" | "success" } {
-  if (fila.estado === "novedad_resuelta") return { texto: ESTADO_ETIQUETA.novedad_resuelta, tono: "warning" };
+  // `estado === "novedad_resuelta"` es el modelo anterior a la migración 0048 (filas aún sin convertir).
+  if (fila.novedadResuelta || fila.estado === "novedad_resuelta") return { texto: ESTADO_ETIQUETA.novedad_resuelta, tono: "warning" };
   return fila.consolidado ? { texto: "Consolidado", tono: "success" } : { texto: "Pendiente", tono: "warning" };
 }
