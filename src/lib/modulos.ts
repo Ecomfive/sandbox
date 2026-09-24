@@ -16,6 +16,7 @@ export const MODULOS: Modulo[] = [
   { clave: "crm-dropshippers", etiqueta: "CRM Dropshippers" },
   { clave: "inteligencia-competitiva", etiqueta: "Inteligencia competitiva" },
   { clave: "catalogo-maestro", etiqueta: "Catálogo maestro de SKU" },
+  { clave: "wms-bodegas", etiqueta: "Bodegas (WMS)" },
   { clave: "wms-productos", etiqueta: "Ficha producto Shopify (WMS)" },
   { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi (WMS)" },
   { clave: "compras", etiqueta: "Compras (WMS)" },
