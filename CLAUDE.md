@@ -234,6 +234,15 @@ convenciones técnicas del código.
   cambios y Cancelar solo con cambios, Desactivar/Activar; **una bodega no se borra**: el stock
   y los movimientos dependerán de ella). La ficha Dropi ofrece solo la bodega «Dropi» (y las
   agregadas desde su ficha). Las ubicaciones (bins) de cada bodega son la fase 3.
+- **Sistema WMS: «Ubicaciones»** (`/wms-ubicaciones`, módulo `wms-ubicaciones`, migración
+  0054; fase 2 del plan de `WMS-REFERENCIA.md`, calcada de `binset`/`binsize`/`binproperty` de
+  GreaterWMS). Una ubicación (bin) pertenece a una bodega (`wms_ubicaciones.bodega_id`, todas
+  las bodegas, también las externas) y tiene código (único dentro de su bodega), **propiedad**
+  (normal, dañado, en inspección, retenido: decidirá a qué cubeta de stock suma lo que se guarde
+  ahí), tamaño opcional y código de barras. Lista de las ubicaciones de las bodegas del país con
+  `TablaDatos` y «Agregar» con `FichaCrear`; ficha lateral que ya es el formulario (la bodega se
+  ve pero no se cambia; Desactivar/Activar; **no se borra**). El stock por ubicación llega con
+  el inventario multi-estado.
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
