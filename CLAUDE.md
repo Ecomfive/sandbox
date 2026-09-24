@@ -224,6 +224,16 @@ convenciones técnicas del código.
   descripción de 200 caracteres como mínimo y, si el producto es público, una bodega con
   100 unidades y 3 imágenes. Peso en gramos, medidas en centímetros. No incluye Carga masiva,
   Actualización masiva ni las descargas en Excel de Dropi.
+- **Sistema WMS: «Bodegas»** (`/wms-bodegas`, módulo `wms-bodegas`, migración 0053; fase 1
+  del plan de `WMS-REFERENCIA.md`, que es el documento maestro del WMS: arquitectura V2,
+  decisiones confirmadas, flujos de GreaterWMS y fases). Las 6 fuentes físicas (Despacho,
+  Fulfillment, Dropi, Effi, Boxfull, Dunamixfy) vienen cargadas para Costa Rica y Panamá en
+  `wms_bodegas`, con un `codigo` fijo y un `tipo`: **propia** (la mueve el WMS) o **externa**
+  (el stock lo tiene el tercero y llega por sincronización, solo lectura aquí). Lista con
+  `TablaDatos`, «Agregar» con `FichaCrear` y ficha lateral que ya es el formulario (Guardar
+  cambios y Cancelar solo con cambios, Desactivar/Activar; **una bodega no se borra**: el stock
+  y los movimientos dependerán de ella). La ficha Dropi ofrece solo la bodega «Dropi» (y las
+  agregadas desde su ficha). Las ubicaciones (bins) de cada bodega son la fase 3.
 - **Buscador con Ctrl K.** El buscador de la barra de arriba
   (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
   página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el

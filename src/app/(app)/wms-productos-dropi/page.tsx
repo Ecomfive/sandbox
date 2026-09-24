@@ -41,7 +41,16 @@ export default async function WmsProductosDropiPage() {
       .eq("pais_id", pais.id)
       .order("creado_en", { ascending: false })
       .limit(1000),
-    supabase.from("wms_bodegas").select("id, nombre").eq("pais_id", pais.id).eq("activa", true).order("nombre"),
+    // El stock de un producto de Dropi va en la bodega «Dropi» (o en las que se agregaron desde su ficha, sin código). Sin la
+    // migración 0053 (columna `codigo`) se ofrecen todas las bodegas, como antes.
+    supabase
+      .from("wms_bodegas")
+      .select("id, nombre")
+      .eq("pais_id", pais.id)
+      .eq("activa", true)
+      .or("codigo.eq.dropi,codigo.is.null")
+      .order("nombre")
+      .then((r) => (r.error ? supabase.from("wms_bodegas").select("id, nombre").eq("pais_id", pais.id).eq("activa", true).order("nombre") : r)),
   ]);
 
   const bodegas: Bodega[] = (bodegasData ?? []).map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
