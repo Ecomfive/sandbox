@@ -15,7 +15,8 @@ const urlPublica = (ruta: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/st
  * Foto del producto: un único archivo, se sube apenas se elige (no se espera a «Guardar»). Usa el mismo
  * patrón de URL firmada que las fichas de producto Shopify/Dropi, para subir directo desde el navegador sin
  * pasar el archivo por la acción del servidor. El campo real (`foto_url`) es un input oculto controlado por
- * ref, para que el formulario lo lea como cualquier otro campo del FormData al enviar.
+ * estado de React (no por ref): así el formulario siempre lo lee con el valor correcto en el FormData al
+ * enviar, sin depender de que una mutación imperativa haya alcanzado a aplicarse antes del submit.
  */
 export function CampoFoto({
   nombreCampo,
@@ -29,7 +30,6 @@ export function CampoFoto({
   const [preview, setPreview] = useState<string | null>(valorInicial);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputOcultoRef = useRef<HTMLInputElement>(null);
   const inputArchivoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -64,9 +64,7 @@ export function CampoFoto({
         setError(`No se pudo subir la imagen: ${errorSubida.message}`);
         return;
       }
-      const url = urlPublica(permiso.ruta);
-      setPreview(url);
-      if (inputOcultoRef.current) inputOcultoRef.current.value = url;
+      setPreview(urlPublica(permiso.ruta));
     } catch {
       setError("No se pudo subir la imagen. Inténtalo de nuevo.");
     } finally {
@@ -77,13 +75,12 @@ export function CampoFoto({
   function quitar() {
     setPreview(null);
     setError(null);
-    if (inputOcultoRef.current) inputOcultoRef.current.value = "";
   }
 
   return (
     <div className="flex flex-col gap-1">
       <span className={labelClass}>Foto del producto</span>
-      <input ref={inputOcultoRef} type="hidden" name={nombreCampo} defaultValue={valorInicial ?? ""} />
+      <input type="hidden" name={nombreCampo} value={preview ?? ""} readOnly />
       <input ref={inputArchivoRef} type="file" accept="image/*" className="sr-only" onChange={alElegirArchivo} />
       <div className="flex items-center gap-3">
         {preview ? (
