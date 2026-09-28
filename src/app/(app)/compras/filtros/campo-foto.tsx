@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { prepararSubidaFotoFiltro } from "./actions";
 import { labelClass } from "@/components/ui/field";
+import { VisorImagen } from "@/components/ui/visor-imagen";
 import { AdjuntoIcon, PapeleraIcon } from "@/lib/nav-icons";
 
 const BUCKET = "wms-productos";
@@ -30,6 +31,7 @@ export function CampoFoto({
   const [preview, setPreview] = useState<string | null>(valorInicial);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ampliada, setAmpliada] = useState(false);
   const inputArchivoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -84,8 +86,15 @@ export function CampoFoto({
       <input ref={inputArchivoRef} type="file" accept="image/*" className="sr-only" onChange={alElegirArchivo} />
       <div className="flex items-center gap-3">
         {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="" className="h-16 w-16 rounded-md border border-border object-cover" />
+          <button
+            type="button"
+            onClick={() => setAmpliada(true)}
+            className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border"
+            aria-label="Ver la foto más grande"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="" className="h-full w-full object-cover" />
+          </button>
         ) : (
           <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
             <AdjuntoIcon className="h-5 w-5" />
@@ -112,6 +121,7 @@ export function CampoFoto({
           {error}
         </p>
       )}
+      {ampliada && <VisorImagen src={preview} onClose={() => setAmpliada(false)} />}
     </div>
   );
 }
