@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarFiltro, crearFiltro } from "./actions";
+import { CampoFoto } from "./campo-foto";
 import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIPOS_ENVIO, type FilaFiltro } from "./def-filtros";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
@@ -38,6 +39,7 @@ export function FormularioFiltro({
   acciones?: ReactNode;
 }) {
   const [modificado, setModificado] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const invalido = (id: string) => (faltante === id ? true : undefined);
   const [pending, startTransition] = useTransition();
@@ -88,7 +90,7 @@ export function FormularioFiltro({
             <div className="flex flex-wrap gap-2">
               {modificado && (
                 <>
-                  <BotonAccion type="submit" tono="oscuro" icono={CheckIcon} disabled={pending}>
+                  <BotonAccion type="submit" tono="oscuro" icono={CheckIcon} disabled={pending || subiendoFoto}>
                     {pending ? "Guardando..." : "Guardar cambios"}
                   </BotonAccion>
                   <BotonAccion icono={CerrarIcon} onClick={alCancelar} disabled={pending}>
@@ -122,16 +124,7 @@ export function FormularioFiltro({
               className={fieldClass}
             />
           </Campo>
-          <Campo etiqueta="Foto del producto (enlace)" id="campo-foto">
-            <input
-              id="campo-foto"
-              type="url"
-              name="foto_url"
-              defaultValue={filtro?.fotoUrl ?? ""}
-              placeholder="Enlace a la imagen"
-              className={fieldClass}
-            />
-          </Campo>
+          <CampoFoto nombreCampo="foto_url" valorInicial={filtro?.fotoUrl ?? null} alCambiarSubiendo={setSubiendoFoto} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta="Estado del Registro" id="campo-estado-registro" obligatorio faltante={faltante}>
               <select
@@ -233,7 +226,7 @@ export function FormularioFiltro({
             </p>
           )}
           <BotonCrear
-            puede={completo}
+            puede={completo && !subiendoFoto}
             enviando={pending}
             etiqueta={editando ? "Guardar cambios" : "Agregar producto"}
             etiquetaEnviando="Guardando..."

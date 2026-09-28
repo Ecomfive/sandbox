@@ -11,6 +11,36 @@ const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
 const ENVIOS_VALIDOS: Set<string> = new Set(TIPOS_ENVIO.map((t) => t.valor));
 const PRIORIDADES_VALIDAS: Set<string> = new Set(PRIORIDADES.map((p) => p.valor));
 
+// La foto del producto vive en el mismo bucket público que las fichas de producto (Shopify/Dropi).
+const BUCKET_FOTOS = "wms-productos";
+const PREFIJO_URL_PUBLICA = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
+
+function limpiarNombreArchivo(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .slice(-120);
+}
+
+/** Da permiso (URL firmada) para subir la foto directo desde el navegador, sin pasar el archivo por la acción. */
+export async function prepararSubidaFotoFiltro(nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
+  await requireModuloEscritura("compras");
+  if (typeof nombreArchivo !== "string" || !nombreArchivo.trim()) return { error: "El archivo no tiene nombre." };
+
+  const ruta = `filtros/${crypto.randomUUID()}/${Date.now()}-${limpiarNombreArchivo(nombreArchivo)}`;
+  const { data, error } = await createServiceClient().storage.from(BUCKET_FOTOS).createSignedUploadUrl(ruta);
+  if (error || !data) return { error: error?.message ?? "No se pudo preparar la subida." };
+  return { ruta, token: data.token };
+}
+
+/** Borra del bucket una foto que ya no queda referenciada (se reemplazó o se quitó). Nunca lanza. */
+async function borrarFotoSiEsNuestra(url: string | null) {
+  if (!url || !url.startsWith(PREFIJO_URL_PUBLICA)) return;
+  const ruta = url.slice(PREFIJO_URL_PUBLICA.length);
+  await createServiceClient().storage.from(BUCKET_FOTOS).remove([ruta]);
+}
+
 const numeroOptativo = (formData: FormData, campo: string): number | null => {
   const texto = formData.get(campo) as string | null;
   return texto && texto !== "" ? Number(texto) : null;
@@ -77,11 +107,15 @@ export async function actualizarFiltro(formData: FormData): Promise<{ error?: st
   if (!PRIORIDADES_VALIDAS.has(prioridad)) return { error: "Elige una prioridad válida." };
 
   const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("wms_filtro_productos").select("foto_url").eq("id", id).single();
+  const cambios = leerCambios(formData);
   const { error } = await supabase
     .from("wms_filtro_productos")
-    .update({ nombre, estado_registro, estado, prioridad, actualizado_en: new Date().toISOString(), ...leerCambios(formData) })
+    .update({ nombre, estado_registro, estado, prioridad, actualizado_en: new Date().toISOString(), ...cambios })
     .eq("id", id);
   if (error) return { error: error.message };
+
+  if (actual && actual.foto_url !== cambios.foto_url) await borrarFotoSiEsNuestra(actual.foto_url);
 
   revalidatePath("/compras/filtros");
   return {};
@@ -93,8 +127,11 @@ export async function eliminarFiltro(formData: FormData) {
   const nombre = formData.get("nombre") as string;
 
   const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("wms_filtro_productos").select("foto_url").eq("id", id).single();
   const { error } = await supabase.from("wms_filtro_productos").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  if (actual?.foto_url) await borrarFotoSiEsNuestra(actual.foto_url);
 
   await registrarAuditoria({ accion: "eliminar_filtro_producto", entidad: "wms_filtro_productos", entidadId: id, detalle: nombre });
   revalidatePath("/compras/filtros");

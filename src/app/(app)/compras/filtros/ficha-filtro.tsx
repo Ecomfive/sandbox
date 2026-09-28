@@ -62,6 +62,10 @@ function DatosDelFiltro({ filtro, codigoPais }: { filtro: FilaFiltro; codigoPais
   return (
     <div className="flex flex-col divide-y divide-border border-t border-border p-5">
       <Seccion icono={FiltroIcon} titulo="Producto">
+        {filtro.fotoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={filtro.fotoUrl} alt="" className="h-32 w-32 rounded-md border border-border object-cover" />
+        )}
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Dato etiqueta="Tipo de Envío">{etiquetaTipoEnvio(filtro.tipoEnvio) ?? SIN_DATO}</Dato>
           <Dato etiqueta="Prioridad">
@@ -69,15 +73,6 @@ function DatosDelFiltro({ filtro, codigoPais }: { filtro: FilaFiltro; codigoPais
           </Dato>
           <Dato etiqueta="Persona asignada">{filtro.asignadoNombre || SIN_DATO}</Dato>
           <Dato etiqueta="Aprobación Gestionada">{filtro.aprobacionGestionada ? "Sí" : "No"}</Dato>
-          <Dato etiqueta="Foto del producto">
-            {filtro.fotoUrl ? (
-              <a href={filtro.fotoUrl} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">
-                Ver foto
-              </a>
-            ) : (
-              SIN_DATO
-            )}
-          </Dato>
         </dl>
       </Seccion>
       <Seccion icono={GastoIcon} titulo="Cantidad y precio">
