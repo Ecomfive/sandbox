@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { Badge } from "@/components/ui/badge";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearMoneda } from "@/lib/formato";
@@ -22,6 +23,7 @@ import {
 } from "./def-filtros";
 import { EtiquetaTienda } from "./etiqueta-tienda";
 import { FichaFiltro } from "./ficha-filtro";
+import { IconoMetricasMeta } from "./metricas-meta-popover";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
@@ -44,8 +46,13 @@ const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
     ocultable: true,
     render: (f) =>
       f.fotoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={f.fotoUrl} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+        <TarjetaEmergente clase="rounded-lg border border-border bg-card p-1.5 shadow-lg" contenido={
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={f.fotoUrl} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
+        }>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={f.fotoUrl} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+        </TarjetaEmergente>
       ) : (
         <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
           <AdjuntoIcon className="h-3.5 w-3.5" />
@@ -60,6 +67,7 @@ const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
     render: (f) => (
       <div className="flex min-w-0 items-center gap-2">
         {f.tienda && <EtiquetaTienda valor={f.tienda} />}
+        <IconoMetricasMeta filtro={f} />
         <span className="block max-w-[22rem] truncate" title={f.nombre}>
           {f.nombre}
         </span>
