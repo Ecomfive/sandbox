@@ -26,7 +26,7 @@ export function AvatarPersona({
 }) {
   return (
     <span
-      className={`relative ${TAMANOS[tamano]} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}
+      className={`relative inline-flex ${TAMANOS[tamano]} shrink-0 overflow-hidden rounded-full border border-border bg-muted`}
     >
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
