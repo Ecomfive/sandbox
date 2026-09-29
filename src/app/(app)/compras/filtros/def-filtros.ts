@@ -14,6 +14,7 @@ export interface FilaFiltro {
   asignadoNombre: string | null;
   asignadoEmail: string | null;
   asignadoAvatarUrl: string | null;
+  tienda: string | null;
   aprobacionGestionada: boolean;
   comentarios: string | null;
   creadoEn: string;
@@ -97,6 +98,23 @@ const PRIORIDAD_COLOR: Record<string, string> = {
 };
 export const colorPrioridad = (valor: string) => PRIORIDAD_COLOR[valor] ?? "#BBBBBB";
 
+/** La etiqueta ("Etiquetas" de ClickUp) junto al nombre del producto: de qué tienda salió. Por ahora solo
+ * hay estas dos en «Productos y Filtro PA» — cada una con su propio color de fondo Y de texto (no uno
+ * calculado como las demás insignias), calcados tal cual de ClickUp. */
+export const TIENDAS = [
+  { valor: "kenku", etiqueta: "kenku" },
+  { valor: "cliente_dropi", etiqueta: "cliente dropi" },
+] as const;
+
+const TIENDA_ETIQUETA: Record<string, string> = Object.fromEntries(TIENDAS.map((t) => [t.valor, t.etiqueta]));
+export const etiquetaTienda = (valor: string | null) => (valor ? (TIENDA_ETIQUETA[valor] ?? valor) : null);
+
+const TIENDA_COLOR: Record<string, { fondo: string; texto: string }> = {
+  kenku: { fondo: "#E5E6FF", texto: "#5A43D6" },
+  cliente_dropi: { fondo: "#FFE5E5", texto: "#C62A2F" },
+};
+export const colorTienda = (valor: string) => TIENDA_COLOR[valor] ?? { fondo: "#E5E5E5", texto: "#4B4B4B" };
+
 /** El ciclo termina en «Aprobado» o «Descartado»: como Cerrados en Compras, se ocultan por defecto. */
 const REGISTROS_CERRADOS = ["aprobado", "descartado"];
 
@@ -142,6 +160,15 @@ export const DEF_FILTROS: DefTabla<FilaFiltro> = {
       opciones: () => PRIORIDADES.map((p) => ({ valor: p.valor, etiqueta: p.etiqueta })),
       agrupable: true,
       ordenGrupos: PRIORIDADES.map((p) => p.valor),
+    },
+    {
+      id: "tienda",
+      etiqueta: "Tienda",
+      tipo: "seleccion",
+      valores: (f) => [f.tienda ?? SIN_VALOR],
+      opciones: () => [...TIENDAS.map((t) => ({ valor: t.valor, etiqueta: t.etiqueta })), { valor: SIN_VALOR, etiqueta: "Sin tienda" }],
+      etiquetaSinValor: "Sin tienda",
+      agrupable: true,
     },
     {
       id: "asignado",

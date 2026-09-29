@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarFiltro, crearFiltro } from "./actions";
 import { CampoFoto } from "./campo-foto";
-import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIPOS_ENVIO, type FilaFiltro } from "./def-filtros";
+import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIENDAS, TIPOS_ENVIO, type FilaFiltro } from "./def-filtros";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { Campo } from "@/components/ui/campo-ficha";
@@ -162,6 +162,16 @@ export function FormularioFiltro({
               <select id="campo-tipo-envio" name="tipo_envio" defaultValue={filtro?.tipoEnvio ?? ""} className={fieldClass}>
                 <option value="">Sin definir</option>
                 {TIPOS_ENVIO.map((t) => (
+                  <option key={t.valor} value={t.valor}>
+                    {t.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo etiqueta="Tienda" id="campo-tienda">
+              <select id="campo-tienda" name="tienda" defaultValue={filtro?.tienda ?? ""} className={fieldClass}>
+                <option value="">Sin tienda</option>
+                {TIENDAS.map((t) => (
                   <option key={t.valor} value={t.valor}>
                     {t.etiqueta}
                   </option>

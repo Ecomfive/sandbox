@@ -21,7 +21,7 @@ export default async function FiltrosComprasPage() {
   const { data: filtros } = await supabase
     .from("wms_filtro_productos")
     .select(
-      "id, nombre, foto_url, estado_registro, estado, tipo_envio, qty_producto, precio_total, precio_unitario, prioridad, aprobacion_gestionada, comentarios, creado_en, perfiles(nombre, email, avatar_url)"
+      "id, nombre, foto_url, estado_registro, estado, tipo_envio, tienda, qty_producto, precio_total, precio_unitario, prioridad, aprobacion_gestionada, comentarios, creado_en, perfiles(nombre, email, avatar_url)"
     )
     .eq("pais_id", pais.id)
     .order("creado_en", { ascending: false })
@@ -36,6 +36,7 @@ export default async function FiltrosComprasPage() {
       estadoRegistro: f.estado_registro,
       estado: f.estado,
       tipoEnvio: f.tipo_envio,
+      tienda: f.tienda,
       qtyProducto: f.qty_producto === null ? null : Number(f.qty_producto),
       precioTotal: f.precio_total === null ? null : Number(f.precio_total),
       precioUnitario: f.precio_unitario === null ? null : Number(f.precio_unitario),

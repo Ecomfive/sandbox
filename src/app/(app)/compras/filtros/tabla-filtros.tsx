@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearMoneda } from "@/lib/formato";
-import { AdjuntoIcon, EstadoIcon, FiltroIcon, GastoIcon, PersonaIcon, PrioridadIcon } from "@/lib/nav-icons";
+import { AdjuntoIcon, EstadoIcon, FiltroIcon, GastoIcon, PersonaIcon, PrioridadIcon, TiendaIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearFiltroPanel } from "./crear-filtro-panel";
 import {
@@ -20,6 +20,7 @@ import {
   etiquetaTipoEnvio,
   type FilaFiltro,
 } from "./def-filtros";
+import { EtiquetaTienda } from "./etiqueta-tienda";
 import { FichaFiltro } from "./ficha-filtro";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
@@ -27,6 +28,7 @@ const ICONOS: Record<string, IconoComp> = {
   estadoRegistro: EstadoIcon,
   estado: EstadoIcon,
   tipoEnvio: FiltroIcon,
+  tienda: TiendaIcon,
   prioridad: PrioridadIcon,
   asignado: PersonaIcon,
   qtyProducto: FiltroIcon,
@@ -56,9 +58,12 @@ const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
     ocultable: false,
     clase: "font-medium",
     render: (f) => (
-      <span className="block max-w-[22rem] truncate" title={f.nombre}>
-        {f.nombre}
-      </span>
+      <div className="flex min-w-0 items-center gap-2">
+        {f.tienda && <EtiquetaTienda valor={f.tienda} />}
+        <span className="block max-w-[22rem] truncate" title={f.nombre}>
+          {f.nombre}
+        </span>
+      </div>
     ),
   },
   { id: "estadoRegistro", label: "Estado del Registro", ocultable: true, render: (f) => <Badge color={colorEstadoRegistro(f.estadoRegistro)}>{etiquetaEstadoRegistro(f.estadoRegistro)}</Badge> },

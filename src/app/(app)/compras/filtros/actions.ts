@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
-import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIPOS_ENVIO } from "./def-filtros";
+import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIENDAS, TIPOS_ENVIO } from "./def-filtros";
 
 const REGISTROS_VALIDOS: Set<string> = new Set(ESTADOS_REGISTRO.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
 const ENVIOS_VALIDOS: Set<string> = new Set(TIPOS_ENVIO.map((t) => t.valor));
 const PRIORIDADES_VALIDAS: Set<string> = new Set(PRIORIDADES.map((p) => p.valor));
+const TIENDAS_VALIDAS: Set<string> = new Set(TIENDAS.map((t) => t.valor));
 
 // La foto del producto vive en el mismo bucket público que las fichas de producto (Shopify/Dropi).
 const BUCKET_FOTOS = "wms-productos";
@@ -54,9 +55,11 @@ const textoOptativo = (formData: FormData, campo: string): string | null => {
 /** Los campos comunes a crear y actualizar (todo lo que no sea el nombre o el país). */
 function leerCambios(formData: FormData) {
   const tipoEnvio = (formData.get("tipo_envio") as string | null) || null;
+  const tienda = (formData.get("tienda") as string | null) || null;
   return {
     foto_url: textoOptativo(formData, "foto_url"),
     tipo_envio: tipoEnvio && ENVIOS_VALIDOS.has(tipoEnvio) ? tipoEnvio : null,
+    tienda: tienda && TIENDAS_VALIDAS.has(tienda) ? tienda : null,
     qty_producto: numeroOptativo(formData, "qty_producto"),
     precio_total: numeroOptativo(formData, "precio_total"),
     precio_unitario: numeroOptativo(formData, "precio_unitario"),

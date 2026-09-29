@@ -21,6 +21,7 @@ import {
   type FilaFiltro,
 } from "./def-filtros";
 import { EliminarFiltroBoton } from "./eliminar-filtro-boton";
+import { EtiquetaTienda } from "./etiqueta-tienda";
 import { FormularioFiltro } from "./formulario-filtro";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
@@ -177,6 +178,7 @@ export function FichaFiltro({
       titulo={
         filtro && (
           <>
+            {filtro.tienda && <EtiquetaTienda valor={filtro.tienda} />}
             <span className="text-lg font-semibold">{filtro.nombre}</span>
             <Badge color={colorEstadoRegistro(filtro.estadoRegistro)}>{etiquetaEstadoRegistro(filtro.estadoRegistro)}</Badge>
             <Badge color={colorEstado(filtro.estado)}>{etiquetaEstado(filtro.estado)}</Badge>
