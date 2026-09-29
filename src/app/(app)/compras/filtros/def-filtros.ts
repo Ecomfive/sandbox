@@ -145,7 +145,7 @@ export const DEF_FILTROS: DefTabla<FilaFiltro> = {
     },
     {
       id: "asignado",
-      etiqueta: "Persona asignada",
+      etiqueta: "Asignado a:",
       tipo: "seleccion",
       valores: (f) => [f.asignadoNombre ?? SIN_VALOR],
       etiquetaSinValor: "Sin asignar",

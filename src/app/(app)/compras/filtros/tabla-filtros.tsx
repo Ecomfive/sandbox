@@ -70,7 +70,7 @@ const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
   { id: "prioridad", label: "Prioridad", ocultable: true, render: (f) => <Badge color={colorPrioridad(f.prioridad)}>{etiquetaPrioridad(f.prioridad)}</Badge> },
   {
     id: "asignado",
-    label: "Persona asignada",
+    label: "Asignado a:",
     ocultable: true,
     render: (f) =>
       f.asignadoNombre ? (

@@ -81,7 +81,7 @@ function DatosDelFiltro({ filtro, codigoPais }: { filtro: FilaFiltro; codigoPais
           <Dato etiqueta="Prioridad">
             <Badge color={colorPrioridad(filtro.prioridad)}>{etiquetaPrioridad(filtro.prioridad)}</Badge>
           </Dato>
-          <Dato etiqueta="Persona asignada">{filtro.asignadoNombre || SIN_DATO}</Dato>
+          <Dato etiqueta="Asignado a:">{filtro.asignadoNombre || SIN_DATO}</Dato>
           <Dato etiqueta="Aprobación Gestionada">{filtro.aprobacionGestionada ? "Sí" : "No"}</Dato>
         </dl>
       </Seccion>
