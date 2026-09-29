@@ -9,8 +9,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearMoneda } from "@/lib/formato";
-import { CalendarioIcon, FiltroIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, FiltroIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, InteligenciaIcon } from "@/lib/nav-icons";
 import {
+  claseMetrica,
   colorEstado,
   colorEstadoRegistro,
   colorPrioridad,
@@ -18,6 +19,13 @@ import {
   etiquetaEstadoRegistro,
   etiquetaPrioridad,
   etiquetaTipoEnvio,
+  nivelCpa,
+  nivelCpm,
+  nivelCtr,
+  nivelCvr,
+  nivelEfectividad,
+  nivelGasto,
+  nivelHookRate,
   type FilaFiltro,
 } from "./def-filtros";
 import { EliminarFiltroBoton } from "./eliminar-filtro-boton";
@@ -34,6 +42,87 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
 }
 
 const SIN_DATO = <span className="text-muted-foreground">—</span>;
+
+/** Las métricas de Meta Ads siempre vienen en dólares (así las reporta Meta), sin importar la moneda
+ * del país — a diferencia del resto de la ficha, que sí usa `formatearMoneda` con la moneda local. */
+const dolar = (valor: number) => `$${valor.toFixed(2)}`;
+const porcentaje = (valor: number) => `${valor.toFixed(2)}%`;
+
+function ValorMetrica({ texto, clase }: { texto: string; clase: string }) {
+  return <span className={`font-semibold tabular-nums ${clase}`}>{texto}</span>;
+}
+
+/**
+ * Las métricas del test en Meta Ads que se usan para decidir cuánto pedir de cada producto — siempre al
+ * final de la ficha, se editen o no los demás datos ahí mismo. El color de cada número se calcula del
+ * valor (no se guarda un color aparte); Oferta y Compras nunca cambian de color.
+ */
+function MetricasMeta({ filtro }: { filtro: FilaFiltro }) {
+  const hay =
+    filtro.landingUrl ||
+    filtro.metricaOferta !== null ||
+    filtro.metricaCpm !== null ||
+    filtro.metricaEfectividad !== null ||
+    filtro.metricaHookRate !== null ||
+    filtro.metricaCtr !== null ||
+    filtro.metricaCpa !== null ||
+    filtro.metricaGasto !== null ||
+    filtro.metricaCompras !== null ||
+    filtro.metricaCvr !== null;
+  if (!hay) return null;
+
+  return (
+    <div className="border-t border-border p-5">
+      <Seccion icono={InteligenciaIcon} titulo="Métricas de Meta Ads">
+        {filtro.landingUrl && (
+        <Dato etiqueta="Landing">
+          <a
+            href={filtro.landingUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-sm break-all text-accent-foreground underline underline-offset-2 hover:no-underline"
+          >
+            {filtro.landingUrl}
+          </a>
+        </Dato>
+      )}
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Dato etiqueta="Oferta">{filtro.metricaOferta !== null ? <ValorMetrica texto={dolar(filtro.metricaOferta)} clase="text-foreground" /> : SIN_DATO}</Dato>
+        <Dato etiqueta="CPM">
+          {filtro.metricaCpm !== null ? <ValorMetrica texto={dolar(filtro.metricaCpm)} clase={claseMetrica(nivelCpm(filtro.metricaCpm))} /> : SIN_DATO}
+        </Dato>
+        <Dato etiqueta="% Efectividad">
+          {filtro.metricaEfectividad !== null ? (
+            <ValorMetrica texto={porcentaje(filtro.metricaEfectividad)} clase={claseMetrica(nivelEfectividad(filtro.metricaEfectividad))} />
+          ) : (
+            SIN_DATO
+          )}
+        </Dato>
+        <Dato etiqueta="Hook Rate">
+          {filtro.metricaHookRate !== null ? (
+            <ValorMetrica texto={porcentaje(filtro.metricaHookRate)} clase={claseMetrica(nivelHookRate(filtro.metricaHookRate))} />
+          ) : (
+            SIN_DATO
+          )}
+        </Dato>
+        <Dato etiqueta="CTR">
+          {filtro.metricaCtr !== null ? <ValorMetrica texto={porcentaje(filtro.metricaCtr)} clase={claseMetrica(nivelCtr(filtro.metricaCtr))} /> : SIN_DATO}
+        </Dato>
+        <Dato etiqueta="CPA">
+          {filtro.metricaCpa !== null ? <ValorMetrica texto={dolar(filtro.metricaCpa)} clase={claseMetrica(nivelCpa(filtro.metricaCpa))} /> : SIN_DATO}
+        </Dato>
+        <Dato etiqueta="Gasto">
+          {filtro.metricaGasto !== null ? <ValorMetrica texto={dolar(filtro.metricaGasto)} clase={claseMetrica(nivelGasto(filtro.metricaGasto))} /> : SIN_DATO}
+        </Dato>
+        <Dato etiqueta="Compras">{filtro.metricaCompras !== null ? <ValorMetrica texto={String(filtro.metricaCompras)} clase="text-foreground" /> : SIN_DATO}</Dato>
+        <Dato etiqueta="CVR">
+          {filtro.metricaCvr !== null ? <ValorMetrica texto={porcentaje(filtro.metricaCvr)} clase={claseMetrica(nivelCvr(filtro.metricaCvr))} /> : SIN_DATO}
+        </Dato>
+      </dl>
+      </Seccion>
+    </div>
+  );
+}
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
   texto: string;
@@ -209,6 +298,7 @@ export function FichaFiltro({
           ) : (
             <DatosDelFiltro filtro={filtro} codigoPais={codigoPais} />
           )}
+          <MetricasMeta filtro={filtro} />
         </div>
       )}
     </Ventana>

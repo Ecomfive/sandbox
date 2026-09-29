@@ -65,6 +65,16 @@ function leerCambios(formData: FormData) {
     precio_unitario: numeroOptativo(formData, "precio_unitario"),
     aprobacion_gestionada: formData.get("aprobacion_gestionada") === "on",
     comentarios: textoOptativo(formData, "comentarios"),
+    landing_url: textoOptativo(formData, "landing_url"),
+    metrica_oferta: numeroOptativo(formData, "metrica_oferta"),
+    metrica_cpm: numeroOptativo(formData, "metrica_cpm"),
+    metrica_efectividad: numeroOptativo(formData, "metrica_efectividad"),
+    metrica_hook_rate: numeroOptativo(formData, "metrica_hook_rate"),
+    metrica_ctr: numeroOptativo(formData, "metrica_ctr"),
+    metrica_cpa: numeroOptativo(formData, "metrica_cpa"),
+    metrica_gasto: numeroOptativo(formData, "metrica_gasto"),
+    metrica_compras: numeroOptativo(formData, "metrica_compras"),
+    metrica_cvr: numeroOptativo(formData, "metrica_cvr"),
   };
 }
 

@@ -21,7 +21,7 @@ export default async function FiltrosComprasPage() {
   const { data: filtros } = await supabase
     .from("wms_filtro_productos")
     .select(
-      "id, nombre, foto_url, estado_registro, estado, tipo_envio, tienda, qty_producto, precio_total, precio_unitario, prioridad, aprobacion_gestionada, comentarios, creado_en, perfiles(nombre, email, avatar_url)"
+      "id, nombre, foto_url, estado_registro, estado, tipo_envio, tienda, qty_producto, precio_total, precio_unitario, prioridad, aprobacion_gestionada, comentarios, creado_en, landing_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, perfiles(nombre, email, avatar_url)"
     )
     .eq("pais_id", pais.id)
     .order("creado_en", { ascending: false })
@@ -47,6 +47,16 @@ export default async function FiltrosComprasPage() {
       aprobacionGestionada: f.aprobacion_gestionada,
       comentarios: f.comentarios,
       creadoEn: f.creado_en,
+      landingUrl: f.landing_url,
+      metricaOferta: f.metrica_oferta === null ? null : Number(f.metrica_oferta),
+      metricaCpm: f.metrica_cpm === null ? null : Number(f.metrica_cpm),
+      metricaEfectividad: f.metrica_efectividad === null ? null : Number(f.metrica_efectividad),
+      metricaHookRate: f.metrica_hook_rate === null ? null : Number(f.metrica_hook_rate),
+      metricaCtr: f.metrica_ctr === null ? null : Number(f.metrica_ctr),
+      metricaCpa: f.metrica_cpa === null ? null : Number(f.metrica_cpa),
+      metricaGasto: f.metrica_gasto === null ? null : Number(f.metrica_gasto),
+      metricaCompras: f.metrica_compras === null ? null : Number(f.metrica_compras),
+      metricaCvr: f.metrica_cvr === null ? null : Number(f.metrica_cvr),
     };
   });
 
