@@ -150,6 +150,7 @@ export const DEF_FILTROS: DefTabla<FilaFiltro> = {
     { id: "precioUnitario", etiqueta: "Precio Unitario", tipo: "numero", valor: (f) => f.precioUnitario },
     { id: "comentarios", etiqueta: "Comentarios", tipo: "texto", valor: (f) => f.comentarios ?? "" },
   ],
+  vistaInicial: { agrupar: "estadoRegistro", orden: "desc" },
   cerrados: {
     etiqueta: "Cerrados",
     esCerrado: (f) => REGISTROS_CERRADOS.includes(f.estadoRegistro),
