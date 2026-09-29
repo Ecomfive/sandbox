@@ -33,15 +33,17 @@ const ESTADO_REGISTRO_ETIQUETA: Record<string, string> = Object.fromEntries(
 );
 export const etiquetaEstadoRegistro = (valor: string) => ESTADO_REGISTRO_ETIQUETA[valor] ?? valor;
 
-const TONO_ESTADO_REGISTRO: Record<string, "neutral" | "success" | "warning" | "destructive" | "info"> = {
-  en_cola: "neutral",
-  enviado_a_test: "info",
-  cotizar: "warning",
-  cotizado: "info",
-  aprobado: "success",
-  descartado: "destructive",
+/** Los mismos colores exactos que ClickUp le da a cada valor del campo personalizado «Estado del Registro»
+ * en «Productos y Filtro PA», tomados de ahí para que la insignia se vea igual en nuestro sistema. */
+const ESTADO_REGISTRO_COLOR: Record<string, string> = {
+  en_cola: "#b5bcc2",
+  enviado_a_test: "#02BCD4",
+  cotizar: "#f9d900",
+  cotizado: "#7C4DFF",
+  aprobado: "#1bbc9c",
+  descartado: "#e50000",
 };
-export const tonoEstadoRegistro = (valor: string) => TONO_ESTADO_REGISTRO[valor] ?? "neutral";
+export const colorEstadoRegistro = (valor: string) => ESTADO_REGISTRO_COLOR[valor] ?? "#8D8D8D";
 
 /** El «Estado» de ClickUp aparte del embudo — el estado de la tarea en sí (Pendiente/En Progreso/Completado),
  * igual que el «Estado» de Compras es distinto de su «Etapa». */
@@ -55,13 +57,15 @@ export const ESTADOS = [
 const ESTADO_ETIQUETA: Record<string, string> = Object.fromEntries(ESTADOS.map((e) => [e.valor, e.etiqueta]));
 export const etiquetaEstado = (valor: string) => ESTADO_ETIQUETA[valor] ?? valor;
 
-const TONO_ESTADO: Record<string, "neutral" | "success" | "warning" | "destructive" | "info"> = {
-  pendiente: "neutral",
-  en_progreso: "info",
-  completado: "success",
-  archivado: "neutral",
+/** Los mismos colores exactos que ClickUp le da al «Estado» nativo de la tarea en «Productos y Filtro PA»,
+ * leídos de su selector de estado para que la insignia se vea igual en nuestro sistema. */
+const ESTADO_COLOR: Record<string, string> = {
+  pendiente: "#8D8D8D",
+  en_progreso: "#0880EA",
+  completado: "#00B499",
+  archivado: "#299764",
 };
-export const tonoEstado = (valor: string) => TONO_ESTADO[valor] ?? "neutral";
+export const colorEstado = (valor: string) => ESTADO_COLOR[valor] ?? "#8D8D8D";
 
 export const TIPOS_ENVIO = [
   { valor: "aereo", etiqueta: "Aéreo" },
@@ -81,13 +85,15 @@ export const PRIORIDADES = [
 const PRIORIDAD_ETIQUETA: Record<string, string> = Object.fromEntries(PRIORIDADES.map((p) => [p.valor, p.etiqueta]));
 export const etiquetaPrioridad = (valor: string) => PRIORIDAD_ETIQUETA[valor] ?? valor;
 
-const TONO_PRIORIDAD: Record<string, "neutral" | "success" | "warning" | "destructive" | "info"> = {
-  urgente: "destructive",
-  alta: "warning",
-  normal: "neutral",
-  baja: "neutral",
+/** Los mismos colores exactos que usa la bandera de prioridad nativa de ClickUp en «Productos y Filtro
+ * PA», leídos de su selector de prioridad para que la insignia se vea igual en nuestro sistema. */
+const PRIORIDAD_COLOR: Record<string, string> = {
+  urgente: "#C62A2F",
+  alta: "#FFC53D",
+  normal: "#3E63DD",
+  baja: "#BBBBBB",
 };
-export const tonoPrioridad = (valor: string) => TONO_PRIORIDAD[valor] ?? "neutral";
+export const colorPrioridad = (valor: string) => PRIORIDAD_COLOR[valor] ?? "#BBBBBB";
 
 /** El ciclo termina en «Aprobado» o «Descartado»: como Cerrados en Compras, se ocultan por defecto. */
 const REGISTROS_CERRADOS = ["aprobado", "descartado"];

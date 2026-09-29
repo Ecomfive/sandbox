@@ -9,14 +9,14 @@ import { EstadoIcon, FiltroIcon, GastoIcon, PersonaIcon, PrioridadIcon } from "@
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearFiltroPanel } from "./crear-filtro-panel";
 import {
+  colorEstado,
+  colorEstadoRegistro,
+  colorPrioridad,
   DEF_FILTROS,
   etiquetaEstado,
   etiquetaEstadoRegistro,
   etiquetaPrioridad,
   etiquetaTipoEnvio,
-  tonoEstado,
-  tonoEstadoRegistro,
-  tonoPrioridad,
   type FilaFiltro,
 } from "./def-filtros";
 import { FichaFiltro } from "./ficha-filtro";
@@ -36,13 +36,13 @@ const ICONOS: Record<string, IconoComp> = {
 
 const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
   { id: "nombre", label: "Nombre", ocultable: false, clase: "font-medium", render: (f) => f.nombre },
-  { id: "estadoRegistro", label: "Estado del Registro", ocultable: true, render: (f) => <Badge tone={tonoEstadoRegistro(f.estadoRegistro)}>{etiquetaEstadoRegistro(f.estadoRegistro)}</Badge> },
-  { id: "estado", label: "Estado", ocultable: true, render: (f) => <Badge tone={tonoEstado(f.estado)}>{etiquetaEstado(f.estado)}</Badge> },
+  { id: "estadoRegistro", label: "Estado del Registro", ocultable: true, render: (f) => <Badge color={colorEstadoRegistro(f.estadoRegistro)}>{etiquetaEstadoRegistro(f.estadoRegistro)}</Badge> },
+  { id: "estado", label: "Estado", ocultable: true, render: (f) => <Badge color={colorEstado(f.estado)}>{etiquetaEstado(f.estado)}</Badge> },
   { id: "tipoEnvio", label: "Tipo de Envío", ocultable: true, clase: "text-muted-foreground", render: (f) => etiquetaTipoEnvio(f.tipoEnvio) || "—" },
   { id: "qtyProducto", label: "QTY Producto", ocultable: true, clase: "tabular-nums", render: (f) => f.qtyProducto ?? "—" },
   { id: "precioTotal", label: "Precio Total", ocultable: true, clase: "tabular-nums", render: (f, codigoPais) => (f.precioTotal !== null ? formatearMoneda(f.precioTotal, codigoPais) : "—") },
   { id: "precioUnitario", label: "Precio Unitario", ocultable: true, clase: "tabular-nums", render: (f, codigoPais) => (f.precioUnitario !== null ? formatearMoneda(f.precioUnitario, codigoPais) : "—") },
-  { id: "prioridad", label: "Prioridad", ocultable: true, render: (f) => <Badge tone={tonoPrioridad(f.prioridad)}>{etiquetaPrioridad(f.prioridad)}</Badge> },
+  { id: "prioridad", label: "Prioridad", ocultable: true, render: (f) => <Badge color={colorPrioridad(f.prioridad)}>{etiquetaPrioridad(f.prioridad)}</Badge> },
   { id: "asignado", label: "Persona asignada", ocultable: true, clase: "text-muted-foreground", render: (f) => f.asignadoNombre || "—" },
 ];
 

@@ -11,13 +11,13 @@ import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, FiltroIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import {
+  colorEstado,
+  colorEstadoRegistro,
+  colorPrioridad,
   etiquetaEstado,
   etiquetaEstadoRegistro,
   etiquetaPrioridad,
   etiquetaTipoEnvio,
-  tonoEstado,
-  tonoEstadoRegistro,
-  tonoPrioridad,
   type FilaFiltro,
 } from "./def-filtros";
 import { EliminarFiltroBoton } from "./eliminar-filtro-boton";
@@ -79,7 +79,7 @@ function DatosDelFiltro({ filtro, codigoPais }: { filtro: FilaFiltro; codigoPais
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Dato etiqueta="Tipo de Envío">{etiquetaTipoEnvio(filtro.tipoEnvio) ?? SIN_DATO}</Dato>
           <Dato etiqueta="Prioridad">
-            <Badge tone={tonoPrioridad(filtro.prioridad)}>{etiquetaPrioridad(filtro.prioridad)}</Badge>
+            <Badge color={colorPrioridad(filtro.prioridad)}>{etiquetaPrioridad(filtro.prioridad)}</Badge>
           </Dato>
           <Dato etiqueta="Persona asignada">{filtro.asignadoNombre || SIN_DATO}</Dato>
           <Dato etiqueta="Aprobación Gestionada">{filtro.aprobacionGestionada ? "Sí" : "No"}</Dato>
@@ -178,8 +178,8 @@ export function FichaFiltro({
         filtro && (
           <>
             <span className="text-lg font-semibold">{filtro.nombre}</span>
-            <Badge tone={tonoEstadoRegistro(filtro.estadoRegistro)}>{etiquetaEstadoRegistro(filtro.estadoRegistro)}</Badge>
-            <Badge tone={tonoEstado(filtro.estado)}>{etiquetaEstado(filtro.estado)}</Badge>
+            <Badge color={colorEstadoRegistro(filtro.estadoRegistro)}>{etiquetaEstadoRegistro(filtro.estadoRegistro)}</Badge>
+            <Badge color={colorEstado(filtro.estado)}>{etiquetaEstado(filtro.estado)}</Badge>
           </>
         )
       }
