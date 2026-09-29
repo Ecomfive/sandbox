@@ -99,7 +99,11 @@ export const colorPrioridad = (valor: string) => PRIORIDAD_COLOR[valor] ?? "#BBB
 const REGISTROS_CERRADOS = ["aprobado", "descartado"];
 
 export const DEF_FILTROS: DefTabla<FilaFiltro> = {
-  clave: "compras-filtros",
+  // v2: quien ya había tocado «Agrupar» (o probado la tabla antes de que existiera `vistaInicial`)
+  // tenía guardada una vista sin agrupar, que ganaba por encima del nuevo valor por defecto — cambiar
+  // la clave le da a todos una vista limpia una sola vez, para que sí arranque agrupada por «Estado del
+  // Registro» como se pidió.
+  clave: "compras-filtros-v2",
   campos: [
     {
       id: "estadoRegistro",
