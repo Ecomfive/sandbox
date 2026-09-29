@@ -38,7 +38,7 @@ const ICONOS: Record<string, IconoComp> = {
 const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
   {
     id: "foto",
-    label: "Foto del Producto",
+    label: "Foto",
     ocultable: true,
     render: (f) =>
       f.fotoUrl ? (
