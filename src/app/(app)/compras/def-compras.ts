@@ -62,6 +62,27 @@ export const ETAPA_ETIQUETA: Record<string, string> = Object.fromEntries(
 
 export const etiquetaEtapa = (valor: string) => ETAPA_ETIQUETA[valor] ?? valor;
 
+/** Los mismos colores exactos que ClickUp le da a cada etapa en «Compras Dropi PA Panamá» (campo
+ * personalizado «Etapa»), tomados de ahí para que la insignia se vea igual en nuestro sistema. */
+const ETAPA_COLOR: Record<string, string> = {
+  backlog: "#667684",
+  solicitud_local: "#ffc500",
+  solicitud_internacional: "#3082B7",
+  cotizar: "#f9d900",
+  cotizado: "#7C4DFF",
+  evaluacion_proveedor: "#04A9F4",
+  solicitud_proveedor: "#12cdd4",
+  compra_pago: "#f9d900",
+  produccion: "#3397dd",
+  tracking: "#8ed401",
+  aviso_logistica: "#FF7FAB",
+  arribo_mercancia: "#EA80FC",
+  completado: "#1bbc9c",
+  descartado: "#e50000",
+};
+
+export const colorEtapa = (valor: string) => ETAPA_COLOR[valor] ?? "#8D8D8D";
+
 /** El «Estado» de ClickUp: un semáforo aparte de la «Etapa», más simple — no sigue el mismo orden ni las
  * mismas 14 paradas, es la columna que estaba entre «Etapa» y «Proveedor» en la lista de ClickUp. */
 export const ESTADOS_COMPRA = [
@@ -79,18 +100,20 @@ const ESTADO_ETIQUETA: Record<string, string> = Object.fromEntries(ESTADOS_COMPR
 
 export const etiquetaEstado = (valor: string) => ESTADO_ETIQUETA[valor] ?? valor;
 
-const TONO_ESTADO: Record<string, "neutral" | "success" | "warning" | "destructive" | "info"> = {
-  backlog: "neutral",
-  pendiente: "warning",
-  en_gestion: "info",
-  hecho: "success",
-  en_revision: "warning",
-  aprobado: "info",
-  rechazado: "destructive",
-  completado: "success",
+/** Los mismos colores exactos que ClickUp le da al «Estado» nativo de la tarea en «Compras Dropi PA
+ * Panamá», leídos de su selector de estado para que la insignia se vea igual en nuestro sistema. */
+const ESTADO_COLOR: Record<string, string> = {
+  backlog: "#8D8D8D",
+  pendiente: "#ED5F00",
+  en_gestion: "#FFC53D",
+  hecho: "#64C6A2",
+  en_revision: "#ED5F00",
+  aprobado: "#0880EA",
+  rechazado: "#9C2BAD",
+  completado: "#299764",
 };
 
-export const tonoEstado = (valor: string) => TONO_ESTADO[valor] ?? "neutral";
+export const colorEstado = (valor: string) => ESTADO_COLOR[valor] ?? "#8D8D8D";
 
 /** El ciclo termina en «Completado» o «Descartado»: como Cerrados en Retiros, se ocultan por defecto. */
 const ETAPAS_CERRADAS = ["completado", "descartado"];
