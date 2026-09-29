@@ -75,6 +75,7 @@ export function CampoFoto({
   }
 
   function quitar() {
+    if (!confirm("¿Quitar la foto del producto?")) return;
     setPreview(null);
     setError(null);
   }
