@@ -11,7 +11,7 @@ import {
   recordarFoto,
   subirFotoDeUsuario,
 } from "./actions";
-import { AvatarPersona } from "./avatar-persona";
+import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { faltantesDePersona, type FilaUsuario, type Rol } from "./def-usuarios";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";

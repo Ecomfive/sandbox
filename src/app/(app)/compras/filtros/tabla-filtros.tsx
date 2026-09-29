@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { Badge } from "@/components/ui/badge";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearMoneda } from "@/lib/formato";
-import { EstadoIcon, FiltroIcon, GastoIcon, PersonaIcon, PrioridadIcon } from "@/lib/nav-icons";
+import { AdjuntoIcon, EstadoIcon, FiltroIcon, GastoIcon, PersonaIcon, PrioridadIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearFiltroPanel } from "./crear-filtro-panel";
 import {
@@ -35,7 +36,31 @@ const ICONOS: Record<string, IconoComp> = {
 };
 
 const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
-  { id: "nombre", label: "Nombre", ocultable: false, clase: "font-medium", render: (f) => f.nombre },
+  {
+    id: "foto",
+    label: "Foto del Producto",
+    ocultable: true,
+    render: (f) =>
+      f.fotoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={f.fotoUrl} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+      ) : (
+        <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
+          <AdjuntoIcon className="h-3.5 w-3.5" />
+        </div>
+      ),
+  },
+  {
+    id: "nombre",
+    label: "Nombre",
+    ocultable: false,
+    clase: "font-medium",
+    render: (f) => (
+      <span className="block max-w-[22rem] truncate" title={f.nombre}>
+        {f.nombre}
+      </span>
+    ),
+  },
   { id: "estadoRegistro", label: "Estado del Registro", ocultable: true, render: (f) => <Badge color={colorEstadoRegistro(f.estadoRegistro)}>{etiquetaEstadoRegistro(f.estadoRegistro)}</Badge> },
   { id: "estado", label: "Estado", ocultable: true, render: (f) => <Badge color={colorEstado(f.estado)}>{etiquetaEstado(f.estado)}</Badge> },
   { id: "tipoEnvio", label: "Tipo de Envío", ocultable: true, clase: "text-muted-foreground", render: (f) => etiquetaTipoEnvio(f.tipoEnvio) || "—" },
@@ -43,7 +68,19 @@ const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
   { id: "precioTotal", label: "Precio Total", ocultable: true, clase: "tabular-nums", render: (f, codigoPais) => (f.precioTotal !== null ? formatearMoneda(f.precioTotal, codigoPais) : "—") },
   { id: "precioUnitario", label: "Precio Unitario", ocultable: true, clase: "tabular-nums", render: (f, codigoPais) => (f.precioUnitario !== null ? formatearMoneda(f.precioUnitario, codigoPais) : "—") },
   { id: "prioridad", label: "Prioridad", ocultable: true, render: (f) => <Badge color={colorPrioridad(f.prioridad)}>{etiquetaPrioridad(f.prioridad)}</Badge> },
-  { id: "asignado", label: "Persona asignada", ocultable: true, clase: "text-muted-foreground", render: (f) => f.asignadoNombre || "—" },
+  {
+    id: "asignado",
+    label: "Persona asignada",
+    ocultable: true,
+    render: (f) =>
+      f.asignadoNombre ? (
+        <span title={f.asignadoNombre}>
+          <AvatarPersona nombre={f.asignadoNombre} email={f.asignadoEmail ?? ""} avatarUrl={f.asignadoAvatarUrl} tamano="sm" />
+        </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
 ];
 
 /** Tabla de Filtros (Sistema WMS › Compras › Filtros): el embudo de cotización de productos candidatos,

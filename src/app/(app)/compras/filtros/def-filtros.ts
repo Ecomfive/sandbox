@@ -12,6 +12,8 @@ export interface FilaFiltro {
   precioUnitario: number | null;
   prioridad: string;
   asignadoNombre: string | null;
+  asignadoEmail: string | null;
+  asignadoAvatarUrl: string | null;
   aprobacionGestionada: boolean;
   comentarios: string | null;
   creadoEn: string;

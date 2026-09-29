@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AvatarPersona } from "./avatar-persona";
+import { AvatarPersona } from "@/components/ui/avatar-persona";
 import type { FilaUsuario, Rol } from "./def-usuarios";
 import { EstadoPresencia } from "./estado-presencia";
 import { EstadoDeAlta, FichaPersona } from "./ficha-persona";

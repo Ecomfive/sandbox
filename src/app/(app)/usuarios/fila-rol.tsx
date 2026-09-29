@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { FichaRol } from "./ficha-rol";
 import type { FilaUsuario, Rol } from "./def-usuarios";
-import { AvatarPersona } from "./avatar-persona";
+import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { anilloFoco } from "@/components/ui/field";
 import { iniciarVistaPrevia } from "@/lib/vista-previa-actions";
 import { EstadoIcon } from "@/lib/nav-icons";
