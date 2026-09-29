@@ -10,7 +10,7 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
-import { CalendarioIcon, CheckIcon, CerrarIcon, FiltroIcon, GastoIcon, InteligenciaIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CheckIcon, CerrarIcon, FiltroIcon, GastoIcon } from "@/lib/nav-icons";
 
 /**
  * El formulario de un producto candidato de Filtros (igual que `FormularioCompra`). Sin `filtro` crea (lleva
@@ -225,48 +225,6 @@ export function FormularioFiltro({
           <Campo etiqueta="Comentarios" id="campo-comentarios">
             <textarea id="campo-comentarios" name="comentarios" defaultValue={filtro?.comentarios ?? ""} rows={3} className={fieldClass} />
           </Campo>
-        </Seccion>
-
-        <Seccion icono={InteligenciaIcon} titulo="Métricas de Meta Ads">
-          <Campo etiqueta="Landing" id="campo-landing-url">
-            <input
-              id="campo-landing-url"
-              type="url"
-              name="landing_url"
-              defaultValue={filtro?.landingUrl ?? ""}
-              placeholder="https://..."
-              className={fieldClass}
-            />
-          </Campo>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Campo etiqueta="Oferta ($)" id="campo-metrica-oferta">
-              <input id="campo-metrica-oferta" type="number" step="0.01" min="0" name="metrica_oferta" defaultValue={filtro?.metricaOferta ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="CPM ($)" id="campo-metrica-cpm">
-              <input id="campo-metrica-cpm" type="number" step="0.01" min="0" name="metrica_cpm" defaultValue={filtro?.metricaCpm ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="% Efectividad" id="campo-metrica-efectividad">
-              <input id="campo-metrica-efectividad" type="number" step="0.01" min="0" name="metrica_efectividad" defaultValue={filtro?.metricaEfectividad ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="Hook Rate (%)" id="campo-metrica-hook-rate">
-              <input id="campo-metrica-hook-rate" type="number" step="0.01" min="0" name="metrica_hook_rate" defaultValue={filtro?.metricaHookRate ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="CTR (%)" id="campo-metrica-ctr">
-              <input id="campo-metrica-ctr" type="number" step="0.01" min="0" name="metrica_ctr" defaultValue={filtro?.metricaCtr ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="CPA ($)" id="campo-metrica-cpa">
-              <input id="campo-metrica-cpa" type="number" step="0.01" min="0" name="metrica_cpa" defaultValue={filtro?.metricaCpa ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="Gasto ($)" id="campo-metrica-gasto">
-              <input id="campo-metrica-gasto" type="number" step="0.01" min="0" name="metrica_gasto" defaultValue={filtro?.metricaGasto ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="Compras" id="campo-metrica-compras">
-              <input id="campo-metrica-compras" type="number" step="1" min="0" name="metrica_compras" defaultValue={filtro?.metricaCompras ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta="CVR (%)" id="campo-metrica-cvr">
-              <input id="campo-metrica-cvr" type="number" step="0.01" min="0" name="metrica_cvr" defaultValue={filtro?.metricaCvr ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-          </div>
         </Seccion>
       </div>
 
