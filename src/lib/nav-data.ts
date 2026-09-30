@@ -32,6 +32,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Ficha producto Shopify", href: "/wms-productos" },
       { label: "Ficha producto Dropi", href: "/wms-productos-dropi" },
       { label: "Compras", href: "/compras" },
+      { label: "Productos Test", href: "/productos-test" },
     ],
   },
   {

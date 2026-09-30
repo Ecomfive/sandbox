@@ -497,6 +497,17 @@ export function HistorialIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Un tubo de ensayo: el módulo de Productos Test. */
+export function TestIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M9 3h6" />
+      <path d="M10 3v6.5L5.5 17a2 2 0 0 0 1.7 3h9.6a2 2 0 0 0 1.7-3L14 9.5V3" />
+      <path d="M7.5 14h9" />
+    </Icon>
+  );
+}
+
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   "Gestión Proveeduría": ProveeduriaIcon,
   Tiendas: TiendaIcon,

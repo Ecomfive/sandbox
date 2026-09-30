@@ -21,9 +21,9 @@ import {
   etiquetaTipoEnvio,
   type FilaFiltro,
 } from "./def-filtros";
+import { IconoMetricasMeta } from "@/components/metricas-meta/popover";
 import { EtiquetaTienda } from "./etiqueta-tienda";
 import { FichaFiltro } from "./ficha-filtro";
-import { IconoMetricasMeta } from "./metricas-meta-popover";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
@@ -67,7 +67,7 @@ const COLUMNAS: ColumnaTabla<FilaFiltro, string>[] = [
     render: (f) => (
       <div className="flex min-w-0 items-center gap-2">
         {f.tienda && <EtiquetaTienda valor={f.tienda} />}
-        <IconoMetricasMeta filtro={f} />
+        <IconoMetricasMeta metricas={f} />
         <span className="block max-w-[22rem] truncate" title={f.nombre}>
           {f.nombre}
         </span>
