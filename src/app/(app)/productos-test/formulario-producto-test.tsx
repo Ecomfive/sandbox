@@ -237,7 +237,7 @@ export function FormularioProductoTest({
               <input id="campo-fecha-test" type="date" name="fecha_test" defaultValue={producto?.fechaTest ?? ""} className={fieldClass} />
             </Campo>
             <Campo etiqueta="Estado" id="campo-estado">
-              <select id="campo-estado" name="estado" defaultValue={producto?.estado ?? "sin_definir"} className={fieldClass}>
+              <select id="campo-estado" name="estado" defaultValue={producto?.estado ?? "pendiente"} className={fieldClass}>
                 {ESTADOS.map((e) => (
                   <option key={e.valor} value={e.valor}>
                     {e.etiqueta}

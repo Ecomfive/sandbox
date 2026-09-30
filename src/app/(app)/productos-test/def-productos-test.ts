@@ -35,9 +35,15 @@ export interface FilaProductoTest {
   creadoEn: string;
 }
 
-/** El resultado del test, calcado de la columna «Estado» de la hoja "Control de Testing en Países". */
+/** El resultado del test, calcado de la columna «Estado» de la hoja "Control de Testing en Países" (los 9
+ * valores que de verdad usa, no solo los del embudo principal). */
 export const ESTADOS = [
-  { valor: "sin_definir", etiqueta: "Sin Definir" },
+  { valor: "pendiente", etiqueta: "Pendiente" },
+  { valor: "backlog", etiqueta: "Backlog" },
+  { valor: "testeando", etiqueta: "Testeando" },
+  { valor: "reserva", etiqueta: "Reserva" },
+  { valor: "consulta", etiqueta: "Consulta" },
+  { valor: "winner", etiqueta: "Winner" },
   { valor: "enviado_a_compras", etiqueta: "Enviado a Compras" },
   { valor: "fallido", etiqueta: "Fallido" },
   { valor: "descartado", etiqueta: "Descartado" },
@@ -47,9 +53,14 @@ const ESTADO_ETIQUETA: Record<string, string> = Object.fromEntries(ESTADOS.map((
 export const etiquetaEstado = (valor: string) => ESTADO_ETIQUETA[valor] ?? valor;
 
 const ESTADO_COLOR: Record<string, string> = {
-  sin_definir: "#8D8D8D",
+  pendiente: "#8D8D8D",
+  backlog: "#b5bcc2",
+  testeando: "#02BCD4",
+  reserva: "#7C4DFF",
+  consulta: "#f9d900",
+  winner: "#1bbc9c",
   enviado_a_compras: "#0880EA",
-  fallido: "#f9d900",
+  fallido: "#FFC53D",
   descartado: "#e50000",
 };
 export const colorEstado = (valor: string) => ESTADO_COLOR[valor] ?? "#8D8D8D";
@@ -89,7 +100,7 @@ const EXPLOTACION_COLOR: Record<string, string> = {
 export const colorExplotacion = (valor: string) => EXPLOTACION_COLOR[valor] ?? "#8D8D8D";
 
 /** El ciclo termina en «Enviado a Compras», «Fallido» o «Descartado»: como en Filtros, se ocultan por defecto. */
-const ESTADOS_CERRADOS = ["enviado_a_compras", "fallido", "descartado"];
+const ESTADOS_CERRADOS = ["winner", "enviado_a_compras", "fallido", "descartado"];
 
 export const DEF_PRODUCTOS_TEST: DefTabla<FilaProductoTest> = {
   clave: "productos-test-v1",

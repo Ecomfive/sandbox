@@ -61,7 +61,7 @@ export async function crearProductoTest(formData: FormData): Promise<{ error?: s
   const usuario = await requireModuloEscritura("productos-test");
   const pais_id = formData.get("pais_id") as string;
   const nombre = (formData.get("nombre") as string).trim();
-  const estado = (formData.get("estado") as string) || "sin_definir";
+  const estado = (formData.get("estado") as string) || "pendiente";
 
   if (!nombre) return { error: "Escribe el nombre del producto." };
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
