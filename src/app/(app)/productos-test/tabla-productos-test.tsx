@@ -7,6 +7,7 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CheckIcon, EstadoIcon, EtiquetaIcon, FiltroIcon, TestIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import type { Grupo } from "@/lib/tabla/vista";
 import { CrearProductoTestPanel } from "./crear-producto-test-panel";
 import {
   colorEstado,
@@ -69,6 +70,21 @@ const COLUMNAS: ColumnaTabla<FilaProductoTest, string>[] = [
   },
 ];
 
+/** Junto al nombre de cada grupo de Categoría, cuántos de sus productos son Winner y cuántos Fallido — lo
+ * primero que se quiere saber para decidir qué categorías siguen dando resultado. */
+function etiquetaGrupo(campo: string, grupo: Grupo<FilaProductoTest>) {
+  if (campo !== "categoria") return <span className="font-semibold">{grupo.etiqueta}</span>;
+  const winners = grupo.filas.filter((f) => f.estado === "winner").length;
+  const fallidos = grupo.filas.filter((f) => f.estado === "fallido").length;
+  return (
+    <span className="flex flex-wrap items-center gap-x-2">
+      <span className="font-semibold">{grupo.etiqueta}</span>
+      {winners > 0 && <span className="text-xs font-medium text-success tabular-nums">{winners} Winner</span>}
+      {fallidos > 0 && <span className="text-xs font-medium text-destructive tabular-nums">{fallidos} Fallido{fallidos === 1 ? "" : "s"}</span>}
+    </span>
+  );
+}
+
 /** Tabla de Productos Test (Sistema WMS): el paso previo a Filtros, calcado de la hoja de cálculo "Control
  * de Testing en Países", con la barra de herramientas común. Por ahora solo se usa para Panamá. */
 export function TablaProductosTest({
@@ -92,6 +108,7 @@ export function TablaProductosTest({
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(f) => f.id}
+        etiquetaGrupo={etiquetaGrupo}
         anchoMinimo="52rem"
         abrirFila={{
           etiqueta: (f) => `Abrir la ficha del producto ${f.nombre}`,

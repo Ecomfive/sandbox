@@ -103,7 +103,7 @@ export const colorExplotacion = (valor: string) => EXPLOTACION_COLOR[valor] ?? "
 const ESTADOS_CERRADOS = ["winner", "enviado_a_compras", "fallido", "descartado"];
 
 export const DEF_PRODUCTOS_TEST: DefTabla<FilaProductoTest> = {
-  clave: "productos-test-v1",
+  clave: "productos-test-v2",
   campos: [
     {
       id: "estado",
@@ -143,13 +143,15 @@ export const DEF_PRODUCTOS_TEST: DefTabla<FilaProductoTest> = {
     { id: "anguloVenta", etiqueta: "Ángulo de Venta", tipo: "texto", valor: (f) => f.anguloVenta ?? "" },
     { id: "observacion", etiqueta: "Observación", tipo: "texto", valor: (f) => f.observacion ?? "" },
   ],
-  vistaInicial: { agrupar: "estado", orden: "desc" },
+  // v2: se agrupa por Categoría (no por Estado) y los cerrados ya no se ocultan por defecto — con la
+  // mayoría de los productos en Winner/Fallido, ocultarlos de entrada dejaba la vista casi vacía.
+  vistaInicial: { agrupar: "categoria", orden: "asc" },
   cerrados: {
     etiqueta: "Cerrados",
     esCerrado: (f) => ESTADOS_CERRADOS.includes(f.estado),
     campoEstado: "estado",
     valoresCerrados: ESTADOS_CERRADOS,
-    ocultosPorDefecto: true,
+    ocultosPorDefecto: false,
     exclusivo: true,
   },
 };
