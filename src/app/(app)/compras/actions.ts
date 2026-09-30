@@ -9,6 +9,28 @@ import { ESTADOS_COMPRA, ETAPAS_COMPRA } from "./def-compras";
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
 
+// La foto del producto vive en el mismo bucket público que Filtros y las fichas de producto Shopify/Dropi.
+const BUCKET_FOTOS = "wms-productos";
+const PREFIJO_URL_PUBLICA = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
+
+/** Da permiso (URL firmada) para subir la foto directo desde el navegador, sin pasar el archivo por la acción. */
+export async function prepararSubidaFotoCompra(nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
+  await requireModuloEscritura("compras");
+  if (typeof nombreArchivo !== "string" || !nombreArchivo.trim()) return { error: "El archivo no tiene nombre." };
+
+  const ruta = `compras/${crypto.randomUUID()}/${Date.now()}-${nombreArchivo.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120)}`;
+  const { data, error } = await createServiceClient().storage.from(BUCKET_FOTOS).createSignedUploadUrl(ruta);
+  if (error || !data) return { error: error?.message ?? "No se pudo preparar la subida." };
+  return { ruta, token: data.token };
+}
+
+/** Borra del bucket una foto que ya no queda referenciada (se reemplazó o se quitó). Nunca lanza. */
+async function borrarFotoSiEsNuestra(url: string | null) {
+  if (!url || !url.startsWith(PREFIJO_URL_PUBLICA)) return;
+  const ruta = url.slice(PREFIJO_URL_PUBLICA.length);
+  await createServiceClient().storage.from(BUCKET_FOTOS).remove([ruta]);
+}
+
 const numeroOptativo = (formData: FormData, campo: string): number | null => {
   const texto = formData.get(campo) as string | null;
   return texto && texto !== "" ? Number(texto) : null;
@@ -24,6 +46,7 @@ const fechaOptativa = (formData: FormData, campo: string): string | null => (for
 /** Los campos comunes a crear y actualizar (todo lo que no sea el nombre, la etapa o el país). */
 function leerCambios(formData: FormData) {
   return {
+    foto_url: textoOptativo(formData, "foto_url"),
     proveedor: textoOptativo(formData, "proveedor"),
     cliente: textoOptativo(formData, "cliente"),
     tienda: textoOptativo(formData, "tienda"),
@@ -93,11 +116,15 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("wms_compras").select("foto_url").eq("id", id).single();
+  const cambios = leerCambios(formData);
   const { error } = await supabase
     .from("wms_compras")
-    .update({ nombre, etapa, estado, ...leerCambios(formData) })
+    .update({ nombre, etapa, estado, ...cambios })
     .eq("id", id);
   if (error) return { error: error.message };
+
+  if (actual && actual.foto_url !== cambios.foto_url) await borrarFotoSiEsNuestra(actual.foto_url);
 
   revalidatePath("/compras");
   return {};
@@ -109,8 +136,11 @@ export async function eliminarCompra(formData: FormData) {
   const nombre = formData.get("nombre") as string;
 
   const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("wms_compras").select("foto_url").eq("id", id).single();
   const { error } = await supabase.from("wms_compras").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  if (actual?.foto_url) await borrarFotoSiEsNuestra(actual.foto_url);
 
   await registrarAuditoria({ accion: "eliminar_compra", entidad: "wms_compras", entidadId: id, detalle: nombre });
   revalidatePath("/compras");

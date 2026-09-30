@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { prepararSubidaFotoFiltro } from "./actions";
 import { labelClass } from "@/components/ui/field";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { AdjuntoIcon, PapeleraIcon } from "@/lib/nav-icons";
@@ -13,20 +12,22 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const urlPublica = (ruta: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${ruta}`;
 
 /**
- * Foto del producto: un único archivo, se sube apenas se elige (no se espera a «Guardar»). Usa el mismo
- * patrón de URL firmada que las fichas de producto Shopify/Dropi, para subir directo desde el navegador sin
- * pasar el archivo por la acción del servidor. El campo real (`foto_url`) es un input oculto controlado por
- * estado de React (no por ref): así el formulario siempre lo lee con el valor correcto en el FormData al
- * enviar, sin depender de que una mutación imperativa haya alcanzado a aplicarse antes del submit.
+ * Foto del producto: un único archivo, se sube apenas se elige (no se espera a «Guardar»). Usa una URL
+ * firmada (que trae `prepararSubida`, propia de cada módulo) para subir directo desde el navegador sin
+ * pasar el archivo por la acción del servidor. El campo real (`nombreCampo`) es un input oculto controlado
+ * por estado de React (no por ref): así el formulario siempre lo lee con el valor correcto en el FormData
+ * al enviar, sin depender de que una mutación imperativa haya alcanzado a aplicarse antes del submit.
  */
 export function CampoFoto({
   nombreCampo,
   valorInicial,
   alCambiarSubiendo,
+  prepararSubida,
 }: {
   nombreCampo: string;
   valorInicial: string | null;
   alCambiarSubiendo?: (subiendo: boolean) => void;
+  prepararSubida: (nombreArchivo: string) => Promise<{ ruta: string; token: string } | { error: string }>;
 }) {
   const [preview, setPreview] = useState<string | null>(valorInicial);
   const [subiendo, setSubiendo] = useState(false);
@@ -54,7 +55,7 @@ export function CampoFoto({
     setError(null);
     setSubiendo(true);
     try {
-      const permiso = await prepararSubidaFotoFiltro(archivo.name);
+      const permiso = await prepararSubida(archivo.name);
       if ("error" in permiso) {
         setError(permiso.error);
         return;

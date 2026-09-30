@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
-import { CalendarioIcon, ComprasIcon, EstadoIcon, GastoIcon, ProductoIcon } from "@/lib/nav-icons";
+import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, GastoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearCompraPanel } from "./crear-compra-panel";
 import { colorEstado, colorEtapa, DEF_COMPRAS, etiquetaEstado, etiquetaEtapa, valorUnitario, type FilaCompra } from "./def-compras";
@@ -41,6 +42,25 @@ const ICONOS: Record<string, IconoComp> = {
 };
 
 const COLUMNAS: ColumnaTabla<FilaCompra, string>[] = [
+  {
+    id: "foto",
+    label: "Foto",
+    ocultable: true,
+    render: (c) =>
+      c.fotoUrl ? (
+        <TarjetaEmergente clase="rounded-lg border border-border bg-card p-1.5 shadow-lg" contenido={
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={c.fotoUrl} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
+        }>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={c.fotoUrl} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+        </TarjetaEmergente>
+      ) : (
+        <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
+          <AdjuntoIcon className="h-3.5 w-3.5" />
+        </div>
+      ),
+  },
   { id: "nombre", label: "Nombre", ocultable: false, clase: "font-medium", render: (c) => c.nombre },
   { id: "etapa", label: "Etapa", ocultable: true, render: (c) => <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge> },
   { id: "estado", label: "Estado", ocultable: true, render: (c) => <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge> },

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
-import { actualizarCompra, crearCompra } from "./actions";
+import { actualizarCompra, crearCompra, prepararSubidaFotoCompra } from "./actions";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
+import { CampoFoto } from "@/components/ui/campo-foto";
 import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -59,6 +60,7 @@ export function FormularioCompra({
   acciones?: ReactNode;
 }) {
   const [modificado, setModificado] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const invalido = (id: string) => (faltante === id ? true : undefined);
   const [pending, startTransition] = useTransition();
@@ -109,7 +111,7 @@ export function FormularioCompra({
             <div className="flex flex-wrap gap-2">
               {modificado && (
                 <>
-                  <BotonAccion type="submit" tono="oscuro" icono={CheckIcon} disabled={pending}>
+                  <BotonAccion type="submit" tono="oscuro" icono={CheckIcon} disabled={pending || subiendoFoto}>
                     {pending ? "Guardando..." : "Guardar cambios"}
                   </BotonAccion>
                   <BotonAccion icono={CerrarIcon} onClick={alCancelar} disabled={pending}>
@@ -143,6 +145,7 @@ export function FormularioCompra({
               className={fieldClass}
             />
           </Campo>
+          <CampoFoto nombreCampo="foto_url" valorInicial={compra?.fotoUrl ?? null} alCambiarSubiendo={setSubiendoFoto} prepararSubida={prepararSubidaFotoCompra} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta="Etapa" id="campo-etapa" obligatorio faltante={faltante}>
               <select
@@ -285,7 +288,7 @@ export function FormularioCompra({
             </p>
           )}
           <BotonCrear
-            puede={completo}
+            puede={completo && !subiendoFoto}
             enviando={pending}
             etiqueta={editando ? "Guardar cambios" : "Crear compra"}
             etiquetaEnviando="Guardando..."

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
-import { actualizarFiltro, crearFiltro } from "./actions";
-import { CampoFoto } from "./campo-foto";
+import { actualizarFiltro, crearFiltro, prepararSubidaFotoFiltro } from "./actions";
+import { CampoFoto } from "@/components/ui/campo-foto";
 import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIENDAS, TIPOS_ENVIO, type FilaFiltro } from "./def-filtros";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
@@ -124,7 +124,12 @@ export function FormularioFiltro({
               className={fieldClass}
             />
           </Campo>
-          <CampoFoto nombreCampo="foto_url" valorInicial={filtro?.fotoUrl ?? null} alCambiarSubiendo={setSubiendoFoto} />
+          <CampoFoto
+            nombreCampo="foto_url"
+            valorInicial={filtro?.fotoUrl ?? null}
+            alCambiarSubiendo={setSubiendoFoto}
+            prepararSubida={prepararSubidaFotoFiltro}
+          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta="Estado del Registro" id="campo-estado-registro" obligatorio faltante={faltante}>
               <select

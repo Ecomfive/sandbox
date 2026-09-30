@@ -7,6 +7,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
+import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, valorUnitario, type FilaCompra } from "./def-compras";
@@ -51,9 +52,22 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
 function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPais: string }) {
   const dinero = (valor: number | null) => (valor !== null ? formatearMoneda(valor, codigoPais) : SIN_DATO);
   const fecha = (valor: string | null) => (valor ? formatearFecha(valor) : SIN_DATO);
+  const [ampliada, setAmpliada] = useState(false);
   return (
     <div className="flex flex-col divide-y divide-border border-t border-border p-5">
       <Seccion icono={ComprasIcon} titulo="Compra">
+        {compra.fotoUrl && (
+          <button
+            type="button"
+            onClick={() => setAmpliada(true)}
+            className="h-32 w-32 overflow-hidden rounded-md border border-border"
+            aria-label="Ver la foto más grande"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={compra.fotoUrl} alt="" className="h-full w-full object-cover" />
+          </button>
+        )}
+        {ampliada && <VisorImagen src={compra.fotoUrl} onClose={() => setAmpliada(false)} />}
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Dato etiqueta="Estado">
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>

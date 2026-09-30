@@ -3,6 +3,7 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 export interface FilaCompra {
   id: string;
   nombre: string;
+  fotoUrl: string | null;
   etapa: string;
   estado: string;
   proveedor: string | null;
