@@ -47,8 +47,9 @@ create index if not exists casos_dropshipper_ds_estado on casos_dropshipper (dro
 alter table pedidos_dropshipper enable row level security;
 alter table casos_dropshipper enable row level security;
 
-create policy "authenticated read/write" on pedidos_dropshipper for all using (auth.role() = 'authenticated');
-create policy "authenticated read/write" on casos_dropshipper for all using (auth.role() = 'authenticated');
+-- Sin políticas, a propósito: la app solo toca estas tablas desde el servidor con la clave de servicio, que se salta RLS.
+-- (Una política «authenticated read/write» daría acceso total a cualquier cuenta con sesión; ver migración 0063 y
+-- SEGURIDAD.md.)
 
 -- Una fila por dropshipper con lo que se suma en la base (no en JavaScript): pedidos y ventas del mes en curso,
 -- último pedido y casos abiertos. Es lo que leen el directorio, el ranking y las tarjetas.

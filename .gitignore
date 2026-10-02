@@ -66,3 +66,6 @@ supabase/.temp/
 # log de la tarea programada que renueva las sesiones de Dropi
 mantener-sesiones-dropi.log
 __pycache__/
+
+# Listas de dropshippers y otros datos de personas: nunca se versionan
+datos-privados/
