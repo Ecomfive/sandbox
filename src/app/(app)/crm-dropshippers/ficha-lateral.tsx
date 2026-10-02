@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
-import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
@@ -10,14 +9,13 @@ import {
   AlertaIcon,
   EnlaceIcon,
   EstadoIcon,
-  EtiquetaIcon,
   FlechaAbajoIcon,
   FlechaArribaIcon,
   HistorialIcon,
-  PedidoIcon,
   PersonaIcon,
 } from "@/lib/nav-icons";
 import { obtenerHistorialDropshipper } from "./actions";
+import { PanelCaso, PanelEditar, PanelNota, PanelPedido } from "./paneles-ficha";
 import {
   etiquetaAntiguedad,
   etiquetaCanal,
@@ -108,7 +106,6 @@ export function FichaLateral({
   codigoPais: string;
   hoy: string;
 }) {
-  const { mostrarToast } = useToast();
   const d = dropshipper;
   if (!d) {
     return (
@@ -122,14 +119,6 @@ export function FichaLateral({
   const anterior = posicion > 0 ? orden[posicion - 1] : null;
   const siguiente = posicion >= 0 && posicion < orden.length - 1 ? orden[posicion + 1] : null;
   const abiertos = casos.filter((c) => c.dropshipperId === d.id && c.estado !== "resuelto");
-  const avisar = () => mostrarToast("Esta acción se activa en la siguiente versión del CRM.", "info");
-  const acciones = [
-    { texto: "Nuevo caso", icono: AlertaIcon, apagado: false },
-    { texto: "Pedido", icono: PedidoIcon, apagado: false },
-    { texto: "Nota", icono: EtiquetaIcon, apagado: false },
-    { texto: "WhatsApp", icono: EnlaceIcon, apagado: !d.telefono },
-  ];
-
   return (
     <aside aria-label={`Ficha de ${d.nombre}`} className="overflow-hidden rounded-[10px] border border-border bg-card min-[1100px]:sticky min-[1100px]:top-3 min-[1100px]:max-h-[calc(100vh-1.5rem)] min-[1100px]:overflow-y-auto">
       <div className="sticky top-0 z-[2] flex flex-col gap-2 border-b border-border bg-card p-3.5">
@@ -156,19 +145,27 @@ export function FichaLateral({
             </Pastilla>
           )}
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {acciones.map(({ texto, icono: Icono, apagado }) => (
-            <button
-              key={texto}
-              type="button"
-              disabled={apagado}
-              onClick={avisar}
-              className={`flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
+        <div className="grid grid-cols-5 gap-1.5">
+          <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} />
+          <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} />
+          <PanelNota key={`nota-${d.id}`} d={d} />
+          <PanelEditar key={`editar-${d.id}`} d={d} />
+          {d.telefono ? (
+            <a
+              href={`https://wa.me/${d.telefono.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover ${anilloFoco}`}
             >
-              <Icono className="h-4 w-4" />
-              {texto}
-            </button>
-          ))}
+              <EnlaceIcon className="h-4 w-4" />
+              WhatsApp
+            </a>
+          ) : (
+            <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
+              <EnlaceIcon className="h-4 w-4" />
+              WhatsApp
+            </span>
+          )}
         </div>
       </div>
 

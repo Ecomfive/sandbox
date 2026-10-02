@@ -1,8 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { BotonAgregar } from "@/components/ui/boton-agregar";
-import { useToast } from "@/components/ui/toast";
+import { PanelCaso, type OpcionDropshipper } from "./paneles-ficha";
 import {
   DEF_CASOS,
   ESTADOS_CASO,
@@ -20,8 +19,19 @@ const TONO_PRIORIDAD = { alta: "peligro", normal: "aviso", baja: "neutro" } as c
 const PUNTO_ESTADO = { abierto: "aviso", en_curso: "aviso", resuelto: "exito" } as const;
 
 /** Casos de soporte: abiertos por defecto, con filtros de un toque, agrupados por estado y con su descarga. */
-export function TablaCasos({ casos, miNombre }: { casos: FilaCaso[]; miNombre: string | null }) {
-  const { mostrarToast } = useToast();
+export function TablaCasos({
+  casos,
+  miNombre,
+  dropshippers,
+  codigoPais,
+  puedeEscribir,
+}: {
+  casos: FilaCaso[];
+  miNombre: string | null;
+  dropshippers: OpcionDropshipper[];
+  codigoPais: string;
+  puedeEscribir: boolean;
+}) {
   const [verResueltos, setVerResueltos] = useState(false);
   const [soloMios, setSoloMios] = useState(false);
   const [sinResponder, setSinResponder] = useState(false);
@@ -52,7 +62,7 @@ export function TablaCasos({ casos, miNombre }: { casos: FilaCaso[]; miNombre: s
         </BotonBarra>
         <span className="flex-1" />
         <BotonDescargar def={DEF_CASOS} filas={filas} />
-        <BotonAgregar etiqueta="Agregar caso" onClick={() => mostrarToast("Crear casos se activa en la siguiente versión del CRM.", "info")} />
+        {puedeEscribir && <PanelCaso dropshippers={dropshippers} codigoPais={codigoPais} />}
       </div>
 
       <MarcoTabla ariaLabel="Casos de soporte">

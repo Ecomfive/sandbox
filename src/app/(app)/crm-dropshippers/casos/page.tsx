@@ -19,7 +19,13 @@ export default async function CasosDropshippersPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Casos" oculto />
-      <TablaCasos casos={datos.casos} miNombre={usuario.nombre} />
+      <TablaCasos
+        casos={datos.casos}
+        miNombre={usuario.nombre}
+        dropshippers={datos.dropshippers.map((d) => ({ id: d.id, nombre: d.nombre, paises: d.paises }))}
+        codigoPais={pais.codigo}
+        puedeEscribir={!usuario.modulosSoloLectura.includes("crm-dropshippers")}
+      />
     </Pagina>
   );
 }

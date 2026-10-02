@@ -39,6 +39,7 @@ export function FichaCrear({
   puedeExtra = true,
   alAbrir,
   alPulsarSinCompletar,
+  boton,
   children,
 }: {
   /** Título de la cabecera: «Nuevo gasto». */
@@ -58,6 +59,8 @@ export function FichaCrear({
   alAbrir?: () => void;
   /** Si `señalarFaltante` no encontró ningún campo por llenar (no hay opciones que elegir), lleva a ese aviso. */
   alPulsarSinCompletar?: () => void;
+  /** Otro botón que abre la ficha en vez de «Agregar» (p. ej. las acciones de la ficha de un dropshipper). */
+  boton?: (abrir: () => void) => ReactNode;
   children: (ayuda: AyudaFaltantes) => ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -123,7 +126,7 @@ export function FichaCrear({
 
   return (
     <>
-      <BotonAgregar ref={botonAbrirRef} etiqueta={etiquetaBoton} onClick={abrir} />
+      {boton ? boton(abrir) : <BotonAgregar ref={botonAbrirRef} etiqueta={etiquetaBoton} onClick={abrir} />}
 
       <Ventana
         abierto={abierto}

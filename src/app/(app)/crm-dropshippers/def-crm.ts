@@ -39,6 +39,13 @@ export const CANALES = [
   { valor: "otro", etiqueta: "Otro" },
 ] as const;
 
+export const ESTADOS_PEDIDO = [
+  { valor: "pendiente", etiqueta: "Pendiente" },
+  { valor: "entregado", etiqueta: "Entregado" },
+  { valor: "devuelto", etiqueta: "Devuelto" },
+  { valor: "cancelado", etiqueta: "Cancelado" },
+] as const;
+
 export const TIPOS_INTERACCION = [
   { valor: "llamada", etiqueta: "Llamada" },
   { valor: "whatsapp", etiqueta: "WhatsApp" },
