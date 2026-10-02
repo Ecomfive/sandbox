@@ -26,6 +26,7 @@ export function TablaDirectorio({
   hoy,
   demo,
   puedeEscribir,
+  buscarInicial = "",
 }: {
   dropshippers: FilaDropshipper[];
   casos: FilaCaso[];
@@ -34,8 +35,10 @@ export function TablaDirectorio({
   hoy: string;
   demo: boolean;
   puedeEscribir: boolean;
+  /** Texto con el que abre el campo de búsqueda (lo manda el buscador global con `?buscar=`). */
+  buscarInicial?: string;
 }) {
-  const [busqueda, setBusqueda] = useState("");
+  const [busqueda, setBusqueda] = useState(buscarInicial);
   const [soloVip, setSoloVip] = useState(false);
   const [enRiesgo, setEnRiesgo] = useState(false);
   const [agrupar, setAgrupar] = useState(true);

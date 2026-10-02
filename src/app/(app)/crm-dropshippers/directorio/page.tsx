@@ -11,8 +11,14 @@ export const metadata = { title: "Dropshippers" };
 
 export const dynamic = "force-dynamic";
 
-export default async function DirectorioDropshippersPage() {
+export default async function DirectorioDropshippersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const usuario = await requireModulo("crm-dropshippers");
+  const { buscar } = await searchParams;
+  const buscarInicial = typeof buscar === "string" ? buscar : "";
   const puedeEscribir = !usuario.modulosSoloLectura.includes("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -23,6 +29,8 @@ export default async function DirectorioDropshippersPage() {
       <EncabezadoPagina titulo="Dropshippers" oculto />
       {datos.demo && <AvisoDemo />}
       <TablaDirectorio
+        key={buscarInicial}
+        buscarInicial={buscarInicial}
         dropshippers={datos.dropshippers}
         casos={datos.casos}
         paisId={pais.id}

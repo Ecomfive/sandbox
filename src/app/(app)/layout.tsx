@@ -59,7 +59,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           pendientes={pendientes}
         />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
-          <NavBar paginas={paginas} />
+          <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
           <BarraMigas seccionesPlataforma={seccionesPlataforma} favoritos={favoritos} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>

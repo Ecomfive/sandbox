@@ -255,16 +255,22 @@ convenciones técnicas del código.
   «Ganador» agrupa `winner` y
   `enviado_a_compras`. Las piezas visuales comunes (insignias redondas, indicadores, botones de barra, marco de
   tabla) viven en `src/components/panel/piezas-panel.tsx` y las usa también el CRM.
-- **Buscador con Ctrl K.** El buscador de la barra de arriba
-  (`src/components/busqueda-global.tsx`) se abre con Ctrl K (o ⌘ K) desde cualquier
-  página. Sin escribir muestra las páginas recientes (`paleta-recientes-v1`, en el
-  navegador de cada persona) y otras a las que ir; al escribir filtra las páginas
-  del menú al instante y pide al servidor retiros (por correlativo: `#0007` o `7`),
-  pedidos, productos y dropshippers (`src/lib/busqueda-global.ts`, que respeta los
-  módulos de la persona). Es un combobox con flechas, Enter y Escape. La lista de
-  páginas sale del menú y de las pestañas de cada módulo
-  (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede
-  buscar sola; un resultado nuevo del servidor se agrega en `buscarGlobal`.
+- **Barra de arriba y buscador con Ctrl K.** `NavBar` (`src/components/nav.tsx`) lleva a la izquierda el
+  buscador y a la derecha: el contexto «Panamá · Dropi» (`SelectorContexto`: el país se cambia ahí; la
+  plataforma solo se muestra, porque Dropi es la única con datos), «Crear» (`MenuCrear`), la campana del Centro de
+  notificaciones con lo pendiente (`CampanaPendientes`, usa la misma promesa del menú lateral) y el menú de la
+  persona (`MenuCuenta`: tema, atajos, configuración, salir y versión). Los menús desplegables nuevos usan
+  `MenuDesplegable` (`src/components/ui/menu-desplegable.tsx`: flechas, Escape, foco). El buscador
+  (`src/components/busqueda-global.tsx`) es una **paleta de comandos**: un botón con forma de campo abre una ventana al
+  centro con Ctrl K (⌘ K), con `/` o al pulsarlo. Sin escribir ofrece Recientes (`paleta-recientes-v1`, en el
+  navegador de cada persona), Acciones (las de `ACCIONES_CREAR`, solo de módulos que puede abrir y modificar) e «Ir
+  a»; al escribir filtra acciones y páginas al instante y pide al servidor retiros (por correlativo: `#0007` o `7`),
+  pedidos, productos, **productos en test** y dropshippers (`src/lib/busqueda-global.ts`, que respeta los módulos
+  de la persona). Productos Test y el directorio del CRM abren ya filtrados con `?buscar=` (la página pasa
+  `buscarInicial` y un `key` para que se vuelva a montar). La lista de páginas sale del menú y de las pestañas de
+  cada módulo (`paginasBuscables`, `src/lib/paleta.ts`): una página nueva del menú se puede buscar sola; una acción
+  nueva se agrega a `ACCIONES_CREAR`; un resultado nuevo del servidor se agrega en `buscarGlobal`. La paleta es un
+  `role="dialog"` modal, así que los atajos de una tecla no actúan mientras está abierta.
 - **Flujo Etapa / Estado / Consolidación de un retiro (manda sobre lo que sigue).** La
   barra de pasos de arriba de la ficha se llama **«Etapa»**; el **Estado** es la insignia
   (Abierto / Novedad / Cerrado) y la **Consolidación** es el dato (Pendiente / Novedad

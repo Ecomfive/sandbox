@@ -83,6 +83,21 @@ export function filtrarPaginas(paginas: PaginaBuscable[], texto: string, limite 
   return puntuadas.slice(0, limite).map((p) => p.pagina);
 }
 
+/** Los elementos (acciones, por ejemplo) cuyo nombre o detalle contiene todas las palabras escritas; primero los que empiezan por ellas. */
+export function filtrarPorTexto<T extends { etiqueta: string; detalle?: string }>(elementos: T[], texto: string, limite = 4): T[] {
+  const palabras = normalizar(texto).split(/\s+/).filter(Boolean);
+  if (palabras.length === 0) return [];
+  const puntuados: { elemento: T; puntos: number; orden: number }[] = [];
+  elementos.forEach((elemento, orden) => {
+    const etiqueta = normalizar(elemento.etiqueta);
+    const todo = `${etiqueta} ${normalizar(elemento.detalle ?? "")}`;
+    if (!palabras.every((p) => todo.includes(p))) return;
+    puntuados.push({ elemento, puntos: etiqueta.startsWith(palabras[0]) ? 0 : palabras.every((p) => etiqueta.includes(p)) ? 1 : 2, orden });
+  });
+  puntuados.sort((a, b) => a.puntos - b.puntos || a.orden - b.orden);
+  return puntuados.slice(0, limite).map((p) => p.elemento);
+}
+
 /** «#0007», «7» o «0007» -> 7 (el correlativo de un retiro); cualquier otra cosa -> null. */
 export function leerBusquedaRetiro(texto: string): number | null {
   const m = /^#?\s*(\d{1,7})$/.exec(texto.trim());

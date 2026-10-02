@@ -47,12 +47,15 @@ export function ListaProductosTest({
   productos,
   paisId,
   puedeEscribir,
+  buscarInicial = "",
 }: {
   productos: FilaProductoTest[];
   paisId: string;
   puedeEscribir: boolean;
+  /** Texto con el que abre el campo de búsqueda (lo manda el buscador global con `?buscar=`). */
+  buscarInicial?: string;
 }) {
-  const [busqueda, setBusqueda] = useState("");
+  const [busqueda, setBusqueda] = useState(buscarInicial);
   const [chip, setChip] = useState<Resultado | null>(null);
   const [estado, setEstado] = useState("");
   const [categoria, setCategoria] = useState("");

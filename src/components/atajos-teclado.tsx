@@ -17,6 +17,9 @@ import type { PaginaBuscable } from "@/lib/paleta";
 /** El buscador de la barra de arriba escucha este evento para abrirse (lo dispara el atajo «/»). */
 export const EVENTO_ABRIR_BUSCADOR = "abrir-buscador-global";
 
+/** El menú de la persona dispara este evento para abrir la ayuda de atajos. */
+export const EVENTO_ABRIR_ATAJOS = "abrir-ayuda-atajos";
+
 const CLAVE_ATAJOS = "atajos-teclado-v1";
 
 function TecladoIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -39,7 +42,7 @@ const Tecla = ({ children }: { children: React.ReactNode }) => (
  * lista. Nunca actúan mientras se escribe en un campo ni con una ventana abierta, y se pueden apagar (regla de
  * WCAG 2.1.4 para los atajos de un solo carácter); apagados, `?` sigue abriendo la ayuda para poder encenderlos.
  */
-export function AtajosTeclado({ paginas }: { paginas: PaginaBuscable[] }) {
+export function AtajosTeclado({ paginas, conBoton = true }: { paginas: PaginaBuscable[]; conBoton?: boolean }) {
   const router = useRouter();
   const [ayudaAbierta, setAyudaAbierta] = useState(false);
   const [esperandoIr, setEsperandoIr] = useState(false);
@@ -108,19 +111,28 @@ export function AtajosTeclado({ paginas }: { paginas: PaginaBuscable[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atajos, activados, router]);
 
+  // La ayuda también se abre desde el menú de la persona.
+  useEffect(() => {
+    const abrir = () => setAyudaAbierta(true);
+    document.addEventListener(EVENTO_ABRIR_ATAJOS, abrir);
+    return () => document.removeEventListener(EVENTO_ABRIR_ATAJOS, abrir);
+  }, []);
+
   return (
     <>
-      <Tooltip texto="Atajos de teclado">
-        <button
-          type="button"
-          onClick={() => setAyudaAbierta(true)}
-          aria-label="Atajos de teclado"
-          aria-keyshortcuts="Shift+/"
-          className={`hidden shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground md:inline-flex ${anilloFoco}`}
-        >
-          <TecladoIcon className="h-4 w-4" />
-        </button>
-      </Tooltip>
+      {conBoton && (
+        <Tooltip texto="Atajos de teclado">
+          <button
+            type="button"
+            onClick={() => setAyudaAbierta(true)}
+            aria-label="Atajos de teclado"
+            aria-keyshortcuts="Shift+/"
+            className={`hidden shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground md:inline-flex ${anilloFoco}`}
+          >
+            <TecladoIcon className="h-4 w-4" />
+          </button>
+        </Tooltip>
+      )}
 
       {/* Mientras se espera la segunda tecla: lo que se puede pulsar (y lo anuncia a los lectores de pantalla). */}
       <p

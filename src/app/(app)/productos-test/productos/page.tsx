@@ -11,8 +11,14 @@ export const metadata = { title: "Productos" };
 export const dynamic = "force-dynamic";
 
 /** Los productos en test, uno por uno: filtrar, ordenar, ver su ficha y editarlo. */
-export default async function ProductosEnTestPage() {
+export default async function ProductosEnTestPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const usuario = await requireModulo("productos-test");
+  const { buscar } = await searchParams;
+  const buscarInicial = typeof buscar === "string" ? buscar : "";
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const productos = await obtenerProductosTest(supabase, pais.id);
@@ -20,7 +26,7 @@ export default async function ProductosEnTestPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Productos" oculto />
-      <ListaProductosTest productos={productos} paisId={pais.id} puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")} />
+      <ListaProductosTest key={buscarInicial} buscarInicial={buscarInicial} productos={productos} paisId={pais.id} puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")} />
     </Pagina>
   );
 }

@@ -5,9 +5,10 @@ import { getPaisActual } from "@/lib/pais";
 import { getUsuarioActual } from "@/lib/auth";
 import { etiquetaCorrelativo, leerBusquedaRetiro } from "@/lib/paleta";
 import { formatearMoneda } from "@/lib/formato";
+import { etiquetaEstado as etiquetaEstadoTest } from "@/app/(app)/productos-test/def-productos-test";
 
 export interface ResultadoBusqueda {
-  tipo: "retiro" | "pedido" | "producto" | "dropshipper";
+  tipo: "retiro" | "pedido" | "producto" | "producto-test" | "dropshipper";
   etiquetaTipo: string;
   titulo: string;
   detalle: string;
@@ -105,6 +106,29 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
     );
   }
 
+  if (buscaTexto && usuario.modulos.includes("productos-test")) {
+    tareas.push(
+      supabase
+        .from("wms_productos_test")
+        .select("nombre, estado")
+        .eq("pais_id", pais.id)
+        .ilike("nombre", `%${texto}%`)
+        .limit(LIMITE_POR_TIPO)
+        .then(({ data }) => {
+          for (const p of data ?? []) {
+            resultados.push({
+              tipo: "producto-test",
+              etiquetaTipo: "Producto Test",
+              titulo: p.nombre,
+              detalle: etiquetaEstadoTest(p.estado),
+              // La lista de productos abre ya filtrada por el nombre (`?buscar=`).
+              href: `/productos-test/productos?buscar=${encodeURIComponent(p.nombre)}`,
+            });
+          }
+        })
+    );
+  }
+
   if (buscaTexto && usuario.modulos.includes("crm-dropshippers")) {
     tareas.push(
       supabase
@@ -120,7 +144,7 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
               etiquetaTipo: "Dropshipper",
               titulo: d.nombre,
               detalle: d.estado,
-              href: "/crm-dropshippers",
+              href: `/crm-dropshippers/directorio?buscar=${encodeURIComponent(d.nombre)}`,
             });
           }
         })
