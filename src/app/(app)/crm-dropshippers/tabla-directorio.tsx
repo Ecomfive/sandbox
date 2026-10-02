@@ -37,6 +37,7 @@ const COLUMNAS: ColumnaTabla<FilaDropshipper, Contexto>[] = [
     id: "nombre",
     label: "Dropshipper",
     ocultable: false,
+    clase: "whitespace-nowrap",
     render: (d) => (
       <span className="flex flex-col">
         <span className="font-medium">{d.nombre}</span>
@@ -47,17 +48,18 @@ const COLUMNAS: ColumnaTabla<FilaDropshipper, Contexto>[] = [
       </span>
     ),
   },
-  { id: "estado", label: "Estado", ocultable: true, render: (d) => <Badge tone={toneEstado[d.estado] ?? "neutral"}>{etiquetaEstado(d.estado)}</Badge> },
-  { id: "nivel", label: "Nivel", ocultable: true, render: (d) => <Badge tone={d.nivel === "vip" ? "warning" : "neutral"}>{etiquetaNivel(d.nivel)}</Badge> },
-  { id: "ciudad", label: "Ciudad", ocultable: true, render: (d) => d.ciudad ?? "—" },
-  { id: "responsable", label: "Responsable", ocultable: true, render: (d) => d.responsable ?? <span className="text-muted-foreground">Sin asignar</span> },
-  { id: "pedidos", label: "Pedidos del mes", ocultable: true, clase: "text-right tabular-nums", render: (d) => (d.pedidosMes ? d.pedidosMes : "—") },
-  { id: "ventas", label: "Ventas del mes", ocultable: true, clase: "text-right tabular-nums", render: (d, c) => (d.ventasMes ? montoCorto(d.ventasMes, c.codigoPais) : "—") },
-  { id: "ultimoPedido", label: "Último pedido", ocultable: true, render: (d, c) => etiquetaUltimoPedido(d.ultimoPedido, c.hoy) },
+  { id: "estado", label: "Estado", clase: "whitespace-nowrap", ocultable: true, render: (d) => <Badge tone={toneEstado[d.estado] ?? "neutral"}>{etiquetaEstado(d.estado)}</Badge> },
+  { id: "nivel", label: "Nivel", clase: "whitespace-nowrap", ocultable: true, render: (d) => <Badge tone={d.nivel === "vip" ? "warning" : "neutral"}>{etiquetaNivel(d.nivel)}</Badge> },
+  { id: "ciudad", label: "Ciudad", clase: "whitespace-nowrap", ocultable: true, render: (d) => d.ciudad ?? "—" },
+  { id: "responsable", label: "Responsable", clase: "whitespace-nowrap", ocultable: true, render: (d) => d.responsable ?? <span className="text-muted-foreground">Sin asignar</span> },
+  { id: "pedidos", label: "Pedidos del mes", ocultable: true, clase: "whitespace-nowrap text-right tabular-nums", render: (d) => (d.pedidosMes ? d.pedidosMes : "—") },
+  { id: "ventas", label: "Ventas del mes", ocultable: true, clase: "whitespace-nowrap text-right tabular-nums", render: (d, c) => (d.ventasMes ? montoCorto(d.ventasMes, c.codigoPais) : "—") },
+  { id: "ultimoPedido", label: "Último pedido", clase: "whitespace-nowrap", ocultable: true, render: (d, c) => etiquetaUltimoPedido(d.ultimoPedido, c.hoy) },
   {
     id: "casos",
     label: "Casos",
     ocultable: true,
+    clase: "whitespace-nowrap",
     render: (d) =>
       d.casosAbiertos ? (
         <span className="inline-flex items-center gap-1.5 tabular-nums">
@@ -84,7 +86,7 @@ const COLUMNAS: ColumnaTabla<FilaDropshipper, Contexto>[] = [
         "—"
       ),
   },
-  { id: "ingreso", label: "Ingreso", ocultable: true, render: (d) => (d.ingreso ? formatearFecha(d.ingreso) : "—") },
+  { id: "ingreso", label: "Ingreso", clase: "whitespace-nowrap", ocultable: true, render: (d) => (d.ingreso ? formatearFecha(d.ingreso) : "—") },
 ];
 
 /** Directorio de dropshippers con la barra común (agrupar, inactivos, filtros, columnas y «Agregar»); la fila abre la ficha. */

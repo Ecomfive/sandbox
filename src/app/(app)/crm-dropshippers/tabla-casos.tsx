@@ -36,6 +36,7 @@ const COLUMNAS: ColumnaTabla<FilaCaso>[] = [
     id: "titulo",
     label: "Caso",
     ocultable: false,
+    clase: "whitespace-nowrap",
     render: (c) => (
       <span className="flex flex-col">
         <span className="font-medium">{c.titulo}</span>
@@ -43,14 +44,14 @@ const COLUMNAS: ColumnaTabla<FilaCaso>[] = [
       </span>
     ),
   },
-  { id: "dropshipper", label: "Dropshipper", ocultable: true, render: (c) => c.dropshipper },
-  { id: "tipo", label: "Tipo", ocultable: true, render: (c) => etiquetaTipoCaso(c.tipo) },
-  { id: "prioridad", label: "Prioridad", ocultable: true, render: (c) => <Badge tone={TONO_PRIORIDAD[c.prioridad] ?? "neutral"}>{etiquetaPrioridad(c.prioridad)}</Badge> },
-  { id: "estado", label: "Estado", ocultable: true, render: (c) => <Badge tone={TONO_ESTADO[c.estado] ?? "neutral"}>{etiquetaEstadoCaso(c.estado)}</Badge> },
-  { id: "pedido", label: "Pedido", ocultable: true, clase: "tabular-nums", render: (c) => c.numeroPedido ?? "—" },
-  { id: "responsable", label: "Responsable", ocultable: true, render: (c) => c.responsable ?? <span className="text-muted-foreground">Sin asignar</span> },
-  { id: "canal", label: "Canal", ocultable: true, render: (c) => etiquetaCanal(c.canal) },
-  { id: "antiguedad", label: "Abierto hace", ocultable: true, clase: "text-right tabular-nums", render: (c) => etiquetaAntiguedad(c.horasAbierto) },
+  { id: "dropshipper", label: "Dropshipper", clase: "whitespace-nowrap", ocultable: true, render: (c) => c.dropshipper },
+  { id: "tipo", label: "Tipo", clase: "whitespace-nowrap", ocultable: true, render: (c) => etiquetaTipoCaso(c.tipo) },
+  { id: "prioridad", label: "Prioridad", clase: "whitespace-nowrap", ocultable: true, render: (c) => <Badge tone={TONO_PRIORIDAD[c.prioridad] ?? "neutral"}>{etiquetaPrioridad(c.prioridad)}</Badge> },
+  { id: "estado", label: "Estado", clase: "whitespace-nowrap", ocultable: true, render: (c) => <Badge tone={TONO_ESTADO[c.estado] ?? "neutral"}>{etiquetaEstadoCaso(c.estado)}</Badge> },
+  { id: "pedido", label: "Pedido", ocultable: true, clase: "whitespace-nowrap tabular-nums", render: (c) => c.numeroPedido ?? "—" },
+  { id: "responsable", label: "Responsable", clase: "whitespace-nowrap", ocultable: true, render: (c) => c.responsable ?? <span className="text-muted-foreground">Sin asignar</span> },
+  { id: "canal", label: "Canal", clase: "whitespace-nowrap", ocultable: true, render: (c) => etiquetaCanal(c.canal) },
+  { id: "antiguedad", label: "Abierto hace", ocultable: true, clase: "whitespace-nowrap text-right tabular-nums", render: (c) => etiquetaAntiguedad(c.horasAbierto) },
 ];
 
 /** Casos de soporte con la barra común (agrupar por estado, resueltos, filtros y columnas). */

@@ -11,6 +11,8 @@ export interface DatosCrm {
   demo: boolean;
 }
 
+const COLONES_POR_DOLAR = 520;
+
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 function nombreMes(hoy: string): string {
@@ -26,11 +28,20 @@ const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) 
  * dropshipper (pedidos y ventas del mes, último pedido, casos abiertos) las hace Postgres en la vista
  * `crm_dropshippers_resumen` (migración 0062), no JavaScript.
  */
-export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string): Promise<DatosCrm> {
+export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, codigoPais: string): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
 
   if (MODO_DEMO) {
-    return { dropshippers: DROPSHIPPERS_DEMO, casos: CASOS_DEMO, resumen: resumenDemo(nombreMes(hoy)), hoy, demo: true };
+    // Los montos de ejemplo están en colones; en Panamá (dólares) se dividen para que no parezcan millones de dólares.
+    const k = codigoPais === "CR" ? 1 : COLONES_POR_DOLAR;
+    const resumen = resumenDemo(nombreMes(hoy));
+    return {
+      dropshippers: DROPSHIPPERS_DEMO.map((d) => ({ ...d, ventasMes: Math.round(d.ventasMes / k) })),
+      casos: CASOS_DEMO,
+      resumen: { ...resumen, ventasMes: Math.round(resumen.ventasMes / k) },
+      hoy,
+      demo: true,
+    };
   }
 
   const [{ data: filas }, { data: sumas }, { data: casosBd }] = await Promise.all([

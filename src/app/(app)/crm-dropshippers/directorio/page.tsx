@@ -16,7 +16,7 @@ export default async function DirectorioDropshippersPage() {
   const puedeEscribir = !usuario.modulosSoloLectura.includes("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await obtenerDatosCrm(supabase, pais.id);
+  const datos = await obtenerDatosCrm(supabase, pais.id, pais.codigo);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
