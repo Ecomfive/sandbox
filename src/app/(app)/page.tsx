@@ -13,10 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
-import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
+import { armarCola, obtenerResumenTest } from "@/lib/hoy";
+import { ColaAtencion } from "@/components/hoy/cola-atencion";
+import { TarjetaProductoTest } from "@/components/hoy/tarjeta-producto-test";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 
-export const metadata = { title: "Dashboard operativo" };
+export const metadata = { title: "Hoy" };
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +39,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await requireModulo("dashboard");
+  const usuario = await requireModulo("dashboard");
   const sp = await searchParams;
   const periodo = resolverPeriodo({
     preset: typeof sp.preset === "string" ? sp.preset : undefined,
@@ -49,7 +51,8 @@ export default async function Home({
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [inventario, ventas, serieFinanzas, { data: dropshippers }, { data: proveedoresComp }, pendientesHoy] =
+  const verTest = usuario.modulos.includes("productos-test");
+  const [inventario, ventas, serieFinanzas, { data: dropshippers }, { data: proveedoresComp }, pendientesHoy, resumenTest] =
     await Promise.all([
       getSerieInventarioComparada(supabase, pais.id, periodo),
       getSerieVentasComparada(supabase, pais.id, periodo),
@@ -57,8 +60,10 @@ export default async function Home({
       supabase.from("dropshippers").select("estado").eq("pais_id", pais.id),
       supabase.from("proveedores_competencia").select("id").eq("pais_id", pais.id),
       obtenerPendientesHoy(supabase, pais.id),
+      verTest ? obtenerResumenTest(supabase, pais.id, periodo.desde, periodo.hasta) : Promise.resolve(null),
     ]);
 
+  const cola = armarCola(pendientesHoy, usuario.modulos);
   const hayInventario = inventario.serie.some((p) => p.entradas > 0 || p.salidas > 0);
   const hayVentas = ventas.serie.some((p) => p.actual > 0);
 
@@ -195,47 +200,16 @@ export default async function Home({
   return (
     <Pagina ancho="ancha">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <EncabezadoPagina titulo="Dashboard operativo" oculto>
+        <EncabezadoPagina titulo="Hoy" oculto>
           {pais.nombre} — {periodo.etiqueta}
         </EncabezadoPagina>
         <PeriodPicker />
       </div>
 
-      {(pendientesHoy.alertasInventario > 0 ||
-        pendientesHoy.saldosSinRegistrar > 0 ||
-        pendientesHoy.pedidosConNovedad > 0) && (
-        <div className="mt-6">
-          <KpiGroup titulo="Pendientes de hoy">
-            <KpiGrid>
-              {pendientesHoy.alertasInventario > 0 && (
-                <KpiCard
-                  titulo="Alertas de inventario abiertas"
-                  valor={pendientesHoy.alertasInventario}
-                  tono="destructive"
-                  href="/alertas"
-                  ayudaLectores="Ir a Alertas de inventario"
-                />
-              )}
-              {pendientesHoy.pedidosConNovedad > 0 && (
-                <KpiCard
-                  titulo="Pedidos Dropi en Novedad"
-                  valor={pendientesHoy.pedidosConNovedad}
-                  tono="destructive"
-                  href="/pedidos-dropi"
-                  ayudaLectores="Ir a Pedidos Dropi"
-                />
-              )}
-              {pendientesHoy.saldosSinRegistrar > 0 && (
-                <KpiCard
-                  titulo="Saldos de wallet sin registrar"
-                  valor={pendientesHoy.saldosSinRegistrar}
-                  tono="destructive"
-                  href="/retiros"
-                  ayudaLectores="Ir a Conciliación de Retiros"
-                />
-              )}
-            </KpiGrid>
-          </KpiGroup>
+      {(cola.length > 0 || resumenTest) && (
+        <div className={`mt-6 grid grid-cols-1 items-start gap-5 ${cola.length > 0 && resumenTest ? "min-[1000px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : ""}`}>
+          <ColaAtencion filas={cola} />
+          {resumenTest && <TarjetaProductoTest resumen={resumenTest} periodo={periodo.etiqueta} />}
         </div>
       )}
 

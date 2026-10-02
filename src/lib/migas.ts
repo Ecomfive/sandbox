@@ -19,7 +19,7 @@ const SIN_MIGAS: Migas = { migas: [], favoritoHref: null, moduloHref: null, modu
 
 /** Páginas que no están en el menú lateral pero tienen su propio título. */
 const TITULOS_APARTE: Record<string, string> = {
-  "/": "Dashboard operativo",
+  "/": "Hoy",
   "/notificaciones": "Centro de notificaciones",
   "/configuracion": "Configuración del sistema",
   "/conciliaciones": "Conciliación banco vs. plataforma",

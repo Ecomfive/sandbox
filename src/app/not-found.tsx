@@ -19,7 +19,7 @@ export default function NotFound() {
           La ruta que buscas no existe o se movió de lugar.
         </p>
         <Link href="/" className={`mt-6 inline-block text-sm ${linkClass}`}>
-          Volver al Dashboard
+          Volver al inicio
         </Link>
       </div>
     </main>

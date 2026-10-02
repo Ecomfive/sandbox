@@ -9,7 +9,7 @@ export interface AtajoIr {
 
 /** A dónde lleva cada letra (después de `g`). Solo se ofrecen las páginas a las que la persona puede ir. */
 const ATAJOS_IR: AtajoIr[] = [
-  { tecla: "d", href: "/", etiqueta: "Dashboard" },
+  { tecla: "d", href: "/", etiqueta: "Hoy" },
   { tecla: "r", href: "/retiros", etiqueta: "Retiros" },
   { tecla: "p", href: "/pedidos-dropi", etiqueta: "Pedidos Dropi" },
   { tecla: "a", href: "/alertas", etiqueta: "Alertas de inventario" },

@@ -14,7 +14,7 @@ export interface PaginaBuscable {
 
 /** Páginas fijas que no salen de las secciones del menú (van arriba y abajo del menú lateral). */
 const PAGINAS_FIJAS: PaginaBuscable[] = [
-  { etiqueta: "Dashboard operativo", href: "/", contexto: "Inicio" },
+  { etiqueta: "Hoy", href: "/", contexto: "Inicio" },
   { etiqueta: "Centro de notificaciones", href: "/notificaciones", contexto: "Inicio" },
   { etiqueta: "Configuración del sistema", href: "/configuracion", contexto: "Sistema" },
 ];

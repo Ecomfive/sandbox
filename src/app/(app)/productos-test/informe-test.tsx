@@ -168,7 +168,7 @@ export function InformeTest({ productos, codigoPais }: { productos: FilaProducto
             titulo="CPA global"
             punto={s.cpa === null ? undefined : s.cpa <= CPA_OBJETIVO ? "exito" : "peligro"}
             valor={s.cpa === null ? "—" : usd(s.cpa)}
-            detalle={s.cpa === null ? "sin compras" : <><b className={`font-medium ${s.cpa <= CPA_OBJETIVO ? "text-success" : "text-destructive"}`}>{s.cpa <= CPA_OBJETIVO ? "dentro" : "sobre"}</b> del objetivo de {usd(CPA_OBJETIVO)}</>}
+            detalle={s.cpa === null ? "sin compras" : <><b className={`font-medium ${s.cpa <= CPA_OBJETIVO ? "text-success" : "text-destructive"}`}>{s.cpa <= CPA_OBJETIVO ? "dentro del" : "por encima del"}</b> objetivo de {usd(CPA_OBJETIVO)}</>}
           />
           <Indicador
             titulo="Costo por winner"

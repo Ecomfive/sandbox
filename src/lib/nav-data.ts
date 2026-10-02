@@ -22,7 +22,7 @@ const AREAS: NavSection[] = [
   {
     title: "Inicio",
     items: [
-      { label: "Dashboard", href: "/" },
+      { label: "Hoy", href: "/" },
       { label: "Centro de notificaciones", href: "/notificaciones" },
     ],
   },
