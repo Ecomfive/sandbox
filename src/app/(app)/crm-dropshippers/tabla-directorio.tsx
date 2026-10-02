@@ -24,7 +24,6 @@ export function TablaDirectorio({
   paisId,
   codigoPais,
   hoy,
-  demo,
   puedeEscribir,
   buscarInicial = "",
 }: {
@@ -33,7 +32,6 @@ export function TablaDirectorio({
   paisId: string;
   codigoPais: string;
   hoy: string;
-  demo: boolean;
   puedeEscribir: boolean;
   /** Texto con el que abre el campo de búsqueda (lo manda el buscador global con `?buscar=`). */
   buscarInicial?: string;
@@ -181,7 +179,6 @@ export function TablaDirectorio({
         alIr={setElegido}
         codigoPais={codigoPais}
         hoy={hoy}
-        demo={demo}
       />
     </div>
   );

@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CASOS_DEMO, DROPSHIPPERS_DEMO, MODO_DEMO, resumenDemo } from "./datos-demo";
 import { diasEntre, type FilaCaso, type FilaDropshipper, type ResumenCrm } from "./def-crm";
 
 export interface DatosCrm {
@@ -8,10 +7,7 @@ export interface DatosCrm {
   resumen: ResumenCrm;
   /** Fecha de hoy (ISO, solo día): referencia de «hace N días». */
   hoy: string;
-  demo: boolean;
 }
-
-const COLONES_POR_DOLAR = 520;
 
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
@@ -24,25 +20,12 @@ type Relacion<T> = T | T[] | null;
 const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
 
 /**
- * Lo que necesita el CRM para dibujarse: con `MODO_DEMO` los datos de ejemplo; si no, la base. Las sumas por
+ * Lo que necesita el CRM para dibujarse: la base. Las sumas por
  * dropshipper (pedidos y ventas del mes, último pedido, casos abiertos) las hace Postgres en la vista
  * `crm_dropshippers_resumen` (migración 0062), no JavaScript.
  */
-export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, codigoPais: string): Promise<DatosCrm> {
+export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
-
-  if (MODO_DEMO) {
-    // Los montos de ejemplo están en colones; en Panamá (dólares) se dividen para que no parezcan millones de dólares.
-    const k = codigoPais === "CR" ? 1 : COLONES_POR_DOLAR;
-    const resumen = resumenDemo(nombreMes(hoy));
-    return {
-      dropshippers: DROPSHIPPERS_DEMO.map((d) => ({ ...d, ventasMes: Math.round(d.ventasMes / k) })),
-      casos: CASOS_DEMO,
-      resumen: { ...resumen, ventasMes: Math.round(resumen.ventasMes / k) },
-      hoy,
-      demo: true,
-    };
-  }
 
   const [{ data: filas }, { data: sumas }, { data: casosBd }] = await Promise.all([
     supabase
@@ -136,5 +119,5 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     mes: nombreMes(hoy),
   };
 
-  return { dropshippers, casos, resumen, hoy, demo: false };
+  return { dropshippers, casos, resumen, hoy };
 }

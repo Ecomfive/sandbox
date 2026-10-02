@@ -52,7 +52,7 @@ export function TablaCasos({ casos, miNombre }: { casos: FilaCaso[]; miNombre: s
         </BotonBarra>
         <span className="flex-1" />
         <BotonDescargar def={DEF_CASOS} filas={filas} />
-        <BotonAgregar etiqueta="Agregar caso" onClick={() => mostrarToast("Crear casos se activa cuando el CRM use datos reales.", "info")} />
+        <BotonAgregar etiqueta="Agregar caso" onClick={() => mostrarToast("Crear casos se activa en la siguiente versión del CRM.", "info")} />
       </div>
 
       <MarcoTabla ariaLabel="Casos de soporte">

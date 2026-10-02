@@ -5,16 +5,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { MODO_DEMO } from "./datos-demo";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { etiquetaEstado } from "./def-crm";
-
-const ERROR_DEMO = "El CRM está en modo demo: aún no se guarda nada. Se activa al pasar a datos reales.";
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("crm-dropshippers");
-  if (MODO_DEMO) return { error: ERROR_DEMO };
   const pais_id = String(formData.get("pais_id") ?? "");
   const nombre = String(formData.get("nombre") ?? "").trim();
   const contacto_email = String(formData.get("contacto_email") ?? "").trim() || null;
@@ -59,7 +55,6 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
 
 export async function actualizarDropshipper(formData: FormData) {
   await requireModuloEscritura("crm-dropshippers");
-  if (MODO_DEMO) throw new Error(ERROR_DEMO);
   const id = formData.get("id") as string;
   const estado = formData.get("estado") as string;
   const volumenRaw = formData.get("volumen_mensual_estimado") as string;
@@ -112,7 +107,6 @@ export async function obtenerHistorialDropshipper(id: string): Promise<{ eventos
 /** Devuelve el error como valor, no lo lanza (ver `crearDropshipper`). */
 export async function registrarInteraccion(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("crm-dropshippers");
-  if (MODO_DEMO) return { error: ERROR_DEMO };
   const dropshipper_id = formData.get("dropshipper_id") as string;
   const fecha = formData.get("fecha") as string;
   const tipo = formData.get("tipo") as string;

@@ -91,8 +91,7 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: str
 /**
  * Ficha de un dropshipper, fija a la derecha de la lista (en pantallas angostas, debajo): insignias, acciones,
  * desempeño, datos, casos abiertos, la conversación de WhatsApp (próximamente, con Chatwoot) y la actividad.
- * `orden` son los ids en el orden de la lista, para las flechas anterior y siguiente. En modo demo las acciones solo
- * avisan que aún no guardan nada y la conversación y la actividad son ejemplos fijos.
+ * `orden` son los ids en el orden de la lista, para las flechas anterior y siguiente.
  */
 export function FichaLateral({
   dropshipper,
@@ -101,7 +100,6 @@ export function FichaLateral({
   alIr,
   codigoPais,
   hoy,
-  demo,
 }: {
   dropshipper: FilaDropshipper | null;
   casos: FilaCaso[];
@@ -109,7 +107,6 @@ export function FichaLateral({
   alIr: (id: string) => void;
   codigoPais: string;
   hoy: string;
-  demo: boolean;
 }) {
   const { mostrarToast } = useToast();
   const d = dropshipper;
@@ -125,7 +122,7 @@ export function FichaLateral({
   const anterior = posicion > 0 ? orden[posicion - 1] : null;
   const siguiente = posicion >= 0 && posicion < orden.length - 1 ? orden[posicion + 1] : null;
   const abiertos = casos.filter((c) => c.dropshipperId === d.id && c.estado !== "resuelto");
-  const avisar = () => mostrarToast("Esta acción se activa cuando el CRM use datos reales.", "info");
+  const avisar = () => mostrarToast("Esta acción se activa en la siguiente versión del CRM.", "info");
   const acciones = [
     { texto: "Nuevo caso", icono: AlertaIcon, apagado: false },
     { texto: "Pedido", icono: PedidoIcon, apagado: false },
@@ -225,7 +222,7 @@ export function FichaLateral({
               <li key={c.id} className="flex items-start gap-2.5 border-b border-border px-3.5 py-2.5 last:border-b-0">
                 <Punto tono={c.prioridad === "alta" ? "peligro" : "aviso"} className="mt-1.5" />
                 <div className="min-w-0 flex-1">
-                  <p className="m-0 text-[13px] font-medium">{c.titulo}</p>
+                <p className="m-0 text-[13px] font-medium">{c.titulo}</p>
                   <p className="m-0 text-xs text-muted-foreground">
                     {etiquetaTipoCaso(c.tipo)} · {etiquetaEstadoCaso(c.estado)}
                     {c.numeroPedido ? ` · ${c.numeroPedido}` : ""} · {etiquetaCanal(c.canal)}
@@ -243,46 +240,11 @@ export function FichaLateral({
           <span>WhatsApp Business · vía Chatwoot</span>
           <Pastilla tono="aviso">Próximamente</Pastilla>
         </div>
-        {demo ? (
-          <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted p-2.5">
-            <p className="m-0 max-w-[85%] self-start rounded-[10px] border border-border bg-card px-2.5 py-1.5 text-[13px]">
-              Hola, el pedido #48213 llegó sin el cargador.
-              <small className="block text-[11px] text-muted-foreground">10:12 · ejemplo</small>
-            </p>
-            <p className="m-0 max-w-[85%] self-end rounded-[10px] border border-foreground bg-foreground px-2.5 py-1.5 text-[13px] text-background">
-              Hola {d.nombre.split(" ")[0]}, ya lo revisamos. Te enviamos la pieza hoy.
-              <small className="block text-[11px] opacity-70">10:31 · {d.responsable ?? "Equipo"}</small>
-            </p>
-            <p className="m-0 max-w-[85%] self-start rounded-[10px] border border-border bg-card px-2.5 py-1.5 text-[13px]">
-              Perfecto, gracias.
-              <small className="block text-[11px] text-muted-foreground">10:33 · ejemplo</small>
-            </p>
-          </div>
-        ) : (
-          <p className="m-0 text-[13px] text-muted-foreground">Cuando se conecte Chatwoot, aquí aparecerá el historial de WhatsApp de este dropshipper.</p>
-        )}
+        <p className="m-0 text-[13px] text-muted-foreground">Cuando se conecte Chatwoot, aquí aparecerá el historial de WhatsApp de este dropshipper.</p>
       </Bloque>
 
       <Bloque icono={HistorialIcon} titulo="Actividad">
-        {demo ? (
-          <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[13px]">
-            {[
-              ["Estado cambió: Prospecto → Activo", "hace 5 meses · Andrea"],
-              [`Nota agregada por ${d.responsable ?? "el equipo"}`, "hace 3 semanas"],
-              [`Nivel cambió: Regular → ${etiquetaNivel(d.nivel)}`, "hace 2 meses · Andrea"],
-            ].map(([texto, cuando]) => (
-              <li key={texto} className="flex gap-2">
-                <Punto tono="gris" className="mt-1.5" />
-                <span>
-                  {texto}
-                  <span className="block text-xs text-muted-foreground">{cuando} · ejemplo</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <HistorialGenerico id={d.id} codigoPais={codigoPais} obtener={obtenerHistorialDropshipper} />
-        )}
+        <HistorialGenerico id={d.id} codigoPais={codigoPais} obtener={obtenerHistorialDropshipper} />
       </Bloque>
     </aside>
   );

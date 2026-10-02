@@ -3,7 +3,6 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { AvisoDemo } from "../aviso-demo";
 import { obtenerDatosCrm } from "../datos-crm";
 import { TablaCasos } from "../tabla-casos";
 
@@ -15,12 +14,11 @@ export default async function CasosDropshippersPage() {
   const usuario = await requireModulo("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await obtenerDatosCrm(supabase, pais.id, pais.codigo);
+  const datos = await obtenerDatosCrm(supabase, pais.id);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Casos" oculto />
-      {datos.demo && <AvisoDemo />}
       <TablaCasos casos={datos.casos} miNombre={usuario.nombre} />
     </Pagina>
   );

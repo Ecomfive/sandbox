@@ -21,14 +21,12 @@ export function ResumenCrm({
   casos,
   codigoPais,
   hoy,
-  demo,
 }: {
   resumen: ResumenCrm;
   dropshippers: FilaDropshipper[];
   casos: FilaCaso[];
   codigoPais: string;
   hoy: string;
-  demo: boolean;
 }) {
   const [orden, setOrden] = useState<Orden>("ventas");
   const [elegido, setElegido] = useState<string | null>(null);
@@ -59,7 +57,7 @@ export function ResumenCrm({
         <section aria-label="Indicadores" className="overflow-hidden rounded-[10px] border border-border bg-card">
           <div className="flex justify-between gap-2 border-b border-border bg-muted px-3.5 py-2 text-xs">
             <span className="font-semibold tracking-[0.04em] text-muted-foreground uppercase">Dashboard · {resumen.mes}</span>
-            <span className="text-muted-foreground">{demo ? "Datos de ejemplo" : "Actualizado ahora"}</span>
+            <span className="text-muted-foreground">Actualizado ahora</span>
           </div>
           <div className="flex flex-wrap">
             <Indicador
@@ -190,7 +188,6 @@ export function ResumenCrm({
         alIr={setElegido}
         codigoPais={codigoPais}
         hoy={hoy}
-        demo={demo}
       />
     </div>
   );
