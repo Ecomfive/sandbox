@@ -476,31 +476,25 @@ convenciones técnicas del código.
   de la barra `z-20`/`z-30`, ventanas modales `z-40`, avisos y tooltips `z-50`. Un
   error al eliminar una fila **no** va en una caja pegada a la celda (tapa las filas de
   abajo): va como aviso (`useToast`, `mensajeErrorAlEliminar`).
-- **Contadores en el menú lateral.** Las páginas donde se resuelve un pendiente
-  (Alertas de inventario, Pedidos Dropi, Conciliación de Retiros) muestran una
-  pastilla con cuántos hay, y el grupo o la sección cerrados muestran la suma de
-  lo que esconden (con el riel colapsado, sobre el ícono). El reparto vive en
-  `calcularPendientesMenu` (`src/lib/contadores-menu.ts`), que parte de
-  `obtenerPendientesHoy` (solo `count` con `head`, nada de traer filas) y respeta
-  los módulos de la persona; para sumar una página, agrégala ahí. **El layout no
-  espera la consulta**: crea la promesa y el menú la lee con `use()` dentro de un
-  `Suspense` (`src/components/sidebar.tsx`), así que el menú sale al instante y
-  los números llegan después; si la consulta falla, el menú sale sin contadores.
-  Los números se calculan al cargar el layout, no en cada navegación entre páginas
-  (el layout persiste): se ven al día tras recargar o al refrescar la ruta. La
-  pastilla dice «3 pendientes» a los lectores de pantalla (texto oculto, no una
-  región en vivo).
-- **Riel del menú colapsado.** Con el menú colapsado (solo íconos), pulsar el ícono
-  de una sección (Proveeduría, Tiendas, Catálogo, Recursos Humanos) abre a su
-  derecha un **panel** con las páginas de esa sección y sus contadores
-  (`PanelSeccion`, `src/components/sidebar-panel.tsx`), para ir a ellas sin
-  desplegar el menú. Va por portal a `<body>`; el foco pasa a la primera página;
-  se cierra con Escape (el foco vuelve al ícono), al pulsar fuera, al pulsar el
-  mismo ícono o al elegir una página, y Tab más allá de la última página lo cierra
-  y sigue desde el ícono. El ícono lleva `data-panel-abridor` y `aria-expanded`.
-  Todo control del riel debe tener nombre accesible aunque no muestre texto
-  (`aria-label` cuando `!expanded`). Con el menú desplegado nada cambia (las
-  secciones se abren en el propio menú).
+- **Menú lateral: riel de áreas + panel.** El menú (`src/components/sidebar.tsx`) es un riel con las áreas de
+  trabajo (Inicio, Operación, Producto, Finanzas, Dropshippers —«Clientes» en el riel—, Mercado y Equipo, más
+  «Ajustes» abajo) y, a su lado, un panel con las páginas del área elegida, las **Fijados** (los accesos rápidos, con la
+  estrella `FavoritoToggle`) y «Próximamente» (lo que aún no se abre, `PRONTO_NAV`). No hay acordeones anidados: toda
+  página queda a dos clics. Pulsar un área solo cambia el panel; al navegar, el panel pasa al área de la página nueva
+  (`encontrarSeccionActiva`, que cuenta subpáginas y detalles). El panel se oculta con el botón de abajo del riel
+  (`sidebar-panel-v1` en el navegador). En móvil, un cajón lista todas las áreas una debajo de la otra. Las áreas y
+  sus páginas están en `AREAS` (`src/lib/nav-data.ts`); una página con `dropi: true` solo sale si Dropi tiene datos
+  en el país (`construirAreas`). **Una página nueva del menú se agrega a su área en `AREAS`**: las migas (Área ›
+  Módulo), el buscador y los contadores salen de ahí. El país y la plataforma ya no son niveles del menú sino el
+  contexto de la barra de arriba. **Contadores:** las páginas donde se resuelve un pendiente (Alertas, Pedidos
+  Dropi, Conciliación de Retiros) muestran una pastilla con cuántos hay, el Centro de notificaciones muestra el total,
+  y cada área del riel muestra lo que suman sus páginas sobre el ícono. El reparto vive en
+  `calcularPendientesMenu` (`src/lib/contadores-menu.ts`), que parte de `obtenerPendientesHoy` (solo `count` con
+  `head`) y respeta los módulos de la persona; para sumar una página, agrégala ahí. **El layout no espera la
+  consulta**: crea la promesa y el menú y la campana la leen con `use()` dentro de un `Suspense`, así que salen al
+  instante y los números llegan después; si la consulta falla, salen sin contadores. Los números se calculan al cargar
+  el layout, no en cada navegación. La cuenta de la persona (foto, tema, atajos, versión y salir) ya no está en el
+  pie del menú: vive en `MenuCuenta`, en la barra de arriba.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

@@ -9,7 +9,7 @@ import { useEtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { construirMigas } from "@/lib/migas";
-import { NAV_SECTIONS, type NavSectionAnidada } from "@/lib/nav-data";
+import type { NavSection } from "@/lib/nav-data";
 import { pestanaActiva, pestanasDe } from "@/lib/pestanas";
 import { ChevronRightIcon, FlechaIzquierdaIcon } from "@/lib/nav-icons";
 
@@ -22,16 +22,16 @@ function hayPaginaAnteriorDeLaApp(): boolean {
 
 /**
  * Franja fija bajo la barra global, igual en todas las páginas: migas de pan a la izquierda
- * (Sección › Plataforma › Módulo) con la estrella de favorito pegada a la página actual. A la
+ * (Área › Módulo) con la estrella de favorito pegada a la página actual. A la
  * derecha queda el sitio de las acciones de la página, siempre en la misma posición.
  * Las migas salen solas del menú y de la ruta: las páginas no las dibujan.
  */
 export function BarraMigas({
-  seccionesPlataforma,
+  areas,
   favoritos,
   rutaActual,
 }: {
-  seccionesPlataforma: NavSectionAnidada[];
+  areas: NavSection[];
   favoritos: string[];
   /** Solo para pruebas visuales: fuerza la ruta en vez de leerla del navegador. */
   rutaActual?: string;
@@ -41,8 +41,8 @@ export function BarraMigas({
   const etiquetaDetalle = useEtiquetaMiga();
   const ruta = rutaActual ?? pathname;
   const { migas, favoritoHref, moduloHref, moduloEtiqueta } = useMemo(
-    () => construirMigas(ruta, seccionesPlataforma, NAV_SECTIONS, etiquetaDetalle),
-    [ruta, seccionesPlataforma, etiquetaDetalle]
+    () => construirMigas(ruta, areas, etiquetaDetalle),
+    [ruta, areas, etiquetaDetalle]
   );
 
   if (migas.length === 0) return null;

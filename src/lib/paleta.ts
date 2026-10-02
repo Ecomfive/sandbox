@@ -2,13 +2,13 @@
 // recientes y cómo se mueve la selección con el teclado. Sin React, para poder probarla.
 
 import { normalizar } from "@/lib/tabla/motor";
-import { moduloDeHref, type NavSection, type NavSectionAnidada } from "@/lib/nav-data";
+import { moduloDeHref, type NavSection } from "@/lib/nav-data";
 import { PESTANAS_POR_MODULO } from "@/lib/pestanas";
 
 export interface PaginaBuscable {
   etiqueta: string;
   href: string;
-  /** Dónde está en el menú ("Gestión Proveeduría › Dropi"), para distinguir y para buscar. */
+  /** El área del menú donde está ("Operación"), para distinguir y para buscar. */
   contexto: string;
 }
 
@@ -23,11 +23,7 @@ const PAGINAS_FIJAS: PaginaBuscable[] = [
  * Todas las páginas a las que esta persona puede ir: las del menú (y las subpáginas de cada módulo, como
  * «Cuentas destino»), solo las de los módulos a los que tiene acceso. `permitidos` null = todas.
  */
-export function paginasBuscables(
-  secciones: NavSectionAnidada[],
-  navSections: NavSection[],
-  permitidos: string[] | null
-): PaginaBuscable[] {
+export function paginasBuscables(areas: NavSection[], permitidos: string[] | null): PaginaBuscable[] {
   const puede = (href: string) => !permitidos || permitidos.includes(moduloDeHref(href));
   const paginas: PaginaBuscable[] = [];
   const vistos = new Set<string>();
@@ -38,21 +34,9 @@ export function paginasBuscables(
   };
 
   for (const fija of PAGINAS_FIJAS) agregar(fija);
-  for (const seccion of secciones) {
-    for (const grupo of seccion.groups) {
-      for (const item of grupo.items) {
-        if (item.href && !item.pronto) agregar({ etiqueta: item.label, href: item.href, contexto: `${seccion.title} › ${grupo.label}` });
-      }
-    }
-  }
-  for (const seccion of navSections) {
-    for (const item of seccion.items ?? []) {
-      if (item.href && !item.pronto) agregar({ etiqueta: item.label, href: item.href, contexto: seccion.title });
-    }
-    for (const grupo of seccion.groups ?? []) {
-      for (const item of grupo.items) {
-        if (item.href && !item.pronto) agregar({ etiqueta: item.label, href: item.href, contexto: `${seccion.title} › ${grupo.label}` });
-      }
+  for (const area of areas) {
+    for (const item of area.items) {
+      if (item.href) agregar({ etiqueta: item.label, href: item.href, contexto: area.title });
     }
   }
   // Subpáginas (las pestañas del módulo): siguen el permiso del módulo al que pertenecen.

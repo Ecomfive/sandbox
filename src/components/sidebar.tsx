@@ -1,27 +1,19 @@
 "use client";
 
-import { Suspense, use, useCallback, useEffect, useState } from "react";
+import { Suspense, use, useState, useSyncExternalStore, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  NAV_SECTIONS,
-  moduloDeHref,
-  encontrarSeccionActiva,
-  type NavSectionAnidada,
-  type NavGroup,
-  type NavItem,
-} from "@/lib/nav-data";
-import { DashboardIcon, ChevronRightIcon, NotificacionesIcon, SECTION_ICONS } from "@/lib/nav-icons";
-import { ConTooltip } from "@/components/sidebar-tooltip";
+import { almacen } from "@/components/tabla/almacen";
 import { ContadorMenu, ContadorSobreIcono } from "@/components/sidebar-contador";
-import { PanelSeccion, type GrupoPanel } from "@/components/sidebar-panel";
-import { SIN_PENDIENTES, sumaDeItems, textoPendientes, type PendientesMenu } from "@/lib/contadores-menu";
-import { CuentaFooter } from "@/components/cuenta-footer";
 import { FavoritoToggle } from "@/components/favorito-toggle";
-import type { UsuarioActual } from "@/lib/auth";
+import { anilloFoco } from "@/components/ui/field";
+import { SIN_PENDIENTES, sumaDeItems, type PendientesMenu } from "@/lib/contadores-menu";
+import { PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
+import { ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
 
-const STORAGE_KEY = "sidebar_expandido";
+/** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
+const CLAVE_PANEL = "sidebar-panel-v1";
 
 function ToggleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -33,567 +25,337 @@ function ToggleIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 function puedeVer(modulosPermitidos: string[] | null | undefined, href?: string) {
-  if (!href) return true;
-  if (!modulosPermitidos) return true;
+  if (!href || !modulosPermitidos) return true;
   return modulosPermitidos.includes(moduloDeHref(href));
 }
 
-/** Fila de un ítem hoja (Link) con su estrella de favorito al lado — usada tanto en los
- * grupos por plataforma como en las secciones planas de NAV_SECTIONS. */
-function ItemHoja({
+interface AreaVisible {
+  area: NavSection;
+  /** Las páginas del área que esta persona puede abrir. */
+  items: NavItem[];
+  /** Lo que suman los pendientes de esas páginas (la pastilla del riel). */
+  cantidad: number;
+}
+
+/** Las áreas tal como las ve la persona: solo las páginas de sus módulos y sin áreas vacías. */
+function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined, contadores: PendientesMenu["contadores"]): AreaVisible[] {
+  return areas
+    .map((area) => {
+      const items = area.items.filter((item) => puedeVer(modulos, item.href));
+      return { area, items, cantidad: sumaDeItems(items, contadores) };
+    })
+    .filter((a) => a.items.length > 0);
+}
+
+/** Pendientes de una página: el Centro de notificaciones muestra el total; las demás, lo suyo. */
+function cantidadDe(item: NavItem, pendientes: PendientesMenu): number {
+  if (!item.href) return 0;
+  return item.href === "/notificaciones" ? pendientes.total : (pendientes.contadores[item.href] ?? 0);
+}
+
+function esActiva(pathname: string, href: string) {
+  return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+}
+
+/** Una página del panel: su enlace, lo pendiente y la estrella para fijarla. */
+function ItemPagina({
   item,
-  activo,
-  esFavorito,
-  cantidad = 0,
-  onNavigate,
+  pathname,
+  favoritos,
+  pendientes,
+  alNavegar,
 }: {
   item: NavItem;
-  activo: boolean;
-  esFavorito: boolean;
-  /** Pendientes de esta página (0 = ninguno, no se dibuja). */
-  cantidad?: number;
-  onNavigate?: () => void;
+  pathname: string;
+  favoritos: string[];
+  pendientes: PendientesMenu;
+  alNavegar?: () => void;
 }) {
-  if (item.pronto || !item.href) {
-    return (
-      <span className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground/60">
-        {item.label}
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
-      </span>
-    );
-  }
+  if (!item.href) return null;
+  const activo = esActiva(pathname, item.href);
   return (
     <div className="flex items-center gap-0.5">
       <Link
         href={item.href}
-        onClick={onNavigate}
-        className={
-          activo
-            ? "flex flex-1 items-center justify-between gap-2 rounded-md bg-accent px-3 py-1.5 text-[13px] text-accent-foreground"
-            : "flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] text-foreground hover:bg-muted transition-colors"
-        }
+        onClick={alNavegar}
+        aria-current={activo ? "page" : undefined}
+        className={`flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${
+          activo ? "bg-accent font-medium text-accent-foreground" : "text-foreground transition-colors hover:bg-muted"
+        }`}
       >
         {item.label}
-        <ContadorMenu cantidad={cantidad} />
+        <ContadorMenu cantidad={cantidadDe(item, pendientes)} />
       </Link>
-      <FavoritoToggle href={item.href} activo={esFavorito} />
+      <FavoritoToggle href={item.href} activo={favoritos.includes(item.href)} />
     </div>
   );
 }
 
-/** Los grupos de una sección desplegada (p. ej. las plataformas de "Gestión Proveeduría", o "Compras" en
- * "Sistema WMS"): cada uno se abre por separado y, sin páginas todavía, se ve como una fila "Pronto". Usado
- * tanto por las secciones por plataforma como por las fijas de `NAV_SECTIONS` que tienen `groups`. */
-function GruposDesplegados({
-  itemsSueltos = [],
-  grupos,
-  grupoAbierto,
-  alAlternarGrupo,
-  modulosPermitidos,
-  contadores,
-  pathname,
-  favoritos,
-  onNavigate,
-}: {
-  /** Páginas sueltas de la sección (sin grupo), si tiene: se ven primero, arriba de los grupos. */
-  itemsSueltos?: NavItem[];
-  grupos: NavGroup[];
-  grupoAbierto: string | null;
-  alAlternarGrupo: (label: string) => void;
-  modulosPermitidos?: string[] | null;
-  contadores: PendientesMenu["contadores"];
-  pathname: string;
-  favoritos: string[];
-  onNavigate?: () => void;
-}) {
+function Titulo({ children }: { children: ReactNode }) {
+  return <h2 className="mb-1 px-3 text-[0.7rem] font-semibold tracking-wide text-muted-foreground uppercase">{children}</h2>;
+}
+
+/** Las páginas fijadas por la persona (los «accesos rápidos»), siempre a la vista. */
+function Fijados({ areas, favoritos, ...resto }: { areas: AreaVisible[]; favoritos: string[]; pathname: string; pendientes: PendientesMenu; alNavegar?: () => void }) {
+  const todos = areas.flatMap((a) => a.items);
+  const fijados = favoritos.map((href) => todos.find((i) => i.href === href)).filter((i): i is NavItem => i !== undefined);
   return (
-    <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-3">
-      {itemsSueltos
-        .filter((item) => puedeVer(modulosPermitidos, item.href))
-        .map((item) => (
-          <ItemHoja
-            key={item.label}
-            item={item}
-            activo={pathname === item.href}
-            esFavorito={!!item.href && favoritos.includes(item.href)}
-            cantidad={item.href ? contadores[item.href] : 0}
-            onNavigate={onNavigate}
-          />
+    <section aria-label="Fijados">
+      <Titulo>Fijados</Titulo>
+      {fijados.length === 0 ? (
+        <p className="px-3 text-xs text-muted-foreground">Marca una página con ☆ para tenerla aquí.</p>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          {fijados.map((item) => (
+            <ItemPagina key={item.href} item={item} favoritos={favoritos} {...resto} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Lo que aún no se puede abrir, recogido para no ocupar lugar en el menú. */
+function Proximamente({ className = "" }: { className?: string }) {
+  return (
+    <details className={`group ${className}`}>
+      <summary className={`cursor-pointer rounded px-3 py-1 text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
+        Próximamente ({PRONTO_NAV.length})
+      </summary>
+      <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0">
+        {PRONTO_NAV.map((nombre) => (
+          <li key={nombre} className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground/70">
+            {nombre}
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
+          </li>
         ))}
-      {grupos.map((grupo) => {
-        if (grupo.items.length === 0) {
-          return (
-            <span
-              key={grupo.label}
-              className="flex items-center justify-between rounded-md px-3 py-1.5 text-[13px] text-muted-foreground/60"
-            >
-              {grupo.label}
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Pronto</span>
-            </span>
-          );
-        }
-        const itemsVisibles = grupo.items.filter((item) => puedeVer(modulosPermitidos, item.href));
-        if (itemsVisibles.length === 0) return null;
-        const grupoOpen = grupoAbierto === grupo.label;
-        return (
-          <div key={grupo.label}>
-            <button
-              type="button"
-              onClick={() => alAlternarGrupo(grupo.label)}
-              className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-muted transition-colors"
-            >
-              <span>{grupo.label}</span>
-              <span className="flex items-center gap-2">
-                {!grupoOpen && <ContadorMenu cantidad={sumaDeItems(itemsVisibles, contadores)} />}
-                <ChevronRightIcon
-                  className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${grupoOpen ? "rotate-90" : ""}`}
-                />
-              </span>
-            </button>
-            {grupoOpen && (
-              <div className="ml-2 flex flex-col gap-0.5 border-l border-border pl-2">
-                {itemsVisibles.map((item) => (
-                  <ItemHoja
-                    key={item.label}
-                    item={item}
-                    activo={pathname === item.href}
-                    esFavorito={!!item.href && favoritos.includes(item.href)}
-                    cantidad={item.href ? contadores[item.href] : 0}
-                    onNavigate={onNavigate}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+      </ul>
+    </details>
   );
 }
 
-/** Botón de una sección del menú. Con la sección cerrada (o el riel colapsado) muestra lo que suman sus páginas. */
-function CabeceraSeccion({
-  titulo,
-  expanded,
-  abierta,
-  cantidad,
-  panelAbierto,
-  alAlternar,
-  alAbrirPanel,
-}: {
-  titulo: string;
-  expanded: boolean;
-  abierta: boolean;
-  cantidad: number;
-  /** Con el riel colapsado: si el panel de esta sección está abierto. */
-  panelAbierto: boolean;
-  /** Con el menú desplegado: abre o cierra la sección. */
-  alAlternar: () => void;
-  /** Con el riel colapsado: abre (o cierra) el panel de la sección junto al ícono. */
-  alAbrirPanel: (ancla: DOMRect, abridor: HTMLElement) => void;
-}) {
-  const Icono = SECTION_ICONS[titulo] ?? DashboardIcon;
-  return (
-    <ConTooltip
-      etiqueta={cantidad > 0 ? `${titulo} · ${textoPendientes(cantidad)}` : titulo}
-      mostrar={!expanded && !panelAbierto}
-    >
-      <button
-        type="button"
-        data-panel-abridor=""
-        aria-expanded={expanded ? abierta : panelAbierto}
-        onClick={(e) => (expanded ? alAlternar() : alAbrirPanel(e.currentTarget.getBoundingClientRect(), e.currentTarget))}
-        aria-label={expanded ? undefined : cantidad > 0 ? `${titulo}, ${textoPendientes(cantidad)}` : titulo}
-        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-bold text-foreground-soft hover:bg-muted transition-colors"
-      >
-        <span className="relative inline-flex shrink-0">
-          <Icono className="h-5 w-5" />
-          {!expanded && <ContadorSobreIcono cantidad={cantidad} />}
-        </span>
-        {expanded && (
-          <>
-            <span className="flex-1 text-left">{titulo}</span>
-            {!abierta && <ContadorMenu cantidad={cantidad} />}
-            <ChevronRightIcon
-              className={`h-4 w-4 text-muted-foreground transition-transform ${abierta ? "rotate-90" : ""}`}
-            />
-          </>
-        )}
-      </button>
-    </ConTooltip>
-  );
-}
+const claseRielBoton = `flex w-full flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[0.65rem] leading-tight ${anilloFoco}`;
 
-function SidebarContents({
-  expanded,
-  onToggle,
-  onNavigate,
+/**
+ * Menú de escritorio: un riel con las áreas de trabajo (un punto de color donde hay algo pendiente) y, al lado, el panel
+ * con las páginas del área elegida, las fijadas y lo que viene. Pulsar un área solo cambia el panel; no sale de la
+ * página. Al navegar, el panel pasa solo al área de la nueva página. El panel se puede ocultar para ganar ancho.
+ */
+function RielYPanel({
+  areas,
   modulosPermitidos,
-  seccionesPlataforma,
   favoritos,
   pendientes,
 }: {
-  expanded: boolean;
-  onToggle?: () => void;
-  onNavigate?: () => void;
+  areas: NavSection[];
   modulosPermitidos?: string[] | null;
-  seccionesPlataforma: NavSectionAnidada[];
   favoritos: string[];
   pendientes: PendientesMenu;
 }) {
-  const { contadores, total: totalPendientes } = pendientes;
   const pathname = usePathname();
-  const primeraSeccion = seccionesPlataforma[0]?.title ?? NAV_SECTIONS[0]?.title ?? null;
-  const seccionActiva = encontrarSeccionActiva(pathname, seccionesPlataforma, NAV_SECTIONS);
-  const [seccionAbierta, setSeccionAbierta] = useState<string | null>(seccionActiva?.seccionTitle ?? primeraSeccion);
-  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(seccionActiva?.grupoLabel ?? null);
-  // Riel colapsado: el panel de la sección cuyo ícono se pulsó (junto a él, sin desplegar el menú).
-  const [panel, setPanel] = useState<{ titulo: string; ancla: DOMRect; abridor: HTMLElement } | null>(null);
-  const cerrarPanel = useCallback(() => setPanel(null), []);
-  const alternarPanel = (titulo: string) => (ancla: DOMRect, abridor: HTMLElement) =>
-    setPanel((actual) => (actual?.titulo === titulo ? null : { titulo, ancla, abridor }));
+  const visibles = areasVisibles(areas, modulosPermitidos, pendientes.contadores);
+  const activa = encontrarSeccionActiva(pathname, visibles.map((v) => ({ ...v.area, items: v.items }))) ?? visibles[0]?.area.title ?? null;
+  // El área que se pulsó vale solo mientras se esté en la misma página: al navegar, manda la de la página nueva.
+  const [elegida, setElegida] = useState<{ ruta: string; titulo: string } | null>(null);
+  const guardado = almacen(CLAVE_PANEL, "local");
+  const panelOculto = useSyncExternalStore(guardado.suscribir, guardado.leer, () => "") === "cerrado";
 
-  /** Las páginas de una sección tal como las ve la persona (según sus módulos), para su panel. */
-  function gruposDePanel(titulo: string): GrupoPanel[] {
-    const deLaPlataforma = seccionesPlataforma.find((s) => s.title === titulo);
-    if (deLaPlataforma) {
-      return deLaPlataforma.groups
-        .map((g) => ({
-          label: g.label,
-          pronto: g.pronto || g.items.length === 0,
-          items: g.items.filter((item) => puedeVer(modulosPermitidos, item.href)),
-        }))
-        .filter((g) => g.pronto || g.items.length > 0);
-    }
-    const plana = NAV_SECTIONS.find((s) => s.title === titulo);
-    if (!plana) return [];
-    const itemsSueltos = (plana.items ?? []).filter((item) => puedeVer(modulosPermitidos, item.href));
-    const gruposMapeados = (plana.groups ?? [])
-      .map((g) => ({
-        label: g.label,
-        pronto: g.pronto || g.items.length === 0,
-        items: g.items.filter((item) => puedeVer(modulosPermitidos, item.href)),
-      }))
-      .filter((g) => g.pronto || g.items.length > 0);
-    return itemsSueltos.length > 0 ? [{ label: null, pronto: false, items: itemsSueltos }, ...gruposMapeados] : gruposMapeados;
-  }
-
-  const todosLosItems: NavItem[] = [
-    ...seccionesPlataforma.flatMap((s) => s.groups.flatMap((g) => g.items)),
-    ...NAV_SECTIONS.flatMap((s) => [...(s.items ?? []), ...(s.groups ?? []).flatMap((g) => g.items)]),
-  ];
-  const favoritosVisibles = favoritos
-    .map((href) => todosLosItems.find((i) => i.href === href))
-    .filter((i): i is NavItem => i !== undefined && puedeVer(modulosPermitidos, i.href));
+  const titulo = elegida && elegida.ruta === pathname ? elegida.titulo : activa;
+  const mostrada = visibles.find((v) => v.area.title === titulo) ?? visibles[0];
+  const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
 
   return (
-    <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto px-2 py-3">
-      {onToggle && (
-        <ConTooltip etiqueta={expanded ? "Colapsar menú" : "Desplegar el menú"} mostrar={!expanded}>
+    <>
+      <nav aria-label="Áreas del menú" className="flex w-[4.5rem] shrink-0 flex-col items-center gap-0.5 border-r border-border bg-muted px-1 py-2.5">
+        <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloFoco}`}>
+          <Image src="/brand/ecomfive-rojo.png" alt="" width={161} height={44} className="h-3 w-auto" />
+        </Link>
+        {visibles.map((v) => {
+          const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
+          const seleccionada = v.area.title === mostrada?.area.title;
+          return (
+            <button
+              key={v.area.title}
+              type="button"
+              aria-pressed={seleccionada}
+              onClick={() => {
+                setElegida({ ruta: pathname, titulo: v.area.title });
+                if (panelOculto) guardado.guardar("");
+              }}
+              className={`${claseRielBoton} ${seleccionada ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+            >
+              <span className="relative inline-flex">
+                <Icono className="h-5 w-5" />
+                <ContadorSobreIcono cantidad={v.cantidad} />
+              </span>
+              <span className="max-w-full truncate">{v.area.corto ?? v.area.title}</span>
+            </button>
+          );
+        })}
+        <div className="mt-auto flex w-full flex-col gap-0.5">
+          {puedeConfigurar && (
+            <Link
+              href="/configuracion"
+              aria-current={pathname === "/configuracion" ? "page" : undefined}
+              className={`${claseRielBoton} ${pathname === "/configuracion" ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+            >
+              <ConfiguracionIcon className="h-5 w-5" />
+              <span>Ajustes</span>
+            </Link>
+          )}
           <button
             type="button"
-            onClick={onToggle}
-            aria-label={expanded ? undefined : "Desplegar el menú"}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            aria-expanded={!panelOculto}
+            aria-label={panelOculto ? "Mostrar el panel de páginas" : "Ocultar el panel de páginas"}
+            onClick={() => guardado.guardar(panelOculto ? "" : "cerrado")}
+            className={`${claseRielBoton} text-muted-foreground hover:bg-accent/60 hover:text-foreground`}
           >
-            <ToggleIcon className="h-5 w-5 shrink-0" />
-            {expanded && <span className="text-sm font-medium">Colapsar menú</span>}
+            <ToggleIcon className="h-5 w-5" />
           </button>
-        </ConTooltip>
-      )}
+        </div>
+      </nav>
 
-      {puedeVer(modulosPermitidos, "/") && (
-        <ConTooltip etiqueta="Dashboard" mostrar={!expanded}>
-          <Link
-            href="/"
-            onClick={onNavigate}
-            aria-label={expanded ? undefined : "Dashboard"}
-            className={
-              pathname === "/"
-                ? "flex w-full items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
-                : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-            }
-          >
-            <DashboardIcon className="h-5 w-5 shrink-0" />
-            {expanded && <span>Dashboard</span>}
-          </Link>
-        </ConTooltip>
-      )}
-
-      {puedeVer(modulosPermitidos, "/notificaciones") && (
-        <ConTooltip etiqueta="Centro de notificaciones" mostrar={!expanded}>
-          <Link
-            href="/notificaciones"
-            onClick={onNavigate}
-            aria-label={
-              expanded
-                ? undefined
-                : totalPendientes > 0
-                  ? `Centro de notificaciones, ${textoPendientes(totalPendientes)}`
-                  : "Centro de notificaciones"
-            }
-            className={
-              pathname === "/notificaciones"
-                ? "flex w-full items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
-                : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-            }
-          >
-            <span className="relative inline-flex shrink-0">
-              <NotificacionesIcon className="h-5 w-5" />
-              {!expanded && <ContadorSobreIcono cantidad={totalPendientes} />}
-            </span>
-            {expanded && <span className="flex-1">Centro de notificaciones</span>}
-            {expanded && <ContadorMenu cantidad={totalPendientes} />}
-          </Link>
-        </ConTooltip>
-      )}
-
-      {expanded && (
-        <>
-          <p className="mt-4 mb-1 px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Accesos rápidos
-          </p>
-          {favoritosVisibles.length === 0 ? (
-            <p className="px-3 text-xs text-muted-foreground">Marca una página con ☆ para tenerla aquí.</p>
-          ) : (
+      {!panelOculto && mostrada && (
+        <nav aria-label={`Páginas de ${mostrada.area.title}`} className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
+          <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
+          <section aria-label={mostrada.area.title}>
+            <Titulo>{mostrada.area.title}</Titulo>
             <div className="flex flex-col gap-0.5">
-              {favoritosVisibles.map((item) => (
-                <ItemHoja
-                  key={item.href}
-                  item={item}
-                  activo={pathname === item.href}
-                  esFavorito
-                  cantidad={item.href ? contadores[item.href] : 0}
-                  onNavigate={onNavigate}
-                />
+              {mostrada.items.map((item) => (
+                <ItemPagina key={item.href} item={item} pathname={pathname} favoritos={favoritos} pendientes={pendientes} />
               ))}
             </div>
-          )}
-        </>
+          </section>
+          <Proximamente className="mt-auto" />
+        </nav>
       )}
+    </>
+  );
+}
 
-      {expanded && (
-        <p className="mt-4 mb-1 px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Áreas de la empresa
-        </p>
-      )}
-
-      {seccionesPlataforma.map((section) => {
-        const isOpen = expanded && seccionAbierta === section.title;
-
-        return (
-          <div key={section.title} className={expanded ? "" : "py-0.5"}>
-            <CabeceraSeccion
-              titulo={section.title}
-              expanded={expanded}
-              abierta={isOpen}
-              cantidad={sumaDeItems(
-                section.groups.flatMap((g) => g.items),
-                contadores
-              )}
-              panelAbierto={panel?.titulo === section.title}
-              alAlternar={() => setSeccionAbierta((prev) => (prev === section.title ? null : section.title))}
-              alAbrirPanel={alternarPanel(section.title)}
-            />
-            {expanded && isOpen && (
-              <GruposDesplegados
-                grupos={section.groups}
-                grupoAbierto={grupoAbierto}
-                alAlternarGrupo={(label) => setGrupoAbierto((prev) => (prev === label ? null : label))}
-                modulosPermitidos={modulosPermitidos}
-                contadores={contadores}
-                pathname={pathname}
-                favoritos={favoritos}
-                onNavigate={onNavigate}
-              />
-            )}
+/** Menú de móvil: todas las áreas, una debajo de la otra (sin acordeones), con las fijadas arriba. */
+function ListaMovil({
+  areas,
+  modulosPermitidos,
+  favoritos,
+  pendientes,
+  alNavegar,
+}: {
+  areas: NavSection[];
+  modulosPermitidos?: string[] | null;
+  favoritos: string[];
+  pendientes: PendientesMenu;
+  alNavegar: () => void;
+}) {
+  const pathname = usePathname();
+  const visibles = areasVisibles(areas, modulosPermitidos, pendientes.contadores);
+  return (
+    <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
+      <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
+      {visibles.map((v) => (
+        <section key={v.area.title} aria-label={v.area.title}>
+          <Titulo>{v.area.title}</Titulo>
+          <div className="flex flex-col gap-0.5">
+            {v.items.map((item) => (
+              <ItemPagina key={item.href} item={item} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
+            ))}
           </div>
-        );
-      })}
-
-      {NAV_SECTIONS.map((section) => {
-        const itemsVisibles = (section.items ?? []).filter((item) => puedeVer(modulosPermitidos, item.href));
-        const grupos = section.groups ?? [];
-        if (itemsVisibles.length === 0 && grupos.length === 0) return null;
-
-        const isOpen = expanded && seccionAbierta === section.title;
-        const cantidad = sumaDeItems([...itemsVisibles, ...grupos.flatMap((g) => g.items)], contadores);
-
-        return (
-          <div key={section.title} className={expanded ? "" : "py-0.5"}>
-            <CabeceraSeccion
-              titulo={section.title}
-              expanded={expanded}
-              abierta={isOpen}
-              cantidad={cantidad}
-              panelAbierto={panel?.titulo === section.title}
-              alAlternar={() => setSeccionAbierta((prev) => (prev === section.title ? null : section.title))}
-              alAbrirPanel={alternarPanel(section.title)}
-            />
-            {expanded && isOpen && (
-              <GruposDesplegados
-                itemsSueltos={section.items ?? []}
-                grupos={grupos}
-                grupoAbierto={grupoAbierto}
-                alAlternarGrupo={(label) => setGrupoAbierto((prev) => (prev === label ? null : label))}
-                modulosPermitidos={modulosPermitidos}
-                contadores={contadores}
-                pathname={pathname}
-                favoritos={favoritos}
-                onNavigate={onNavigate}
-              />
-            )}
-          </div>
-        );
-      })}
-
-      {!expanded && panel && (
-        <PanelSeccion
-          titulo={panel.titulo}
-          grupos={gruposDePanel(panel.titulo)}
-          contadores={contadores}
-          pathname={pathname}
-          ancla={panel.ancla}
-          abridor={panel.abridor}
-          alCerrar={cerrarPanel}
-          alNavegar={onNavigate}
-        />
+        </section>
+      ))}
+      {puedeVer(modulosPermitidos, "/configuracion") && (
+        <section aria-label="Sistema">
+          <Titulo>Sistema</Titulo>
+          <Link
+            href="/configuracion"
+            onClick={alNavegar}
+            aria-current={pathname === "/configuracion" ? "page" : undefined}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${pathname === "/configuracion" ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted"}`}
+          >
+            <ConfiguracionIcon className="h-4 w-4 text-muted-foreground" />
+            Configuración
+          </Link>
+        </section>
       )}
+      <Proximamente />
     </nav>
   );
 }
 
-type PropsContenido = Parameters<typeof SidebarContents>[0];
-
-function ContenidoResuelto({
-  pendientes,
-  ...props
-}: Omit<PropsContenido, "pendientes"> & { pendientes: Promise<PendientesMenu> }) {
-  return <SidebarContents {...props} pendientes={use(pendientes)} />;
+function Resuelto({ pendientes, children }: { pendientes: Promise<PendientesMenu>; children: (p: PendientesMenu) => ReactNode }) {
+  return <>{children(use(pendientes))}</>;
 }
 
 /**
- * El menú sale de inmediato y los contadores llegan cuando la consulta termina: la promesa la crea el
- * layout sin esperarla, así contar pendientes no retrasa la carga de ninguna página. Mientras tanto se
- * dibuja el mismo menú sin contadores (las pastillas están al final de cada fila: no mueve nada).
+ * El menú sale de inmediato y los contadores llegan cuando la consulta termina: la promesa la crea el layout sin
+ * esperarla, así contar pendientes no retrasa la carga de ninguna página. Mientras tanto se dibuja el mismo menú sin
+ * contadores (las pastillas están al final de cada fila: no mueve nada).
  */
-function ContenidoConPendientes({
-  pendientes,
-  ...props
-}: Omit<PropsContenido, "pendientes"> & { pendientes: Promise<PendientesMenu> }) {
+function ConPendientes({ pendientes, children }: { pendientes: Promise<PendientesMenu>; children: (p: PendientesMenu) => ReactNode }) {
   return (
-    <Suspense fallback={<SidebarContents {...props} pendientes={SIN_PENDIENTES} />}>
-      <ContenidoResuelto {...props} pendientes={pendientes} />
+    <Suspense fallback={<>{children(SIN_PENDIENTES)}</>}>
+      <Resuelto pendientes={pendientes}>{children}</Resuelto>
     </Suspense>
   );
 }
 
 export function Sidebar({
   modulosPermitidos,
-  usuario,
-  seccionesPlataforma,
+  areas,
   favoritos,
   pendientes,
 }: {
   modulosPermitidos?: string[] | null;
-  usuario: UsuarioActual | null;
-  seccionesPlataforma: NavSectionAnidada[];
+  areas: NavSection[];
   favoritos: string[];
   pendientes: Promise<PendientesMenu>;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved !== null) setExpanded(saved === "1");
-  }, []);
-
-  function toggleExpanded() {
-    setExpanded((prev) => {
-      window.localStorage.setItem(STORAGE_KEY, prev ? "0" : "1");
-      return !prev;
-    });
-  }
+  const [movilAbierto, setMovilAbierto] = useState(false);
 
   return (
     <>
-      {/* Riel persistente — escritorio */}
-      <aside
-        className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-border bg-card md:flex ${
-          expanded ? "w-64" : "w-16"
-        } transition-[width] duration-150`}
-      >
-        <Link href="/" className="flex items-center justify-center border-b border-border px-2 py-3">
-          <Image
-            src="/brand/ecomfive-rojo.png"
-            alt="Ecomfive"
-            width={161}
-            height={44}
-            className={expanded ? "h-5 w-auto" : "h-3 w-auto"}
-          />
-        </Link>
-        <ContenidoConPendientes
-          expanded={expanded}
-          onToggle={toggleExpanded}
-          modulosPermitidos={modulosPermitidos}
-          seccionesPlataforma={seccionesPlataforma}
-          favoritos={favoritos}
-          pendientes={pendientes}
-        />
-        {usuario && <CuentaFooter usuario={usuario} expanded={expanded} />}
+      {/* Riel y panel — escritorio */}
+      <aside className="sticky top-0 hidden h-screen shrink-0 md:flex">
+        <ConPendientes pendientes={pendientes}>
+          {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} />}
+        </ConPendientes>
       </aside>
 
       {/* Botón hamburguesa — móvil */}
       <button
         type="button"
         aria-label="Abrir menú"
-        onClick={() => setMobileOpen(true)}
-        className="fixed top-3 left-3 z-40 rounded-md bg-card p-2 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground transition-colors md:hidden"
+        onClick={() => setMovilAbierto(true)}
+        className={`fixed top-3 left-3 z-40 rounded-md bg-card p-2 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground transition-colors md:hidden ${anilloFoco}`}
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
 
-      {/* Overlay — móvil */}
-      {mobileOpen && (
+      {/* Cajón — móvil */}
+      {movilAbierto && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="flex w-72 max-w-[85vw] flex-col bg-card shadow-xl">
+          <div role="dialog" aria-modal="true" aria-label="Menú" className="flex w-72 max-w-[85vw] flex-col bg-card shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-3 py-3">
-              <Image
-                src="/brand/ecomfive-rojo.png"
-                alt="Ecomfive"
-                width={161}
-                height={44}
-                className="h-5 w-auto"
-              />
+              <Image src="/brand/ecomfive-rojo.png" alt="Ecomfive" width={161} height={44} className="h-5 w-auto" />
               <button
                 type="button"
                 aria-label="Cerrar menú"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-md p-1 text-muted-foreground hover:bg-muted transition-colors"
+                onClick={() => setMovilAbierto(false)}
+                className={`rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted ${anilloFoco}`}
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
                 </svg>
               </button>
             </div>
-            <ContenidoConPendientes
-              expanded
-              onNavigate={() => setMobileOpen(false)}
-              modulosPermitidos={modulosPermitidos}
-              seccionesPlataforma={seccionesPlataforma}
-              favoritos={favoritos}
-              pendientes={pendientes}
-            />
-            {usuario && <CuentaFooter usuario={usuario} expanded />}
+            <ConPendientes pendientes={pendientes}>
+              {(p) => (
+                <ListaMovil areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} alNavegar={() => setMovilAbierto(false)} />
+              )}
+            </ConPendientes>
           </div>
-          <button
-            aria-label="Cerrar menú"
-            onClick={() => setMobileOpen(false)}
-            className="flex-1 bg-black/30"
-          />
+          <button aria-label="Cerrar menú" onClick={() => setMovilAbierto(false)} className="flex-1 bg-black/30" />
         </div>
       )}
     </>

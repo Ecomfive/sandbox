@@ -1,8 +1,8 @@
-import type { NavSection, NavSectionAnidada } from "./nav-data";
+import type { NavSection } from "./nav-data";
 
 export interface Miga {
   etiqueta: string;
-  /** Sin href = ubicación que no es una página (sección, plataforma) o la página actual. */
+  /** Sin href = ubicación que no es una página (el área) o la página actual. */
   href?: string;
 }
 
@@ -41,48 +41,30 @@ interface ModuloDeNav {
   href: string;
   label: string;
   seccion: string;
-  grupo: string | null;
 }
 
-function modulosDeNav(seccionesPlataforma: NavSectionAnidada[], navSections: NavSection[]): ModuloDeNav[] {
+function modulosDeNav(areas: NavSection[]): ModuloDeNav[] {
   const lista: ModuloDeNav[] = [];
-  for (const seccion of seccionesPlataforma) {
-    for (const grupo of seccion.groups) {
-      for (const item of grupo.items) {
-        if (item.href) lista.push({ href: item.href, label: item.label, seccion: seccion.title, grupo: grupo.label });
-      }
-    }
-  }
-  for (const seccion of navSections) {
-    for (const item of seccion.items ?? []) {
-      if (item.href) lista.push({ href: item.href, label: item.label, seccion: seccion.title, grupo: null });
-    }
-    for (const grupo of seccion.groups ?? []) {
-      for (const item of grupo.items) {
-        if (item.href) lista.push({ href: item.href, label: item.label, seccion: seccion.title, grupo: grupo.label });
-      }
+  for (const area of areas) {
+    for (const item of area.items) {
+      if (item.href) lista.push({ href: item.href, label: item.label, seccion: area.title });
     }
   }
   return lista;
 }
 
 function rutaDeModulo(modulo: ModuloDeNav, conEnlace: boolean): Miga[] {
-  return [
-    { etiqueta: modulo.seccion },
-    ...(modulo.grupo ? [{ etiqueta: modulo.grupo }] : []),
-    { etiqueta: modulo.label, ...(conEnlace ? { href: modulo.href } : {}) },
-  ];
+  return [{ etiqueta: modulo.seccion }, { etiqueta: modulo.label, ...(conEnlace ? { href: modulo.href } : {}) }];
 }
 
 /**
- * Migas de pan de la ruta actual a partir del menú: Sección › Plataforma › Módulo (› subpágina).
+ * Migas de pan de la ruta actual a partir del menú: Área › Módulo (› subpágina).
  * `etiquetaDetalle` es el nombre de un registro concreto (p. ej. "Retiro #0009") que pone la propia
  * página de detalle; sin él la última miga dice "Detalle".
  */
 export function construirMigas(
   pathname: string,
-  seccionesPlataforma: NavSectionAnidada[],
-  navSections: NavSection[],
+  areas: NavSection[],
   etiquetaDetalle?: string | null
 ): Migas {
   const ruta = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -99,7 +81,7 @@ export function construirMigas(
     };
   }
 
-  const modulos = modulosDeNav(seccionesPlataforma, navSections);
+  const modulos = modulosDeNav(areas);
 
   const exacto = modulos.find((m) => m.href === ruta);
   if (exacto) {

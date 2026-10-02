@@ -509,9 +509,11 @@ export function TestIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
-  "Gestión Proveeduría": ProveeduriaIcon,
-  Tiendas: TiendaIcon,
-  "Gestión de Tiendas": GestionTiendasIcon,
-  "Sistema WMS": WmsIcon,
-  "Recursos Humanos": RecursosHumanosIcon,
+  Inicio: DashboardIcon,
+  Operación: PedidoIcon,
+  Producto: ProductoIcon,
+  Finanzas: WalletIcon,
+  Dropshippers: DropshipperIcon,
+  Mercado: InteligenciaIcon,
+  Equipo: RecursosHumanosIcon,
 };

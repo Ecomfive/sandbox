@@ -9,7 +9,7 @@ import { TransicionPagina } from "@/components/transicion-pagina";
 import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
-import { NAV_SECTIONS, construirSeccionesPlataforma } from "@/lib/nav-data";
+import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
@@ -43,24 +43,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     usuarioP,
   ]);
   const favoritos = usuario ? favoritosDeSesion : [];
-  const seccionesPlataforma = construirSeccionesPlataforma(plataformasPais);
-  const paginas = paginasBuscables(seccionesPlataforma, NAV_SECTIONS, usuario?.modulos ?? null);
+  const areas = construirAreas(plataformasPais);
+  const paginas = paginasBuscables(areas, usuario?.modulos ?? null);
 
   return (
     <ToastProvider>
       {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
-        <Sidebar
-          modulosPermitidos={usuario?.modulos ?? null}
-          usuario={usuario}
-          seccionesPlataforma={seccionesPlataforma}
-          favoritos={favoritos}
-          pendientes={pendientes}
-        />
+        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
-          <BarraMigas seccionesPlataforma={seccionesPlataforma} favoritos={favoritos} />
+          <BarraMigas areas={areas} favoritos={favoritos} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>
       </div>
