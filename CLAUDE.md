@@ -250,9 +250,9 @@ convenciones técnicas del código.
   (`lista-productos-test.tsx`): búsqueda, filtros, orden por columna y ficha fija a la derecha
   (`ficha-lateral-test.tsx`); «Editar producto» y «Agregar» siguen usando la ficha y el formulario de siempre.
   Los datos salen de `wms_productos_test` (`datos-test.ts`, hasta 1 000 filas) y las sumas se hacen en el navegador
-  con esas filas: si la tabla crece mucho, pasarlas a Postgres. El criterio de winner (`CPA_OBJETIVO` = $4 y
-  `COMPRAS_MINIMAS` = 4, en `informe.ts`) **no está en la base**: se dedujo de los datos de septiembre 2026
-  (todos los winners tienen CPA menor a $4) y hay que confirmarlo con el equipo. «Ganador» agrupa `winner` y
+  con esas filas: si la tabla crece mucho, pasarlas a Postgres. El criterio de winner es **solo el CPA menor a $4**
+  (`CPA_OBJETIVO` en `informe.ts`, confirmado por el equipo; no hay mínimo de compras) y **no está guardado en la base**.
+  «Ganador» agrupa `winner` y
   `enviado_a_compras`. Las piezas visuales comunes (insignias redondas, indicadores, botones de barra, marco de
   tabla) viven en `src/components/panel/piezas-panel.tsx` y las usa también el CRM.
 - **Buscador con Ctrl K.** El buscador de la barra de arriba

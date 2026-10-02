@@ -6,12 +6,10 @@ import type { FilaProductoTest } from "./def-productos-test";
  */
 
 /**
- * Criterio con el que se decide si un test gana. No está escrito en la base: sale de los datos de septiembre 2026
- * (todos los winners tienen CPA menor a $4 y ninguno de los fallidos lo cumple). Cuando haya una tabla de criterios,
- * estos valores pasan a leerse de ahí.
+ * Criterio con el que se decide si un test gana: **solo el CPA**, menor a $4 (confirmado por el equipo). No hay un mínimo
+ * de compras. El valor no está guardado en la base; cuando haya una tabla de criterios, pasa a leerse de ahí.
  */
 export const CPA_OBJETIVO = 4;
-export const COMPRAS_MINIMAS = 4;
 
 export type Granularidad = "dia" | "semana" | "mes";
 
@@ -29,10 +27,9 @@ export function resultadoDe(estado: string): Resultado {
   return "otro";
 }
 
-/** El test cumple el criterio de CPA y de compras mínimas. */
-export function cumpleCriterio(f: Pick<FilaProductoTest, "metricaCpa" | "metricaCompras">): boolean | null {
-  if (f.metricaCpa === null || f.metricaCompras === null) return null;
-  return f.metricaCpa < CPA_OBJETIVO && f.metricaCompras >= COMPRAS_MINIMAS;
+/** El test cumple el criterio: CPA menor al objetivo. Sin CPA no se puede saber (null). */
+export function cumpleCriterio(f: Pick<FilaProductoTest, "metricaCpa">): boolean | null {
+  return f.metricaCpa === null ? null : f.metricaCpa < CPA_OBJETIVO;
 }
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

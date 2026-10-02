@@ -12,7 +12,7 @@ import {
   etiquetaTestNumero,
   type FilaProductoTest,
 } from "./def-productos-test";
-import { CPA_OBJETIVO, COMPRAS_MINIMAS, cumpleCriterio, limpiarCategoria, porcentaje, promedio, resultadoDe, usd } from "./informe";
+import { CPA_OBJETIVO, cumpleCriterio, limpiarCategoria, porcentaje, promedio, resultadoDe, usd } from "./informe";
 
 const tonoEstado = (estado: string) => {
   const r = resultadoDe(estado);
@@ -142,18 +142,18 @@ export function FichaLateralTest({
           <Punto tono={cumple === null ? "gris" : cumple ? "exito" : "peligro"} className="mt-1.5" />
           <span>
             {cumple === null
-              ? "Faltan métricas para evaluar el criterio."
+              ? "Falta el CPA para evaluar el criterio."
               : cumple
-                ? `Cumple el criterio: CPA ${usd(p.metricaCpa ?? 0)} (máximo ${usd(CPA_OBJETIVO)}) con ${p.metricaCompras} compras (mínimo ${COMPRAS_MINIMAS}).`
-                : `No cumple: CPA ${usd(p.metricaCpa ?? 0)} contra un máximo de ${usd(CPA_OBJETIVO)}${(p.metricaCompras ?? 0) < COMPRAS_MINIMAS ? `, con ${p.metricaCompras} compras de ${COMPRAS_MINIMAS} mínimas` : ""}.`}
+                ? `Cumple el criterio: CPA ${usd(p.metricaCpa ?? 0)}, menor a ${usd(CPA_OBJETIVO)}.`
+                : `No cumple: CPA ${usd(p.metricaCpa ?? 0)}, no es menor a ${usd(CPA_OBJETIVO)}.`}
           </span>
         </p>
         <Medida nombre="CPA" valor={p.metricaCpa} maximo={20} referencia={CPA_OBJETIVO} texto={p.metricaCpa === null ? "—" : usd(p.metricaCpa)} />
-        <Medida nombre="Compras" valor={p.metricaCompras} maximo={12} referencia={COMPRAS_MINIMAS} texto={p.metricaCompras === null ? "—" : String(p.metricaCompras)} />
+        <Medida nombre="Compras" valor={p.metricaCompras} maximo={12} referencia={promedio(ganadores, (f) => f.metricaCompras)} texto={p.metricaCompras === null ? "—" : String(p.metricaCompras)} />
         <Medida nombre="CTR" valor={p.metricaCtr} maximo={10} referencia={refCtr} texto={p.metricaCtr === null ? "—" : porcentaje(p.metricaCtr)} />
         <Medida nombre="Hook rate" valor={p.metricaHookRate} maximo={80} referencia={refHook} texto={p.metricaHookRate === null ? "—" : porcentaje(p.metricaHookRate)} />
         <Medida nombre="CVR" valor={p.metricaCvr} maximo={20} referencia={refCvr} texto={p.metricaCvr === null ? "—" : porcentaje(p.metricaCvr)} />
-        <p className="m-0 text-xs text-muted-foreground">La marca negra es el criterio (CPA y compras) o el promedio de los winners (CTR, Hook y CVR).</p>
+        <p className="m-0 text-xs text-muted-foreground">La marca negra es el criterio (CPA) o el promedio de los winners (compras, CTR, Hook y CVR).</p>
       </Bloque>
 
       <Bloque titulo="Datos del test">
