@@ -1,12 +1,11 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import type { IconoComp } from "@/components/tabla/botones-vista";
-import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
-import { AlertaIcon, DropshipperIcon, EstadoIcon, PedidoIcon, PersonaIcon, PrioridadIcon } from "@/lib/nav-icons";
-import type { NombreFilas } from "@/lib/tabla/pie";
+import { Fragment, useMemo, useState } from "react";
+import { BotonAgregar } from "@/components/ui/boton-agregar";
+import { useToast } from "@/components/ui/toast";
 import {
   DEF_CASOS,
+  ESTADOS_CASO,
   etiquetaAntiguedad,
   etiquetaCanal,
   etiquetaEstadoCaso,
@@ -14,59 +13,105 @@ import {
   etiquetaTipoCaso,
   type FilaCaso,
 } from "./def-crm";
+import { BotonBarra, BotonDescargar, MarcoTabla, Pastilla, Punto, claseTd, claseTh } from "./piezas-crm";
 
-const NOMBRE: NombreFilas = { singular: "caso", plural: "casos" };
-const ICONOS: Record<string, IconoComp> = {
-  estado: EstadoIcon,
-  prioridad: PrioridadIcon,
-  tipo: AlertaIcon,
-  canal: PersonaIcon,
-  responsable: PersonaIcon,
-  dropshipper: DropshipperIcon,
-  titulo: AlertaIcon,
-  pedido: PedidoIcon,
-  antiguedad: EstadoIcon,
-};
+const ENCABEZADOS = ["Caso", "Dropshipper", "Tipo", "Prioridad", "Estado", "Pedido", "Responsable", "Canal", "Abierto hace"];
+const TONO_PRIORIDAD = { alta: "peligro", normal: "aviso", baja: "neutro" } as const;
+const PUNTO_ESTADO = { abierto: "aviso", en_curso: "aviso", resuelto: "exito" } as const;
 
-const TONO_PRIORIDAD: Record<string, "destructive" | "warning" | "neutral"> = { alta: "destructive", normal: "warning", baja: "neutral" };
-const TONO_ESTADO: Record<string, "warning" | "info" | "success"> = { abierto: "warning", en_curso: "info", resuelto: "success" };
+/** Casos de soporte: abiertos por defecto, con filtros de un toque, agrupados por estado y con su descarga. */
+export function TablaCasos({ casos, miNombre }: { casos: FilaCaso[]; miNombre: string | null }) {
+  const { mostrarToast } = useToast();
+  const [verResueltos, setVerResueltos] = useState(false);
+  const [soloMios, setSoloMios] = useState(false);
+  const [sinResponder, setSinResponder] = useState(false);
 
-const COLUMNAS: ColumnaTabla<FilaCaso>[] = [
-  {
-    id: "titulo",
-    label: "Caso",
-    ocultable: false,
-    clase: "whitespace-nowrap",
-    render: (c) => (
-      <span className="flex flex-col">
-        <span className="font-medium">{c.titulo}</span>
-        <span className="text-xs text-muted-foreground tabular-nums">{c.codigo}</span>
-      </span>
-    ),
-  },
-  { id: "dropshipper", label: "Dropshipper", clase: "whitespace-nowrap", ocultable: true, render: (c) => c.dropshipper },
-  { id: "tipo", label: "Tipo", clase: "whitespace-nowrap", ocultable: true, render: (c) => etiquetaTipoCaso(c.tipo) },
-  { id: "prioridad", label: "Prioridad", clase: "whitespace-nowrap", ocultable: true, render: (c) => <Badge tone={TONO_PRIORIDAD[c.prioridad] ?? "neutral"}>{etiquetaPrioridad(c.prioridad)}</Badge> },
-  { id: "estado", label: "Estado", clase: "whitespace-nowrap", ocultable: true, render: (c) => <Badge tone={TONO_ESTADO[c.estado] ?? "neutral"}>{etiquetaEstadoCaso(c.estado)}</Badge> },
-  { id: "pedido", label: "Pedido", ocultable: true, clase: "whitespace-nowrap tabular-nums", render: (c) => c.numeroPedido ?? "—" },
-  { id: "responsable", label: "Responsable", clase: "whitespace-nowrap", ocultable: true, render: (c) => c.responsable ?? <span className="text-muted-foreground">Sin asignar</span> },
-  { id: "canal", label: "Canal", clase: "whitespace-nowrap", ocultable: true, render: (c) => etiquetaCanal(c.canal) },
-  { id: "antiguedad", label: "Abierto hace", ocultable: true, clase: "whitespace-nowrap text-right tabular-nums", render: (c) => etiquetaAntiguedad(c.horasAbierto) },
-];
+  const filas = useMemo(
+    () =>
+      casos.filter(
+        (c) =>
+          (verResueltos || c.estado !== "resuelto") &&
+          (!soloMios || (miNombre !== null && c.responsable === miNombre)) &&
+          (!sinResponder || c.responsable === null),
+      ),
+    [casos, verResueltos, soloMios, sinResponder, miNombre],
+  );
+  const grupos = ESTADOS_CASO.map((e) => ({ ...e, filas: filas.filter((c) => c.estado === e.valor) })).filter((g) => g.filas.length > 0);
 
-/** Casos de soporte con la barra común (agrupar por estado, resueltos, filtros y columnas). */
-export function TablaCasos({ casos }: { casos: FilaCaso[] }) {
   return (
-    <TablaDatos
-      def={DEF_CASOS}
-      filas={casos}
-      columnas={COLUMNAS}
-      iconos={ICONOS}
-      nombre={NOMBRE}
-      claveFila={(c) => c.id}
-      anchoMinimo="60rem"
-      ariaLabel="Casos de soporte"
-      vacio="Todavía no hay casos de soporte."
-    />
+    <div className="min-w-0">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <BotonBarra activo={!verResueltos} onClick={() => setVerResueltos((v) => !v)}>
+          {verResueltos ? "Todos" : "Abiertos"}
+        </BotonBarra>
+        <BotonBarra activo={soloMios} onClick={() => setSoloMios((v) => !v)} disabled={miNombre === null}>
+          Mis casos
+        </BotonBarra>
+        <BotonBarra activo={sinResponder} onClick={() => setSinResponder((v) => !v)}>
+          Sin responsable
+        </BotonBarra>
+        <span className="flex-1" />
+        <BotonDescargar def={DEF_CASOS} filas={filas} />
+        <BotonAgregar etiqueta="Agregar caso" onClick={() => mostrarToast("Crear casos se activa cuando el CRM use datos reales.", "info")} />
+      </div>
+
+      <MarcoTabla ariaLabel="Casos de soporte">
+        <table className="w-full min-w-[60rem] border-collapse">
+          <thead>
+            <tr>
+              {ENCABEZADOS.map((t, i) => (
+                <th key={t} scope="col" className={`${claseTh} ${i === 8 ? "text-right" : ""}`}>
+                  {t}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filas.length === 0 ? (
+              <tr>
+                <td colSpan={ENCABEZADOS.length} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  {casos.length === 0 ? "Todavía no hay casos de soporte." : "Ningún caso coincide con los filtros."}
+                </td>
+              </tr>
+            ) : (
+              grupos.map((g) => (
+                <Fragment key={g.valor}>
+                  <tr>
+                    <td colSpan={ENCABEZADOS.length} className="border-b border-border bg-muted px-3 py-2 text-xs font-semibold text-foreground-soft">
+                      <Punto tono={PUNTO_ESTADO[g.valor]} className="mr-2" />
+                      {g.etiqueta} · {g.filas.length}
+                    </td>
+                  </tr>
+                  {g.filas.map((c) => (
+                    <tr key={c.id} className="hover:bg-muted">
+                      <td className={claseTd}>
+                        <span className="block font-medium">{c.titulo}</span>
+                        <span className="block text-xs text-muted-foreground tabular-nums">{c.codigo}</span>
+                      </td>
+                      <td className={claseTd}>{c.dropshipper}</td>
+                      <td className={claseTd}>{etiquetaTipoCaso(c.tipo)}</td>
+                      <td className={claseTd}>
+                        <Pastilla tono={TONO_PRIORIDAD[c.prioridad as keyof typeof TONO_PRIORIDAD] ?? "neutro"}>{etiquetaPrioridad(c.prioridad)}</Pastilla>
+                      </td>
+                      <td className={claseTd}>
+                        <Pastilla tono={c.estado === "resuelto" ? "exito" : c.estado === "abierto" ? "aviso" : "neutro"}>{etiquetaEstadoCaso(c.estado)}</Pastilla>
+                      </td>
+                      <td className={`${claseTd} tabular-nums`}>{c.numeroPedido ?? "—"}</td>
+                      <td className={claseTd}>{c.responsable ?? <span className="text-muted-foreground">Sin asignar</span>}</td>
+                      <td className={claseTd}>{etiquetaCanal(c.canal)}</td>
+                      <td className={`${claseTd} text-right tabular-nums`}>{etiquetaAntiguedad(c.horasAbierto)}</td>
+                    </tr>
+                  ))}
+                </Fragment>
+              ))
+            )}
+          </tbody>
+        </table>
+      </MarcoTabla>
+      <p className="px-0.5 py-2 text-xs text-muted-foreground" role="status">
+        Mostrando {filas.length} de {casos.length}
+        {!verResueltos && casos.some((c) => c.estado === "resuelto") ? " · los resueltos están ocultos (botón «Abiertos»)" : ""}
+      </p>
+    </div>
   );
 }

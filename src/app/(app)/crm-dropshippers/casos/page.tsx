@@ -12,7 +12,7 @@ export const metadata = { title: "Casos" };
 export const dynamic = "force-dynamic";
 
 export default async function CasosDropshippersPage() {
-  await requireModulo("crm-dropshippers");
+  const usuario = await requireModulo("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const datos = await obtenerDatosCrm(supabase, pais.id, pais.codigo);
@@ -21,7 +21,7 @@ export default async function CasosDropshippersPage() {
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Casos" oculto />
       {datos.demo && <AvisoDemo />}
-      <TablaCasos casos={datos.casos} />
+      <TablaCasos casos={datos.casos} miNombre={usuario.nombre} />
     </Pagina>
   );
 }
