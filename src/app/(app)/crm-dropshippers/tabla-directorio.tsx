@@ -7,7 +7,7 @@ import { normalizar } from "@/lib/tabla/motor";
 import { CrearDropshipperPanel } from "./crear-dropshipper-panel";
 import { DEF_DROPSHIPPERS, diasEntre, etiquetaNivel, etiquetaUltimoPedido, montoCorto, type FilaCaso, type FilaDropshipper } from "./def-crm";
 import { FichaLateral, tonoEstado } from "./ficha-lateral";
-import { BotonBarra, BotonDescargar, Etiqueta, MarcoTabla, Pastilla, Punto, claseConFicha, claseTd, claseTh } from "./piezas-crm";
+import { BotonBarra, BotonDescargar, Etiqueta, MarcoTabla, Pastilla, Punto, claseConFicha, claseTd, claseTh } from "@/components/panel/piezas-panel";
 
 const DIAS_RIESGO = 30;
 const GRUPOS = [

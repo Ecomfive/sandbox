@@ -1,45 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { etiquetaAntiguedad, etiquetaCanal, montoCorto, type FilaCaso, type FilaDropshipper, type ResumenCrm } from "./def-crm";
 import { FichaLateral } from "./ficha-lateral";
-import { CabeceraTarjeta, Punto, Segmentado, claseConFicha } from "./piezas-crm";
+import { CabeceraTarjeta, Delta, Indicador, Punto, Segmentado, claseConFicha } from "@/components/panel/piezas-panel";
 
 type Orden = "ventas" | "pedidos";
 const LIMITE_RANKING = 8;
 const LIMITE_CASOS = 5;
-
-/** «+12,4 %»; sin dato del mes anterior no se dibuja nada. `inverso`: bajar es mejorar (tiempos). */
-function Delta({ valor, sufijo, inverso = false }: { valor: number | null; sufijo: string; inverso?: boolean }) {
-  if (valor === null) return null;
-  const mejora = inverso ? valor < 0 : valor > 0;
-  const texto = `${valor > 0 ? "+" : valor < 0 ? "−" : ""}${Math.abs(valor).toLocaleString("es-CR", { maximumFractionDigits: 1 })}${sufijo}`;
-  return <b className={`font-medium ${mejora ? "text-success" : valor === 0 ? "" : "text-destructive"}`}>{texto}</b>;
-}
-
-/** Una celda de la barra de indicadores; con `href` es un enlace a la página que lista lo que cuenta. */
-function Indicador({ titulo, punto, valor, detalle, href }: { titulo: string; punto?: "aviso" | "peligro"; valor: string; detalle: ReactNode; href?: string }) {
-  const contenido = (
-    <>
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {punto && <Punto tono={punto} />}
-        {titulo}
-      </span>
-      <span className="mt-0.5 block text-[22px] leading-tight font-semibold tracking-tight tabular-nums">{valor}</span>
-      <span className="block text-xs text-muted-foreground">{detalle}</span>
-    </>
-  );
-  const clase = `-mr-px -mb-px block min-w-0 flex-[1_1_10.5rem] border-r border-b border-border px-3.5 py-3 text-left`;
-  return href ? (
-    <Link href={href} className={`${clase} hover:bg-muted ${anilloFoco}`}>
-      {contenido}
-    </Link>
-  ) : (
-    <div className={clase}>{contenido}</div>
-  );
-}
 
 /**
  * Resumen del CRM: barra de indicadores, ranking de quién vende más y los casos que piden atención, con la ficha del

@@ -3,24 +3,24 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { obtenerProductosTest } from "./datos-test";
-import { InformeTest } from "./informe-test";
+import { obtenerProductosTest } from "../datos-test";
+import { ListaProductosTest } from "../lista-productos-test";
 
-export const metadata = { title: "Productos Test" };
+export const metadata = { title: "Productos" };
 
 export const dynamic = "force-dynamic";
 
-/** Informe de Productos Test (Sistema WMS): lo testeado por día, semana o mes, con winners, gasto y CPA. Por ahora solo Panamá. */
-export default async function InformeProductosTestPage() {
-  await requireModulo("productos-test");
+/** Los productos en test, uno por uno: filtrar, ordenar, ver su ficha y editarlo. */
+export default async function ProductosEnTestPage() {
+  const usuario = await requireModulo("productos-test");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const productos = await obtenerProductosTest(supabase, pais.id);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo={`Productos Test ${pais.codigo}`} oculto />
-      <InformeTest productos={productos} codigoPais={pais.codigo} />
+      <EncabezadoPagina titulo="Productos" oculto />
+      <ListaProductosTest productos={productos} paisId={pais.id} puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")} />
     </Pagina>
   );
 }

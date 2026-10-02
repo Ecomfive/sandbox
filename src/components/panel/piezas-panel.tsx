@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { DescargarIcon } from "@/lib/nav-icons";
@@ -135,3 +136,45 @@ export function BotonDescargar<F>({ def, filas }: { def: DefTabla<F>; filas: F[]
 
 /** Dos columnas: lo principal y la ficha fija a la derecha (en pantallas anchas); en angostas, la ficha va debajo. */
 export const claseConFicha = "grid grid-cols-1 items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_420px]";
+
+/** «+12,4 %»; sin dato anterior no se dibuja nada. `inverso`: bajar es mejorar (costos, tiempos). */
+export function Delta({ valor, sufijo, prefijo = "", inverso = false, decimales = 1 }: { valor: number | null; sufijo: string; prefijo?: string; inverso?: boolean; decimales?: number }) {
+  if (valor === null) return null;
+  const mejora = inverso ? valor < 0 : valor > 0;
+  const texto = `${valor > 0 ? "+" : valor < 0 ? "−" : ""}${prefijo}${Math.abs(valor).toLocaleString("es-CR", { maximumFractionDigits: decimales })}${sufijo}`;
+  return <b className={`font-medium ${mejora ? "text-success" : valor === 0 ? "" : "text-destructive"}`}>{texto}</b>;
+}
+
+/** Una celda de la barra de indicadores; con `href` es un enlace a la página que lista lo que cuenta. */
+export function Indicador({
+  titulo,
+  punto,
+  valor,
+  detalle,
+  href,
+}: {
+  titulo: string;
+  punto?: "aviso" | "peligro" | "exito";
+  valor: string;
+  detalle: ReactNode;
+  href?: string;
+}) {
+  const contenido = (
+    <>
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {punto && <Punto tono={punto} />}
+        {titulo}
+      </span>
+      <span className="mt-0.5 block text-[22px] leading-tight font-semibold tracking-tight tabular-nums">{valor}</span>
+      <span className="block text-xs text-muted-foreground">{detalle}</span>
+    </>
+  );
+  const clase = "-mr-px -mb-px block min-w-0 flex-[1_1_10.5rem] border-r border-b border-border px-3.5 py-3 text-left";
+  return href ? (
+    <Link href={href} className={`${clase} hover:bg-muted ${anilloFoco}`}>
+      {contenido}
+    </Link>
+  ) : (
+    <div className={clase}>{contenido}</div>
+  );
+}

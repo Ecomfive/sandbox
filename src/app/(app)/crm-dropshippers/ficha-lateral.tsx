@@ -30,7 +30,7 @@ import {
   type FilaCaso,
   type FilaDropshipper,
 } from "./def-crm";
-import { Etiqueta, Pastilla, Punto } from "./piezas-crm";
+import { Etiqueta, Pastilla, Punto } from "@/components/panel/piezas-panel";
 
 export const tonoEstado = (estado: string) => (estado === "activo" ? "exito" : estado === "prospecto" ? "aviso" : "neutro");
 

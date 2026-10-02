@@ -13,7 +13,7 @@ import {
   etiquetaTipoCaso,
   type FilaCaso,
 } from "./def-crm";
-import { BotonBarra, BotonDescargar, MarcoTabla, Pastilla, Punto, claseTd, claseTh } from "./piezas-crm";
+import { BotonBarra, BotonDescargar, MarcoTabla, Pastilla, Punto, claseTd, claseTh } from "@/components/panel/piezas-panel";
 
 const ENCABEZADOS = ["Caso", "Dropshipper", "Tipo", "Prioridad", "Estado", "Pedido", "Responsable", "Canal", "Abierto hace"];
 const TONO_PRIORIDAD = { alta: "peligro", normal: "aviso", baja: "neutro" } as const;

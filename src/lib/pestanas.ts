@@ -25,6 +25,10 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Dropshippers", href: "/crm-dropshippers/directorio" },
     { etiqueta: "Casos", href: "/crm-dropshippers/casos" },
   ],
+  "/productos-test": [
+    { etiqueta: "Informe", href: "/productos-test" },
+    { etiqueta: "Productos", href: "/productos-test/productos" },
+  ],
   "/compras": [
     { etiqueta: "Productos", href: "/compras" },
     { etiqueta: "Filtros", href: "/compras/filtros" },
