@@ -32,6 +32,8 @@ const SUBPAGINAS: Record<string, string> = {
   "/usuarios/auditoria": "Historial de auditoría",
   "/extractos/patrones": "Diccionario de patrones bancarios",
   "/compras/filtros": "Filtros",
+  "/crm-dropshippers/directorio": "Dropshippers",
+  "/crm-dropshippers/casos": "Casos",
 };
 
 interface ModuloDeNav {

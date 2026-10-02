@@ -3,15 +3,15 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { obtenerDatosCrm } from "./datos-crm";
-import { AvisoDemo } from "./aviso-demo";
-import { ResumenCrm } from "./resumen-crm";
+import { AvisoDemo } from "../aviso-demo";
+import { obtenerDatosCrm } from "../datos-crm";
+import { TablaCasos } from "../tabla-casos";
 
-export const metadata = { title: "CRM Dropshippers" };
+export const metadata = { title: "Casos" };
 
 export const dynamic = "force-dynamic";
 
-export default async function CrmDropshippersPage() {
+export default async function CasosDropshippersPage() {
   await requireModulo("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -19,16 +19,9 @@ export default async function CrmDropshippersPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="CRM Dropshippers" oculto />
+      <EncabezadoPagina titulo="Casos" oculto />
       {datos.demo && <AvisoDemo />}
-      <ResumenCrm
-        resumen={datos.resumen}
-        dropshippers={datos.dropshippers}
-        casos={datos.casos}
-        codigoPais={pais.codigo}
-        hoy={datos.hoy}
-        demo={datos.demo}
-      />
+      <TablaCasos casos={datos.casos} />
     </Pagina>
   );
 }
