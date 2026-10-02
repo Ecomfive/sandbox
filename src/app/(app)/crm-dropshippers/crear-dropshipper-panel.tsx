@@ -33,6 +33,28 @@ export function CrearDropshipperPanel({ paisId }: { paisId: string }) {
                 className={`${fieldClass} w-full`}
               />
             </Campo>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Campo etiqueta="Tienda" id="campo-tienda-dropshipper">
+                <input
+                  id="campo-tienda-dropshipper"
+                  type="text"
+                  name="tienda"
+                  autoComplete="off"
+                  placeholder="Ej: aurora-shop.com"
+                  className={`${fieldClass} w-full`}
+                />
+              </Campo>
+              <Campo etiqueta="Ciudad" id="campo-ciudad-dropshipper">
+                <input
+                  id="campo-ciudad-dropshipper"
+                  type="text"
+                  name="ciudad"
+                  autoComplete="off"
+                  placeholder="Ej: Medellín"
+                  className={`${fieldClass} w-full`}
+                />
+              </Campo>
+            </div>
           </Seccion>
 
           <Seccion icono={PersonaIcon} titulo="Contacto">
@@ -53,7 +75,7 @@ export function CrearDropshipperPanel({ paisId }: { paisId: string }) {
                   type="text"
                   name="contacto_telefono"
                   autoComplete="off"
-                  placeholder="Ej: +506 8888 0000"
+                  placeholder="Ej: +57 300 111 2233"
                   className={`${fieldClass} w-full`}
                 />
               </Campo>

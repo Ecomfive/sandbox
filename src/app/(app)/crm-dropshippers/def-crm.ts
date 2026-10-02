@@ -50,6 +50,14 @@ export const TIPOS_INTERACCION = [
 type ConEtiqueta = readonly { valor: string; etiqueta: string }[];
 const etiquetaDe = (lista: ConEtiqueta) => (valor: string) => lista.find((e) => e.valor === valor)?.etiqueta ?? valor;
 
+/** Nombres de los países con los que se trabaja o de donde suelen ser los dropshippers (código ISO → nombre). */
+const NOMBRES_PAIS: Record<string, string> = {
+  AR: "Argentina", BO: "Bolivia", BR: "Brasil", CL: "Chile", CO: "Colombia", CR: "Costa Rica", DO: "Rep. Dominicana",
+  EC: "Ecuador", ES: "España", GT: "Guatemala", HN: "Honduras", MX: "México", NI: "Nicaragua", PA: "Panamá",
+  PE: "Perú", PY: "Paraguay", SV: "El Salvador", US: "Estados Unidos", UY: "Uruguay", VE: "Venezuela",
+};
+export const nombrePais = (codigo: string) => NOMBRES_PAIS[codigo] ?? codigo;
+
 export const etiquetaEstado = etiquetaDe(ESTADOS);
 export const etiquetaNivel = etiquetaDe(NIVELES);
 export const etiquetaTipoCaso = etiquetaDe(TIPOS_CASO);
@@ -70,6 +78,10 @@ export interface FilaDropshipper {
   estado: string;
   nivel: string;
   responsable: string | null;
+  /** País de donde es (código ISO de 2 letras, «CO»), según su teléfono; null si no se sabe. */
+  paisOrigen: string | null;
+  /** Códigos de los países donde vende con nosotros («PA», «CR»); puede ser más de uno. */
+  paises: string[];
   /** Fecha de ingreso (ISO, solo día). */
   ingreso: string | null;
   pedidosMes: number;
@@ -172,6 +184,23 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       tipo: "seleccion",
       valores: (d) => [d.responsable ?? SIN_VALOR],
       etiquetaSinValor: "Sin responsable",
+      agrupable: true,
+    },
+    {
+      id: "venta",
+      etiqueta: "Vende en",
+      tipo: "seleccion",
+      valores: (d) => (d.paises.length ? d.paises : [SIN_VALOR]),
+      etiquetaSinValor: "Sin país",
+      formatearValor: (v) => nombrePais(v),
+    },
+    {
+      id: "origen",
+      etiqueta: "País de origen",
+      tipo: "seleccion",
+      valores: (d) => [d.paisOrigen ?? SIN_VALOR],
+      etiquetaSinValor: "Sin origen",
+      formatearValor: (v) => nombrePais(v),
       agrupable: true,
     },
     {

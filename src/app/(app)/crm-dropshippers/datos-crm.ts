@@ -48,24 +48,33 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     supabase
       .from("dropshippers")
       .select(
-        "id, codigo, nombre, tienda, ciudad, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, notas, perfiles:responsable_id(nombre)",
+        "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, notas, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))",
       )
-      .eq("pais_id", paisId)
-      .order("nombre"),
-    supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos"),
+      .order("nombre")
+      .limit(2000),
+    // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
+    supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos").eq("pais_id", paisId),
     supabase
       .from("casos_dropshipper")
       .select(
-        "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, dropshipper_id, dropshippers!inner(nombre, pais_id), perfiles:responsable_id(nombre)",
+        "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, dropshipper_id, dropshippers(nombre), perfiles:responsable_id(nombre)",
       )
-      .eq("dropshippers.pais_id", paisId)
+      .eq("pais_id", paisId)
       .order("abierto_en", { ascending: false })
       .limit(500),
   ]);
 
   const sumaPorId = new Map((sumas ?? []).map((s) => [s.id as string, s]));
-  const dropshippers: FilaDropshipper[] = (filas ?? []).map((d) => {
+  // Se muestran los que venden en este país; de cada uno se listan todos sus países.
+  const delPais = (filas ?? []).filter((d) =>
+    ((d.dropshipper_paises ?? []) as { pais_id: string }[]).some((p) => p.pais_id === paisId),
+  );
+  const dropshippers: FilaDropshipper[] = delPais.map((d) => {
     const s = sumaPorId.get(d.id);
+    const paises = ((d.dropshipper_paises ?? []) as { paises: Relacion<{ codigo: string }> }[])
+      .map((p) => uno<{ codigo: string }>(p.paises)?.codigo)
+      .filter((c): c is string => !!c)
+      .sort();
     return {
       id: d.id,
       codigo: d.codigo ?? "—",
@@ -77,6 +86,8 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       estado: d.estado,
       nivel: d.nivel,
       responsable: uno<{ nombre: string | null }>(d.perfiles as Relacion<{ nombre: string | null }>)?.nombre ?? null,
+      paisOrigen: d.pais_origen,
+      paises,
       ingreso: d.fecha_ingreso,
       pedidosMes: Number(s?.pedidos_mes ?? 0),
       ventasMes: Number(s?.ventas_mes ?? 0),

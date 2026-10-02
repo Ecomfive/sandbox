@@ -6,6 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { MODO_DEMO } from "./datos-demo";
+import { normalizarTelefono } from "@/lib/crm/telefono";
 import { etiquetaEstado } from "./def-crm";
 
 const ERROR_DEMO = "El CRM está en modo demo: aún no se guarda nada. Se activa al pasar a datos reales.";
@@ -14,20 +15,43 @@ const ERROR_DEMO = "El CRM está en modo demo: aún no se guarda nada. Se activa
 export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("crm-dropshippers");
   if (MODO_DEMO) return { error: ERROR_DEMO };
-  const pais_id = formData.get("pais_id") as string;
+  const pais_id = String(formData.get("pais_id") ?? "");
   const nombre = String(formData.get("nombre") ?? "").trim();
-  const contacto_email = (formData.get("contacto_email") as string) || null;
-  const contacto_telefono = (formData.get("contacto_telefono") as string) || null;
+  const contacto_email = String(formData.get("contacto_email") ?? "").trim() || null;
+  const telefonoTexto = String(formData.get("contacto_telefono") ?? "").trim();
+  const tienda = String(formData.get("tienda") ?? "").trim() || null;
+  const ciudad = String(formData.get("ciudad") ?? "").trim() || null;
 
   if (!nombre) return { error: "Escribe el nombre del dropshipper." };
+  if (!/^[0-9a-fA-F-]{8,64}$/.test(pais_id)) return { error: "País no válido." };
 
   const supabase = createServiceClient();
+  const { data: pais } = await supabase.from("paises").select("codigo").eq("id", pais_id).single();
+
+  // El WhatsApp se guarda en formato internacional: con él se enlaza la conversación. Sin prefijo se asume el país actual.
+  let contacto_telefono: string | null = null;
+  let pais_origen: string | null = null;
+  if (telefonoTexto) {
+    const tel = normalizarTelefono(telefonoTexto, pais?.codigo);
+    if (!tel) return { error: "El teléfono no es válido. Escríbelo con el prefijo del país, p. ej. +57 300 111 2233." };
+    contacto_telefono = tel.e164;
+    pais_origen = tel.pais;
+  }
+
   const { data, error } = await supabase
     .from("dropshippers")
-    .insert({ pais_id, nombre, contacto_email, contacto_telefono })
+    .insert({ pais_id, nombre, tienda, ciudad, contacto_email, contacto_telefono, pais_origen })
     .select("id")
     .single();
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") return { error: "Ya hay un dropshipper con ese WhatsApp." };
+    return { error: error.message };
+  }
+  const { error: errorPais } = await supabase.from("dropshipper_paises").insert({ dropshipper_id: data.id, pais_id });
+  if (errorPais) {
+    await supabase.from("dropshippers").delete().eq("id", data.id);
+    return { error: errorPais.message };
+  }
   await registrarAuditoria({ accion: "crear_dropshipper", entidad: "dropshippers", entidadId: data.id, detalle: `nombre=${nombre}` });
   revalidatePath("/crm-dropshippers");
   return {};
