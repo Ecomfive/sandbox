@@ -491,7 +491,8 @@ convenciones técnicas del código.
   estrella `FavoritoToggle`) y «Próximamente» (lo que aún no se abre, `PRONTO_NAV`). No hay acordeones anidados: toda
   página queda a dos clics. Pulsar un área solo cambia el panel; al navegar, el panel pasa al área de la página nueva
   (`encontrarSeccionActiva`, que cuenta subpáginas y detalles). El panel se oculta con el botón de abajo del riel
-  (`sidebar-panel-v1` en el navegador). En móvil, un cajón lista todas las áreas una debajo de la otra. Las áreas y
+  o **solo, con un clic fuera del menú** (el riel se queda; pulsar un área lo vuelve a abrir); se guarda en el
+  navegador (`sidebar-panel-v1`). En móvil, un cajón lista todas las áreas una debajo de la otra. Las áreas y
   sus páginas están en `AREAS` (`src/lib/nav-data.ts`); una página con `dropi: true` solo sale si Dropi tiene datos
   en el país (`construirAreas`). **Una página nueva del menú se agrega a su área en `AREAS`**: las migas (Área ›
   Módulo), el buscador y los contadores salen de ahí. El país y la plataforma ya no son niveles del menú sino el
