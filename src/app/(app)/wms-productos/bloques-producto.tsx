@@ -48,7 +48,7 @@ export function BloqueMultimedia({
   alCambiar,
   archivos,
   titulo = "Multimedia",
-  aceptar = "image/*,video/*",
+  aceptar = "image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime",
   conAlt = true,
   etiquetaBoton = "Agregar archivos",
   ayudaArrastrar = "o arrastrar imágenes y videos aquí",

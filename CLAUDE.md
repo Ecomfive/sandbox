@@ -9,12 +9,26 @@ convenciones técnicas del código.
 ## Stack
 
 - Next.js (App Router), Server Components y Server Actions.
-- Supabase: Postgres + Storage. RLS activado en todas las tablas
-  (`for all using (auth.role() = 'authenticated')`).
+- Supabase: Postgres + Storage. RLS activado en todas las tablas **y sin políticas** (migración 0063): solo el
+  servidor, con la clave de servicio, toca los datos. **Una tabla nueva** se crea con
+  `alter table ... enable row level security` y sin política alguna (nada de `auth.role() = 'authenticated'`: daba
+  acceso total a cualquier usuario con sesión). Ver [SEGURIDAD.md](SEGURIDAD.md).
 - Hosting en Vercel, desplegado desde el repo `Ecomfive/sandbox` en GitHub,
   CI/CD automático en push a `main`.
 - Sin autenticación de usuarios finales todavía (ver PRODUCT.md) — es una
   limitación temporal conocida, no una decisión de diseño definitiva.
+
+## Seguridad (reglas que no se rompen)
+
+- Los datos se leen y escriben solo con `createServiceClient()` en el servidor. `createSessionClient()` es solo para
+  saber quién es la persona y para el login. Toda página, acción y ruta nueva empieza con `requireModulo` /
+  `requireModuloEscritura` (o `getUsuarioActual` en una ruta de API).
+- Todo HTML que viene de una persona (descripciones) pasa por `sanitizarHtml` (`src/lib/seguridad/`, lista permitida);
+  una imagen subida se valida por su firma (`detectarImagen`), no por `archivo.type` ni por la extensión; el texto de una
+  persona nunca se arma dentro de un filtro `.or()` de PostgREST sin limpiarlo.
+- Las cabeceras de seguridad están en `next.config.ts` y las cookies de sesión son `httpOnly`
+  (`src/lib/supabase/cookies.ts`). Los secretos nunca llevan `NEXT_PUBLIC_`.
+- Pruebas: `npm run test:seguridad`. Comprobar la base desde fuera: `node scripts/verificar-seguridad-supabase.mjs`.
 
 ## Convenciones importantes
 

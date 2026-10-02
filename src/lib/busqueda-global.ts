@@ -61,13 +61,17 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
 
   const buscaTexto = texto.length >= 2;
 
-  if (buscaTexto && usuario.modulos.includes("productos")) {
+  // El texto entra en un filtro `.or()` de PostgREST, donde la coma, los paréntesis y los comodines tienen significado:
+  // se quitan para que quien escribe no pueda agregar condiciones propias.
+  const textoFiltro = texto.replace(/[,()*%_\\"'`]/g, " ").replace(/\s+/g, " ").trim();
+
+  if (buscaTexto && textoFiltro.length >= 2 && usuario.modulos.includes("productos")) {
     tareas.push(
       supabase
         .from("productos")
         .select("sku, nombre")
         .eq("pais_id", pais.id)
-        .or(`nombre.ilike.%${texto}%,sku.ilike.%${texto}%`)
+        .or(`nombre.ilike.%${textoFiltro}%,sku.ilike.%${textoFiltro}%`)
         .limit(LIMITE_POR_TIPO)
         .then(({ data }) => {
           for (const p of data ?? []) {

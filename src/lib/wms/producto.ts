@@ -1,6 +1,8 @@
 // Lógica pura de la «Ficha producto Shopify» (módulo WMS): tipos, listas de opciones, cálculos y la validación de lo que
 // llega del formulario. Sin acceso a la base ni a React: se puede probar suelta.
 
+import { sanitizarHtml } from "@/lib/seguridad/sanitizar-html";
+
 export const ESTADOS_PRODUCTO = ["activo", "borrador", "no_listado"] as const;
 export type EstadoProducto = (typeof ESTADOS_PRODUCTO)[number];
 
@@ -223,14 +225,9 @@ export function sincronizarVariantes(opciones: OpcionProducto[], actuales: Varia
   });
 }
 
-/** Quita lo que puede ejecutar código del HTML de la descripción (script, iframe, atributos on*, javascript:). */
-export function sanitizarHtml(html: string): string {
-  return html
-    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
-    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
-}
+// La limpieza del HTML de la descripción vive en `lib/seguridad` (lista permitida); se reexporta aquí porque el resto del
+// WMS la importa de este módulo.
+export { sanitizarHtml };
 
 const texto = (v: unknown, max: number): string => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const lista = (v: unknown, max: number, largo = 255): string[] =>

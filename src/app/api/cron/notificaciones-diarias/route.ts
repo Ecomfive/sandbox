@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { esPeticionDeCron } from "@/lib/seguridad/cron";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { enviarCorreo } from "@/lib/notificaciones/correo";
@@ -6,8 +7,7 @@ import { enviarCorreo } from "@/lib/notificaciones/correo";
 const SITIO = "https://mom-beta-proveduria.vercel.app";
 
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!esPeticionDeCron(request)) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

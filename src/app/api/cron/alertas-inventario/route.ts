@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { esPeticionDeCron } from "@/lib/seguridad/cron";
 import { createServiceClient } from "@/lib/supabase/server";
 import { calcularPendientes, upsertAlerta } from "@/lib/alertas/pendientes";
 
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!esPeticionDeCron(request)) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

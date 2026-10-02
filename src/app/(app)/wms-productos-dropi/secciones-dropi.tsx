@@ -326,7 +326,7 @@ export function SeccionVideos({ d, set, archivos, existe }: PropsSeccion & { arc
         <BloqueMultimedia
           envolver={false}
           conAlt={false}
-          aceptar="video/*"
+          aceptar="video/mp4,video/webm,video/quicktime"
           etiquetaBoton="Cargar videos"
           ayudaArrastrar="o arrastrar videos aquí"
           medios={d.medios.filter((m) => m.tipo === "video")}

@@ -85,7 +85,7 @@ export function CampoFoto({
     <div className="flex flex-col gap-1">
       <span className={labelClass}>Foto del producto</span>
       <input type="hidden" name={nombreCampo} value={preview ?? ""} readOnly />
-      <input ref={inputArchivoRef} type="file" accept="image/*" className="sr-only" onChange={alElegirArchivo} />
+      <input ref={inputArchivoRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="sr-only" onChange={alElegirArchivo} />
       <div className="flex items-center gap-3">
         {preview ? (
           <button
