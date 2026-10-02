@@ -22,8 +22,8 @@ const SERIE = [52, 61, 58, 77, 84, 97];
 /** Pedidos de los últimos seis meses a partir de los del mes: misma forma de curva, escalada. */
 const serie = (pedidosMes: number) => SERIE.map((m) => Math.round((m * pedidosMes) / 97));
 
-function ds(d: Omit<FilaDropshipper, "pedidosPorMes" | "email" | "paises" | "paisOrigen"> & { paises?: string[]; paisOrigen?: string }): FilaDropshipper {
-  return { ...d, email: null, paises: d.paises ?? ["CR"], paisOrigen: d.paisOrigen ?? "CR", pedidosPorMes: serie(d.pedidosMes) };
+function ds(d: Omit<FilaDropshipper, "pedidosPorMes" | "email" | "paises" | "paisOrigen" | "etapa" | "productos"> & { paises?: string[]; paisOrigen?: string }): FilaDropshipper {
+  return { ...d, email: null, etapa: null, productos: [], paises: d.paises ?? ["CR"], paisOrigen: d.paisOrigen ?? "CR", pedidosPorMes: serie(d.pedidosMes) };
 }
 
 export const DROPSHIPPERS_DEMO: FilaDropshipper[] = [

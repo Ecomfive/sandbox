@@ -90,6 +90,10 @@ export interface FilaDropshipper {
   ultimoPedido: string | null;
   casosAbiertos: number;
   etiquetas: string[];
+  /** Etapa que tenía en ClickUp (leads, seguimiento, privado, dropshippers, archivado…); null si se creó aquí. */
+  etapa: string | null;
+  /** Productos que vende u ofrece. */
+  productos: string[];
   notas: string | null;
   /** Pedidos de los últimos seis meses, del más antiguo al más reciente. */
   pedidosPorMes: number[];
@@ -168,6 +172,14 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       opciones: () => ESTADOS.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
       agrupable: true,
       ordenGrupos: ["activo", "prospecto", "inactivo"],
+    },
+    {
+      id: "etapa",
+      etiqueta: "Etapa",
+      tipo: "seleccion",
+      valores: (d) => [d.etapa ?? SIN_VALOR],
+      etiquetaSinValor: "Sin etapa",
+      agrupable: true,
     },
     {
       id: "nivel",

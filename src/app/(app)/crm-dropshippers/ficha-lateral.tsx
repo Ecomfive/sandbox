@@ -204,6 +204,8 @@ export function FichaLateral({
             ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
             ["Responsable", d.responsable ?? "Sin asignar"],
             ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
+            ...(d.etapa ? [["Etapa", d.etapa]] : []),
+            ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
             ["Etiquetas", d.etiquetas.length ? d.etiquetas.map((e) => <Etiqueta key={e}>{e}</Etiqueta>) : "—"],
             ...(d.email ? [["Correo", d.email]] : []),
             ...(d.notas ? [["Notas", d.notas]] : []),

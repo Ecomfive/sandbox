@@ -48,7 +48,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     supabase
       .from("dropshippers")
       .select(
-        "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, notas, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))",
+        "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))",
       )
       .order("nombre")
       .limit(2000),
@@ -65,11 +65,8 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
   ]);
 
   const sumaPorId = new Map((sumas ?? []).map((s) => [s.id as string, s]));
-  // Se muestran los que venden en este país; de cada uno se listan todos sus países.
-  const delPais = (filas ?? []).filter((d) =>
-    ((d.dropshipper_paises ?? []) as { pais_id: string }[]).some((p) => p.pais_id === paisId),
-  );
-  const dropshippers: FilaDropshipper[] = delPais.map((d) => {
+  // Se listan todos los dropshippers, venda donde venda: «Vende en» filtra por país. Las cifras del mes son del país elegido.
+  const dropshippers: FilaDropshipper[] = (filas ?? []).map((d) => {
     const s = sumaPorId.get(d.id);
     const paises = ((d.dropshipper_paises ?? []) as { paises: Relacion<{ codigo: string }> }[])
       .map((p) => uno<{ codigo: string }>(p.paises)?.codigo)
@@ -94,6 +91,8 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       ultimoPedido: s?.ultimo_pedido ?? null,
       casosAbiertos: Number(s?.casos_abiertos ?? 0),
       etiquetas: d.etiquetas ?? [],
+      etapa: d.etapa ?? null,
+      productos: d.productos ?? [],
       notas: d.notas,
       // La serie de seis meses de la ficha se pide al abrirla cuando haya pedidos reales (fase siguiente).
       pedidosPorMes: [],
