@@ -369,10 +369,10 @@ export function BloqueInventario({ d, set }: PropsBloque) {
 
       {simple && (
         <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">SKU maestro</span>
             <CampoSkuMaestro valor={v.sku_maestro_id} alCambiar={(s) => actualizarVariante(d, set, 0, { sku_maestro_id: s?.id ?? null, sku: s?.codigo ?? "" })} />
-          </label>
+          </div>
           <CampoTexto etiqueta="Código de barras (ISBN, UPC, GTIN…)" valor={v.codigo_barras} alCambiar={(codigo_barras) => actualizarVariante(d, set, 0, { codigo_barras })} placeholder="Ej: 7501031311309" maxLength={60} />
         </div>
       )}

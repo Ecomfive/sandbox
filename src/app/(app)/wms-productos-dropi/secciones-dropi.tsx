@@ -128,10 +128,10 @@ export function SeccionGeneral({ d, set, intento }: PropsSeccion) {
           )}
         </fieldset>
 
-        <label className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">SKU maestro</span>
           <CampoSkuMaestro valor={d.sku_maestro_id} alCambiar={(s) => set({ sku_maestro_id: s?.id ?? null, sku: s?.codigo ?? "" })} />
-        </label>
+        </div>
         <Casilla texto="Aprobado" marcada={d.aprobado} alCambiar={(aprobado) => set({ aprobado })} />
 
         <EditorDescripcion etiqueta="Descripción" valor={d.descripcion} alCambiar={(descripcion) => set({ descripcion })} invalido={falta(textoPlano(d.descripcion).length >= MIN_DESCRIPCION)} />
