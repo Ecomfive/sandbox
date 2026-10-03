@@ -7,6 +7,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { DropshipperIcon, PersonaIcon } from "@/lib/nav-icons";
 import { FASES } from "@/lib/crm/areas";
 import { crearDropshipper } from "./actions";
+import { CampoTiendas } from "./campo-tiendas";
 
 /** «Agregar» del directorio de dropshippers: la ficha para dar de alta uno (nombre y datos de contacto). */
 export function CrearDropshipperPanel({ paisId, conFase }: { paisId: string; conFase: boolean }) {
@@ -35,16 +36,7 @@ export function CrearDropshipperPanel({ paisId, conFase }: { paisId: string; con
               />
             </Campo>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Tienda" id="campo-tienda-dropshipper">
-                <input
-                  id="campo-tienda-dropshipper"
-                  type="text"
-                  name="tienda"
-                  autoComplete="off"
-                  placeholder="Ej: aurora-shop.com"
-                  className={`${fieldClass} w-full`}
-                />
-              </Campo>
+              <CampoTiendas id="campo-tienda-dropshipper" />
               <Campo etiqueta="Ciudad" id="campo-ciudad-dropshipper">
                 <input
                   id="campo-ciudad-dropshipper"

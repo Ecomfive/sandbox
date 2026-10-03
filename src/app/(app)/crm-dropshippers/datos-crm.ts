@@ -28,7 +28,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
-    "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
+    "id, codigo, nombre, tienda, tiendas, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
   const consultaDropshippers = (conCuentas: boolean) =>
     supabase
       .from("dropshippers")
@@ -71,7 +71,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
       id: d.id,
       codigo: d.codigo ?? "—",
       nombre: d.nombre,
-      tienda: d.tienda,
+      tiendas: d.tiendas?.length ? d.tiendas : d.tienda ? [d.tienda] : [],
       ciudad: d.ciudad,
       email: d.contacto_email,
       telefono: d.contacto_telefono,

@@ -88,7 +88,7 @@ export interface FilaDropshipper {
   id: string;
   codigo: string;
   nombre: string;
-  tienda: string | null;
+  tiendas: string[];
   ciudad: string | null;
   email: string | null;
   telefono: string | null;
@@ -265,7 +265,7 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       etiquetaSinValor: "Sin ciudad",
       agrupable: true,
     },
-    { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (d) => `${d.nombre} ${d.codigo} ${d.tienda ?? ""}` },
+    { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (d) => `${d.nombre} ${d.codigo} ${d.tiendas.join(" ")}` },
     { id: "contacto", etiqueta: "Correo o teléfono", tipo: "texto", valor: (d) => `${d.email ?? ""} ${d.telefono ?? ""}` },
     { id: "pedidos", etiqueta: "Pedidos del mes", tipo: "numero", valor: (d) => d.pedidosMes },
     { id: "ventas", etiqueta: "Ventas del mes", tipo: "numero", valor: (d) => d.ventasMes },

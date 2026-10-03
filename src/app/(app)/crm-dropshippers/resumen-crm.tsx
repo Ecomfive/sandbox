@@ -136,7 +136,7 @@ export function ResumenCrm({
                         <span className="min-w-0">
                           <span className="flex justify-between gap-2 text-[13px]">
                             <span className="truncate">{d.nombre}</span>
-                            <span className="truncate text-xs text-muted-foreground">{d.tienda}</span>
+                            <span className="truncate text-xs text-muted-foreground">{d.tiendas.join(", ")}</span>
                           </span>
                           <span aria-hidden="true" className="mt-[5px] block h-1.5 overflow-hidden rounded-[3px] bg-accent">
                             <span className="block h-full rounded-[3px] bg-foreground-soft" style={{ width: `${(valor / maximo) * 100}%` }} />

@@ -33,7 +33,7 @@ function PanelVincular({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codig
   const usuario = Array.isArray(usuarios) ? usuarios.find((u) => u.idExterno === elegido) : undefined;
   // Los usuarios cuya tienda se parece a este dropshipper van primero, marcados con ★ (sin vincular a otro).
   const ordenados = (Array.isArray(usuarios) ? usuarios : [])
-    .map((u) => ({ u, puntaje: Math.max(parecido(u.tienda, d.tienda), parecido(u.tienda, d.nombre) * 0.9) }))
+    .map((u) => ({ u, puntaje: Math.max(...d.tiendas.map((t) => parecido(u.tienda, t)), parecido(u.tienda, d.nombre) * 0.9) }))
     .map((x) => ({ ...x, sugerido: x.puntaje >= PUNTAJE_MINIMO && (!x.u.dropshipperId || x.u.dropshipperId === d.id) }))
     .sort((a, b) => Number(b.sugerido) - Number(a.sugerido) || b.puntaje - a.puntaje);
 

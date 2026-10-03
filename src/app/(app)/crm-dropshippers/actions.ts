@@ -16,7 +16,7 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
   const nombre = String(formData.get("nombre") ?? "").trim();
   const contacto_email = String(formData.get("contacto_email") ?? "").trim() || null;
   const telefonoTexto = String(formData.get("contacto_telefono") ?? "").trim();
-  const tienda = String(formData.get("tienda") ?? "").trim() || null;
+  const tiendas = listaTiendas(formData);
   const ciudad = String(formData.get("ciudad") ?? "").trim() || null;
   // La captación (ferias, eventos) es del área comercial: solo quien la tiene puede crear un dropshipper «captado».
   const faseNueva = String(formData.get("fase") ?? "activo");
@@ -40,7 +40,7 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
 
   const { data, error } = await supabase
     .from("dropshippers")
-    .insert({ pais_id, nombre, tienda, ciudad, contacto_email, contacto_telefono, pais_origen, fase, captado_en: fase === "activo" ? null : new Date().toLocaleDateString("en-CA") })
+    .insert({ pais_id, nombre, tienda: tiendas[0] ?? null, tiendas, ciudad, contacto_email, contacto_telefono, pais_origen, fase, captado_en: fase === "activo" ? null : new Date().toLocaleDateString("en-CA") })
     .select("id")
     .single();
   if (error) {
@@ -114,6 +114,10 @@ export async function registrarInteraccion(formData: FormData): Promise<{ error?
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 const esUnoDe = (lista: readonly { valor: string }[], v: string) => lista.some((x) => x.valor === v);
 const texto = (formData: FormData, campo: string) => String(formData.get(campo) ?? "").trim();
+
+/** Las tiendas del formulario (un campo `tienda` por cada una): sin vacías ni repetidas, hasta 20. */
+const listaTiendas = (formData: FormData) =>
+  [...new Set(formData.getAll("tienda").map((v) => String(v).trim().slice(0, 200)).filter(Boolean))].slice(0, 20);
 
 /** El país donde se registra un caso o un pedido: uno de los países donde ese dropshipper vende. */
 async function resolverPais(supabase: ReturnType<typeof createServiceClient>, dropshipperId: string, codigo: string) {
@@ -208,7 +212,7 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
   const nombre = texto(formData, "nombre");
   const estado = texto(formData, "estado");
   const nivel = texto(formData, "nivel");
-  const tienda = texto(formData, "tienda") || null;
+  const tiendas = listaTiendas(formData);
   const ciudad = texto(formData, "ciudad") || null;
   const contacto_email = texto(formData, "contacto_email").toLowerCase() || null;
   const notas = texto(formData, "notas") || null;
@@ -248,7 +252,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
       nombre,
       estado,
       nivel,
-      tienda,
+      tienda: tiendas[0] ?? null,
+      tiendas,
       ciudad,
       contacto_email,
       contacto_telefono,
@@ -721,7 +726,7 @@ export async function crearDropshipperDesdeUsuario(formData: FormData): Promise<
   const nombre = (tienda ?? `Usuario ${id_externo} (${plat.nombre})`).slice(0, 200);
   const { data: nuevo, error } = await supabase
     .from("dropshippers")
-    .insert({ pais_id: pais.id, nombre, tienda, estado: "activo" })
+    .insert({ pais_id: pais.id, nombre, tienda, tiendas: tienda ? [tienda] : [], estado: "activo" })
     .select("id")
     .single();
   if (error) return { error: "No se pudo crear el dropshipper." };

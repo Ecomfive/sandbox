@@ -29,9 +29,9 @@ test("tiendas distintas puntúan bajo", () => {
 
 test("sugiere primero al dropshipper que más se parece y descarta los que no", () => {
   const lista = [
-    { id: "a", nombre: "Marta Ruiz", tienda: "Aurora Shop" },
-    { id: "b", nombre: "Pedro Gil", tienda: "Panamex store" },
-    { id: "c", nombre: "Aurora Gómez", tienda: null },
+    { id: "a", nombre: "Marta Ruiz", tiendas: ["Aurora Shop"] },
+    { id: "b", nombre: "Pedro Gil", tiendas: ["Panamex store"] },
+    { id: "c", nombre: "Aurora Gómez", tiendas: [] },
   ];
   const r = sugerirDropshippers("Tienda Aurora", lista);
   assert.equal(r[0].dropshipperId, "a");
@@ -39,6 +39,12 @@ test("sugiere primero al dropshipper que más se parece y descarta los que no", 
   assert.ok(!r.some((c) => c.dropshipperId === "b"));
 });
 
+test("con varias tiendas cuenta la que más se parece", () => {
+  const lista = [{ id: "a", nombre: "Marta Ruiz", tiendas: ["Panamex store", "Aurora Shop", "Kuma"] }];
+  assert.equal(sugerirDropshippers("Tienda Aurora", lista)[0].dropshipperId, "a");
+  assert.equal(sugerirDropshippers("Kuma Store", lista)[0].dropshipperId, "a");
+});
+
 test("sin nombre de tienda no hay sugerencias", () => {
-  assert.deepEqual(sugerirDropshippers(null, [{ id: "a", nombre: "X", tienda: "Y" }]), []);
+  assert.deepEqual(sugerirDropshippers(null, [{ id: "a", nombre: "X", tiendas: ["Y"] }]), []);
 });

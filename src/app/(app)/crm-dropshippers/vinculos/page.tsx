@@ -21,13 +21,13 @@ export default async function VinculosDropshippersPage() {
 
   const [{ data: plataforma }, { data: dropshippers }] = await Promise.all([
     supabase.from("plataformas").select("id").eq("nombre", PLATAFORMA).maybeSingle(),
-    supabase.from("dropshippers").select("id, nombre, tienda").order("nombre").limit(2000),
+    supabase.from("dropshippers").select("id, nombre, tienda, tiendas").order("nombre").limit(2000),
   ]);
   const { data: usuarios } = plataforma
     ? await supabase.rpc("crm_usuarios_plataforma", { p_plataforma: plataforma.id, p_pais: pais.id })
     : { data: [] };
 
-  const lista = (dropshippers ?? []).map((d) => ({ id: d.id as string, nombre: d.nombre as string, tienda: (d.tienda as string | null) ?? null }));
+  const lista = (dropshippers ?? []).map((d) => ({ id: d.id as string, nombre: d.nombre as string, tiendas: ((d.tiendas as string[] | null)?.length ? (d.tiendas as string[]) : d.tienda ? [d.tienda as string] : []) }));
   const todos = (usuarios ?? []) as { id_externo: string; tienda_nombre: string | null; pedidos: number; ultimo_pedido: string | null; dropshipper_id: string | null }[];
   const sinVincular = todos.filter((u) => !u.dropshipper_id);
 

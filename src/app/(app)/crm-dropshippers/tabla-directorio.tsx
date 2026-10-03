@@ -49,7 +49,7 @@ export function TablaDirectorio({
     return dropshippers.filter(
       (d) =>
         (verInactivos || d.estado !== "inactivo") &&
-        (!q || normalizar(`${d.nombre} ${d.codigo} ${d.ciudad ?? ""} ${d.tienda ?? ""}`).includes(q)) &&
+        (!q || normalizar(`${d.nombre} ${d.codigo} ${d.ciudad ?? ""} ${d.tiendas.join(" ")}`).includes(q)) &&
         (!soloVip || d.nivel === "vip") &&
         (!enRiesgo || (d.estado === "activo" && d.ultimoPedido !== null && diasEntre(d.ultimoPedido, hoy) >= DIAS_RIESGO)),
     );
@@ -81,7 +81,7 @@ export function TablaDirectorio({
         <span className="block font-medium">{d.nombre}</span>
         <span className="block text-xs text-muted-foreground tabular-nums">
           {d.codigo}
-          {d.tienda ? ` · ${d.tienda}` : ""}
+          {d.tiendas.length ? ` · ${d.tiendas.join(", ")}` : ""}
         </span>
       </td>
       <td className={claseTd}>

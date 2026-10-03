@@ -134,7 +134,7 @@ export function FichaLateral({
             <h3 className="m-0 text-base font-semibold tracking-tight">{d.nombre}</h3>
             <p className="m-0 text-xs text-muted-foreground tabular-nums">
               {d.codigo}
-              {d.tienda ? ` · ${d.tienda}` : ""}
+              {d.tiendas.length ? ` · ${d.tiendas.join(", ")}` : ""}
             </p>
           </div>
           <div className="flex gap-1">

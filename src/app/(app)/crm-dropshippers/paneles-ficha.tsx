@@ -7,6 +7,7 @@ import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PedidoIcon, PersonaIcon } from "@/lib/nav-icons";
 import type { AccesoCrm } from "@/lib/crm/areas";
+import { CampoTiendas } from "./campo-tiendas";
 import { crearCaso, crearPedidoManual, editarDropshipper, registrarInteraccion } from "./actions";
 import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, TIPOS_INTERACCION, nombrePais, type FilaDropshipper } from "./def-crm";
 
@@ -302,9 +303,7 @@ export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: 
                   <Opciones lista={NIVELES} />
                 </select>
               </Campo>
-              <Campo etiqueta="Tienda" id="campo-tienda-editar">
-                <input id="campo-tienda-editar" type="text" name="tienda" autoComplete="off" defaultValue={d.tienda ?? ""} className={`${fieldClass} w-full`} />
-              </Campo>
+              <CampoTiendas id="campo-tienda-editar" inicial={d.tiendas} />
               <Campo etiqueta="Ciudad" id="campo-ciudad-editar">
                 <input id="campo-ciudad-editar" type="text" name="ciudad" autoComplete="off" defaultValue={d.ciudad ?? ""} className={`${fieldClass} w-full`} />
               </Campo>

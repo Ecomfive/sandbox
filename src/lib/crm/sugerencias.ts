@@ -74,7 +74,7 @@ export function parecido(a: string | null | undefined, b: string | null | undefi
 export interface DropshipperParaComparar {
   id: string;
   nombre: string;
-  tienda: string | null;
+  tiendas: string[];
 }
 
 export interface Candidato {
@@ -88,12 +88,12 @@ export const PUNTAJE_ALTO = 0.8;
 
 /**
  * Los dropshippers que más se parecen a una tienda de la plataforma, del más al menos parecido. Se compara con la tienda
- * del dropshipper y, un poco menos, con su nombre (hay quien usa su nombre como tienda).
+ * del dropshipper y, un poco menos, con su nombre (hay quien usa su nombre como tienda). Un dropshipper puede tener varias tiendas: cuenta la que más se parezca.
  */
 export function sugerirDropshippers(tiendaPlataforma: string | null | undefined, dropshippers: DropshipperParaComparar[], max = 3): Candidato[] {
   if (!tiendaPlataforma) return [];
   return dropshippers
-    .map((d) => ({ dropshipperId: d.id, puntaje: Math.max(parecido(tiendaPlataforma, d.tienda), parecido(tiendaPlataforma, d.nombre) * 0.9) }))
+    .map((d) => ({ dropshipperId: d.id, puntaje: Math.max(...d.tiendas.map((t) => parecido(tiendaPlataforma, t)), parecido(tiendaPlataforma, d.nombre) * 0.9) }))
     .filter((c) => c.puntaje >= PUNTAJE_MINIMO)
     .sort((x, y) => y.puntaje - x.puntaje)
     .slice(0, max)

@@ -25,7 +25,7 @@ export interface FilaVinculo {
 interface Opcion {
   id: string;
   nombre: string;
-  tienda: string | null;
+  tiendas: string[];
 }
 
 const ENCABEZADOS = [
@@ -138,7 +138,7 @@ function Fila({
                 .map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.nombre}
-                    {d.tienda ? ` · ${d.tienda}` : ""}
+                    {d.tiendas.length ? ` · ${d.tiendas.join(", ")}` : ""}
                   </option>
                 ))}
             </optgroup>
