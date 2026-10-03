@@ -12,7 +12,8 @@ import { BotonAccion } from "@/components/ui/boton-accion";
 import { CalendarioIcon, CatalogoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, FlechaIzquierdaIcon, ProductoIcon } from "@/lib/nav-icons";
 import { formatearFecha } from "@/lib/formato";
 import { cambiarEstadoSku, obtenerHistorialSku } from "./actions";
-import { ETIQUETA_ESTADO, ETIQUETA_TIPO, TONO_ESTADO, siguientesEstados, type FilaSku } from "./def-catalogo";
+import { ETIQUETA_ASOCIACION, ETIQUETA_ESTADO, ETIQUETA_TIPO, TONO_ESTADO, siguientesEstados, type FilaSku } from "./def-catalogo";
+import Link from "next/link";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
@@ -165,6 +166,37 @@ export function FichaSku({
                 <p className="text-sm">{sku.componentes || "—"}</p>
               </Seccion>
             )}
+
+            <Seccion icono={ProductoIcon} titulo="Asociaciones">
+              {sku.asociaciones.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin fichas enlazadas.</p>
+              ) : (
+                <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">
+                  {sku.asociaciones.map((a, i) => (
+                    <li key={`${a.tipo}-${i}`} className="flex flex-col">
+                      {a.href ? (
+                        <Link href={a.href} className="font-medium underline-offset-2 hover:underline">
+                          {a.nombre}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{a.nombre}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {ETIQUETA_ASOCIACION[a.tipo]} · {a.detalle}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {puedeEscribir && (
+                <Link
+                  href={`/wms-productos/nuevo?sku_maestro=${sku.id}`}
+                  className={`mt-2 inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}
+                >
+                  Crear ficha Shopify
+                </Link>
+              )}
+            </Seccion>
 
             <Seccion icono={CalendarioIcon} titulo="Fechas">
               <dl className="flex flex-col gap-3">

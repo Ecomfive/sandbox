@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -368,7 +369,10 @@ export function BloqueInventario({ d, set }: PropsBloque) {
 
       {simple && (
         <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-          <CampoTexto etiqueta="SKU (código de referencia)" valor={v.sku} alCambiar={(sku) => actualizarVariante(d, set, 0, { sku })} placeholder="Ej: KIT-RIEGO-001" maxLength={120} />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">SKU maestro</span>
+            <CampoSkuMaestro valor={v.sku_maestro_id} alCambiar={(s) => actualizarVariante(d, set, 0, { sku_maestro_id: s?.id ?? null, sku: s?.codigo ?? "" })} />
+          </label>
           <CampoTexto etiqueta="Código de barras (ISBN, UPC, GTIN…)" valor={v.codigo_barras} alCambiar={(codigo_barras) => actualizarVariante(d, set, 0, { codigo_barras })} placeholder="Ej: 7501031311309" maxLength={60} />
         </div>
       )}
@@ -515,7 +519,7 @@ export function BloqueVariantes({ d, set, codigoPais }: PropsBloque) {
                       <td className="px-2 py-1.5"><CampoNumero prefijo="$" valor={v.precio} alCambiar={(precio) => actualizarVariante(d, set, i, { precio })} ariaLabel={`Precio de ${nombre}`} /></td>
                       <td className="px-2 py-1.5"><CampoNumero prefijo="$" valor={v.precio_comparacion} alCambiar={(precio_comparacion) => actualizarVariante(d, set, i, { precio_comparacion })} ariaLabel={`Precio de comparación de ${nombre}`} /></td>
                       <td className="px-2 py-1.5"><CampoNumero prefijo="$" valor={v.costo} alCambiar={(costo) => actualizarVariante(d, set, i, { costo })} ariaLabel={`Costo de ${nombre}`} /></td>
-                      <td className="px-2 py-1.5"><input type="text" value={v.sku} onChange={(e) => actualizarVariante(d, set, i, { sku: e.target.value })} aria-label={`SKU de ${nombre}`} maxLength={120} className={`${fieldClass} w-full min-w-28`} /></td>
+                      <td className="px-2 py-1.5"><CampoSkuMaestro valor={v.sku_maestro_id} etiquetaAria={`SKU maestro de ${nombre}`} placeholder="Elegir SKU" className="min-w-40" alCambiar={(s) => actualizarVariante(d, set, i, { sku_maestro_id: s?.id ?? null, sku: s?.codigo ?? "" })} /></td>
                       <td className="px-2 py-1.5"><input type="text" value={v.codigo_barras} onChange={(e) => actualizarVariante(d, set, i, { codigo_barras: e.target.value })} aria-label={`Código de barras de ${nombre}`} maxLength={60} className={`${fieldClass} w-full min-w-28`} /></td>
                       <td className="px-2 py-1.5">
                         <CampoNumero

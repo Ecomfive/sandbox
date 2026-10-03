@@ -238,6 +238,14 @@ convenciones técnicas del código.
   descripción de 200 caracteres como mínimo y, si el producto es público, una bodega con
   100 unidades y 3 imágenes. Peso en gramos, medidas en centímetros. No incluye Carga masiva,
   Actualización masiva ni las descargas en Excel de Dropi.
+- **Producto central: el SKU maestro es la identidad** (migración 0068, fase A de `WMS-REFERENCIA.md`). Cada
+  **variante** de la ficha Shopify y cada **producto** de la ficha Dropi se enlazan a un SKU maestro con una llave
+  foránea (`sku_maestro_id`); el campo de SKU de esas fichas ya no es texto libre sino un selector
+  (`CampoSkuMaestro`, `src/components/ui/selector-sku-maestro.tsx`, con una sola lista compartida por `ProveedorSkusMaestros`)
+  y el servidor copia el código del maestro en `sku` al guardar (`escribirHijos`, `resolverSkuMaestro`). El enlace es
+  opcional por ahora (hay borradores). La ficha del SKU maestro muestra sus **Asociaciones** (variantes Shopify, productos
+  Dropi y productos de los pedidos de Dropi) y «Crear ficha Shopify» (`/wms-productos/nuevo?sku_maestro=<id>`, que arranca con
+  su nombre y código). Las variaciones de un producto Dropi variable conservan su SKU como texto.
 - **Sistema WMS: «Bodegas»** (`/wms-bodegas`, módulo `wms-bodegas`, migración 0053; fase 1
   del plan de `WMS-REFERENCIA.md`, que es el documento maestro del WMS: arquitectura V2,
   decisiones confirmadas, flujos de GreaterWMS y fases). Las 6 fuentes físicas (Despacho,

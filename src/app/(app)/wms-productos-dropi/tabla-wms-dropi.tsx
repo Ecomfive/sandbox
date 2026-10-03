@@ -1,5 +1,6 @@
 "use client";
 
+import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { BotonAgregar } from "@/components/ui/boton-agregar";
@@ -68,19 +69,21 @@ export function TablaWmsDropi({
   codigoPais,
   bodegasIniciales,
   puedeEscribir,
+  skusMaestros,
 }: {
   productos: FilaProductoDropi[];
   paisId: string;
   codigoPais: string;
   bodegasIniciales: Bodega[];
   puedeEscribir: boolean;
+  skusMaestros: OpcionSkuMaestro[];
 }) {
   // undefined = cerrada; null = producto nuevo; texto = el id del producto abierto.
   const [abierto, setAbierto] = useState<string | null | undefined>(undefined);
   const [bodegas, setBodegas] = useState<Bodega[]>(bodegasIniciales);
 
   return (
-    <>
+    <ProveedorSkusMaestros opciones={skusMaestros}>
       <TablaDatos
         def={DEF_WMS_DROPI}
         filas={productos}
@@ -104,6 +107,6 @@ export function TablaWmsDropi({
         alAgregarBodega={(b) => setBodegas((actuales) => [...actuales, b])}
         alCerrar={() => setAbierto(undefined)}
       />
-    </>
+    </ProveedorSkusMaestros>
   );
 }

@@ -72,7 +72,14 @@ async function escribirMedios(supabase: Cliente, productoId: string, datos: Prod
   return null;
 }
 
-function columnas(d: ProductoDropiDatos) {
+/** El SKU maestro elegido, comprobado contra la base: devuelve su id y su código (que se copia en `sku`), o null si no existe. */
+async function resolverSkuMaestro(supabase: ReturnType<typeof createServiceClient>, id: string | null) {
+  if (!id) return null;
+  const { data } = await supabase.from("skus_maestros").select("id, codigo").eq("id", id).maybeSingle();
+  return data ? { id: data.id as string, codigo: data.codigo as string } : null;
+}
+
+function columnas(d: ProductoDropiDatos, maestro: { id: string; codigo: string } | null) {
   return {
     nombre: d.nombre,
     nombre_guia: d.usar_nombre_guia ? d.nombre_guia : null,
@@ -86,7 +93,8 @@ function columnas(d: ProductoDropiDatos) {
     tipo: d.tipo,
     categorias: d.categorias,
     aprobado: d.aprobado,
-    sku: d.sku || null,
+    sku: maestro ? maestro.codigo : d.sku_maestro_id ? null : d.sku || null,
+    sku_maestro_id: maestro ? maestro.id : null,
     descripcion: d.descripcion,
     descripcion_app: d.descripcion_app,
     stock: d.stock,
@@ -112,6 +120,7 @@ export async function guardarProductoDropi(entrada: { id: string | null; paisId:
   if (id === null && !UUID.test(entrada.paisId)) return { error: "País no válido." };
 
   const supabase = createServiceClient();
+  const maestro = await resolverSkuMaestro(supabase, datos.sku_maestro_id);
   let productoId = id;
   let antes: { nombre: string; publicacion: string } | null = null;
   let stockAntes: Record<string, number> = {};
@@ -121,12 +130,12 @@ export async function guardarProductoDropi(entrada: { id: string | null; paisId:
     if (!actual) return { error: "El producto ya no existe." };
     antes = actual;
     stockAntes = stockPorBodega(actual as unknown as Pick<ProductoDropiDatos, "tipo" | "stock" | "variaciones">);
-    const { error } = await supabase.from("wms_dropi_productos").update({ ...columnas(datos), actualizado_en: new Date().toISOString() }).eq("id", productoId);
+    const { error } = await supabase.from("wms_dropi_productos").update({ ...columnas(datos, maestro), actualizado_en: new Date().toISOString() }).eq("id", productoId);
     if (error) return { error: error.message };
   } else {
     const { data, error } = await supabase
       .from("wms_dropi_productos")
-      .insert({ ...columnas(datos), pais_id: entrada.paisId, creado_por: usuario.id })
+      .insert({ ...columnas(datos, maestro), pais_id: entrada.paisId, creado_por: usuario.id })
       .select("id")
       .single();
     if (error || !data) return { error: error?.message ?? "No se pudo crear el producto." };
@@ -218,6 +227,7 @@ export async function obtenerProductoDropi(
       tipo: p.tipo === "variable" ? "variable" : "simple",
       categorias: p.categorias ?? [],
       aprobado: p.aprobado === true,
+      sku_maestro_id: (p.sku_maestro_id as string | null) ?? null,
       sku: p.sku ?? "",
       descripcion: p.descripcion ?? "",
       descripcion_app: p.descripcion_app ?? "",
@@ -283,7 +293,7 @@ export async function duplicarProductoDropi(id: string): Promise<{ id: string } 
   void _a;
   const { data: nuevo, error } = await supabase
     .from("wms_dropi_productos")
-    .insert({ ...campos, nombre: `Copia de ${origen.nombre}`, publicacion: "privado", sku: null, creado_por: usuario.id })
+    .insert({ ...campos, nombre: `Copia de ${origen.nombre}`, publicacion: "privado", sku: null, sku_maestro_id: null, creado_por: usuario.id })
     .select("id")
     .single();
   if (error || !nuevo) return { error: error?.message ?? "No se pudo duplicar el producto." };

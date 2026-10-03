@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { KpiGroup } from "@/components/ui/kpi-card";
-import type { FilaSku } from "./def-catalogo";
+import type { Asociacion, FilaSku } from "./def-catalogo";
 import { TablaCatalogo } from "./tabla-catalogo";
 import { TarjetasEstadoCatalogo } from "./tarjetas-estado";
 
@@ -49,6 +49,46 @@ export default async function CatalogoMaestroPage() {
     componentesPorCombo.get(fila.combo_id)!.push({ ...componente, cantidad: fila.cantidad });
   }
 
+  // Lo enlazado a cada SKU maestro. Se trae lo que tiene enlace (no un `in` con todos los ids: la dirección sería enorme).
+  const [variantes, dropi, enPedidos] = await Promise.all([
+    supabase
+      .from("wms_producto_variantes")
+      .select("sku_maestro_id, opciones, wms_productos(id, titulo, estado, paises(codigo))")
+      .not("sku_maestro_id", "is", null),
+    supabase.from("wms_dropi_productos").select("sku_maestro_id, nombre, publicacion, archivado, paises(codigo)").not("sku_maestro_id", "is", null),
+    supabase.from("productos").select("sku_maestro_id, nombre, paises(codigo)").not("sku_maestro_id", "is", null),
+  ]);
+  const unoDe = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
+  const asociacionesPorSku = new Map<string, Asociacion[]>();
+  const agregar = (id: string, a: Asociacion) => asociacionesPorSku.set(id, [...(asociacionesPorSku.get(id) ?? []), a]);
+  for (const v of variantes.data ?? []) {
+    const p = unoDe(v.wms_productos as unknown as { id: string; titulo: string; estado: string; paises: { codigo: string } | { codigo: string }[] | null } | null);
+    if (!p) continue;
+    const opciones = Object.values((v.opciones ?? {}) as Record<string, string>).join(" / ");
+    agregar(v.sku_maestro_id as string, {
+      tipo: "shopify",
+      nombre: opciones ? `${p.titulo} (${opciones})` : p.titulo,
+      detalle: `${unoDe(p.paises)?.codigo ?? "—"} · ${p.estado}`,
+      href: `/wms-productos/${p.id}`,
+    });
+  }
+  for (const p of dropi.data ?? []) {
+    agregar(p.sku_maestro_id as string, {
+      tipo: "dropi",
+      nombre: p.nombre as string,
+      detalle: `${unoDe(p.paises as unknown as { codigo: string } | { codigo: string }[] | null)?.codigo ?? "—"} · ${p.archivado ? "archivado" : p.publicacion}`,
+      href: "/wms-productos-dropi",
+    });
+  }
+  for (const p of enPedidos.data ?? []) {
+    agregar(p.sku_maestro_id as string, {
+      tipo: "pedidos",
+      nombre: p.nombre as string,
+      detalle: unoDe(p.paises as unknown as { codigo: string } | { codigo: string }[] | null)?.codigo ?? "—",
+      href: null,
+    });
+  }
+
   const opcionesSimples = lista.filter((s) => s.tipo === "simple" && s.estado === "aprobado");
 
   const filas: FilaSku[] = lista.map((s) => ({
@@ -62,6 +102,7 @@ export default async function CatalogoMaestroPage() {
         ? (componentesPorCombo.get(s.id) ?? []).map((c) => `${c.cantidad}× ${c.codigo}`).join(", ")
         : "",
     creado: s.creado_en.slice(0, 10),
+    asociaciones: asociacionesPorSku.get(s.id) ?? [],
   }));
 
   const conteo = { propuesto: 0, en_revision: 0, aprobado: 0 };

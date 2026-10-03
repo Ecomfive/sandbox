@@ -37,6 +37,24 @@ export interface FilaSku {
   componentes: string;
   /** Día en que se propuso (AAAA-MM-DD). */
   creado: string;
+  /** Las fichas y productos enlazados a este SKU maestro (Shopify, Dropi, pedidos de Dropi). */
+  asociaciones: Asociacion[];
+}
+
+export interface Asociacion {
+  tipo: "shopify" | "dropi" | "pedidos";
+  /** Nombre del producto o variante enlazado. */
+  nombre: string;
+  /** País y estado, para distinguirlos. */
+  detalle: string;
+  /** A dónde lleva (la ficha), si hay. */
+  href: string | null;
+}
+
+export const ETIQUETA_ASOCIACION: Record<Asociacion["tipo"], string> = {
+  shopify: "Ficha Shopify",
+  dropi: "Ficha Dropi",
+  pedidos: "Producto en pedidos de Dropi",
 }
 
 /** Cómo se filtra y agrupa el catálogo de SKU maestros; "Aprobados" es lo terminado, pero se ve por defecto. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useState, type MutableRefObject } from "react";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -127,7 +128,10 @@ export function SeccionGeneral({ d, set, intento }: PropsSeccion) {
           )}
         </fieldset>
 
-        <CampoTexto etiqueta="SKU (Opcional)" valor={d.sku} alCambiar={(sku) => set({ sku })} maxLength={120} placeholder="Ej: KIT-RIEGO-001" />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">SKU maestro</span>
+          <CampoSkuMaestro valor={d.sku_maestro_id} alCambiar={(s) => set({ sku_maestro_id: s?.id ?? null, sku: s?.codigo ?? "" })} />
+        </label>
         <Casilla texto="Aprobado" marcada={d.aprobado} alCambiar={(aprobado) => set({ aprobado })} />
 
         <EditorDescripcion etiqueta="Descripción" valor={d.descripcion} alCambiar={(descripcion) => set({ descripcion })} invalido={falta(textoPlano(d.descripcion).length >= MIN_DESCRIPCION)} />

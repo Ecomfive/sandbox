@@ -43,6 +43,12 @@ async function escribirHijos(supabase: Cliente, productoId: string, datos: Produ
   const idsPrevios = new Set((previas ?? []).map((v) => v.id as string));
   const conservados = new Set<string>();
 
+  // El SKU maestro de cada variante se comprueba contra la base y su código se copia en `sku`: la identidad es el maestro.
+  const pedidos = [...new Set(datos.variantes.map((v) => v.sku_maestro_id).filter((x): x is string => !!x))];
+  const { data: maestros } = pedidos.length > 0 ? await supabase.from("skus_maestros").select("id, codigo").in("id", pedidos) : { data: [] };
+  const codigos = new Map((maestros ?? []).map((m) => [m.id as string, m.codigo as string]));
+  const skuDe = (id: string | null) => (id ? (codigos.get(id) ?? null) : null);
+
   for (const [posicion, v] of datos.variantes.entries()) {
     const fila = {
       producto_id: productoId,
@@ -51,7 +57,8 @@ async function escribirHijos(supabase: Cliente, productoId: string, datos: Produ
       precio: v.precio,
       precio_comparacion: v.precio_comparacion,
       costo: v.costo,
-      sku: v.sku || null,
+      sku: skuDe(v.sku_maestro_id) ?? (v.sku_maestro_id ? null : v.sku || null),
+      sku_maestro_id: skuDe(v.sku_maestro_id) ? v.sku_maestro_id : null,
       codigo_barras: v.codigo_barras || null,
       peso: v.peso,
       unidad_peso: v.unidad_peso,
@@ -224,7 +231,7 @@ export async function duplicarProductoWms(id: string): Promise<{ id: string } | 
     void _p;
     const { data: copia } = await supabase
       .from("wms_producto_variantes")
-      .insert({ ...resto, producto_id: nuevo.id, sku: null })
+      .insert({ ...resto, producto_id: nuevo.id, sku: null, sku_maestro_id: null })
       .select("id")
       .single();
     if (!copia) continue;

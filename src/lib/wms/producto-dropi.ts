@@ -75,6 +75,8 @@ export interface ProductoDropiDatos {
   categorias: string[];
   /** Lo revisa y marca Dropi; aquí se lleva el mismo dato (columna «Aprobado»). */
   aprobado: boolean;
+  /** SKU maestro del producto (la identidad). `sku` es una copia de su código. */
+  sku_maestro_id: string | null;
   sku: string;
   descripcion: string;
   descripcion_app: string;
@@ -108,6 +110,7 @@ export function productoDropiVacio(): ProductoDropiDatos {
     tipo: "simple",
     categorias: [],
     aprobado: false,
+    sku_maestro_id: null,
     sku: "",
     descripcion: "",
     descripcion_app: "",
@@ -292,6 +295,7 @@ export function validarProductoDropi(crudo: unknown): { datos: ProductoDropiDato
     tipo,
     categorias: [...new Set((Array.isArray(r.categorias) ? r.categorias : []).filter((c): c is string => (CATEGORIAS_DROPI as readonly string[]).includes(c as string)))],
     aprobado: r.aprobado === true,
+    sku_maestro_id: typeof r.sku_maestro_id === "string" && /^[0-9a-fA-F-]{8,64}$/.test(r.sku_maestro_id) ? r.sku_maestro_id : null,
     sku: texto(r.sku, 120),
     descripcion: sanitizarHtml(typeof r.descripcion === "string" ? r.descripcion.slice(0, 200_000) : ""),
     descripcion_app: sanitizarHtml(typeof r.descripcion_app === "string" ? r.descripcion_app.slice(0, 200_000) : ""),

@@ -12,6 +12,7 @@ import {
   type ProductoDatos,
   type VarianteDatos,
 } from "@/lib/wms/producto";
+import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { FichaProductoShopify } from "../ficha-producto-shopify";
 
 export const metadata = { title: "Ficha producto Shopify" };
@@ -52,6 +53,7 @@ export default async function WmsProductoPage({ params }: { params: Promise<{ id
       precio: numero(v.precio),
       precio_comparacion: numero(v.precio_comparacion),
       costo: numero(v.costo),
+      sku_maestro_id: (v.sku_maestro_id as string | null) ?? null,
       sku: (v.sku as string | null) ?? "",
       codigo_barras: (v.codigo_barras as string | null) ?? "",
       peso: numero(v.peso),
@@ -77,6 +79,8 @@ export default async function WmsProductoPage({ params }: { params: Promise<{ id
       tipo: m.tipo === "video" ? "video" : "imagen",
       alt: (m.alt as string | null) ?? "",
     }));
+
+  const skusMaestros = await obtenerOpcionesSkuMaestro(supabase);
 
   const inicial: ProductoDatos = {
     titulo: p.titulo,
@@ -115,6 +119,7 @@ export default async function WmsProductoPage({ params }: { params: Promise<{ id
         paisId={p.pais_id}
         codigoPais={pais.codigo}
         puedeEscribir={!usuario.modulosSoloLectura.includes("wms-productos")}
+        skusMaestros={skusMaestros}
       />
     </Pagina>
   );

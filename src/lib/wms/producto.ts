@@ -76,6 +76,8 @@ export interface VarianteDatos {
   precio: number | null;
   precio_comparacion: number | null;
   costo: number | null;
+  /** SKU maestro de esta variante (la identidad del producto). `sku` es una copia de su código. */
+  sku_maestro_id: string | null;
   sku: string;
   codigo_barras: string;
   peso: number | null;
@@ -136,6 +138,7 @@ export function varianteVacia(sucursales: string[] = [SUCURSAL_PREDETERMINADA]):
     precio: null,
     precio_comparacion: null,
     costo: null,
+    sku_maestro_id: null,
     sku: "",
     codigo_barras: "",
     peso: null,
@@ -300,6 +303,7 @@ export function validarProducto(crudo: unknown): { datos: ProductoDatos } | { er
       precio: precio as number | null,
       precio_comparacion: comparacion as number | null,
       costo: costo as number | null,
+      sku_maestro_id: typeof c.sku_maestro_id === "string" && /^[0-9a-fA-F-]{8,64}$/.test(c.sku_maestro_id) ? c.sku_maestro_id : null,
       sku: texto(c.sku, 120),
       codigo_barras: texto(c.codigo_barras, 60),
       peso: peso as number | null,

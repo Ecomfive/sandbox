@@ -1,3 +1,4 @@
+import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
@@ -104,6 +105,7 @@ export default async function WmsProductosDropiPage() {
         codigoPais={pais.codigo}
         bodegasIniciales={bodegas}
         puedeEscribir={!usuario.modulosSoloLectura.includes("wms-productos-dropi")}
+        skusMaestros={await obtenerOpcionesSkuMaestro(supabase)}
       />
     </Pagina>
   );

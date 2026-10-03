@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fieldClass } from "@/components/ui/field";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
+import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import {
@@ -45,6 +46,7 @@ export function FichaProductoShopify({
   paisId,
   codigoPais,
   puedeEscribir,
+  skusMaestros,
 }: {
   /** null = producto nuevo. */
   id: string | null;
@@ -52,6 +54,8 @@ export function FichaProductoShopify({
   paisId: string;
   codigoPais: string;
   puedeEscribir: boolean;
+  /** Los SKU maestros que se pueden elegir para las variantes. */
+  skusMaestros: OpcionSkuMaestro[];
 }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -150,6 +154,7 @@ export function FichaProductoShopify({
   const props = { d, set, codigoPais };
 
   return (
+    <ProveedorSkusMaestros opciones={skusMaestros}>
     <div className="flex flex-col gap-4">
       {/* Barra de acciones: Guardar y Descartar solo con cambios (como en Shopify); Duplicar y Eliminar en un producto guardado. */}
       <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5">
@@ -271,5 +276,6 @@ export function FichaProductoShopify({
         </div>
       )}
     </div>
+    </ProveedorSkusMaestros>
   );
 }
