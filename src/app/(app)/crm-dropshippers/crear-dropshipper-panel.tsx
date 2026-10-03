@@ -5,10 +5,11 @@ import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { DropshipperIcon, PersonaIcon } from "@/lib/nav-icons";
+import { FASES } from "@/lib/crm/areas";
 import { crearDropshipper } from "./actions";
 
 /** «Agregar» del directorio de dropshippers: la ficha para dar de alta uno (nombre y datos de contacto). */
-export function CrearDropshipperPanel({ paisId }: { paisId: string }) {
+export function CrearDropshipperPanel({ paisId, conFase }: { paisId: string; conFase: boolean }) {
   return (
     <FichaCrear
       titulo="Nuevo dropshipper"
@@ -55,6 +56,17 @@ export function CrearDropshipperPanel({ paisId }: { paisId: string }) {
                 />
               </Campo>
             </div>
+            {conFase && (
+              <Campo etiqueta="Fase" id="campo-fase-dropshipper">
+                <select id="campo-fase-dropshipper" name="fase" defaultValue="activo" className={`${fieldClass} w-full`}>
+                  {FASES.map((f) => (
+                    <option key={f.valor} value={f.valor}>
+                      {f.etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+            )}
           </Seccion>
 
           <Seccion icono={PersonaIcon} titulo="Contacto">

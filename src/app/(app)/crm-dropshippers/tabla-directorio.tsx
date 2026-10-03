@@ -1,5 +1,6 @@
 "use client";
 
+import type { AccesoCrm } from "@/lib/crm/areas";
 import { Fragment, useMemo, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { BuscarIcon } from "@/lib/nav-icons";
@@ -24,7 +25,7 @@ export function TablaDirectorio({
   paisId,
   codigoPais,
   hoy,
-  puedeEscribir,
+  acceso,
   buscarInicial = "",
 }: {
   dropshippers: FilaDropshipper[];
@@ -32,7 +33,7 @@ export function TablaDirectorio({
   paisId: string;
   codigoPais: string;
   hoy: string;
-  puedeEscribir: boolean;
+  acceso: AccesoCrm;
   /** Texto con el que abre el campo de búsqueda (lo manda el buscador global con `?buscar=`). */
   buscarInicial?: string;
 }) {
@@ -127,7 +128,7 @@ export function TablaDirectorio({
           <BotonBarra activo={verInactivos} onClick={() => setVerInactivos((v) => !v)}>Inactivos{ocultos ? ` (${ocultos})` : ""}</BotonBarra>
           <span className="flex-1" />
           <BotonDescargar def={DEF_DROPSHIPPERS} filas={filas} />
-          {puedeEscribir && <CrearDropshipperPanel paisId={paisId} />}
+          {acceso.escribeAtencion && <CrearDropshipperPanel paisId={paisId} conFase={acceso.escribeComercial} />}
         </div>
 
         <MarcoTabla ariaLabel="Directorio de dropshippers">
@@ -179,7 +180,7 @@ export function TablaDirectorio({
         alIr={setElegido}
         codigoPais={codigoPais}
         hoy={hoy}
-        puedeEscribir={puedeEscribir}
+        acceso={acceso}
       />
     </div>
   );

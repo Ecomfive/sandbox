@@ -1,3 +1,4 @@
+import { FASES } from "@/lib/crm/areas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 /** Un usuario de una plataforma (Dropi, Boxful, EFI) vinculado a un dropshipper. */
@@ -112,6 +113,12 @@ export interface FilaDropshipper {
   productos: string[];
   /** Cuentas de plataforma (Dropi…) vinculadas a este dropshipper. */
   cuentas: CuentaVinculada[];
+  /** Plataformas donde vende con nosotros, según sus cuentas vinculadas («Dropi»). */
+  plataformas: string[];
+  /** Captación: captado, en onboarding o activo. */
+  fase: string;
+  /** Líder comercial que lo lleva (id de perfil), si hay. */
+  responsableId: string | null;
   notas: string | null;
   /** Pedidos de los últimos seis meses, del más antiguo al más reciente. */
   pedidosPorMes: number[];
@@ -131,6 +138,8 @@ export interface FilaCaso {
   canal: string;
   /** Horas transcurridas desde que se abrió. */
   horasAbierto: number;
+  /** Ya se pasó al área comercial. */
+  escalado: boolean;
 }
 
 export interface ResumenCrm {
@@ -190,6 +199,21 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       opciones: () => ESTADOS.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
       agrupable: true,
       ordenGrupos: ["activo", "prospecto", "inactivo"],
+    },
+    {
+      id: "fase",
+      etiqueta: "Fase",
+      tipo: "seleccion",
+      valores: (d) => [d.fase],
+      opciones: () => FASES.map((f) => ({ valor: f.valor, etiqueta: f.etiqueta })),
+      agrupable: true,
+    },
+    {
+      id: "plataforma",
+      etiqueta: "Plataforma",
+      tipo: "seleccion",
+      valores: (d) => (d.plataformas.length ? d.plataformas : [SIN_VALOR]),
+      etiquetaSinValor: "Sin plataforma",
     },
     {
       id: "etapa",

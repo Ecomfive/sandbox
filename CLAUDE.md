@@ -746,6 +746,24 @@ convenciones técnicas del código.
   `generated always as (...) stored` (ej. `monto_neto` en `retiros`) en vez
   de calcularse en el código.
 
+- **CRM de dropshippers** (`/crm-dropshippers`, migraciones 0062, 0064, 0065 y 0066). Datos reales (ya no hay modo demo).
+  Una ficha por dropshipper; **vende en varios países** (`dropshipper_paises`, M:N) y `pais_origen` es de dónde es (por su
+  WhatsApp, formato E.164, `src/lib/crm/telefono.ts`). Los pedidos y casos llevan `pais_id` (no se suman colones y
+  dólares). La lista salió de ClickUp («CRM DROPI»): `scripts/clickup-exportar-crm.mjs` la baja a `datos-privados/`
+  (ignorada por git: son datos de clientes) y `scripts/importar-dropshippers-clickup.ts` la migra (sin `--aplicar` solo
+  informa; junta por teléfono, correo o nombre; cada tarea de origen queda completa en `dropshippers.clickup`).
+  **Cuentas de plataforma:** desde la ficha se vincula, a mano, el dropshipper con su usuario de Dropi
+  (`dropshipper_cuentas`); los pedidos de Dropi traen `user_id` y `shop`, y `crm_sincronizar_ordenes()` (la corre
+  `dropi-ingerir-ordenes.ts`) los pasa a `crm_ordenes`. El desempeño (guías, despachadas, entregadas, tasa de entrega =
+  entregadas ÷ despachadas, productos) lo suman las funciones `crm_desempeno` y `crm_productos_vendidos` por período;
+  *despachado* = ya salió de la bodega (`crm_estado_grupo`). Cada línea del pedido cuenta como una unidad.
+  **Áreas** (un solo CRM, `src/lib/crm/areas.ts`): Atención = módulo `crm-dropshippers`; Comercial = además el módulo
+  `crm-comercial`. Atención **no** ve las notas, seguimientos ni cambios comerciales: se filtran en el servidor
+  (`obtenerLineaDeTiempo`, `areaParaNota`); Comercial ve las dos. Captación: `dropshippers.fase` (captado → onboarding →
+  activo) y la «transferencia» asigna un líder comercial (`responsable_id`). Atención puede «pasar a Comercial» un caso
+  (crea un seguimiento). **Toda acción nueva del CRM** empieza con `requireModuloEscritura` del módulo de su área y
+  devuelve `{ error }`; una lectura que muestre algo comercial exige `crm-comercial`.
+
 ## Dónde vive cada cosa
 
 - `supabase/migrations/` — cambios de esquema, en orden numerado. Correr

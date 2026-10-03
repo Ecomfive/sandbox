@@ -40,6 +40,7 @@ export function FichaCrear({
   alAbrir,
   alPulsarSinCompletar,
   boton,
+  alGuardar,
   children,
 }: {
   /** Título de la cabecera: «Nuevo gasto». */
@@ -61,6 +62,8 @@ export function FichaCrear({
   alPulsarSinCompletar?: () => void;
   /** Otro botón que abre la ficha en vez de «Agregar» (p. ej. las acciones de la ficha de un dropshipper). */
   boton?: (abrir: () => void) => ReactNode;
+  /** Se llama cuando se guardó sin error (para que la ficha que la contiene vuelva a pedir lo que muestra). */
+  alGuardar?: () => void;
   children: (ayuda: AyudaFaltantes) => ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -113,6 +116,7 @@ export function FichaCrear({
         else {
           setAbierto(false);
           mostrarToast(mensajeExito);
+          alGuardar?.();
         }
       } catch {
         setError("No se pudo guardar. Inténtalo de nuevo.");

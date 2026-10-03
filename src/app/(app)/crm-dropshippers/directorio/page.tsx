@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
+import { accesoCrm } from "@/lib/crm/areas";
 import { requireModulo } from "@/lib/auth";
 import { obtenerDatosCrm } from "../datos-crm";
 import { TablaDirectorio } from "../tabla-directorio";
@@ -18,7 +19,6 @@ export default async function DirectorioDropshippersPage({
   const usuario = await requireModulo("crm-dropshippers");
   const { buscar } = await searchParams;
   const buscarInicial = typeof buscar === "string" ? buscar : "";
-  const puedeEscribir = !usuario.modulosSoloLectura.includes("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const datos = await obtenerDatosCrm(supabase, pais.id);
@@ -34,7 +34,7 @@ export default async function DirectorioDropshippersPage({
         paisId={pais.id}
         codigoPais={pais.codigo}
         hoy={datos.hoy}
-        puedeEscribir={puedeEscribir}
+        acceso={accesoCrm(usuario)}
       />
     </Pagina>
   );

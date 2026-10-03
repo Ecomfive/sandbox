@@ -14,7 +14,7 @@ import { nombrePais, type FilaDropshipper } from "./def-crm";
 const PLATAFORMAS = ["Dropi"] as const;
 
 /** «Vincular cuenta»: elige a qué usuario de la plataforma (de los que ya tienen pedidos) corresponde este dropshipper. */
-function PanelVincular({ d, codigoPais }: { d: FilaDropshipper; codigoPais: string }) {
+function PanelVincular({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codigoPais: string; alGuardar?: () => void }) {
   const paises = d.paises.length ? d.paises : [codigoPais];
   const [pais, setPais] = useState(paises.includes(codigoPais) ? codigoPais : paises[0]);
   const [plataforma, setPlataforma] = useState<string>(PLATAFORMAS[0]);
@@ -33,6 +33,7 @@ function PanelVincular({ d, codigoPais }: { d: FilaDropshipper; codigoPais: stri
 
   return (
     <FichaCrear
+      alGuardar={alGuardar}
       titulo="Vincular cuenta"
       etiquetaCrear="Vincular cuenta"
       action={vincularCuenta}

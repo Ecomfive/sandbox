@@ -1,5 +1,6 @@
 "use client";
 
+import type { AccesoCrm } from "@/lib/crm/areas";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
@@ -21,14 +22,14 @@ export function ResumenCrm({
   casos,
   codigoPais,
   hoy,
-  puedeEscribir,
+  acceso,
 }: {
   resumen: ResumenCrm;
   dropshippers: FilaDropshipper[];
   casos: FilaCaso[];
   codigoPais: string;
   hoy: string;
-  puedeEscribir: boolean;
+  acceso: AccesoCrm;
 }) {
   const [orden, setOrden] = useState<Orden>("ventas");
   const [elegido, setElegido] = useState<string | null>(null);
@@ -190,7 +191,7 @@ export function ResumenCrm({
         alIr={setElegido}
         codigoPais={codigoPais}
         hoy={hoy}
-        puedeEscribir={puedeEscribir}
+        acceso={acceso}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PedidoIcon, PersonaIcon } from "@/lib/nav-icons";
+import type { AccesoCrm } from "@/lib/crm/areas";
 import { crearCaso, crearPedidoManual, editarDropshipper, registrarInteraccion } from "./actions";
 import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, TIPOS_INTERACCION, nombrePais, type FilaDropshipper } from "./def-crm";
 
@@ -65,12 +66,13 @@ function Opciones({ lista }: { lista: readonly { valor: string; etiqueta: string
  * Abrir un caso de soporte. Con `d` es el de ese dropshipper (botón de su ficha); sin `d`, el «Agregar caso» de la
  * tabla de casos, donde primero se elige a quién.
  */
-export function PanelCaso({ d, dropshippers, codigoPais }: { d?: FilaDropshipper; dropshippers?: OpcionDropshipper[]; codigoPais: string }) {
+export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: FilaDropshipper; dropshippers?: OpcionDropshipper[]; codigoPais: string; alGuardar?: () => void }) {
   const [elegido, setElegido] = useState("");
   const opciones = dropshippers ?? [];
   const paises = d ? d.paises : (opciones.find((o) => o.id === elegido)?.paises ?? []);
   return (
     <FichaCrear
+      alGuardar={alGuardar}
       titulo="Nuevo caso"
       etiquetaBoton="Agregar caso"
       etiquetaCrear="Abrir caso"
@@ -147,9 +149,10 @@ export function PanelCaso({ d, dropshippers, codigoPais }: { d?: FilaDropshipper
 }
 
 /** Registrar a mano un pedido del dropshipper. */
-export function PanelPedido({ d, codigoPais }: { d: FilaDropshipper; codigoPais: string }) {
+export function PanelPedido({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codigoPais: string; alGuardar?: () => void }) {
   return (
     <FichaCrear
+      alGuardar={alGuardar}
       titulo="Nuevo pedido"
       etiquetaCrear="Registrar pedido"
       action={crearPedidoManual}
@@ -203,9 +206,10 @@ export function PanelPedido({ d, codigoPais }: { d: FilaDropshipper; codigoPais:
 }
 
 /** Una nota o contacto con el dropshipper (llamada, WhatsApp…): queda en su historial de interacciones. */
-export function PanelNota({ d }: { d: FilaDropshipper }) {
+export function PanelNota({ d, acceso, alGuardar }: { d: FilaDropshipper; acceso: AccesoCrm; alGuardar?: () => void }) {
   return (
     <FichaCrear
+      alGuardar={alGuardar}
       titulo="Nueva nota"
       etiquetaCrear="Guardar nota"
       action={registrarInteraccion}
@@ -215,6 +219,14 @@ export function PanelNota({ d }: { d: FilaDropshipper }) {
     >
       {({ faltante, invalido }) => (
         <Seccion icono={CalendarioIcon} titulo="Nota">
+          {acceso.escribeComercial && (
+            <Campo etiqueta="Área" id="campo-area-nota">
+              <select id="campo-area-nota" name="area" defaultValue="comercial" className={`${fieldClass} w-full`}>
+                <option value="comercial">Comercial (privada)</option>
+                <option value="atencion">Atención</option>
+              </select>
+            </Campo>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta="Tipo" id="campo-tipo-nota">
               <select id="campo-tipo-nota" name="tipo" defaultValue="whatsapp" className={`${fieldClass} w-full`}>
@@ -252,9 +264,10 @@ export function PanelNota({ d }: { d: FilaDropshipper }) {
 }
 
 /** Editar los datos de un dropshipper. La ficha lleva `key` con su id, así que al cambiar de uno arranca con sus datos. */
-export function PanelEditar({ d }: { d: FilaDropshipper }) {
+export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: () => void }) {
   return (
     <FichaCrear
+      alGuardar={alGuardar}
       titulo={`Editar ${d.nombre}`}
       etiquetaCrear="Guardar cambios"
       action={editarDropshipper}

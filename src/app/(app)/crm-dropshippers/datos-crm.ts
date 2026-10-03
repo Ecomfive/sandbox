@@ -28,7 +28,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
-    "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
+    "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
   const consultaDropshippers = (conCuentas: boolean) =>
     supabase
       .from("dropshippers")
@@ -47,7 +47,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
     supabase
       .from("casos_dropshipper")
       .select(
-        "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, dropshipper_id, dropshippers(nombre), perfiles:responsable_id(nombre)",
+        "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, escalado_en, dropshipper_id, dropshippers(nombre), perfiles:responsable_id(nombre)",
       )
       .eq("pais_id", paisId)
       .order("abierto_en", { ascending: false })
@@ -99,13 +99,18 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
         idExterno: c.id_externo,
         tienda: c.tienda_nombre,
       })),
+      fase: d.fase ?? "activo",
+      responsableId: d.responsable_id ?? null,
       etapa: d.etapa ?? null,
       productos: d.productos ?? [],
+      plataformas: [],
       notas: d.notas,
       // La serie de seis meses de la ficha se pide al abrirla cuando haya pedidos reales (fase siguiente).
       pedidosPorMes: [],
     };
   });
+
+  for (const d of dropshippers) d.plataformas = [...new Set(d.cuentas.map((c) => c.plataforma))];
 
   const ahora = Date.now();
   const casos: FilaCaso[] = (casosBd ?? []).map((c) => ({
@@ -120,6 +125,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
     numeroPedido: c.numero_pedido,
     responsable: uno<{ nombre: string | null }>(c.perfiles as Relacion<{ nombre: string | null }>)?.nombre ?? null,
     canal: c.canal,
+    escalado: !!c.escalado_en,
     horasAbierto: Math.max(0, Math.round((ahora - Date.parse(c.abierto_en)) / 3_600_000)),
   }));
 

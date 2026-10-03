@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
+import { accesoCrm } from "@/lib/crm/areas";
 import { requireModulo } from "@/lib/auth";
 import { obtenerDatosCrm } from "./datos-crm";
 import { ResumenCrm } from "./resumen-crm";
@@ -25,7 +26,7 @@ export default async function CrmDropshippersPage() {
         casos={datos.casos}
         codigoPais={pais.codigo}
         hoy={datos.hoy}
-        puedeEscribir={!usuario.modulosSoloLectura.includes("crm-dropshippers")}
+        acceso={accesoCrm(usuario)}
       />
     </Pagina>
   );

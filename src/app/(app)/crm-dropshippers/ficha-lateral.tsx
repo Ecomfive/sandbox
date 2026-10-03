@@ -1,7 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { HistorialGenerico } from "@/components/ui/historial-generico";
+import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
@@ -14,7 +13,8 @@ import {
   HistorialIcon,
   PersonaIcon,
 } from "@/lib/nav-icons";
-import { obtenerHistorialDropshipper } from "./actions";
+import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
+import { BotonEscalar, LineaDeTiempo, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { PanelCaso, PanelEditar, PanelNota, PanelPedido } from "./paneles-ficha";
@@ -100,7 +100,7 @@ export function FichaLateral({
   alIr,
   codigoPais,
   hoy,
-  puedeEscribir,
+  acceso,
 }: {
   dropshipper: FilaDropshipper | null;
   casos: FilaCaso[];
@@ -108,9 +108,12 @@ export function FichaLateral({
   alIr: (id: string) => void;
   codigoPais: string;
   hoy: string;
-  puedeEscribir: boolean;
+  acceso: AccesoCrm;
 }) {
   const d = dropshipper;
+  // Sube cuando algo de la ficha se guarda, para que la actividad y los seguimientos se vuelvan a pedir.
+  const [version, setVersion] = useState(0);
+  const alGuardar = () => setVersion((v) => v + 1);
   if (!d) {
     return (
       <aside aria-label="Ficha del dropshipper" className="rounded-[10px] border border-border bg-card px-6 py-12 text-center text-sm text-muted-foreground">
@@ -142,6 +145,7 @@ export function FichaLateral({
         <div className="flex flex-wrap gap-1.5">
           <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
           <Pastilla tono={d.nivel === "vip" ? "oscuro" : "neutro"}>{etiquetaNivel(d.nivel)}</Pastilla>
+          {d.fase !== "activo" && <Pastilla tono="aviso">{etiquetaFase(d.fase)}</Pastilla>}
           {abiertos.length > 0 && (
             <Pastilla>
               <Punto />
@@ -149,13 +153,19 @@ export function FichaLateral({
             </Pastilla>
           )}
         </div>
-        <div className={`grid gap-1.5 ${puedeEscribir ? "grid-cols-5" : "grid-cols-1"}`}>
-          {puedeEscribir && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(58px,1fr))] gap-1.5">
+          {acceso.escribeAtencion && (
             <>
-              <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} />
-              <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} />
-              <PanelNota key={`nota-${d.id}`} d={d} />
-              <PanelEditar key={`editar-${d.id}`} d={d} />
+              <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
+              <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
+              <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
+              <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
+            </>
+          )}
+          {acceso.escribeComercial && (
+            <>
+              <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />
+              <PanelFase key={`fase-${d.id}`} d={d} alGuardar={alGuardar} />
             </>
           )}
           {d.telefono ? (
@@ -233,7 +243,10 @@ export function FichaLateral({
                     {c.numeroPedido ? ` · ${c.numeroPedido}` : ""} · {etiquetaCanal(c.canal)}
                   </p>
                 </div>
-                <span className="ml-auto text-xs whitespace-nowrap text-muted-foreground tabular-nums">{etiquetaAntiguedad(c.horasAbierto)}</span>
+                <div className="ml-auto flex flex-col items-end gap-1">
+                  <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{etiquetaAntiguedad(c.horasAbierto)}</span>
+                  {acceso.escribeAtencion && <BotonEscalar casoId={c.id} escalado={c.escalado} />}
+                </div>
               </li>
             ))}
           </ul>
@@ -241,8 +254,14 @@ export function FichaLateral({
       )}
 
       <Bloque icono={EnlaceIcon} titulo="Cuentas">
-        <CuentasDropshipper key={`cuentas-${d.id}`} d={d} codigoPais={codigoPais} puedeEscribir={puedeEscribir} />
+        <CuentasDropshipper key={`cuentas-${d.id}`} d={d} codigoPais={codigoPais} puedeEscribir={acceso.escribeAtencion} />
       </Bloque>
+
+      {acceso.comercial && (
+        <Bloque icono={AlertaIcon} titulo="Seguimientos">
+          <SeguimientosDropshipper key={`seguimientos-${d.id}`} dropshipperId={d.id} puedeEscribir={acceso.escribeComercial} version={version} />
+        </Bloque>
+      )}
 
       <Bloque icono={EstadoIcon} titulo="Desempeño en la plataforma">
         <DesempenoDropshipper key={`desempeno-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
@@ -257,7 +276,7 @@ export function FichaLateral({
       </Bloque>
 
       <Bloque icono={HistorialIcon} titulo="Actividad">
-        <HistorialGenerico id={d.id} codigoPais={codigoPais} obtener={obtenerHistorialDropshipper} />
+        <LineaDeTiempo key={`linea-${d.id}`} dropshipperId={d.id} acceso={acceso} version={version} />
       </Bloque>
     </aside>
   );
