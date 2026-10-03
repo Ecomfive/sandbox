@@ -3,10 +3,16 @@
 import { useMemo, useState, useTransition } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { BotonBarra, MarcoTabla, Pastilla, claseTd, claseTh } from "@/components/panel/piezas-panel";
+import {
+  BotonBarra,
+  MarcoTabla,
+  Pastilla,
+  claseTd,
+  claseTh,
+} from "@/components/panel/piezas-panel";
 import { formatearFecha } from "@/lib/formato";
 import { PUNTAJE_ALTO, type Candidato } from "@/lib/crm/sugerencias";
-import { vincularCuenta } from "./actions";
+import { crearDropshipperDesdeUsuario, vincularCuenta } from "./actions";
 
 export interface FilaVinculo {
   idExterno: string;
@@ -22,7 +28,14 @@ interface Opcion {
   tienda: string | null;
 }
 
-const ENCABEZADOS = ["Usuario", "Tienda en la plataforma", "Pedidos", "Último pedido", "Dropshipper", ""];
+const ENCABEZADOS = [
+  "Usuario",
+  "Tienda en la plataforma",
+  "Pedidos",
+  "Último pedido",
+  "Dropshipper",
+  "",
+];
 
 function Fila({
   fila,
@@ -43,7 +56,11 @@ function Fila({
   const [pendiente, start] = useTransition();
   const mejor = fila.sugeridos[0];
   const [elegido, setElegido] = useState(mejor?.dropshipperId ?? "");
-  const porId = useMemo(() => new Map(dropshippers.map((d) => [d.id, d])), [dropshippers]);
+  const [confirmando, setConfirmando] = useState(false);
+  const porId = useMemo(
+    () => new Map(dropshippers.map((d) => [d.id, d])),
+    [dropshippers],
+  );
   const idsSugeridos = new Set(fila.sugeridos.map((c) => c.dropshipperId));
 
   function vincular() {
@@ -57,18 +74,45 @@ function Fila({
       const r = await vincularCuenta(datos);
       if (r.error) mostrarToast(r.error, "destructive");
       else {
-        mostrarToast(`Vinculado a ${porId.get(elegido)?.nombre ?? "el dropshipper"}`);
+        mostrarToast(
+          `Vinculado a ${porId.get(elegido)?.nombre ?? "el dropshipper"}`,
+        );
         alVincular(fila.idExterno);
       }
     });
   }
 
+  function crear() {
+    const datos = new FormData();
+    datos.set("id_externo", fila.idExterno);
+    datos.set("tienda_nombre", fila.tienda ?? "");
+    datos.set("pais", codigoPais);
+    datos.set("plataforma", plataforma);
+    start(async () => {
+      const r = await crearDropshipperDesdeUsuario(datos);
+      setConfirmando(false);
+      if (r.error) mostrarToast(r.error, "destructive");
+      else {
+        mostrarToast("Dropshipper creado y vinculado");
+        alVincular(fila.idExterno);
+      }
+    });
+  }
+
+  const claseSecundario = `rounded-md border border-border bg-card px-3 py-1 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`;
+
   return (
     <tr className="hover:bg-muted">
       <td className={`${claseTd} tabular-nums`}>{fila.idExterno}</td>
-      <td className={claseTd}>{fila.tienda ?? <span className="text-muted-foreground">Sin nombre</span>}</td>
+      <td className={claseTd}>
+        {fila.tienda ?? (
+          <span className="text-muted-foreground">Sin nombre</span>
+        )}
+      </td>
       <td className={`${claseTd} tabular-nums`}>{fila.pedidos}</td>
-      <td className={claseTd}>{fila.ultimoPedido ? formatearFecha(fila.ultimoPedido) : "—"}</td>
+      <td className={claseTd}>
+        {fila.ultimoPedido ? formatearFecha(fila.ultimoPedido) : "—"}
+      </td>
       <td className={claseTd}>
         <div className="flex items-center gap-2">
           <select
@@ -99,19 +143,57 @@ function Fila({
                 ))}
             </optgroup>
           </select>
-          {mejor && elegido === mejor.dropshipperId && <Pastilla tono={mejor.puntaje >= PUNTAJE_ALTO ? "exito" : "aviso"}>{mejor.puntaje >= PUNTAJE_ALTO ? "Alta" : "Media"}</Pastilla>}
+          {mejor && elegido === mejor.dropshipperId && (
+            <Pastilla tono={mejor.puntaje >= PUNTAJE_ALTO ? "exito" : "aviso"}>
+              {mejor.puntaje >= PUNTAJE_ALTO ? "Alta" : "Media"}
+            </Pastilla>
+          )}
         </div>
       </td>
       <td className={`${claseTd} text-right`}>
         {puedeEscribir && (
-          <button
-            type="button"
-            disabled={!elegido || pendiente}
-            onClick={vincular}
-            className={`rounded-md border border-foreground bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/85 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
-          >
-            {pendiente ? "Vinculando…" : "Vincular"}
-          </button>
+          <div className="flex items-center justify-end gap-2">
+            {confirmando ? (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  ¿Crear dropshipper nuevo?
+                </span>
+                <button
+                  type="button"
+                  disabled={pendiente}
+                  onClick={crear}
+                  className={claseSecundario}
+                >
+                  {pendiente ? "Creando…" : "Sí, crear"}
+                </button>
+                <button
+                  type="button"
+                  disabled={pendiente}
+                  onClick={() => setConfirmando(false)}
+                  className={claseSecundario}
+                >
+                  No
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={pendiente}
+                onClick={() => setConfirmando(true)}
+                className={claseSecundario}
+              >
+                Crear nuevo
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={!elegido || pendiente}
+              onClick={vincular}
+              className={`rounded-md border border-foreground bg-foreground px-3 py-1 text-xs font-medium text-background hover:bg-foreground/85 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
+            >
+              {pendiente ? "Vinculando…" : "Vincular"}
+            </button>
+          </div>
         )}
       </td>
     </tr>
@@ -141,7 +223,12 @@ export function TablaVinculos({
   const [hechos, setHechos] = useState<Set<string>>(new Set());
 
   const visibles = useMemo(
-    () => filas.filter((f) => !hechos.has(f.idExterno) && (!soloSugeridos || f.sugeridos.length > 0)),
+    () =>
+      filas.filter(
+        (f) =>
+          !hechos.has(f.idExterno) &&
+          (!soloSugeridos || f.sugeridos.length > 0),
+      ),
     [filas, hechos, soloSugeridos],
   );
   const pendientes = filas.length - hechos.size;
@@ -149,12 +236,19 @@ export function TablaVinculos({
   return (
     <div className="min-w-0">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <BotonBarra activo={soloSugeridos} onClick={() => setSoloSugeridos((v) => !v)}>
+        <BotonBarra
+          activo={soloSugeridos}
+          onClick={() => setSoloSugeridos((v) => !v)}
+        >
           Con sugerencia
         </BotonBarra>
         <span className="flex-1" />
-        <span className="text-xs text-muted-foreground tabular-nums" role="status">
-          {plataforma}: {pendientes} sin vincular · {vinculados + hechos.size} vinculados
+        <span
+          className="text-xs text-muted-foreground tabular-nums"
+          role="status"
+        >
+          {plataforma}: {pendientes} sin vincular · {vinculados + hechos.size}{" "}
+          vinculados
         </span>
       </div>
 
@@ -172,8 +266,13 @@ export function TablaVinculos({
           <tbody>
             {visibles.length === 0 ? (
               <tr>
-                <td colSpan={ENCABEZADOS.length} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  {pendientes === 0 ? "Todos los usuarios con pedidos están vinculados." : "Ningún usuario tiene sugerencia."}
+                <td
+                  colSpan={ENCABEZADOS.length}
+                  className="px-3 py-8 text-center text-sm text-muted-foreground"
+                >
+                  {pendientes === 0
+                    ? "Todos los usuarios con pedidos están vinculados."
+                    : "Ningún usuario tiene sugerencia."}
                 </td>
               </tr>
             ) : (

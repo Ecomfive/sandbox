@@ -690,3 +690,56 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
   items.sort((a, b) => Date.parse(b.creadoEn) - Date.parse(a.creadoEn));
   return { items: items.slice(0, 80), verComercial: acceso.comercial };
 }
+
+/**
+ * Crea un dropshipper a partir de un usuario de la plataforma que no está en el CRM y lo vincula en un solo paso. El
+ * nombre es el de su tienda en la plataforma (se corrige después desde la ficha); no tiene más datos de contacto.
+ */
+export async function crearDropshipperDesdeUsuario(formData: FormData): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO_ATENCION);
+  const id_externo = texto(formData, "id_externo");
+  const tienda = texto(formData, "tienda_nombre") || null;
+  if (!/^[\w.-]{1,64}$/.test(id_externo)) return { error: "Usuario no válido." };
+
+  const supabase = createServiceClient();
+  const [{ data: pais }, { data: plat }] = await Promise.all([
+    supabase.from("paises").select("id").eq("codigo", texto(formData, "pais")).maybeSingle(),
+    supabase.from("plataformas").select("id, nombre").eq("nombre", texto(formData, "plataforma")).maybeSingle(),
+  ]);
+  if (!pais || !plat) return { error: "Elige el país y la plataforma." };
+
+  // Si el usuario ya se vinculó (otra persona, otra pestaña), no se crea un duplicado.
+  const { data: yaVinculado } = await supabase
+    .from("dropshipper_cuentas")
+    .select("id")
+    .eq("plataforma_id", plat.id)
+    .eq("pais_id", pais.id)
+    .eq("id_externo", id_externo)
+    .maybeSingle();
+  if (yaVinculado) return { error: "Ese usuario ya está vinculado a un dropshipper." };
+
+  const nombre = (tienda ?? `Usuario ${id_externo} (${plat.nombre})`).slice(0, 200);
+  const { data: nuevo, error } = await supabase
+    .from("dropshippers")
+    .insert({ pais_id: pais.id, nombre, tienda, estado: "activo" })
+    .select("id")
+    .single();
+  if (error) return { error: "No se pudo crear el dropshipper." };
+
+  const [{ error: e1 }, { error: e2 }] = await Promise.all([
+    supabase.from("dropshipper_paises").insert({ dropshipper_id: nuevo.id, pais_id: pais.id }),
+    supabase.from("dropshipper_cuentas").insert({ dropshipper_id: nuevo.id, plataforma_id: plat.id, pais_id: pais.id, id_externo, tienda_nombre: tienda }),
+  ]);
+  if (e1 || e2) {
+    await supabase.from("dropshippers").delete().eq("id", nuevo.id);
+    return { error: "No se pudo vincular la cuenta." };
+  }
+  await registrarAuditoria({
+    accion: "crear_dropshipper",
+    entidad: "dropshippers",
+    entidadId: nuevo.id,
+    detalle: `nombre=${nombre} (desde el usuario ${id_externo} de ${plat.nombre})`,
+  });
+  revalidatePath("/crm-dropshippers", "layout");
+  return {};
+}
