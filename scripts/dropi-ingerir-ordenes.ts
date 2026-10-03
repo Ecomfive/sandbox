@@ -157,6 +157,11 @@ async function main() {
   }
 
   console.log(`Normalizadas ${filasOrdenes.length} ordenes.`);
+
+  // Pedidos por dropshipper del CRM (migración 0065). Si todavía no se corrió, solo avisa.
+  const { data: sincronizadas, error: errorCrm } = await supabase.rpc("crm_sincronizar_ordenes");
+  if (errorCrm) console.log(`Aviso: no se actualizaron los pedidos del CRM (${errorCrm.message}).`);
+  else console.log(`Pedidos del CRM actualizados: ${sincronizadas}.`);
   if (duplicadas > 0) {
     console.log(`Aviso: ${duplicadas} ordenes aparecian repetidas entre paginas (misma orden, una fila).`);
   }

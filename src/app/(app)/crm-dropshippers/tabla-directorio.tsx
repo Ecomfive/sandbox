@@ -179,6 +179,7 @@ export function TablaDirectorio({
         alIr={setElegido}
         codigoPais={codigoPais}
         hoy={hoy}
+        puedeEscribir={puedeEscribir}
       />
     </div>
   );

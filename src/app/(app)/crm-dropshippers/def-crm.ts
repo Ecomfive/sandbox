@@ -1,5 +1,14 @@
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
+/** Un usuario de una plataforma (Dropi, Boxful, EFI) vinculado a un dropshipper. */
+export interface CuentaVinculada {
+  id: string;
+  plataforma: string;
+  codigoPais: string;
+  idExterno: string;
+  tienda: string | null;
+}
+
 export const ESTADOS = [
   { valor: "prospecto", etiqueta: "Prospecto" },
   { valor: "activo", etiqueta: "Activo" },
@@ -101,6 +110,8 @@ export interface FilaDropshipper {
   etapa: string | null;
   /** Productos que vende u ofrece. */
   productos: string[];
+  /** Cuentas de plataforma (Dropi…) vinculadas a este dropshipper. */
+  cuentas: CuentaVinculada[];
   notas: string | null;
   /** Pedidos de los últimos seis meses, del más antiguo al más reciente. */
   pedidosPorMes: number[];

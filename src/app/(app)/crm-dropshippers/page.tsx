@@ -11,7 +11,7 @@ export const metadata = { title: "CRM Dropshippers" };
 export const dynamic = "force-dynamic";
 
 export default async function CrmDropshippersPage() {
-  await requireModulo("crm-dropshippers");
+  const usuario = await requireModulo("crm-dropshippers");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const datos = await obtenerDatosCrm(supabase, pais.id);
@@ -25,6 +25,7 @@ export default async function CrmDropshippersPage() {
         casos={datos.casos}
         codigoPais={pais.codigo}
         hoy={datos.hoy}
+        puedeEscribir={!usuario.modulosSoloLectura.includes("crm-dropshippers")}
       />
     </Pagina>
   );

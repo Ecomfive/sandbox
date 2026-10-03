@@ -15,6 +15,8 @@ import {
   PersonaIcon,
 } from "@/lib/nav-icons";
 import { obtenerHistorialDropshipper } from "./actions";
+import { CuentasDropshipper } from "./cuentas-dropshipper";
+import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { PanelCaso, PanelEditar, PanelNota, PanelPedido } from "./paneles-ficha";
 import {
   etiquetaAntiguedad,
@@ -98,6 +100,7 @@ export function FichaLateral({
   alIr,
   codigoPais,
   hoy,
+  puedeEscribir,
 }: {
   dropshipper: FilaDropshipper | null;
   casos: FilaCaso[];
@@ -105,6 +108,7 @@ export function FichaLateral({
   alIr: (id: string) => void;
   codigoPais: string;
   hoy: string;
+  puedeEscribir: boolean;
 }) {
   const d = dropshipper;
   if (!d) {
@@ -145,11 +149,15 @@ export function FichaLateral({
             </Pastilla>
           )}
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
-          <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} />
-          <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} />
-          <PanelNota key={`nota-${d.id}`} d={d} />
-          <PanelEditar key={`editar-${d.id}`} d={d} />
+        <div className={`grid gap-1.5 ${puedeEscribir ? "grid-cols-5" : "grid-cols-1"}`}>
+          {puedeEscribir && (
+            <>
+              <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} />
+              <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} />
+              <PanelNota key={`nota-${d.id}`} d={d} />
+              <PanelEditar key={`editar-${d.id}`} d={d} />
+            </>
+          )}
           {d.telefono ? (
             <a
               href={`https://wa.me/${d.telefono.replace(/\D/g, "")}`}
@@ -231,6 +239,14 @@ export function FichaLateral({
           </ul>
         </Bloque>
       )}
+
+      <Bloque icono={EnlaceIcon} titulo="Cuentas">
+        <CuentasDropshipper key={`cuentas-${d.id}`} d={d} codigoPais={codigoPais} puedeEscribir={puedeEscribir} />
+      </Bloque>
+
+      <Bloque icono={EstadoIcon} titulo="Desempeño en la plataforma">
+        <DesempenoDropshipper key={`desempeno-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
+      </Bloque>
 
       <Bloque icono={EnlaceIcon} titulo="Conversación">
         <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">

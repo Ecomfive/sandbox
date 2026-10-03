@@ -21,12 +21,14 @@ export function ResumenCrm({
   casos,
   codigoPais,
   hoy,
+  puedeEscribir,
 }: {
   resumen: ResumenCrm;
   dropshippers: FilaDropshipper[];
   casos: FilaCaso[];
   codigoPais: string;
   hoy: string;
+  puedeEscribir: boolean;
 }) {
   const [orden, setOrden] = useState<Orden>("ventas");
   const [elegido, setElegido] = useState<string | null>(null);
@@ -188,6 +190,7 @@ export function ResumenCrm({
         alIr={setElegido}
         codigoPais={codigoPais}
         hoy={hoy}
+        puedeEscribir={puedeEscribir}
       />
     </div>
   );

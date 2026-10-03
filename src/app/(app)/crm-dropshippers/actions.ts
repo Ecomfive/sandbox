@@ -293,3 +293,163 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
   revalidatePath("/crm-dropshippers", "layout");
   return {};
 }
+
+// ---- Cuentas de plataforma vinculadas (Dropi hoy; Boxful y EFI cuando lleguen) y su desempeño ----
+
+export interface UsuarioPlataforma {
+  idExterno: string;
+  tienda: string | null;
+  pedidos: number;
+  ultimoPedido: string | null;
+  dropshipperId: string | null;
+  dropshipperNombre: string | null;
+}
+
+/** Los usuarios de una plataforma que tienen pedidos en un país, para elegir a cuál vincular un dropshipper. */
+export async function listarUsuariosPlataforma(
+  codigoPais: string,
+  plataforma: string,
+): Promise<{ usuarios: UsuarioPlataforma[] } | { error: string }> {
+  await requireModulo("crm-dropshippers");
+  const supabase = createServiceClient();
+  const [{ data: pais }, { data: plat }] = await Promise.all([
+    supabase.from("paises").select("id").eq("codigo", codigoPais).maybeSingle(),
+    supabase.from("plataformas").select("id").eq("nombre", plataforma).maybeSingle(),
+  ]);
+  if (!pais || !plat) return { error: "País o plataforma no válidos." };
+  const { data, error } = await supabase.rpc("crm_usuarios_plataforma", { p_plataforma: plat.id, p_pais: pais.id });
+  if (error) return { error: "No se pudo cargar la lista de usuarios." };
+  return {
+    usuarios: (data ?? []).map((u: Record<string, unknown>) => ({
+      idExterno: String(u.id_externo),
+      tienda: (u.tienda_nombre as string | null) ?? null,
+      pedidos: Number(u.pedidos),
+      ultimoPedido: (u.ultimo_pedido as string | null) ?? null,
+      dropshipperId: (u.dropshipper_id as string | null) ?? null,
+      dropshipperNombre: (u.dropshipper_nombre as string | null) ?? null,
+    })),
+  };
+}
+
+/** Vincula un dropshipper con un usuario de una plataforma. Devuelve el error como valor (ver `crearDropshipper`). */
+export async function vincularCuenta(formData: FormData): Promise<{ error?: string }> {
+  await requireModuloEscritura("crm-dropshippers");
+  const dropshipper_id = texto(formData, "dropshipper_id");
+  const id_externo = texto(formData, "id_externo");
+  const tienda_nombre = texto(formData, "tienda_nombre") || null;
+  if (!ES_ID(dropshipper_id)) return { error: "Dropshipper no válido." };
+  if (!/^[\w.-]{1,64}$/.test(id_externo)) return { error: "Elige el usuario de la plataforma." };
+
+  const supabase = createServiceClient();
+  const [{ data: pais }, { data: plat }] = await Promise.all([
+    supabase.from("paises").select("id").eq("codigo", texto(formData, "pais")).maybeSingle(),
+    supabase.from("plataformas").select("id, nombre").eq("nombre", texto(formData, "plataforma")).maybeSingle(),
+  ]);
+  if (!pais || !plat) return { error: "Elige el país y la plataforma." };
+
+  const { error } = await supabase
+    .from("dropshipper_cuentas")
+    .insert({ dropshipper_id, plataforma_id: plat.id, pais_id: pais.id, id_externo, tienda_nombre });
+  if (error) {
+    return { error: error.code === "23505" ? "Ese usuario ya está vinculado a un dropshipper." : "No se pudo vincular la cuenta." };
+  }
+  // Para que sus cifras de ese país aparezcan en el directorio, el dropshipper debe vender en él.
+  await supabase.from("dropshipper_paises").upsert({ dropshipper_id, pais_id: pais.id }, { onConflict: "dropshipper_id,pais_id", ignoreDuplicates: true });
+  await registrarAuditoria({
+    accion: "vincular_cuenta_dropshipper",
+    entidad: "dropshippers",
+    entidadId: dropshipper_id,
+    detalle: `${plat.nombre} usuario ${id_externo}${tienda_nombre ? ` (${tienda_nombre})` : ""}`,
+  });
+  revalidatePath("/crm-dropshippers", "layout");
+  return {};
+}
+
+/** Quita el vínculo con una cuenta de plataforma (los pedidos siguen guardados; solo dejan de contarse para el dropshipper). */
+export async function desvincularCuenta(cuentaId: string): Promise<{ error?: string }> {
+  await requireModuloEscritura("crm-dropshippers");
+  if (!ES_ID(cuentaId)) return { error: "Cuenta no válida." };
+  const supabase = createServiceClient();
+  const { data: cuenta } = await supabase
+    .from("dropshipper_cuentas")
+    .select("dropshipper_id, id_externo, plataformas(nombre)")
+    .eq("id", cuentaId)
+    .maybeSingle();
+  if (!cuenta) return { error: "La cuenta ya no existe." };
+  const { error } = await supabase.from("dropshipper_cuentas").delete().eq("id", cuentaId);
+  if (error) return { error: "No se pudo desvincular." };
+  const plataforma = Array.isArray(cuenta.plataformas) ? cuenta.plataformas[0]?.nombre : (cuenta.plataformas as { nombre: string } | null)?.nombre;
+  await registrarAuditoria({
+    accion: "desvincular_cuenta_dropshipper",
+    entidad: "dropshippers",
+    entidadId: cuenta.dropshipper_id,
+    detalle: `${plataforma ?? "Plataforma"} usuario ${cuenta.id_externo}`,
+  });
+  revalidatePath("/crm-dropshippers", "layout");
+  return {};
+}
+
+export interface DesempenoPais {
+  codigoPais: string;
+  pedidos: number;
+  despachados: number;
+  entregados: number;
+  devueltos: number;
+  cancelados: number;
+  conNovedad: number;
+  ventas: number;
+}
+export interface ProductoVendido {
+  producto: string;
+  sku: string | null;
+  unidades: number;
+  entregadas: number;
+}
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Lo que hizo un dropshipper en Dropi (u otra plataforma vinculada) entre dos fechas: guías, despachadas, entregadas,
+ * tasa de entrega y productos. Las sumas las hace Postgres (`crm_desempeno`, `crm_productos_vendidos`). Es una lectura:
+ * basta poder abrir el CRM. Devuelve el error como valor.
+ */
+export async function obtenerDesempeno(
+  dropshipperId: string,
+  desde: string,
+  hasta: string,
+): Promise<{ paises: DesempenoPais[]; productos: ProductoVendido[] } | { error: string }> {
+  await requireModulo("crm-dropshippers");
+  if (!ES_ID(dropshipperId)) return { error: "Dropshipper no válido." };
+  if (!FECHA_ISO.test(desde) || !FECHA_ISO.test(hasta) || Number.isNaN(Date.parse(desde)) || Number.isNaN(Date.parse(hasta))) {
+    return { error: "Las fechas no son válidas." };
+  }
+  if (desde > hasta) return { error: "La fecha de inicio es posterior a la final." };
+  if (Date.parse(hasta) - Date.parse(desde) > 3 * 366 * 86_400_000) return { error: "Elige un período de hasta 3 años." };
+
+  const supabase = createServiceClient();
+  const [resumen, productos, paises] = await Promise.all([
+    supabase.rpc("crm_desempeno", { p_dropshipper: dropshipperId, p_desde: desde, p_hasta: hasta }),
+    supabase.rpc("crm_productos_vendidos", { p_dropshipper: dropshipperId, p_desde: desde, p_hasta: hasta }),
+    supabase.from("paises").select("id, codigo"),
+  ]);
+  if (resumen.error || productos.error) return { error: "No se pudo cargar el desempeño." };
+  const codigo = new Map((paises.data ?? []).map((p) => [p.id as string, p.codigo as string]));
+  return {
+    paises: (resumen.data ?? []).map((r: Record<string, unknown>) => ({
+      codigoPais: codigo.get(r.pais_id as string) ?? "—",
+      pedidos: Number(r.pedidos),
+      despachados: Number(r.despachados),
+      entregados: Number(r.entregados),
+      devueltos: Number(r.devueltos),
+      cancelados: Number(r.cancelados),
+      conNovedad: Number(r.con_novedad),
+      ventas: Number(r.ventas),
+    })),
+    productos: (productos.data ?? []).map((p: Record<string, unknown>) => ({
+      producto: String(p.producto),
+      sku: (p.sku as string | null) ?? null,
+      unidades: Number(p.unidades),
+      entregadas: Number(p.entregadas),
+    })),
+  };
+}

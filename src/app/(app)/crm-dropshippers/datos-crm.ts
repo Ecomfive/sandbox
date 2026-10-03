@@ -27,14 +27,21 @@ const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) 
 export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
 
-  const [{ data: filas }, { data: sumas }, { data: casosBd }] = await Promise.all([
+  const CAMPOS_DROPSHIPPER =
+    "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
+  const consultaDropshippers = (conCuentas: boolean) =>
     supabase
       .from("dropshippers")
       .select(
-        "id, codigo, nombre, tienda, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))",
+        conCuentas
+          ? `${CAMPOS_DROPSHIPPER}, dropshipper_cuentas(id, id_externo, tienda_nombre, plataformas(nombre), paises(codigo))`
+          : CAMPOS_DROPSHIPPER,
       )
       .order("nombre")
-      .limit(2000),
+      .limit(2000);
+
+  const [conCuentas, { data: sumas }, { data: casosBd }] = await Promise.all([
+    consultaDropshippers(true),
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
     supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos").eq("pais_id", paisId),
     supabase
@@ -46,6 +53,11 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
       .order("abierto_en", { ascending: false })
       .limit(500),
   ]);
+
+  // Plan B: si la migración 0065 (cuentas vinculadas) todavía no se corrió, el directorio se lee sin ellas.
+  const filas = (conCuentas.error ? (await consultaDropshippers(false)).data : conCuentas.data) as unknown as
+    | (Record<string, any>)[] // eslint-disable-line @typescript-eslint/no-explicit-any
+    | null;
 
   const sumaPorId = new Map((sumas ?? []).map((s) => [s.id as string, s]));
   // Se listan todos los dropshippers, venda donde venda: «Vende en» filtra por país. Las cifras del mes son del país elegido.
@@ -74,6 +86,19 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
       ultimoPedido: s?.ultimo_pedido ?? null,
       casosAbiertos: Number(s?.casos_abiertos ?? 0),
       etiquetas: d.etiquetas ?? [],
+      cuentas: ((d.dropshipper_cuentas ?? []) as unknown as {
+        id: string;
+        id_externo: string;
+        tienda_nombre: string | null;
+        plataformas: Relacion<{ nombre: string }>;
+        paises: Relacion<{ codigo: string }>;
+      }[]).map((c) => ({
+        id: c.id,
+        plataforma: uno<{ nombre: string }>(c.plataformas)?.nombre ?? "—",
+        codigoPais: uno<{ codigo: string }>(c.paises)?.codigo ?? "—",
+        idExterno: c.id_externo,
+        tienda: c.tienda_nombre,
+      })),
       etapa: d.etapa ?? null,
       productos: d.productos ?? [],
       notas: d.notas,
