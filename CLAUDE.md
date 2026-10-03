@@ -757,6 +757,9 @@ convenciones técnicas del código.
   `dropi-ingerir-ordenes.ts`) los pasa a `crm_ordenes`. El desempeño (guías, despachadas, entregadas, tasa de entrega =
   entregadas ÷ despachadas, productos) lo suman las funciones `crm_desempeno` y `crm_productos_vendidos` por período;
   *despachado* = ya salió de la bodega (`crm_estado_grupo`). Cada línea del pedido cuenta como una unidad.
+  La pestaña **Vínculos** (`/crm-dropshippers/vinculos`) lista los usuarios de Dropi con pedidos que no son de ningún
+  dropshipper, de más a menos pedidos, con una sugerencia por parecido del nombre de la tienda (`src/lib/crm/sugerencias.ts`;
+  Dropi no manda más datos del dropshipper): se confirma uno a uno, nunca se vincula solo.
   **Áreas** (un solo CRM, `src/lib/crm/areas.ts`): Atención = módulo `crm-dropshippers`; Comercial = además el módulo
   `crm-comercial`. Atención **no** ve las notas, seguimientos ni cambios comerciales: se filtran en el servidor
   (`obtenerLineaDeTiempo`, `areaParaNota`); Comercial ve las dos. Captación: `dropshippers.fase` (captado → onboarding →

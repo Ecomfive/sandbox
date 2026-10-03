@@ -8,6 +8,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { EnlaceIcon, MasIcon } from "@/lib/nav-icons";
 import { desvincularCuenta, listarUsuariosPlataforma, vincularCuenta, type UsuarioPlataforma } from "./actions";
+import { PUNTAJE_MINIMO, parecido } from "@/lib/crm/sugerencias";
 import { nombrePais, type FilaDropshipper } from "./def-crm";
 
 /** Plataformas con pedidos que ya llegan al sistema. Boxful y EFI se suman aquí cuando tengan datos. */
@@ -30,6 +31,11 @@ function PanelVincular({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codig
   }
 
   const usuario = Array.isArray(usuarios) ? usuarios.find((u) => u.idExterno === elegido) : undefined;
+  // Los usuarios cuya tienda se parece a este dropshipper van primero, marcados con ★ (sin vincular a otro).
+  const ordenados = (Array.isArray(usuarios) ? usuarios : [])
+    .map((u) => ({ u, puntaje: Math.max(parecido(u.tienda, d.tienda), parecido(u.tienda, d.nombre) * 0.9) }))
+    .map((x) => ({ ...x, sugerido: x.puntaje >= PUNTAJE_MINIMO && (!x.u.dropshipperId || x.u.dropshipperId === d.id) }))
+    .sort((a, b) => Number(b.sugerido) - Number(a.sugerido) || b.puntaje - a.puntaje);
 
   return (
     <FichaCrear
@@ -110,8 +116,9 @@ function PanelVincular({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codig
                 className={`${fieldClass} w-full`}
               >
                 <option value="">{usuarios === null ? "Cargando…" : "Selecciona un usuario"}</option>
-                {(usuarios ?? []).map((u) => (
+                {ordenados.map(({ u, sugerido }) => (
                   <option key={u.idExterno} value={u.idExterno} disabled={!!u.dropshipperId && u.dropshipperId !== d.id}>
+                    {sugerido ? "★ " : ""}
                     {u.tienda ?? "Sin tienda"} · usuario {u.idExterno} · {u.pedidos} {u.pedidos === 1 ? "pedido" : "pedidos"}
                     {u.dropshipperNombre ? ` · de ${u.dropshipperNombre}` : ""}
                   </option>
