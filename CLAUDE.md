@@ -520,7 +520,7 @@ convenciones técnicas del código.
   error al eliminar una fila **no** va en una caja pegada a la celda (tapa las filas de
   abajo): va como aviso (`useToast`, `mensajeErrorAlEliminar`).
 - **Menú lateral: riel de áreas + panel, con tres frentes** (modelado sobre el de Mi Reto Digital para que su importación futura
-  encaje). El riel (`src/components/sidebar.tsx`) lleva **Desempeño, Favoritos, Marketing, Operación, Finanzas y Equipo** y, abajo,
+  encaje). El riel (`src/components/sidebar.tsx`) lleva **Desempeño, Favoritos, Marketing, Clientes, Investigación, Operación, Finanzas y Equipo** y, abajo,
   **Avisos** (con el contador de pendientes; es el Centro de notificaciones), **Ajustes** y el botón que oculta el panel. Al lado,
   el panel muestra solo el área elegida (su título puede ser más descriptivo: «Marketing y ventas», «Operaciones», «Recursos
   humanos», campo `panel`) o, si se pulsa **Favoritos**, los accesos rápidos de la persona (la estrella `FavoritoToggle` de cada
@@ -531,9 +531,10 @@ convenciones técnicas del código.
   son del frente Fulfillment** (las fichas de producto de Shopify y de Dropi ya **no están en el menú**: se llega desde Producto, y siguen
   registradas en un área oculta «Fichas de canal» para migas, buscador y favoritos) (en Operación, no en Marketing): el producto entra por el WMS y sale por Proveeduría
   (dropshippers) o por Fulfillment hacia tiendas, de un tercero a quien solo se le presta el servicio (Clicksy) o propias
-  (Kenku, Nuvo, Wao Ofertas y Ofertfy); Compras también es de Fulfillment (el fulfillment se gestiona desde el WMS); solo Pedidos Dropi sigue en Proveeduría. En un negocio de dropshipping el
-  catálogo sí sería parte de vender, aquí no. Productos Test, el CRM y
-  la Inteligencia competitiva están en Marketing. `AREAS` sigue siendo una lista plana de páginas por área (migas, buscador,
+  (Kenku, Nuvo, Wao Ofertas y Ofertfy); Compras también es de Fulfillment (el fulfillment se gestiona desde el WMS) y ya no tiene pestaña de Filtros; solo Pedidos Dropi sigue en Proveeduría. En un negocio de dropshipping el
+  catálogo sí sería parte de vender, aquí no. Marketing tiene Productos Test y **Filtro de productos** (`/filtro-productos`, módulo `filtro-productos`; antes era la
+  pestaña «Filtros» de Compras y `/compras/filtros` redirige aquí); **Clientes** tiene el CRM de dropshippers e
+  **Investigación** la Inteligencia competitiva. `AREAS` sigue siendo una lista plana de páginas por área (migas, buscador,
   contadores y `encontrarSeccionActiva` no cambian); un área con `oculta: true` (Avisos) no tiene botón en el riel pero cuenta
   para migas, buscador y fijados. **Una página nueva del menú se agrega a su área y frente en `AREAS`** (con una prueba en
   `nav-data.test.ts` si cambia el reparto). Al pulsar un área solo cambia el panel; al navegar, el panel pasa al área de la

@@ -50,10 +50,19 @@ const AREAS: NavSection[] = [
     panel: "Marketing y ventas",
     frentes: true,
     items: [
-      { label: "CRM Dropshippers", href: "/crm-dropshippers", dropi: true, frente: "proveeduria" },
-      { label: "Inteligencia competitiva", href: "/inteligencia-competitiva", dropi: true, frente: "proveeduria" },
       { label: "Productos Test", href: "/productos-test", frente: "proveeduria" },
+      { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria" },
     ],
+  },
+  {
+    title: "Clientes",
+    frentes: true,
+    items: [{ label: "CRM Dropshippers", href: "/crm-dropshippers", dropi: true, frente: "proveeduria" }],
+  },
+  {
+    title: "Investigación",
+    frentes: true,
+    items: [{ label: "Inteligencia competitiva", href: "/inteligencia-competitiva", dropi: true, frente: "proveeduria" }],
   },
   {
     title: "Operación",

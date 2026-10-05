@@ -10,7 +10,7 @@ const hrefs = (titulo: string) => (area(titulo)?.items ?? []).map((i) => i.href)
 test("el riel tiene las áreas acordadas y Avisos va oculto", () => {
   assert.deepEqual(
     areas.filter((a) => !a.oculta).map((a) => a.title),
-    ["Desempeño", "Marketing", "Operación", "Finanzas", "Equipo"],
+    ["Desempeño", "Marketing", "Clientes", "Investigación", "Operación", "Finanzas", "Equipo"],
   );
   assert.equal(area("Avisos")?.oculta, true);
 });
@@ -25,6 +25,14 @@ test("Compras y Producto están en Operación, no en Marketing", () => {
     assert.ok(!hrefs("Marketing").includes(ruta), `${ruta} no en Marketing`);
   }
   assert.ok(hrefs("Marketing").includes("/productos-test"), "Productos Test sigue en Marketing");
+});
+
+test("CRM en Clientes, Inteligencia competitiva en Investigación y Filtro de productos en Marketing", () => {
+  assert.deepEqual(hrefs("Clientes"), ["/crm-dropshippers"]);
+  assert.deepEqual(hrefs("Investigación"), ["/inteligencia-competitiva"]);
+  assert.ok(hrefs("Marketing").includes("/filtro-productos"));
+  for (const ruta of ["/crm-dropshippers", "/inteligencia-competitiva"]) assert.ok(!hrefs("Marketing").includes(ruta), ruta);
+  assert.ok(!hrefs("Operación").includes("/filtro-productos"));
 });
 
 test("Usuarios y roles queda afuera de los frentes", () => {
@@ -53,8 +61,8 @@ test("una página de Dropi se oculta si Dropi no tiene datos en el país", () =>
 });
 
 test("el área activa se encuentra por la ruta, también en una subpágina", () => {
-  assert.equal(encontrarSeccionActiva("/compras/filtros", areas), "Operación");
-  assert.equal(encontrarSeccionActiva("/crm-dropshippers/casos", areas), "Marketing");
+  assert.equal(encontrarSeccionActiva("/compras/nueva", areas), "Operación");
+  assert.equal(encontrarSeccionActiva("/crm-dropshippers/casos", areas), "Clientes");
   assert.equal(encontrarSeccionActiva("/notificaciones", areas), "Avisos");
   assert.equal(encontrarSeccionActiva("/", areas), "Desempeño");
 });
