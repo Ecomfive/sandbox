@@ -18,6 +18,8 @@ interface ProductoBd {
   nombre: string;
   tipo: string;
   clase: string;
+  codigo_barras: string | null;
+  codigo_barras_origen: string | null;
   creado_en: string;
 }
 
@@ -36,7 +38,7 @@ export default async function ProductoPage() {
 
   const { data: productos } = await supabase
     .from("skus_maestros")
-    .select("id, codigo, nombre, tipo, clase, creado_en")
+    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, creado_en")
     .order("creado_en", { ascending: false });
   const lista: ProductoBd[] = productos ?? [];
 
@@ -95,6 +97,8 @@ export default async function ProductoPage() {
     nombre: p.nombre,
     tipo: p.tipo,
     clase: p.clase,
+    codigoBarras: p.codigo_barras,
+    codigoBarrasOrigen: p.codigo_barras_origen,
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],

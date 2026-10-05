@@ -31,6 +31,9 @@ export interface FilaProducto {
   nombre: string;
   tipo: string;
   clase: string;
+  /** El EAN/UPC/GTIN del fabricante o el interno que generó el sistema; null si no tiene. */
+  codigoBarras: string | null;
+  codigoBarrasOrigen: string | null;
   /** Solo los compuestos: "2× 1001, 1× 1002". */
   componentes: string;
   /** Día en que se creó (AAAA-MM-DD). */
@@ -42,7 +45,7 @@ export interface FilaProducto {
 export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
   clave: "producto",
   campos: [
-    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => `${p.codigo} ${p.nombre}` },
+    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => `${p.codigo} ${p.nombre} ${p.codigoBarras ?? ""}` },
     {
       id: "clase",
       etiqueta: "Clase",
@@ -66,6 +69,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
     { etiqueta: "Producto", valor: (p) => p.nombre },
     { etiqueta: "Tipo", valor: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
     { etiqueta: "Clase", valor: (p) => ETIQUETA_CLASE[p.clase] ?? p.clase },
+    { etiqueta: "Código de barras", valor: (p) => p.codigoBarras ?? "" },
     { etiqueta: "Componentes", valor: (p) => p.componentes },
   ],
 };

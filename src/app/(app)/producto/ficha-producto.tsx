@@ -13,6 +13,7 @@ import { BotonAccion } from "@/components/ui/boton-accion";
 import { CalendarioIcon, CatalogoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, FlechaIzquierdaIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import { formatearFecha } from "@/lib/formato";
 import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
+import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -158,6 +159,18 @@ export function FichaProducto({
                 <p className="text-sm">{producto.componentes || "—"}</p>
               </Seccion>
             )}
+
+            <Seccion icono={CatalogoIcon} titulo="Código de barras">
+              <CodigoBarrasProducto
+                key={producto.id}
+                id={producto.id}
+                codigoBarras={producto.codigoBarras}
+                origen={producto.codigoBarrasOrigen}
+                nombre={producto.nombre}
+                sku={producto.codigo}
+                puedeEscribir={puedeEscribir}
+              />
+            </Seccion>
 
             <Seccion icono={InventarioIcon} titulo="Inventario">
               {esTest ? (

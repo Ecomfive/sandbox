@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { esCodigoBarrasValido, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { ETIQUETA_CLASE } from "./def-producto";
 
 const MODULO = "producto";
@@ -23,6 +24,9 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   const codigo = texto(formData, "codigo");
   const tipo = texto(formData, "tipo");
   const clase = texto(formData, "clase");
+  // El código de barras es opcional: se escribe el del fabricante o se pide uno interno (no las dos cosas).
+  const barras = normalizarCodigoBarras(texto(formData, "codigo_barras"));
+  const generarBarras = texto(formData, "generar_barras") === "1";
 
   if (!nombre) return { error: "Escribe el nombre del producto." };
   if (nombre.length > 200) return { error: "El nombre es muy largo (máximo 200 caracteres)." };
@@ -30,6 +34,8 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   if (codigo.length > 60 || /\s/.test(codigo)) return { error: "El SKU no puede llevar espacios ni pasar de 60 caracteres." };
   if (tipo !== "simple" && tipo !== "combo") return { error: "Elige si es simple o compuesto." };
   if (clase !== "fisico" && clase !== "test") return { error: "Elige si es físico o de prueba (test)." };
+  if (barras && generarBarras) return { error: "Escribe el código de barras o pide uno interno, no las dos cosas." };
+  if (barras && !esCodigoBarrasValido(barras)) return { error: "El código de barras no es válido: debe ser un EAN-8, UPC-A, EAN-13 o GTIN-14 con su dígito de control correcto." };
 
   // Un compuesto: pares (componente, cantidad), sin repetir un componente.
   const ids = formData.getAll("componente_id").map(String);
@@ -52,10 +58,13 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
 
   const { data, error } = await supabase
     .from("skus_maestros")
-    .insert({ codigo, nombre, tipo, clase, estado: "aprobado", creado_por: usuario.id })
+    .insert({ codigo, nombre, tipo, clase, estado: "aprobado", creado_por: usuario.id, ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : {}) })
     .select("id")
     .single();
-  if (error) return { error: error.code === "23505" ? "Ya hay un producto con ese SKU." : "No se pudo crear el producto." };
+  if (error) {
+    if (error.code === "23505") return { error: error.message.includes("barras") ? "Otro producto ya tiene ese código de barras." : "Ya hay un producto con ese SKU." };
+    return { error: "No se pudo crear el producto." };
+  }
 
   if (componentes.size > 0) {
     const { error: errorComponentes } = await supabase
@@ -66,6 +75,9 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
       return { error: "No se pudieron guardar los componentes." };
     }
   }
+
+  // Si se pidió un código interno y no se pudo generar, el producto queda creado: se genera después desde su ficha.
+  if (generarBarras) await supabase.rpc("wms_asignar_codigo_barras_interno", { p_sku: data.id });
 
   await registrarAuditoria({
     accion: "crear_producto",
@@ -137,4 +149,58 @@ export async function vincularProductoASku(formData: FormData) {
   const { error } = await supabase.from("productos").update({ sku_maestro_id: skuMaestroId }).eq("id", productoId);
   if (error) throw new Error(error.message);
   revalidatePath("/productos");
+}
+
+/**
+ * Guarda el código de barras del fabricante (EAN-8, UPC-A, EAN-13 o GTIN-14) de un producto, o lo quita si llega vacío. Se
+ * comprueba el dígito de control: un código mal escrito se rechaza. Devuelve el error como valor.
+ */
+export async function guardarCodigoBarras(id: string, codigoTexto: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const codigo = normalizarCodigoBarras(codigoTexto);
+  if (codigo && !esCodigoBarrasValido(codigo)) {
+    return { error: "El código no es válido: debe ser un EAN-8, UPC-A, EAN-13 o GTIN-14 con su dígito de control correcto." };
+  }
+
+  const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("skus_maestros").select("codigo, codigo_barras").eq("id", id).maybeSingle();
+  if (!actual) return { error: "El producto ya no existe." };
+  if ((actual.codigo_barras ?? "") === codigo) return {};
+
+  const { error } = await supabase
+    .from("skus_maestros")
+    .update({ codigo_barras: codigo || null, codigo_barras_origen: codigo ? "fabricante" : null })
+    .eq("id", id);
+  if (error) return { error: error.code === "23505" ? "Otro producto ya tiene ese código de barras." : "No se pudo guardar el código de barras." };
+
+  await registrarAuditoria({
+    accion: "guardar_codigo_barras",
+    entidad: "skus_maestros",
+    entidadId: id,
+    antes: { "Código de barras": actual.codigo_barras ?? "—" },
+    despues: { "Código de barras": codigo || "—" },
+  });
+  revalidatePath("/producto");
+  return {};
+}
+
+/**
+ * Le genera a un producto que no tiene código de barras uno INTERNO (EAN-13 con prefijo 20, reservado por GS1 para uso interno),
+ * para poder manejarlo en la bodega con escáner. Lo hace la base en una sola operación: dos personas a la vez no obtienen el
+ * mismo código. Devuelve el código, o el error como valor.
+ */
+export async function generarCodigoBarrasInterno(id: string): Promise<{ codigo?: string; error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const { data, error } = await createServiceClient().rpc("wms_asignar_codigo_barras_interno", { p_sku: id });
+  if (error) return { error: error.message.length < 200 ? error.message : "No se pudo generar el código de barras." };
+  await registrarAuditoria({
+    accion: "generar_codigo_barras",
+    entidad: "skus_maestros",
+    entidadId: id,
+    detalle: `código interno ${data}`,
+  });
+  revalidatePath("/producto");
+  return { codigo: String(data) };
 }

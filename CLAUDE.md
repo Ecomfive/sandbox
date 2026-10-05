@@ -253,7 +253,11 @@ convenciones técnicas del código.
   `ProveedorSkusMaestros`) y el servidor copia el código del producto en `sku` al guardar (`escribirHijos`, `resolverSkuMaestro`). La
   ficha de un producto muestra sus **Asociaciones** (variantes Shopify, productos Dropi y productos de los pedidos de Dropi), un acceso a
   Inventario y «Crear ficha Shopify» (`/wms-productos/nuevo?sku_maestro=<id>`). Las variaciones de un producto Dropi variable
-  conservan su SKU como texto. Las llaves nuevas de los productos y de las tablas `wms_*` son **UUID v7** (`uuid_v7()`, migración 0071). El módulo **Productos Test** (Marketing) sigue aparte: aún no está ligado a la clase test de un producto.
+  conservan su SKU como texto. **Código de barras** (migración 0072, `src/lib/wms/codigo-barras.ts`): cada producto puede tener el EAN-8, UPC-A, EAN-13 o GTIN-14 del fabricante
+  (se valida el dígito de control GS1; `codigo_barras_origen = 'fabricante'`) o, si no trae ninguno, **uno interno que se genera desde su ficha**
+  («Generar código interno», `wms_asignar_codigo_barras_interno`): un **EAN-13 con prefijo 20** (el estándar GS1 reserva del 20 al 29 para
+  uso interno, así que no choca con ningún código de fabricante) formado por un consecutivo de 10 cifras y su dígito de control. Es único entre
+  productos, opcional (un compuesto normalmente no tiene), se puede cambiar o quitar, se dibuja en la ficha y su etiqueta se imprime. Las llaves nuevas de los productos y de las tablas `wms_*` son **UUID v7** (`uuid_v7()`, migración 0071). El módulo **Productos Test** (Marketing) sigue aparte: aún no está ligado a la clase test de un producto.
 - **Sistema WMS: «Bodegas»** (`/wms-bodegas`, módulo `wms-bodegas`, migración 0053; fase 1
   del plan de `WMS-REFERENCIA.md`, que es el documento maestro del WMS: arquitectura V2,
   decisiones confirmadas, flujos de GreaterWMS y fases). Las 6 fuentes físicas (Despacho,

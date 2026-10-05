@@ -177,4 +177,6 @@ aquí; en las propias (Despacho, Fulfillment) el WMS es quien mueve las cubetas.
 6. **UUID v7 para las llaves nuevas** (migración 0071): `uuid_v7()` (SQL puro) es el valor por defecto del `id` de los productos y de las tablas
    `wms_*`. Se ordena solo por fecha de creación. Los UUID que ya existían no se tocan. **No resuelve el vencimiento**: los productos con
    fecha de caducidad necesitan lotes (pendiente de diseñar: ver el plan de lotes y FEFO).
+7. **Código de barras en la ficha del producto** (migración 0072): el del fabricante (EAN/UPC/GTIN, con dígito de control) o, si el producto no trae,
+   uno **interno generado desde la misma ficha** (EAN-13 con prefijo 20, uso interno según GS1) para poder escanearlo en recepción y picking.
 

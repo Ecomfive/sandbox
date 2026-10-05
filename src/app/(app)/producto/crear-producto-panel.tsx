@@ -82,6 +82,22 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 className={`${fieldClass} w-full`}
               />
             </Campo>
+            <Campo etiqueta="Código de barras del fabricante (opcional)" id="campo-barras-producto">
+              <input
+                id="campo-barras-producto"
+                type="text"
+                name="codigo_barras"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={20}
+                placeholder="Ej: 4006381333931"
+                className={`${fieldClass} w-full`}
+              />
+            </Campo>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="generar_barras" value="1" className="h-4 w-4" />
+              Generar un código de barras interno
+            </label>
           </Seccion>
 
           {combo && (
