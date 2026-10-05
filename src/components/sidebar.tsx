@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, Suspense, use, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,8 +9,8 @@ import { ContadorMenu, ContadorSobreIcono } from "@/components/sidebar-contador"
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, sumaDeItems, type PendientesMenu } from "@/lib/contadores-menu";
-import { PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
-import { ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
+import { ConfiguracionIcon, DashboardIcon, NotificacionesIcon, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -95,6 +95,66 @@ function Titulo({ children }: { children: ReactNode }) {
   return <h2 className="mb-1 px-3 text-[0.7rem] font-semibold tracking-wide text-muted-foreground uppercase">{children}</h2>;
 }
 
+function SubTitulo({ children }: { children: ReactNode }) {
+  return <h3 className="mb-0.5 px-3 text-[0.68rem] font-medium tracking-wide text-muted-foreground">{children}</h3>;
+}
+
+/**
+ * Las páginas de un área. Si el área se reparte en frentes (Proveeduría, Gestión de tienda, Fulfillment) cada uno lleva su
+ * subtítulo y el que no tiene páginas dice «Próximamente»; lo que no es de ningún frente va arriba, sin subtítulo.
+ */
+function PaginasDeArea({
+  area,
+  items,
+  ...resto
+}: {
+  area: NavSection;
+  items: NavItem[];
+  pathname: string;
+  favoritos: string[];
+  pendientes: PendientesMenu;
+  alNavegar?: () => void;
+}) {
+  if (!area.frentes) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        {items.map((item) => (
+          <ItemPagina key={item.href} item={item} {...resto} />
+        ))}
+      </div>
+    );
+  }
+  const generales = items.filter((i) => !i.frente);
+  return (
+    <div className="flex flex-col gap-3">
+      {generales.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          {generales.map((item) => (
+            <ItemPagina key={item.href} item={item} {...resto} />
+          ))}
+        </div>
+      )}
+      {FRENTES.map((f) => {
+        const delFrente = items.filter((i) => i.frente === f.id);
+        return (
+          <div key={f.id} role="group" aria-label={f.titulo}>
+            <SubTitulo>{f.titulo}</SubTitulo>
+            {delFrente.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {delFrente.map((item) => (
+                  <ItemPagina key={item.href} item={item} {...resto} />
+                ))}
+              </div>
+            ) : (
+              <p className="m-0 px-3 py-1 text-xs text-muted-foreground/70">Próximamente</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Las páginas fijadas por la persona (los «accesos rápidos»), siempre a la vista. */
 function Fijados({ areas, favoritos, ...resto }: { areas: AreaVisible[]; favoritos: string[]; pathname: string; pendientes: PendientesMenu; alNavegar?: () => void }) {
   const todos = areas.flatMap((a) => a.items);
@@ -154,7 +214,10 @@ function RielYPanel({
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos, pendientes.contadores);
-  const activa = encontrarSeccionActiva(pathname, visibles.map((v) => ({ ...v.area, items: v.items }))) ?? visibles[0]?.area.title ?? null;
+  // Las áreas «ocultas» (Avisos) no tienen botón en el riel: tienen el suyo abajo.
+  const delRiel = visibles.filter((v) => !v.area.oculta);
+  const deLaRuta = encontrarSeccionActiva(pathname, visibles.map((v) => ({ ...v.area, items: v.items })));
+  const activa = deLaRuta && delRiel.some((v) => v.area.title === deLaRuta) ? deLaRuta : (delRiel[0]?.area.title ?? null);
   // El área que se pulsó vale solo mientras se esté en la misma página: al navegar, manda la de la página nueva.
   const [elegida, setElegida] = useState<{ ruta: string; titulo: string } | null>(null);
   const guardado = almacen(CLAVE_PANEL, "local");
@@ -177,8 +240,33 @@ function RielYPanel({
   }, [panelOculto]);
 
   const titulo = elegida && elegida.ruta === pathname ? elegida.titulo : activa;
-  const mostrada = visibles.find((v) => v.area.title === titulo) ?? visibles[0];
+  const verFijados = titulo === "Fijados";
+  const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
+  const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones");
+
+  function elegir(nombre: string) {
+    setElegida({ ruta: pathname, titulo: nombre });
+    if (panelOculto) guardado.guardar("");
+  }
+
+  function botonRiel(nombre: string, seleccionada: boolean, Icono: (typeof SECTION_ICONS)[string], cantidad: number) {
+    return (
+      <button
+        key={nombre}
+        type="button"
+        aria-pressed={seleccionada}
+        onClick={() => elegir(nombre)}
+        className={`${claseRielBoton} ${seleccionada ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+      >
+        <span className="relative inline-flex">
+          <Icono className="h-5 w-5" />
+          <ContadorSobreIcono cantidad={cantidad} />
+        </span>
+        <span className="max-w-full truncate">{nombre}</span>
+      </button>
+    );
+  }
 
   return (
     <>
@@ -186,29 +274,33 @@ function RielYPanel({
         <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloFoco}`}>
           <Image src="/brand/ecomfive-rojo.png" alt="" width={161} height={44} className="h-3 w-auto" />
         </Link>
-        {visibles.map((v) => {
+        {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
-          const seleccionada = v.area.title === mostrada?.area.title;
-          return (
-            <button
-              key={v.area.title}
-              type="button"
-              aria-pressed={seleccionada}
-              onClick={() => {
-                setElegida({ ruta: pathname, titulo: v.area.title });
-                if (panelOculto) guardado.guardar("");
-              }}
-              className={`${claseRielBoton} ${seleccionada ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
-            >
-              <span className="relative inline-flex">
-                <Icono className="h-5 w-5" />
-                <ContadorSobreIcono cantidad={v.cantidad} />
-              </span>
-              <span className="max-w-full truncate">{v.area.corto ?? v.area.title}</span>
-            </button>
+          const boton = botonRiel(v.area.title, !verFijados && v.area.title === mostrada?.area.title, Icono, v.cantidad);
+          // «Fijados» va justo después del primer botón, como acceso propio.
+          return i === 0 ? (
+            <Fragment key={v.area.title}>
+              {boton}
+              {botonRiel("Fijados", verFijados, SECTION_ICONS.Fijados, 0)}
+            </Fragment>
+          ) : (
+            boton
           );
         })}
         <div className="mt-auto flex w-full flex-col gap-0.5">
+          {puedeVerAvisos && (
+            <Link
+              href="/notificaciones"
+              aria-current={pathname === "/notificaciones" ? "page" : undefined}
+              className={`${claseRielBoton} ${pathname === "/notificaciones" ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+            >
+              <span className="relative inline-flex">
+                <NotificacionesIcon className="h-5 w-5" />
+                <ContadorSobreIcono cantidad={pendientes.total} />
+              </span>
+              <span>Avisos</span>
+            </Link>
+          )}
           {puedeConfigurar && (
             <Link
               href="/configuracion"
@@ -231,17 +323,18 @@ function RielYPanel({
         </div>
       </nav>
 
-      {!panelOculto && mostrada && (
-        <nav aria-label={`Páginas de ${mostrada.area.title}`} className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
-          <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
-          <section aria-label={mostrada.area.title}>
-            <Titulo>{mostrada.area.title}</Titulo>
-            <div className="flex flex-col gap-0.5">
-              {mostrada.items.map((item) => (
-                <ItemPagina key={item.href} item={item} pathname={pathname} favoritos={favoritos} pendientes={pendientes} />
-              ))}
-            </div>
-          </section>
+      {!panelOculto && (verFijados || mostrada) && (
+        <nav aria-label={verFijados ? "Páginas fijadas" : `Páginas de ${mostrada?.area.title}`} className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
+          {verFijados ? (
+            <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
+          ) : (
+            mostrada && (
+              <section aria-label={mostrada.area.panel ?? mostrada.area.title}>
+                <Titulo>{mostrada.area.panel ?? mostrada.area.title}</Titulo>
+                <PaginasDeArea area={mostrada.area} items={mostrada.items} pathname={pathname} favoritos={favoritos} pendientes={pendientes} />
+              </section>
+            )
+          )}
           <Proximamente className="mt-auto" />
         </nav>
       )}
@@ -268,16 +361,28 @@ function ListaMovil({
   return (
     <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
       <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
-      {visibles.map((v) => (
-        <section key={v.area.title} aria-label={v.area.title}>
-          <Titulo>{v.area.title}</Titulo>
-          <div className="flex flex-col gap-0.5">
-            {v.items.map((item) => (
-              <ItemPagina key={item.href} item={item} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
-            ))}
-          </div>
+      {visibles
+        .filter((v) => !v.area.oculta)
+        .map((v) => (
+          <section key={v.area.title} aria-label={v.area.panel ?? v.area.title}>
+            <Titulo>{v.area.panel ?? v.area.title}</Titulo>
+            <PaginasDeArea area={v.area} items={v.items} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
+          </section>
+        ))}
+      {puedeVer(modulosPermitidos, "/notificaciones") && (
+        <section aria-label="Avisos">
+          <Titulo>Avisos</Titulo>
+          <Link
+            href="/notificaciones"
+            onClick={alNavegar}
+            aria-current={pathname === "/notificaciones" ? "page" : undefined}
+            className={`flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${pathname === "/notificaciones" ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted"}`}
+          >
+            Centro de notificaciones
+            <ContadorMenu cantidad={pendientes.total} />
+          </Link>
         </section>
-      ))}
+      )}
       {puedeVer(modulosPermitidos, "/configuracion") && (
         <section aria-label="Sistema">
           <Titulo>Sistema</Titulo>

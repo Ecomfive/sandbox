@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:seguridad": "tsx --test src/lib/seguridad/*.test.ts src/lib/crm/*.test.ts"
+    "test:seguridad": "tsx --test src/lib/seguridad/*.test.ts src/lib/crm/*.test.ts src/lib/nav-data.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
