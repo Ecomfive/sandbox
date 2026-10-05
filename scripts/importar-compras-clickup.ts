@@ -84,9 +84,12 @@ function mapEtapa(nombre: string | null): string {
 
 /** El valor legible de un campo personalizado por el nombre del campo (sin emojis), y su tipo. */
 function campo(t: Json, nombre: string, tipo?: string): Json | null {
-  const c = (t.custom_fields ?? []).find((x: Json) => normal(String(x.name).replace(/[^\p{L}\p{N} ()]/gu, "")) === normal(nombre) && (!tipo || x.type === tipo));
-  if (!c || c.value === undefined || c.value === null || c.value === "" || (Array.isArray(c.value) && c.value.length === 0)) return null;
-  return c;
+  // Puede haber dos campos con el mismo nombre (Importadora tiene «👣 Etapa» y «Etapa»): vale el primero que tenga valor.
+  const conValor = (x: Json) => !(x.value === undefined || x.value === null || x.value === "" || (Array.isArray(x.value) && x.value.length === 0));
+  const candidatos = (t.custom_fields ?? []).filter((x: Json) => normal(String(x.name).replace(/[^\p{L}\p{N} ()]/gu, "")) === normal(nombre) && (!tipo || x.type === tipo));
+  // Primero el del emoji (el que se usa hoy): «👣 Etapa» antes que la «Etapa» vieja de Importadora.
+  const conEmoji = (x: Json) => (/^[\p{L}\p{N}]/u.test(String(x.name).trim()) ? 1 : 0);
+  return [...candidatos].sort((a, b) => conEmoji(a) - conEmoji(b)).find(conValor) ?? null;
 }
 function texto(t: Json, nombre: string, tipo?: string): string | null {
   const c = campo(t, nombre, tipo);

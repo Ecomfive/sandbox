@@ -28,7 +28,7 @@ for (const { lista, campos, tareas } of datos.listas) {
   p(`Checklists: ${tareas.filter((t) => (t.checklists ?? []).length).length} tareas · ${tareas.flatMap((t) => t.checklists ?? []).flatMap((c) => c.items ?? []).length} ítems`);
   p(`Comentarios: ${tareas.flatMap((t) => t._comentarios ?? []).length} en ${tareas.filter((t) => (t._comentarios ?? []).length).length} tareas`);
   p(`Dependencias: ${tareas.filter((t) => (t.dependencies ?? []).length).length} · enlaces: ${tareas.filter((t) => (t.linked_tasks ?? []).length).length}`);
-  p(`Fechas de creación: ${new Date(Math.min(...tareas.map((t) => Number(t.date_created)))).toISOString().slice(0, 10)} a ${new Date(Math.max(...tareas.map((t) => Number(t.date_created)))).toISOString().slice(0, 10)}`);
+  if (tareas.length) p(`Fechas de creación: ${new Date(Math.min(...tareas.map((t) => Number(t.date_created)))).toISOString().slice(0, 10)} a ${new Date(Math.max(...tareas.map((t) => Number(t.date_created)))).toISOString().slice(0, 10)}`);
   p("");
   p("--- Campos personalizados ---");
   for (const c of campos) {
