@@ -508,12 +508,21 @@ export function TestIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Megáfono: Marketing y ventas. */
+export function MarketingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 10v4a1 1 0 0 0 1 1h2l5 3.5v-13L7 9H5a1 1 0 0 0-1 1Z" />
+      <path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10" />
+    </svg>
+  );
+}
+
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
-  Inicio: DashboardIcon,
+  Desempeño: DashboardIcon,
+  Fijados: EstrellaIcon,
+  Marketing: MarketingIcon,
   Operación: PedidoIcon,
-  Producto: ProductoIcon,
   Finanzas: WalletIcon,
-  Dropshippers: DropshipperIcon,
-  Mercado: InteligenciaIcon,
   Equipo: RecursosHumanosIcon,
 };

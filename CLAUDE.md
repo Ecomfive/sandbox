@@ -499,26 +499,28 @@ convenciones técnicas del código.
   de la barra `z-20`/`z-30`, ventanas modales `z-40`, avisos y tooltips `z-50`. Un
   error al eliminar una fila **no** va en una caja pegada a la celda (tapa las filas de
   abajo): va como aviso (`useToast`, `mensajeErrorAlEliminar`).
-- **Menú lateral: riel de áreas + panel.** El menú (`src/components/sidebar.tsx`) es un riel con las áreas de
-  trabajo (Inicio, Operación, Producto, Finanzas, Dropshippers —«Clientes» en el riel—, Mercado y Equipo, más
-  «Ajustes» abajo) y, a su lado, un panel con las páginas del área elegida, las **Fijados** (los accesos rápidos, con la
-  estrella `FavoritoToggle`) y «Próximamente» (lo que aún no se abre, `PRONTO_NAV`). No hay acordeones anidados: toda
-  página queda a dos clics. Pulsar un área solo cambia el panel; al navegar, el panel pasa al área de la página nueva
-  (`encontrarSeccionActiva`, que cuenta subpáginas y detalles). El panel se oculta con el botón de abajo del riel
-  o **solo, con un clic fuera del menú** (el riel se queda; pulsar un área lo vuelve a abrir); se guarda en el
-  navegador (`sidebar-panel-v1`). En móvil, un cajón lista todas las áreas una debajo de la otra. Las áreas y
-  sus páginas están en `AREAS` (`src/lib/nav-data.ts`); una página con `dropi: true` solo sale si Dropi tiene datos
-  en el país (`construirAreas`). **Una página nueva del menú se agrega a su área en `AREAS`**: las migas (Área ›
-  Módulo), el buscador y los contadores salen de ahí. El país y la plataforma ya no son niveles del menú sino el
-  contexto de la barra de arriba. **Contadores:** las páginas donde se resuelve un pendiente (Alertas, Pedidos
-  Dropi, Conciliación de Retiros) muestran una pastilla con cuántos hay, el Centro de notificaciones muestra el total,
-  y cada área del riel muestra lo que suman sus páginas sobre el ícono. El reparto vive en
-  `calcularPendientesMenu` (`src/lib/contadores-menu.ts`), que parte de `obtenerPendientesHoy` (solo `count` con
-  `head`) y respeta los módulos de la persona; para sumar una página, agrégala ahí. **El layout no espera la
-  consulta**: crea la promesa y el menú y la campana la leen con `use()` dentro de un `Suspense`, así que salen al
-  instante y los números llegan después; si la consulta falla, salen sin contadores. Los números se calculan al cargar
-  el layout, no en cada navegación. La cuenta de la persona (foto, tema, atajos, versión y salir) ya no está en el
-  pie del menú: vive en `MenuCuenta`, en la barra de arriba.
+- **Menú lateral: riel de áreas + panel, con tres frentes** (modelado sobre el de Mi Reto Digital para que su importación futura
+  encaje). El riel (`src/components/sidebar.tsx`) lleva **Desempeño, Fijados, Marketing, Operación, Finanzas y Equipo** y, abajo,
+  **Avisos** (con el contador de pendientes; es el Centro de notificaciones), **Ajustes** y el botón que oculta el panel. Al lado,
+  el panel muestra solo el área elegida (su título puede ser más descriptivo: «Marketing y ventas», «Operaciones», «Recursos
+  humanos», campo `panel`) o, si se pulsa **Fijados**, los accesos rápidos de la persona (la estrella `FavoritoToggle` de cada
+  página). **Cada área se reparte en tres frentes** (`FRENTES`, `src/lib/nav-data.ts`): **Proveeduría** (lo de Ecomfive hoy),
+  **Gestión de tienda** (Mi Reto Digital, cuando se importe) y **Fulfillment**; un frente sin páginas dice «Próximamente»
+  (`PaginasDeArea`). Una página lleva su `frente` en `AREAS`; sin frente queda **afuera de los tres** y va arriba (hoy solo
+  Usuarios y roles). **Compras, Catálogo maestro y las fichas de producto están en Operación, no en Marketing**: Ecomfive
+  importa y compra sus productos (en un negocio de dropshipping el catálogo sí es parte de vender). Productos Test, el CRM y
+  la Inteligencia competitiva están en Marketing. `AREAS` sigue siendo una lista plana de páginas por área (migas, buscador,
+  contadores y `encontrarSeccionActiva` no cambian); un área con `oculta: true` (Avisos) no tiene botón en el riel pero cuenta
+  para migas, buscador y fijados. **Una página nueva del menú se agrega a su área y frente en `AREAS`** (con una prueba en
+  `nav-data.test.ts` si cambia el reparto). Al pulsar un área solo cambia el panel; al navegar, el panel pasa al área de la
+  página nueva. El panel se oculta con el botón de abajo del riel o **solo, con un clic fuera del menú**; se guarda en el
+  navegador (`sidebar-panel-v1`). En móvil, un cajón lista las áreas con sus frentes una debajo de la otra. Una página con
+  `dropi: true` solo sale si Dropi tiene datos en el país (`construirAreas`). **Contadores:** Alertas, Pedidos Dropi y Conciliación
+  de Retiros muestran una pastilla con cuántos hay, **Avisos** muestra el total, y cada área del riel muestra lo que suman
+  sus páginas (`calcularPendientesMenu`, `src/lib/contadores-menu.ts`). **El layout no espera la consulta**: crea la promesa y el
+  menú y la campana la leen con `use()` dentro de un `Suspense`. Las rutas de Mi Reto Digital chocan con algunas nuestras
+  (`/alertas`, `/productos`, `/finanzas`): al importarlas, montarlas bajo un prefijo (`/tienda/...`). La cuenta de la persona
+  (foto, tema, atajos, versión y salir) vive en `MenuCuenta`, en la barra de arriba.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

@@ -1,77 +1,101 @@
+/** Los tres frentes del negocio: cada área del menú se reparte entre ellos. */
+export type FrenteId = "proveeduria" | "tienda" | "fulfillment";
+
+export const FRENTES: { id: FrenteId; titulo: string }[] = [
+  { id: "proveeduria", titulo: "Proveeduría" },
+  { id: "tienda", titulo: "Gestión de tienda" },
+  { id: "fulfillment", titulo: "Fulfillment" },
+];
+
 export interface NavItem {
   label: string;
   href?: string;
   /** Solo se ofrece cuando la plataforma Dropi tiene datos en el país elegido. */
   dropi?: boolean;
+  /** El frente al que pertenece. Sin frente la página va «afuera» de los tres (es de toda la empresa). */
+  frente?: FrenteId;
 }
 
 /** Un área del menú (un botón del riel) con las páginas que se abren desde ella. */
 export interface NavSection {
   title: string;
-  /** Nombre corto bajo el ícono del riel, si el título no cabe («Clientes» para «Dropshippers»). */
-  corto?: string;
+  /** El título del panel, si es más descriptivo que el del riel («Marketing y ventas» para «Marketing»). */
+  panel?: string;
+  /** El panel muestra los tres frentes (Proveeduría, Gestión de tienda y Fulfillment); el que no tiene páginas dice «Próximamente». */
+  frentes?: boolean;
+  /** No sale en el riel ni en el panel (tiene su propio acceso, como «Avisos»), pero cuenta para migas, buscador y fijados. */
+  oculta?: boolean;
   items: NavItem[];
 }
 
 /**
  * Las áreas del menú, agrupadas por el trabajo que se hace en ellas (y no por la plataforma de donde vienen los datos:
- * el país y la plataforma son el contexto de la barra de arriba). Una página con `dropi` solo aparece si Dropi tiene
- * datos en el país elegido, igual que antes con el grupo «Dropi».
+ * el país y la plataforma son el contexto de la barra de arriba). Cada área se reparte en tres frentes: Proveeduría (lo
+ * de Ecomfive hoy), Gestión de tienda (Mi Reto Digital, cuando se importe) y Fulfillment. Una página con `dropi` solo
+ * aparece si Dropi tiene datos en el país elegido, igual que antes con el grupo «Dropi».
+ *
+ * Compras, el catálogo y las fichas de producto están en Operación y no en Marketing: aquí los productos se importan y se
+ * compran (en Gestión de tienda, bajo dropshipping, el catálogo sí es parte de vender).
  */
 const AREAS: NavSection[] = [
   {
-    title: "Inicio",
+    title: "Desempeño",
+    frentes: true,
+    items: [{ label: "Hoy", href: "/", frente: "proveeduria" }],
+  },
+  {
+    title: "Marketing",
+    panel: "Marketing y ventas",
+    frentes: true,
     items: [
-      { label: "Hoy", href: "/" },
-      { label: "Centro de notificaciones", href: "/notificaciones" },
+      { label: "CRM Dropshippers", href: "/crm-dropshippers", dropi: true, frente: "proveeduria" },
+      { label: "Inteligencia competitiva", href: "/inteligencia-competitiva", dropi: true, frente: "proveeduria" },
+      { label: "Productos Test", href: "/productos-test", frente: "proveeduria" },
     ],
   },
   {
     title: "Operación",
+    panel: "Operaciones",
+    frentes: true,
     items: [
-      { label: "Pedidos Dropi", href: "/pedidos-dropi", dropi: true },
-      { label: "Alertas de inventario", href: "/alertas", dropi: true },
-      { label: "Inventario", href: "/inventario", dropi: true },
-      { label: "Bodegas", href: "/wms-bodegas" },
-      { label: "Ubicaciones", href: "/wms-ubicaciones" },
-    ],
-  },
-  {
-    title: "Producto",
-    items: [
-      { label: "Productos Test", href: "/productos-test" },
-      { label: "Compras", href: "/compras" },
-      { label: "Catálogo maestro", href: "/catalogo-maestro" },
-      { label: "Ficha producto Shopify", href: "/wms-productos" },
-      { label: "Ficha producto Dropi", href: "/wms-productos-dropi" },
+      { label: "Pedidos Dropi", href: "/pedidos-dropi", dropi: true, frente: "proveeduria" },
+      { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "proveeduria" },
+      { label: "Inventario", href: "/inventario", dropi: true, frente: "proveeduria" },
+      { label: "Bodegas", href: "/wms-bodegas", frente: "proveeduria" },
+      { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "proveeduria" },
+      { label: "Compras", href: "/compras", frente: "proveeduria" },
+      { label: "Catálogo maestro", href: "/catalogo-maestro", frente: "proveeduria" },
+      { label: "Ficha producto Shopify", href: "/wms-productos", frente: "proveeduria" },
+      { label: "Ficha producto Dropi", href: "/wms-productos-dropi", frente: "proveeduria" },
     ],
   },
   {
     title: "Finanzas",
+    frentes: true,
     items: [
-      { label: "Conciliación de Retiros", href: "/retiros", dropi: true },
-      { label: "Extractos bancarios", href: "/extractos", dropi: true },
-      { label: "Nómina y gastos", href: "/gastos", dropi: true },
-      { label: "Productos y márgenes", href: "/productos", dropi: true },
+      { label: "Conciliación de Retiros", href: "/retiros", dropi: true, frente: "proveeduria" },
+      { label: "Extractos bancarios", href: "/extractos", dropi: true, frente: "proveeduria" },
+      { label: "Nómina y gastos", href: "/gastos", dropi: true, frente: "proveeduria" },
+      { label: "Productos y márgenes", href: "/productos", dropi: true, frente: "proveeduria" },
     ],
   },
   {
-    title: "Dropshippers",
-    corto: "Clientes",
-    items: [{ label: "CRM Dropshippers", href: "/crm-dropshippers", dropi: true }],
-  },
-  {
-    title: "Mercado",
-    items: [{ label: "Inteligencia competitiva", href: "/inteligencia-competitiva", dropi: true }],
-  },
-  {
     title: "Equipo",
+    panel: "Recursos humanos",
+    frentes: true,
+    // Usuarios y roles es de toda la empresa: queda afuera de los tres frentes.
     items: [{ label: "Usuarios y roles", href: "/usuarios" }],
+  },
+  // Su acceso es el botón «Avisos» de abajo del riel (con el contador de pendientes).
+  {
+    title: "Avisos",
+    oculta: true,
+    items: [{ label: "Centro de notificaciones", href: "/notificaciones" }],
   },
 ];
 
 /** Lo que todavía no se puede abrir: va aparte, en «Próximamente», para no ocupar lugar en el menú. */
-export const PRONTO_NAV: string[] = ["Gestión de Tiendas", "Contrataciones"];
+export const PRONTO_NAV: string[] = ["Contrataciones"];
 
 /** Las áreas del menú para un país: sin las páginas de Dropi si Dropi no tiene datos allí, y sin áreas vacías. */
 export function construirAreas(plataformasPais: { nombre: string; tieneDatos: boolean }[]): NavSection[] {
