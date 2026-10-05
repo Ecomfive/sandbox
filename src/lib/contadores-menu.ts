@@ -13,7 +13,7 @@ export interface PendientesMenu {
 export const SIN_PENDIENTES: PendientesMenu = { contadores: {}, total: 0 };
 
 /** Páginas del menú que muestran un contador; el resto no cuenta nada. */
-const PAGINAS_CON_CONTADOR = ["/alertas", "/pedidos-dropi", "/retiros"];
+const PAGINAS_CON_CONTADOR = ["/alertas", "/pedidos-dropi", "/retiros", "/inventario"];
 
 /** ¿Hay algo que consultar para esta persona? Sin ninguno de estos módulos no se gasta ni una consulta. */
 export function necesitaPendientes(modulos: string[]): boolean {
@@ -25,13 +25,14 @@ export function necesitaPendientes(modulos: string[]): boolean {
 /**
  * Reparte los pendientes del día entre las páginas donde se resuelven: las alertas en «Alertas de
  * inventario», los pedidos con novedad en «Pedidos Dropi», y los saldos sin registrar y los retiros
- * de Dropi sin vincular en «Conciliación de Retiros». Solo se cuentan las páginas que la persona puede ver.
+ * de Dropi sin vincular en «Conciliación de Retiros», y los lotes vencidos o por vencer en «Inventario». Solo se cuentan las páginas que la persona puede ver.
  */
 export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: string[]): PendientesMenu {
   const porPagina: ContadoresMenu = {
     "/alertas": pendientes.alertasInventario,
     "/pedidos-dropi": pendientes.pedidosConNovedad,
     "/retiros": pendientes.saldosSinRegistrar + pendientes.retirosDropiSinVincular,
+    "/inventario": pendientes.lotesVencidos + pendientes.lotesPorVencer,
   };
   const contadores: ContadoresMenu = {};
   for (const [href, cantidad] of Object.entries(porPagina)) {
@@ -41,7 +42,9 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
     ? pendientes.alertasInventario +
       pendientes.pedidosConNovedad +
       pendientes.saldosSinRegistrar +
-      pendientes.retirosDropiSinVincular
+      pendientes.retirosDropiSinVincular +
+      pendientes.lotesVencidos +
+      pendientes.lotesPorVencer
     : 0;
   return { contadores, total };
 }

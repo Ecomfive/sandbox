@@ -8,7 +8,7 @@ import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { calcularCambios, ETIQUETA_ACCION } from "@/lib/auditoria-cambios";
-import { AlertaIcon, PedidoIcon, WalletIcon, ConciliacionIcon, BuscarIcon } from "@/lib/nav-icons";
+import { AlertaIcon, PedidoIcon, WalletIcon, ConciliacionIcon, BuscarIcon, CalendarioIcon } from "@/lib/nav-icons";
 import type { PendientesHoy } from "@/lib/pendientes-hoy";
 
 interface EventoAuditoria {
@@ -157,6 +157,20 @@ function PorCorregir({ pendientes }: { pendientes: PendientesHoy }) {
       titulo: "Retiros de Dropi sin vincular",
       href: "/retiros",
       Icono: ConciliacionIcon,
+    },
+    {
+      clave: "lotes-vencidos",
+      cantidad: pendientes.lotesVencidos,
+      titulo: "Lotes vencidos con unidades",
+      href: "/inventario/vencimientos",
+      Icono: CalendarioIcon,
+    },
+    {
+      clave: "lotes-por-vencer",
+      cantidad: pendientes.lotesPorVencer,
+      titulo: "Lotes por vencer",
+      href: "/inventario/vencimientos",
+      Icono: CalendarioIcon,
     },
   ].filter((t) => t.cantidad > 0);
 

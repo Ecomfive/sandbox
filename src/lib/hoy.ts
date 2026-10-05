@@ -59,6 +59,24 @@ const PENDIENTES: {
     href: "/alertas",
     accion: "Revisar",
   },
+  {
+    clave: "lotes-vencidos",
+    modulo: "inventario",
+    campo: "lotesVencidos",
+    titulo: "Lotes vencidos con unidades",
+    descripcion: "Ya no se pueden vender: hay que darlos de baja",
+    href: "/inventario/vencimientos",
+    accion: "Revisar",
+  },
+  {
+    clave: "lotes-por-vencer",
+    modulo: "inventario",
+    campo: "lotesPorVencer",
+    titulo: "Lotes por vencer",
+    descripcion: "Vencen dentro de los días de aviso de su producto",
+    href: "/inventario/vencimientos",
+    accion: "Revisar",
+  },
 ];
 
 /**

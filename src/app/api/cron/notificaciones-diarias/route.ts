@@ -43,6 +43,16 @@ export async function GET(request: Request) {
         `<li>${pendientes.retirosDropiSinVincular} retiro${pendientes.retirosDropiSinVincular === 1 ? "" : "s"} de Dropi sin vincular — <a href="${SITIO}/notificaciones">ver</a></li>`
       );
     }
+    if (pendientes.lotesVencidos > 0) {
+      items.push(
+        `<li>${pendientes.lotesVencidos} lote${pendientes.lotesVencidos === 1 ? "" : "s"} vencido${pendientes.lotesVencidos === 1 ? "" : "s"} con unidades — <a href="${SITIO}/inventario/vencimientos">ver</a></li>`
+      );
+    }
+    if (pendientes.lotesPorVencer > 0) {
+      items.push(
+        `<li>${pendientes.lotesPorVencer} lote${pendientes.lotesPorVencer === 1 ? "" : "s"} por vencer — <a href="${SITIO}/inventario/vencimientos">ver</a></li>`
+      );
+    }
     if (items.length > 0) {
       secciones.push(`<h2>${pais.nombre}</h2><ul>${items.join("")}</ul>`);
     }

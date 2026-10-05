@@ -292,7 +292,7 @@ convenciones técnicas del código.
 - **Pantalla «Hoy»** (`/`, antes «Dashboard operativo»; el módulo de permisos sigue siendo `dashboard`). Arriba, en dos
   tarjetas lado a lado (apiladas en pantallas angostas): **«Necesita tu atención»** (`ColaAtencion`), la cola de trabajo
   con lo que cuenta `obtenerPendientesHoy` (pedidos de Dropi en Novedad, plataformas sin saldo de wallet, retiros de
-  Dropi sin vincular y alertas de inventario), lo pendiente primero y lo que está al día abajo con su marca verde
+  Dropi sin vincular, alertas de inventario y lotes vencidos o por vencer), lo pendiente primero y lo que está al día abajo con su marca verde
   (`armarCola`, `src/lib/hoy.ts`: cada fila lleva el módulo que hay que poder abrir y a dónde se resuelve); y
   **«Producto en test»** (`TarjetaProductoTest`), lo testeado en el período elegido según «Fecha Test»
   (`obtenerResumenTest`, hasta 1 000 filas, solo con el módulo `productos-test`). Debajo siguen el selector de
