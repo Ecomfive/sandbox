@@ -63,6 +63,10 @@ async function main() {
   console.log("tramos:", K.tiemposPorTramo(compras).map((t) => `${t.nombre}: ${t.mediana} d (n ${t.n})`).join(" | "));
   console.log("por proveedor:", K.porDimension(compras, (c) => [c.proveedor ?? "Sin proveedor"]).slice(0, 3));
   console.log("semanas:", K.periodos(compras, "semana").length, "| días:", K.periodos(compras, "dia").length);
+  console.log("serie (últimos 3):", K.serieMensual(compras).slice(-3));
+  console.log("tránsito mensual (últimos 3):", K.transitoMensual(compras).slice(-3));
+  console.log("histograma:", K.histogramaTransito(compras).map((f) => `${f.rango}: ${f.mar}/${f.aire}/${f.otra}`).join(" | "));
+  console.log("a tiempo:", K.aTiempo(compras, umbral));
   console.log(K.textoInforme(compras, "2026-09", "mes", "todos", umbral));
 }
 main();

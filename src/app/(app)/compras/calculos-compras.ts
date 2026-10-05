@@ -265,3 +265,74 @@ export function textoInforme(compras: FilaCompra[], clave: string, g: Granularid
     .filter((l, i, a) => l !== "" || a[i - 1] !== "")
     .join("\n");
 }
+
+// --- Dashboard ----------------------------------------------------------------------------------------------------
+
+/** Mes a mes: compras creadas y completadas, lo pagado (por fecha del primer pago) y las unidades. */
+export function serieMensual(compras: FilaCompra[]) {
+  const meses = new Map<string, { mes: string; creadas: number; completadas: number; pagado: number; unidades: number }>();
+  const fila = (mes: string) => {
+    if (!meses.has(mes)) meses.set(mes, { mes, creadas: 0, completadas: 0, pagado: 0, unidades: 0 });
+    return meses.get(mes)!;
+  };
+  for (const c of compras) {
+    const m = fila(c.creadoEn.slice(0, 7));
+    m.creadas++;
+    m.unidades += c.qtyTotal ?? 0;
+    if (c.etapa === "completado" && c.cerradoEn) fila(c.cerradoEn.slice(0, 7)).completadas++;
+    if (c.fechaPago1) fila(c.fechaPago1.slice(0, 7)).pagado += c.pagadoAProveedor ?? 0;
+  }
+  return [...meses.values()].sort((a, b) => a.mes.localeCompare(b.mes)).map((m) => ({ ...m, etiqueta: etiquetaCorta(m.mes, "mes") + " " + m.mes.slice(2, 4) }));
+}
+
+/** Por mes de llegada: días medianos de tránsito por vía (para ver si los envíos se están demorando más). */
+export function transitoMensual(compras: FilaCompra[]) {
+  const meses = new Map<string, Record<string, number[]>>();
+  for (const c of compras) {
+    const d = diasEntre(c.fechaEnvio, c.fechaLlegada);
+    if (d === null || !c.fechaLlegada) continue;
+    const mes = c.fechaLlegada.slice(0, 7);
+    const m = meses.get(mes) ?? {};
+    for (const v of c.viaEnvio.length ? c.viaEnvio : ["sin"]) m[v] = [...(m[v] ?? []), d];
+    meses.set(mes, m);
+  }
+  return [...meses.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([mes, m]) => ({
+      mes,
+      etiqueta: etiquetaCorta(mes, "mes") + " " + mes.slice(2, 4),
+      mar: resumenDias(m.mar ?? []).mediana,
+      aire: resumenDias(m.aire ?? []).mediana,
+      envios: Object.values(m).reduce((n, v) => n + v.length, 0),
+    }));
+}
+
+/** Cuántos envíos tardaron cada rango de días (histograma), por vía. */
+export function histogramaTransito(compras: FilaCompra[], ancho = 15, tope = 150) {
+  const filas: { rango: string; desde: number; mar: number; aire: number; otra: number }[] = [];
+  for (let d = 0; d < tope; d += ancho) filas.push({ rango: `${d}–${d + ancho - 1}`, desde: d, mar: 0, aire: 0, otra: 0 });
+  filas.push({ rango: `${tope}+`, desde: tope, mar: 0, aire: 0, otra: 0 });
+  for (const c of compras) {
+    const d = diasEntre(c.fechaEnvio, c.fechaLlegada);
+    if (d === null) continue;
+    const f = filas[Math.min(filas.length - 1, Math.floor(d / ancho))];
+    if (c.viaEnvio.includes("mar")) f.mar++;
+    else if (c.viaEnvio.includes("aire")) f.aire++;
+    else f.otra++;
+  }
+  return filas;
+}
+
+/** Envíos que llegaron dentro de lo normal para su vía (el porcentaje «a tiempo»). */
+export function aTiempo(compras: FilaCompra[], umbral: Record<string, number>): { llegadas: number; aTiempo: number } {
+  let llegadas = 0;
+  let bien = 0;
+  for (const c of compras) {
+    const d = diasEntre(c.fechaEnvio, c.fechaLlegada);
+    if (d === null) continue;
+    llegadas++;
+    const limite = Math.max(...(c.viaEnvio.length ? c.viaEnvio : ["mar"]).map((v) => umbral[v] ?? 90));
+    if (d <= limite) bien++;
+  }
+  return { llegadas, aTiempo: bien };
+}

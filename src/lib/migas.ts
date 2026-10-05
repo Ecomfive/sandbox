@@ -31,6 +31,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/retiros/cuentas": "Cuentas destino",
   "/usuarios/auditoria": "Historial de auditoría",
   "/extractos/patrones": "Diccionario de patrones bancarios",
+  "/compras/dashboard": "Dashboard",
   "/compras/lista": "Compras",
   "/compras/tiempos": "Tiempos y fallas",
   "/crm-dropshippers/directorio": "Dropshippers",

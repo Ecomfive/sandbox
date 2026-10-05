@@ -569,7 +569,15 @@ convenciones técnicas del código.
   no necesita lote; el despacho (`wms_aplicar_venta`) sí consume lotes vigentes. Las ubicaciones aún no son por lote. La pestaña
   **Vencimientos** (`/inventario/vencimientos`, `wms_vigilancia_vencimientos`) lista vencidos y por vencer. La fecha de «hoy» es la de
   America/Panama (`wms_hoy()`).
-- **Compras: tres pestañas, como Productos Test.** **Informe** (`/compras`, `informe-compras.tsx`): por día, semana o mes
+- **Compras › Dashboard** (`/compras/dashboard`, `dashboard-compras.tsx`): toda la operación a la vez con **filtros que se
+  cruzan** (fechas de creación, país, proveedor, vía, tienda, responsable, etapa, solo abiertas): pulsar un mes de la gráfica,
+  una etapa o una fila de «Comparar por» pone ese filtro y lo vuelve a quitar; los filtros activos se ven como chips.
+  Indicadores (compras, pagado y costo por unidad, unidades, ciclo, tránsito mar/aire, % a tiempo, atrasadas, fallas),
+  compras y pagos por mes, abiertas por etapa, días de tránsito por mes de llegada, histograma de tránsito, tiempo por tramo,
+  dónde se quedan más tiempo (historial de estados y etapas), comparación y lo que está fallando. Gráficas con recharts;
+  cálculos en `calculos-compras.ts` (`serieMensual`, `transitoMensual`, `histogramaTransito`, `aTiempo`). «A tiempo» usa el
+  mismo umbral que «atrasada», calculado con todas las compras de la vista y no solo con las filtradas.
+- **Compras: Informe, lista y tiempos, como Productos Test.** **Informe** (`/compras`, `informe-compras.tsx`): por día, semana o mes
   (pulsar una barra elige el periodo), lo creado/pagado/enviado/llegado del periodo, «Hoy» (abiertas, en tránsito, atrasadas,
   con inconveniente, pago pendiente: cada tarjeta lleva a la lista filtrada), abiertas por etapa, tránsito por vía de envío y
   «Para revisar»; «Copiar informe». **Compras** (`/compras/lista`, `lista-compras.tsx`): búsqueda, filtros de un toque
