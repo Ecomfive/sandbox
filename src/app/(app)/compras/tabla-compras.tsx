@@ -11,6 +11,8 @@ import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, PrioridadIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearCompraPanel } from "./crear-compra-panel";
+import { CrearPaisPanel } from "@/components/paises/crear-pais-panel";
+import { anilloFoco } from "@/components/ui/field";
 import {
   colorEstado,
   colorEtapa,
@@ -175,11 +177,14 @@ export function TablaCompras({
   vista,
   paises,
   puedeEscribir,
+  puedeAgregarPais,
 }: {
   compras: FilaCompra[];
   vista: string;
   paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
+  /** Puede modificar Configuración: ve «＋ País» junto al selector. */
+  puedeAgregarPais: boolean;
 }) {
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
   const compra = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
@@ -202,6 +207,20 @@ export function TablaCompras({
         accionPrincipal={
           <div className="flex items-center gap-2">
             <SelectorVista vista={vista} paises={paises} />
+            {puedeAgregarPais && (
+              <CrearPaisPanel
+                boton={(abrir) => (
+                  <button
+                    type="button"
+                    onClick={abrir}
+                    aria-haspopup="dialog"
+                    className={`h-8 rounded-md border border-border-control bg-card px-2.5 text-xs font-medium whitespace-nowrap hover:bg-accent ${anilloFoco}`}
+                  >
+                    ＋ País
+                  </button>
+                )}
+              />
+            )}
             {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} />}
           </div>
         }

@@ -575,13 +575,16 @@ convenciones técnicas del código.
   aunque se entregue en Panamá —el destino va en `paises_destino`— y nunca se mezcla con las compras de un país; lo impone
   un `check`). Los montos van en dólares en todos los países (`MONEDA_COMPRAS`). Cada columna lleva el emoji de su campo como
   en ClickUp (`EMOJI_CAMPO`, `conEmoji`, `def-compras.ts`). La ficha termina con la actividad (`actividad-compra.tsx`):
-  adjuntos (fotos y documentos en el bucket **privado** `wms-compras` con enlaces firmados; los videos, enlace a ClickUp),
+  adjuntos (fotos, documentos y videos en el bucket **privado** `wms-compras`, plan Pro, con enlaces firmados; si uno no se
+  pudo copiar queda con su enlace de ClickUp),
   subtareas, comentarios y el **historial de etapa y estado** (`wms_compra_eventos`, con la hora: cada cambio que se guarda
   aquí lo anota `actualizarCompra`; es la base de los tiempos por etapa). Al pasar a Completado o Descartado se sella
   `cerrado_en`. **Importación desde ClickUp:** `scripts/clickup-exportar-compras.mjs` baja las listas «Compras Dropi» de cada
   país y «Compras Importadora🌍» a `datos-privados/` (con comentarios e historial de estados), `scripts/clickup-inventario-compras.mjs`
   hace el inventario de campos y `scripts/importar-compras-clickup.ts` importa (sin `--aplicar` solo informa; se puede repetir,
-  actualiza por `clickup_id`; `--subir-adjuntos` copia fotos y documentos). Cada compra guarda su tarea original en
+  actualiza por `clickup_id`; `--subir-adjuntos` copia los adjuntos). **Países:** se agregan desde Configuración (sección Países) o con «＋ País» junto al
+  selector de Compras (`crearPais`, `src/lib/paises-actions.ts`; pide poder modificar Configuración). El selector de país de la
+  barra de arriba (`PAISES_NAV`) sigue siendo fijo: es el contexto de Dropi. Cada compra guarda su tarea original en
   `clickup` (jsonb), así que ningún dato de ClickUp se pierde. El historial de la **Etapa** (campo personalizado) no sale por
   la API de ClickUp: solo el de Estado.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una

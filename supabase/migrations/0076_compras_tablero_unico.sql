@@ -122,3 +122,6 @@ alter table wms_compra_eventos enable row level security;
 -- Fotos y documentos de las compras: bucket privado (facturas y comprobantes); se ven con enlaces firmados de una hora.
 insert into storage.buckets (id, name, public) values ('wms-compras', 'wms-compras', false)
 on conflict (id) do nothing;
+
+-- Plan Pro: los videos de las compras pesan hasta ~75 MB; el bucket acepta archivos de hasta 200 MB.
+update storage.buckets set file_size_limit = 209715200 where id = 'wms-compras';

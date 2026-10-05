@@ -115,6 +115,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           vista={vista}
           paises={paises}
           puedeEscribir={!usuario.modulosSoloLectura.includes("compras")}
+          puedeAgregarPais={usuario.modulos.includes("configuracion") && !usuario.modulosSoloLectura.includes("configuracion")}
         />
       )}
     </Pagina>

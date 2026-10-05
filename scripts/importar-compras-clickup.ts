@@ -6,7 +6,7 @@
 // Por defecto NO escribe nada: dice qué haría y qué valores no reconoce.
 //   npx tsx scripts/importar-compras-clickup.ts              → informe
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar    → importa los datos (los adjuntos quedan como enlace a ClickUp)
-//   npx tsx scripts/importar-compras-clickup.ts --aplicar --subir-adjuntos → además copia fotos y documentos a Storage
+//   npx tsx scripts/importar-compras-clickup.ts --aplicar --subir-adjuntos → además copia los adjuntos (fotos, documentos y videos) a Storage
 //
 // Responsables (decisión de Hernán, 5 oct 2026): lo de Zeylimar Moreno, Maria Jose Aponte y Fabiola Concha pasa a Francis
 // Aponte; lo de Alcides Andrade se queda a su nombre.
@@ -317,11 +317,11 @@ async function main() {
   if (aplicar && subirAdjuntos) await copiarAdjuntos();
 }
 
-/** Copia a Storage (bucket privado wms-compras) las fotos y documentos que aún no están; los videos quedan como enlace. */
+/** Copia a Storage (bucket privado wms-compras) los adjuntos que aún no están: fotos, documentos y videos (plan Pro). Si uno falla, queda con su enlace de ClickUp. */
 async function copiarAdjuntos() {
   const pendientes: Json[] = [];
   for (let desde = 0; ; desde += 1000) {
-    const { data } = await supabase.from("wms_compra_adjuntos").select("id, compra_id, clickup_id, extension, clase, origen, url_clickup").is("ruta", null).neq("clase", "video").range(desde, desde + 999);
+    const { data } = await supabase.from("wms_compra_adjuntos").select("id, compra_id, clickup_id, extension, clase, origen, url_clickup").is("ruta", null).range(desde, desde + 999);
     if (!data?.length) break;
     pendientes.push(...data);
   }
