@@ -6,6 +6,8 @@
 // Por defecto NO escribe nada: dice qué haría y qué valores no reconoce.
 //   npx tsx scripts/importar-compras-clickup.ts              → informe
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar    → importa los datos (los adjuntos quedan como enlace a ClickUp)
+//   npx tsx scripts/importar-compras-clickup.ts --aplicar --solo-historial → rehace solo el historial de estados
+//   npx tsx scripts/importar-compras-clickup.ts --aplicar --solo-adjuntos → solo copia los adjuntos que faltan
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar --subir-adjuntos → además copia los adjuntos (fotos, documentos y videos) a Storage
 //
 // Responsables (decisión de Hernán, 5 oct 2026): lo de Zeylimar Moreno, Maria Jose Aponte y Fabiola Concha pasa a Francis
@@ -16,6 +18,10 @@ import { readFileSync } from "node:fs";
 
 const aplicar = process.argv.includes("--aplicar");
 const subirAdjuntos = process.argv.includes("--subir-adjuntos");
+// Rehace solo el historial de estados (sin tocar compras, comentarios ni adjuntos).
+const soloHistorial = process.argv.includes("--solo-historial");
+// Solo copia los adjuntos que faltan (sin volver a importar los datos).
+const soloAdjuntos = process.argv.includes("--solo-adjuntos");
 
 const env = Object.fromEntries(
   readFileSync(".env.local", "utf8")
@@ -71,6 +77,14 @@ function mapEstado(s: string | undefined): string {
   if (!v) anotar(`estado «${s}»`);
   return v ?? "backlog";
 }
+/**
+ * Un estado del historial: si es uno de los de hoy, su valor; si no, el nombre que tenía en ClickUp tal cual («07 -
+ * tracking», «to-do»…). Esas listas usaban antes los estados como etapas, y ese nombre es lo que permite medir sus tiempos.
+ */
+function estadoHistorial(s: string | undefined): string {
+  return ESTADOS[normal(s ?? "")] ?? String(s ?? "").trim();
+}
+
 function mapEtapa(nombre: string | null): string {
   if (!nombre) return "backlog";
   const n = normal(nombre);
@@ -140,6 +154,7 @@ const EXT_VIDEO = ["mp4", "mov", "avi", "webm", "mkv"];
 const claseDe = (ext: string) => (EXT_FOTO.includes(ext) ? "foto" : EXT_VIDEO.includes(ext) ? "video" : "documento");
 
 async function main() {
+  if (aplicar && soloAdjuntos) return copiarAdjuntos();
   const datos = JSON.parse(readFileSync("datos-privados/clickup-compras.json", "utf8"));
   const { data: paises } = await supabase.from("paises").select("id, codigo");
   const paisId = new Map((paises ?? []).map((p) => [p.codigo as string, p.id as string]));
@@ -223,7 +238,7 @@ async function main() {
         actualizado_en: iso(t.date_updated),
         cerrado_en: iso(t.date_closed),
       };
-      if (!aplicar) continue;
+      if (!aplicar || soloHistorial) continue;
       const { data, error } = await supabase.from("wms_compras").upsert(fila, { onConflict: "clickup_id" }).select("id").single();
       if (error) {
         console.error(`✗ ${t.id} ${t.name}: ${error.message}`);
@@ -232,12 +247,19 @@ async function main() {
       idCompra.set(t.id, data.id);
     }
     if (!aplicar) continue;
+    if (soloHistorial) {
+      const ids = principales.map((t) => t.id);
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data } = await supabase.from("wms_compras").select("id, clickup_id").in("clickup_id", ids.slice(i, i + 200));
+        for (const c of data ?? []) idCompra.set(c.clickup_id as string, c.id as string);
+      }
+    }
 
     // Subtareas, comentarios, adjuntos e historial de estados (de las compras y de sus subtareas, colgados de la compra).
     for (const t of tareas) {
       const compraId = idCompra.get(t.parent ?? t.id);
       if (!compraId) continue;
-      if (t.parent) {
+      if (t.parent && !soloHistorial) {
         const asignado = (t.assignees ?? [])[0]?.username ?? null;
         await supabase.from("wms_compra_subtareas").upsert(
           {
@@ -254,6 +276,10 @@ async function main() {
           { onConflict: "clickup_id" },
         );
       }
+      if (soloHistorial) {
+        if (t.parent) continue;
+        await supabase.from("wms_compra_eventos").delete().eq("compra_id", compraId).eq("origen", "clickup_estado");
+      }
       const prefijo = t.parent ? `[Subtarea: ${t.name}] ` : "";
       const comentarios = (t._comentarios ?? []).map((c: Json) => ({
         compra_id: compraId,
@@ -263,7 +289,7 @@ async function main() {
         creado_en: iso(c.date),
         clickup: c,
       }));
-      for (let i = 0; i < comentarios.length; i += 200) {
+      for (let i = 0; !soloHistorial && i < comentarios.length; i += 200) {
         const { error } = await supabase.from("wms_compra_comentarios").upsert(comentarios.slice(i, i + 200), { onConflict: "clickup_id" });
         if (error) console.error(`✗ comentarios de ${t.id}: ${error.message}`);
       }
@@ -286,7 +312,7 @@ async function main() {
           creado_en: iso(a.date) ?? iso(t.date_created),
         };
       });
-      if (adjuntos.length) {
+      if (adjuntos.length && !soloHistorial) {
         const { error } = await supabase.from("wms_compra_adjuntos").upsert(adjuntos, { onConflict: "compra_id,clickup_id" });
         if (error) console.error(`✗ adjuntos de ${t.id}: ${error.message}`);
       }
@@ -299,8 +325,8 @@ async function main() {
         const eventos = pasos.map((h: Json, i: number) => ({
           compra_id: compraId,
           campo: "estado",
-          valor_antes: i === 0 ? null : mapEstado(pasos[i - 1].status),
-          valor_despues: mapEstado(h.status),
+          valor_antes: i === 0 ? null : estadoHistorial(pasos[i - 1].status),
+          valor_despues: estadoHistorial(h.status),
           ocurrido_en: iso(h.total_time.since),
           origen: "clickup_estado",
         }));
@@ -330,8 +356,10 @@ async function copiarAdjuntos() {
   }
   let ok = 0;
   let fallos = 0;
-  for (const a of pendientes) {
-    if (!a.url_clickup) continue;
+  let siguiente = 0;
+  console.log(`Adjuntos por copiar: ${pendientes.length}`);
+  async function copiarUno(a: Json) {
+    if (!a.url_clickup) return;
     try {
       const r = await fetch(a.url_clickup, { headers: tokenClickup ? { Authorization: tokenClickup } : {} });
       if (!r.ok) throw new Error(String(r.status));
@@ -354,7 +382,14 @@ async function copiarAdjuntos() {
       fallos++;
       if (fallos <= 10) console.error(`✗ adjunto ${a.id}: ${(e as Error).message}`);
     }
+    const hechos = ok + fallos;
+    if (hechos % 200 === 0) console.log(`  … ${hechos} de ${pendientes.length}`);
   }
+  await Promise.all(
+    Array.from({ length: 6 }, async () => {
+      while (siguiente < pendientes.length) await copiarUno(pendientes[siguiente++]);
+    }),
+  );
   console.log(`Adjuntos copiados: ${ok}; fallidos: ${fallos} (quedan con su enlace de ClickUp).`);
 }
 
