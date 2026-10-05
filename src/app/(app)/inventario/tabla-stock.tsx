@@ -33,7 +33,7 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
   },
   {
     id: "clase",
-    label: "Clase",
+    label: "Estado",
     ocultable: true,
     render: (f) => (f.clase === "test" ? <Badge tone="warning">{ETIQUETA_CLASE_SKU.test}</Badge> : <span className="text-muted-foreground">{ETIQUETA_CLASE_SKU.fisico}</span>),
   },

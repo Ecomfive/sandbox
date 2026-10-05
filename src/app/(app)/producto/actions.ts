@@ -97,14 +97,10 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
 }
 
 /**
- * Pasa un producto de test a físico (se decidió comprarlo) o de físico a test. Vuelve a test solo si nunca tuvo movimientos
- * de inventario: con historia ya no es una prueba. Devuelve el error como valor.
+ * Cambia el estado de un producto: de Test a Activo (se decidió comprarlo) o de Activo a Test. Vuelve a Test solo si nunca
+ * tuvo movimientos de inventario: con historia ya no es una prueba. `desde` queda en la actividad («desde Compras»).
  */
-export async function cambiarClaseProducto(id: string, clase: string): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
-  if (!ES_ID(id)) return { error: "Producto no válido." };
-  if (clase !== "fisico" && clase !== "test") return { error: "Clase no válida." };
-
+async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: string): Promise<{ error?: string }> {
   const supabase = createServiceClient();
   const { data: actual } = await supabase.from("skus_maestros").select("codigo, clase").eq("id", id).maybeSingle();
   if (!actual) return { error: "El producto ya no existe." };
@@ -116,17 +112,36 @@ export async function cambiarClaseProducto(id: string, clase: string): Promise<{
   }
 
   const { error } = await supabase.from("skus_maestros").update({ clase }).eq("id", id);
-  if (error) return { error: "No se pudo cambiar la clase." };
+  if (error) return { error: "No se pudo cambiar el estado." };
   await registrarAuditoria({
     accion: "cambiar_clase_producto",
     entidad: "skus_maestros",
     entidadId: id,
-    antes: { Clase: ETIQUETA_CLASE[actual.clase] ?? actual.clase },
-    despues: { Clase: ETIQUETA_CLASE[clase] },
+    antes: { Estado: ETIQUETA_CLASE[actual.clase] ?? actual.clase },
+    despues: { Estado: desde ? `${ETIQUETA_CLASE[clase]} (${desde})` : ETIQUETA_CLASE[clase] },
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");
   return {};
+}
+
+/** El estado de un producto desde su ficha: Activo ('fisico') o Test. Devuelve el error como valor. */
+export async function cambiarClaseProducto(id: string, clase: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  if (clase !== "fisico" && clase !== "test") return { error: "Estado no válido." };
+  return aplicarEstado(id, clase);
+}
+
+/**
+ * Para Compras: un producto en Test no se puede comprar. Cuando alguien acepta la advertencia de Compras («este producto
+ * debe pasar a Activo»), esta acción lo pasa a Activo en su ficha. Basta poder modificar Compras: aceptar es la decisión
+ * de comprarlo. Si ya estaba activo no hace nada. Devuelve el error como valor.
+ */
+export async function activarProductoParaCompra(id: string): Promise<{ error?: string }> {
+  await requireModuloEscritura("compras");
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  return aplicarEstado(id, "fisico", "desde Compras");
 }
 
 /** La actividad de un producto (creación, cambios de clase) para su ficha. Basta poder abrir Producto. */

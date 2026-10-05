@@ -127,7 +127,7 @@ export function FichaStock({
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">
             <Seccion icono={InventarioIcon} titulo="Stock por bodega">
               {esTest ? (
-                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se marque como físico (en Producto).</p>
+                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo (en Producto).</p>
               ) : esCombo ? (
                 <p className="text-sm text-muted-foreground">Un producto compuesto no guarda stock: se calcula de sus componentes.</p>
               ) : datos === null ? (

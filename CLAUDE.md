@@ -240,9 +240,9 @@ convenciones técnicas del código.
   Actualización masiva ni las descargas en Excel de Dropi.
 - **Módulo «Producto»** (`/producto`, módulo `producto`, migración 0070; sustituye al Catálogo maestro, cuya ruta redirige aquí). Un
   producto vive en `skus_maestros` (el nombre de la tabla se conserva) y se crea desde «Agregar»: **simple o compuesto** (un compuesto
-  es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **físico o test** (`clase`:
+  es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **Activo o Test** (se ve como «Estado» y se elige en la ficha; en la base es la columna `clase`, y Activo se guarda como `'fisico'`:
   un test se está probando, todavía no se compra, **aparece en Inventario pero no tiene stock** —`wms_aplicar_cambios` rechaza cualquier
-  movimiento— y se pasa a físico con «Marcar como físico» en su ficha; volver a test solo si nunca tuvo movimientos). Ya no hay flujo
+  movimiento— y se pasa a Activo desde el selector «Estado» de su ficha; volver a Test solo si nunca tuvo movimientos). **Compras: un producto en Test no se compra.** Al agregar un producto a una compra se usa `useConfirmarProductoActivo` (`compras/confirmar-producto-activo.tsx`): si está en Test advierte que debe pasar a Activo; Cancelar vuelve atrás y Aceptar lo pasa a Activo en su ficha (`activarProductoParaCompra`, basta poder modificar Compras; queda en su actividad «desde Compras»). Hoy Compras todavía no enlaza productos (`producto_relacionado` es texto): usarlo cuando se enlacen. Ya no hay flujo
   propuesto → en revisión → aprobado (todo queda `aprobado`). **El SKU (`codigo`) es la llave del descuento automático**: es
   obligatorio y único sin importar mayúsculas ni espacios, y una venta de cualquier plataforma (Dropi, las tiendas de Shopify) encuentra
   su producto por ese código, que debe ser el mismo en las dos. `wms_aplicar_venta(codigo, cantidad, bodega, fase)` ya lo implementa

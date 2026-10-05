@@ -13,11 +13,11 @@ const atajoDeClase = (clase: string): AtajoFiltro => ({
   suma: true,
 });
 
-/** Las tarjetas «Físicos / Test»: al pulsar una filtran la lista por esa clase (se pulsa otra vez para quitarla). */
+/** Las tarjetas «Activos / Test»: al pulsar una filtran la lista por ese estado (se pulsa otra vez para quitarla). */
 export function TarjetasClase({ conteo }: { conteo: { fisico: number; test: number } }) {
   return (
     <KpiGrid>
-      <KpiFiltro def={DEF_PRODUCTO} atajo={atajoDeClase("fisico")} titulo="Físicos" valor={conteo.fisico} />
+      <KpiFiltro def={DEF_PRODUCTO} atajo={atajoDeClase("fisico")} titulo="Activos" valor={conteo.fisico} />
       <KpiFiltro def={DEF_PRODUCTO} atajo={atajoDeClase("test")} titulo="Test" valor={conteo.test} />
     </KpiGrid>
   );

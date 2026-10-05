@@ -3,8 +3,11 @@ import type { DefTabla } from "@/lib/tabla/motor";
 /** Simple: un solo producto. Compuesto: una combinación de productos simples (al venderlo se descuenta cada uno). */
 export const ETIQUETA_TIPO: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
 
-/** Físico: ya se compró y tiene stock. Test: se está probando; todavía no se compra y no tiene stock. */
-export const ETIQUETA_CLASE: Record<string, string> = { fisico: "Físico", test: "Test" };
+/**
+ * El estado de un producto. Activo: se compra y tiene stock. Test: se está probando; todavía no se compra y no tiene stock.
+ * En la base es la columna `clase` y «activo» se guarda como 'fisico' (el nombre de antes): solo cambia lo que se ve.
+ */
+export const ETIQUETA_CLASE: Record<string, string> = { fisico: "Activo", test: "Test" };
 export const TONO_CLASE: Record<string, "success" | "warning"> = { fisico: "success", test: "warning" };
 
 /** Lo enlazado a un producto: fichas de Shopify y de Dropi, y el producto tal como llega en los pedidos de Dropi. */
@@ -70,7 +73,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
     { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => `${p.codigo} ${p.nombre} ${p.codigoBarras ?? ""}` },
     {
       id: "clase",
-      etiqueta: "Clase",
+      etiqueta: "Estado",
       tipo: "seleccion",
       valores: (p) => [p.clase],
       opciones: () => Object.entries(ETIQUETA_CLASE).map(([valor, etiqueta]) => ({ valor, etiqueta })),
@@ -90,7 +93,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
     { etiqueta: "SKU", valor: (p) => p.codigo },
     { etiqueta: "Producto", valor: (p) => p.nombre },
     { etiqueta: "Tipo", valor: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
-    { etiqueta: "Clase", valor: (p) => ETIQUETA_CLASE[p.clase] ?? p.clase },
+    { etiqueta: "Estado", valor: (p) => ETIQUETA_CLASE[p.clase] ?? p.clase },
     { etiqueta: "Código de barras", valor: (p) => p.codigoBarras ?? "" },
     { etiqueta: "Componentes", valor: (p) => p.componentes },
   ],

@@ -6,7 +6,7 @@ export interface FilaStock {
   codigo: string;
   nombre: string;
   tipo: string;
-  /** «fisico» o «test»: un producto de prueba aparece aquí pero no tiene stock. */
+  /** Estado del producto, «fisico» (Activo) o «test»: un producto de prueba aparece aquí pero no tiene stock. */
   clase: string;
   fisico: number;
   reservado: number;
@@ -22,7 +22,7 @@ export interface FilaStock {
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
-export const ETIQUETA_CLASE_SKU: Record<string, string> = { fisico: "Físico", test: "Test" };
+export const ETIQUETA_CLASE_SKU: Record<string, string> = { fisico: "Activo", test: "Test" };
 
 export const ETIQUETA_EXISTENCIA: Record<string, string> = {
   negativo: "Saldo negativo",
@@ -50,7 +50,7 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     },
     {
       id: "clase",
-      etiqueta: "Clase",
+      etiqueta: "Estado",
       tipo: "seleccion",
       valores: (f) => [f.clase],
       opciones: () => Object.entries(ETIQUETA_CLASE_SKU).map(([valor, etiqueta]) => ({ valor, etiqueta })),

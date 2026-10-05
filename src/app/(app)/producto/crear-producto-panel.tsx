@@ -10,7 +10,7 @@ import { crearProducto } from "./actions";
 import { ComboBuilder } from "./combo-builder";
 
 /**
- * «Agregar» de Producto: la ficha para crear un producto. La clase (Físico o Test) dice si ya se compró o se está probando;
+ * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
  * el tipo (Simple o Compuesto) decide si aparece el bloque de componentes. El SKU es obligatorio: con él una venta de Dropi
  * o de una tienda de Shopify encuentra el producto para descontar el inventario.
  */
@@ -34,9 +34,9 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
         <>
           <Seccion icono={CatalogoIcon} titulo="Producto">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Clase" id="campo-clase-producto" obligatorio faltante={faltante}>
+              <Campo etiqueta="Estado" id="campo-clase-producto" obligatorio faltante={faltante}>
                 <select id="campo-clase-producto" name="clase" required defaultValue="fisico" aria-invalid={invalido("campo-clase-producto")} className={`${fieldClass} w-full`}>
-                  <option value="fisico">Físico (ya se compró)</option>
+                  <option value="fisico">Activo (se compra)</option>
                   <option value="test">Test (se está probando)</option>
                 </select>
               </Campo>

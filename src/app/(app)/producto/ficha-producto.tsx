@@ -2,15 +2,14 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { anilloFoco } from "@/components/ui/field";
+import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
-import { BotonAccion } from "@/components/ui/boton-accion";
-import { CalendarioIcon, CatalogoIcon, CheckIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, FlechaIzquierdaIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import { formatearFecha } from "@/lib/formato";
 import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
@@ -73,7 +72,7 @@ export function FichaProducto({
   const { mostrarToast } = useToast();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // Sube cada vez que se cambia la clase, para que la línea de tiempo se vuelva a pedir.
+  // Sube cada vez que se cambia el estado, para que la línea de tiempo se vuelva a pedir.
   const [version, setVersion] = useState(0);
 
   const indice = producto ? orden.indexOf(producto.id) : -1;
@@ -93,7 +92,7 @@ export function FichaProducto({
       const r = await cambiarClaseProducto(producto.id, nueva);
       if (r.error) setError(r.error);
       else {
-        mostrarToast(`Ahora es un producto ${ETIQUETA_CLASE[nueva].toLowerCase()}`);
+        mostrarToast(`Estado: ${ETIQUETA_CLASE[nueva]}`);
         setVersion((v) => v + 1);
       }
     });
@@ -126,25 +125,6 @@ export function FichaProducto({
         <div className="flex flex-1 flex-col">
           <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{producto.nombre}</p>
 
-          {puedeEscribir && (
-            <div className="flex flex-col gap-2 border-y border-border px-5 py-3">
-              <div className="flex flex-wrap gap-2">
-                <BotonAccion
-                  icono={esTest ? CheckIcon : FlechaIzquierdaIcon}
-                  tono={esTest ? "oscuro" : "neutro"}
-                  disabled={pending}
-                  onClick={() => cambiarClase(esTest ? "fisico" : "test")}
-                >
-                  {pending ? "Guardando..." : esTest ? "Marcar como físico" : "Marcar como test"}
-                </BotonAccion>
-              </div>
-              {error && (
-                <p role="alert" className="text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-            </div>
-          )}
 
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">
             <Seccion icono={CatalogoIcon} titulo="Producto">
@@ -152,7 +132,27 @@ export function FichaProducto({
                 <Dato etiqueta="Nombre">{producto.nombre}</Dato>
                 <Dato etiqueta="SKU">{producto.codigo}</Dato>
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
-                <Dato etiqueta="Clase">{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Dato>
+                <Dato etiqueta="Estado">
+                  {puedeEscribir ? (
+                    <select
+                      aria-label="Estado del producto"
+                      value={producto.clase}
+                      disabled={pending}
+                      onChange={(e) => cambiarClase(e.target.value)}
+                      className={`${fieldClassSm} w-40`}
+                    >
+                      <option value="fisico">{ETIQUETA_CLASE.fisico}</option>
+                      <option value="test">{ETIQUETA_CLASE.test}</option>
+                    </select>
+                  ) : (
+                    (ETIQUETA_CLASE[producto.clase] ?? producto.clase)
+                  )}
+                  {error && (
+                    <span role="alert" className="mt-1 block text-xs text-destructive">
+                      {error}
+                    </span>
+                  )}
+                </Dato>
               </dl>
             </Seccion>
 
@@ -192,7 +192,7 @@ export function FichaProducto({
 
             <Seccion icono={InventarioIcon} titulo="Inventario">
               {esTest ? (
-                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se marque como físico.</p>
+                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo.</p>
               ) : (
                 <Link href="/inventario" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
                   Ver en Inventario

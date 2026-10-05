@@ -27,7 +27,7 @@ const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
   { id: "codigo", label: "SKU", ocultable: false, clase: "font-medium", render: (p) => p.codigo },
   { id: "nombre", label: "Producto", ocultable: true, render: (p) => p.nombre },
   { id: "tipo", label: "Tipo", ocultable: true, clase: "text-muted-foreground", render: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
-  { id: "clase", label: "Clase", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },
+  { id: "clase", label: "Estado", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },
   { id: "barras", label: "Código de barras", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.codigoBarras ?? "—" },
   { id: "vencimiento", label: "Vencimiento", ocultable: true, clase: "text-muted-foreground", render: (p) => (p.manejaVencimiento ? "Por lote" : "—") },
   { id: "componentes", label: "Componentes", ocultable: true, clase: "text-muted-foreground", render: (p) => p.componentes || "—" },
