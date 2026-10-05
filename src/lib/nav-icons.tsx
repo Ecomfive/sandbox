@@ -508,21 +508,124 @@ export function TestIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Megáfono: Marketing y ventas. */
-export function MarketingIcon(props: SVGProps<SVGSVGElement>) {
+/*
+ * Íconos del riel del menú: los mismos de Mi Reto Digital (Lucide, trazo de 1,75) para que los dos sistemas se vean
+ * iguales al integrarlos.
+ */
+function IconoLucide({ children, relleno, ...props }: SVGProps<SVGSVGElement> & { relleno?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M4 10v4a1 1 0 0 0 1 1h2l5 3.5v-13L7 9H5a1 1 0 0 0-1 1Z" />
-      <path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10" />
+    <svg
+      viewBox="0 0 24 24"
+      fill={relleno ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      {children}
     </svg>
   );
 }
 
+/** Barras: Desempeño. */
+export function DesempenoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+      <path d="M18 17V9" />
+      <path d="M13 17V5" />
+      <path d="M8 17v-3" />
+    </IconoLucide>
+  );
+}
+
+/** Estrella llena: Fijados. */
+export function FijadosIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide relleno {...props}>
+      <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
+    </IconoLucide>
+  );
+}
+
+/** Megáfono: Marketing y ventas. */
+export function MarketingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
+      <path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14" />
+      <path d="M8 6v8" />
+    </IconoLucide>
+  );
+}
+
+/** Portapapeles con lista: Operación. */
+export function OperacionIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M12 11h4" />
+      <path d="M12 16h4" />
+      <path d="M8 11h.01" />
+      <path d="M8 16h.01" />
+    </IconoLucide>
+  );
+}
+
+/** Edificio con columnas: Finanzas. */
+export function FinanzasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M10 18v-7" />
+      <path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z" />
+      <path d="M14 18v-7" />
+      <path d="M18 18v-7" />
+      <path d="M3 22h18" />
+      <path d="M6 18v-7" />
+    </IconoLucide>
+  );
+}
+
+/** Personas: Equipo. */
+export function EquipoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <circle cx="9" cy="7" r="4" />
+    </IconoLucide>
+  );
+}
+
+/** Campana: Avisos. */
+export function AvisosIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+      <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+    </IconoLucide>
+  );
+}
+
+/** Engranaje: Ajustes. */
+export function AjustesIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+      <circle cx="12" cy="12" r="3" />
+    </IconoLucide>
+  );
+}
+
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
-  Desempeño: DashboardIcon,
-  Fijados: EstrellaIcon,
+  Desempeño: DesempenoIcon,
+  Fijados: FijadosIcon,
   Marketing: MarketingIcon,
-  Operación: PedidoIcon,
-  Finanzas: WalletIcon,
-  Equipo: RecursosHumanosIcon,
+  Operación: OperacionIcon,
+  Finanzas: FinanzasIcon,
+  Equipo: EquipoIcon,
 };

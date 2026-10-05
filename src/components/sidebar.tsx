@@ -10,7 +10,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, sumaDeItems, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
-import { ConfiguracionIcon, DashboardIcon, NotificacionesIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import { AjustesIcon, AvisosIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -194,7 +194,7 @@ function Proximamente({ className = "" }: { className?: string }) {
   );
 }
 
-const claseRielBoton = `flex w-full flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[0.65rem] leading-tight ${anilloFoco}`;
+const claseRielBoton = `flex w-full flex-col items-center gap-1 rounded-lg px-0.5 py-2 text-center text-[0.625rem] leading-tight ${anilloFoco}`;
 
 /**
  * Menú de escritorio: un riel con las áreas de trabajo (un punto de color donde hay algo pendiente) y, al lado, el panel
@@ -260,17 +260,17 @@ function RielYPanel({
         className={`${claseRielBoton} ${seleccionada ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
       >
         <span className="relative inline-flex">
-          <Icono className="h-5 w-5" />
+          <Icono className="h-4 w-4" />
           <ContadorSobreIcono cantidad={cantidad} />
         </span>
-        <span className="max-w-full truncate">{nombre}</span>
+        <span>{nombre}</span>
       </button>
     );
   }
 
   return (
     <>
-      <nav ref={rielRef} aria-label="Áreas del menú" className="flex w-[4.5rem] shrink-0 flex-col items-center gap-0.5 border-r border-border bg-muted px-1 py-2.5">
+      <nav ref={rielRef} aria-label="Áreas del menú" className="flex w-20 shrink-0 flex-col items-center gap-0.5 border-r border-border bg-muted px-1 py-2.5">
         <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloFoco}`}>
           <Image src="/brand/ecomfive-rojo.png" alt="" width={161} height={44} className="h-3 w-auto" />
         </Link>
@@ -295,7 +295,7 @@ function RielYPanel({
               className={`${claseRielBoton} ${pathname === "/notificaciones" ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
             >
               <span className="relative inline-flex">
-                <NotificacionesIcon className="h-5 w-5" />
+                <AvisosIcon className="h-4 w-4" />
                 <ContadorSobreIcono cantidad={pendientes.total} />
               </span>
               <span>Avisos</span>
@@ -307,7 +307,7 @@ function RielYPanel({
               aria-current={pathname === "/configuracion" ? "page" : undefined}
               className={`${claseRielBoton} ${pathname === "/configuracion" ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
             >
-              <ConfiguracionIcon className="h-5 w-5" />
+              <AjustesIcon className="h-4 w-4" />
               <span>Ajustes</span>
             </Link>
           )}
@@ -318,13 +318,13 @@ function RielYPanel({
             onClick={() => guardado.guardar(panelOculto ? "" : "cerrado")}
             className={`${claseRielBoton} text-muted-foreground hover:bg-accent/60 hover:text-foreground`}
           >
-            <ToggleIcon className="h-5 w-5" />
+            <ToggleIcon className="h-4 w-4" />
           </button>
         </div>
       </nav>
 
       {!panelOculto && (verFijados || mostrada) && (
-        <nav aria-label={verFijados ? "Páginas fijadas" : `Páginas de ${mostrada?.area.title}`} className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
+        <nav aria-label={verFijados ? "Páginas fijadas" : `Páginas de ${mostrada?.area.title}`} className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
           {verFijados ? (
             <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
           ) : (
