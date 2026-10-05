@@ -14,6 +14,10 @@ const CABECERAS = [
 ];
 
 const nextConfig: NextConfig = {
+  // El Catálogo maestro pasó a ser el módulo Producto.
+  async redirects() {
+    return [{ source: "/catalogo-maestro", destination: "/producto", permanent: false }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: CABECERAS }];
   },

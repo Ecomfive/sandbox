@@ -121,9 +121,10 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   if (tipo === "ajuste" && !motivo) return { error: "Un ajuste necesita un motivo." };
 
   const supabase = createServiceClient();
-  const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo").eq("id", sku).maybeSingle();
+  const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase").eq("id", sku).maybeSingle();
   if (!maestro) return { error: "El SKU no existe." };
-  if (maestro.tipo === "combo") return { error: "Un combo no guarda stock: se calcula de sus componentes." };
+  if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
+  if (maestro.clase === "test") return { error: "Es un producto de prueba: no tiene stock hasta que se marque como físico." };
 
   const { error } = await supabase.rpc("wms_registrar_movimiento", {
     p_sku: sku,

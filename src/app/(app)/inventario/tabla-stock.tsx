@@ -8,13 +8,13 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
-import { DEF_STOCK, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
+import { DEF_STOCK, ETIQUETA_CLASE_SKU, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { FichaStock } from "./ficha-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
-const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, fisico: InventarioIcon, disponible: InventarioIcon };
+const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, disponible: InventarioIcon };
 
 /** Una cifra de la tabla: alineada a la derecha, y en rojo si el saldo es negativo. */
 function celda(n: number) {
@@ -30,6 +30,12 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
     ocultable: true,
     clase: "text-muted-foreground",
     render: (f) => (f.tipo === "combo" ? <Badge tone="neutral">{ETIQUETA_TIPO_SKU[f.tipo]}</Badge> : (ETIQUETA_TIPO_SKU[f.tipo] ?? f.tipo)),
+  },
+  {
+    id: "clase",
+    label: "Clase",
+    ocultable: true,
+    render: (f) => (f.clase === "test" ? <Badge tone="warning">{ETIQUETA_CLASE_SKU.test}</Badge> : <span className="text-muted-foreground">{ETIQUETA_CLASE_SKU.fisico}</span>),
   },
   { id: "fisico", label: "Físico", descripcion: DESCRIPCION_CUBETA.fisico, ocultable: false, render: (f) => celda(f.fisico) },
   { id: "reservado", label: "Reservado", descripcion: DESCRIPCION_CUBETA.reservado, ocultable: true, render: (f) => celda(f.reservado) },

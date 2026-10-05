@@ -48,6 +48,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     codigo: String(r.codigo),
     nombre: String(r.nombre),
     tipo: String(r.tipo),
+    clase: String(r.clase ?? "fisico"),
     fisico: Number(r.fisico),
     reservado: Number(r.reservado),
     disponible: Number(r.disponible),

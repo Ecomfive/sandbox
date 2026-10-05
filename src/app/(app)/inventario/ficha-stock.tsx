@@ -72,6 +72,7 @@ export function FichaStock({
   }, [id, version]);
 
   const esCombo = sku?.tipo === "combo";
+  const esTest = sku?.clase === "test";
   return (
     <Ventana
       abierto={!!sku}
@@ -94,7 +95,7 @@ export function FichaStock({
         <div className="flex flex-1 flex-col">
           <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{sku.nombre}</p>
 
-          {puedeEscribir && !esCombo && (
+          {puedeEscribir && !esCombo && !esTest && (
             <div className="flex flex-wrap gap-2 border-y border-border px-5 py-3">
               {(["entrada", "salida", "ajuste"] as const).map((tipo) => (
                 <PanelMovimiento
@@ -114,8 +115,10 @@ export function FichaStock({
 
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">
             <Seccion icono={InventarioIcon} titulo="Stock por bodega">
-              {esCombo ? (
-                <p className="text-sm text-muted-foreground">Un combo no guarda stock: se calcula de sus componentes.</p>
+              {esTest ? (
+                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se marque como físico (en Producto).</p>
+              ) : esCombo ? (
+                <p className="text-sm text-muted-foreground">Un producto compuesto no guarda stock: se calcula de sus componentes.</p>
               ) : datos === null ? (
                 <p className="text-sm text-muted-foreground">Cargando…</p>
               ) : datos === "error" ? (
@@ -171,7 +174,7 @@ export function FichaStock({
               )}
             </Seccion>
 
-            {!esCombo && (
+            {!esCombo && !esTest && (
               <Seccion icono={HistorialIcon} titulo="Movimientos">
                 {datos === null || datos === "error" ? null : datos.movimientos.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Sin movimientos todavía.</p>

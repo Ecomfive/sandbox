@@ -22,7 +22,7 @@ export default async function ProductosPage({
   const usuario = await requireModulo("productos");
   const puedeEscribir = !usuario.modulosSoloLectura.includes("productos");
   // Vincular a un SKU maestro es una acción del catálogo maestro: pide escritura allí, no en Productos.
-  const puedeVincular = usuario.modulos.includes("catalogo-maestro") && !usuario.modulosSoloLectura.includes("catalogo-maestro");
+  const puedeVincular = usuario.modulos.includes("producto") && !usuario.modulosSoloLectura.includes("producto");
   const sp = await searchParams;
   const buscar = typeof sp.buscar === "string" ? sp.buscar.trim() : "";
 

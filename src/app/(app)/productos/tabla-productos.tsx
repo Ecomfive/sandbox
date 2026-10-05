@@ -26,7 +26,7 @@ import { formatearMoneda } from "@/lib/formato";
 import { margenActual, type ProductoFila } from "@/lib/margen";
 import { EstadoIcon, GastoIcon, LapizIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
 import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
-import { vincularProductoASku } from "../catalogo-maestro/actions";
+import { vincularProductoASku } from "../producto/actions";
 import { actualizarMargenMasivo, actualizarProducto } from "./actions";
 import { DEF_PRODUCTOS } from "./def-productos";
 

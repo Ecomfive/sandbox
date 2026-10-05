@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { anilloFoco } from "@/components/ui/field";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -9,11 +10,10 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
-import { CalendarioIcon, CatalogoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, FlechaIzquierdaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, FlechaIzquierdaIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import { formatearFecha } from "@/lib/formato";
-import { cambiarEstadoSku, obtenerHistorialSku } from "./actions";
-import { ETIQUETA_ASOCIACION, ETIQUETA_ESTADO, ETIQUETA_TIPO, TONO_ESTADO, siguientesEstados, type FilaSku } from "./def-catalogo";
-import Link from "next/link";
+import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
+import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
@@ -24,7 +24,7 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   );
 }
 
-/** Botón de la cabecera para pasar al SKU anterior o siguiente (mismo patrón que `FichaCuenta`). */
+/** Botón de la cabecera para pasar al producto anterior o siguiente (mismo patrón que `FichaCuenta`). */
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
     <Tooltip texto={texto}>
@@ -44,25 +44,24 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: str
 }
 
 /**
- * Ficha de un SKU maestro: el panel a la derecha que se abre al pulsar su fila, con la misma estructura que
- * `FichaCuenta` — cabecera con sus insignias, las flechas de anterior y siguiente, una fila de botones para pasar
- * al siguiente estado (todo pasa por revisión antes de quedar aprobado) y los datos en bloques con ícono. **La
- * tabla ya no tiene columna de acciones**: cambiar el estado se hace desde aquí. La actividad (propuesto, cambios
- * de estado) va al final, siempre la misma línea de tiempo que las demás fichas de detalle.
+ * Ficha de un producto: el panel a la derecha que se abre al pulsar su fila, con la misma estructura que `FichaCuenta` —
+ * cabecera con sus insignias (tipo y clase), flechas de anterior y siguiente, el botón para pasarlo de Test a Físico (o al
+ * revés) y los datos en bloques con ícono: el producto, sus componentes si es compuesto, las fichas de Shopify y de Dropi
+ * enlazadas, el acceso a su inventario y la actividad al final.
  */
-export function FichaSku({
-  sku,
+export function FichaProducto({
+  producto,
   orden,
   codigoPais,
   puedeEscribir,
   alIr,
   alCerrar,
 }: {
-  /** El SKU que se ve; sin él (no abierto) el panel está cerrado. */
-  sku: FilaSku | undefined;
-  /** Las claves de los SKU en el orden de la tabla. */
+  /** El producto que se ve; sin él (no abierto) el panel está cerrado. */
+  producto: FilaProducto | undefined;
+  /** Las claves de los productos en el orden de la tabla. */
   orden: string[];
-  /** El SKU maestro es igual para todos los países; el código de país solo da formato a las fechas de la actividad. */
+  /** El producto es igual para todos los países; el código de país solo da formato a las fechas de la actividad. */
   codigoPais: string;
   puedeEscribir: boolean;
   alIr: (id: string) => void;
@@ -71,10 +70,10 @@ export function FichaSku({
   const { mostrarToast } = useToast();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // Sube cada vez que se cambia el estado, para que la línea de tiempo se vuelva a pedir.
+  // Sube cada vez que se cambia la clase, para que la línea de tiempo se vuelva a pedir.
   const [version, setVersion] = useState(0);
 
-  const indice = sku ? orden.indexOf(sku.id) : -1;
+  const indice = producto ? orden.indexOf(producto.id) : -1;
   const anterior = indice > 0 ? orden[indice - 1] : null;
   const siguiente = indice >= 0 && indice < orden.length - 1 ? orden[indice + 1] : null;
 
@@ -84,66 +83,57 @@ export function FichaSku({
     alIr(id);
   }
 
-  function cambiarEstado(nuevoEstado: string) {
-    if (!sku) return;
+  function cambiarClase(nueva: string) {
+    if (!producto) return;
     setError(null);
-    const formData = new FormData();
-    formData.set("id", sku.id);
-    formData.set("nuevo_estado", nuevoEstado);
     startTransition(async () => {
-      try {
-        await cambiarEstadoSku(formData);
-        mostrarToast(`Estado cambiado a ${ETIQUETA_ESTADO[nuevoEstado] ?? nuevoEstado}`);
+      const r = await cambiarClaseProducto(producto.id, nueva);
+      if (r.error) setError(r.error);
+      else {
+        mostrarToast(`Ahora es un producto ${ETIQUETA_CLASE[nueva].toLowerCase()}`);
         setVersion((v) => v + 1);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo cambiar el estado.");
       }
     });
   }
 
+  const esTest = producto?.clase === "test";
   return (
     <Ventana
-      abierto={!!sku}
+      abierto={!!producto}
       alCerrar={alCerrar}
       lado="derecha"
       ancho="lg"
       titulo={
-        sku && (
+        producto && (
           <>
-            <span className="text-lg font-semibold">{sku.codigo}</span>
-            <Badge tone="neutral">{ETIQUETA_TIPO[sku.tipo] ?? sku.tipo}</Badge>
-            <Badge tone={TONO_ESTADO[sku.estado]}>{ETIQUETA_ESTADO[sku.estado] ?? sku.estado}</Badge>
+            <span className="text-lg font-semibold">{producto.codigo}</span>
+            <Badge tone="neutral">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Badge>
+            <Badge tone={TONO_CLASE[producto.clase]}>{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Badge>
           </>
         )
       }
       navegacion={
         <>
-          <BotonNavegar texto="SKU anterior" icono={FlechaArribaIcon} activo={!!anterior && !pending} alHacerClic={() => anterior && irA(anterior)} />
-          <BotonNavegar texto="SKU siguiente" icono={FlechaAbajoIcon} activo={!!siguiente && !pending} alHacerClic={() => siguiente && irA(siguiente)} />
+          <BotonNavegar texto="Producto anterior" icono={FlechaArribaIcon} activo={!!anterior && !pending} alHacerClic={() => anterior && irA(anterior)} />
+          <BotonNavegar texto="Producto siguiente" icono={FlechaAbajoIcon} activo={!!siguiente && !pending} alHacerClic={() => siguiente && irA(siguiente)} />
         </>
       }
     >
-      {sku && (
+      {producto && (
         <div className="flex flex-1 flex-col">
-          <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{sku.nombre}</p>
+          <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{producto.nombre}</p>
 
           {puedeEscribir && (
             <div className="flex flex-col gap-2 border-y border-border px-5 py-3">
               <div className="flex flex-wrap gap-2">
-                {siguientesEstados(sku.estado).map((paso) => {
-                  const retrocede = paso.etiqueta.startsWith("Regresar");
-                  return (
-                    <BotonAccion
-                      key={paso.valor}
-                      icono={retrocede ? FlechaIzquierdaIcon : CheckIcon}
-                      tono={paso.valor === "aprobado" ? "oscuro" : "neutro"}
-                      disabled={pending}
-                      onClick={() => cambiarEstado(paso.valor)}
-                    >
-                      {pending ? "Guardando..." : paso.etiqueta}
-                    </BotonAccion>
-                  );
-                })}
+                <BotonAccion
+                  icono={esTest ? CheckIcon : FlechaIzquierdaIcon}
+                  tono={esTest ? "oscuro" : "neutro"}
+                  disabled={pending}
+                  onClick={() => cambiarClase(esTest ? "fisico" : "test")}
+                >
+                  {pending ? "Guardando..." : esTest ? "Marcar como físico" : "Marcar como test"}
+                </BotonAccion>
               </div>
               {error && (
                 <p role="alert" className="text-sm text-destructive">
@@ -154,25 +144,37 @@ export function FichaSku({
           )}
 
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">
-            <Seccion icono={CatalogoIcon} titulo="SKU">
+            <Seccion icono={CatalogoIcon} titulo="Producto">
               <dl className="flex flex-col gap-3">
-                <Dato etiqueta="Nombre">{sku.nombre}</Dato>
-                <Dato etiqueta="Tipo">{ETIQUETA_TIPO[sku.tipo] ?? sku.tipo}</Dato>
+                <Dato etiqueta="Nombre">{producto.nombre}</Dato>
+                <Dato etiqueta="SKU">{producto.codigo}</Dato>
+                <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
+                <Dato etiqueta="Clase">{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Dato>
               </dl>
             </Seccion>
 
-            {sku.tipo === "combo" && (
+            {producto.tipo === "combo" && (
               <Seccion icono={ProductoIcon} titulo="Componentes">
-                <p className="text-sm">{sku.componentes || "—"}</p>
+                <p className="text-sm">{producto.componentes || "—"}</p>
               </Seccion>
             )}
 
+            <Seccion icono={InventarioIcon} titulo="Inventario">
+              {esTest ? (
+                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se marque como físico.</p>
+              ) : (
+                <Link href="/inventario" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
+                  Ver en Inventario
+                </Link>
+              )}
+            </Seccion>
+
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
-              {sku.asociaciones.length === 0 ? (
+              {producto.asociaciones.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sin fichas enlazadas.</p>
               ) : (
                 <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">
-                  {sku.asociaciones.map((a, i) => (
+                  {producto.asociaciones.map((a, i) => (
                     <li key={`${a.tipo}-${i}`} className="flex flex-col">
                       {a.href ? (
                         <Link href={a.href} className="font-medium underline-offset-2 hover:underline">
@@ -190,7 +192,7 @@ export function FichaSku({
               )}
               {puedeEscribir && (
                 <Link
-                  href={`/wms-productos/nuevo?sku_maestro=${sku.id}`}
+                  href={`/wms-productos/nuevo?sku_maestro=${producto.id}`}
                   className={`mt-2 inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}
                 >
                   Crear ficha Shopify
@@ -200,12 +202,12 @@ export function FichaSku({
 
             <Seccion icono={CalendarioIcon} titulo="Fechas">
               <dl className="flex flex-col gap-3">
-                <Dato etiqueta="Propuesto el">{formatearFecha(sku.creado)}</Dato>
+                <Dato etiqueta="Creado el">{formatearFecha(producto.creado)}</Dato>
               </dl>
             </Seccion>
           </div>
 
-          <HistorialGenerico id={sku.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialSku} />
+          <HistorialGenerico id={producto.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialProducto} />
         </div>
       )}
     </Ventana>

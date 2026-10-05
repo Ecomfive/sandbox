@@ -39,7 +39,7 @@ export const DEF_PRODUCTOS: DefTabla<ProductoFila> = {
     },
     {
       id: "vinculo",
-      etiqueta: "Catálogo maestro",
+      etiqueta: "Producto (SKU)",
       tipo: "seleccion",
       valores: (p) => [p.sku_maestro_id ? "vinculado" : "sin-vincular"],
       opciones: () => [

@@ -163,3 +163,15 @@ aquí; en las propias (Despacho, Fulfillment) el WMS es quien mueve las cubetas.
 - Salida: `dn/views.py` (`DnNewOrderViewSet`, `DnOrderReleaseViewSet`, `DnPickedViewSet`, `DnDispatchViewSet`, `DnPODViewSet`).
 - Conteos: `cyclecount/models.py`, `cyclecount/views.py`. Libro de movimientos: `cyclecount.QTYRecorder`.
 - Escáner: `scanner/views.py`. Catálogos de producto: `goods*` (siete tablas de atributos).
+
+## 10. Decisiones de octubre de 2026
+
+1. **El Catálogo maestro desaparece** y su lugar lo toma el módulo **Producto** (`/producto`): todo producto se crea ahí y se ve en Inventario.
+2. **Un producto es simple o compuesto, y físico o test.** Un compuesto combina productos simples; al venderlo se descuenta cada componente. Un test se
+   está probando, todavía no se compra y **no tiene stock** hasta que se marque como físico.
+3. **El SKU es la llave del descuento automático:** el mismo código en Dropi y en las tiendas de Shopify. Cuando ocurra una venta por una plataforma, el
+   sistema busca el producto por ese código y descuenta (`wms_aplicar_venta`; falta conectar cada plataforma).
+4. **El inventario nace vacío y admite saldos negativos** (fase B): primero los módulos, luego las conexiones; la bodega de Dropi la trae Dropi y el
+   inventario de las tiendas se ata al del WMS. Las cantidades llegan por entradas, salidas y sincronizaciones.
+5. **Compras es de Fulfillment** (el fulfillment se gestiona desde el WMS).
+

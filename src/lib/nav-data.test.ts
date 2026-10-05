@@ -19,8 +19,8 @@ test("hay tres frentes y el de tienda se llama Gestión de tienda", () => {
   assert.deepEqual(FRENTES.map((f) => f.titulo), ["Proveeduría", "Gestión de tienda", "Fulfillment"]);
 });
 
-test("Compras, el catálogo y las fichas de producto están en Operación, no en Marketing", () => {
-  for (const ruta of ["/compras", "/catalogo-maestro", "/wms-productos", "/wms-productos-dropi"]) {
+test("Compras, Producto y las fichas de producto están en Operación, no en Marketing", () => {
+  for (const ruta of ["/compras", "/producto", "/wms-productos", "/wms-productos-dropi"]) {
     assert.ok(hrefs("Operación").includes(ruta), `${ruta} en Operación`);
     assert.ok(!hrefs("Marketing").includes(ruta), `${ruta} no en Marketing`);
   }
@@ -61,7 +61,7 @@ test("el área activa se encuentra por la ruta, también en una subpágina", () 
 
 test("bodegas, ubicaciones, inventario, compras y producto son del frente Fulfillment; los pedidos de dropshippers, de Proveeduría", () => {
   const frenteDe = (ruta: string) => areas.flatMap((a) => a.items).find((i) => i.href === ruta)?.frente;
-  for (const ruta of ["/wms-bodegas", "/wms-ubicaciones", "/inventario", "/alertas", "/compras", "/catalogo-maestro", "/wms-productos", "/wms-productos-dropi"]) {
+  for (const ruta of ["/wms-bodegas", "/wms-ubicaciones", "/inventario", "/alertas", "/compras", "/producto", "/wms-productos", "/wms-productos-dropi"]) {
     assert.equal(frenteDe(ruta), "fulfillment", ruta);
   }
   assert.equal(frenteDe("/pedidos-dropi"), "proveeduria");

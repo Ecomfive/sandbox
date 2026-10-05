@@ -24,7 +24,7 @@ export function ComboBuilder({ opciones }: { opciones: OpcionSimple[] }) {
             defaultValue=""
           >
             <option value="" disabled>
-              Selecciona un SKU simple aprobado
+              Selecciona un producto simple
             </option>
             {opciones.map((o) => (
               <option key={o.id} value={o.id}>

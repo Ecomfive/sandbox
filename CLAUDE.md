@@ -238,14 +238,22 @@ convenciones técnicas del código.
   descripción de 200 caracteres como mínimo y, si el producto es público, una bodega con
   100 unidades y 3 imágenes. Peso en gramos, medidas en centímetros. No incluye Carga masiva,
   Actualización masiva ni las descargas en Excel de Dropi.
-- **Producto central: el SKU maestro es la identidad** (migración 0068, fase A de `WMS-REFERENCIA.md`). Cada
-  **variante** de la ficha Shopify y cada **producto** de la ficha Dropi se enlazan a un SKU maestro con una llave
-  foránea (`sku_maestro_id`); el campo de SKU de esas fichas ya no es texto libre sino un selector
-  (`CampoSkuMaestro`, `src/components/ui/selector-sku-maestro.tsx`, con una sola lista compartida por `ProveedorSkusMaestros`)
-  y el servidor copia el código del maestro en `sku` al guardar (`escribirHijos`, `resolverSkuMaestro`). El enlace es
-  opcional por ahora (hay borradores). La ficha del SKU maestro muestra sus **Asociaciones** (variantes Shopify, productos
-  Dropi y productos de los pedidos de Dropi) y «Crear ficha Shopify» (`/wms-productos/nuevo?sku_maestro=<id>`, que arranca con
-  su nombre y código). Las variaciones de un producto Dropi variable conservan su SKU como texto.
+- **Módulo «Producto»** (`/producto`, módulo `producto`, migración 0070; sustituye al Catálogo maestro, cuya ruta redirige aquí). Un
+  producto vive en `skus_maestros` (el nombre de la tabla se conserva) y se crea desde «Agregar»: **simple o compuesto** (un compuesto
+  es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **físico o test** (`clase`:
+  un test se está probando, todavía no se compra, **aparece en Inventario pero no tiene stock** —`wms_aplicar_cambios` rechaza cualquier
+  movimiento— y se pasa a físico con «Marcar como físico» en su ficha; volver a test solo si nunca tuvo movimientos). Ya no hay flujo
+  propuesto → en revisión → aprobado (todo queda `aprobado`). **El SKU (`codigo`) es la llave del descuento automático**: es
+  obligatorio y único sin importar mayúsculas ni espacios, y una venta de cualquier plataforma (Dropi, las tiendas de Shopify) encuentra
+  su producto por ese código, que debe ser el mismo en las dos. `wms_aplicar_venta(codigo, cantidad, bodega, fase)` ya lo implementa
+  (fases `reserva` al crear el pedido, `liberacion` si se cancela y `despacho` al salir; un compuesto se reparte entre sus componentes
+  y todo ocurre en una transacción), pero **todavía no está conectada a ninguna plataforma**. Cada **variante** de la ficha Shopify
+  y cada **producto** de la ficha Dropi se enlazan a su producto con una llave foránea (`sku_maestro_id`, migración 0068): el campo de SKU
+  de esas fichas es un selector (`CampoSkuMaestro`, `src/components/ui/selector-sku-maestro.tsx`, con una sola lista compartida por
+  `ProveedorSkusMaestros`) y el servidor copia el código del producto en `sku` al guardar (`escribirHijos`, `resolverSkuMaestro`). La
+  ficha de un producto muestra sus **Asociaciones** (variantes Shopify, productos Dropi y productos de los pedidos de Dropi), un acceso a
+  Inventario y «Crear ficha Shopify» (`/wms-productos/nuevo?sku_maestro=<id>`). Las variaciones de un producto Dropi variable
+  conservan su SKU como texto. El módulo **Productos Test** (Marketing) sigue aparte: aún no está ligado a la clase test de un producto.
 - **Sistema WMS: «Bodegas»** (`/wms-bodegas`, módulo `wms-bodegas`, migración 0053; fase 1
   del plan de `WMS-REFERENCIA.md`, que es el documento maestro del WMS: arquitectura V2,
   decisiones confirmadas, flujos de GreaterWMS y fases). Las 6 fuentes físicas (Despacho,
@@ -515,7 +523,7 @@ convenciones técnicas del código.
   página). **Cada área se reparte en tres frentes** (`FRENTES`, `src/lib/nav-data.ts`): **Proveeduría** (lo de Ecomfive hoy),
   **Gestión de tienda** (Mi Reto Digital, cuando se importe) y **Fulfillment**; un frente sin páginas dice «Próximamente»
   (`PaginasDeArea`). Una página lleva su `frente` en `AREAS`; sin frente queda **afuera de los tres** y va arriba (hoy solo
-  Usuarios y roles). **Bodegas, Ubicaciones, Inventario, Alertas de inventario, Compras, Catálogo maestro y las fichas de producto
+  Usuarios y roles). **Bodegas, Ubicaciones, Inventario, Alertas de inventario, Compras, Producto y las fichas de producto
   son del frente Fulfillment** (en Operación, no en Marketing): el producto entra por el WMS y sale por Proveeduría
   (dropshippers) o por Fulfillment hacia tiendas, de un tercero a quien solo se le presta el servicio (Clicksy) o propias
   (Kenku, Nuvo, Wao Ofertas y Ofertfy); Compras también es de Fulfillment (el fulfillment se gestiona desde el WMS); solo Pedidos Dropi sigue en Proveeduría. En un negocio de dropshipping el
