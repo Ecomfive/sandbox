@@ -174,4 +174,7 @@ aquí; en las propias (Despacho, Fulfillment) el WMS es quien mueve las cubetas.
 4. **El inventario nace vacío y admite saldos negativos** (fase B): primero los módulos, luego las conexiones; la bodega de Dropi la trae Dropi y el
    inventario de las tiendas se ata al del WMS. Las cantidades llegan por entradas, salidas y sincronizaciones.
 5. **Compras es de Fulfillment** (el fulfillment se gestiona desde el WMS).
+6. **UUID v7 para las llaves nuevas** (migración 0071): `uuid_v7()` (SQL puro) es el valor por defecto del `id` de los productos y de las tablas
+   `wms_*`. Se ordena solo por fecha de creación. Los UUID que ya existían no se tocan. **No resuelve el vencimiento**: los productos con
+   fecha de caducidad necesitan lotes (pendiente de diseñar: ver el plan de lotes y FEFO).
 

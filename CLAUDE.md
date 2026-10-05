@@ -253,7 +253,7 @@ convenciones técnicas del código.
   `ProveedorSkusMaestros`) y el servidor copia el código del producto en `sku` al guardar (`escribirHijos`, `resolverSkuMaestro`). La
   ficha de un producto muestra sus **Asociaciones** (variantes Shopify, productos Dropi y productos de los pedidos de Dropi), un acceso a
   Inventario y «Crear ficha Shopify» (`/wms-productos/nuevo?sku_maestro=<id>`). Las variaciones de un producto Dropi variable
-  conservan su SKU como texto. El módulo **Productos Test** (Marketing) sigue aparte: aún no está ligado a la clase test de un producto.
+  conservan su SKU como texto. Las llaves nuevas de los productos y de las tablas `wms_*` son **UUID v7** (`uuid_v7()`, migración 0071). El módulo **Productos Test** (Marketing) sigue aparte: aún no está ligado a la clase test de un producto.
 - **Sistema WMS: «Bodegas»** (`/wms-bodegas`, módulo `wms-bodegas`, migración 0053; fase 1
   del plan de `WMS-REFERENCIA.md`, que es el documento maestro del WMS: arquitectura V2,
   decisiones confirmadas, flujos de GreaterWMS y fases). Las 6 fuentes físicas (Despacho,
