@@ -23,7 +23,7 @@ export interface NavSection {
   panel?: string;
   /** El panel muestra los tres frentes (Proveeduría, Gestión de tienda y Fulfillment); el que no tiene páginas dice «Próximamente». */
   frentes?: boolean;
-  /** No sale en el riel ni en el panel (tiene su propio acceso, como «Avisos»), pero cuenta para migas, buscador y fijados. */
+  /** No sale en el riel ni en el panel (tiene su propio acceso, como «Avisos»), pero cuenta para migas, buscador y favoritos. */
   oculta?: boolean;
   items: NavItem[];
 }

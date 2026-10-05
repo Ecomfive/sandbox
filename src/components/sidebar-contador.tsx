@@ -20,14 +20,14 @@ export function ContadorMenu({ cantidad }: { cantidad: number }) {
   );
 }
 
-/** La misma pastilla pero pequeña, montada en la esquina del ícono (el menú lateral colapsado). */
+/** La misma pastilla pero pequeña, al costado del ícono (el riel del menú): no lo tapa y el ícono sigue centrado. */
 export function ContadorSobreIcono({ cantidad }: { cantidad: number }) {
   if (cantidad <= 0) return null;
   return (
     <>
       <span
         aria-hidden="true"
-        className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning-soft px-0.5 text-[0.6rem] leading-none font-medium text-warning tabular-nums"
+        className="absolute top-1/2 left-full ml-1 flex h-4 min-w-4 -translate-y-1/2 items-center justify-center rounded-full bg-warning-soft px-1 text-[0.6rem] leading-none font-medium text-warning tabular-nums"
       >
         {textoContador(cantidad)}
       </span>

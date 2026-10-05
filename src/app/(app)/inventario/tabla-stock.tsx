@@ -9,6 +9,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { DEF_STOCK, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
+import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { FichaStock } from "./ficha-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 
@@ -30,13 +31,13 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
     clase: "text-muted-foreground",
     render: (f) => (f.tipo === "combo" ? <Badge tone="neutral">{ETIQUETA_TIPO_SKU[f.tipo]}</Badge> : (ETIQUETA_TIPO_SKU[f.tipo] ?? f.tipo)),
   },
-  { id: "fisico", label: "Físico", ocultable: false, render: (f) => celda(f.fisico) },
-  { id: "reservado", label: "Reservado", ocultable: true, render: (f) => celda(f.reservado) },
-  { id: "disponible", label: "Disponible", ocultable: false, render: (f) => celda(f.disponible) },
-  { id: "danado", label: "Dañado", ocultable: true, render: (f) => celda(f.danado) },
-  { id: "inspeccion", label: "En inspección", ocultable: true, render: (f) => celda(f.inspeccion) },
-  { id: "retenido", label: "Retenido", ocultable: true, render: (f) => celda(f.retenido) },
-  { id: "enCamino", label: "En camino", ocultable: true, render: (f) => celda(f.enCamino) },
+  { id: "fisico", label: "Físico", descripcion: DESCRIPCION_CUBETA.fisico, ocultable: false, render: (f) => celda(f.fisico) },
+  { id: "reservado", label: "Reservado", descripcion: DESCRIPCION_CUBETA.reservado, ocultable: true, render: (f) => celda(f.reservado) },
+  { id: "disponible", label: "Disponible", descripcion: DESCRIPCION_CUBETA.disponible, ocultable: false, render: (f) => celda(f.disponible) },
+  { id: "danado", label: "Dañado", descripcion: DESCRIPCION_CUBETA.danado, ocultable: true, render: (f) => celda(f.danado) },
+  { id: "inspeccion", label: "En inspección", descripcion: DESCRIPCION_CUBETA.inspeccion, ocultable: true, render: (f) => celda(f.inspeccion) },
+  { id: "retenido", label: "Retenido", descripcion: DESCRIPCION_CUBETA.retenido, ocultable: true, render: (f) => celda(f.retenido) },
+  { id: "enCamino", label: "En camino", descripcion: DESCRIPCION_CUBETA.enCamino, ocultable: true, render: (f) => celda(f.enCamino) },
 ];
 
 /** Elige de qué bodega se ve el stock (todas las del país, o una): se guarda en la dirección, `?bodega=`. */

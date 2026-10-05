@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Seccion } from "@/components/ui/seccion-ficha";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
+import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
 import { obtenerStockDeSku, type MovimientoStock, type StockBodega } from "./stock-actions";
 
@@ -128,9 +130,23 @@ export function FichaStock({
                         <th scope="col" className="py-1.5 pr-2 font-semibold">
                           Bodega
                         </th>
-                        {["Físico", "Reserv.", "Disp.", "Dañado", "Insp.", "Retenido", "En camino"].map((t) => (
+                        {(
+                          [
+                            ["Físico", DESCRIPCION_CUBETA.fisico],
+                            ["Reserv.", DESCRIPCION_CUBETA.reservado],
+                            ["Disp.", DESCRIPCION_CUBETA.disponible],
+                            ["Dañado", DESCRIPCION_CUBETA.danado],
+                            ["Insp.", DESCRIPCION_CUBETA.inspeccion],
+                            ["Retenido", DESCRIPCION_CUBETA.retenido],
+                            ["En camino", DESCRIPCION_CUBETA.enCamino],
+                          ] as const
+                        ).map(([t, descripcion]) => (
                           <th key={t} scope="col" className="px-1.5 py-1.5 text-right font-semibold">
-                            {t}
+                            <Tooltip texto={descripcion}>
+                              <span tabIndex={0} className="cursor-help border-b border-dotted border-muted-foreground/60">
+                                {t}
+                              </span>
+                            </Tooltip>
                           </th>
                         ))}
                       </tr>

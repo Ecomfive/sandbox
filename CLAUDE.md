@@ -508,10 +508,10 @@ convenciones técnicas del código.
   error al eliminar una fila **no** va en una caja pegada a la celda (tapa las filas de
   abajo): va como aviso (`useToast`, `mensajeErrorAlEliminar`).
 - **Menú lateral: riel de áreas + panel, con tres frentes** (modelado sobre el de Mi Reto Digital para que su importación futura
-  encaje). El riel (`src/components/sidebar.tsx`) lleva **Desempeño, Fijados, Marketing, Operación, Finanzas y Equipo** y, abajo,
+  encaje). El riel (`src/components/sidebar.tsx`) lleva **Desempeño, Favoritos, Marketing, Operación, Finanzas y Equipo** y, abajo,
   **Avisos** (con el contador de pendientes; es el Centro de notificaciones), **Ajustes** y el botón que oculta el panel. Al lado,
   el panel muestra solo el área elegida (su título puede ser más descriptivo: «Marketing y ventas», «Operaciones», «Recursos
-  humanos», campo `panel`) o, si se pulsa **Fijados**, los accesos rápidos de la persona (la estrella `FavoritoToggle` de cada
+  humanos», campo `panel`) o, si se pulsa **Favoritos**, los accesos rápidos de la persona (la estrella `FavoritoToggle` de cada
   página). **Cada área se reparte en tres frentes** (`FRENTES`, `src/lib/nav-data.ts`): **Proveeduría** (lo de Ecomfive hoy),
   **Gestión de tienda** (Mi Reto Digital, cuando se importe) y **Fulfillment**; un frente sin páginas dice «Próximamente»
   (`PaginasDeArea`). Una página lleva su `frente` en `AREAS`; sin frente queda **afuera de los tres** y va arriba (hoy solo

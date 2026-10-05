@@ -24,7 +24,7 @@ export function FavoritoToggle({
   const boton = (
     <button
       type="button"
-      aria-label={activo ? "Quitar de accesos rápidos" : "Agregar a accesos rápidos"}
+      aria-label={activo ? "Quitar de favoritos" : "Agregar a favoritos"}
       aria-pressed={activo}
       disabled={pending}
       onClick={(e) => {

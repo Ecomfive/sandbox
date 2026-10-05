@@ -32,6 +32,8 @@ export interface ColumnaDef {
   label: string;
   /** Si se puede ocultar (la columna clave, como el número, no). */
   ocultable: boolean;
+  /** Qué significa la columna: sale en una burbuja al pasar el cursor (o el foco) por su título. */
+  descripcion?: string;
 }
 
 export interface EstadoColumnas {

@@ -155,13 +155,13 @@ function PaginasDeArea({
   );
 }
 
-/** Las páginas fijadas por la persona (los «accesos rápidos»), siempre a la vista. */
-function Fijados({ areas, favoritos, ...resto }: { areas: AreaVisible[]; favoritos: string[]; pathname: string; pendientes: PendientesMenu; alNavegar?: () => void }) {
+/** Las páginas favoritas de la persona (los accesos rápidos), siempre a la vista. */
+function Favoritos({ areas, favoritos, ...resto }: { areas: AreaVisible[]; favoritos: string[]; pathname: string; pendientes: PendientesMenu; alNavegar?: () => void }) {
   const todos = areas.flatMap((a) => a.items);
   const fijados = favoritos.map((href) => todos.find((i) => i.href === href)).filter((i): i is NavItem => i !== undefined);
   return (
-    <section aria-label="Fijados">
-      <Titulo>Fijados</Titulo>
+    <section aria-label="Favoritos">
+      <Titulo>Favoritos</Titulo>
       {fijados.length === 0 ? (
         <p className="px-3 text-xs text-muted-foreground">Marca una página con ☆ para tenerla aquí.</p>
       ) : (
@@ -240,7 +240,7 @@ function RielYPanel({
   }, [panelOculto]);
 
   const titulo = elegida && elegida.ruta === pathname ? elegida.titulo : activa;
-  const verFijados = titulo === "Fijados";
+  const verFavoritos = titulo === "Favoritos";
   const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
   const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones");
@@ -276,12 +276,12 @@ function RielYPanel({
         </Link>
         {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
-          const boton = botonRiel(v.area.title, !verFijados && v.area.title === mostrada?.area.title, Icono, v.cantidad);
-          // «Fijados» va justo después del primer botón, como acceso propio.
+          const boton = botonRiel(v.area.title, !verFavoritos && v.area.title === mostrada?.area.title, Icono, v.cantidad);
+          // «Favoritos» va justo después del primer botón, como acceso propio.
           return i === 0 ? (
             <Fragment key={v.area.title}>
               {boton}
-              {botonRiel("Fijados", verFijados, SECTION_ICONS.Fijados, 0)}
+              {botonRiel("Favoritos", verFavoritos, SECTION_ICONS.Favoritos, 0)}
             </Fragment>
           ) : (
             boton
@@ -323,10 +323,10 @@ function RielYPanel({
         </div>
       </nav>
 
-      {!panelOculto && (verFijados || mostrada) && (
-        <nav aria-label={verFijados ? "Páginas fijadas" : `Páginas de ${mostrada?.area.title}`} className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
-          {verFijados ? (
-            <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
+      {!panelOculto && (verFavoritos || mostrada) && (
+        <nav aria-label={verFavoritos ? "Páginas favoritas" : `Páginas de ${mostrada?.area.title}`} className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
+          {verFavoritos ? (
+            <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
           ) : (
             mostrada && (
               <section aria-label={mostrada.area.panel ?? mostrada.area.title}>
@@ -342,7 +342,7 @@ function RielYPanel({
   );
 }
 
-/** Menú de móvil: todas las áreas, una debajo de la otra (sin acordeones), con las fijadas arriba. */
+/** Menú de móvil: todas las áreas, una debajo de la otra (sin acordeones), con los favoritos arriba. */
 function ListaMovil({
   areas,
   modulosPermitidos,
@@ -360,7 +360,7 @@ function ListaMovil({
   const visibles = areasVisibles(areas, modulosPermitidos, pendientes.contadores);
   return (
     <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
-      <Fijados areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
+      <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
       {visibles
         .filter((v) => !v.area.oculta)
         .map((v) => (

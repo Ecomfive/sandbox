@@ -1,5 +1,6 @@
 "use client";
 
+import { Tooltip } from "@/components/ui/tooltip";
 import { ContenedorTabla } from "./contenedor-tabla";
 import type { ReactNode } from "react";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -176,7 +177,15 @@ export function TablaDatos<F, C = undefined>({
             <tr className={claseFilaEncabezado}>
               {visibles_.map((c) => (
                 <th key={c.id} scope="col" className={claseEncabezadoColumna}>
-                  {c.label}
+                  {c.descripcion ? (
+                    <Tooltip texto={c.descripcion}>
+                      <span tabIndex={0} className="cursor-help border-b border-dotted border-muted-foreground/60">
+                        {c.label}
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    c.label
+                  )}
                 </th>
               ))}
               {accion && (
