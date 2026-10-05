@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { fieldClassSm } from "@/components/ui/field";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
@@ -11,8 +9,7 @@ import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, PrioridadIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearCompraPanel } from "./crear-compra-panel";
-import { CrearPaisPanel } from "@/components/paises/crear-pais-panel";
-import { anilloFoco } from "@/components/ui/field";
+import { SelectorVista } from "./selector-vista";
 import {
   colorEstado,
   colorEtapa,
@@ -145,28 +142,6 @@ const COLUMNAS: ColumnaTabla<FilaCompra>[] = [
   col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
 ];
 
-/** Qué compras se ven: todos los países, uno solo o Importadora. Va en la dirección (`?ver=`) para poder compartirla. */
-function SelectorVista({ vista, paises }: { vista: string; paises: { codigo: string; nombre: string }[] }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  return (
-    <select
-      aria-label="Qué compras ver"
-      value={vista}
-      onChange={(e) => router.replace(e.target.value === "todos" ? pathname : `${pathname}?ver=${e.target.value}`)}
-      className={fieldClassSm}
-    >
-      <option value="todos">🗺️ Todos los países</option>
-      {paises.map((p) => (
-        <option key={p.codigo} value={p.codigo}>
-          {p.nombre}
-        </option>
-      ))}
-      <option value="importacion">🌍 Importadora</option>
-    </select>
-  );
-}
-
 /**
  * El tablero de Compras con la barra de herramientas común (agrupar por etapa, país, vía de envío…, filtros, columnas,
  * cerrados y «Agregar») y el selector de qué compras ver. Cada columna lleva el emoji de su campo, como en ClickUp. Toda la
@@ -206,21 +181,7 @@ export function TablaCompras({
         }}
         accionPrincipal={
           <div className="flex items-center gap-2">
-            <SelectorVista vista={vista} paises={paises} />
-            {puedeAgregarPais && (
-              <CrearPaisPanel
-                boton={(abrir) => (
-                  <button
-                    type="button"
-                    onClick={abrir}
-                    aria-haspopup="dialog"
-                    className={`h-8 rounded-md border border-border-control bg-card px-2.5 text-xs font-medium whitespace-nowrap hover:bg-accent ${anilloFoco}`}
-                  >
-                    ＋ País
-                  </button>
-                )}
-              />
-            )}
+            <SelectorVista vista={vista} paises={paises} puedeAgregarPais={puedeAgregarPais} />
             {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} />}
           </div>
         }

@@ -568,6 +568,19 @@ convenciones técnicas del código.
   no necesita lote; el despacho (`wms_aplicar_venta`) sí consume lotes vigentes. Las ubicaciones aún no son por lote. La pestaña
   **Vencimientos** (`/inventario/vencimientos`, `wms_vigilancia_vencimientos`) lista vencidos y por vencer. La fecha de «hoy» es la de
   America/Panama (`wms_hoy()`).
+- **Compras: tres pestañas, como Productos Test.** **Informe** (`/compras`, `informe-compras.tsx`): por día, semana o mes
+  (pulsar una barra elige el periodo), lo creado/pagado/enviado/llegado del periodo, «Hoy» (abiertas, en tránsito, atrasadas,
+  con inconveniente, pago pendiente: cada tarjeta lleva a la lista filtrada), abiertas por etapa, tránsito por vía de envío y
+  «Para revisar»; «Copiar informe». **Compras** (`/compras/lista`, `lista-compras.tsx`): búsqueda, filtros de un toque
+  (Abiertas, Cotizando, Producción, En tránsito, Atrasadas, Cerradas; `?grupo=` y `?etapa=` los preseleccionan), orden por
+  columna y la ficha fija a la derecha (`ficha-lateral-compra.tsx`: etapa N de 11, fechas clave con los días entre una y otra);
+  «Abrir ficha completa» (o doble clic) abre el formulario con la actividad, y «Tabla completa» la tabla con todas las columnas.
+  **Tiempos y fallas** (`/compras/tiempos`): tiempo por tramo (con las fechas), tiempo en cada estado (con `wms_compra_eventos`),
+  comparación por proveedor, vía, país, tienda o responsable, atrasadas e inconvenientes. **Atrasada** = abierta, ya salió y
+  lleva más días en tránsito que el 90 % de los envíos de su vía (`umbralesTransito`). Los cálculos son puros, en
+  `calculos-compras.ts` (prueba contra datos reales: `npx tsx scripts/probar-calculos-compras.ts`); los datos los carga
+  `datos-compras.ts` (la vista elegida se recuerda en la cookie `compras-vista`). En los datos de ClickUp el envío suele ir
+  antes del primer pago, por eso el tramo es «Creada → envío».
 - **Compras: un solo tablero** (`/compras`, migración 0076). Arriba se elige qué se ve: 🗺️ Todos los países, uno solo o
   🌍 **Importadora** (`?ver=todos|PA|CR|…|importacion`; no depende del país de la barra de arriba). `wms_compras.tipo` es
   `'pais'` (compra nuestra, lleva `pais_id`) o `'importacion'` («Compras Importadora»: un **servicio a un cliente** que nos
