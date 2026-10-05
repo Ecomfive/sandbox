@@ -10,7 +10,8 @@ import { Ventana } from "@/components/ui/ventana";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
-import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, valorUnitario, type FilaCompra } from "./def-compras";
+import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, valorUnitario, type FilaCompra } from "./def-compras";
+import { ActividadCompra } from "./actividad-compra";
 import { EliminarCompraBoton } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
 
@@ -139,8 +140,7 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
 export function FichaCompra({
   compra,
   orden,
-  paisId,
-  codigoPais,
+  paises,
   puedeEscribir,
   alIr,
   alCerrar,
@@ -149,8 +149,7 @@ export function FichaCompra({
   compra: FilaCompra | undefined;
   /** Las claves de las compras en el orden de la tabla. */
   orden: string[];
-  paisId: string;
-  codigoPais: string;
+  paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
   alIr: (id: string) => void;
   alCerrar: () => void;
@@ -226,7 +225,8 @@ export function FichaCompra({
           {puedeEscribir ? (
             <FormularioCompra
               key={`${compra.id}-${version}`}
-              paisId={paisId}
+              vista={compra.paisCodigo ?? "importacion"}
+              paises={paises}
               compra={compra}
               botonesArriba
               acciones={<EliminarCompraBoton id={compra.id} nombre={compra.nombre} alEliminar={alCerrar} />}
@@ -236,8 +236,9 @@ export function FichaCompra({
               alModificar={() => setSinGuardarId(compra.id)}
             />
           ) : (
-            <DatosDeLaCompra compra={compra} codigoPais={codigoPais} />
+            <DatosDeLaCompra compra={compra} codigoPais={MONEDA_COMPRAS} />
           )}
+          <ActividadCompra key={compra.id} id={compra.id} />
         </div>
       )}
     </Ventana>

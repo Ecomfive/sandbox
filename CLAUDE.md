@@ -568,6 +568,22 @@ convenciones técnicas del código.
   no necesita lote; el despacho (`wms_aplicar_venta`) sí consume lotes vigentes. Las ubicaciones aún no son por lote. La pestaña
   **Vencimientos** (`/inventario/vencimientos`, `wms_vigilancia_vencimientos`) lista vencidos y por vencer. La fecha de «hoy» es la de
   America/Panama (`wms_hoy()`).
+- **Compras: un solo tablero** (`/compras`, migración 0076). Arriba se elige qué se ve: 🗺️ Todos los países, uno solo o
+  🌍 **Importadora** (`?ver=todos|PA|CR|…|importacion`; no depende del país de la barra de arriba). `wms_compras.tipo` es
+  `'pais'` (compra nuestra, lleva `pais_id`) o `'importacion'` («Compras Importadora»: un **servicio a un cliente** que nos
+  pide mercancía de cualquier parte del mundo y se la entregamos puerta a puerta; no es nuestra, así que **nunca lleva país**
+  aunque se entregue en Panamá —el destino va en `paises_destino`— y nunca se mezcla con las compras de un país; lo impone
+  un `check`). Los montos van en dólares en todos los países (`MONEDA_COMPRAS`). Cada columna lleva el emoji de su campo como
+  en ClickUp (`EMOJI_CAMPO`, `conEmoji`, `def-compras.ts`). La ficha termina con la actividad (`actividad-compra.tsx`):
+  adjuntos (fotos y documentos en el bucket **privado** `wms-compras` con enlaces firmados; los videos, enlace a ClickUp),
+  subtareas, comentarios y el **historial de etapa y estado** (`wms_compra_eventos`, con la hora: cada cambio que se guarda
+  aquí lo anota `actualizarCompra`; es la base de los tiempos por etapa). Al pasar a Completado o Descartado se sella
+  `cerrado_en`. **Importación desde ClickUp:** `scripts/clickup-exportar-compras.mjs` baja las listas «Compras Dropi» de cada
+  país y «Compras Importadora🌍» a `datos-privados/` (con comentarios e historial de estados), `scripts/clickup-inventario-compras.mjs`
+  hace el inventario de campos y `scripts/importar-compras-clickup.ts` importa (sin `--aplicar` solo informa; se puede repetir,
+  actualiza por `clickup_id`; `--subir-adjuntos` copia fotos y documentos). Cada compra guarda su tarea original en
+  `clickup` (jsonb), así que ningún dato de ClickUp se pierde. El historial de la **Etapa** (campo personalizado) no sale por
+  la API de ClickUp: solo el de Estado.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

@@ -2,6 +2,12 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 export interface FilaCompra {
   id: string;
+  /** 'pais' (compra nuestra de un país) o 'importacion' (Compras Importadora: servicio a un cliente, sin país). */
+  tipo: string;
+  /** Código del país de la compra (null en Importadora). */
+  paisCodigo: string | null;
+  /** El código de la compra (PA-00112, OM-0449…). */
+  codigo: string | null;
   nombre: string;
   fotoUrl: string | null;
   etapa: string;
@@ -35,7 +41,90 @@ export interface FilaCompra {
   documentos: string | null;
   notas: string | null;
   asignadoNombre: string | null;
+  /** Aire, mar o tierra (puede ser más de una). */
+  viaEnvio: string[];
+  prioridad: string | null;
+  etiquetas: string[];
+  creadorNombre: string | null;
+  descripcion: string | null;
+  urlProducto: string | null;
+  paisesDestino: string[];
+  fechaInicio: string | null;
+  cerradoEn: string | null;
   creadoEn: string;
+}
+
+/** Los emojis de cada columna, tal como en ClickUp, para reconocerlas de un vistazo. */
+export const EMOJI_CAMPO: Record<string, string> = {
+  codigo: "🔖",
+  pais: "🗺️",
+  etapa: "👣",
+  estado: "🚦",
+  proveedor: "🏭",
+  tienda: "🏪",
+  cliente: "👤",
+  viaEnvio: "🏗️",
+  prioridad: "🚩",
+  etiquetas: "🏷️",
+  qtyTotal: "🧾",
+  montoTotal: "💲",
+  valorUnitario: "💲",
+  primerPago: "⚠️",
+  segundoPago: "⚠️",
+  pagadoAProveedor: "💲",
+  pagoPendiente: "❗",
+  cobradoCliente: "💵",
+  pendienteCliente: "⏳",
+  pagoCliente: "💰",
+  cuentaReceptora: "🏦",
+  factura: "✅",
+  financiamiento: "💰",
+  revisadoAA: "☑️",
+  fechaLimite: "⏰",
+  fechaLlegada: "📦",
+  fechaPago1: "📆",
+  fechaPago2: "🗓️",
+  fechaEnvio: "🚚",
+  trackId: "🎫",
+  orden: "🧾",
+  inconveniente: "🚨",
+  planificacion: "🗓️",
+  urlProducto: "🔗",
+  documentos: "📎",
+  foto: "📸",
+  asignado: "🙋",
+  creado: "🕒",
+  cerrado: "🏁",
+  dias: "⏱️",
+  notas: "📝",
+};
+
+/** «🏭 Proveedor»: el nombre de la columna con su emoji. */
+export const conEmoji = (campo: string, nombre: string) => (EMOJI_CAMPO[campo] ? `${EMOJI_CAMPO[campo]} ${nombre}` : nombre);
+
+/** Los montos de compras van en dólares en todos los países (así se pagan a los proveedores). */
+export const MONEDA_COMPRAS = "PA";
+
+export const VIAS_ENVIO = [
+  { valor: "aire", etiqueta: "🛩️ Aire" },
+  { valor: "mar", etiqueta: "🚢 Mar" },
+  { valor: "tierra", etiqueta: "🛻 Tierra" },
+] as const;
+export const etiquetaVia = (v: string) => VIAS_ENVIO.find((x) => x.valor === v)?.etiqueta ?? v;
+
+/** Las prioridades de ClickUp con sus colores (urgente rojo, alta amarillo, normal azul, baja gris). */
+export const PRIORIDADES = [
+  { valor: "urgente", etiqueta: "Urgente", color: "#F50000" },
+  { valor: "alta", etiqueta: "Alta", color: "#F8AE00" },
+  { valor: "normal", etiqueta: "Normal", color: "#6FDDFF" },
+  { valor: "baja", etiqueta: "Baja", color: "#D8D8D8" },
+] as const;
+export const prioridadDe = (v: string | null) => PRIORIDADES.find((p) => p.valor === v) ?? null;
+
+/** Días que lleva (o llevó, si ya cerró) una compra desde que se creó. */
+export function diasDeCompra(c: Pick<FilaCompra, "creadoEn" | "cerradoEn">, ahora: number = Date.now()): number {
+  const fin = c.cerradoEn ? Date.parse(c.cerradoEn) : ahora;
+  return Math.max(0, Math.floor((fin - Date.parse(c.creadoEn)) / 86_400_000));
 }
 
 /** Las 14 etapas del flujo de compra y financiamiento, calcadas de la lista de ClickUp «Compras Dropi PA
@@ -128,6 +217,14 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
   clave: "compras",
   campos: [
     {
+      id: "pais",
+      etiqueta: "País",
+      tipo: "seleccion",
+      valores: (c) => [c.paisCodigo ?? SIN_VALOR],
+      etiquetaSinValor: "Importadora",
+      agrupable: true,
+    },
+    {
       id: "etapa",
       etiqueta: "Etapa",
       tipo: "seleccion",
@@ -169,6 +266,42 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       etiquetaSinValor: "Sin cliente",
       agrupable: true,
     },
+    {
+      id: "viaEnvio",
+      etiqueta: "Vía de envío",
+      tipo: "seleccion",
+      valores: (c) => (c.viaEnvio.length ? c.viaEnvio : [SIN_VALOR]),
+      opciones: () => VIAS_ENVIO.map((v) => ({ valor: v.valor, etiqueta: v.etiqueta })),
+      etiquetaSinValor: "Sin vía",
+      agrupable: true,
+    },
+    {
+      id: "prioridad",
+      etiqueta: "Prioridad",
+      tipo: "seleccion",
+      valores: (c) => [c.prioridad ?? SIN_VALOR],
+      opciones: () => PRIORIDADES.map((p) => ({ valor: p.valor, etiqueta: p.etiqueta })),
+      etiquetaSinValor: "Sin prioridad",
+      agrupable: true,
+      ordenGrupos: PRIORIDADES.map((p) => p.valor),
+    },
+    {
+      id: "etiquetas",
+      etiqueta: "Etiquetas",
+      tipo: "seleccion",
+      valores: (c) => (c.etiquetas.length ? c.etiquetas : [SIN_VALOR]),
+      etiquetaSinValor: "Sin etiquetas",
+      agrupable: true,
+    },
+    {
+      id: "planificacionMes",
+      etiqueta: "Planificación",
+      tipo: "seleccion",
+      valores: (c) => [c.planificacion ?? SIN_VALOR],
+      etiquetaSinValor: "Sin planificación",
+      agrupable: true,
+    },
+    { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
     { id: "trackId", etiqueta: "Track ID", tipo: "texto", valor: (c) => c.trackId ?? "" },
     { id: "orden", etiqueta: "Orden", tipo: "texto", valor: (c) => c.orden ?? "" },
     { id: "qtyTotal", etiqueta: "QTY Total", tipo: "numero", valor: (c) => c.qtyTotal },
@@ -185,8 +318,10 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     { id: "fechaPago1", etiqueta: "Fecha de Pago (1)", tipo: "fecha", valor: (c) => c.fechaPago1 },
     { id: "fechaPago2", etiqueta: "Fecha de Pago (2)", tipo: "fecha", valor: (c) => c.fechaPago2 },
     { id: "fechaEnvio", etiqueta: "Fecha de Envío", tipo: "fecha", valor: (c) => c.fechaEnvio },
+    { id: "creado", etiqueta: "Creada", tipo: "fecha", valor: (c) => c.creadoEn.slice(0, 10) },
+    { id: "cerrado", etiqueta: "Cerrada", tipo: "fecha", valor: (c) => (c.cerradoEn ? c.cerradoEn.slice(0, 10) : null) },
+    { id: "dias", etiqueta: "Días", tipo: "numero", valor: (c) => diasDeCompra(c) },
     { id: "inconveniente", etiqueta: "Inconveniente", tipo: "texto", valor: (c) => c.inconveniente ?? "" },
-    { id: "planificacion", etiqueta: "Planificación", tipo: "texto", valor: (c) => c.planificacion ?? "" },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (c) => c.notas ?? "" },
     {
       id: "asignado",
@@ -196,6 +331,13 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       etiquetaSinValor: "Sin asignar",
       agrupable: true,
     },
+    { id: "factura", etiqueta: "Factura", tipo: "seleccion", valores: (c) => [c.factura ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sí" }, { valor: "no", etiqueta: "No" }] },
+    { id: "financiamiento", etiqueta: "Financiamiento", tipo: "seleccion", valores: (c) => [c.financiamiento ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sí" }, { valor: "no", etiqueta: "No" }] },
+  ],
+  csvAntes: [
+    { etiqueta: "Código", valor: (c) => c.codigo ?? "" },
+    { etiqueta: "Nombre", valor: (c) => c.nombre },
+    { etiqueta: "Tipo", valor: (c) => (c.tipo === "importacion" ? "Importadora" : "País") },
   ],
   cerrados: {
     etiqueta: "Cerrados",

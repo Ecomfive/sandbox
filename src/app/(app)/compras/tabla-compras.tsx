@@ -1,24 +1,45 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { fieldClassSm } from "@/components/ui/field";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
-import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, GastoIcon, ProductoIcon } from "@/lib/nav-icons";
+import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, PrioridadIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearCompraPanel } from "./crear-compra-panel";
-import { colorEstado, colorEtapa, DEF_COMPRAS, etiquetaEstado, etiquetaEtapa, valorUnitario, type FilaCompra } from "./def-compras";
+import {
+  colorEstado,
+  colorEtapa,
+  conEmoji,
+  DEF_COMPRAS,
+  diasDeCompra,
+  etiquetaEstado,
+  etiquetaEtapa,
+  etiquetaVia,
+  MONEDA_COMPRAS,
+  prioridadDe,
+  valorUnitario,
+  type FilaCompra,
+} from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
 
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
 const ICONOS: Record<string, IconoComp> = {
+  pais: ComprasIcon,
   etapa: EstadoIcon,
   estado: EstadoIcon,
   proveedor: ProductoIcon,
   tienda: ComprasIcon,
-  cliente: ProductoIcon,
+  cliente: PersonaIcon,
+  viaEnvio: ComprasIcon,
+  prioridad: PrioridadIcon,
+  etiquetas: EtiquetaIcon,
+  planificacionMes: CalendarioIcon,
+  codigo: EtiquetaIcon,
   qtyTotal: ProductoIcon,
   montoTotal: GastoIcon,
   valorUnitario: GastoIcon,
@@ -33,25 +54,40 @@ const ICONOS: Record<string, IconoComp> = {
   fechaPago1: CalendarioIcon,
   fechaPago2: CalendarioIcon,
   fechaEnvio: CalendarioIcon,
+  creado: CalendarioIcon,
+  cerrado: CalendarioIcon,
+  dias: CalendarioIcon,
   trackId: EstadoIcon,
   orden: EstadoIcon,
   inconveniente: EstadoIcon,
-  planificacion: EstadoIcon,
   notas: EstadoIcon,
-  asignado: ProductoIcon,
+  asignado: PersonaIcon,
+  factura: EstadoIcon,
+  financiamiento: GastoIcon,
 };
 
-const COLUMNAS: ColumnaTabla<FilaCompra, string>[] = [
-  {
-    id: "foto",
-    label: "Foto",
+const usd = (v: number | null) => (v !== null ? formatearMoneda(v, MONEDA_COMPRAS) : "—");
+const fecha = (v: string | null) => (v ? formatearFecha(v) : "—");
+const siNo = (v: boolean) => (v ? "Sí" : <span className="text-muted-foreground">No</span>);
+const lista = (v: string[], f: (x: string) => string = (x) => x) => (v.length ? v.map(f).join(", ") : "—");
+
+/** Una columna con el emoji de su campo delante del nombre, como en ClickUp. */
+function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "id" | "label">): ColumnaTabla<FilaCompra> {
+  return { id, label: conEmoji(id, nombre), ...resto };
+}
+
+const COLUMNAS: ColumnaTabla<FilaCompra>[] = [
+  col("foto", "Foto", {
     ocultable: true,
     render: (c) =>
       c.fotoUrl ? (
-        <TarjetaEmergente clase="rounded-lg border border-border bg-card p-1.5 shadow-lg" contenido={
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={c.fotoUrl} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
-        }>
+        <TarjetaEmergente
+          clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+          contenido={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={c.fotoUrl} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
+          }
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={c.fotoUrl} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
         </TarjetaEmergente>
@@ -60,39 +96,89 @@ const COLUMNAS: ColumnaTabla<FilaCompra, string>[] = [
           <AdjuntoIcon className="h-3.5 w-3.5" />
         </div>
       ),
-  },
+  }),
   { id: "nombre", label: "Nombre", ocultable: false, clase: "font-medium", render: (c) => c.nombre },
-  { id: "etapa", label: "Etapa", ocultable: true, render: (c) => <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge> },
-  { id: "estado", label: "Estado", ocultable: true, render: (c) => <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge> },
-  { id: "proveedor", label: "Proveedor", ocultable: true, clase: "text-muted-foreground", render: (c) => c.proveedor || "—" },
-  { id: "tienda", label: "Tienda", ocultable: true, clase: "text-muted-foreground", render: (c) => c.tienda || "—" },
-  { id: "qtyTotal", label: "QTY Total", ocultable: true, clase: "tabular-nums", render: (c) => c.qtyTotal ?? "—" },
-  { id: "montoTotal", label: "Monto Total", ocultable: true, clase: "tabular-nums", render: (c, codigoPais) => (c.montoTotal !== null ? formatearMoneda(c.montoTotal, codigoPais) : "—") },
-  {
-    id: "valorUnitario",
-    label: "Valor Unitario",
+  col("codigo", "Código", { ocultable: true, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
+  col("pais", "País", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
+  col("etapa", "Etapa", { ocultable: true, render: (c) => <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge> }),
+  col("estado", "Estado", { ocultable: true, render: (c) => <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge> }),
+  col("prioridad", "Prioridad", {
     ocultable: true,
-    clase: "tabular-nums",
-    render: (c, codigoPais) => {
-      const valor = valorUnitario(c);
-      return valor !== null ? formatearMoneda(valor, codigoPais) : "—";
+    render: (c) => {
+      const p = prioridadDe(c.prioridad);
+      return p ? <Badge color={p.color}>{p.etiqueta}</Badge> : "—";
     },
-  },
-  { id: "fechaLimite", label: "Fecha límite", ocultable: true, render: (c) => (c.fechaLimite ? formatearFecha(c.fechaLimite) : "—") },
-  { id: "fechaLlegada", label: "Fecha de llegada", ocultable: true, render: (c) => (c.fechaLlegada ? formatearFecha(c.fechaLlegada) : "—") },
+  }),
+  col("proveedor", "Proveedor", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.proveedor || "—" }),
+  col("tienda", "Tienda", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.tienda || "—" }),
+  col("cliente", "Cliente", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.cliente || "—" }),
+  col("viaEnvio", "Vía de envío", { ocultable: true, clase: "whitespace-nowrap", render: (c) => lista(c.viaEnvio, etiquetaVia) }),
+  col("etiquetas", "Etiquetas", { ocultable: true, clase: "text-muted-foreground", render: (c) => lista(c.etiquetas) }),
+  col("asignado", "Responsable", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
+  col("planificacion", "Planificación", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),
+  col("qtyTotal", "QTY Total", { ocultable: true, clase: "tabular-nums", render: (c) => c.qtyTotal ?? "—" }),
+  col("montoTotal", "Monto Total", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.montoTotal) }),
+  col("valorUnitario", "Valor Unitario", { ocultable: true, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
+  col("primerPago", "Primer Pago", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.primerPago) }),
+  col("segundoPago", "Segundo Pago", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.segundoPago) }),
+  col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.pagadoAProveedor) }),
+  col("pagoPendiente", "Pago Pendiente", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.pagoPendiente) }),
+  col("cobradoCliente", "Cobrado Cliente", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.cobradoCliente) }),
+  col("pendienteCliente", "Pendiente Cliente", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.pendienteCliente) }),
+  col("pagoCliente", "Pago Cliente", { ocultable: true, render: (c) => c.pagoCliente || "—" }),
+  col("cuentaReceptora", "Cuenta receptora", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.cuentaReceptora || "—" }),
+  col("factura", "Factura", { ocultable: true, render: (c) => siNo(c.factura) }),
+  col("financiamiento", "Financiamiento", { ocultable: true, render: (c) => siNo(c.financiamiento) }),
+  col("revisadoAA", "Revisado AA", { ocultable: true, render: (c) => siNo(c.revisadoAA) }),
+  col("fechaPago1", "Fecha de Pago (1)", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago1) }),
+  col("fechaPago2", "Fecha de Pago (2)", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago2) }),
+  col("fechaEnvio", "Fecha de Envío", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaEnvio) }),
+  col("fechaLlegada", "Fecha de llegada", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaLlegada) }),
+  col("fechaLimite", "Fecha límite", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaLimite) }),
+  col("trackId", "Track ID", { ocultable: true, clase: "text-muted-foreground", render: (c) => c.trackId || "—" }),
+  col("orden", "Orden", { ocultable: true, clase: "text-muted-foreground tabular-nums", render: (c) => c.orden || "—" }),
+  col("inconveniente", "Inconveniente", { ocultable: true, render: (c) => c.inconveniente || "—" }),
+  col("creado", "Creada", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.creadoEn) }),
+  col("cerrado", "Cerrada", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.cerradoEn) }),
+  col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
 ];
 
-/** Tabla de compras (Sistema WMS › Compras) con la barra de herramientas común: agrupar por etapa, filtros,
- * columnas, cerrados (completado/descartado) y «Agregar». Toda la fila se puede pulsar: abre la ficha. */
+/** Qué compras se ven: todos los países, uno solo o Importadora. Va en la dirección (`?ver=`) para poder compartirla. */
+function SelectorVista({ vista, paises }: { vista: string; paises: { codigo: string; nombre: string }[] }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  return (
+    <select
+      aria-label="Qué compras ver"
+      value={vista}
+      onChange={(e) => router.replace(e.target.value === "todos" ? pathname : `${pathname}?ver=${e.target.value}`)}
+      className={fieldClassSm}
+    >
+      <option value="todos">🗺️ Todos los países</option>
+      {paises.map((p) => (
+        <option key={p.codigo} value={p.codigo}>
+          {p.nombre}
+        </option>
+      ))}
+      <option value="importacion">🌍 Importadora</option>
+    </select>
+  );
+}
+
+/**
+ * El tablero de Compras con la barra de herramientas común (agrupar por etapa, país, vía de envío…, filtros, columnas,
+ * cerrados y «Agregar») y el selector de qué compras ver. Cada columna lleva el emoji de su campo, como en ClickUp. Toda la
+ * fila abre la ficha.
+ */
 export function TablaCompras({
   compras,
-  codigoPais,
-  paisId,
+  vista,
+  paises,
   puedeEscribir,
 }: {
   compras: FilaCompra[];
-  codigoPais: string;
-  paisId: string;
+  vista: string;
+  paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
 }) {
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
@@ -104,25 +190,28 @@ export function TablaCompras({
         def={DEF_COMPRAS}
         filas={compras}
         columnas={COLUMNAS}
-        contexto={codigoPais}
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(c) => c.id}
-        formatearTotal={(total) => formatearMoneda(total, codigoPais)}
-        anchoMinimo="56rem"
+        formatearTotal={(total) => formatearMoneda(total, MONEDA_COMPRAS)}
+        anchoMinimo="72rem"
         abrirFila={{
           etiqueta: (c) => `Abrir la ficha de la compra ${c.nombre}`,
           alAbrir: (c, orden) => setAbierta({ id: c.id, orden }),
         }}
-        accionPrincipal={puedeEscribir ? <CrearCompraPanel paisId={paisId} /> : undefined}
-        ariaLabel="Tabla de compras"
-        vacio="Todavía no hay compras registradas."
+        accionPrincipal={
+          <div className="flex items-center gap-2">
+            <SelectorVista vista={vista} paises={paises} />
+            {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} />}
+          </div>
+        }
+        ariaLabel="Tablero de compras"
+        vacio={vista === "importacion" ? "Todavía no hay compras de Importadora." : "Todavía no hay compras registradas."}
       />
       <FichaCompra
         compra={compra}
         orden={abierta?.orden ?? []}
-        paisId={paisId}
-        codigoPais={codigoPais}
+        paises={paises}
         puedeEscribir={puedeEscribir}
         alIr={(id) => setAbierta((a) => (a ? { ...a, id } : a))}
         alCerrar={() => setAbierta(null)}
