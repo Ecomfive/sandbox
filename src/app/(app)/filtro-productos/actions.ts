@@ -6,6 +6,8 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIENDAS, TIPOS_ENVIO } from "./def-filtros";
 
+const MODULO = "filtro-productos";
+
 const REGISTROS_VALIDOS: Set<string> = new Set(ESTADOS_REGISTRO.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
 const ENVIOS_VALIDOS: Set<string> = new Set(TIPOS_ENVIO.map((t) => t.valor));
@@ -26,7 +28,7 @@ function limpiarNombreArchivo(nombre: string): string {
 
 /** Da permiso (URL firmada) para subir la foto directo desde el navegador, sin pasar el archivo por la acción. */
 export async function prepararSubidaFotoFiltro(nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
-  await requireModuloEscritura("compras");
+  await requireModuloEscritura(MODULO);
   if (typeof nombreArchivo !== "string" || !nombreArchivo.trim()) return { error: "El archivo no tiene nombre." };
 
   const ruta = `filtros/${crypto.randomUUID()}/${Date.now()}-${limpiarNombreArchivo(nombreArchivo)}`;
@@ -70,7 +72,7 @@ function leerCambios(formData: FormData) {
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearFiltro(formData: FormData): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("compras");
+  const usuario = await requireModuloEscritura(MODULO);
   const pais_id = formData.get("pais_id") as string;
   const nombre = (formData.get("nombre") as string).trim();
   const estado_registro = (formData.get("estado_registro") as string) || "en_cola";
@@ -91,13 +93,13 @@ export async function crearFiltro(formData: FormData): Promise<{ error?: string 
   if (error) return { error: error.message };
 
   await registrarAuditoria({ accion: "crear_filtro_producto", entidad: "wms_filtro_productos", entidadId: data.id, detalle: nombre });
-  revalidatePath("/compras/filtros");
+  revalidatePath("/filtro-productos");
   return {};
 }
 
 /** Edita cualquier dato de un producto candidato ya creado — todo junto, desde su ficha. */
 export async function actualizarFiltro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+  await requireModuloEscritura(MODULO);
   const id = formData.get("id") as string;
   const nombre = (formData.get("nombre") as string).trim();
   const estado_registro = formData.get("estado_registro") as string;
@@ -120,12 +122,12 @@ export async function actualizarFiltro(formData: FormData): Promise<{ error?: st
 
   if (actual && actual.foto_url !== cambios.foto_url) await borrarFotoSiEsNuestra(actual.foto_url);
 
-  revalidatePath("/compras/filtros");
+  revalidatePath("/filtro-productos");
   return {};
 }
 
 export async function eliminarFiltro(formData: FormData) {
-  await requireModuloEscritura("compras");
+  await requireModuloEscritura(MODULO);
   const id = formData.get("id") as string;
   const nombre = formData.get("nombre") as string;
 
@@ -137,5 +139,5 @@ export async function eliminarFiltro(formData: FormData) {
   if (actual?.foto_url) await borrarFotoSiEsNuestra(actual.foto_url);
 
   await registrarAuditoria({ accion: "eliminar_filtro_producto", entidad: "wms_filtro_productos", entidadId: id, detalle: nombre });
-  revalidatePath("/compras/filtros");
+  revalidatePath("/filtro-productos");
 }
