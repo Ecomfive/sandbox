@@ -5,7 +5,7 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { CatalogoIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ProductoIcon } from "@/lib/nav-icons";
 import { crearProducto } from "./actions";
 import { ComboBuilder } from "./combo-builder";
 
@@ -99,6 +99,18 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
               Generar un código de barras interno
             </label>
           </Seccion>
+
+          {!combo && (
+            <Seccion icono={CalendarioIcon} titulo="Vencimiento">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="maneja_vencimiento" value="1" className="h-4 w-4" />
+                Tiene fecha de vencimiento (se controla por lote)
+              </label>
+              <Campo etiqueta="Avisar con cuántos días de anticipación (opcional, 60 por defecto)" id="campo-aviso-producto">
+                <input id="campo-aviso-producto" type="number" name="dias_aviso_vencimiento" min="1" max="3650" step="1" inputMode="numeric" placeholder="Ej: 90" className={`${fieldClass} w-full`} />
+              </Campo>
+            </Seccion>
+          )}
 
           {combo && (
             <Seccion icono={ProductoIcon} titulo="Componentes">

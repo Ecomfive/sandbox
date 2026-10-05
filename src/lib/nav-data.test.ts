@@ -19,8 +19,8 @@ test("hay tres frentes y el de tienda se llama Gestión de tienda", () => {
   assert.deepEqual(FRENTES.map((f) => f.titulo), ["Proveeduría", "Gestión de tienda", "Fulfillment"]);
 });
 
-test("Compras, Producto y las fichas de producto están en Operación, no en Marketing", () => {
-  for (const ruta of ["/compras", "/producto", "/wms-productos", "/wms-productos-dropi"]) {
+test("Compras y Producto están en Operación, no en Marketing", () => {
+  for (const ruta of ["/compras", "/producto"]) {
     assert.ok(hrefs("Operación").includes(ruta), `${ruta} en Operación`);
     assert.ok(!hrefs("Marketing").includes(ruta), `${ruta} no en Marketing`);
   }
@@ -61,8 +61,17 @@ test("el área activa se encuentra por la ruta, también en una subpágina", () 
 
 test("bodegas, ubicaciones, inventario, compras y producto son del frente Fulfillment; los pedidos de dropshippers, de Proveeduría", () => {
   const frenteDe = (ruta: string) => areas.flatMap((a) => a.items).find((i) => i.href === ruta)?.frente;
-  for (const ruta of ["/wms-bodegas", "/wms-ubicaciones", "/inventario", "/alertas", "/compras", "/producto", "/wms-productos", "/wms-productos-dropi"]) {
+  for (const ruta of ["/wms-bodegas", "/wms-ubicaciones", "/inventario", "/alertas", "/compras", "/producto"]) {
     assert.equal(frenteDe(ruta), "fulfillment", ruta);
   }
   assert.equal(frenteDe("/pedidos-dropi"), "proveeduria");
+});
+
+test("las fichas de Shopify y de Dropi ya no están en el menú, pero siguen registradas (migas y buscador)", () => {
+  const visibles = areas.filter((a) => !a.oculta).flatMap((a) => a.items.map((i) => i.href));
+  assert.ok(!visibles.includes("/wms-productos"));
+  assert.ok(!visibles.includes("/wms-productos-dropi"));
+  const ocultas = areas.filter((a) => a.oculta).flatMap((a) => a.items.map((i) => i.href));
+  assert.ok(ocultas.includes("/wms-productos") && ocultas.includes("/wms-productos-dropi"));
+  assert.equal(encontrarSeccionActiva("/wms-productos/nuevo", areas), "Fichas de canal");
 });

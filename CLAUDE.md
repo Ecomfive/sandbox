@@ -527,8 +527,9 @@ convenciones técnicas del código.
   página). **Cada área se reparte en tres frentes** (`FRENTES`, `src/lib/nav-data.ts`): **Proveeduría** (lo de Ecomfive hoy),
   **Gestión de tienda** (Mi Reto Digital, cuando se importe) y **Fulfillment**; un frente sin páginas dice «Próximamente»
   (`PaginasDeArea`). Una página lleva su `frente` en `AREAS`; sin frente queda **afuera de los tres** y va arriba (hoy solo
-  Usuarios y roles). **Bodegas, Ubicaciones, Inventario, Alertas de inventario, Compras, Producto y las fichas de producto
-  son del frente Fulfillment** (en Operación, no en Marketing): el producto entra por el WMS y sale por Proveeduría
+  Usuarios y roles). **Bodegas, Ubicaciones, Inventario, Alertas de inventario, Compras y Producto
+  son del frente Fulfillment** (las fichas de producto de Shopify y de Dropi ya **no están en el menú**: se llega desde Producto, y siguen
+  registradas en un área oculta «Fichas de canal» para migas, buscador y favoritos) (en Operación, no en Marketing): el producto entra por el WMS y sale por Proveeduría
   (dropshippers) o por Fulfillment hacia tiendas, de un tercero a quien solo se le presta el servicio (Clicksy) o propias
   (Kenku, Nuvo, Wao Ofertas y Ofertfy); Compras también es de Fulfillment (el fulfillment se gestiona desde el WMS); solo Pedidos Dropi sigue en Proveeduría. En un negocio de dropshipping el
   catálogo sí sería parte de vender, aquí no. Productos Test, el CRM y
@@ -559,6 +560,14 @@ convenciones técnicas del código.
   ficha de un SKU (`FichaStock`) muestra su stock por bodega, los últimos movimientos y los botones Entrada, Salida y Ajuste
   (`registrarMovimientoStock`, que devuelve `{ error }` como valor). El pistoleo anterior (carga por CSV) quedó en
   `/inventario/pistoleo`.
+  **Lotes y vencimiento** (migración 0073): el producto marca «maneja vencimiento» (+ días de aviso, 60 por defecto) en su ficha; no
+  aplica a compuestos y solo se activa sin stock físico (se desactiva sin lotes con unidades). Su stock se reparte por lote
+  (`wms_lotes`, `wms_stock_lote`, por bodega): la entrada exige lote y fecha (un lote existente exige la misma fecha), el ajuste exige
+  lote y la salida sin lote sale por **FEFO** (primero el que vence antes, un movimiento por lote) y **nunca toma un lote vencido**.
+  Un lote vencido no cuenta como disponible (`disponible` = generado − vencido) y se da de baja con una salida que lo nombre. La reserva
+  no necesita lote; el despacho (`wms_aplicar_venta`) sí consume lotes vigentes. Las ubicaciones aún no son por lote. La pestaña
+  **Vencimientos** (`/inventario/vencimientos`, `wms_vigilancia_vencimientos`) lista vencidos y por vencer. La fecha de «hoy» es la de
+  America/Panama (`wms_hoy()`).
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

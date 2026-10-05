@@ -14,6 +14,7 @@ import { CalendarioIcon, CatalogoIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaI
 import { formatearFecha } from "@/lib/formato";
 import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
+import { VencimientoProducto } from "./vencimiento-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -171,6 +172,18 @@ export function FichaProducto({
                 puedeEscribir={puedeEscribir}
               />
             </Seccion>
+
+            {producto.tipo !== "combo" && (
+              <Seccion icono={CalendarioIcon} titulo="Vencimiento">
+                <VencimientoProducto
+                  key={producto.id}
+                  id={producto.id}
+                  maneja={producto.manejaVencimiento}
+                  diasAviso={producto.diasAvisoVencimiento}
+                  puedeEscribir={puedeEscribir}
+                />
+              </Seccion>
+            )}
 
             <Seccion icono={InventarioIcon} titulo="Inventario">
               {esTest ? (

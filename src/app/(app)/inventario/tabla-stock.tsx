@@ -14,7 +14,7 @@ import { FichaStock } from "./ficha-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
-const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, disponible: InventarioIcon };
+const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon };
 
 /** Una cifra de la tabla: alineada a la derecha, y en rojo si el saldo es negativo. */
 function celda(n: number) {
@@ -43,6 +43,7 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
   { id: "danado", label: "Dañado", descripcion: DESCRIPCION_CUBETA.danado, ocultable: true, render: (f) => celda(f.danado) },
   { id: "inspeccion", label: "En inspección", descripcion: DESCRIPCION_CUBETA.inspeccion, ocultable: true, render: (f) => celda(f.inspeccion) },
   { id: "retenido", label: "Retenido", descripcion: DESCRIPCION_CUBETA.retenido, ocultable: true, render: (f) => celda(f.retenido) },
+  { id: "vencido", label: "Vencido", descripcion: DESCRIPCION_CUBETA.vencido, ocultable: true, render: (f) => celda(f.vencido) },
   { id: "enCamino", label: "En camino", descripcion: DESCRIPCION_CUBETA.enCamino, ocultable: true, render: (f) => celda(f.enCamino) },
 ];
 

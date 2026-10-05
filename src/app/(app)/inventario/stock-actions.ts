@@ -23,6 +23,19 @@ export interface StockBodega {
   inspeccion: number;
   retenido: number;
   enCamino: number;
+  vencido: number;
+}
+
+/** Un lote de un producto con vencimiento y lo que hay de él en una bodega. */
+export interface LoteStock {
+  loteId: string;
+  lote: string;
+  fechaVencimiento: string;
+  diasRestantes: number;
+  estado: "vencido" | "por_vencer" | "vigente";
+  bodegaId: string;
+  bodega: string;
+  cantidad: number;
 }
 
 export interface MovimientoStock {
@@ -39,13 +52,13 @@ export interface MovimientoStock {
 }
 
 /** El stock de un SKU en cada bodega del país y sus últimos movimientos, para su ficha. Basta poder abrir Inventario. */
-export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[] } | { error: string }> {
+export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[] } | { error: string }> {
   await requireModulo(MODULO);
   if (!ES_ID(skuId)) return { error: "SKU no válido." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [porBodega, libro] = await Promise.all([
+  const [porBodega, libro, lotesRpc] = await Promise.all([
     supabase.rpc("wms_stock_por_bodega", { p_sku: skuId, p_pais: pais.id }),
     supabase
       .from("wms_movimientos")
@@ -54,6 +67,7 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
       .eq("wms_bodegas.pais_id", pais.id)
       .order("creado_en", { ascending: false })
       .limit(30),
+    supabase.rpc("wms_lotes_de_sku", { p_sku: skuId, p_pais: pais.id }),
   ]);
   if (porBodega.error) return { error: "No se pudo cargar el stock." };
 
@@ -75,7 +89,21 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
       inspeccion: Number(b.inspeccion),
       retenido: Number(b.retenido),
       enCamino: Number(b.en_camino),
+      vencido: Number(b.vencido ?? 0),
     })),
+    // Los lotes pueden fallar sin romper la ficha (producto sin vencimiento o migración sin correr).
+    lotes: lotesRpc.error
+      ? []
+      : (lotesRpc.data ?? []).map((l: Record<string, unknown>) => ({
+          loteId: String(l.lote_id),
+          lote: String(l.lote),
+          fechaVencimiento: String(l.fecha_vencimiento),
+          diasRestantes: Number(l.dias_restantes),
+          estado: l.estado as LoteStock["estado"],
+          bodegaId: String(l.bodega_id),
+          bodega: String(l.bodega),
+          cantidad: Number(l.cantidad),
+        })),
     // El libro puede fallar sin romper la ficha (si no se pudo leer, se muestra el stock igual).
     movimientos: libro.error
       ? []
@@ -111,6 +139,10 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   const cantidad = Number(texto(formData, "cantidad"));
   const referencia = texto(formData, "referencia").slice(0, 200) || null;
   const motivo = texto(formData, "motivo").slice(0, 500) || null;
+  // Un producto con vencimiento se mueve por lote: entrada y ajuste nombran el lote (código y fecha si es nuevo); la salida puede no nombrarlo (sale primero lo que vence antes).
+  const loteId = texto(formData, "lote_id") || null;
+  const loteCodigo = texto(formData, "lote_codigo").slice(0, 80) || null;
+  const vencimiento = texto(formData, "vencimiento") || null;
 
   if (!ES_ID(sku)) return { error: "SKU no válido." };
   if (!ES_ID(bodega)) return { error: "Elige la bodega." };
@@ -119,12 +151,18 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   if (!Number.isInteger(cantidad) || cantidad === 0 || Math.abs(cantidad) > 1_000_000) return { error: "La cantidad debe ser un número entero distinto de cero." };
   if (tipo !== "ajuste" && cantidad < 0) return { error: "La cantidad debe ser positiva (para restar, usa una salida)." };
   if (tipo === "ajuste" && !motivo) return { error: "Un ajuste necesita un motivo." };
+  if (loteId && !ES_ID(loteId)) return { error: "Lote no válido." };
+  if (vencimiento && !/^\d{4}-\d{2}-\d{2}$/.test(vencimiento)) return { error: "La fecha de vencimiento no es válida." };
 
   const supabase = createServiceClient();
-  const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase").eq("id", sku).maybeSingle();
+  const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", sku).maybeSingle();
   if (!maestro) return { error: "El SKU no existe." };
   if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
   if (maestro.clase === "test") return { error: "Es un producto de prueba: no tiene stock hasta que se marque como físico." };
+
+  if (maestro.maneja_vencimiento && tipo === "entrada" && !loteId && !(loteCodigo && vencimiento)) return { error: "Un producto con vencimiento necesita el lote y su fecha de vencimiento." };
+  if (maestro.maneja_vencimiento && tipo === "ajuste" && !loteId && !loteCodigo) return { error: "Un ajuste de un producto con vencimiento necesita el lote." };
+  if (!maestro.maneja_vencimiento && (loteId || loteCodigo || vencimiento)) return { error: "Este producto no maneja vencimiento." };
 
   const { error } = await supabase.rpc("wms_registrar_movimiento", {
     p_sku: sku,
@@ -136,6 +174,9 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
     p_referencia: referencia,
     p_motivo: motivo,
     p_usuario: usuario.id,
+    p_lote: loteId,
+    p_lote_codigo: loteCodigo,
+    p_vencimiento: vencimiento,
   });
   if (error) return { error: error.message.length < 200 ? error.message : "No se pudo registrar el movimiento." };
 
@@ -143,7 +184,7 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
     accion: "movimiento_inventario",
     entidad: "skus_maestros",
     entidadId: sku,
-    detalle: `${tipo} ${cantidad} de ${maestro.codigo}${referencia ? ` (${referencia})` : ""}`,
+    detalle: `${tipo} ${cantidad} de ${maestro.codigo}${loteCodigo ? ` lote ${loteCodigo}` : ""}${referencia ? ` (${referencia})` : ""}`,
   });
   revalidatePath("/inventario");
   return {};

@@ -56,6 +56,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     inspeccion: Number(r.inspeccion),
     retenido: Number(r.retenido),
     enCamino: Number(r.en_camino),
+    vencido: Number(r.vencido ?? 0),
+    manejaVencimiento: r.maneja_vencimiento === true,
   }));
 
   return (

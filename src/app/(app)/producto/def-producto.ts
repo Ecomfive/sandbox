@@ -34,6 +34,10 @@ export interface FilaProducto {
   /** El EAN/UPC/GTIN del fabricante o el interno que generó el sistema; null si no tiene. */
   codigoBarras: string | null;
   codigoBarrasOrigen: string | null;
+  /** Se controla por lote y fecha de vencimiento. */
+  manejaVencimiento: boolean;
+  /** Con cuántos días de anticipación se avisa que un lote está por vencer (null = 60). */
+  diasAvisoVencimiento: number | null;
   /** Solo los compuestos: "2× 1001, 1× 1002". */
   componentes: string;
   /** Día en que se creó (AAAA-MM-DD). */

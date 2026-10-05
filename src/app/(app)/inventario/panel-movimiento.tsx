@@ -7,7 +7,7 @@ import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, LapizIcon } from "@/lib/nav-icons";
-import { registrarMovimientoStock } from "./stock-actions";
+import { registrarMovimientoStock, type LoteStock } from "./stock-actions";
 
 export interface BodegaOpcion {
   id: string;
@@ -37,10 +37,16 @@ export function PanelMovimiento({
   tipo,
   bodegas,
   ubicaciones,
+  manejaVencimiento = false,
+  lotes = [],
   alGuardar,
 }: {
   skuId: string;
   tipo: "entrada" | "salida" | "ajuste";
+  /** El producto se mueve por lote: la entrada pide lote y fecha de vencimiento, el ajuste el lote, y la salida puede nombrarlo. */
+  manejaVencimiento?: boolean;
+  /** Los lotes con unidades del producto (para elegir uno en una salida o un ajuste). */
+  lotes?: LoteStock[];
   bodegas: BodegaOpcion[];
   ubicaciones: UbicacionOpcion[];
   alGuardar: () => void;
@@ -48,6 +54,9 @@ export function PanelMovimiento({
   const c = CONFIG[tipo];
   const [bodega, setBodega] = useState(bodegas[0]?.id ?? "");
   const delasUbicaciones = ubicaciones.filter((u) => u.bodegaId === bodega);
+  const lotesDeBodega = lotes.filter((l) => l.bodegaId === bodega);
+  // En una entrada se puede escribir un lote nuevo o repetir uno existente; en una salida o ajuste se elige uno existente.
+  const lotePorTexto = tipo === "entrada";
   return (
     <FichaCrear
       titulo={c.titulo}
@@ -91,6 +100,34 @@ export function PanelMovimiento({
                   <option key={u.id} value={u.id}>
                     {u.codigo}
                     {ETIQUETA_PROPIEDAD[u.propiedad] ?? ""}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          )}
+          {manejaVencimiento && lotePorTexto && (
+            <>
+              <Campo etiqueta="Lote" id="campo-lote-mov" obligatorio faltante={faltante}>
+                <input id="campo-lote-mov" type="text" name="lote_codigo" required maxLength={80} autoComplete="off" list="lotes-existentes-mov" aria-invalid={invalido("campo-lote-mov")} placeholder="Ej: L2411-A" className={`${fieldClass} w-full`} />
+                <datalist id="lotes-existentes-mov">
+                  {lotes.map((l) => (
+                    <option key={l.loteId + l.bodegaId} value={l.lote} />
+                  ))}
+                </datalist>
+              </Campo>
+              <Campo etiqueta="Fecha de vencimiento" id="campo-vencimiento-mov" obligatorio faltante={faltante}>
+                <input id="campo-vencimiento-mov" type="date" name="vencimiento" required aria-invalid={invalido("campo-vencimiento-mov")} className={`${fieldClass} w-full`} />
+              </Campo>
+            </>
+          )}
+          {manejaVencimiento && !lotePorTexto && (
+            <Campo etiqueta={tipo === "ajuste" ? "Lote" : "Lote (si no eliges, sale primero el que vence antes)"} id="campo-lote-elegido-mov" obligatorio={tipo === "ajuste"} faltante={faltante}>
+              <select id="campo-lote-elegido-mov" name="lote_id" required={tipo === "ajuste"} defaultValue="" key={bodega} aria-invalid={tipo === "ajuste" ? invalido("campo-lote-elegido-mov") : undefined} className={`${fieldClass} w-full`}>
+                <option value="">{tipo === "ajuste" ? "Elige el lote" : "El que vence antes"}</option>
+                {lotesDeBodega.map((l) => (
+                  <option key={l.loteId} value={l.loteId}>
+                    {l.lote} · vence {l.fechaVencimiento} · {l.cantidad} u.
+                    {l.estado === "vencido" ? " · vencido" : ""}
                   </option>
                 ))}
               </select>

@@ -27,6 +27,10 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   // El código de barras es opcional: se escribe el del fabricante o se pide uno interno (no las dos cosas).
   const barras = normalizarCodigoBarras(texto(formData, "codigo_barras"));
   const generarBarras = texto(formData, "generar_barras") === "1";
+  // Un producto que caduca se controla por lote y fecha de vencimiento; un compuesto no (sale de sus componentes).
+  const manejaVencimiento = texto(formData, "maneja_vencimiento") === "1";
+  const diasAvisoTexto = texto(formData, "dias_aviso_vencimiento");
+  const diasAviso = diasAvisoTexto ? Number(diasAvisoTexto) : null;
 
   if (!nombre) return { error: "Escribe el nombre del producto." };
   if (nombre.length > 200) return { error: "El nombre es muy largo (máximo 200 caracteres)." };
@@ -34,6 +38,8 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   if (codigo.length > 60 || /\s/.test(codigo)) return { error: "El SKU no puede llevar espacios ni pasar de 60 caracteres." };
   if (tipo !== "simple" && tipo !== "combo") return { error: "Elige si es simple o compuesto." };
   if (clase !== "fisico" && clase !== "test") return { error: "Elige si es físico o de prueba (test)." };
+  if (manejaVencimiento && tipo === "combo") return { error: "Un producto compuesto no maneja vencimiento: sale de sus componentes." };
+  if (diasAviso !== null && (!Number.isInteger(diasAviso) || diasAviso < 1 || diasAviso > 3650)) return { error: "Los días de aviso deben ser un número entre 1 y 3650." };
   if (barras && generarBarras) return { error: "Escribe el código de barras o pide uno interno, no las dos cosas." };
   if (barras && !esCodigoBarrasValido(barras)) return { error: "El código de barras no es válido: debe ser un EAN-8, UPC-A, EAN-13 o GTIN-14 con su dígito de control correcto." };
 
@@ -58,7 +64,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
 
   const { data, error } = await supabase
     .from("skus_maestros")
-    .insert({ codigo, nombre, tipo, clase, estado: "aprobado", creado_por: usuario.id, ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : {}) })
+    .insert({ codigo, nombre, tipo, clase, estado: "aprobado", creado_por: usuario.id, ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : {}), ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso } : {}) })
     .select("id")
     .single();
   if (error) {
@@ -203,4 +209,34 @@ export async function generarCodigoBarrasInterno(id: string): Promise<{ codigo?:
   });
   revalidatePath("/producto");
   return { codigo: String(data) };
+}
+
+/**
+ * Activa o desactiva el control de vencimiento de un producto (se lleva por lote y fecha de caducidad) y fija con cuántos días
+ * de anticipación se avisa de un lote por vencer (sin dato, 60). La base lo rechaza si el producto ya tiene stock sin lote (al
+ * activarlo) o lotes con unidades (al desactivarlo). Devuelve el error como valor.
+ */
+export async function configurarVencimiento(id: string, maneja: boolean, diasAviso: number | null): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  if (diasAviso !== null && (!Number.isInteger(diasAviso) || diasAviso < 1 || diasAviso > 3650)) return { error: "Los días de aviso deben ser un número entre 1 y 3650." };
+
+  const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("skus_maestros").select("codigo, tipo, maneja_vencimiento, dias_aviso_vencimiento").eq("id", id).maybeSingle();
+  if (!actual) return { error: "El producto ya no existe." };
+  if (maneja && actual.tipo === "combo") return { error: "Un producto compuesto no maneja vencimiento: sale de sus componentes." };
+
+  const { error } = await supabase.from("skus_maestros").update({ maneja_vencimiento: maneja, dias_aviso_vencimiento: maneja ? diasAviso : null }).eq("id", id);
+  if (error) return { error: error.message.length < 200 ? error.message : "No se pudo cambiar el control de vencimiento." };
+
+  await registrarAuditoria({
+    accion: "configurar_vencimiento",
+    entidad: "skus_maestros",
+    entidadId: id,
+    antes: { Vencimiento: actual.maneja_vencimiento ? `Sí (aviso ${actual.dias_aviso_vencimiento ?? 60} días)` : "No" },
+    despues: { Vencimiento: maneja ? `Sí (aviso ${diasAviso ?? 60} días)` : "No" },
+  });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return {};
 }

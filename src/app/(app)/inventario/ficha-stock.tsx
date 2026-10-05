@@ -6,11 +6,11 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
-import { HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
-import { obtenerStockDeSku, type MovimientoStock, type StockBodega } from "./stock-actions";
+import { obtenerStockDeSku, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
 const ETIQUETA_CUBETA: Record<string, string> = {
@@ -20,8 +20,17 @@ const ETIQUETA_CUBETA: Record<string, string> = {
   inspeccion: "en inspección",
   retenido: "retenido",
   en_camino: "en camino",
+  vencido: "vencido",
 };
 const ETIQUETA_ORIGEN: Record<string, string> = { manual: "A mano", sync_dropi: "Sincronización de Dropi", sync_shopify: "Sincronización de Shopify", pedido: "Pedido", conteo: "Conteo" };
+
+const ETIQUETA_ESTADO_LOTE = { vencido: "Vencido", por_vencer: "Por vencer", vigente: "Vigente" } as const;
+
+function textoDias(d: number): string {
+  if (d < 0) return `venció hace ${-d} ${d === -1 ? "día" : "días"}`;
+  if (d === 0) return "vence hoy";
+  return `en ${d} ${d === 1 ? "día" : "días"}`;
+}
 
 /** Un número del inventario: tabular, y en rojo si el saldo quedó negativo. */
 function Cifra({ n }: { n: number }) {
@@ -55,7 +64,7 @@ export function FichaStock({
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
 }) {
-  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[] } | "error" | null>(null);
+  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[] } | "error" | null>(null);
   // Sube cuando se guarda un movimiento, para volver a pedir el stock y el libro.
   const [version, setVersion] = useState(0);
   const id = sku?.id;
@@ -104,6 +113,8 @@ export function FichaStock({
                   tipo={tipo}
                   bodegas={bodegasPropias}
                   ubicaciones={ubicaciones}
+                  manejaVencimiento={sku.manejaVencimiento}
+                  lotes={datos && datos !== "error" ? datos.lotes : []}
                   alGuardar={() => {
                     setVersion((v) => v + 1);
                     alCambiar();
@@ -127,7 +138,7 @@ export function FichaStock({
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[34rem] border-collapse text-[13px]">
+                  <table className="w-full min-w-[38rem] border-collapse text-[13px]">
                     <thead>
                       <tr className="text-left text-[11px] tracking-wide text-muted-foreground uppercase">
                         <th scope="col" className="py-1.5 pr-2 font-semibold">
@@ -141,6 +152,7 @@ export function FichaStock({
                             ["Dañado", DESCRIPCION_CUBETA.danado],
                             ["Insp.", DESCRIPCION_CUBETA.inspeccion],
                             ["Retenido", DESCRIPCION_CUBETA.retenido],
+                            ["Vencido", DESCRIPCION_CUBETA.vencido],
                             ["En camino", DESCRIPCION_CUBETA.enCamino],
                           ] as const
                         ).map(([t, descripcion]) => (
@@ -161,7 +173,7 @@ export function FichaStock({
                             {b.nombre}
                             {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">externa</span>}
                           </th>
-                          {[b.fisico, b.reservado, b.disponible, b.danado, b.inspeccion, b.retenido, b.enCamino].map((n, i) => (
+                          {[b.fisico, b.reservado, b.disponible, b.danado, b.inspeccion, b.retenido, b.vencido, b.enCamino].map((n, i) => (
                             <td key={i} className="px-1.5 py-1.5 text-right">
                               <Cifra n={n} />
                             </td>
@@ -173,6 +185,26 @@ export function FichaStock({
                 </div>
               )}
             </Seccion>
+
+            {sku.manejaVencimiento && !esCombo && !esTest && datos !== null && datos !== "error" && (
+              <Seccion icono={CalendarioIcon} titulo="Lotes">
+                {datos.lotes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin lotes con unidades.</p>
+                ) : (
+                  <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[13px]">
+                    {datos.lotes.map((l) => (
+                      <li key={l.loteId + l.bodegaId} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <strong className="font-medium">{l.lote}</strong>
+                        <Badge tone={l.estado === "vencido" ? "destructive" : l.estado === "por_vencer" ? "warning" : "neutral"}>{ETIQUETA_ESTADO_LOTE[l.estado]}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {l.cantidad} u. · {l.bodega} · vence {l.fechaVencimiento} ({textoDias(l.diasRestantes)})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Seccion>
+            )}
 
             {!esCombo && !esTest && (
               <Seccion icono={HistorialIcon} titulo="Movimientos">

@@ -20,6 +20,8 @@ interface ProductoBd {
   clase: string;
   codigo_barras: string | null;
   codigo_barras_origen: string | null;
+  maneja_vencimiento: boolean;
+  dias_aviso_vencimiento: number | null;
   creado_en: string;
 }
 
@@ -38,7 +40,7 @@ export default async function ProductoPage() {
 
   const { data: productos } = await supabase
     .from("skus_maestros")
-    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, creado_en")
+    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, maneja_vencimiento, dias_aviso_vencimiento, creado_en")
     .order("creado_en", { ascending: false });
   const lista: ProductoBd[] = productos ?? [];
 
@@ -99,6 +101,8 @@ export default async function ProductoPage() {
     clase: p.clase,
     codigoBarras: p.codigo_barras,
     codigoBarrasOrigen: p.codigo_barras_origen,
+    manejaVencimiento: p.maneja_vencimiento,
+    diasAvisoVencimiento: p.dias_aviso_vencimiento,
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],

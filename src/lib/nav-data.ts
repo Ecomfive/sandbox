@@ -67,8 +67,6 @@ const AREAS: NavSection[] = [
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
       { label: "Producto", href: "/producto", frente: "fulfillment" },
-      { label: "Ficha producto Shopify", href: "/wms-productos", frente: "fulfillment" },
-      { label: "Ficha producto Dropi", href: "/wms-productos-dropi", frente: "fulfillment" },
     ],
   },
   {
@@ -87,6 +85,16 @@ const AREAS: NavSection[] = [
     frentes: true,
     // Usuarios y roles es de toda la empresa: queda afuera de los tres frentes.
     items: [{ label: "Usuarios y roles", href: "/usuarios" }],
+  },
+  // Las fichas de producto de Shopify y de Dropi ya no están en el menú (se llega a ellas desde Producto); la página y su
+  // permiso siguen vivos, y esta área oculta mantiene sus migas, el buscador y los favoritos.
+  {
+    title: "Fichas de canal",
+    oculta: true,
+    items: [
+      { label: "Ficha producto Shopify", href: "/wms-productos" },
+      { label: "Ficha producto Dropi", href: "/wms-productos-dropi" },
+    ],
   },
   // Su acceso es el botón «Avisos» de abajo del riel (con el contador de pendientes).
   {

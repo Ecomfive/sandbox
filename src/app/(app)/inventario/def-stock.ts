@@ -15,6 +15,10 @@ export interface FilaStock {
   inspeccion: number;
   retenido: number;
   enCamino: number;
+  /** Unidades de lotes ya vencidos: siguen en la bodega pero no cuentan como disponibles. */
+  vencido: number;
+  /** El producto se controla por lote y fecha de vencimiento. */
+  manejaVencimiento: boolean;
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
@@ -63,6 +67,7 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     },
     { id: "fisico", etiqueta: "Físico", tipo: "numero", valor: (f) => f.fisico },
     { id: "disponible", etiqueta: "Disponible", tipo: "numero", valor: (f) => f.disponible },
+    { id: "vencido", etiqueta: "Vencido", tipo: "numero", valor: (f) => f.vencido },
   ],
   csvAntes: [
     { etiqueta: "Código", valor: (f) => f.codigo },
@@ -74,5 +79,6 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     { etiqueta: "En inspección", valor: (f) => f.inspeccion },
     { etiqueta: "Retenido", valor: (f) => f.retenido },
     { etiqueta: "En camino", valor: (f) => f.enCamino },
+    { etiqueta: "Vencido", valor: (f) => f.vencido },
   ],
 };
