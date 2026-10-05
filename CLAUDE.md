@@ -515,8 +515,11 @@ convenciones técnicas del código.
   página). **Cada área se reparte en tres frentes** (`FRENTES`, `src/lib/nav-data.ts`): **Proveeduría** (lo de Ecomfive hoy),
   **Gestión de tienda** (Mi Reto Digital, cuando se importe) y **Fulfillment**; un frente sin páginas dice «Próximamente»
   (`PaginasDeArea`). Una página lleva su `frente` en `AREAS`; sin frente queda **afuera de los tres** y va arriba (hoy solo
-  Usuarios y roles). **Compras, Catálogo maestro y las fichas de producto están en Operación, no en Marketing**: Ecomfive
-  importa y compra sus productos (en un negocio de dropshipping el catálogo sí es parte de vender). Productos Test, el CRM y
+  Usuarios y roles). **Bodegas, Ubicaciones, Inventario, Alertas de inventario, Catálogo maestro y las fichas de producto
+  son del frente Fulfillment** (en Operación, no en Marketing): el producto entra por el WMS y sale por Proveeduría
+  (dropshippers) o por Fulfillment hacia tiendas, de un tercero a quien solo se le presta el servicio (Clicksy) o propias
+  (Kenku, Nuvo, Wao Ofertas y Ofertfy); Pedidos Dropi y Compras siguen en Proveeduría. En un negocio de dropshipping el
+  catálogo sí sería parte de vender, aquí no. Productos Test, el CRM y
   la Inteligencia competitiva están en Marketing. `AREAS` sigue siendo una lista plana de páginas por área (migas, buscador,
   contadores y `encontrarSeccionActiva` no cambian); un área con `oculta: true` (Avisos) no tiene botón en el riel pero cuenta
   para migas, buscador y fijados. **Una página nueva del menú se agrega a su área y frente en `AREAS`** (con una prueba en

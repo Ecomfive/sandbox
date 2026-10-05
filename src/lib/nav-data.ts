@@ -34,8 +34,10 @@ export interface NavSection {
  * de Ecomfive hoy), Gestión de tienda (Mi Reto Digital, cuando se importe) y Fulfillment. Una página con `dropi` solo
  * aparece si Dropi tiene datos en el país elegido, igual que antes con el grupo «Dropi».
  *
- * Compras, el catálogo y las fichas de producto están en Operación y no en Marketing: aquí los productos se importan y se
- * compran (en Gestión de tienda, bajo dropshipping, el catálogo sí es parte de vender).
+ * Bodegas, ubicaciones, inventario y producto (catálogo y fichas) son de **Fulfillment**: el producto entra por el WMS y sale
+ * o bien por Proveeduría (dropshippers) o bien por Fulfillment hacia tiendas, sean de un tercero a quien solo se le presta el
+ * servicio (Clicksy) o propias (Kenku, Nuvo, Wao Ofertas y Ofertfy). Están en Operación y no en Marketing: aquí los productos
+ * se importan y se compran (bajo dropshipping, en cambio, el catálogo sí es parte de vender).
  */
 const AREAS: NavSection[] = [
   {
@@ -59,14 +61,14 @@ const AREAS: NavSection[] = [
     frentes: true,
     items: [
       { label: "Pedidos Dropi", href: "/pedidos-dropi", dropi: true, frente: "proveeduria" },
-      { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "proveeduria" },
-      { label: "Inventario", href: "/inventario", dropi: true, frente: "proveeduria" },
-      { label: "Bodegas", href: "/wms-bodegas", frente: "proveeduria" },
-      { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "proveeduria" },
+      { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
+      { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
+      { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
+      { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "proveeduria" },
-      { label: "Catálogo maestro", href: "/catalogo-maestro", frente: "proveeduria" },
-      { label: "Ficha producto Shopify", href: "/wms-productos", frente: "proveeduria" },
-      { label: "Ficha producto Dropi", href: "/wms-productos-dropi", frente: "proveeduria" },
+      { label: "Catálogo maestro", href: "/catalogo-maestro", frente: "fulfillment" },
+      { label: "Ficha producto Shopify", href: "/wms-productos", frente: "fulfillment" },
+      { label: "Ficha producto Dropi", href: "/wms-productos-dropi", frente: "fulfillment" },
     ],
   },
   {

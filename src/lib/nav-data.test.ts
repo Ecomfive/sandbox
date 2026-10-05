@@ -58,3 +58,11 @@ test("el área activa se encuentra por la ruta, también en una subpágina", () 
   assert.equal(encontrarSeccionActiva("/notificaciones", areas), "Avisos");
   assert.equal(encontrarSeccionActiva("/", areas), "Desempeño");
 });
+
+test("bodegas, ubicaciones, inventario y producto son del frente Fulfillment; los pedidos de dropshippers, de Proveeduría", () => {
+  const frenteDe = (ruta: string) => areas.flatMap((a) => a.items).find((i) => i.href === ruta)?.frente;
+  for (const ruta of ["/wms-bodegas", "/wms-ubicaciones", "/inventario", "/alertas", "/catalogo-maestro", "/wms-productos", "/wms-productos-dropi"]) {
+    assert.equal(frenteDe(ruta), "fulfillment", ruta);
+  }
+  assert.equal(frenteDe("/pedidos-dropi"), "proveeduria");
+});
