@@ -515,10 +515,10 @@ convenciones técnicas del código.
   página). **Cada área se reparte en tres frentes** (`FRENTES`, `src/lib/nav-data.ts`): **Proveeduría** (lo de Ecomfive hoy),
   **Gestión de tienda** (Mi Reto Digital, cuando se importe) y **Fulfillment**; un frente sin páginas dice «Próximamente»
   (`PaginasDeArea`). Una página lleva su `frente` en `AREAS`; sin frente queda **afuera de los tres** y va arriba (hoy solo
-  Usuarios y roles). **Bodegas, Ubicaciones, Inventario, Alertas de inventario, Catálogo maestro y las fichas de producto
+  Usuarios y roles). **Bodegas, Ubicaciones, Inventario, Alertas de inventario, Compras, Catálogo maestro y las fichas de producto
   son del frente Fulfillment** (en Operación, no en Marketing): el producto entra por el WMS y sale por Proveeduría
   (dropshippers) o por Fulfillment hacia tiendas, de un tercero a quien solo se le presta el servicio (Clicksy) o propias
-  (Kenku, Nuvo, Wao Ofertas y Ofertfy); Pedidos Dropi y Compras siguen en Proveeduría. En un negocio de dropshipping el
+  (Kenku, Nuvo, Wao Ofertas y Ofertfy); Compras también es de Fulfillment (el fulfillment se gestiona desde el WMS); solo Pedidos Dropi sigue en Proveeduría. En un negocio de dropshipping el
   catálogo sí sería parte de vender, aquí no. Productos Test, el CRM y
   la Inteligencia competitiva están en Marketing. `AREAS` sigue siendo una lista plana de páginas por área (migas, buscador,
   contadores y `encontrarSeccionActiva` no cambian); un área con `oculta: true` (Avisos) no tiene botón en el riel pero cuenta
@@ -532,6 +532,21 @@ convenciones técnicas del código.
   menú y la campana la leen con `use()` dentro de un `Suspense`. Las rutas de Mi Reto Digital chocan con algunas nuestras
   (`/alertas`, `/productos`, `/finanzas`): al importarlas, montarlas bajo un prefijo (`/tienda/...`). La cuenta de la persona
   (foto, tema, atajos, versión y salir) vive en `MenuCuenta`, en la barra de arriba.
+- **Inventario por cubetas** (`/inventario`, módulo `inventario`, migración 0069; fase B de `WMS-REFERENCIA.md`). El stock vive
+  en `wms_stock` (una fila por **SKU maestro y bodega**, creada con el primer movimiento): `fisico`, `reservado`, `danado`,
+  `inspeccion`, `retenido`, `en_camino` y `disponible`, que es una **columna generada** (físico menos reservado, dañado,
+  en inspección y retenido). `wms_stock_ubicacion` lo reparte por ubicación (la propiedad del bin decide la cubeta extra) y
+  `wms_movimientos` es el **libro que no se edita ni se borra** (un disparador lo impide; las cubetas se pueden reconstruir
+  sumando sus `cambios`). Todo cambio de cantidad pasa por **una función SQL atómica** (`wms_registrar_movimiento`: entrada,
+  salida, ajuste, reserva, liberación; `wms_trasladar`: entre ubicaciones) con `UPDATE ... SET x = x + n`, así que dos
+  personas a la vez no se pisan (probado con 60 entradas simultáneas). **Nace vacío y un saldo puede ser negativo** (decisión
+  de Hernán): primero los módulos, luego las conexiones; una salida que llega antes que su entrada se registra y se corrige
+  con una entrada o un ajuste (el negativo se ve en rojo). **Una bodega externa (Dropi, Effi, Boxful, Dunamixfy) solo acepta
+  movimientos de una sincronización** (`origen` `sync_dropi` / `sync_shopify`): a mano se rechaza. Un **combo no guarda stock**:
+  `wms_stock_resumen` lo calcula de sus componentes. La página lista todos los SKU (también en cero) con filtro por bodega; la
+  ficha de un SKU (`FichaStock`) muestra su stock por bodega, los últimos movimientos y los botones Entrada, Salida y Ajuste
+  (`registrarMovimientoStock`, que devuelve `{ error }` como valor). El pistoleo anterior (carga por CSV) quedó en
+  `/inventario/pistoleo`.
 - **Pestañas del módulo (estilo ClickUp).** Un módulo con subpáginas muestra una
   franja de pestañas bajo las migas, también en `BarraMigas`. Se declaran en
   `PESTANAS_POR_MODULO` (`src/lib/pestanas.ts`, la clave es la ruta del módulo y

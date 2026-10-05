@@ -65,7 +65,7 @@ const AREAS: NavSection[] = [
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
-      { label: "Compras", href: "/compras", frente: "proveeduria" },
+      { label: "Compras", href: "/compras", frente: "fulfillment" },
       { label: "Catálogo maestro", href: "/catalogo-maestro", frente: "fulfillment" },
       { label: "Ficha producto Shopify", href: "/wms-productos", frente: "fulfillment" },
       { label: "Ficha producto Dropi", href: "/wms-productos-dropi", frente: "fulfillment" },
