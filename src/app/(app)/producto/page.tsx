@@ -22,6 +22,16 @@ interface ProductoBd {
   codigo_barras_origen: string | null;
   maneja_vencimiento: boolean;
   dias_aviso_vencimiento: number | null;
+  es_fisico: boolean;
+  embalaje: string | null;
+  largo: number | null;
+  ancho: number | null;
+  alto: number | null;
+  unidad_medida: string;
+  peso: number | null;
+  unidad_peso: string;
+  pais_origen: string | null;
+  codigo_sa: string | null;
   creado_en: string;
 }
 
@@ -40,7 +50,7 @@ export default async function ProductoPage() {
 
   const { data: productos } = await supabase
     .from("skus_maestros")
-    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, maneja_vencimiento, dias_aviso_vencimiento, creado_en")
+    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa, creado_en")
     .order("creado_en", { ascending: false });
   const lista: ProductoBd[] = productos ?? [];
 
@@ -103,6 +113,18 @@ export default async function ProductoPage() {
     codigoBarrasOrigen: p.codigo_barras_origen,
     manejaVencimiento: p.maneja_vencimiento,
     diasAvisoVencimiento: p.dias_aviso_vencimiento,
+    envio: {
+      esFisico: p.es_fisico,
+      embalaje: p.embalaje,
+      largo: p.largo === null ? null : Number(p.largo),
+      ancho: p.ancho === null ? null : Number(p.ancho),
+      alto: p.alto === null ? null : Number(p.alto),
+      unidadMedida: p.unidad_medida,
+      peso: p.peso === null ? null : Number(p.peso),
+      unidadPeso: p.unidad_peso,
+      paisOrigen: p.pais_origen,
+      codigoSa: p.codigo_sa,
+    },
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],

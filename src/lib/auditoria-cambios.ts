@@ -45,6 +45,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_producto: "Creó el producto",
   guardar_codigo_barras: "Cambió el código de barras",
   configurar_vencimiento: "Cambió el control de vencimiento",
+  guardar_envio: "Cambió los datos de envío",
   generar_codigo_barras: "Generó un código de barras interno",
   cambiar_clase_producto: "Cambió la clase del producto",
   crear_caso_dropshipper: "Abrió un caso",

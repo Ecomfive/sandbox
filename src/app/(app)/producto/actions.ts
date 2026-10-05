@@ -240,3 +240,93 @@ export async function configurarVencimiento(id: string, maneja: boolean, diasAvi
   revalidatePath("/inventario");
   return {};
 }
+
+/** Lo que manda el bloque «Envío» de la ficha (los números llegan como texto, tal como se escribieron). */
+export interface DatosEnvio {
+  esFisico: boolean;
+  embalaje: string;
+  largo: string;
+  ancho: string;
+  alto: string;
+  unidadMedida: string;
+  peso: string;
+  unidadPeso: string;
+  paisOrigen: string;
+  codigoSa: string;
+}
+
+/**
+ * Guarda el bloque «Envío» de un producto: si es físico y, entonces, su embalaje, tamaño empacado, peso, país de origen y
+ * código SA. Con «físico» apagado los datos se conservan (por si se vuelve a encender). Devuelve el error como valor.
+ */
+export async function guardarEnvio(id: string, d: DatosEnvio): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+
+  const medida = (v: string, nombre: string): number | null | { error: string } => {
+    const t = String(v ?? "").trim().replace(",", ".");
+    if (!t) return null;
+    const n = Number(t);
+    if (!Number.isFinite(n) || n < 0 || n > 99_999_999) return { error: `${nombre} debe ser un número positivo.` };
+    return n;
+  };
+  const valores: Record<string, number | null> = {};
+  for (const [campo, nombre] of [["largo", "El largo"], ["ancho", "El ancho"], ["alto", "El alto"], ["peso", "El peso"]] as const) {
+    const r = medida(d[campo], nombre);
+    if (r !== null && typeof r === "object") return r;
+    valores[campo] = r;
+  }
+  if (!["cm", "in"].includes(d.unidadMedida)) return { error: "Unidad de medida no válida." };
+  if (!["kg", "g", "lb", "oz"].includes(d.unidadPeso)) return { error: "Unidad de peso no válida." };
+  const codigoSa = String(d.codigoSa ?? "").trim();
+  if (codigoSa && !/^[0-9]{4}([.]?[0-9]{2}){0,3}$/.test(codigoSa)) return { error: "El código SA debe tener de 4 a 10 cifras (Ej: 8424.89)." };
+
+  const nuevo = {
+    es_fisico: d.esFisico === true,
+    embalaje: String(d.embalaje ?? "").trim().slice(0, 120) || null,
+    largo: valores.largo,
+    ancho: valores.ancho,
+    alto: valores.alto,
+    unidad_medida: d.unidadMedida,
+    peso: valores.peso,
+    unidad_peso: d.unidadPeso,
+    pais_origen: String(d.paisOrigen ?? "").trim().slice(0, 80) || null,
+    codigo_sa: codigoSa || null,
+  };
+
+  const supabase = createServiceClient();
+  const { data: actual } = await supabase
+    .from("skus_maestros")
+    .select("es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa")
+    .eq("id", id)
+    .maybeSingle();
+  if (!actual) return { error: "El producto ya no existe." };
+
+  const { error } = await supabase.from("skus_maestros").update(nuevo).eq("id", id);
+  if (error) return { error: error.message.length < 200 ? error.message : "No se pudo guardar el envío." };
+
+  const tamano = (r: { largo: unknown; ancho: unknown; alto: unknown; unidad_medida: unknown }) =>
+    r.largo === null && r.ancho === null && r.alto === null ? "—" : `${r.largo ?? 0} × ${r.ancho ?? 0} × ${r.alto ?? 0} ${r.unidad_medida}`;
+  const resumen = (r: typeof nuevo | typeof actual) => ({
+    "Producto físico": r.es_fisico ? "Sí" : "No",
+    Embalaje: r.embalaje || "—",
+    Tamaño: tamano(r),
+    Peso: r.peso === null ? "—" : `${r.peso} ${r.unidad_peso}`,
+    "País de origen": r.pais_origen || "—",
+    "Código SA": r.codigo_sa || "—",
+  });
+  const antes = resumen(actual);
+  const despues = resumen(nuevo);
+  const cambiaron = (Object.keys(despues) as (keyof typeof despues)[]).filter((k) => String(antes[k]) !== String(despues[k]));
+  if (cambiaron.length > 0) {
+    await registrarAuditoria({
+      accion: "guardar_envio",
+      entidad: "skus_maestros",
+      entidadId: id,
+      antes: Object.fromEntries(cambiaron.map((k) => [k, antes[k]])),
+      despues: Object.fromEntries(cambiaron.map((k) => [k, despues[k]])),
+    });
+  }
+  revalidatePath("/producto");
+  return {};
+}

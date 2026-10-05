@@ -24,6 +24,23 @@ export const ETIQUETA_ASOCIACION: Record<Asociacion["tipo"], string> = {
   pedidos: "Producto en pedidos de Dropi",
 };
 
+export const UNIDADES_MEDIDA = ["cm", "in"] as const;
+export const UNIDADES_PESO_ENVIO = ["kg", "g", "lb", "oz"] as const;
+
+/** Los datos de envío de un producto (el bloque «Envío», como en Shopify). Sin «físico», se conservan pero no se usan. */
+export interface EnvioProducto {
+  esFisico: boolean;
+  embalaje: string | null;
+  largo: number | null;
+  ancho: number | null;
+  alto: number | null;
+  unidadMedida: string;
+  peso: number | null;
+  unidadPeso: string;
+  paisOrigen: string | null;
+  codigoSa: string | null;
+}
+
 export interface FilaProducto {
   id: string;
   /** El SKU: la llave con la que una venta de cualquier plataforma encuentra el producto. */
@@ -38,6 +55,7 @@ export interface FilaProducto {
   manejaVencimiento: boolean;
   /** Con cuántos días de anticipación se avisa que un lote está por vencer (null = 60). */
   diasAvisoVencimiento: number | null;
+  envio: EnvioProducto;
   /** Solo los compuestos: "2× 1001, 1× 1002". */
   componentes: string;
   /** Día en que se creó (AAAA-MM-DD). */
