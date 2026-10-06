@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { startTransition, useCallback, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -89,11 +90,28 @@ function CamposCosto({ costo, deshabilitado, alSalir }: { costo: ReturnType<type
 }
 
 /** Una línea de la orden: lo pedido y el costo (unitario o total) se editan en el lugar y se guardan al salir del campo. */
-function FilaItem({ item, puedeEscribir, alCambiar }: { item: ItemCompra; puedeEscribir: boolean; alCambiar: () => void }) {
+function FilaItem({
+  item,
+  puedeEscribir,
+  alCambiar,
+  alEscribir,
+}: {
+  item: ItemCompra;
+  puedeEscribir: boolean;
+  alCambiar: () => void;
+  /** Lo que se ve escrito ahora (aunque no se haya guardado), para el total de la orden en vivo. */
+  alEscribir: (id: string, vivo: { cantidad: number; subtotal: number | null }) => void;
+}) {
   const { mostrarToast } = useToast();
   const [cantidad, setCantidad] = useState(String(item.cantidadPedida));
   const n = Number(cantidad);
   const costo = useCosto(n, item.costoUnitario);
+  const subtotalVivo = aNumero(costo.total);
+  useEffect(() => {
+    alEscribir(item.id, { cantidad: Number.isFinite(n) ? n : 0, subtotal: subtotalVivo });
+    // `alEscribir` es estable (setState del padre); lo que importa es lo escrito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id, n, subtotalVivo]);
   const [pendiente, start] = useTransition();
   const recibido = item.cantidadRecibida !== null;
 
@@ -179,6 +197,10 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
   // Cantidades por variante cuando el producto elegido tiene variantes.
   const [porVariante, setPorVariante] = useState<Record<string, string>>({});
   const [pendiente, start] = useTransition();
+  const router = useRouter();
+  // Lo escrito en cada línea (antes de guardar), para que el total de la orden cambie mientras se escribe.
+  const [vivo, setVivo] = useState<Record<string, { cantidad: number; subtotal: number | null }>>({});
+  const alEscribir = useCallback((id: string, v: { cantidad: number; subtotal: number | null }) => setVivo((x) => ({ ...x, [id]: v })), []);
 
   const items = datos?.items ?? [];
   const yaEstan = new Set(items.map((i) => i.skuId));
@@ -195,6 +217,12 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
       setDatos(r);
     }
   }, [compraId]);
+
+  /** Después de un cambio: recarga las líneas y refresca la tabla de Compras en segundo plano (sin bloquear). */
+  const trasCambio = useCallback(async () => {
+    await cargar();
+    startTransition(() => router.refresh());
+  }, [cargar, router]);
 
   useEffect(() => {
     // Carga al abrir la compra (o al pasar a otra).
@@ -231,14 +259,17 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
         }
       }
       limpiar();
-      await cargar();
+      await trasCambio();
     });
   }
 
-  // El total de la orden.
-  const unidades = items.reduce((s, i) => s + i.cantidadPedida, 0);
-  const monto = items.reduce((s, i) => s + (i.costoUnitario !== null ? redondear(i.costoUnitario * i.cantidadPedida, 2) : 0), 0);
-  const sinCosto = items.filter((i) => i.costoUnitario === null).length;
+  // El total de la orden, con lo que está escrito ahora en cada línea (guardado o no) y la línea por agregar.
+  const lineaVivo = (i: ItemCompra) => vivo[i.id] ?? { cantidad: i.cantidadPedida, subtotal: i.costoUnitario !== null ? redondear(i.costoUnitario * i.cantidadPedida, 2) : null };
+  const nuevaSubtotal = aNumero(costoNuevo.total);
+  const hayNueva = !!elegido && cantidadNueva > 0;
+  const unidades = items.reduce((s, i) => s + lineaVivo(i).cantidad, 0) + (hayNueva ? cantidadNueva : 0);
+  const monto = items.reduce((s, i) => s + (lineaVivo(i).subtotal ?? 0), 0) + (hayNueva && nuevaSubtotal !== null ? nuevaSubtotal : 0);
+  const sinCosto = items.filter((i) => lineaVivo(i).subtotal === null).length;
   // Se busca el producto (o el padre); las variantes se piden al elegirlo.
   const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
   const listo = !!elegido && cantidadNueva > 0;
@@ -258,22 +289,9 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
         {items.length > 0 && (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {items.map((i) => (
-              <FilaItem key={`${i.id}-${i.cantidadPedida}-${i.costoUnitario}`} item={i} puedeEscribir={puedeEscribir} alCambiar={() => void cargar()} />
+              <FilaItem key={`${i.id}-${i.cantidadPedida}-${i.costoUnitario}`} item={i} puedeEscribir={puedeEscribir} alCambiar={() => void trasCambio()} alEscribir={alEscribir} />
             ))}
           </ul>
-        )}
-        {items.length > 0 && (
-          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-muted px-3 py-2" role="status">
-            <span className="text-sm font-medium">
-              Total de la orden · {items.length} producto{items.length === 1 ? "" : "s"} · {unidades.toLocaleString("es-PA")} u.
-            </span>
-            <span className="text-base font-semibold tabular-nums">{usd(monto)}</span>
-            {sinCosto > 0 && (
-              <span className="w-full text-xs text-warning">
-                {sinCosto} producto{sinCosto === 1 ? "" : "s"} sin costo: no {sinCosto === 1 ? "suma" : "suman"} al total.
-              </span>
-            )}
-          </div>
         )}
         {puedeEscribir && datos && (
           <ProveedorSkusMaestros opciones={opciones}>
@@ -350,6 +368,20 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
               </div>
             </div>
           </ProveedorSkusMaestros>
+        )}
+        {(items.length > 0 || hayNueva) && (
+          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-muted px-3 py-2" role="status">
+            <span className="text-sm font-medium">
+              Total de la orden · {items.length + (hayNueva ? 1 : 0)} producto{items.length + (hayNueva ? 1 : 0) === 1 ? "" : "s"} · {unidades.toLocaleString("es-PA")} u.
+            </span>
+            <span className="text-base font-semibold tabular-nums">{usd(monto)}</span>
+            {hayNueva && <span className="w-full text-xs text-muted-foreground">Incluye la línea que estás agregando: pulsa «Agregar a la orden» para guardarla.</span>}
+            {sinCosto > 0 && (
+              <span className="w-full text-xs text-warning">
+                {sinCosto} producto{sinCosto === 1 ? "" : "s"} sin costo: no {sinCosto === 1 ? "suma" : "suman"} al total.
+              </span>
+            )}
+          </div>
         )}
       </Seccion>
       {dialogo}

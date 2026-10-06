@@ -353,6 +353,10 @@ async function sincronizarCantidad(compraId: string) {
     .eq("id", compraId);
 }
 
+// Las acciones de las líneas de una compra no llaman a `revalidatePath`: rearmar toda la página de Compras (más de mil
+// compras con sus productos) antes de responder hacía lenta cada edición. El bloque «Productos» recarga sus líneas y pide al
+// navegador refrescar la tabla en segundo plano (`router.refresh()` dentro de una transición).
+
 /**
  * Agrega un producto de la ficha a una compra de país, con lo pedido y su costo unitario. Toma el número de lote siguiente
  * de ese producto en el país de la compra (Lote #1, #2…). Un producto en Test no se compra: primero pasa a Activo
@@ -385,7 +389,6 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   }
   await sincronizarCantidad(compraId);
   await registrarAuditoria({ accion: "agregar_producto_compra", entidad: "wms_compras", entidadId: compraId, detalle: `${sku.codigo} · ${cantidad} u.` });
-  revalidatePath("/compras");
   return {};
 }
 
@@ -404,7 +407,6 @@ export async function actualizarProductoCompra(itemId: string, cantidad: number,
     .single();
   if (error || !data) return { error: "No se pudo guardar el cambio." };
   await sincronizarCantidad(data.compra_id);
-  revalidatePath("/compras");
   return {};
 }
 
@@ -421,6 +423,5 @@ export async function quitarProductoCompra(itemId: string): Promise<{ error?: st
   await sincronizarCantidad(item.compra_id);
   const sku = (Array.isArray(item.skus_maestros) ? item.skus_maestros[0] : item.skus_maestros) as { codigo: string } | null;
   await registrarAuditoria({ accion: "quitar_producto_compra", entidad: "wms_compras", entidadId: item.compra_id, detalle: sku?.codigo ?? itemId });
-  revalidatePath("/compras");
   return {};
 }
