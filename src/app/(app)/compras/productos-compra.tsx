@@ -12,7 +12,7 @@ import { ProductoIcon } from "@/lib/nav-icons";
 import { actualizarProductoCompra, agregarProductoCompra, obtenerProductosCompra, quitarProductoCompra, type ItemCompra, type ProductoComprable } from "./actions";
 import { useConfirmarProductoActivo } from "./confirmar-producto-activo";
 import { usd } from "./calculos-compras";
-import { aNumero, CamposCosto, claseNumero, redondear, useCosto } from "./costo-linea";
+import { aNumero, CamposCosto, claseNumero, DECIMALES_UNITARIO, redondear, useCosto } from "./costo-linea";
 
 /**
  * Una línea de la orden: lo pedido y el costo (unitario o total) se editan en el lugar, en cualquier momento (también con la
@@ -55,7 +55,7 @@ function FilaItem({
     const u = costo.valorUnitario;
     if (n === item.cantidadPedida && u === item.costoUnitario) return;
     start(async () => {
-      const r = await actualizarProductoCompra(item.id, n, u === null ? null : redondear(u, 4));
+      const r = await actualizarProductoCompra(item.id, n, u === null ? null : redondear(u, DECIMALES_UNITARIO));
       if (r.error) {
         mostrarToast(r.error, "destructive");
         setCantidad(String(item.cantidadPedida));
@@ -195,7 +195,7 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
       : [[producto, Number(cantidad)]];
     if (pares.length === 0) return mostrarToast("Escribe la cantidad de al menos una variante.", "destructive");
     if (pares.some(([, n]) => !Number.isInteger(n) || n <= 0)) return mostrarToast("Las cantidades deben ser números enteros mayores que cero.", "destructive");
-    const unitario = costoNuevo.valorUnitario === null ? null : redondear(costoNuevo.valorUnitario, 4);
+    const unitario = costoNuevo.valorUnitario === null ? null : redondear(costoNuevo.valorUnitario, DECIMALES_UNITARIO);
     for (const [p] of pares) if (!(await confirmar(p))) return;
     start(async () => {
       for (const [p, n] of pares) {
