@@ -1,6 +1,7 @@
 "use client";
 
 import type { IconoComp } from "@/components/tabla/botones-vista";
+import { Bandera } from "@/components/paises/bandera";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CrearPaisPanel } from "@/components/paises/crear-pais-panel";
 import { ConfiguracionIcon } from "@/lib/nav-icons";
@@ -23,7 +24,18 @@ const DEF_PAISES: DefTabla<FilaPais> = {
 const NOMBRE: NombreFilas = { singular: "país", plural: "países" };
 const ICONOS: Record<string, IconoComp> = { nombre: ConfiguracionIcon, codigo: ConfiguracionIcon };
 const COLUMNAS: ColumnaTabla<FilaPais>[] = [
-  { id: "nombre", label: "País", ocultable: false, clase: "font-medium", render: (p) => p.nombre },
+  {
+    id: "nombre",
+    label: "País",
+    ocultable: false,
+    clase: "font-medium",
+    render: (p) => (
+      <span className="flex items-center gap-2">
+        <Bandera codigo={p.codigo} />
+        {p.nombre}
+      </span>
+    ),
+  },
   { id: "codigo", label: "Código", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.codigo },
 ];
 
