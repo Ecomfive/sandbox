@@ -247,7 +247,7 @@ export function LineaDeTiempo({ dropshipperId, acceso, version }: { dropshipperI
               aria-pressed={filtro === f.id}
               onClick={() => setFiltro(f.id)}
               className={`rounded-md border px-2 py-1 text-xs font-medium ${anilloFoco} ${
-                filtro === f.id ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-accent"
+                filtro === f.id ? "border-primario bg-primario text-white" : "border-border bg-card hover:bg-accent"
               }`}
             >
               {f.etiqueta}

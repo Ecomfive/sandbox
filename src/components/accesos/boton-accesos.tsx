@@ -120,7 +120,7 @@ export function BotonAccesos({
           aria-expanded={abierto}
           aria-haspopup="dialog"
           className={`inline-flex h-8 items-center gap-1.5 !rounded-full px-3 text-xs font-medium whitespace-nowrap transition-colors max-sm:w-8 max-sm:justify-center max-sm:px-0 ${anilloFoco} ${
-            abierto ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
+            abierto ? "bg-primario text-white" : "bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
           }`}
         >
           <AccesosIcon className="h-4 w-4 shrink-0" />

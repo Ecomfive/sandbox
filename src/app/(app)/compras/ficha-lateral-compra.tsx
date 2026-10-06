@@ -113,7 +113,7 @@ export function FichaLateralCompra({
           <div>
             <div className="flex gap-0.5" aria-label={`Etapa ${paso + 1} de ${RECORRIDO.length}`} role="img">
               {RECORRIDO.map((e, n) => (
-                <span key={e} className={`h-1.5 flex-1 rounded-sm ${n < paso ? "bg-success" : n === paso ? "bg-foreground" : "bg-muted"}`} />
+                <span key={e} className={`h-1.5 flex-1 rounded-sm ${n < paso ? "bg-success" : n === paso ? "bg-primario" : "bg-muted"}`} />
               ))}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">

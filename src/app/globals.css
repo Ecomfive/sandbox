@@ -4,7 +4,7 @@
   --background: #ffffff;
   --foreground: #18181b;
   --card: #ffffff;
-  --muted: #f9f9f9;
+  --muted: #f8f7fb;
   /* Texto secundario: ≥ 4.5:1 sobre el fondo, la tarjeta, --muted y --accent (la superficie de lo seleccionado). */
   --muted-foreground: #636363;
   /* Gris oscuro para títulos e íconos que necesitan verse marcados sin ser negro puro (--foreground). */
@@ -15,9 +15,9 @@
   --border-control: #8a8a8a;
   /* Interactions/buttons use a neutral light gray, not the Ecomfive brand
      red — the red is reserved for the logo only (see /brand/ecomfive-rojo.png). */
-  --accent: #e4e4e7;
-  --accent-hover: #d4d4d8;
-  --accent-foreground: #27272a;
+  --accent: #efe8fb;
+  --accent-hover: #e3d7f7;
+  --accent-foreground: #3b1d5a;
   --success: #15803d;
   --success-soft: #dcfce7;
   --warning: #b45309;
@@ -31,6 +31,13 @@
   --riel-texto: #c4c4c8;
   --riel-hover: #1c1c1f;
   --aviso: #d74c81;
+  /* Paleta «neón», tomada del halo del área elegida en el riel. El degradado va en los botones principales (Crear, Agregar)
+     y el violeta sólido en lo activo (página actual, filtro aplicado, pestaña, interruptor). Con texto blanco encima:
+     ≥ 4.5:1 en todo el degradado. */
+  --neon: linear-gradient(120deg, #c22f6a 0%, #9b2fa8 50%, #5f43d1 100%);
+  --neon-brillo: 0 6px 20px -6px rgb(155 47 168 / 0.6);
+  --primario: #8a35c9;
+  --primario-suave: #f3ecfc;
 }
 
 @theme inline {
@@ -55,6 +62,8 @@
   --color-riel-texto: var(--riel-texto);
   --color-riel-hover: var(--riel-hover);
   --color-aviso: var(--aviso);
+  --color-primario: var(--primario);
+  --color-primario-suave: var(--primario-suave);
   --font-sans: var(--font-inter);
 }
 
@@ -74,9 +83,11 @@
   --foreground-soft: #d4d4d8;
   --border: #38383d;
   --border-control: #71717a;
-  --accent: #3f3f46;
-  --accent-hover: #4b4b52;
-  --accent-foreground: #f4f4f5;
+  --accent: #392b4d;
+  --accent-hover: #46375c;
+  --accent-foreground: #f1e9ff;
+  --primario: #9d55e0;
+  --primario-suave: #2c2140;
   --success: #4ade80;
   --success-soft: #14532d;
   --warning: #fbbf24;
@@ -188,6 +199,18 @@ html {
 
 .animate-entrar-derecha {
   animation: entrar-derecha 220ms ease-out;
+}
+
+/* Botón principal: el degradado neón con un brillo al pasar el cursor. */
+.boton-neon {
+  background-image: var(--neon);
+  transition:
+    box-shadow 0.2s,
+    filter 0.2s;
+}
+.boton-neon:not(:disabled):hover {
+  box-shadow: var(--neon-brillo);
+  filter: brightness(1.08);
 }
 
 /* El brillo del área elegida en el riel: un halo difuminado naranja, magenta, morado y azul detrás del ícono. */

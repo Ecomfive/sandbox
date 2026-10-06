@@ -28,7 +28,7 @@ const ORDENES: { id: OrdenGrupos; etiqueta: string; Icono: IconoComp }[] = [
  */
 export const pastilla = (activa: boolean) =>
   `relative inline-flex h-8 items-center !rounded-full px-2 text-xs font-medium whitespace-nowrap transition-colors ${anilloFoco} ${
-    activa ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
+    activa ? "bg-primario text-white" : "bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
   }`;
 
 /**

@@ -61,7 +61,7 @@ export function Paginacion({
                 aria-label={`Página ${boton}`}
                 aria-current={boton === pagina.pagina ? "page" : undefined}
                 className={`${BASE} ${
-                  boton === pagina.pagina ? "bg-foreground text-background" : "text-foreground hover:bg-muted"
+                  boton === pagina.pagina ? "bg-primario text-white" : "text-foreground hover:bg-muted"
                 }`}
               >
                 {boton}

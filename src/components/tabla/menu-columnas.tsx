@@ -146,7 +146,7 @@ export function MenuColumnas({
                   aria-pressed={densidad === valor}
                   onClick={() => cambiarDensidad(valor)}
                   className={`min-h-8 flex-1 rounded-md px-2 py-1 text-xs font-medium ${anilloFoco} ${
-                    densidad === valor ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border"
+                    densidad === valor ? "bg-primario text-white" : "bg-muted text-muted-foreground hover:bg-border"
                   }`}
                 >
                   {etiqueta}

@@ -138,7 +138,7 @@ export function BarraMigas({
                     aria-current={activa ? "page" : undefined}
                     className={`relative inline-flex min-h-9 items-center px-3 text-sm whitespace-nowrap transition-colors ${anilloFoco} ${
                       activa
-                        ? "font-semibold text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-foreground"
+                        ? "font-semibold text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:[background-image:var(--neon)]"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >

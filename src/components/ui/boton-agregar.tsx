@@ -15,7 +15,7 @@ export const BotonAgregar = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<H
         ref={ref}
         type="button"
         aria-haspopup="dialog"
-        className={`inline-flex items-center justify-center gap-1 border border-foreground bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/85 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md ${className}`}
+        className={`inline-flex items-center justify-center gap-1 boton-neon border border-transparent px-4 py-2 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md ${className}`}
         {...props}
       >
         <MasIcon className="h-4 w-4" />

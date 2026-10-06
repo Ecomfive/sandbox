@@ -47,7 +47,7 @@ export function BotonBarra({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { activo?: boolean; principal?: boolean }) {
   const aspecto = principal
-    ? "border-foreground bg-foreground font-medium text-background hover:opacity-90"
+    ? "boton-neon border-transparent font-medium text-white"
     : activo
       ? "border-accent bg-accent text-foreground"
       : "border-border bg-card text-foreground hover:bg-muted";
@@ -93,7 +93,7 @@ export function Segmentado<T extends string>({
           type="button"
           aria-pressed={valor === o.valor}
           onClick={() => alCambiar(o.valor)}
-          className={`rounded-[5px] px-2 py-0.5 text-xs ${anilloFoco} ${valor === o.valor ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
+          className={`rounded-[5px] px-2 py-0.5 text-xs ${anilloFoco} ${valor === o.valor ? "bg-primario text-white" : "text-muted-foreground hover:text-foreground"}`}
         >
           {o.etiqueta}
         </button>

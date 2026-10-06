@@ -205,7 +205,7 @@ export function InformeCompras({
                   className={`flex h-full min-w-0 flex-1 flex-col justify-end rounded p-0 hover:bg-muted aria-pressed:bg-muted ${anilloFoco}`}
                 >
                   <span
-                    className={`block rounded-sm ${p.clave === actual.clave ? "bg-foreground" : "bg-border-control"}`}
+                    className={`block rounded-sm ${p.clave === actual.clave ? "bg-primario" : "bg-border-control"}`}
                     style={{ height: `${(p.creadas.length / maximo) * 100}%`, minHeight: p.creadas.length ? 2 : 0 }}
                   />
                 </button>

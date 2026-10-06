@@ -41,7 +41,7 @@ export function BotonCrear({
         if (!enviando) alPulsarSinCompletar();
       }}
       className={`flex h-12 w-full items-center justify-center text-base font-semibold transition-colors ${anilloFoco} !rounded-full ${
-        activo ? "bg-foreground text-background hover:bg-foreground/85" : "cursor-not-allowed bg-muted text-muted-foreground"
+        activo ? "boton-neon text-white" : "cursor-not-allowed bg-muted text-muted-foreground"
       }`}
     >
       {enviando ? etiquetaEnviando : etiqueta}

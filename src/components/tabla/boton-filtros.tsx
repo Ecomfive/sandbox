@@ -36,7 +36,7 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
       title={typeof children === "string" ? children : undefined}
       className={`max-w-full truncate !rounded-full px-2.5 py-1 text-xs ${anilloFoco} ${
         activo
-          ? "bg-foreground font-medium text-background"
+          ? "bg-primario font-medium text-white"
           : "border border-border text-muted-foreground hover:bg-muted"
       }`}
     >
@@ -303,7 +303,7 @@ export function BotonFiltros<F>({
           aria-haspopup="dialog"
           aria-expanded={abierto}
           className={`relative flex h-8 w-8 items-center justify-center !rounded-full transition-colors ${anilloFoco} ${
-            activos > 0 ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-border"
+            activos > 0 ? "bg-primario text-white" : "bg-muted text-muted-foreground hover:bg-border"
           }`}
         >
           <FiltroIcon className="h-4 w-4" />

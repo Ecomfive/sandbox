@@ -74,7 +74,7 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
             aria-pressed={periodo === p.id}
             onClick={() => elegir(p.id)}
             className={`rounded-md border px-2 py-1 text-xs font-medium ${anilloFoco} ${
-              periodo === p.id ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-accent"
+              periodo === p.id ? "border-primario bg-primario text-white" : "border-border bg-card hover:bg-accent"
             }`}
           >
             {p.etiqueta}

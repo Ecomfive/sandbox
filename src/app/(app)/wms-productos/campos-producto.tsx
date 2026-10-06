@@ -172,7 +172,7 @@ export function Interruptor({ etiqueta, activo, alCambiar }: { etiqueta: string;
       aria-checked={activo}
       aria-label={etiqueta}
       onClick={() => alCambiar(!activo)}
-      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${anilloFoco} ${activo ? "border-foreground bg-foreground" : "border-border-control bg-muted"}`}
+      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${anilloFoco} ${activo ? "border-primario bg-primario" : "border-border-control bg-muted"}`}
     >
       <span
         aria-hidden="true"

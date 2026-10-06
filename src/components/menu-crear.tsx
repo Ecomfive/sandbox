@@ -70,7 +70,7 @@ export function MenuCrear({ acciones }: { acciones: AccionCrear[] }) {
             setAbierto(true);
           }
         }}
-        className={`inline-flex min-h-8 items-center gap-1 rounded-full bg-foreground px-3 py-1 text-sm font-medium text-background hover:opacity-90 ${anilloFoco}`}
+        className={`inline-flex min-h-8 items-center gap-1 rounded-full boton-neon px-3 py-1 text-sm font-medium text-white ${anilloFoco}`}
       >
         <MasIcon className="h-4 w-4" />
         Crear
