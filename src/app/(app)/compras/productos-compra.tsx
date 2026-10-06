@@ -106,7 +106,7 @@ function FilaItem({
       </div>
       <div className="flex flex-wrap items-end gap-3 text-xs">
         <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">Pedido (u.)</span>
+          <span className="text-muted-foreground">Unidades</span>
           <input
             type="number"
             min={1}
@@ -291,7 +291,7 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
               <div className="flex flex-wrap items-end gap-3 text-xs">
                 {variantesElegido.length === 0 ? (
                   <label className="flex flex-col gap-1">
-                    <span className="text-muted-foreground">Pedido (u.)</span>
+                    <span className="text-muted-foreground">Unidades</span>
                     <input
                       type="number"
                       min={1}
@@ -306,7 +306,7 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
                     />
                   </label>
                 ) : (
-                  <p className="m-0 pb-2 text-muted-foreground">Pedido: {cantidadNueva.toLocaleString("es-PA")} u.</p>
+                  <p className="m-0 pb-2 text-muted-foreground">Unidades: {cantidadNueva.toLocaleString("es-PA")}</p>
                 )}
                 <CamposCosto costo={costoNuevo} />
                 <BotonBarra principal disabled={!listo || pendiente} onClick={() => void agregar()} className="ml-auto">
