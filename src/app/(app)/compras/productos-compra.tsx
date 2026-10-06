@@ -89,7 +89,10 @@ function CamposCosto({ costo, deshabilitado, alSalir }: { costo: ReturnType<type
   );
 }
 
-/** Una línea de la orden: lo pedido y el costo (unitario o total) se editan en el lugar y se guardan al salir del campo. */
+/**
+ * Una línea de la orden: lo pedido y el costo (unitario o total) se editan en el lugar, en cualquier momento (también con la
+ * compra cerrada), y se guardan al salir del campo, con «Guardando…» y «✓ Guardado» a la vista.
+ */
 function FilaItem({
   item,
   puedeEscribir,
@@ -113,6 +116,14 @@ function FilaItem({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id, n, subtotalVivo]);
   const [pendiente, start] = useTransition();
+  const [guardado, setGuardado] = useState(false);
+  // Al volver a escribir, el «✓ Guardado» se quita hasta el próximo guardado.
+  const [escrito, setEscrito] = useState(`${cantidad}|${costo.unitario}|${costo.total}`);
+  const ahora = `${cantidad}|${costo.unitario}|${costo.total}`;
+  if (ahora !== escrito) {
+    setEscrito(ahora);
+    if (guardado) setGuardado(false);
+  }
   const recibido = item.cantidadRecibida !== null;
 
   function guardar() {
@@ -124,7 +135,11 @@ function FilaItem({
         mostrarToast(r.error, "destructive");
         setCantidad(String(item.cantidadPedida));
         costo.reiniciar(item.costoUnitario, item.cantidadPedida);
-      } else alCambiar();
+      } else {
+        mostrarToast(`${item.codigo}: cambio guardado`);
+        setGuardado(true);
+        alCambiar();
+      }
     });
   }
 
@@ -151,11 +166,18 @@ function FilaItem({
             {recibido ? ` · recibido ${item.cantidadRecibida} u.${item.fechaRecepcion ? ` el ${formatearFecha(item.fechaRecepcion)}` : ""}` : ""}
           </p>
         </div>
-        {puedeEscribir && !recibido && (
-          <button type="button" onClick={quitar} disabled={pendiente} className={`text-xs text-muted-foreground hover:text-destructive ${anilloFoco}`}>
-            Quitar
-          </button>
-        )}
+        <span className="flex shrink-0 items-center gap-3">
+          {pendiente ? (
+            <span className="text-xs text-muted-foreground">Guardando…</span>
+          ) : (
+            guardado && <span className="text-xs text-success">✓ Guardado</span>
+          )}
+          {puedeEscribir && !recibido && (
+            <button type="button" onClick={quitar} disabled={pendiente} className={`text-xs text-muted-foreground hover:text-destructive ${anilloFoco}`}>
+              Quitar
+            </button>
+          )}
+        </span>
       </div>
       <div className="flex flex-wrap items-end gap-3 text-xs">
         <label className="flex flex-col gap-1">
@@ -289,7 +311,7 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
         {items.length > 0 && (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {items.map((i) => (
-              <FilaItem key={`${i.id}-${i.cantidadPedida}-${i.costoUnitario}`} item={i} puedeEscribir={puedeEscribir} alCambiar={() => void trasCambio()} alEscribir={alEscribir} />
+              <FilaItem key={i.id} item={i} puedeEscribir={puedeEscribir} alCambiar={() => void trasCambio()} alEscribir={alEscribir} />
             ))}
           </ul>
         )}
