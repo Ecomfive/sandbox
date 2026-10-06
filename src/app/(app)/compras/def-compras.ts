@@ -334,6 +334,8 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     { id: "factura", etiqueta: "Factura", tipo: "seleccion", valores: (c) => [c.factura ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sí" }, { valor: "no", etiqueta: "No" }] },
     { id: "financiamiento", etiqueta: "Financiamiento", tipo: "seleccion", valores: (c) => [c.financiamiento ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sí" }, { valor: "no", etiqueta: "No" }] },
   ],
+  // Como una lista de ClickUp: arranca agrupada por Etapa, en el orden del flujo. Cada persona puede agrupar por otra cosa.
+  vistaInicial: { agrupar: "etapa" },
   csvAntes: [
     { etiqueta: "Código", valor: (c) => c.codigo ?? "" },
     { etiqueta: "Nombre", valor: (c) => c.nombre },
