@@ -363,9 +363,6 @@ export function FormularioCompra({
               <input id="campo-documentos" type="url" name="documentos" defaultValue={compra?.documentos ?? ""} placeholder="Enlace a la factura o soporte" className={fieldClass} />
             </Campo>
           </div>
-          <Campo etiqueta={conEmoji("inconveniente", "Inconveniente")} id="campo-inconveniente">
-            <input id="campo-inconveniente" type="text" name="inconveniente" defaultValue={compra?.inconveniente ?? ""} className={fieldClass} />
-          </Campo>
           <Campo etiqueta={conEmoji("planificacion", "Planificación")} id="campo-planificacion">
             <input id="campo-planificacion" type="text" name="planificacion" defaultValue={compra?.planificacion ?? ""} className={fieldClass} />
           </Campo>

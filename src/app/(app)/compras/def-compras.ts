@@ -41,6 +41,10 @@ export interface FilaCompra {
   fechaPago1: string | null;
   fechaPago2: string | null;
   fechaEnvio: string | null;
+  /**
+   * El último comentario que empieza con «Inconveniente:» (sin ese título): una falla de la compra (aduana, retraso, error de
+   * entrega…). Ya no es un campo: se marca comentando. De aquí salen las fallas del dashboard, el informe y Tiempos y fallas.
+   */
   inconveniente: string | null;
   planificacion: string | null;
   documentos: string | null;
@@ -90,7 +94,6 @@ export const EMOJI_CAMPO: Record<string, string> = {
   fechaEnvio: "🚚",
   trackId: "🎫",
   orden: "🧾",
-  inconveniente: "🚨",
   planificacion: "🗓️",
   urlProducto: "🔗",
   documentos: "📎",
@@ -353,7 +356,6 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     { id: "creado", etiqueta: "Creada", tipo: "fecha", valor: (c) => c.creadoEn.slice(0, 10) },
     { id: "cerrado", etiqueta: "Cerrada", tipo: "fecha", valor: (c) => (c.cerradoEn ? c.cerradoEn.slice(0, 10) : null) },
     { id: "dias", etiqueta: "Días", tipo: "numero", valor: (c) => diasDeCompra(c) },
-    { id: "inconveniente", etiqueta: "Inconveniente", tipo: "texto", valor: (c) => c.inconveniente ?? "" },
     {
       id: "asignado",
       etiqueta: "Persona asignada",

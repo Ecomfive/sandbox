@@ -113,7 +113,6 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
           <Dato etiqueta="Producto relacionado">{compra.productoRelacionado || SIN_DATO}</Dato>
         </dl>
         <dl className="flex flex-col gap-3">
-          <Dato etiqueta="Inconveniente">{compra.inconveniente || SIN_DATO}</Dato>
           <Dato etiqueta="Planificación">{compra.planificacion || SIN_DATO}</Dato>
           <Dato etiqueta="Documentos">
             {compra.documentos ? (

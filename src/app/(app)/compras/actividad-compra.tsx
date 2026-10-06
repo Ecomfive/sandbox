@@ -160,7 +160,7 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
               valor={texto}
               alCambiar={setTexto}
               alMencionar={setMenciones}
-              placeholder="Escribe un comentario… usa @ para etiquetar a alguien"
+              placeholder="Escribe un comentario… usa @ para etiquetar a alguien. Empieza con «Inconveniente:» para marcar una falla."
             />
             <button
               type="button"

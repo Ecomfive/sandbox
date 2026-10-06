@@ -53,7 +53,6 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   fechaEnvio: { etiqueta: "Fecha de Envío", prop: "fechaEnvio", columna: "fecha_envio", tipo: "fecha" },
   trackId: { etiqueta: "Track ID", prop: "trackId", columna: "track_id", tipo: "texto" },
   orden: { etiqueta: "Orden", prop: "orden", columna: "orden", tipo: "texto" },
-  inconveniente: { etiqueta: "Inconveniente", prop: "inconveniente", columna: "inconveniente", tipo: "texto" },
 };
 
 export const campoEditable = (id: string): CampoEditable | undefined =>

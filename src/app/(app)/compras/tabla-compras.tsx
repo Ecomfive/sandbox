@@ -69,7 +69,6 @@ const ICONOS: Record<string, IconoComp> = {
   dias: CalendarioIcon,
   trackId: EstadoIcon,
   orden: EstadoIcon,
-  inconveniente: EstadoIcon,
   asignado: PersonaIcon,
   factura: EstadoIcon,
   financiamiento: GastoIcon,
@@ -233,7 +232,6 @@ function columnas(umbral: Record<string, number>, dia: string, edicion: { puedeE
     col("fechaLimite", "Fecha límite", { ...resto, clase: "whitespace-nowrap", render: (c) => ed(c, "fechaLimite", fecha(c.fechaLimite)) }),
     col("trackId", "Track ID", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "trackId", c.trackId || "—") }),
     col("orden", "Orden", { ...resto, clase: "text-muted-foreground tabular-nums", render: (c) => ed(c, "orden", c.orden || "—") }),
-    col("inconveniente", "Inconveniente", { ...resto, render: (c) => ed(c, "inconveniente", c.inconveniente || "—") }),
     col("cerrado", "Cerrada", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.cerradoEn) }),
   ];
 }

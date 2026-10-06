@@ -78,7 +78,6 @@ function leerCambios(formData: FormData) {
     fecha_pago_1: fechaOptativa(formData, "fecha_pago_1"),
     fecha_pago_2: fechaOptativa(formData, "fecha_pago_2"),
     fecha_envio: fechaOptativa(formData, "fecha_envio"),
-    inconveniente: textoOptativo(formData, "inconveniente"),
     planificacion: textoOptativo(formData, "planificacion"),
     documentos: textoOptativo(formData, "documentos"),
     prioridad: PRIORIDADES_VALIDAS.has(String(formData.get("prioridad") ?? "")) ? String(formData.get("prioridad")) : null,
