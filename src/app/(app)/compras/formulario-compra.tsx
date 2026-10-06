@@ -353,9 +353,6 @@ export function FormularioCompra({
           <Campo etiqueta={conEmoji("planificacion", "Planificación")} id="campo-planificacion">
             <input id="campo-planificacion" type="text" name="planificacion" defaultValue={compra?.planificacion ?? ""} className={fieldClass} />
           </Campo>
-          <Campo etiqueta={conEmoji("notas", "Notas")} id="campo-notas">
-            <textarea id="campo-notas" name="notas" defaultValue={compra?.notas ?? ""} rows={3} className={fieldClass} />
-          </Campo>
         </Seccion>
       </div>
 

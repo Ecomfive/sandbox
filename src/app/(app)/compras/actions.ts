@@ -81,7 +81,6 @@ function leerCambios(formData: FormData) {
     inconveniente: textoOptativo(formData, "inconveniente"),
     planificacion: textoOptativo(formData, "planificacion"),
     documentos: textoOptativo(formData, "documentos"),
-    notas: textoOptativo(formData, "notas"),
     prioridad: PRIORIDADES_VALIDAS.has(String(formData.get("prioridad") ?? "")) ? String(formData.get("prioridad")) : null,
     via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)),
     etiquetas: listaDeTexto(textoOptativo(formData, "etiquetas")),

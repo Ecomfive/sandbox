@@ -70,7 +70,6 @@ const ICONOS: Record<string, IconoComp> = {
   trackId: EstadoIcon,
   orden: EstadoIcon,
   inconveniente: EstadoIcon,
-  notas: EstadoIcon,
   asignado: PersonaIcon,
   factura: EstadoIcon,
   financiamiento: GastoIcon,

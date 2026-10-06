@@ -115,7 +115,6 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
         <dl className="flex flex-col gap-3">
           <Dato etiqueta="Inconveniente">{compra.inconveniente || SIN_DATO}</Dato>
           <Dato etiqueta="Planificación">{compra.planificacion || SIN_DATO}</Dato>
-          <Dato etiqueta="Notas">{compra.notas || SIN_DATO}</Dato>
           <Dato etiqueta="Documentos">
             {compra.documentos ? (
               <a href={compra.documentos} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">

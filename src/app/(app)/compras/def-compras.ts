@@ -44,7 +44,6 @@ export interface FilaCompra {
   inconveniente: string | null;
   planificacion: string | null;
   documentos: string | null;
-  notas: string | null;
   asignadoNombre: string | null;
   /** Aire, mar o tierra (puede ser más de una). */
   viaEnvio: string[];
@@ -100,7 +99,6 @@ export const EMOJI_CAMPO: Record<string, string> = {
   creado: "🕒",
   cerrado: "🏁",
   dias: "⏱️",
-  notas: "📝",
 };
 
 /** «🏭 Proveedor»: el nombre de la columna con su emoji. */
@@ -356,7 +354,6 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     { id: "cerrado", etiqueta: "Cerrada", tipo: "fecha", valor: (c) => (c.cerradoEn ? c.cerradoEn.slice(0, 10) : null) },
     { id: "dias", etiqueta: "Días", tipo: "numero", valor: (c) => diasDeCompra(c) },
     { id: "inconveniente", etiqueta: "Inconveniente", tipo: "texto", valor: (c) => c.inconveniente ?? "" },
-    { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (c) => c.notas ?? "" },
     {
       id: "asignado",
       etiqueta: "Persona asignada",
