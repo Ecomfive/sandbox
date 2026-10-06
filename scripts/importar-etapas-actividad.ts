@@ -54,11 +54,30 @@ const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLower
 const noReconocidos = new Map<string, number>();
 const anotar = (que: string) => noReconocidos.set(que, (noReconocidos.get(que) ?? 0) + 1);
 
-function etapa(v: string): string | null {
-  if (!v || v === "–") return null;
+// El campo «Etapa» viejo (antes de pasar todo al «👣 Etapa» el 14 jul 2025) numeraba distinto: 06 Compra y pago,
+// 07 En China (producción o embarque), 08 Tracking, 10 Completado. Lo que no se vio con nombre se supone en el mismo orden.
+const ETAPA_VIEJA_POR_NUMERO: Record<string, string> = {
+  "01": "solicitud_local",
+  "02": "solicitud_internacional",
+  "03": "cotizar",
+  "04": "cotizado",
+  "05": "evaluacion_proveedor",
+  "06": "compra_pago",
+  "07": "produccion",
+  "08": "tracking",
+  "09": "arribo_mercancia",
+  "10": "completado",
+};
+// El traspaso en bloque al campo nuevo (todo a «12 - Completado»): 14 jul 2025, 22:11 UTC.
+const TRASPASO_DESDE = Date.UTC(2025, 6, 14, 22, 10);
+const TRASPASO_HASTA = Date.UTC(2025, 6, 14, 22, 13);
+
+function etapa(v: string, vieja = false): string | null {
+  // Vacío, o una opción que ya se borró en ClickUp («#id»): sin valor.
+  if (!v || v === "–" || v.startsWith("#")) return null;
   const n = normal(v);
   if (/^\d{1,2}$/.test(n)) {
-    const e = ETAPA_POR_NUMERO[n.padStart(2, "0")];
+    const e = (vieja ? ETAPA_VIEJA_POR_NUMERO : ETAPA_POR_NUMERO)[n.padStart(2, "0")];
     if (e) return e;
   }
   if (n.startsWith("backlog")) return "backlog";
@@ -118,6 +137,11 @@ async function main() {
     // milisegundos de diferencia.
     // ClickUp a veces repite el mismo cambio (mismo autor, mismo valor, misma hora): cuenta una vez.
     const unicas = [...new Set(lineas)];
+    // Si la compra pasó por el traspaso al campo nuevo, lo de antes es del campo viejo (otra numeración) y el traspaso
+    // mismo no es un cambio real.
+    const msDe = (l: string) => Number(l.split("|")[2]);
+    const traspaso = unicas.find((l) => /^\d+\|>12\|\d{12,14}$/.test(l) && msDe(l) >= TRASPASO_DESDE && msDe(l) <= TRASPASO_HASTA);
+    const corte = traspaso ? msDe(traspaso) : null;
     const propios = unicas
       .map((l, i) => ({ l, orden: /\|\d{12,14}$/.test(l) ? 0 : unicas.length - i }))
       .flatMap(({ l, orden }) => {
@@ -125,6 +149,7 @@ async function main() {
           raras.push(`${cid}: ${l}`);
           return [];
         }
+        if (l === traspaso) return [];
         const [codigo, cambio, cuando] = l.split("|");
         const [de, a] = cambio.split(">");
         // La lectura nueva trae la hora exacta del servidor de ClickUp en milisegundos; la vieja, el texto de pantalla.
@@ -134,12 +159,16 @@ async function main() {
           return [];
         }
         const autor = autorPorCodigo[codigo] ?? null;
+        const vieja = corte !== null && d.getTime() < corte;
+        const despues = etapa(a, vieja);
+        // Quitar la etapa (dejarla vacía) no es pasar a otra: no cuenta.
+        if (!despues) return [];
         return [
           {
             compra_id: compraId,
             campo: "etapa",
-            valor_antes: etapa(de),
-            valor_despues: etapa(a),
+            valor_antes: etapa(de, vieja),
+            valor_despues: despues,
             ocurrido_en: new Date(d.getTime() + orden).toISOString(),
             autor: autor ? (REASIGNAR[autor] ?? autor) : null,
             origen: "clickup_actividad",

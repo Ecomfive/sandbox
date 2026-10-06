@@ -606,7 +606,14 @@ convenciones técnicas del código.
   `cerrado_en`. **Importación desde ClickUp:** `scripts/clickup-exportar-compras.mjs` baja las listas «Compras Dropi» de cada
   país y «Compras Importadora🌍» a `datos-privados/` (con comentarios e historial de estados), `scripts/clickup-inventario-compras.mjs`
   hace el inventario de campos y `scripts/importar-compras-clickup.ts` importa (sin `--aplicar` solo informa; se puede repetir,
-  actualiza por `clickup_id`; `--subir-adjuntos` copia los adjuntos). **Países:** se agregan desde Configuración (sección Países) o con «＋ País» junto al
+  actualiza por `clickup_id`; `--subir-adjuntos` copia los adjuntos). **Historial exacto de Etapa** (la API de ClickUp no da el
+  de campos personalizados): se leyó en la página de ClickUp con la sesión de Hernán (el detalle de la Actividad que la
+  página pide a su servidor, con la hora en ms), quedó en la conversación como bloques `@@ACT@@`;
+  `scripts/extraer-etapas-transcripcion.mjs <conversación.jsonl>` arma `datos-privados/clickup-etapas.json` y
+  `scripts/importar-etapas-actividad.ts --aplicar` lo carga (`origen` «clickup_actividad», rehace los suyos). Lo anterior al
+  traspaso del 14 jul 2025 (todo a «12 - Completado») es del campo «Etapa» viejo, con otra numeración (06 compra y pago,
+  07 En China, 08 tracking, 10 completado); el traspaso no cuenta como cambio. Cargado el 7 oct 2026: 5.259 cambios de
+  1.196 compras. **Países:** se agregan desde Configuración (sección Países) o con «＋ País» junto al
   selector de Compras (`crearPais`, `src/lib/paises-actions.ts`; pide poder modificar Configuración). El selector de país de la
   barra de arriba (`PAISES_NAV`) sigue siendo fijo: es el contexto de Dropi. Cada compra guarda su tarea original en
   `clickup` (jsonb), así que ningún dato de ClickUp se pierde. El historial de la **Etapa** (campo personalizado) no sale por
