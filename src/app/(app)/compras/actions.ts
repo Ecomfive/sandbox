@@ -6,7 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, PRIORIDADES, VIAS_ENVIO } from "./def-compras";
-import { campoEditable, normalizarValor, textoDeValor } from "./def-edicion-compras";
+import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor } from "./def-edicion-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
@@ -119,6 +119,47 @@ async function siguienteCodigo(tipo: string, paisId: string | null): Promise<str
   return (data as string | null) ?? null;
 }
 
+/** Un cambio de un dato de una compra para su Actividad: el campo y los valores ya en palabras («—» si no había). */
+interface CambioActividad {
+  campo: string;
+  antes: string | null;
+  despues: string | null;
+}
+
+/**
+ * Anota en la Actividad de una compra cualquier cambio (que no sea etapa ni estado, que van con `anotarEventos`), con quién
+ * lo hizo y la hora, como la actividad de ClickUp. Lo usan la ficha, las celdas de la lista y el bloque «Productos».
+ */
+async function anotarCambios(compraId: string, cambios: CambioActividad[]) {
+  const reales = cambios.filter((c) => c.antes !== c.despues);
+  if (reales.length === 0) return;
+  const usuario = await getUsuarioActual();
+  const autor = usuario?.nombre || usuario?.email || null;
+  const ahora = Date.now();
+  // Varios cambios del mismo guardado llevan milisegundos distintos (la base no repite campo + valor + hora).
+  await createServiceClient()
+    .from("wms_compra_eventos")
+    .insert(reales.map((c, i) => ({ compra_id: compraId, campo: c.campo, valor_antes: c.antes, valor_despues: c.despues, ocurrido_en: new Date(ahora + i).toISOString(), autor, origen: "sistema" })));
+}
+
+const dinero = (n: number) => n.toLocaleString("es-PA", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** «1.040 u. · $1.270,00» (sin costo, solo las unidades). */
+const textoLinea = (cantidad: number, costo: number | null) =>
+  `${cantidad.toLocaleString("es-PA")} u.${costo !== null ? ` · ${dinero(Math.round(cantidad * costo * 100) / 100)}` : ""}`;
+
+/** Otros datos de la ficha (fuera de las celdas de la lista) que también quedan en la Actividad. */
+const OTROS_CAMPOS: { campo: string; columna: string }[] = [
+  { campo: "nombre", columna: "nombre" },
+  { campo: "descripcion", columna: "descripcion" },
+  { campo: "urlProducto", columna: "url_producto" },
+  { campo: "documentos", columna: "documentos" },
+  { campo: "foto", columna: "foto_url" },
+  { campo: "paisesDestino", columna: "paises_destino" },
+];
+/** Una lista en orden fijo, para que el mismo contenido en otro orden (vías de envío, etiquetas) no cuente como cambio. */
+const ordenada = (v: unknown) => (Array.isArray(v) ? [...v].map(String).sort() : v);
+const textoSimple = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : Array.isArray(v) ? (v.length ? v.join(", ") : "—") : String(v));
+
 /** Anota los cambios de etapa y de estado con su hora: de ahí salen los tiempos por etapa del tablero de compras. */
 async function anotarEventos(compraId: string, antes: { etapa: string; estado: string } | null, despues: { etapa: string; estado: string }) {
   const usuario = await getUsuarioActual();
@@ -175,7 +216,8 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   if ("error" in tipoYPais) return tipoYPais;
 
   const supabase = createServiceClient();
-  const { data: actual } = await supabase.from("wms_compras").select("foto_url, etapa, estado").eq("id", id).single();
+  const { data: actualCompleta } = await supabase.from("wms_compras").select("*").eq("id", id).single();
+  const actual = actualCompleta as Record<string, unknown> & { foto_url: string | null; etapa: string; estado: string } | null;
   const { qty_total, monto_total, ...resto } = leerCambios(formData);
   // Con productos vinculados, la cantidad y el monto los calcula el bloque «Productos»: el formulario no los pisa.
   const { count: lineas } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);
@@ -188,7 +230,17 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
     .update({ ...tipoYPais, nombre, etapa, estado, ...cambios, ...(cerrado_en !== undefined ? { cerrado_en } : {}), actualizado_en: new Date().toISOString() })
     .eq("id", id);
   if (error) return { error: error.message };
-  if (actual) await anotarEventos(id, { etapa: actual.etapa, estado: actual.estado }, { etapa, estado });
+  if (actual) {
+    await anotarEventos(id, { etapa: actual.etapa, estado: actual.estado }, { etapa, estado });
+    // Lo demás que cambió en la ficha, en palabras, para la Actividad.
+    const nuevo: Record<string, unknown> = { ...actual, ...tipoYPais, nombre, ...cambios };
+    await anotarCambios(id, [
+      ...Object.entries(CAMPOS_EDITABLES)
+        .filter(([clave]) => clave !== "etapa" && clave !== "estado")
+        .map(([clave, def]) => ({ campo: clave, antes: textoDeValor(def, ordenada(actual[def.columna])), despues: textoDeValor(def, ordenada(nuevo[def.columna])) })),
+      ...OTROS_CAMPOS.map((c) => ({ campo: c.campo, antes: textoSimple(actual[c.columna]), despues: textoSimple(nuevo[c.columna]) })),
+    ]);
+  }
 
   if (actual && actual.foto_url !== cambios.foto_url) await borrarFotoSiEsNuestra(actual.foto_url);
 
@@ -238,6 +290,9 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
       { etapa: String(actual.etapa), estado: String(actual.estado) },
       { etapa: campo === "etapa" ? String(normalizado.valor) : String(actual.etapa), estado: campo === "estado" ? String(normalizado.valor) : String(actual.estado) },
     );
+  }
+  if (campo !== "etapa" && campo !== "estado") {
+    await anotarCambios(id, [{ campo, antes: textoDeValor(def, actual[def.columna]), despues: textoDeValor(def, normalizado.valor) }]);
   }
   await registrarAuditoria({
     accion: "editar_campo_compra",
@@ -461,6 +516,7 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
     return { error: error.message.length < 200 ? error.message : "No se pudo agregar el producto." };
   }
   await sincronizarCantidad(compraId);
+  await anotarCambios(compraId, [{ campo: "productoAgregado", antes: null, despues: `${sku.codigo} · ${sku.nombre} · ${textoLinea(cantidad, costo)}` }]);
   await registrarAuditoria({ accion: "agregar_producto_compra", entidad: "wms_compras", entidadId: compraId, detalle: `${sku.codigo} · ${cantidad} u.` });
   return {};
 }
@@ -472,6 +528,7 @@ export async function actualizarProductoCompra(itemId: string, cantidad: number,
   if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
   if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
   const supabase = createServiceClient();
+  const { data: antes } = await supabase.from("wms_compra_items").select("cantidad_pedida, costo_unitario, skus_maestros(codigo, nombre)").eq("id", itemId).maybeSingle();
   const { data, error } = await supabase
     .from("wms_compra_items")
     .update({ cantidad_pedida: cantidad, costo_unitario: costo, actualizado_en: new Date().toISOString() })
@@ -480,6 +537,12 @@ export async function actualizarProductoCompra(itemId: string, cantidad: number,
     .single();
   if (error || !data) return { error: "No se pudo guardar el cambio." };
   await sincronizarCantidad(data.compra_id);
+  if (antes) {
+    const sku = (Array.isArray(antes.skus_maestros) ? antes.skus_maestros[0] : antes.skus_maestros) as { codigo: string; nombre: string } | null;
+    const previo = textoLinea(Number(antes.cantidad_pedida), antes.costo_unitario === null ? null : Number(antes.costo_unitario));
+    const ahora = textoLinea(cantidad, costo);
+    if (previo !== ahora) await anotarCambios(data.compra_id, [{ campo: "productoCambiado", antes: `${sku?.codigo ?? ""} · ${sku?.nombre ?? ""} · ${previo}`, despues: ahora }]);
+  }
   return {};
 }
 
@@ -488,13 +551,24 @@ export async function quitarProductoCompra(itemId: string): Promise<{ error?: st
   await requireModuloEscritura("compras");
   if (!ES_ID(itemId)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
-  const { data: item } = await supabase.from("wms_compra_items").select("compra_id, cantidad_recibida, skus_maestros(codigo)").eq("id", itemId).maybeSingle();
+  const { data: item } = await supabase
+    .from("wms_compra_items")
+    .select("compra_id, cantidad_recibida, cantidad_pedida, costo_unitario, skus_maestros(codigo, nombre)")
+    .eq("id", itemId)
+    .maybeSingle();
   if (!item) return { error: "El producto ya no está en la compra." };
   if (item.cantidad_recibida !== null) return { error: "Ya se recibió mercancía de este producto: no se puede quitar." };
   const { error } = await supabase.from("wms_compra_items").delete().eq("id", itemId);
   if (error) return { error: "No se pudo quitar el producto." };
   await sincronizarCantidad(item.compra_id);
-  const sku = (Array.isArray(item.skus_maestros) ? item.skus_maestros[0] : item.skus_maestros) as { codigo: string } | null;
+  const sku = (Array.isArray(item.skus_maestros) ? item.skus_maestros[0] : item.skus_maestros) as { codigo: string; nombre: string } | null;
+  await anotarCambios(item.compra_id, [
+    {
+      campo: "productoQuitado",
+      antes: `${sku?.codigo ?? ""} · ${sku?.nombre ?? ""} · ${textoLinea(Number(item.cantidad_pedida), item.costo_unitario === null ? null : Number(item.costo_unitario))}`,
+      despues: null,
+    },
+  ]);
   await registrarAuditoria({ accion: "quitar_producto_compra", entidad: "wms_compras", entidadId: item.compra_id, detalle: sku?.codigo ?? itemId });
   return {};
 }

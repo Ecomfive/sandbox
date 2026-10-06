@@ -10,6 +10,18 @@ import { comentarCompra, obtenerActividadCompra, type ActividadCompra as Datos }
 import { CampoMenciones, TextoConMenciones } from "@/components/ui/campo-menciones";
 import { Badge } from "@/components/ui/badge";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa } from "./def-compras";
+import { CAMPOS_EDITABLES } from "./def-edicion-compras";
+
+/** El nombre de cada dato en la Actividad: los de las celdas de la lista y los demás de la ficha. */
+const NOMBRE_CAMPO: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(CAMPOS_EDITABLES).map(([clave, def]) => [clave, def.etiqueta])),
+  nombre: "Nombre",
+  descripcion: "Descripción",
+  urlProducto: "URL del producto",
+  documentos: "Documentos",
+  paisesDestino: "Países de destino",
+};
+const corto = (t: string | null, max = 120) => (t && t.length > max ? `${t.slice(0, max)}…` : t);
 
 const fechaHora = (iso: string) =>
   `${formatearFecha(iso)} ${new Date(iso).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" })}`;
@@ -21,12 +33,22 @@ const ICONO_CLASE: Record<string, string> = { foto: "🖼️", documento: "📄"
  * color (etapa y estado); otro campo, en texto.
  */
 function CambioEvento({ e }: { e: Datos["eventos"][number] }) {
-  const nombre = e.campo === "etapa" ? "Etapa" : e.campo === "estado" ? "Estado" : e.campo;
+  // Los productos de la orden y la foto se cuentan como una acción; el resto, «Dato: antes → después».
+  if (e.campo === "productoAgregado") return <span>Agregó el producto {e.despues}</span>;
+  if (e.campo === "productoQuitado") return <span>Quitó el producto {e.antes}</span>;
+  if (e.campo === "productoCambiado")
+    return (
+      <span>
+        Cambió {e.antes} <span className="text-muted-foreground">→</span> {e.despues}
+      </span>
+    );
+  if (e.campo === "foto") return <span>{e.despues && e.despues !== "—" ? "Cambió la foto del producto" : "Quitó la foto del producto"}</span>;
+  const nombre = e.campo === "etapa" ? "Etapa" : e.campo === "estado" ? "Estado" : (NOMBRE_CAMPO[e.campo] ?? e.campo);
   const valor = (v: string | null) => {
     if (v === null) return <span className="text-muted-foreground">—</span>;
     if (e.campo === "etapa") return <Badge color={colorEtapa(v)}>{etiquetaEtapa(v)}</Badge>;
     if (e.campo === "estado") return <Badge color={colorEstado(v)}>{etiquetaEstado(v)}</Badge>;
-    return <span>{v}</span>;
+    return <span className="break-words">{corto(v)}</span>;
   };
   return (
     <span className="flex flex-wrap items-center gap-1.5">
