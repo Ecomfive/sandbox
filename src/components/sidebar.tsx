@@ -212,7 +212,7 @@ function IconoRiel({ Icono, seleccionada, cantidad = 0 }: { Icono: (typeof SECTI
 }
 
 /**
- * Menú de escritorio: un riel con las áreas de trabajo (un punto de color donde hay algo pendiente) y, al lado, el panel
+ * Menú de escritorio: un riel negro de esquinas redondeadas, separado del borde, con las áreas de trabajo (un punto de color donde hay algo pendiente) y, al lado, el panel
  * con las páginas del área elegida, las fijadas y lo que viene. Pulsar un área solo cambia el panel; no sale de la
  * página. Al navegar, el panel pasa solo al área de la nueva página. El panel se puede ocultar para ganar ancho.
  */
@@ -282,7 +282,7 @@ function RielYPanel({
 
   return (
     <>
-      <nav ref={rielRef} aria-label="Áreas del menú" className="flex w-20 shrink-0 flex-col items-center gap-1 bg-riel px-1 py-2.5">
+      <nav ref={rielRef} aria-label="Áreas del menú" className="m-1.5 flex w-20 shrink-0 flex-col items-center gap-1 rounded-2xl bg-riel px-1 py-2.5">
         <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloRiel}`}>
           <Image src="/brand/ecomfive-blanco.png" alt="" width={161} height={44} className="h-3 w-auto" />
         </Link>
