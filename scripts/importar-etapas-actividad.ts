@@ -116,8 +116,10 @@ async function main() {
     }
     // La Actividad viene de la más reciente a la más vieja; dos cambios en el mismo minuto conservan su orden con
     // milisegundos de diferencia.
-    const propios = lineas
-      .map((l, i) => ({ l, orden: lineas.length - i }))
+    // ClickUp a veces repite el mismo cambio (mismo autor, mismo valor, misma hora): cuenta una vez.
+    const unicas = [...new Set(lineas)];
+    const propios = unicas
+      .map((l, i) => ({ l, orden: /\|\d{12,14}$/.test(l) ? 0 : unicas.length - i }))
       .flatMap(({ l, orden }) => {
         if (/^[?!]/.test(l)) {
           raras.push(`${cid}: ${l}`);
