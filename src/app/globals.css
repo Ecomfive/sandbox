@@ -125,7 +125,9 @@ table.tabla-datos[data-aspecto="lista"] :is(th, td) {
   border-left-width: 0;
   border-right-width: 0;
 }
+/* El nombre de la columna en una sola línea: el emoji no queda arriba y el nombre abajo. */
 table.tabla-datos[data-aspecto="lista"] thead th {
+  white-space: nowrap;
   background: var(--card);
   text-transform: none;
   letter-spacing: 0;
