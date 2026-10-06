@@ -580,10 +580,12 @@ convenciones técnicas del código.
 - **Compras: Informe, lista y tiempos, como Productos Test.** **Informe** (`/compras`, `informe-compras.tsx`): por día, semana o mes
   (pulsar una barra elige el periodo), lo creado/pagado/enviado/llegado del periodo, «Hoy» (abiertas, en tránsito, atrasadas,
   con inconveniente, pago pendiente: cada tarjeta lleva a la lista filtrada), abiertas por etapa, tránsito por vía de envío y
-  «Para revisar»; «Copiar informe». **Compras** (`/compras/lista`, `lista-compras.tsx`): búsqueda, filtros de un toque
-  (Abiertas, Cotizando, Producción, En tránsito, Atrasadas, Cerradas; `?grupo=` y `?etapa=` los preseleccionan), orden por
-  columna y la ficha fija a la derecha (`ficha-lateral-compra.tsx`: etapa N de 11, fechas clave con los días entre una y otra);
-  «Abrir ficha completa» (o doble clic) abre el formulario con la actividad, y «Tabla completa» la tabla con todas las columnas.
+  «Para revisar»; «Copiar informe». **Compras** (`/compras/lista`, `tabla-compras.tsx`): una sola vista, la `TablaDatos`
+  con aspecto de lista (agrupar —arranca por Etapa—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
+  de los campos de ClickUp ocultos (`oculta` en la columna) hasta mostrarlos en «Columnas»; filtros de un toque (Cotizando,
+  Producción, En tránsito, Atrasadas; `?grupo=` y `?etapa=` los preseleccionan) y la ficha de resumen a la derecha, que se
+  minimiza (`ficha-lateral-compra.tsx`: etapa N de 11, fechas clave con los días entre una y otra). Pulsar la fila la muestra
+  en la ficha; «Abrir ficha completa» abre el formulario con la actividad (con la ficha minimizada, la fila lo abre directo).
   **Tiempos y fallas** (`/compras/tiempos`): tiempo por tramo (con las fechas), tiempo en cada estado (con `wms_compra_eventos`),
   comparación por proveedor, vía, país, tienda o responsable, atrasadas e inconvenientes. **Atrasada** = abierta, ya salió y
   lleva más días en tránsito que el 90 % de los envíos de su vía (`umbralesTransito`). Los cálculos son puros, en

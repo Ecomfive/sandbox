@@ -3,7 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { cargarCompras } from "../datos-compras";
 import type { Grupo } from "../calculos-compras";
-import { ListaCompras } from "../lista-compras";
+import { TablaCompras } from "../tabla-compras";
 
 export const metadata = { title: "Compras" };
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atrasadas", "cerradas"];
 
-/** Compras › Compras: la lista con búsqueda, filtros de un toque y la ficha fija a la derecha (como Productos Test). */
+/** Compras › Compras: el tablero (todas las columnas, agrupar, filtros de un toque) con la ficha de resumen a la derecha. */
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("compras");
   const { ver, grupo, etapa } = await searchParams;
@@ -25,7 +25,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
           No se pudieron cargar las compras.
         </p>
       ) : (
-        <ListaCompras
+        <TablaCompras
           key={`${vista}-${grupoInicial ?? ""}-${typeof etapa === "string" ? etapa : ""}`}
           compras={compras}
           vista={vista}

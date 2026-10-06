@@ -34,6 +34,8 @@ export interface ColumnaDef {
   ocultable: boolean;
   /** Qué significa la columna: sale en una burbuja al pasar el cursor (o el foco) por su título. */
   descripcion?: string;
+  /** Oculta hasta que la persona la muestre desde «Columnas» (para tablas con muchos campos). */
+  oculta?: boolean;
 }
 
 export interface EstadoColumnas {
@@ -54,7 +56,7 @@ export function useColumnas(
   const estado = useMemo<EstadoColumnas>(() => {
     const ids = columnas.map((c) => c.id);
     let orden = ids;
-    let ocultas: string[] = [];
+    let ocultas: string[] = columnas.filter((c) => c.oculta && c.ocultable).map((c) => c.id);
     if (json !== "") {
       try {
         const datos = JSON.parse(json) as { orden?: unknown[]; ocultas?: unknown[] };

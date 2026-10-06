@@ -25,7 +25,7 @@ const datos = JSON.parse(readFileSync("datos-privados/clickup-etapas.json", "utf
   autores: Record<string, number>;
   res: Record<string, string[]>;
 };
-// Quien tenía la sesión abierta al leer sale como «Nombre (Tú)».
+// Quien tenía la sesión abierta al leer sale como «Nombre (Tú)» (solo en la lectura vieja, de pantalla).
 const autorPorCodigo = Object.fromEntries(Object.entries(datos.autores).map(([n, c]) => [String(c), n.replace(/\s*\(Tú\)$/, "")]));
 const REASIGNAR: Record<string, string> = {
   "Zeylimar Moreno": "Francis Aponte",
@@ -125,7 +125,8 @@ async function main() {
         }
         const [codigo, cambio, cuando] = l.split("|");
         const [de, a] = cambio.split(">");
-        const d = fecha(cuando);
+        // La lectura nueva trae la hora exacta del servidor de ClickUp en milisegundos; la vieja, el texto de pantalla.
+        const d = /^\d{12,14}$/.test(cuando) ? new Date(Number(cuando)) : fecha(cuando);
         if (!d) {
           raras.push(`${cid}: fecha «${cuando}»`);
           return [];
