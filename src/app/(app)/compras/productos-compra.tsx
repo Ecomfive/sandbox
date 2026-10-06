@@ -115,6 +115,8 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
   const [elegido, setElegido] = useState<OpcionSkuMaestro | null>(null);
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
+  // Cantidades por variante cuando el producto elegido tiene variantes.
+  const [porVariante, setPorVariante] = useState<Record<string, string>>({});
   const [pendiente, start] = useTransition();
 
   const cargar = useCallback(async () => {
@@ -132,19 +134,34 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
     void cargar();
   }, [cargar]);
 
+  function limpiar() {
+    setElegido(null);
+    setCantidad("");
+    setCosto("");
+    setPorVariante({});
+  }
+
   async function agregar() {
     if (!elegido || !datos) return;
-    const n = Number(cantidad);
-    if (!Number.isInteger(n) || n <= 0) return mostrarToast("Escribe la cantidad pedida (un número entero).", "destructive");
     const producto = datos.productos.find((p) => p.id === elegido.id);
     if (!producto) return;
-    if (!(await confirmar(producto))) return;
+    // Con variantes: se agrega cada variante que tenga cantidad (el padre no se compra: no lleva stock).
+    const hijas = datos.productos.filter((p) => p.padreId === producto.id);
+    const pares: [ProductoComprable, number][] = hijas.length
+      ? hijas.map((h) => [h, Number(porVariante[h.id] || 0)] as [ProductoComprable, number]).filter(([, n]) => n !== 0)
+      : [[producto, Number(cantidad)]];
+    if (pares.length === 0) return mostrarToast("Escribe la cantidad de al menos una variante.", "destructive");
+    if (pares.some(([, n]) => !Number.isInteger(n) || n <= 0)) return mostrarToast("Las cantidades deben ser números enteros mayores que cero.", "destructive");
+    for (const [p] of pares) if (!(await confirmar(p))) return;
     start(async () => {
-      const r = await agregarProductoCompra(compraId, producto.id, n, aNumero(costo));
-      if (r.error) return mostrarToast(r.error, "destructive");
-      setElegido(null);
-      setCantidad("");
-      setCosto("");
+      for (const [p, n] of pares) {
+        const r = await agregarProductoCompra(compraId, p.id, n, aNumero(costo));
+        if (r.error) {
+          mostrarToast(`${p.codigo}: ${r.error}`, "destructive");
+          break;
+        }
+      }
+      limpiar();
       await cargar();
     });
   }
@@ -152,7 +169,10 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
   const items = datos?.items ?? [];
   const total = items.reduce((s, i) => s + i.cantidadPedida, 0);
   const yaEstan = new Set(items.map((i) => i.skuId));
-  const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
+  // Se busca el producto (o el padre); las variantes se piden al elegirlo.
+  const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
+  const variantesElegido = elegido ? (datos?.productos ?? []).filter((p) => p.padreId === elegido.id) : [];
+  const listo = !!elegido && (variantesElegido.length ? Object.values(porVariante).some((v) => Number(v) > 0) : !!cantidad);
 
   return (
     <div className="border-t border-border p-5">
@@ -179,19 +199,57 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
             <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
               <label className="flex min-w-[14rem] flex-1 flex-col gap-1 text-xs">
                 <span className="text-muted-foreground">Producto</span>
-                <CampoSkuMaestro valor={elegido?.id ?? null} alCambiar={setElegido} etiquetaAria="Producto a agregar" placeholder="Código o nombre del producto" />
+                <CampoSkuMaestro
+                  valor={elegido?.id ?? null}
+                  alCambiar={(s) => {
+                    setElegido(s);
+                    setPorVariante({});
+                  }}
+                  etiquetaAria="Producto a agregar"
+                  placeholder="Código o nombre del producto"
+                />
               </label>
-              <label className="flex flex-col gap-1 text-xs">
-                <span className="text-muted-foreground">Pedido (u.)</span>
-                <input type="number" min={1} step={1} inputMode="numeric" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className={claseNumero} />
-              </label>
+              {variantesElegido.length === 0 && (
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Pedido (u.)</span>
+                  <input type="number" min={1} step={1} inputMode="numeric" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className={claseNumero} />
+                </label>
+              )}
               <label className="flex flex-col gap-1 text-xs">
                 <span className="text-muted-foreground">Costo unitario (USD)</span>
                 <input type="number" min={0} step="0.0001" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} className={claseNumero} />
               </label>
-              <BotonBarra principal disabled={!elegido || !cantidad || pendiente} onClick={() => void agregar()}>
+              <BotonBarra principal disabled={!listo || pendiente} onClick={() => void agregar()}>
                 {pendiente ? "Agregando…" : "Agregar"}
               </BotonBarra>
+              {variantesElegido.length > 0 && (
+                <fieldset className="m-0 flex w-full flex-col gap-1.5 border-0 p-0">
+                  <legend className="mb-1 text-xs text-muted-foreground">Cantidad por variante (deja vacías las que no se compran):</legend>
+                  {variantesElegido.map((v) => {
+                    const ya = yaEstan.has(v.id);
+                    return (
+                      <label key={v.id} className="flex items-center gap-2 text-xs">
+                        <span className="w-28 shrink-0 font-medium">{v.codigo}</span>
+                        <span className="min-w-0 flex-1 truncate text-muted-foreground">{v.opciones ? Object.values(v.opciones).join(" / ") : v.nombre}</span>
+                        {ya ? (
+                          <span className="text-muted-foreground">ya está en la compra</span>
+                        ) : (
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            inputMode="numeric"
+                            aria-label={`Cantidad de ${v.codigo}`}
+                            value={porVariante[v.id] ?? ""}
+                            onChange={(e) => setPorVariante((c) => ({ ...c, [v.id]: e.target.value }))}
+                            className={claseNumero}
+                          />
+                        )}
+                      </label>
+                    );
+                  })}
+                </fieldset>
+              )}
             </div>
           </ProveedorSkusMaestros>
         )}

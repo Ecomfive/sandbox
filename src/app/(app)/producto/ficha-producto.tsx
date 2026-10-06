@@ -15,6 +15,7 @@ import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
+import { VariantesProducto } from "./variantes-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -156,6 +157,12 @@ export function FichaProducto({
               </dl>
             </Seccion>
 
+            {producto.tipo !== "combo" && (
+              <Seccion icono={ProductoIcon} titulo="Variantes">
+                <VariantesProducto key={producto.id} producto={producto} puedeEscribir={puedeEscribir} alAbrir={irA} />
+              </Seccion>
+            )}
+
             {producto.tipo === "combo" && (
               <Seccion icono={ProductoIcon} titulo="Componentes">
                 <p className="text-sm">{producto.componentes || "—"}</p>
@@ -193,6 +200,8 @@ export function FichaProducto({
             <Seccion icono={InventarioIcon} titulo="Inventario">
               {esTest ? (
                 <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo.</p>
+              ) : producto.variantes.length > 0 ? (
+                <p className="text-sm text-muted-foreground">El stock se lleva en cada variante (ábrelas desde Variantes).</p>
               ) : (
                 <Link href="/inventario" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
                   Ver en Inventario

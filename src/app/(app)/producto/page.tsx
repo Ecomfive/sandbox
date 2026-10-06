@@ -33,6 +33,9 @@ interface ProductoBd {
   pais_origen: string | null;
   codigo_sa: string | null;
   creado_en: string;
+  padre_id: string | null;
+  opciones: Record<string, string> | null;
+  opciones_variantes: { nombre: string; valores: string[] }[] | null;
 }
 
 const unoDe = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
@@ -50,7 +53,7 @@ export default async function ProductoPage() {
 
   const { data: productos } = await supabase
     .from("skus_maestros")
-    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa, creado_en")
+    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa, creado_en, padre_id, opciones, opciones_variantes")
     .order("creado_en", { ascending: false });
   const lista: ProductoBd[] = productos ?? [];
 
@@ -103,6 +106,15 @@ export default async function ProductoPage() {
     });
   }
 
+  // Las variantes de cada producto y el padre de cada variante.
+  const porId = new Map(lista.map((p) => [p.id as string, p]));
+  const variantesPorPadre = new Map<string, FilaProducto["variantes"]>();
+  for (const p of lista) {
+    if (!p.padre_id) continue;
+    const v = { id: p.id as string, codigo: p.codigo as string, nombre: p.nombre as string, opciones: (p.opciones ?? {}) as Record<string, string> };
+    variantesPorPadre.set(p.padre_id, [...(variantesPorPadre.get(p.padre_id) ?? []), v]);
+  }
+
   const filas: FilaProducto[] = lista.map((p) => ({
     id: p.id,
     codigo: p.codigo,
@@ -128,6 +140,10 @@ export default async function ProductoPage() {
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],
+    padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre } : null,
+    opciones: (p.opciones ?? null) as Record<string, string> | null,
+    opcionesVariantes: (p.opciones_variantes ?? []) as { nombre: string; valores: string[] }[],
+    variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })),
   }));
 
   const conteo = { fisico: 0, test: 0 };

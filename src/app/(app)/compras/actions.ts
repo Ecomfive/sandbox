@@ -288,6 +288,9 @@ export interface ProductoComprable {
   nombre: string;
   estado: string;
   clase: string;
+  /** Si es una variante, su producto padre; un producto con variantes se compra por variante. */
+  padreId: string | null;
+  opciones: Record<string, string> | null;
 }
 
 /** Los productos de una compra y los que se le pueden agregar. Basta poder abrir Compras. */
@@ -301,7 +304,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
       .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre)")
       .eq("compra_id", compraId)
       .order("creado_en"),
-    supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase").neq("tipo", "combo").order("nombre"),
+    supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones").neq("tipo", "combo").order("nombre"),
   ]);
   if (items.error || productos.error) return { error: "No se pudieron cargar los productos." };
   return {
@@ -320,7 +323,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
         origen: i.origen,
       };
     }),
-    productos: (productos.data ?? []) as ProductoComprable[],
+    productos: (productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones })),
   };
 }
 
@@ -350,6 +353,8 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   if (!sku) return { error: "El producto no existe." };
   if (sku.tipo === "combo") return { error: "Un producto compuesto no se compra: se compran sus componentes." };
   if (sku.clase === "test") return { error: "El producto está en Test: pásalo a Activo para comprarlo." };
+  const { count: variantes } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("padre_id", skuId);
+  if ((variantes ?? 0) > 0) return { error: "Ese producto tiene variantes: se compra por variante." };
   const { error } = await supabase.rpc("wms_agregar_item_compra", {
     p_compra: compraId,
     p_sku: skuId,

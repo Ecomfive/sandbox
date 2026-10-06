@@ -345,3 +345,129 @@ export async function guardarEnvio(id: string, d: DatosEnvio): Promise<{ error?:
   revalidatePath("/producto");
   return {};
 }
+
+/** Una opción de las variantes de un producto (Color, Talla…) con sus valores. */
+export interface OpcionVariante {
+  nombre: string;
+  valores: string[];
+}
+
+/** Una variante a crear: sus valores (uno por opción), su SKU y su nombre. */
+export interface VarianteNueva {
+  opciones: Record<string, string>;
+  codigo: string;
+  nombre: string;
+}
+
+const limpiar = (t: string) => String(t ?? "").trim().replace(/\s+/g, " ");
+
+/**
+ * Crea variantes de un producto (cada una es un producto simple con su SKU, su stock y sus lotes) y guarda en el padre sus
+ * opciones con los valores. Las variantes heredan del padre el estado (Activo/Test), el vencimiento y los datos de envío. El
+ * padre deja de tener stock propio: para darle variantes no puede tener unidades. Una variante no tiene variantes y un
+ * compuesto tampoco. Devuelve el error como valor.
+ */
+export async function crearVariantes(padreId: string, opciones: OpcionVariante[], variantes: VarianteNueva[]): Promise<{ error?: string; creadas?: number }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!ES_ID(padreId)) return { error: "Producto no válido." };
+
+  // Las opciones: 1 a 3, con nombre y al menos un valor, sin repetir.
+  const ops = (opciones ?? []).map((o) => ({ nombre: limpiar(o.nombre).slice(0, 40), valores: [...new Set((o.valores ?? []).map((v) => limpiar(v).slice(0, 40)).filter(Boolean))] }));
+  if (ops.length === 0 || ops.length > 3) return { error: "Las variantes llevan de 1 a 3 opciones (por ejemplo Color y Talla)." };
+  if (ops.some((o) => !o.nombre || o.valores.length === 0)) return { error: "Cada opción necesita un nombre y al menos un valor." };
+  if (new Set(ops.map((o) => o.nombre.toLowerCase())).size !== ops.length) return { error: "Hay dos opciones con el mismo nombre." };
+
+  const nuevas = (variantes ?? []).map((v) => ({ opciones: v.opciones ?? {}, codigo: limpiar(v.codigo), nombre: limpiar(v.nombre).slice(0, 200) }));
+  if (nuevas.length === 0) return { error: "No hay variantes nuevas para crear." };
+  if (nuevas.length > 200) return { error: "Son demasiadas variantes de una vez (máximo 200)." };
+  for (const v of nuevas) {
+    if (!v.codigo || v.codigo.length > 60 || /\s/.test(v.codigo)) return { error: `El SKU «${v.codigo || "(vacío)"}» no es válido: sin espacios y hasta 60 caracteres.` };
+    if (!v.nombre) return { error: `Falta el nombre de la variante ${v.codigo}.` };
+    for (const o of ops) if (!o.valores.includes(v.opciones[o.nombre])) return { error: `La variante ${v.codigo} no tiene un valor válido de ${o.nombre}.` };
+  }
+  if (new Set(nuevas.map((v) => v.codigo.toLowerCase())).size !== nuevas.length) return { error: "Hay dos variantes con el mismo SKU." };
+
+  const supabase = createServiceClient();
+  const { data: padre } = await supabase
+    .from("skus_maestros")
+    .select("id, codigo, tipo, clase, padre_id, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa")
+    .eq("id", padreId)
+    .maybeSingle();
+  if (!padre) return { error: "El producto ya no existe." };
+  if (padre.tipo === "combo") return { error: "Un producto compuesto no tiene variantes." };
+  if (padre.padre_id) return { error: "Una variante no puede tener variantes." };
+
+  const { data: hijas } = await supabase.from("skus_maestros").select("opciones").eq("padre_id", padreId);
+  if (!hijas || hijas.length === 0) {
+    const { data: stock } = await supabase.from("wms_stock").select("fisico").eq("sku_maestro_id", padreId);
+    if ((stock ?? []).some((s) => Number(s.fisico) !== 0)) return { error: "El producto tiene stock: llévalo a cero antes de darle variantes (el stock pasa a llevarse en cada variante)." };
+  }
+  // Una combinación que ya existe no se vuelve a crear.
+  const clave = (o: Record<string, string>) => ops.map((x) => `${x.nombre}=${o?.[x.nombre] ?? ""}`).join("|");
+  const existentes = new Set((hijas ?? []).map((h) => clave(h.opciones as Record<string, string>)));
+  const aCrear = nuevas.filter((v) => !existentes.has(clave(v.opciones)));
+  if (aCrear.length === 0) return { error: "Esas variantes ya existen." };
+
+  const { error: errorPadre } = await supabase.from("skus_maestros").update({ opciones_variantes: ops }).eq("id", padreId);
+  if (errorPadre) return { error: "No se pudieron guardar las opciones." };
+
+  const heredado = {
+    tipo: "simple",
+    clase: padre.clase,
+    estado: "aprobado",
+    padre_id: padreId,
+    creado_por: usuario.id,
+    maneja_vencimiento: padre.maneja_vencimiento,
+    dias_aviso_vencimiento: padre.dias_aviso_vencimiento,
+    es_fisico: padre.es_fisico,
+    embalaje: padre.embalaje,
+    largo: padre.largo,
+    ancho: padre.ancho,
+    alto: padre.alto,
+    unidad_medida: padre.unidad_medida,
+    peso: padre.peso,
+    unidad_peso: padre.unidad_peso,
+    pais_origen: padre.pais_origen,
+    codigo_sa: padre.codigo_sa,
+  };
+  const { error } = await supabase.from("skus_maestros").insert(aCrear.map((v) => ({ ...heredado, codigo: v.codigo, nombre: v.nombre, opciones: v.opciones })));
+  if (error) {
+    if (error.code === "23505") return { error: "Uno de esos SKU ya lo tiene otro producto." };
+    return { error: error.message.length < 200 ? error.message : "No se pudieron crear las variantes." };
+  }
+  await registrarAuditoria({
+    accion: "crear_variantes",
+    entidad: "skus_maestros",
+    entidadId: padreId,
+    detalle: `${aCrear.length} variante${aCrear.length === 1 ? "" : "s"}: ${aCrear.map((v) => v.codigo).join(", ")}`.slice(0, 500),
+  });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return { creadas: aCrear.length };
+}
+
+/**
+ * Quita una variante que todavía no se usó: sin movimientos de inventario, sin compras y sin fichas enlazadas. Si ya tiene
+ * historia, se conserva (se puede pasar a Test o dejar sin stock).
+ */
+export async function quitarVariante(id: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Variante no válida." };
+  const supabase = createServiceClient();
+  const { data: v } = await supabase.from("skus_maestros").select("codigo, padre_id").eq("id", id).maybeSingle();
+  if (!v || !v.padre_id) return { error: "No es una variante." };
+  const [movs, compras, shopify, dropi] = await Promise.all([
+    supabase.from("wms_movimientos").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
+    supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
+    supabase.from("wms_producto_variantes").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
+    supabase.from("wms_dropi_productos").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
+  ]);
+  if ((movs.count ?? 0) + (compras.count ?? 0) + (shopify.count ?? 0) + (dropi.count ?? 0) > 0)
+    return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar." };
+  const { error } = await supabase.from("skus_maestros").delete().eq("id", id);
+  if (error) return { error: "No se pudo quitar la variante." };
+  await registrarAuditoria({ accion: "quitar_variante", entidad: "skus_maestros", entidadId: v.padre_id, detalle: v.codigo });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return {};
+}

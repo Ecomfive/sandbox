@@ -64,6 +64,12 @@ export interface FilaProducto {
   /** Día en que se creó (AAAA-MM-DD). */
   creado: string;
   asociaciones: Asociacion[];
+  /** Si es una variante: su producto padre y sus valores ({ Color: "Beige", Talla: "S" }). */
+  padre: { id: string; codigo: string; nombre: string } | null;
+  opciones: Record<string, string> | null;
+  /** Si tiene variantes: sus opciones con los valores, y las variantes. */
+  opcionesVariantes: { nombre: string; valores: string[] }[];
+  variantes: { id: string; codigo: string; nombre: string; opciones: Record<string, string> }[];
 }
 
 /** Cómo se filtra y agrupa la lista de productos. */
