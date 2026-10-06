@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { BotonBarra, CabeceraTarjeta, Delta, Indicador, Pastilla, Punto, Segmentado } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { etiquetaEtapa, type FilaCompra } from "./def-compras";
+import { etiquetaEtapa, etiquetaVia, type FilaCompra } from "./def-compras";
 import {
   abiertasPorEtapa,
   diasEntre,
@@ -35,11 +35,7 @@ const OPCIONES: { valor: Granularidad; etiqueta: string }[] = [
 ];
 const BARRAS: Record<Granularidad, number> = { dia: 30, semana: 12, mes: 12 };
 const TITULO: Record<Granularidad, string> = { dia: "Informe diario", semana: "Informe semanal", mes: "Informe mensual" };
-const VIAS = [
-  { valor: "mar", nombre: "🚢 Mar" },
-  { valor: "aire", nombre: "🛩️ Aire" },
-  { valor: "tierra", nombre: "🛻 Tierra" },
-];
+const VIAS = (["mar", "aire", "tierra"] as const).map((valor) => ({ valor, nombre: etiquetaVia(valor) }));
 
 /** Una barra horizontal con su número (abiertas por etapa). */
 function Barra({ nombre, valor, maximo, href }: { nombre: string; valor: number; maximo: number; href: string }) {

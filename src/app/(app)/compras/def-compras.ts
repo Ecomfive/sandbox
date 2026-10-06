@@ -109,10 +109,12 @@ export const conEmoji = (campo: string, nombre: string) => (EMOJI_CAMPO[campo] ?
 /** Los montos de compras van en dólares en todos los países (así se pagan a los proveedores). */
 export const MONEDA_COMPRAS = "PA";
 
+/** Lo que se guarda (`valor`: aire, mar, tierra) no cambia nunca — la base lo restringe a esos tres y las compras ya
+ * guardadas lo usan; solo cambia el texto que se ve (`etiqueta`). */
 export const VIAS_ENVIO = [
-  { valor: "aire", etiqueta: "🛩️ Aire" },
-  { valor: "mar", etiqueta: "🚢 Mar" },
-  { valor: "tierra", etiqueta: "🛻 Tierra" },
+  { valor: "aire", etiqueta: "🛩️ Aéreo" },
+  { valor: "mar", etiqueta: "🚢 Marítimo" },
+  { valor: "tierra", etiqueta: "🛻 Terrestre" },
 ] as const;
 export const etiquetaVia = (v: string) => VIAS_ENVIO.find((x) => x.valor === v)?.etiqueta ?? v;
 

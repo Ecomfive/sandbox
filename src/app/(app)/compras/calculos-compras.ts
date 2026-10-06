@@ -260,7 +260,7 @@ export function textoInforme(compras: FilaCompra[], clave: string, g: Granularid
     s.ciclo.mediana !== null ? `• Ciclo de las completadas: ${s.ciclo.mediana} días (mediana)` : "",
     "",
     `Hoy: ${abiertas} abiertas · ${r.atrasadas.length} atrasadas en tránsito · ${r.conInconveniente.length} con inconveniente`,
-    `Tránsito normal: mar ${mar.mediana ?? "—"} días · aire ${aire.mediana ?? "—"} días`,
+    `Tránsito normal: marítimo ${mar.mediana ?? "—"} días · aéreo ${aire.mediana ?? "—"} días`,
   ]
     .filter((l, i, a) => l !== "" || a[i - 1] !== "")
     .join("\n");
