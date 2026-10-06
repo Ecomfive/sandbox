@@ -10,7 +10,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, sumaDeItems, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
-import { AjustesIcon, AvisosIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import { AjustesIcon, AvisosIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -175,6 +175,20 @@ function Favoritos({ areas, favoritos, ...resto }: { areas: AreaVisible[]; favor
   );
 }
 
+/** Baby Yoda: el cerebro que aprenderá de la operación. Por ahora solo anuncia que viene. */
+function BabyYoda() {
+  return (
+    <section aria-label="Baby Yoda">
+      <Titulo>Baby Yoda</Titulo>
+      <div className="flex flex-col items-center gap-2 rounded-lg border border-border px-3 py-5 text-center">
+        <BabyYodaIcon className="h-10 w-10 text-foreground-soft" />
+        <p className="m-0 text-sm font-medium text-foreground">Próximamente</p>
+        <p className="m-0 text-xs text-muted-foreground">Un cerebro que te ayudará en el día a día y aprenderá solo de tu operación.</p>
+      </div>
+    </section>
+  );
+}
+
 /** Lo que aún no se puede abrir, recogido para no ocupar lugar en el menú. */
 function Proximamente({ className = "" }: { className?: string }) {
   return (
@@ -256,6 +270,7 @@ function RielYPanel({
 
   const titulo = elegida && elegida.ruta === pathname ? elegida.titulo : activa;
   const verFavoritos = titulo === "Favoritos";
+  const verYoda = titulo === "Baby Yoda";
   const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
   const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones");
@@ -288,12 +303,13 @@ function RielYPanel({
         </Link>
         {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
-          const boton = botonRiel(v.area.title, !verFavoritos && v.area.title === mostrada?.area.title, Icono, v.cantidad);
+          const boton = botonRiel(v.area.title, !verFavoritos && !verYoda && v.area.title === mostrada?.area.title, Icono, v.cantidad);
           // «Favoritos» va justo después del primer botón, como acceso propio.
           return i === 0 ? (
             <Fragment key={v.area.title}>
               {boton}
               {botonRiel("Favoritos", verFavoritos, SECTION_ICONS.Favoritos, 0)}
+              {botonRiel("Baby Yoda", verYoda, BabyYodaIcon, 0)}
             </Fragment>
           ) : (
             boton
@@ -332,9 +348,14 @@ function RielYPanel({
         </div>
       </nav>
 
-      {!panelOculto && (verFavoritos || mostrada) && (
-        <nav aria-label={verFavoritos ? "Páginas favoritas" : `Páginas de ${mostrada?.area.title}`} className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5">
-          {verFavoritos ? (
+      {!panelOculto && (verFavoritos || verYoda || mostrada) && (
+        <nav
+          aria-label={verFavoritos ? "Páginas favoritas" : verYoda ? "Baby Yoda" : `Páginas de ${mostrada?.area.title}`}
+          className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5"
+        >
+          {verYoda ? (
+            <BabyYoda />
+          ) : verFavoritos ? (
             <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
           ) : (
             mostrada && (

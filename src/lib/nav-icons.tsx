@@ -661,6 +661,21 @@ export function AjustesIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Cabeza de orejas largas y ojos grandes: Baby Yoda, el cerebro de la operación (próximamente). */
+export function BabyYodaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M6.8 12c0-3.4 2.3-5.6 5.2-5.6s5.2 2.2 5.2 5.6c0 3.3-2.3 5.4-5.2 5.4S6.8 15.3 6.8 12z" />
+      <path d="M7 10.4 1 9.6c.8 2.3 2.9 3.9 6.2 4.1" />
+      <path d="m17 10.4 6-.8c-.8 2.3-2.9 3.9-6.2 4.1" />
+      <circle cx="9.7" cy="12.2" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="14.3" cy="12.2" r="1.2" fill="currentColor" stroke="none" />
+      <path d="M11.2 15c.5.4 1.1.4 1.6 0" />
+      <path d="M7.5 20.5c1.2-1.2 2.7-1.9 4.5-1.9s3.3.7 4.5 1.9" />
+    </IconoLucide>
+  );
+}
+
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   Desempeño: DesempenoIcon,
   Favoritos: FavoritosIcon,
