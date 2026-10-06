@@ -5,9 +5,20 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 
+/** El primer prefijo de compras «ECOM##» que no usa ningún país ni Importadora (ECOM01 es Panamá, ECOM07 Importadora…). */
+async function siguientePrefijoLibre(): Promise<string> {
+  const { data } = await createServiceClient().from("wms_compras_correlativo").select("prefijo");
+  const usados = new Set((data ?? []).map((c) => c.prefijo as string | null));
+  for (let n = 1; ; n++) {
+    const prefijo = `ECOM${String(n).padStart(2, "0")}`;
+    if (!usados.has(prefijo)) return prefijo;
+  }
+}
+
 /**
  * Agrega un país al sistema (código ISO de dos letras y nombre): queda disponible en Compras, el CRM y donde se elija un
- * país. Los países son de toda la empresa, así que pide poder modificar Configuración. Devuelve el error como valor.
+ * país. Toma solo el prefijo de sus órdenes de compra: el siguiente «ECOM##» libre (se puede cambiar en Configuración).
+ * Los países son de toda la empresa, así que pide poder modificar Configuración. Devuelve el error como valor.
  */
 export async function crearPais(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("configuracion");
@@ -22,7 +33,9 @@ export async function crearPais(formData: FormData): Promise<{ error?: string }>
 
   const { data, error } = await supabase.from("paises").insert({ codigo, nombre }).select("id").single();
   if (error || !data) return { error: "No se pudo agregar el país." };
-  await registrarAuditoria({ accion: "crear_pais", entidad: "paises", entidadId: data.id, detalle: `${codigo} · ${nombre}` });
+  const prefijo = await siguientePrefijoLibre();
+  await supabase.from("wms_compras_correlativo").upsert({ clave: codigo, prefijo }, { onConflict: "clave", ignoreDuplicates: true });
+  await registrarAuditoria({ accion: "crear_pais", entidad: "paises", entidadId: data.id, detalle: `${codigo} · ${nombre} · compras ${prefijo}` });
   revalidatePath("/configuracion");
   revalidatePath("/compras");
   return {};

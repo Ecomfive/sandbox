@@ -2,8 +2,9 @@
 --
 -- * wms_compras_correlativo: el prefijo y el último número de las órdenes de compra de cada país (`clave` = código del
 --   país) y de Importadora (`clave` = 'importacion'). Se sigue con la numeración que traían de ClickUp: Panamá ECOM01,
---   México ECOM02, Costa Rica ECOM03, Venezuela ECOM04, Importadora ECOM07. Guatemala, Nicaragua, El Salvador y Honduras
---   no tenían: se configuran en Configuración › Países y, mientras tanto, sus compras se crean sin código.
+--   México ECOM02, Costa Rica ECOM03, Venezuela ECOM04, Importadora ECOM07. Los que no tenían toman los números libres en el
+--   orden en que se crearon sus listas en ClickUp: Guatemala ECOM05, Honduras ECOM06, Nicaragua ECOM08, El Salvador ECOM09.
+--   Un país nuevo toma solo el siguiente ECOM libre al crearse (`crearPais`); el prefijo se puede cambiar en Configuración.
 -- * wms_siguiente_codigo_compra(clave): reserva el número siguiente («ECOM01-0450») de una vez, aunque se creen dos compras
 --   al mismo tiempo. Sin prefijo configurado devuelve null.
 -- * wms_compra_items: los productos de una orden de compra (de la ficha de producto), con lo pedido y su costo, y lo
@@ -28,7 +29,11 @@ insert into wms_compras_correlativo (clave, prefijo, ultimo) values
   ('MX', 'ECOM02', 78),
   ('CR', 'ECOM03', 218),
   ('VE', 'ECOM04', 19),
-  ('importacion', 'ECOM07', 2)
+  ('GT', 'ECOM05', 0),
+  ('HN', 'ECOM06', 0),
+  ('importacion', 'ECOM07', 2),
+  ('NI', 'ECOM08', 0),
+  ('SV', 'ECOM09', 0)
 on conflict (clave) do nothing;
 
 create or replace function wms_siguiente_codigo_compra(p_clave text) returns text
