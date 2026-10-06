@@ -6,6 +6,7 @@
 // Por defecto NO escribe nada: dice qué haría y qué valores no reconoce.
 //   npx tsx scripts/importar-compras-clickup.ts              → informe
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar    → importa los datos (los adjuntos quedan como enlace a ClickUp)
+//   npx tsx scripts/importar-compras-clickup.ts --aplicar --solo MX → importa solo esas listas
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar --solo-historial → rehace solo el historial de estados
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar --solo-adjuntos → solo copia los adjuntos que faltan
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar --subir-adjuntos → además copia los adjuntos (fotos, documentos y videos) a Storage
@@ -22,6 +23,9 @@ const subirAdjuntos = process.argv.includes("--subir-adjuntos");
 const soloHistorial = process.argv.includes("--solo-historial");
 // Solo copia los adjuntos que faltan (sin volver a importar los datos).
 const soloAdjuntos = process.argv.includes("--solo-adjuntos");
+// --solo MX,CR: importa solo esas listas (por su clave).
+const iSolo = process.argv.indexOf("--solo");
+const soloListas = iSolo >= 0 ? process.argv[iSolo + 1].split(",").map((x) => x.trim()) : null;
 
 const env = Object.fromEntries(
   readFileSync(".env.local", "utf8")
@@ -164,6 +168,7 @@ async function main() {
   const resumen: string[] = [];
   let totalCompras = 0;
   for (const { clave, lista, tareas } of datos.listas as { clave: string; lista: Json; tareas: Json[] }[]) {
+    if (soloListas && !soloListas.includes(clave)) continue;
     if (clave === "chat_compras") {
       resumen.push(`${lista.name}: se omite (${tareas.length} tareas de conversación, sin datos de compras).`);
       continue;

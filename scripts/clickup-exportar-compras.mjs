@@ -3,7 +3,8 @@
 // de estados con sus horas), junto con la
 // definición de cada lista (estados y campos con sus opciones), a un archivo local para inventariarlas e importarlas.
 //
-// Uso: node scripts/clickup-exportar-compras.mjs
+// Uso: node scripts/clickup-exportar-compras.mjs            → todas las listas
+//      node scripts/clickup-exportar-compras.mjs --solo MX  → solo esas listas (separadas por coma), y las mezcla con lo ya bajado
 // Salida: datos-privados/clickup-compras.json (carpeta ignorada por git: datos de proveedores y pagos).
 // Token: variable CLICKUP_TOKEN, o la línea CLICKUP_TOKEN=... de .env.local (ese archivo no se sube a git).
 // Solo lee de ClickUp: no cambia nada allá. Solo imprime conteos.
@@ -19,10 +20,13 @@ const LISTAS = [
   { id: "901712816880", clave: "NI" }, // Compras Dropi 🇳🇮 Nicaragua
   { id: "901711155824", clave: "GT" }, // Compras Dropi 🇬🇹 Guatemala
   { id: "901711155894", clave: "HN" }, // Compras Dropi 🇭🇳 Honduras
+  { id: "901711122406", clave: "MX" }, // Compras Dropi 🇲🇽 México
   { id: "901705771256", clave: "importadora" }, // Compras Importadora 🌍 (servicio a clientes, no es de un país)
   { id: "901704851476", clave: "chat_compras" }, // Chat Compras EcomFive 📦
 ];
 const SALIDA = "datos-privados/clickup-compras.json";
+const i = process.argv.indexOf("--solo");
+const SOLO = i >= 0 ? process.argv[i + 1].split(",").map((x) => x.trim()) : null;
 
 function leerToken() {
   if (process.env.CLICKUP_TOKEN) return process.env.CLICKUP_TOKEN.trim();
@@ -51,7 +55,7 @@ async function api(ruta) {
 }
 
 const salida = { exportado_en: new Date().toISOString(), listas: [] };
-for (const { id, clave } of LISTAS) {
+for (const { id, clave } of LISTAS.filter((l) => !SOLO || SOLO.includes(l.clave))) {
   const lista = await api(`/list/${id}`);
   const { fields } = await api(`/list/${id}/field`);
   const tareas = [];
@@ -88,5 +92,13 @@ for (const { id, clave } of LISTAS) {
 }
 
 mkdirSync("datos-privados", { recursive: true });
+// Con --solo, lo nuevo reemplaza esas listas dentro de lo que ya estaba bajado.
+if (SOLO) {
+  let previo = { listas: [] };
+  try {
+    previo = JSON.parse(readFileSync(SALIDA, "utf8"));
+  } catch {}
+  salida.listas = [...previo.listas.filter((l) => !SOLO.includes(l.clave)), ...salida.listas];
+}
 writeFileSync(SALIDA, JSON.stringify(salida, null, 2), "utf8");
 console.log(`Guardado en ${SALIDA}`);
