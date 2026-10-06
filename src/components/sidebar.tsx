@@ -284,7 +284,7 @@ function RielYPanel({
     <>
       <nav ref={rielRef} aria-label="Áreas del menú" className="flex w-20 shrink-0 flex-col items-center gap-1 bg-riel px-1 py-2.5">
         <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloRiel}`}>
-          <Image src="/brand/ecomfive-rojo.png" alt="" width={161} height={44} className="h-3 w-auto" />
+          <Image src="/brand/ecomfive-blanco.png" alt="" width={161} height={44} className="h-3 w-auto" />
         </Link>
         {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
