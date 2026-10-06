@@ -8,7 +8,7 @@ import { almacen } from "@/components/tabla/almacen";
 import { ContadorMenu, ContadorSobreIcono } from "@/components/sidebar-contador";
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
-import { SIN_PENDIENTES, sumaDeItems, type PendientesMenu } from "@/lib/contadores-menu";
+import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
 import { AjustesIcon, AvisosIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
 
@@ -33,17 +33,12 @@ interface AreaVisible {
   area: NavSection;
   /** Las páginas del área que esta persona puede abrir. */
   items: NavItem[];
-  /** Lo que suman los pendientes de esas páginas (la pastilla del riel). */
-  cantidad: number;
 }
 
 /** Las áreas tal como las ve la persona: solo las páginas de sus módulos y sin áreas vacías. */
-function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined, contadores: PendientesMenu["contadores"]): AreaVisible[] {
+function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined): AreaVisible[] {
   return areas
-    .map((area) => {
-      const items = area.items.filter((item) => puedeVer(modulos, item.href));
-      return { area, items, cantidad: sumaDeItems(items, contadores) };
-    })
+    .map((area) => ({ area, items: area.items.filter((item) => puedeVer(modulos, item.href)) }))
     .filter((a) => a.items.length > 0);
 }
 
@@ -229,7 +224,7 @@ function IconoRiel({ Icono, seleccionada, cantidad = 0 }: { Icono: (typeof SECTI
 }
 
 /**
- * Menú de escritorio: un riel negro de esquinas redondeadas, separado del borde, con las áreas de trabajo (un punto de color donde hay algo pendiente) y, al lado, el panel
+ * Menú de escritorio: un riel negro de esquinas redondeadas, separado del borde, con las áreas de trabajo y, al lado, el panel
  * con las páginas del área elegida, las fijadas y lo que viene. Pulsar un área solo cambia el panel; no sale de la
  * página. Al navegar, el panel pasa solo al área de la nueva página. El panel se puede ocultar para ganar ancho.
  */
@@ -245,7 +240,7 @@ function RielYPanel({
   pendientes: PendientesMenu;
 }) {
   const pathname = usePathname();
-  const visibles = areasVisibles(areas, modulosPermitidos, pendientes.contadores);
+  const visibles = areasVisibles(areas, modulosPermitidos);
   // Las áreas «ocultas» (Avisos) no tienen botón en el riel: tienen el suyo abajo.
   const delRiel = visibles.filter((v) => !v.area.oculta);
   const deLaRuta = encontrarSeccionActiva(pathname, visibles.map((v) => ({ ...v.area, items: v.items })));
@@ -283,7 +278,8 @@ function RielYPanel({
     if (panelOculto) guardado.guardar("");
   }
 
-  function botonRiel(nombre: string, seleccionada: boolean, Icono: (typeof SECTION_ICONS)[string], cantidad: number) {
+  // Los botones de las áreas no llevan pastilla de pendientes: el número se ve en la página que los genera (en el panel).
+  function botonRiel(nombre: string, seleccionada: boolean, Icono: (typeof SECTION_ICONS)[string]) {
     return (
       <button
         key={nombre}
@@ -292,7 +288,7 @@ function RielYPanel({
         onClick={() => elegir(nombre)}
         className={claseRiel(seleccionada)}
       >
-        <IconoRiel Icono={Icono} seleccionada={seleccionada} cantidad={cantidad} />
+        <IconoRiel Icono={Icono} seleccionada={seleccionada} />
         <span>{nombre}</span>
       </button>
     );
@@ -306,13 +302,13 @@ function RielYPanel({
         </Link>
         {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
-          const boton = botonRiel(v.area.title, !verFavoritos && !verYoda && v.area.title === mostrada?.area.title, Icono, v.cantidad);
+          const boton = botonRiel(v.area.title, !verFavoritos && !verYoda && v.area.title === mostrada?.area.title, Icono);
           // «Favoritos» va justo después del primer botón, como acceso propio.
           return i === 0 ? (
             <Fragment key={v.area.title}>
               {boton}
-              {botonRiel("Favoritos", verFavoritos, SECTION_ICONS.Favoritos, 0)}
-              {botonRiel("Baby Yoda", verYoda, BabyYodaIcon, 0)}
+              {botonRiel("Favoritos", verFavoritos, SECTION_ICONS.Favoritos)}
+              {botonRiel("Baby Yoda", verYoda, BabyYodaIcon)}
             </Fragment>
           ) : (
             boton
@@ -390,7 +386,7 @@ function ListaMovil({
   alNavegar: () => void;
 }) {
   const pathname = usePathname();
-  const visibles = areasVisibles(areas, modulosPermitidos, pendientes.contadores);
+  const visibles = areasVisibles(areas, modulosPermitidos);
   return (
     <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
       <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />

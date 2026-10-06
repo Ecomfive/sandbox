@@ -11,7 +11,7 @@ export function ContadorMenu({ cantidad }: { cantidad: number }) {
     <>
       <span
         aria-hidden="true"
-        className="shrink-0 rounded-full bg-warning-soft px-1.5 py-0.5 text-xs leading-none font-medium text-warning tabular-nums"
+        className="shrink-0 rounded-full bg-aviso px-1.5 py-0.5 text-xs leading-none font-semibold text-white tabular-nums"
       >
         {textoContador(cantidad)}
       </span>

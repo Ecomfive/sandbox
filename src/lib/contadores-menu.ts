@@ -1,4 +1,4 @@
-import { moduloDeHref, type NavItem } from "./nav-data";
+import { moduloDeHref } from "./nav-data";
 import type { PendientesHoy } from "./pendientes-hoy";
 
 /** Pendientes por página del menú: la clave es el href, solo con las que tienen algo por atender. */
@@ -47,11 +47,6 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
       pendientes.lotesPorVencer
     : 0;
   return { contadores, total };
-}
-
-/** Lo que suman las páginas de un grupo o sección (lo que se muestra cuando está cerrado). */
-export function sumaDeItems(items: NavItem[], contadores: ContadoresMenu): number {
-  return items.reduce((suma, item) => suma + (item.href ? (contadores[item.href] ?? 0) : 0), 0);
 }
 
 /** «99+» para no ensanchar la pastilla. */
