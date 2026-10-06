@@ -11,8 +11,8 @@
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar --solo-adjuntos → solo copia los adjuntos que faltan
 //   npx tsx scripts/importar-compras-clickup.ts --aplicar --subir-adjuntos → además copia los adjuntos (fotos, documentos y videos) a Storage
 //
-// Responsables (decisión de Hernán, 5 oct 2026): lo de Zeylimar Moreno, Maria Jose Aponte y Fabiola Concha pasa a Francis
-// Aponte; lo de Alcides Andrade se queda a su nombre.
+// Responsables (decisión de Hernán, 5 oct 2026): lo de Zeylimar Moreno, Maria Jose Aponte, Fabiola Concha y Andreina Andrade
+// de Morales pasa a Francis Aponte; lo de Alcides Andrade se queda a su nombre.
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
@@ -43,6 +43,7 @@ const REASIGNAR: Record<string, string> = {
   "maria jose aponte": "Francis Aponte",
   "maría josé aponte": "Francis Aponte",
   "fabiola concha": "Francis Aponte",
+  "andreina andrade de morales": "Francis Aponte",
 };
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
