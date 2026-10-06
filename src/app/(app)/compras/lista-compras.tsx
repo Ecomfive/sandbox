@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { BotonBarra, BotonDescargar, MarcoTabla, Punto, claseConFicha, claseFichaMinimizada, claseTd, claseTh } from "@/components/panel/piezas-panel";
+import { BotonBarra, BotonDescargar, MarcoTabla, Punto, claseConFicha, claseFichaMinimizada, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
 import { almacen } from "@/components/tabla/almacen";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
@@ -118,8 +118,8 @@ export function ListaCompras({
     setOrden((o) => (o.columna === columna ? { columna, sentido: o.sentido === 1 ? -1 : 1 } : { columna, sentido: -1 }));
   }
   const cabecera = (col: Columna, texto: string, derecha = false) => (
-    <th scope="col" aria-sort={orden.columna === col ? (orden.sentido === 1 ? "ascending" : "descending") : undefined} className={`${claseTh} ${derecha ? "text-right" : ""}`}>
-      <button type="button" onClick={() => ordenarPor(col)} className={`rounded font-[inherit] tracking-[inherit] uppercase ${anilloFoco}`}>
+    <th scope="col" aria-sort={orden.columna === col ? (orden.sentido === 1 ? "ascending" : "descending") : undefined} className={`${claseThLista} ${derecha ? "text-right" : ""}`}>
+      <button type="button" onClick={() => ordenarPor(col)} className={`rounded font-[inherit] tracking-[inherit] ${anilloFoco}`}>
         {texto} {orden.columna === col ? (orden.sentido === 1 ? "↑" : "↓") : "↕"}
       </button>
     </th>
@@ -173,9 +173,9 @@ export function ListaCompras({
           <table className="w-full min-w-[54rem] border-collapse">
             <thead>
               <tr>
-                <th scope="col" className={claseTh}>Compra</th>
-                <th scope="col" className={claseTh}>👣 Etapa</th>
-                <th scope="col" className={claseTh}>🏗️ Vía</th>
+                <th scope="col" className={claseThLista}>Compra</th>
+                <th scope="col" className={claseThLista}>👣 Etapa</th>
+                <th scope="col" className={claseThLista}>🏗️ Vía</th>
                 {cabecera("creada", "Creada")}
                 {cabecera("llega", "Llegada")}
                 {cabecera("qty", "QTY", true)}
@@ -210,9 +210,9 @@ export function ListaCompras({
                           setElegida(c.id);
                         }
                       }}
-                      className={`cursor-pointer hover:bg-muted aria-[current=true]:bg-accent ${anilloFoco}`}
+                      className={`cursor-pointer last:[&>td]:border-b-0 hover:bg-muted aria-[current=true]:bg-accent ${anilloFoco}`}
                     >
-                      <td className={claseTd}>
+                      <td className={claseTdLista}>
                         <span className="flex items-center gap-1.5">
                           {atrasada && <Punto tono="peligro" />}
                           {atrasada && <span className="sr-only">Atrasada. </span>}
@@ -225,12 +225,12 @@ export function ListaCompras({
                           {[c.paisCodigo ?? "Importadora", c.proveedor, c.asignadoNombre].filter(Boolean).join(" · ")}
                         </span>
                       </td>
-                      <td className={claseTd}>
+                      <td className={claseTdLista}>
                         <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
                       </td>
-                      <td className={`${claseTd} text-muted-foreground`}>{c.viaEnvio.length ? c.viaEnvio.map(etiquetaVia).join(", ") : "—"}</td>
-                      <td className={claseTd}>{formatearFecha(c.creadoEn)}</td>
-                      <td className={claseTd}>
+                      <td className={`${claseTdLista} text-muted-foreground`}>{c.viaEnvio.length ? c.viaEnvio.map(etiquetaVia).join(", ") : "—"}</td>
+                      <td className={claseTdLista}>{formatearFecha(c.creadoEn)}</td>
+                      <td className={claseTdLista}>
                         {c.fechaLlegada ? (
                           formatearFecha(c.fechaLlegada)
                         ) : c.fechaEnvio ? (
@@ -239,9 +239,9 @@ export function ListaCompras({
                           "—"
                         )}
                       </td>
-                      <td className={`${claseTd} text-right tabular-nums`}>{c.qtyTotal ?? "—"}</td>
-                      <td className={`${claseTd} text-right tabular-nums`}>{c.pagadoAProveedor !== null ? usd(c.pagadoAProveedor) : "—"}</td>
-                      <td className={`${claseTd} text-right tabular-nums`}>{diasDeCompra(c)}</td>
+                      <td className={`${claseTdLista} text-right tabular-nums`}>{c.qtyTotal ?? "—"}</td>
+                      <td className={`${claseTdLista} text-right tabular-nums`}>{c.pagadoAProveedor !== null ? usd(c.pagadoAProveedor) : "—"}</td>
+                      <td className={`${claseTdLista} text-right tabular-nums`}>{diasDeCompra(c)}</td>
                     </tr>
                   );
                 })

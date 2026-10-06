@@ -114,6 +114,10 @@ export function MarcoTabla({ ariaLabel, children }: { ariaLabel: string; childre
 export const claseTh =
   "border-r border-b border-border bg-muted px-3 py-2.5 text-left text-[11px] font-semibold tracking-[0.05em] whitespace-nowrap text-muted-foreground uppercase last:border-r-0";
 export const claseTd = "border-r border-b border-border px-3 py-2.5 text-[13px] whitespace-nowrap last:border-r-0";
+/** Las mismas celdas con aspecto de lista (como ClickUp): sin rayas entre columnas, encabezado sin fondo ni mayúsculas
+ * y apenas una línea suave entre filas. */
+export const claseThLista = "border-b border-border px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground";
+export const claseTdLista = "border-b border-border/45 px-3 py-2.5 text-[13px] whitespace-nowrap";
 
 /** Botón «Descargar»: baja como CSV lo que se ve (con los filtros), con la definición de la tabla. */
 export function BotonDescargar<F>({ def, filas }: { def: DefTabla<F>; filas: F[] }) {
