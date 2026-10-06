@@ -74,8 +74,10 @@ export function TablaDatos<F, C = undefined>({
    * (el interruptor de estado, por ejemplo) sigue haciendo lo suyo y no abre nada. Para teclado y lectores de
    * pantalla, el contenido de la primera columna es un botón (`etiqueta` es su nombre). `alAbrir` recibe, además de
    * la fila, las claves de las filas en el orden en que se ven (para pasar a la anterior o a la siguiente).
+   * Con `soloColumna`, la ficha se abre **solo** desde el botón de la columna `columna` (la primera si no se dice): el resto
+   * de la fila no responde al clic, para que sus celdas puedan editarse en su sitio (Compras).
    */
-  abrirFila?: { etiqueta: (fila: F) => string; alAbrir: (fila: F, orden: string[]) => void };
+  abrirFila?: { etiqueta: (fila: F) => string; alAbrir: (fila: F, orden: string[]) => void; columna?: string; soloColumna?: boolean };
   claseFila?: (fila: F) => string;
   ariaLabel: string;
   anchoMinimo?: string;
@@ -127,7 +129,7 @@ export function TablaDatos<F, C = undefined>({
     <tr
       key={claveFila(f)}
       onClick={
-        abrirFila
+        abrirFila && !abrirFila.soloColumna
           ? (e) => {
               if ((e.target as HTMLElement).closest("button, a, input, select, textarea, label, summary")) return;
               // El foco pasa al botón de la fila antes de abrir: al cerrar la ficha vuelve ahí y no se pierde.
@@ -136,11 +138,11 @@ export function TablaDatos<F, C = undefined>({
             }
           : undefined
       }
-      className={`group border-b border-border/60 last:border-0 ${abrirFila ? "cursor-pointer hover:bg-muted/50" : ""} ${claseFila?.(f) ?? ""}`}
+      className={`group border-b border-border/60 last:border-0 ${abrirFila && !abrirFila.soloColumna ? "cursor-pointer" : ""} ${abrirFila ? "hover:bg-muted/50" : ""} ${claseFila?.(f) ?? ""}`}
     >
       {visibles_.map((c, i) => (
         <td key={c.id} className={`${claseCeldaColumna} ${c.clase ?? ""}`}>
-          {abrirFila && i === 0 ? (
+          {abrirFila && (abrirFila.columna ? c.id === abrirFila.columna : i === 0) ? (
             <button
               type="button"
               aria-haspopup="dialog"

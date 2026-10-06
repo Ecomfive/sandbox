@@ -57,6 +57,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   completar_seguimiento_dropshipper: "Completó un seguimiento",
   escalar_caso_dropshipper: "Pasó un caso a Comercial",
   transferir_dropshipper: "Cambió la fase o el líder comercial",
+  editar_campo_compra: "Editó un dato de la compra",
   crear_sku: "Propuso el SKU",
   cambiar_estado_sku: "Cambió el estado",
   vincular_producto_sku: "Vinculó un producto",
