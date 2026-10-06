@@ -8,6 +8,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { CalendarioIcon, CatalogoIcon, ProductoIcon } from "@/lib/nav-icons";
 import { crearProducto } from "./actions";
 import { ComboBuilder } from "./combo-builder";
+import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
@@ -17,6 +18,11 @@ import { ComboBuilder } from "./combo-builder";
 export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id: string; codigo: string; nombre: string }[] }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
+  // El nombre y el SKU se siguen para sugerir los de las variantes.
+  const [nombre, setNombre] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [conVariantes, setConVariantes] = useState(false);
+  const [armadas, setArmadas] = useState<VariantesArmadas>({ opciones: [], variantes: [] });
   // Un compuesto sin productos simples no se puede armar: el botón lleva a ese aviso.
   const sinComponentes = combo && opcionesSimples.length === 0;
 
@@ -26,7 +32,12 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
       etiquetaCrear="Crear producto"
       action={crearProducto}
       mensajeExito="Producto creado"
-      alAbrir={() => setTipo("simple")}
+      alAbrir={() => {
+        setTipo("simple");
+        setNombre("");
+        setCodigo("");
+        setConVariantes(false);
+      }}
       puedeExtra={!sinComponentes}
       alPulsarSinCompletar={() => document.getElementById("campo-componentes")?.scrollIntoView({ block: "center" })}
     >
@@ -64,6 +75,8 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 data-enfocar
                 autoComplete="off"
                 maxLength={200}
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
                 aria-invalid={invalido("campo-nombre-producto")}
                 placeholder={combo ? "Ej: Kit de limpieza facial" : "Ej: Crema hidratante 50 ml"}
                 className={`${fieldClass} w-full`}
@@ -77,6 +90,8 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 required
                 autoComplete="off"
                 maxLength={60}
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.replace(/\s/g, ""))}
                 aria-invalid={invalido("campo-codigo-producto")}
                 placeholder={combo ? "Ej: KIT-LIMPIEZA-01" : "Ej: CREMA-50"}
                 className={`${fieldClass} w-full`}
@@ -109,6 +124,21 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
               <Campo etiqueta="Avisar con cuántos días de anticipación (opcional, 60 por defecto)" id="campo-aviso-producto">
                 <input id="campo-aviso-producto" type="number" name="dias_aviso_vencimiento" min="1" max="3650" step="1" inputMode="numeric" placeholder="Ej: 90" className={`${fieldClass} w-full`} />
               </Campo>
+            </Seccion>
+          )}
+
+          {!combo && (
+            <Seccion icono={ProductoIcon} titulo="Variantes">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={conVariantes} onChange={(e) => setConVariantes(e.target.checked)} className="h-4 w-4" />
+                Tiene variantes (colores, tallas u otras opciones; cada una lleva su propio stock)
+              </label>
+              {conVariantes && (
+                <>
+                  <CamposVariantes codigoBase={codigo} nombreBase={nombre} alCambiar={setArmadas} />
+                  <input type="hidden" name="variantes" value={armadas.variantes.length ? JSON.stringify(armadas) : ""} />
+                </>
+              )}
             </Seccion>
           )}
 

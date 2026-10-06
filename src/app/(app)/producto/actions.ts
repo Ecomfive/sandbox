@@ -82,6 +82,22 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
     }
   }
 
+  // Variantes pedidas al crear: se crean ya con el producto; si no se pueden (un SKU repetido…), el producto tampoco queda.
+  const variantesTexto = texto(formData, "variantes");
+  if (variantesTexto && tipo === "simple") {
+    let armadas: { opciones: OpcionVariante[]; variantes: VarianteNueva[] } | null = null;
+    try {
+      armadas = JSON.parse(variantesTexto);
+    } catch {
+      armadas = null;
+    }
+    const r = armadas ? await crearVariantes(data.id, armadas.opciones, armadas.variantes) : { error: "Las variantes no son válidas." };
+    if (r.error) {
+      await supabase.from("skus_maestros").delete().eq("id", data.id);
+      return { error: `No se creó el producto: ${r.error}` };
+    }
+  }
+
   // Si se pidió un código interno y no se pudo generar, el producto queda creado: se genera después desde su ficha.
   if (generarBarras) await supabase.rpc("wms_asignar_codigo_barras_interno", { p_sku: data.id });
 

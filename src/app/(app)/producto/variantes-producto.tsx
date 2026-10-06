@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -16,51 +16,68 @@ function combinaciones(opciones: OpcionVariante[]): Record<string, string>[] {
   return opciones.reduce<Record<string, string>[]>((acc, o) => acc.flatMap((c) => o.valores.map((v) => ({ ...c, [o.nombre]: v }))), [{}]);
 }
 
+/** Lo que arma el editor: las opciones con sus valores y las variantes nuevas (combinaciones que faltan) con SKU y nombre. */
+export interface VariantesArmadas {
+  opciones: OpcionVariante[];
+  variantes: { opciones: Record<string, string>; codigo: string; nombre: string }[];
+}
+
 /**
- * El editor de variantes: opciones con sus valores separados por comas y, debajo, las combinaciones que faltan con su SKU y
- * su nombre sugeridos (el SKU del padre con -01, -02…; el nombre del padre con los valores), que se pueden cambiar antes de
- * crear. Las combinaciones que ya existen no se repiten.
+ * Las opciones (Color, Talla…) con sus valores separados por comas y, debajo, las combinaciones que faltan con su SKU y su
+ * nombre sugeridos (el SKU base con -01, -02…; el nombre base con los valores), que se pueden cambiar. Las combinaciones que
+ * ya existen no se repiten. Lo usan la ficha (agregar variantes) y «Crear producto» (crearlas de una vez).
  */
-function EditorVariantes({ producto, alTerminar }: { producto: FilaProducto; alTerminar: () => void }) {
-  const { mostrarToast } = useToast();
-  const [pendiente, start] = useTransition();
-  const inicial = producto.opcionesVariantes.length ? producto.opcionesVariantes.map((o) => ({ nombre: o.nombre, valores: o.valores.join(", ") })) : [{ nombre: "", valores: "" }];
-  const [filas, setFilas] = useState(inicial);
+export function CamposVariantes({
+  codigoBase,
+  nombreBase,
+  opcionesIniciales = [],
+  existentes = [],
+  alCambiar,
+}: {
+  codigoBase: string;
+  nombreBase: string;
+  opcionesIniciales?: OpcionVariante[];
+  existentes?: { codigo: string; opciones: Record<string, string> }[];
+  alCambiar: (armadas: VariantesArmadas) => void;
+}) {
+  const [filas, setFilas] = useState(
+    opcionesIniciales.length ? opcionesIniciales.map((o) => ({ nombre: o.nombre, valores: o.valores.join(", ") })) : [{ nombre: "", valores: "" }],
+  );
   const [cambios, setCambios] = useState<Record<string, { codigo?: string; nombre?: string }>>({});
 
-  const opciones: OpcionVariante[] = filas.map((f) => ({ nombre: f.nombre.trim(), valores: separar(f.valores) })).filter((o) => o.nombre && o.valores.length);
-  const existentes = useMemo(() => new Set(producto.variantes.map((v) => opciones.map((o) => v.opciones[o.nombre] ?? "").join("|"))), [producto.variantes, opciones]);
-  const usados = useMemo(() => new Set(producto.variantes.map((v) => v.codigo.toLowerCase())), [producto.variantes]);
+  const opciones: OpcionVariante[] = useMemo(
+    () => filas.map((f) => ({ nombre: f.nombre.trim(), valores: separar(f.valores) })).filter((o) => o.nombre && o.valores.length),
+    [filas],
+  );
+  const yaHay = useMemo(() => new Set(existentes.map((v) => opciones.map((o) => v.opciones[o.nombre] ?? "").join("|"))), [existentes, opciones]);
+  const usados = useMemo(() => new Set(existentes.map((v) => v.codigo.toLowerCase())), [existentes]);
 
-  // Las combinaciones que faltan, con el siguiente número libre del SKU del padre.
+  // Las combinaciones que faltan, con el siguiente número libre del SKU base.
   const nuevas = useMemo(() => {
     let n = 1;
     const siguienteCodigo = () => {
       let c: string;
-      do c = `${producto.codigo}-${String(n++).padStart(2, "0")}`;
+      do c = `${codigoBase || "SKU"}-${String(n++).padStart(2, "0")}`;
       while (usados.has(c.toLowerCase()));
       return c;
     };
     return combinaciones(opciones)
-      .filter((c) => !existentes.has(opciones.map((o) => c[o.nombre]).join("|")))
-      .map((c) => {
-        const clave = opciones.map((o) => c[o.nombre]).join("|");
-        return { clave, opciones: c, codigo: siguienteCodigo(), nombre: `${producto.nombre} · ${textoOpciones(c)}` };
-      });
-  }, [opciones, existentes, usados, producto.codigo, producto.nombre]);
+      .filter((c) => !yaHay.has(opciones.map((o) => c[o.nombre]).join("|")))
+      .map((c) => ({ clave: opciones.map((o) => c[o.nombre]).join("|"), opciones: c, codigo: siguienteCodigo(), nombre: `${nombreBase || "Producto"} · ${textoOpciones(c)}` }));
+  }, [opciones, yaHay, usados, codigoBase, nombreBase]);
 
-  function crear() {
-    const variantes = nuevas.map((v) => ({ opciones: v.opciones, codigo: cambios[v.clave]?.codigo ?? v.codigo, nombre: cambios[v.clave]?.nombre ?? v.nombre }));
-    start(async () => {
-      const r = await crearVariantes(producto.id, opciones, variantes);
-      if (r.error) return mostrarToast(r.error, "destructive");
-      mostrarToast(`${r.creadas} variante${r.creadas === 1 ? "" : "s"} creada${r.creadas === 1 ? "" : "s"}`);
-      alTerminar();
+  // Avisa lo armado cada vez que cambia (con lo que se haya editado a mano).
+  useEffect(() => {
+    alCambiar({
+      opciones,
+      variantes: nuevas.map((v) => ({ opciones: v.opciones, codigo: cambios[v.clave]?.codigo ?? v.codigo, nombre: cambios[v.clave]?.nombre ?? v.nombre })),
     });
-  }
+    // `alCambiar` puede cambiar en cada dibujo del padre: lo que importa es lo armado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opciones, nuevas, cambios]);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-3">
+    <div className="flex flex-col gap-3">
       {filas.map((f, i) => (
         <div key={i} className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-xs">
@@ -121,13 +138,41 @@ function EditorVariantes({ producto, alTerminar }: { producto: FilaProducto; alT
           </ul>
         </div>
       )}
+    </div>
+  );
+}
 
+/** Agregar variantes a un producto que ya existe, desde su ficha. */
+function EditorVariantes({ producto, alTerminar }: { producto: FilaProducto; alTerminar: () => void }) {
+  const { mostrarToast } = useToast();
+  const [pendiente, start] = useTransition();
+  const [armadas, setArmadas] = useState<VariantesArmadas>({ opciones: [], variantes: [] });
+  const n = armadas.variantes.length;
+
+  function crear() {
+    start(async () => {
+      const r = await crearVariantes(producto.id, armadas.opciones, armadas.variantes);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast(`${r.creadas} variante${r.creadas === 1 ? "" : "s"} creada${r.creadas === 1 ? "" : "s"}`);
+      alTerminar();
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-3">
+      <CamposVariantes
+        codigoBase={producto.codigo}
+        nombreBase={producto.nombre}
+        opcionesIniciales={producto.opcionesVariantes}
+        existentes={producto.variantes}
+        alCambiar={setArmadas}
+      />
       <div className="flex justify-end gap-2">
         <BotonBarra onClick={alTerminar} disabled={pendiente}>
           Cancelar
         </BotonBarra>
-        <BotonBarra principal onClick={crear} disabled={pendiente || nuevas.length === 0}>
-          {pendiente ? "Creando…" : nuevas.length ? `Crear ${nuevas.length} variante${nuevas.length === 1 ? "" : "s"}` : "Crear variantes"}
+        <BotonBarra principal onClick={crear} disabled={pendiente || n === 0}>
+          {pendiente ? "Creando…" : n ? `Crear ${n} variante${n === 1 ? "" : "s"}` : "Crear variantes"}
         </BotonBarra>
       </div>
     </div>
