@@ -7,7 +7,7 @@ import type { FilaCompra } from "./def-compras";
 export const COOKIE_VISTA_COMPRAS = "compras-vista";
 
 const COLUMNAS =
-  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, cliente, tienda, track_id, orden, producto_relacionado, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, pago_pendiente, cobrado_cliente, pendiente_cliente, pago_cliente, cuenta_receptora, factura, financiamiento, revisado_aa, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, inconveniente, planificacion, documentos, notas, via_envio, prioridad, etiquetas, responsable_nombre, creador_nombre, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), wms_compra_items(count)";
+  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, cliente, tienda, track_id, orden, producto_relacionado, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, pago_pendiente, cobrado_cliente, pendiente_cliente, pago_cliente, cuenta_receptora, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, inconveniente, planificacion, documentos, notas, via_envio, prioridad, etiquetas, responsable_nombre, creador_nombre, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), wms_compra_items(count)";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? null) : ((r as T) ?? null));
@@ -77,7 +77,6 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       cuentaReceptora: txt(c.cuenta_receptora),
       factura: c.factura === true,
       financiamiento: c.financiamiento === true,
-      revisadoAA: c.revisado_aa === true,
       fechaLimite: txt(c.fecha_limite),
       fechaLlegada: txt(c.fecha_llegada),
       fechaPago1: txt(c.fecha_pago_1),

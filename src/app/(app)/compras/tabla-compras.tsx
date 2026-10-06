@@ -188,7 +188,6 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
     col("cuentaReceptora", "Cuenta receptora", { ...resto, clase: "text-muted-foreground", render: (c) => c.cuentaReceptora || "—" }),
     col("factura", "Factura", { ...resto, render: (c) => siNo(c.factura) }),
     col("financiamiento", "Financiamiento", { ...resto, render: (c) => siNo(c.financiamiento) }),
-    col("revisadoAA", "Revisado AA", { ...resto, render: (c) => siNo(c.revisadoAA) }),
     col("fechaPago1", "Fecha de Pago (1)", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago1) }),
     col("fechaPago2", "Fecha de Pago (2)", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago2) }),
     col("fechaEnvio", "Fecha de Envío", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaEnvio) }),

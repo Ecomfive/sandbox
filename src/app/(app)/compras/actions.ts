@@ -71,7 +71,6 @@ function leerCambios(formData: FormData) {
     cuenta_receptora: textoOptativo(formData, "cuenta_receptora"),
     factura: formData.get("factura") === "on",
     financiamiento: formData.get("financiamiento") === "on",
-    revisado_aa: formData.get("revisado_aa") === "on",
     fecha_limite: fechaOptativa(formData, "fecha_limite"),
     fecha_llegada: fechaOptativa(formData, "fecha_llegada"),
     fecha_pago_1: fechaOptativa(formData, "fecha_pago_1"),

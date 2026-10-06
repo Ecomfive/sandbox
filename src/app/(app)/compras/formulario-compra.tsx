@@ -19,7 +19,7 @@ import {
   GastoIcon,
 } from "@/lib/nav-icons";
 
-/** Casilla suelta (Factura, Financiamiento, Revisado AA): sin `Campo` porque no lleva etiqueta arriba. */
+/** Casilla suelta (Factura, Financiamiento): sin `Campo` porque no lleva etiqueta arriba. */
 function Casilla({ id, texto, defaultChecked }: { id: string; texto: string; defaultChecked?: boolean }) {
   return (
     <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm">
@@ -342,7 +342,6 @@ export function FormularioCompra({
           <Campo etiqueta={conEmoji("notas", "Notas")} id="campo-notas">
             <textarea id="campo-notas" name="notas" defaultValue={compra?.notas ?? ""} rows={3} className={fieldClass} />
           </Campo>
-          <Casilla id="revisado_aa" texto={conEmoji("revisadoAA", "Revisado AA")} defaultChecked={compra?.revisadoAA} />
         </Seccion>
       </div>
 

@@ -32,7 +32,6 @@ export interface FilaCompra {
   cuentaReceptora: string | null;
   factura: boolean;
   financiamiento: boolean;
-  revisadoAA: boolean;
   fechaLimite: string | null;
   fechaLlegada: string | null;
   fechaPago1: string | null;
@@ -81,7 +80,6 @@ export const EMOJI_CAMPO: Record<string, string> = {
   cuentaReceptora: "🏦",
   factura: "✅",
   financiamiento: "💰",
-  revisadoAA: "☑️",
   fechaLimite: "⏰",
   fechaLlegada: "📦",
   fechaPago1: "📆",

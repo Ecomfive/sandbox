@@ -111,7 +111,6 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
           <Dato etiqueta="Track ID">{compra.trackId || SIN_DATO}</Dato>
           <Dato etiqueta="Orden">{compra.orden || SIN_DATO}</Dato>
           <Dato etiqueta="Producto relacionado">{compra.productoRelacionado || SIN_DATO}</Dato>
-          <Dato etiqueta="Revisado AA">{compra.revisadoAA ? "Sí" : "No"}</Dato>
         </dl>
         <dl className="flex flex-col gap-3">
           <Dato etiqueta="Inconveniente">{compra.inconveniente || SIN_DATO}</Dato>
