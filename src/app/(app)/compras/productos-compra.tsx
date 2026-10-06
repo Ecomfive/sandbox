@@ -133,8 +133,10 @@ function FilaItem({
  * o el total y el otro se calcula), su número de lote en el país de la compra (Lote #1, #2… se sigue solo) y, al final, el
  * total de la orden (unidades y monto). La QTY Total y el Monto Total de la compra salen de aquí. Un producto con variantes
  * pide la cantidad de cada variante; uno en Test, pasarlo a Activo. Solo compras de país: Importadora compra para clientes.
+ * Con `incrustado` se dibuja dentro del formulario de la compra (ver `FormularioCompra`): guarda sus propios cambios, no
+ * los de la compra.
  */
-export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string; puedeEscribir: boolean }) {
+export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }: { compraId: string; puedeEscribir: boolean; incrustado?: boolean }) {
   const { mostrarToast } = useToast();
   const { confirmar, dialogo } = useConfirmarProductoActivo();
   const [datos, setDatos] = useState<{ items: ItemCompra[]; productos: ProductoComprable[] } | null>(null);
@@ -221,8 +223,10 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
   const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
   const listo = !!elegido && cantidadNueva > 0;
 
+  // Incrustado (dentro del bloque «Compra» del formulario, bajo Prioridad) va entre dos líneas, sin el margen de una sección
+  // aparte; suelto (a solo lectura, al final de la ficha) es una sección propia.
   return (
-    <div className="border-t border-border p-5">
+    <div className={incrustado ? "border-y border-border py-4" : "border-t border-border p-5"}>
       <Seccion icono={ProductoIcon} titulo="Productos">
         {error && (
           <p role="alert" className="m-0 text-sm text-destructive">
