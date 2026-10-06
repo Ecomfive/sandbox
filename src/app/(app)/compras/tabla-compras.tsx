@@ -276,7 +276,7 @@ export function TablaCompras({
   const [soloSinProductos, setSoloSinProductos] = useState(false);
   const [etapa, setEtapa] = useState(etapaInicial);
   const [elegida, setElegida] = useState<{ id: string; orden: string[] } | null>(null);
-  const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(abrirInicial && compras.some((c) => c.id === abrirInicial) ? { id: abrirInicial, orden: [abrirInicial] } : null);
+  const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(abrirInicial && comprasServidor.some((c) => c.id === abrirInicial) ? { id: abrirInicial, orden: [abrirInicial] } : null);
   const guardadoFicha = almacen(CLAVE_FICHA, "local");
   const fichaMinimizada = useSyncExternalStore(guardadoFicha.suscribir, guardadoFicha.leer, () => "") === "minimizada";
 
