@@ -2,7 +2,7 @@
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { ContenedorTabla } from "./contenedor-tabla";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import type { DefTabla } from "@/lib/tabla/motor";
 import { notasPie, type NombreFilas } from "@/lib/tabla/pie";
@@ -98,6 +98,23 @@ export function TablaDatos<F, C = undefined>({
   const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
   const { raiz, alIrA } = useIrAPaginaArriba(tabla.irAPagina);
 
+  // Arrastrar el título de una columna sobre otro la pone en su lugar (el menú «Columnas» hace lo mismo con flechas,
+  // para teclado). El orden se guarda por persona, como el del menú.
+  const [arrastrada, setArrastrada] = useState<string | null>(null);
+  const [sobre, setSobre] = useState<string | null>(null);
+  function soltarEn(destino: string) {
+    if (arrastrada && arrastrada !== destino) {
+      const origen = guardadas.orden.indexOf(arrastrada);
+      const sinOrigen = guardadas.orden.filter((id) => id !== arrastrada);
+      const i = sinOrigen.indexOf(destino);
+      // Hacia la derecha queda después del destino; hacia la izquierda, antes.
+      sinOrigen.splice(origen < guardadas.orden.indexOf(destino) ? i + 1 : i, 0, arrastrada);
+      cambiarColumnas({ orden: sinOrigen });
+    }
+    setArrastrada(null);
+    setSobre(null);
+  }
+
   const porId = new Map(columnas.map((c) => [c.id, c]));
   const visibles_ = guardadas.orden.filter((id) => !guardadas.ocultas.has(id)).map((id) => porId.get(id)!);
   const anchoColumnas = visibles_.length + (accion ? 1 : 0);
@@ -182,7 +199,33 @@ export function TablaDatos<F, C = undefined>({
           <thead>
             <tr className={claseFilaEncabezado}>
               {visibles_.map((c) => (
-                <th key={c.id} scope="col" className={claseEncabezadoColumna}>
+                <th
+                  key={c.id}
+                  scope="col"
+                  draggable
+                  title="Arrastra para mover la columna"
+                  onDragStart={(e) => {
+                    setArrastrada(c.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", c.id);
+                  }}
+                  onDragOver={(e) => {
+                    if (!arrastrada) return;
+                    e.preventDefault();
+                    if (sobre !== c.id) setSobre(c.id);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    soltarEn(c.id);
+                  }}
+                  onDragEnd={() => {
+                    setArrastrada(null);
+                    setSobre(null);
+                  }}
+                  className={`${claseEncabezadoColumna} cursor-grab active:cursor-grabbing ${arrastrada === c.id ? "opacity-50" : ""} ${
+                    sobre === c.id && arrastrada && arrastrada !== c.id ? "outline-2 -outline-offset-2 outline-foreground" : ""
+                  }`}
+                >
                   {c.descripcion ? (
                     <Tooltip texto={c.descripcion}>
                       <span tabIndex={0} className="cursor-help border-b border-dotted border-muted-foreground/60">

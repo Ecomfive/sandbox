@@ -90,12 +90,12 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
 }
 
 /**
- * Las columnas: primero las ocho que se ven al entrar (compra, etapa, vía, creada, llegada, QTY, pagado y días) y después el
- * resto de los campos de ClickUp, ocultos hasta que cada persona los muestre desde «Columnas». La compra lleva un punto
- * rojo si está atrasada (más días en tránsito de lo normal para su vía).
+ * Las columnas: primero las ocho del día a día (compra, etapa, vía, creada, llegada, QTY, pagado y días) y después el resto
+ * de los campos de ClickUp; todas a la vista, y cada persona oculta o mueve las que quiera (arrastrando el título o desde
+ * «Columnas»). La compra lleva un punto rojo si está atrasada (más días en tránsito de lo normal para su vía).
  */
 function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<FilaCompra>[] {
-  const oculta = { ocultable: true, oculta: true } as const;
+  const resto = { ocultable: true } as const;
   return [
     {
       id: "nombre",
@@ -137,7 +137,7 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
     col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.pagadoAProveedor) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("foto", "Foto", {
-      ...oculta,
+      ...resto,
       render: (c) =>
         c.fotoUrl ? (
           <TarjetaEmergente
@@ -156,42 +156,42 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
           </div>
         ),
     }),
-    col("codigo", "Código", { ...oculta, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
-    col("pais", "País", { ...oculta, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
-    col("estado", "Estado", { ...oculta, render: (c) => <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge> }),
+    col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
+    col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
+    col("estado", "Estado", { ...resto, render: (c) => <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge> }),
     col("prioridad", "Prioridad", {
-      ...oculta,
+      ...resto,
       render: (c) => {
         const p = prioridadDe(c.prioridad);
         return p ? <Badge color={p.color}>{p.etiqueta}</Badge> : "—";
       },
     }),
-    col("proveedor", "Proveedor", { ...oculta, clase: "text-muted-foreground", render: (c) => c.proveedor || "—" }),
-    col("tienda", "Tienda", { ...oculta, clase: "text-muted-foreground", render: (c) => c.tienda || "—" }),
-    col("cliente", "Cliente", { ...oculta, clase: "text-muted-foreground", render: (c) => c.cliente || "—" }),
-    col("etiquetas", "Etiquetas", { ...oculta, clase: "text-muted-foreground", render: (c) => lista(c.etiquetas) }),
-    col("asignado", "Responsable", { ...oculta, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
-    col("planificacion", "Planificación", { ...oculta, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),
-    col("montoTotal", "Monto Total", { ...oculta, clase: "tabular-nums", render: (c) => usd(c.montoTotal) }),
-    col("valorUnitario", "Valor Unitario", { ...oculta, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
-    col("primerPago", "Primer Pago", { ...oculta, clase: "tabular-nums", render: (c) => usd(c.primerPago) }),
-    col("segundoPago", "Segundo Pago", { ...oculta, clase: "tabular-nums", render: (c) => usd(c.segundoPago) }),
-    col("pagoPendiente", "Pago Pendiente", { ...oculta, clase: "tabular-nums", render: (c) => usd(c.pagoPendiente) }),
-    col("cobradoCliente", "Cobrado Cliente", { ...oculta, clase: "tabular-nums", render: (c) => usd(c.cobradoCliente) }),
-    col("pendienteCliente", "Pendiente Cliente", { ...oculta, clase: "tabular-nums", render: (c) => usd(c.pendienteCliente) }),
-    col("pagoCliente", "Pago Cliente", { ...oculta, render: (c) => c.pagoCliente || "—" }),
-    col("cuentaReceptora", "Cuenta receptora", { ...oculta, clase: "text-muted-foreground", render: (c) => c.cuentaReceptora || "—" }),
-    col("factura", "Factura", { ...oculta, render: (c) => siNo(c.factura) }),
-    col("financiamiento", "Financiamiento", { ...oculta, render: (c) => siNo(c.financiamiento) }),
-    col("revisadoAA", "Revisado AA", { ...oculta, render: (c) => siNo(c.revisadoAA) }),
-    col("fechaPago1", "Fecha de Pago (1)", { ...oculta, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago1) }),
-    col("fechaPago2", "Fecha de Pago (2)", { ...oculta, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago2) }),
-    col("fechaEnvio", "Fecha de Envío", { ...oculta, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaEnvio) }),
-    col("fechaLimite", "Fecha límite", { ...oculta, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaLimite) }),
-    col("trackId", "Track ID", { ...oculta, clase: "text-muted-foreground", render: (c) => c.trackId || "—" }),
-    col("orden", "Orden", { ...oculta, clase: "text-muted-foreground tabular-nums", render: (c) => c.orden || "—" }),
-    col("inconveniente", "Inconveniente", { ...oculta, render: (c) => c.inconveniente || "—" }),
-    col("cerrado", "Cerrada", { ...oculta, clase: "whitespace-nowrap", render: (c) => fecha(c.cerradoEn) }),
+    col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => c.proveedor || "—" }),
+    col("tienda", "Tienda", { ...resto, clase: "text-muted-foreground", render: (c) => c.tienda || "—" }),
+    col("cliente", "Cliente", { ...resto, clase: "text-muted-foreground", render: (c) => c.cliente || "—" }),
+    col("etiquetas", "Etiquetas", { ...resto, clase: "text-muted-foreground", render: (c) => lista(c.etiquetas) }),
+    col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
+    col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),
+    col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", render: (c) => usd(c.montoTotal) }),
+    col("valorUnitario", "Valor Unitario", { ...resto, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
+    col("primerPago", "Primer Pago", { ...resto, clase: "tabular-nums", render: (c) => usd(c.primerPago) }),
+    col("segundoPago", "Segundo Pago", { ...resto, clase: "tabular-nums", render: (c) => usd(c.segundoPago) }),
+    col("pagoPendiente", "Pago Pendiente", { ...resto, clase: "tabular-nums", render: (c) => usd(c.pagoPendiente) }),
+    col("cobradoCliente", "Cobrado Cliente", { ...resto, clase: "tabular-nums", render: (c) => usd(c.cobradoCliente) }),
+    col("pendienteCliente", "Pendiente Cliente", { ...resto, clase: "tabular-nums", render: (c) => usd(c.pendienteCliente) }),
+    col("pagoCliente", "Pago Cliente", { ...resto, render: (c) => c.pagoCliente || "—" }),
+    col("cuentaReceptora", "Cuenta receptora", { ...resto, clase: "text-muted-foreground", render: (c) => c.cuentaReceptora || "—" }),
+    col("factura", "Factura", { ...resto, render: (c) => siNo(c.factura) }),
+    col("financiamiento", "Financiamiento", { ...resto, render: (c) => siNo(c.financiamiento) }),
+    col("revisadoAA", "Revisado AA", { ...resto, render: (c) => siNo(c.revisadoAA) }),
+    col("fechaPago1", "Fecha de Pago (1)", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago1) }),
+    col("fechaPago2", "Fecha de Pago (2)", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago2) }),
+    col("fechaEnvio", "Fecha de Envío", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaEnvio) }),
+    col("fechaLimite", "Fecha límite", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaLimite) }),
+    col("trackId", "Track ID", { ...resto, clase: "text-muted-foreground", render: (c) => c.trackId || "—" }),
+    col("orden", "Orden", { ...resto, clase: "text-muted-foreground tabular-nums", render: (c) => c.orden || "—" }),
+    col("inconveniente", "Inconveniente", { ...resto, render: (c) => c.inconveniente || "—" }),
+    col("cerrado", "Cerrada", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.cerradoEn) }),
   ];
 }
 
@@ -260,7 +260,7 @@ export function TablaCompras({
           nombre={NOMBRE}
           claveFila={(c) => c.id}
           formatearTotal={(total) => formatearMoneda(total, MONEDA_COMPRAS)}
-          anchoMinimo="56rem"
+          anchoMinimo="72rem"
           porPagina={100}
           paginarSiempre
           abrirFila={{
