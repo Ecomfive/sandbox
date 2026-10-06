@@ -194,7 +194,22 @@ function Proximamente({ className = "" }: { className?: string }) {
   );
 }
 
-const claseRielBoton = `flex w-full flex-col items-center gap-1 rounded-lg px-0.5 py-2 text-center text-[0.625rem] leading-tight ${anilloFoco}`;
+/** El foco sobre el riel negro: anillo blanco (el de siempre es casi negro y no se vería). */
+const anilloRiel = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-riel";
+const claseRielBoton = `flex w-full flex-col items-center gap-1.5 rounded-lg px-0.5 py-2 text-center text-[0.65rem] leading-tight ${anilloRiel}`;
+/** Elegida: texto blanco y el halo de color detrás del ícono; las demás, gris claro que se aclara al pasar. */
+const claseRiel = (seleccionada: boolean) => `${claseRielBoton} ${seleccionada ? "font-semibold text-white" : "text-riel-texto hover:bg-riel-hover hover:text-white"}`;
+
+/** El ícono de un botón del riel, con el halo de color si es el elegido y la pastilla de pendientes en su esquina. */
+function IconoRiel({ Icono, seleccionada, cantidad = 0 }: { Icono: (typeof SECTION_ICONS)[string]; seleccionada: boolean; cantidad?: number }) {
+  return (
+    <span className="relative inline-flex">
+      {seleccionada && <span aria-hidden="true" className="brillo-riel" />}
+      <Icono className="relative h-5 w-5" />
+      <ContadorSobreIcono cantidad={cantidad} />
+    </span>
+  );
+}
 
 /**
  * Menú de escritorio: un riel con las áreas de trabajo (un punto de color donde hay algo pendiente) y, al lado, el panel
@@ -257,12 +272,9 @@ function RielYPanel({
         type="button"
         aria-pressed={seleccionada}
         onClick={() => elegir(nombre)}
-        className={`${claseRielBoton} ${seleccionada ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+        className={claseRiel(seleccionada)}
       >
-        <span className="relative inline-flex">
-          <Icono className="h-4 w-4" />
-          <ContadorSobreIcono cantidad={cantidad} />
-        </span>
+        <IconoRiel Icono={Icono} seleccionada={seleccionada} cantidad={cantidad} />
         <span>{nombre}</span>
       </button>
     );
@@ -270,8 +282,8 @@ function RielYPanel({
 
   return (
     <>
-      <nav ref={rielRef} aria-label="Áreas del menú" className="flex w-20 shrink-0 flex-col items-center gap-0.5 border-r border-border bg-muted px-1 py-2.5">
-        <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloFoco}`}>
+      <nav ref={rielRef} aria-label="Áreas del menú" className="flex w-20 shrink-0 flex-col items-center gap-1 bg-riel px-1 py-2.5">
+        <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloRiel}`}>
           <Image src="/brand/ecomfive-rojo.png" alt="" width={161} height={44} className="h-3 w-auto" />
         </Link>
         {delRiel.map((v, i) => {
@@ -292,12 +304,9 @@ function RielYPanel({
             <Link
               href="/notificaciones"
               aria-current={pathname === "/notificaciones" ? "page" : undefined}
-              className={`${claseRielBoton} ${pathname === "/notificaciones" ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+              className={claseRiel(pathname === "/notificaciones")}
             >
-              <span className="relative inline-flex">
-                <AvisosIcon className="h-4 w-4" />
-                <ContadorSobreIcono cantidad={pendientes.total} />
-              </span>
+              <IconoRiel Icono={AvisosIcon} seleccionada={pathname === "/notificaciones"} cantidad={pendientes.total} />
               <span>Avisos</span>
             </Link>
           )}
@@ -305,9 +314,9 @@ function RielYPanel({
             <Link
               href="/configuracion"
               aria-current={pathname === "/configuracion" ? "page" : undefined}
-              className={`${claseRielBoton} ${pathname === "/configuracion" ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
+              className={claseRiel(pathname === "/configuracion")}
             >
-              <AjustesIcon className="h-4 w-4" />
+              <IconoRiel Icono={AjustesIcon} seleccionada={pathname === "/configuracion"} />
               <span>Ajustes</span>
             </Link>
           )}
@@ -316,9 +325,9 @@ function RielYPanel({
             aria-expanded={!panelOculto}
             aria-label={panelOculto ? "Mostrar el panel de páginas" : "Ocultar el panel de páginas"}
             onClick={() => guardado.guardar(panelOculto ? "" : "cerrado")}
-            className={`${claseRielBoton} text-muted-foreground hover:bg-accent/60 hover:text-foreground`}
+            className={claseRiel(false)}
           >
-            <ToggleIcon className="h-4 w-4" />
+            <ToggleIcon className="h-5 w-5" />
           </button>
         </div>
       </nav>
