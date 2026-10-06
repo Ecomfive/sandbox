@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { BotonBarra, BotonDescargar, MarcoTabla, Punto, claseConFicha, claseTd, claseTh } from "@/components/panel/piezas-panel";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { BotonBarra, BotonDescargar, MarcoTabla, Punto, claseConFicha, claseFichaMinimizada, claseTd, claseTh } from "@/components/panel/piezas-panel";
+import { almacen } from "@/components/tabla/almacen";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
@@ -10,7 +11,7 @@ import { normalizar } from "@/lib/tabla/motor";
 import { CrearCompraPanel } from "./crear-compra-panel";
 import { colorEtapa, DEF_COMPRAS, diasDeCompra, ETAPAS_COMPRA, etiquetaEtapa, etiquetaVia, type FilaCompra } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
-import { FichaLateralCompra } from "./ficha-lateral-compra";
+import { FichaLateralCompra, FichaMinimizada } from "./ficha-lateral-compra";
 import { diasEntre, enGrupo, estaAtrasada, hoy, umbralesTransito, usd, type Grupo } from "./calculos-compras";
 import { SelectorVista } from "./selector-vista";
 import { TablaCompras } from "./tabla-compras";
@@ -34,6 +35,9 @@ const ORDEN: Record<Columna, (c: FilaCompra) => number | string | null> = {
 };
 const claseSelect = `h-[34px] rounded-lg border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`;
 
+
+/** Si la ficha de la derecha está minimizada; se guarda en el navegador de cada persona. */
+const CLAVE_FICHA = "compras-ficha-v1";
 /**
  * Las compras como en Productos Test: búsqueda (nombre, código, proveedor, track ID), filtros de un toque por grupo
  * (abiertas, cotizando, producción, en tránsito, atrasadas, cerradas), etapa y responsable, orden por columna y la ficha
@@ -64,6 +68,9 @@ export function ListaCompras({
   const [orden, setOrden] = useState<{ columna: Columna; sentido: 1 | -1 }>({ columna: "creada", sentido: -1 });
   const [elegida, setElegida] = useState<string | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
+  // La ficha de la derecha se puede minimizar para ver todas las columnas; cada persona la deja como le guste.
+  const guardadoFicha = almacen(CLAVE_FICHA, "local");
+  const fichaMinimizada = useSyncExternalStore(guardadoFicha.suscribir, guardadoFicha.leer, () => "") === "minimizada";
 
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
   const dia = hoy();
@@ -119,7 +126,7 @@ export function ListaCompras({
   );
 
   return (
-    <div className={claseConFicha}>
+    <div className={fichaMinimizada ? claseFichaMinimizada : claseConFicha}>
       <div className="min-w-0">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <label className="flex h-[34px] max-w-xs min-w-[12.5rem] flex-[1_1_12.5rem] items-center gap-1.5 rounded-lg border border-border-control bg-card px-2.5 focus-within:ring-2 focus-within:ring-foreground">
@@ -248,7 +255,17 @@ export function ListaCompras({
         </p>
       </div>
 
-      <FichaLateralCompra compra={compra} orden={ids} alIr={setElegida} alAbrir={() => compra && setAbierta(compra.id)} />
+      {fichaMinimizada ? (
+        <FichaMinimizada alAbrir={() => guardadoFicha.guardar("")} />
+      ) : (
+        <FichaLateralCompra
+          compra={compra}
+          orden={ids}
+          alIr={setElegida}
+          alAbrir={() => compra && setAbierta(compra.id)}
+          alMinimizar={() => guardadoFicha.guardar("minimizada")}
+        />
+      )}
       <FichaCompra
         compra={abierta ? compras.find((c) => c.id === abierta) : undefined}
         orden={ids}

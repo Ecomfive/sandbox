@@ -136,6 +136,8 @@ export function BotonDescargar<F>({ def, filas }: { def: DefTabla<F>; filas: F[]
 
 /** Dos columnas: lo principal y la ficha fija a la derecha (en pantallas anchas); en angostas, la ficha va debajo. */
 export const claseConFicha = "grid grid-cols-1 items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_420px]";
+/** Lo mismo con la ficha minimizada: queda una franja angosta a la derecha para volver a abrirla. */
+export const claseFichaMinimizada = "grid grid-cols-1 items-start gap-3 min-[1100px]:grid-cols-[minmax(0,1fr)_36px]";
 
 /** «+12,4 %»; sin dato anterior no se dibuja nada. `inverso`: bajar es mejorar (costos, tiempos). */
 export function Delta({ valor, sufijo, prefijo = "", inverso = false, decimales = 1 }: { valor: number | null; sufijo: string; prefijo?: string; inverso?: boolean; decimales?: number }) {

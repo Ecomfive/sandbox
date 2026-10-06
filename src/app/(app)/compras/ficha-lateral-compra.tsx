@@ -2,6 +2,7 @@
 
 import { BotonBarra, CabeceraTarjeta, Pastilla } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
+import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
 import { colorEtapa, etiquetaEstado, etiquetaEtapa, etiquetaVia, ETAPAS_COMPRA, prioridadDe, valorUnitario, type FilaCompra } from "./def-compras";
 import { diasEntre, estaAbierta, hoy, usd } from "./calculos-compras";
@@ -18,6 +19,22 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   );
 }
 
+/** La ficha minimizada: una franja angosta a la derecha; al pulsarla se vuelve a abrir. */
+export function FichaMinimizada({ alAbrir }: { alAbrir: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={alAbrir}
+      aria-label="Mostrar la ficha de la compra"
+      title="Mostrar la ficha"
+      className={`hidden flex-col items-center gap-2 rounded-[10px] border border-border bg-card py-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground min-[1100px]:sticky min-[1100px]:top-[calc(var(--alto-barra,3.5rem)+1rem)] min-[1100px]:flex ${anilloFoco}`}
+    >
+      <span aria-hidden="true">←</span>
+      <span className="[writing-mode:vertical-rl]">Ficha de compra</span>
+    </button>
+  );
+}
+
 /**
  * La ficha fija a la derecha de la lista de compras (como la de Productos Test): en qué etapa va y cuánto falta, sus
  * fechas clave con los días entre una y otra (de ahí salen los tiempos por tramo), montos y datos de envío. «Abrir ficha
@@ -28,11 +45,14 @@ export function FichaLateralCompra({
   orden,
   alIr,
   alAbrir,
+  alMinimizar,
 }: {
   compra: FilaCompra | null;
   orden: string[];
   alIr: (id: string) => void;
   alAbrir: () => void;
+  /** Guarda la ficha a la derecha para que la tabla use todo el ancho. */
+  alMinimizar: () => void;
 }) {
   if (!compra) {
     return (
@@ -64,6 +84,9 @@ export function FichaLateralCompra({
           </BotonBarra>
           <BotonBarra aria-label="Compra siguiente" disabled={i < 0 || i >= orden.length - 1} onClick={() => alIr(orden[i + 1])} className="h-7 w-7 justify-center px-0 disabled:opacity-40">
             ↓
+          </BotonBarra>
+          <BotonBarra aria-label="Minimizar la ficha" title="Minimizar la ficha" onClick={alMinimizar} className="h-7 w-7 justify-center px-0">
+            →
           </BotonBarra>
         </span>
       </CabeceraTarjeta>
