@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ACCIONES_COMERCIALES, FASES, MODULO_ATENCION, MODULO_COMERCIAL, accesoCrm, areaParaNota, areasVisibles, etiquetaFase } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
@@ -107,6 +108,21 @@ export async function registrarInteraccion(formData: FormData): Promise<{ error?
     .from("interacciones_dropshipper")
     .insert({ dropshipper_id, fecha, tipo, nota, area, creado_por: usuario.id });
   if (error) return { error: error.message };
+
+  // Las personas etiquetadas con «@» reciben un aviso «Para ti» que abre la ficha de este dropshipper.
+  const mencionados = await mencionadosValidos(formData.getAll("menciones").map(String), nota, usuario.id);
+  if (mencionados.length) {
+    const { data: d } = await supabase.from("dropshippers").select("nombre, codigo").eq("id", dropshipper_id).maybeSingle();
+    const autor = usuario.nombre || usuario.email;
+    await notificarMenciones({
+      mencionados,
+      autorId: usuario.id,
+      autorNombre: autor,
+      titulo: `${autor} te mencionó en una nota de ${d ? `${d.nombre}${d.codigo ? ` (${d.codigo})` : ""}` : "un dropshipper"}`,
+      texto: nota,
+      href: `/crm-dropshippers/directorio?abrir=${dropshipper_id}`,
+    });
+  }
   revalidatePath("/crm-dropshippers", "layout");
   return {};
 }

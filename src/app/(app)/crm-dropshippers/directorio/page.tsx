@@ -17,7 +17,7 @@ export default async function DirectorioDropshippersPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const usuario = await requireModulo("crm-dropshippers");
-  const { buscar } = await searchParams;
+  const { buscar, abrir } = await searchParams;
   const buscarInicial = typeof buscar === "string" ? buscar : "";
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -27,8 +27,9 @@ export default async function DirectorioDropshippersPage({
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Dropshippers" oculto />
       <TablaDirectorio
-        key={buscarInicial}
+        key={`${buscarInicial}-${typeof abrir === "string" ? abrir : ""}`}
         buscarInicial={buscarInicial}
+        abrirInicial={typeof abrir === "string" ? abrir : null}
         dropshippers={datos.dropshippers}
         casos={datos.casos}
         paisId={pais.id}

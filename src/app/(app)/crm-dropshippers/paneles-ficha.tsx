@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ComponentType } from "react";
+import { CampoMenciones } from "@/components/ui/campo-menciones";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
@@ -247,15 +248,14 @@ export function PanelNota({ d, acceso, alGuardar }: { d: FilaDropshipper; acceso
             </Campo>
           </div>
           <Campo etiqueta="Nota" id="campo-texto-nota" obligatorio faltante={faltante}>
-            <textarea
+            <CampoMenciones
               id="campo-texto-nota"
               name="nota"
               required
-              rows={4}
-              data-enfocar
-              aria-invalid={invalido("campo-texto-nota")}
-              placeholder="Ej: Confirmó que empieza a enviar pedidos la próxima semana"
-              className={`${fieldClass} w-full resize-y`}
+              filas={4}
+              enfocar
+              ariaInvalid={invalido("campo-texto-nota")}
+              placeholder="Ej: Confirmó que empieza a enviar pedidos la próxima semana (usa @ para etiquetar a alguien)"
             />
           </Campo>
         </Seccion>

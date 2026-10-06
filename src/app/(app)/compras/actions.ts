@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
+import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, PRIORIDADES, VIAS_ENVIO } from "./def-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
@@ -256,16 +257,35 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   };
 }
 
-/** Agrega un comentario a una compra (queda con el nombre de quien lo escribe y la hora). Devuelve el error como valor. */
-export async function comentarCompra(id: string, texto: string): Promise<{ error?: string }> {
+/**
+ * Agrega un comentario a una compra (queda con el nombre de quien lo escribe y la hora). Las personas etiquetadas con «@»
+ * (`menciones`) reciben un aviso «Para ti» que abre esta compra en ese comentario. Devuelve el error como valor.
+ */
+export async function comentarCompra(id: string, texto: string, menciones: string[] = []): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(id)) return { error: "Compra no válida." };
   const limpio = String(texto ?? "").trim().slice(0, 5000);
   if (!limpio) return { error: "Escribe el comentario." };
-  const { error } = await createServiceClient()
-    .from("wms_compra_comentarios")
-    .insert({ compra_id: id, autor: usuario.nombre || usuario.email, texto: limpio });
-  if (error) return { error: "No se pudo guardar el comentario." };
+  const autor = usuario.nombre || usuario.email;
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("wms_compra_comentarios").insert({ compra_id: id, autor, texto: limpio }).select("id").single();
+  if (error || !data) return { error: "No se pudo guardar el comentario." };
+
+  const mencionados = await mencionadosValidos(menciones, limpio, usuario.id);
+  if (mencionados.length) {
+    const { data: compra } = await supabase.from("wms_compras").select("numero, nombre, tipo, paises(codigo)").eq("id", id).maybeSingle();
+    const pais = (Array.isArray(compra?.paises) ? compra?.paises[0] : compra?.paises) as { codigo: string } | null | undefined;
+    const ver = compra?.tipo === "importacion" ? "importacion" : (pais?.codigo ?? "todos");
+    const oc = compra ? `OC-${String(compra.numero).padStart(4, "0")}` : "una compra";
+    await notificarMenciones({
+      mencionados,
+      autorId: usuario.id,
+      autorNombre: autor,
+      titulo: `${autor} te mencionó en la compra ${oc}${compra?.nombre ? ` · ${compra.nombre}` : ""}`,
+      texto: limpio,
+      href: `/compras/lista?ver=${encodeURIComponent(ver)}&abrir=${id}&comentario=${data.id}`,
+    });
+  }
   return {};
 }
 

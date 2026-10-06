@@ -271,7 +271,7 @@ function RielYPanel({
   const verYoda = titulo === "Baby Yoda";
   const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
-  const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones");
+  const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0;
 
   function elegir(nombre: string) {
     setElegida({ ruta: pathname, titulo: nombre });
@@ -398,7 +398,7 @@ function ListaMovil({
             <PaginasDeArea area={v.area} items={v.items} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
           </section>
         ))}
-      {puedeVer(modulosPermitidos, "/notificaciones") && (
+      {(puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0) && (
         <section aria-label="Avisos">
           <Titulo>Avisos</Titulo>
           <Link

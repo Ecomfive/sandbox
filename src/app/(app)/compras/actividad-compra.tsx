@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { anilloFoco, fieldClass } from "@/components/ui/field";
+import { anilloFoco } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { AdjuntoIcon, HistorialIcon, ProductoIcon } from "@/lib/nav-icons";
 import { comentarCompra, obtenerActividadCompra, type ActividadCompra as Datos } from "./actions";
+import { CampoMenciones, TextoConMenciones } from "@/components/ui/campo-menciones";
 import { etiquetaEstado, etiquetaEtapa } from "./def-compras";
 
 const fechaHora = (iso: string) =>
@@ -26,11 +27,14 @@ function textoEvento(e: Datos["eventos"][number]): string {
  * que se cambie aquí), los comentarios (con uno nuevo), las subtareas (las alternativas de proveedor) y los adjuntos. Se
  * pide al abrir la ficha.
  */
-export function ActividadCompra({ id, puedeComentar = true }: { id: string; puedeComentar?: boolean }) {
+export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado }: { id: string; puedeComentar?: boolean; comentarioResaltado?: string | null }) {
   const { mostrarToast } = useToast();
   const [datos, setDatos] = useState<Datos | "error" | null>(null);
   const [version, setVersion] = useState(0);
   const [texto, setTexto] = useState("");
+  const [menciones, setMenciones] = useState<string[]>([]);
+  // El campo se vuelve a armar (vacío) después de comentar.
+  const [vueltaCampo, setVueltaCampo] = useState(0);
   const [pendiente, start] = useTransition();
 
   useEffect(() => {
@@ -45,10 +49,13 @@ export function ActividadCompra({ id, puedeComentar = true }: { id: string; pued
 
   function comentar() {
     start(async () => {
-      const r = await comentarCompra(id, texto);
+      const r = await comentarCompra(id, texto, menciones);
       if (r.error) mostrarToast(r.error, "destructive");
       else {
+        if (menciones.length) mostrarToast(`Comentario guardado: se avisó a ${menciones.length} persona${menciones.length === 1 ? "" : "s"}`);
         setTexto("");
+        setMenciones([]);
+        setVueltaCampo((v) => v + 1);
         setVersion((v) => v + 1);
       }
     });
@@ -102,14 +109,14 @@ export function ActividadCompra({ id, puedeComentar = true }: { id: string; pued
       <Seccion icono={HistorialIcon} titulo="Comentarios">
         {puedeComentar && (
           <div className="flex flex-col gap-2">
-            <textarea
-              aria-label="Nuevo comentario"
-              rows={2}
-              maxLength={5000}
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              placeholder="Escribe un comentario…"
-              className={`${fieldClass} resize-y`}
+            <CampoMenciones
+              key={vueltaCampo}
+              ariaLabel="Nuevo comentario"
+              filas={2}
+              valor={texto}
+              alCambiar={setTexto}
+              alMencionar={setMenciones}
+              placeholder="Escribe un comentario… usa @ para etiquetar a alguien"
             />
             <button
               type="button"
@@ -126,11 +133,18 @@ export function ActividadCompra({ id, puedeComentar = true }: { id: string; pued
         ) : (
           <ul className="m-0 flex list-none flex-col gap-3 p-0 text-sm">
             {datos.comentarios.map((c) => (
-              <li key={c.id} className="flex flex-col gap-0.5">
+              <li
+                key={c.id}
+                id={`comentario-${c.id}`}
+                ref={c.id === comentarioResaltado ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
+                className={`flex flex-col gap-0.5 ${c.id === comentarioResaltado ? "-mx-2 rounded-lg bg-primario-suave px-2 py-1.5 ring-2 ring-primario" : ""}`}
+              >
                 <span className="text-xs text-muted-foreground">
                   <strong className="font-medium text-foreground">{c.autor ?? "—"}</strong> · {fechaHora(c.creadoEn)}
                 </span>
-                <span className="whitespace-pre-wrap break-words">{c.texto}</span>
+                <span className="whitespace-pre-wrap break-words">
+                  <TextoConMenciones texto={c.texto} />
+                </span>
               </li>
             ))}
           </ul>

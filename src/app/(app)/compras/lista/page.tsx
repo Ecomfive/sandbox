@@ -14,7 +14,7 @@ const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atr
 /** Compras › Compras: el tablero (todas las columnas, agrupar, filtros de un toque) con la ficha de resumen a la derecha. */
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("compras");
-  const { ver, grupo, etapa } = await searchParams;
+  const { ver, grupo, etapa, abrir, comentario } = await searchParams;
   const { compras, paises, vista, error } = await cargarCompras(ver);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
@@ -26,7 +26,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
         </p>
       ) : (
         <TablaCompras
-          key={`${vista}-${grupoInicial ?? ""}-${typeof etapa === "string" ? etapa : ""}`}
+          key={`${vista}-${grupoInicial ?? ""}-${typeof etapa === "string" ? etapa : ""}-${typeof abrir === "string" ? abrir : ""}-${typeof comentario === "string" ? comentario : ""}`}
           compras={compras}
           vista={vista}
           paises={paises}
@@ -34,6 +34,8 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
           puedeAgregarPais={usuario.modulos.includes("configuracion") && !usuario.modulosSoloLectura.includes("configuracion")}
           grupoInicial={grupoInicial}
           etapaInicial={typeof etapa === "string" ? etapa : ""}
+          abrirInicial={typeof abrir === "string" ? abrir : null}
+          comentarioInicial={typeof comentario === "string" ? comentario : null}
         />
       )}
     </Pagina>

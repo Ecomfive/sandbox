@@ -144,7 +144,10 @@ export function FichaCompra({
   puedeEscribir,
   alIr,
   alCerrar,
+  comentarioResaltado,
 }: {
+  /** El comentario al que lleva un aviso «Para ti» (se señala y se muestra). */
+  comentarioResaltado?: string | null;
   /** La compra que se ve; sin ella el panel está cerrado. */
   compra: FilaCompra | undefined;
   /** Las claves de las compras en el orden de la tabla. */
@@ -240,7 +243,7 @@ export function FichaCompra({
             <DatosDeLaCompra compra={compra} codigoPais={MONEDA_COMPRAS} />
           )}
           {compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={puedeEscribir} />}
-          <ActividadCompra key={compra.id} id={compra.id} />
+          <ActividadCompra key={compra.id} id={compra.id} comentarioResaltado={comentarioResaltado} />
         </div>
       )}
     </Ventana>

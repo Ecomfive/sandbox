@@ -222,6 +222,8 @@ export function TablaCompras({
   puedeAgregarPais,
   grupoInicial,
   etapaInicial,
+  abrirInicial = null,
+  comentarioInicial = null,
 }: {
   compras: FilaCompra[];
   vista: string;
@@ -233,12 +235,15 @@ export function TablaCompras({
   grupoInicial: Grupo | null;
   /** Etapa con que se llega desde el informe («ver las de esta etapa»). */
   etapaInicial: string;
+  /** La compra que se abre al llegar (desde un aviso «Para ti») y el comentario que se señala. */
+  abrirInicial?: string | null;
+  comentarioInicial?: string | null;
 }) {
   const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
   const [soloSinProductos, setSoloSinProductos] = useState(false);
   const [etapa, setEtapa] = useState(etapaInicial);
   const [elegida, setElegida] = useState<{ id: string; orden: string[] } | null>(null);
-  const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
+  const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(abrirInicial && compras.some((c) => c.id === abrirInicial) ? { id: abrirInicial, orden: [abrirInicial] } : null);
   const guardadoFicha = almacen(CLAVE_FICHA, "local");
   const fichaMinimizada = useSyncExternalStore(guardadoFicha.suscribir, guardadoFicha.leer, () => "") === "minimizada";
 
@@ -333,6 +338,7 @@ export function TablaCompras({
         puedeEscribir={puedeEscribir}
         alIr={(id) => setAbierta((a) => (a ? { ...a, id } : a))}
         alCerrar={() => setAbierta(null)}
+        comentarioResaltado={abierta?.id === abrirInicial ? comentarioInicial : null}
       />
     </div>
   );

@@ -27,6 +27,7 @@ export function TablaDirectorio({
   hoy,
   acceso,
   buscarInicial = "",
+  abrirInicial = null,
 }: {
   dropshippers: FilaDropshipper[];
   casos: FilaCaso[];
@@ -36,13 +37,15 @@ export function TablaDirectorio({
   acceso: AccesoCrm;
   /** Texto con el que abre el campo de búsqueda (lo manda el buscador global con `?buscar=`). */
   buscarInicial?: string;
+  /** El dropshipper cuya ficha se abre al llegar (desde un aviso «Para ti», `?abrir=`). */
+  abrirInicial?: string | null;
 }) {
   const [busqueda, setBusqueda] = useState(buscarInicial);
   const [soloVip, setSoloVip] = useState(false);
   const [enRiesgo, setEnRiesgo] = useState(false);
   const [agrupar, setAgrupar] = useState(true);
   const [verInactivos, setVerInactivos] = useState(false);
-  const [elegido, setElegido] = useState<string | null>(null);
+  const [elegido, setElegido] = useState<string | null>(abrirInicial ?? null);
 
   const filas = useMemo(() => {
     const q = normalizar(busqueda.trim());

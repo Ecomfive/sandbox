@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { TextoConMenciones } from "@/components/ui/campo-menciones";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
@@ -264,7 +265,7 @@ export function LineaDeTiempo({ dropshipperId, acceso, version }: { dropshipperI
             <li key={i.id} className="flex gap-2">
               <span aria-hidden="true" className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${i.area === "comercial" ? "bg-foreground" : "bg-border-control"}`} />
               <span className="min-w-0">
-                {i.texto}
+                <TextoConMenciones texto={i.texto} />
                 <span className="block text-xs text-muted-foreground">
                   {formatearTiempoRelativo(i.creadoEn)}
                   {acceso.comercial && i.area !== "general" ? ` · ${i.area === "comercial" ? "Comercial" : "Atención"}` : ""}

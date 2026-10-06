@@ -1,7 +1,9 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
-import { requireModulo } from "@/lib/auth";
+import { getUsuarioActual } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { ParaTi, type AvisoParaTi } from "./para-ti";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { CentroNotificaciones } from "./centro-notificaciones";
@@ -10,9 +12,31 @@ export const metadata = { title: "Centro de notificaciones" };
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Centro de notificaciones. Arriba, «Para ti»: los avisos personales (menciones con «@»), que ve todo el que los tenga. El
+ * resto (pendientes del día, actividad, sesiones de Dropi) solo con el módulo.
+ */
 export default async function NotificacionesPage() {
-  await requireModulo("notificaciones");
+  const usuario = await getUsuarioActual();
+  if (!usuario) redirect("/login");
   const supabase = createServiceClient();
+  const { data: propios } = await supabase
+    .from("notificaciones_usuario")
+    .select("id, titulo, texto, href, leida_en, creado_en")
+    .eq("usuario_id", usuario.id)
+    .order("creado_en", { ascending: false })
+    .limit(50);
+  const avisos: AvisoParaTi[] = (propios ?? []).map((a) => ({ id: a.id, titulo: a.titulo, texto: a.texto, href: a.href, leida: !!a.leida_en, creadoEn: a.creado_en }));
+
+  if (!usuario.modulos.includes("notificaciones")) {
+    return (
+      <Pagina ancho="media" className="flex flex-col gap-6">
+        <EncabezadoPagina titulo="Centro de notificaciones" oculto />
+        <ParaTi avisos={avisos} />
+      </Pagina>
+    );
+  }
+
   const pais = await getPaisActual(supabase);
 
   const [pendientes, { data: eventos }, { data: sesionesDropi }] = await Promise.all([
@@ -31,6 +55,8 @@ export default async function NotificacionesPage() {
         Lo que hay que corregir hoy, quién hizo qué en operaciones sensibles, y si las sesiones
         de Dropi siguen vivas — todo en un solo lugar.
       </EncabezadoPagina>
+
+      <ParaTi avisos={avisos} />
 
       <CentroNotificaciones
         pendientes={pendientes}

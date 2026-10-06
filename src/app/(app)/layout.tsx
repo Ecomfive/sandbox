@@ -14,10 +14,12 @@ import { paginasBuscables } from "@/lib/paleta";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
+import { contarParaTi } from "@/lib/menciones";
 import {
   SIN_PENDIENTES,
   calcularPendientesMenu,
   necesitaPendientes,
+  conParaTi,
   type PendientesMenu,
 } from "@/lib/contadores-menu";
 
@@ -32,9 +34,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // los números llegan por streaming; si la consulta falla, el menú sale sin contadores en vez de romper la página.
   const pendientes: Promise<PendientesMenu> = Promise.all([paisP, usuarioP])
     .then(([p, u]) =>
-      u && necesitaPendientes(u.modulos)
-        ? obtenerPendientesHoy(supabase, p.id).then((datos) => calcularPendientesMenu(datos, u.modulos))
-        : SIN_PENDIENTES
+      Promise.all([
+        u && necesitaPendientes(u.modulos)
+          ? obtenerPendientesHoy(supabase, p.id).then((datos) => calcularPendientesMenu(datos, u.modulos))
+          : SIN_PENDIENTES,
+        // Los avisos «Para ti» (menciones con «@») de esta persona, sin leer.
+        u ? contarParaTi(u.id).catch(() => 0) : 0,
+      ]).then(([menu, paraTi]) => conParaTi(menu, paraTi))
     )
     .catch(() => SIN_PENDIENTES);
   const [plataformasPais, favoritosDeSesion, usuario] = await Promise.all([
