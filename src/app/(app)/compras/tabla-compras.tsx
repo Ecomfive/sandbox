@@ -112,6 +112,11 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
                 {c.codigo && <span className="mr-1.5 font-normal text-muted-foreground">{c.codigo}</span>}
                 {c.nombre}
               </span>
+              {c.tipo === "pais" && c.productos === 0 && (
+                <span className="shrink-0 rounded-full border border-warning/40 bg-warning-soft px-1.5 py-px text-[0.65rem] font-medium whitespace-nowrap text-warning">
+                  Sin productos
+                </span>
+              )}
             </span>
             <span className="block text-xs text-muted-foreground">{[c.paisCodigo ?? "Importadora", c.proveedor, c.asignadoNombre].filter(Boolean).join(" · ")}</span>
           </span>
@@ -222,6 +227,7 @@ export function TablaCompras({
   etapaInicial: string;
 }) {
   const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
+  const [soloSinProductos, setSoloSinProductos] = useState(false);
   const [etapa, setEtapa] = useState(etapaInicial);
   const [elegida, setElegida] = useState<{ id: string; orden: string[] } | null>(null);
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
@@ -232,7 +238,13 @@ export function TablaCompras({
   const dia = hoy();
   const cols = useMemo(() => columnas(umbral, dia), [umbral, dia]);
   const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, compras.filter((c) => enGrupo(c, r.valor, umbral)).length])), [compras, umbral]);
-  const filas = useMemo(() => compras.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa)), [compras, rapido, etapa, umbral]);
+  const filas = useMemo(
+    () => compras.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
+    [compras, rapido, etapa, umbral, soloSinProductos],
+  );
+  // El avance de vincular productos a las compras de país (las de ClickUp llegaron sin productos).
+  const dePais = compras.filter((c) => c.tipo === "pais");
+  const sinProductos = dePais.filter((c) => c.productos === 0);
   const resumen = elegida ? (compras.find((c) => c.id === elegida.id) ?? null) : null;
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
@@ -251,7 +263,22 @@ export function TablaCompras({
               Etapa: {etiquetaEtapa(etapa)} ✕
             </BotonBarra>
           )}
+          {dePais.length > 0 && (
+            <BotonBarra activo={soloSinProductos} onClick={() => setSoloSinProductos((v) => !v)}>
+              {sinProductos.length > 0 && <Punto tono="aviso" />}
+              Sin productos <span className="text-muted-foreground tabular-nums">{sinProductos.length}</span>
+            </BotonBarra>
+          )}
         </div>
+        {dePais.length > 0 && (
+          <p className="m-0 text-xs text-muted-foreground" role="status">
+            {sinProductos.length === 0
+              ? `Todas las compras tienen sus productos vinculados (${dePais.length}).`
+              : `Productos vinculados: ${dePais.length - sinProductos.length} de ${dePais.length} compras. Faltan ${sinProductos.length}${
+                  soloSinProductos ? " (las cerradas se ven con el botón «Cerrados» de la tabla)" : ""
+                }.`}
+          </p>
+        )}
         <TablaDatos
           def={DEF_COMPRAS}
           filas={filas}

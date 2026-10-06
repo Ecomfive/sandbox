@@ -2,6 +2,8 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 export interface FilaCompra {
   id: string;
+  /** Cuántos productos de la ficha tiene vinculados (las compras de ClickUp llegan sin ninguno y se vinculan a mano). */
+  productos: number;
   /** 'pais' (compra nuestra de un país) o 'importacion' (Compras Importadora: servicio a un cliente, sin país). */
   tipo: string;
   /** Código del país de la compra (null en Importadora). */
@@ -299,6 +301,18 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       tipo: "seleccion",
       valores: (c) => [c.planificacion ?? SIN_VALOR],
       etiquetaSinValor: "Sin planificación",
+      agrupable: true,
+    },
+    {
+      id: "vinculo",
+      etiqueta: "Productos",
+      tipo: "seleccion",
+      valores: (c) => [c.tipo !== "pais" ? "no_aplica" : c.productos > 0 ? "con" : "sin"],
+      opciones: () => [
+        { valor: "sin", etiqueta: "Sin productos vinculados" },
+        { valor: "con", etiqueta: "Con productos vinculados" },
+        { valor: "no_aplica", etiqueta: "Importadora (no lleva)" },
+      ],
       agrupable: true,
     },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
