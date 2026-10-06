@@ -8,22 +8,44 @@ import { formatearFecha } from "@/lib/formato";
 import { AdjuntoIcon, HistorialIcon, ProductoIcon } from "@/lib/nav-icons";
 import { comentarCompra, obtenerActividadCompra, type ActividadCompra as Datos } from "./actions";
 import { CampoMenciones, TextoConMenciones } from "@/components/ui/campo-menciones";
-import { etiquetaEstado, etiquetaEtapa } from "./def-compras";
+import { Badge } from "@/components/ui/badge";
+import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa } from "./def-compras";
 
 const fechaHora = (iso: string) =>
   `${formatearFecha(iso)} ${new Date(iso).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" })}`;
 
 const ICONO_CLASE: Record<string, string> = { foto: "🖼️", documento: "📄", video: "🎬", otro: "📎" };
 
-/** Un cambio del historial en palabras: «Etapa: 03 - Cotizar → 09 - Tracking». */
-function textoEvento(e: Datos["eventos"][number]): string {
+/**
+ * Un cambio de la actividad, como en ClickUp: «Etapa: [03 - Cotizar] → [09 - Tracking]», con la etiqueta de cada valor en su
+ * color (etapa y estado); otro campo, en texto.
+ */
+function CambioEvento({ e }: { e: Datos["eventos"][number] }) {
   const nombre = e.campo === "etapa" ? "Etapa" : e.campo === "estado" ? "Estado" : e.campo;
-  const valor = (v: string | null) => (v === null ? "—" : e.campo === "etapa" ? etiquetaEtapa(v) : e.campo === "estado" ? etiquetaEstado(v) : v);
-  return e.antes === null ? `${nombre}: ${valor(e.despues)}` : `${nombre}: ${valor(e.antes)} → ${valor(e.despues)}`;
+  const valor = (v: string | null) => {
+    if (v === null) return <span className="text-muted-foreground">—</span>;
+    if (e.campo === "etapa") return <Badge color={colorEtapa(v)}>{etiquetaEtapa(v)}</Badge>;
+    if (e.campo === "estado") return <Badge color={colorEstado(v)}>{etiquetaEstado(v)}</Badge>;
+    return <span>{v}</span>;
+  };
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <span className="text-muted-foreground">{nombre}:</span>
+      {e.antes !== null && (
+        <>
+          {valor(e.antes)}
+          <span aria-label="pasó a" className="text-muted-foreground">
+            →
+          </span>
+        </>
+      )}
+      {valor(e.despues)}
+    </span>
+  );
 }
 
 /**
- * La actividad de una compra, al final de su ficha: el historial de etapa y estado con su fecha y hora (lo de ClickUp y lo
+ * La actividad de una compra, al final de su ficha: la actividad (cada cambio de etapa y estado, con sus etiquetas de color, su fecha y hora) (lo de ClickUp y lo
  * que se cambie aquí), los comentarios (con uno nuevo), las subtareas (las alternativas de proveedor) y los adjuntos. Se
  * pide al abrir la ficha.
  */
@@ -151,14 +173,14 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
         )}
       </Seccion>
 
-      <Seccion icono={HistorialIcon} titulo="Historial de etapa y estado">
+      <Seccion icono={HistorialIcon} titulo="Actividad">
         {datos.eventos.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin cambios registrados.</p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[13px]">
             {datos.eventos.map((e) => (
               <li key={e.id} className="flex flex-col">
-                <span>{textoEvento(e)}</span>
+                <CambioEvento e={e} />
                 <span className="text-xs text-muted-foreground">
                   {fechaHora(e.ocurridoEn)}
                   {e.autor ? ` · ${e.autor}` : ""}
