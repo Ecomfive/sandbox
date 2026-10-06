@@ -119,6 +119,22 @@ table.tabla-datos thead th {
   background: var(--muted);
 }
 
+/* Aspecto «lista» (como una lista de ClickUp): sin rayas entre columnas, encabezado sin fondo ni mayúsculas y apenas
+   una línea suave entre filas. Fuera de capas, así gana a las clases de Tailwind de las celdas. */
+table.tabla-datos[data-aspecto="lista"] :is(th, td) {
+  border-left-width: 0;
+  border-right-width: 0;
+}
+table.tabla-datos[data-aspecto="lista"] thead th {
+  background: var(--card);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+table.tabla-datos[data-aspecto="lista"] tbody tr {
+  border-bottom-color: color-mix(in srgb, var(--border) 45%, transparent);
+}
+
 /* Densidad compacta: filas más bajas. Elegida por cada persona en el menú "Columnas". */
 [data-densidad="compacta"] table.tabla-datos :is(td, th) {
   padding-block: 0.25rem;

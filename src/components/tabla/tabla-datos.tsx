@@ -50,6 +50,7 @@ export function TablaDatos<F, C = undefined>({
   descargaCompleta,
   accionPrincipal,
   vacio,
+  aspecto = "tabla",
 }: {
   def: DefTabla<F>;
   filas: F[];
@@ -86,6 +87,8 @@ export function TablaDatos<F, C = undefined>({
   accionPrincipal?: ReactNode;
   /** Mensaje cuando no hay filas cargadas. */
   vacio: string;
+  /** «lista»: más limpia, como una lista de ClickUp (sin rayas entre columnas y apenas una línea suave entre filas). */
+  aspecto?: "tabla" | "lista";
 }) {
   const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros, porPagina });
   const [guardadas, cambiarColumnas] = useColumnas(def.clave, columnas);
@@ -172,7 +175,7 @@ export function TablaDatos<F, C = undefined>({
         accionPrincipal={accionPrincipal}
       />
       <ContenedorTabla ariaLabel={ariaLabel}>
-        <table className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
+        <table data-aspecto={aspecto} className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
           <thead>
             <tr className={claseFilaEncabezado}>
               {visibles_.map((c) => (

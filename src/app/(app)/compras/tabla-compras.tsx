@@ -186,6 +186,7 @@ export function TablaCompras({
           </div>
         }
         ariaLabel="Tablero de compras"
+        aspecto="lista"
         vacio={vista === "importacion" ? "Todavía no hay compras de Importadora." : "Todavía no hay compras registradas."}
       />
       <FichaCompra
