@@ -2,8 +2,12 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 export interface FilaCompra {
   id: string;
+  /** Número de orden de compra: correlativo único de todas las compras (OC-0123), aparte del código por país. */
+  numero: number;
   /** Cuántos productos de la ficha tiene vinculados (las compras de ClickUp llegan sin ninguno y se vinculan a mano). */
   productos: number;
+  /** Los productos vinculados, con lo pedido de cada uno. */
+  lineas: { codigo: string; nombre: string; cantidad: number }[];
   /** 'pais' (compra nuestra de un país) o 'importacion' (Compras Importadora: servicio a un cliente, sin país). */
   tipo: string;
   /** Código del país de la compra (null en Importadora). */
@@ -212,6 +216,21 @@ const ETAPAS_CERRADAS = ["completado", "descartado"];
 export const valorUnitario = (c: FilaCompra): number | null =>
   c.montoTotal !== null && c.qtyTotal ? c.montoTotal / c.qtyTotal : null;
 
+/** «OC-0123»: el número de orden de compra como se muestra. */
+export const numeroOC = (n: number) => `OC-${String(n).padStart(4, "0")}`;
+
+/**
+ * El título de una compra: con productos vinculados, su número de orden (los productos se ven debajo); sin ellos, el nombre
+ * que traía de ClickUp (que decía el producto).
+ */
+export const tituloCompra = (c: Pick<FilaCompra, "numero" | "nombre" | "productos">) => (c.productos > 0 ? numeroOC(c.numero) : c.nombre);
+
+/** «1.000 × Faja · Beige / S, 500 × Truly…» (hasta `max`, y «y N más»). */
+export function resumenLineas(lineas: FilaCompra["lineas"], max = 3): string {
+  const partes = lineas.slice(0, max).map((l) => `${l.cantidad.toLocaleString("es-PA")} × ${l.nombre || l.codigo}`);
+  return lineas.length > max ? `${partes.join(", ")} y ${lineas.length - max} más` : partes.join(", ");
+}
+
 /** Cómo se filtra, agrupa y oculta lo cerrado en la tabla de Compras. */
 export const DEF_COMPRAS: DefTabla<FilaCompra> = {
   clave: "compras",
@@ -313,7 +332,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       ],
       agrupable: true,
     },
-    { id: "nombreCompra", etiqueta: "Nombre", tipo: "texto", valor: (c) => `${c.nombre} ${c.proveedor ?? ""}` },
+    { id: "nombreCompra", etiqueta: "Nombre", tipo: "texto", valor: (c) => `${numeroOC(c.numero)} ${c.nombre} ${c.proveedor ?? ""} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}` },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
     { id: "trackId", etiqueta: "Track ID", tipo: "texto", valor: (c) => c.trackId ?? "" },
     { id: "orden", etiqueta: "Orden", tipo: "texto", valor: (c) => c.orden ?? "" },
@@ -350,6 +369,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
   // Como una lista de ClickUp: arranca agrupada por Etapa, en el orden del flujo. Cada persona puede agrupar por otra cosa.
   vistaInicial: { agrupar: "etapa" },
   csvAntes: [
+    { etiqueta: "N.º OC", valor: (c) => numeroOC(c.numero) },
     { etiqueta: "Código", valor: (c) => c.codigo ?? "" },
     { etiqueta: "Nombre", valor: (c) => c.nombre },
     { etiqueta: "Tipo", valor: (c) => (c.tipo === "importacion" ? "Importadora" : "País") },

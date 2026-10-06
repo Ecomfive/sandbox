@@ -22,6 +22,9 @@ import {
   etiquetaEtapa,
   etiquetaVia,
   MONEDA_COMPRAS,
+  numeroOC,
+  resumenLineas,
+  tituloCompra,
   prioridadDe,
   valorUnitario,
   type FilaCompra,
@@ -97,6 +100,7 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
 function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<FilaCompra>[] {
   const resto = { ocultable: true } as const;
   return [
+    { id: "numero", label: "N.º OC", ocultable: true, clase: "whitespace-nowrap tabular-nums text-muted-foreground", render: (c) => numeroOC(c.numero) },
     {
       id: "nombre",
       label: "Compra",
@@ -110,7 +114,7 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
               {atrasada && <span className="sr-only">Atrasada. </span>}
               <span className="block max-w-[24rem] truncate font-medium" title={c.nombre}>
                 {c.codigo && <span className="mr-1.5 font-normal text-muted-foreground">{c.codigo}</span>}
-                {c.nombre}
+                {tituloCompra(c)}
               </span>
               {c.tipo === "pais" && c.productos === 0 && (
                 <span className="shrink-0 rounded-full border border-warning/40 bg-warning-soft px-1.5 py-px text-[0.65rem] font-medium whitespace-nowrap text-warning">
@@ -119,6 +123,11 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
               )}
             </span>
             <span className="block text-xs text-muted-foreground">{[c.paisCodigo ?? "Importadora", c.proveedor, c.asignadoNombre].filter(Boolean).join(" · ")}</span>
+            {c.lineas.length > 0 && (
+              <span className="block max-w-[28rem] truncate text-xs text-foreground-soft" title={resumenLineas(c.lineas, 50)}>
+                {resumenLineas(c.lineas)}
+              </span>
+            )}
           </span>
         );
       },

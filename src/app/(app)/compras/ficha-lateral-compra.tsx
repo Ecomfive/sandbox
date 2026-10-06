@@ -4,7 +4,7 @@ import { BotonBarra, CabeceraTarjeta, Pastilla } from "@/components/panel/piezas
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
-import { colorEtapa, etiquetaEstado, etiquetaEtapa, etiquetaVia, ETAPAS_COMPRA, prioridadDe, valorUnitario, type FilaCompra } from "./def-compras";
+import { colorEtapa, etiquetaEstado, etiquetaEtapa, etiquetaVia, ETAPAS_COMPRA, prioridadDe, valorUnitario, type FilaCompra, numeroOC, resumenLineas } from "./def-compras";
 import { diasEntre, estaAbierta, hoy, usd } from "./calculos-compras";
 
 // El recorrido de una compra (sin Backlog ni Descartado) para la barra de avance.
@@ -97,7 +97,11 @@ export function FichaLateralCompra({
             <img src={compra.fotoUrl} alt="" className="h-14 w-14 shrink-0 rounded-md border border-border object-cover" />
           )}
           <div className="min-w-0">
-            <p className="m-0 text-[15px] font-semibold leading-snug">{compra.nombre}</p>
+            <p className="m-0 text-[15px] font-semibold leading-snug">
+              <span className="mr-1.5 tabular-nums">{numeroOC(compra.numero)}</span>
+              {compra.productos === 0 && compra.nombre}
+            </p>
+            {compra.lineas.length > 0 && <p className="m-0 text-xs text-foreground-soft">{resumenLineas(compra.lineas, 10)}</p>}
             <p className="m-0 text-xs text-muted-foreground">
               {[compra.codigo, compra.paisCodigo ?? "Importadora", compra.asignadoNombre].filter(Boolean).join(" · ")}
             </p>

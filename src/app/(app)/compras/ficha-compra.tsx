@@ -10,7 +10,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
-import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, valorUnitario, type FilaCompra } from "./def-compras";
+import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
 import { EliminarCompraBoton } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
@@ -207,7 +207,8 @@ export function FichaCompra({
       titulo={
         compra && (
           <>
-            <span className="text-lg font-semibold">{compra.nombre}</span>
+            <span className="text-lg font-semibold tabular-nums">{numeroOC(compra.numero)}</span>
+            {compra.productos === 0 && <span className="text-lg font-semibold">{compra.nombre}</span>}
             <Badge color={colorEtapa(compra.etapa)}>{etiquetaEtapa(compra.etapa)}</Badge>
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
           </>
