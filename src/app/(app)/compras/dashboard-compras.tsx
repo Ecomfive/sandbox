@@ -248,9 +248,9 @@ export function DashboardCompras({
         </select>
         <select aria-label="Vía de envío" value={f.via} onChange={(e) => setF((x) => ({ ...x, via: e.target.value }))} className={claseSelect}>
           <option value="">Todas las vías</option>
-          <option value="mar">🚢 Mar</option>
-          <option value="aire">🛩️ Aire</option>
-          <option value="tierra">🛻 Tierra</option>
+          <option value="mar">{etiquetaVia("mar")}</option>
+          <option value="aire">{etiquetaVia("aire")}</option>
+          <option value="tierra">{etiquetaVia("tierra")}</option>
           <option value="sin">Sin vía</option>
         </select>
         <select aria-label="Tienda" value={f.tienda} onChange={(e) => setF((x) => ({ ...x, tienda: e.target.value }))} className={claseSelect}>
@@ -297,7 +297,7 @@ export function DashboardCompras({
           <Indicador titulo="Pagado a proveedores" valor={usd(k.pagado, true)} detalle={k.costoUnidad !== null ? `${usd(k.costoUnidad)} por unidad` : "—"} />
           <Indicador titulo="Unidades" valor={entero(k.unidades)} detalle="en las compras filtradas" />
           <Indicador titulo="Ciclo completo" valor={dias(k.ciclo)} detalle="mediana, de crear a completar" />
-          <Indicador titulo="Tránsito" valor={`${dias(k.transitoMar)} / ${dias(k.transitoAire)}`} detalle="mar / aire (mediana)" />
+          <Indicador titulo="Tránsito" valor={`${dias(k.transitoMar)} / ${dias(k.transitoAire)}`} detalle="marítimo / aéreo (mediana)" />
           <Indicador
             titulo="A tiempo"
             punto={k.aTiempo === null ? undefined : k.aTiempo >= 85 ? "exito" : "aviso"}
@@ -354,8 +354,8 @@ export function DashboardCompras({
                   <YAxis {...ejes} width={36} />
                   <Tooltip contentStyle={estiloTooltip} formatter={(v) => (v === null ? "—" : `${v} días`)} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Line type="monotone" dataKey="mar" name="🚢 Mar" stroke="var(--foreground)" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                  <Line type="monotone" dataKey="aire" name="🛩️ Aire" stroke="var(--warning)" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Line type="monotone" dataKey="mar" name={etiquetaVia("mar")} stroke="var(--foreground)" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Line type="monotone" dataKey="aire" name={etiquetaVia("aire")} stroke="var(--warning)" strokeWidth={2} dot={{ r: 2 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -371,8 +371,8 @@ export function DashboardCompras({
                 <YAxis {...ejes} allowDecimals={false} width={32} />
                 <Tooltip contentStyle={estiloTooltip} labelFormatter={(l) => `${l} días`} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="mar" name="🚢 Mar" stackId="v" fill="var(--foreground)" />
-                <Bar dataKey="aire" name="🛩️ Aire" stackId="v" fill="var(--warning)" />
+                <Bar dataKey="mar" name={etiquetaVia("mar")} stackId="v" fill="var(--foreground)" />
+                <Bar dataKey="aire" name={etiquetaVia("aire")} stackId="v" fill="var(--warning)" />
                 <Bar dataKey="otra" name="Otra" stackId="v" fill="var(--border-control)" />
               </BarChart>
             </ResponsiveContainer>
