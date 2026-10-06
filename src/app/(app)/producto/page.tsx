@@ -148,8 +148,10 @@ export default async function ProductoPage() {
 
   const conteo = { fisico: 0, test: 0 };
   for (const p of lista) conteo[p.clase === "test" ? "test" : "fisico"]++;
+  // Un compuesto se arma con productos simples y variantes, nunca con un producto que tiene variantes (no lleva stock:
+  // al vender el compuesto se descuenta la variante elegida).
   const opcionesSimples = lista
-    .filter((p) => p.tipo === "simple")
+    .filter((p) => p.tipo === "simple" && !variantesPorPadre.has(p.id))
     .sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }))
     .map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre }));
 

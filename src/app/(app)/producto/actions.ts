@@ -60,6 +60,9 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   if (componentes.size > 0) {
     const { data: simples } = await supabase.from("skus_maestros").select("id").eq("tipo", "simple").in("id", [...componentes.keys()]);
     if ((simples ?? []).length !== componentes.size) return { error: "Un componente no es un producto simple válido." };
+    // Un producto con variantes no lleva stock: el compuesto debe llevar la variante (la que se descuenta al vender).
+    const { data: conVariantes } = await supabase.from("skus_maestros").select("padre_id").in("padre_id", [...componentes.keys()]).limit(1);
+    if ((conVariantes ?? []).length > 0) return { error: "Un componente tiene variantes: elige la variante (por ejemplo el color o la talla) que lleva el compuesto." };
   }
 
   const { data, error } = await supabase
@@ -472,6 +475,8 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
   const supabase = createServiceClient();
   const { data: v } = await supabase.from("skus_maestros").select("codigo, padre_id").eq("id", id).maybeSingle();
   if (!v || !v.padre_id) return { error: "No es una variante." };
+  const { count: enCombos } = await supabase.from("sku_maestro_componentes").select("id", { count: "exact", head: true }).eq("componente_id", id);
+  if ((enCombos ?? 0) > 0) return { error: "La variante es parte de un producto compuesto: quítala del compuesto primero." };
   const [movs, compras, shopify, dropi] = await Promise.all([
     supabase.from("wms_movimientos").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
     supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
