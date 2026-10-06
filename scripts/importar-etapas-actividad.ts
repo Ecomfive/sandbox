@@ -25,7 +25,8 @@ const datos = JSON.parse(readFileSync("datos-privados/clickup-etapas.json", "utf
   autores: Record<string, number>;
   res: Record<string, string[]>;
 };
-const autorPorCodigo = Object.fromEntries(Object.entries(datos.autores).map(([n, c]) => [String(c), n]));
+// Quien tenía la sesión abierta al leer sale como «Nombre (Tú)».
+const autorPorCodigo = Object.fromEntries(Object.entries(datos.autores).map(([n, c]) => [String(c), n.replace(/\s*\(Tú\)$/, "")]));
 const REASIGNAR: Record<string, string> = {
   "Zeylimar Moreno": "Francis Aponte",
   "Maria Jose Aponte": "Francis Aponte",
