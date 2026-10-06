@@ -1,16 +1,20 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { BotonBarra, Punto, claseConFicha, claseFichaMinimizada } from "@/components/panel/piezas-panel";
 import { almacen } from "@/components/tabla/almacen";
 import { Badge } from "@/components/ui/badge";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
+import { useToast } from "@/components/ui/toast";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, PrioridadIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import { actualizarCampoCompra } from "./actions";
+import { CeldaEditable, type GuardarCelda } from "./celda-editable";
 import { CrearCompraPanel } from "./crear-compra-panel";
+import { campoEditable, normalizarValor } from "./def-edicion-compras";
 import { SelectorVista } from "./selector-vista";
 import {
   colorEstado,
@@ -87,6 +91,23 @@ const RAPIDOS: { valor: Grupo; etiqueta: string }[] = [
   { valor: "atrasadas", etiqueta: "Atrasadas" },
 ];
 
+/**
+ * Quita de los cambios hechos en las celdas lo que el servidor ya trae igual (y las compras que ya no existen): lo que
+ * queda es lo que todavía no llegó. Así un cambio de otra persona que llegue después no queda tapado por uno viejo.
+ */
+function podarCambios(cambios: Record<string, Partial<FilaCompra>>, servidor: FilaCompra[]): Record<string, Partial<FilaCompra>> {
+  const porId = new Map(servidor.map((c) => [c.id, c]));
+  const resultado: Record<string, Partial<FilaCompra>> = {};
+  let cambio = false;
+  for (const [id, parcial] of Object.entries(cambios)) {
+    const fila = porId.get(id);
+    const pendiente = Object.fromEntries(Object.entries(parcial).filter(([k, v]) => !fila || JSON.stringify(fila[k as keyof FilaCompra]) !== JSON.stringify(v)));
+    if (fila && Object.keys(pendiente).length) resultado[id] = pendiente as Partial<FilaCompra>;
+    if (!fila || Object.keys(pendiente).length !== Object.keys(parcial).length) cambio = true;
+  }
+  return cambio ? resultado : cambios;
+}
+
 /** Una columna con el emoji de su campo delante del nombre, como en ClickUp. */
 function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "id" | "label">): ColumnaTabla<FilaCompra> {
   return { id, label: conEmoji(id, nombre), ...resto };
@@ -97,8 +118,14 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
  * de los campos de ClickUp; todas a la vista, y cada persona oculta o mueve las que quiera (arrastrando el título o desde
  * «Columnas»). La compra lleva un punto rojo si está atrasada (más días en tránsito de lo normal para su vía).
  */
-function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<FilaCompra>[] {
+function columnas(umbral: Record<string, number>, dia: string, edicion: { puedeEscribir: boolean; guardar: GuardarCelda }): ColumnaTabla<FilaCompra>[] {
   const resto = { ocultable: true } as const;
+  /** El contenido de una celda, editable en su sitio si su dato se puede editar (ver `CAMPOS_EDITABLES`). */
+  const ed = (c: FilaCompra, campo: string, contenido: ReactNode) => (
+    <CeldaEditable compra={c} campo={campo} puedeEscribir={edicion.puedeEscribir} guardar={edicion.guardar}>
+      {contenido}
+    </CeldaEditable>
+  );
   return [
     { id: "numero", label: "N.º OC", ocultable: true, clase: "whitespace-nowrap tabular-nums text-muted-foreground", render: (c) => numeroOC(c.numero) },
     {
@@ -132,23 +159,27 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
         );
       },
     },
-    col("etapa", "Etapa", { ocultable: true, render: (c) => <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge> }),
-    col("viaEnvio", "Vía de envío", { ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (c) => lista(c.viaEnvio, etiquetaVia) }),
+    col("etapa", "Etapa", { ocultable: true, render: (c) => ed(c, "etapa", <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>) }),
+    col("viaEnvio", "Vía de envío", { ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (c) => ed(c, "viaEnvio", lista(c.viaEnvio, etiquetaVia)) }),
     col("creado", "Creada", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.creadoEn) }),
     col("fechaLlegada", "Fecha de llegada", {
       ocultable: true,
       clase: "whitespace-nowrap",
       render: (c) =>
-        c.fechaLlegada ? (
-          fecha(c.fechaLlegada)
-        ) : c.fechaEnvio ? (
-          <span className={estaAtrasada(c, umbral, dia) ? "text-destructive" : "text-muted-foreground"}>en tránsito {diasEntre(c.fechaEnvio, dia)} d</span>
-        ) : (
-          "—"
+        ed(
+          c,
+          "fechaLlegada",
+          c.fechaLlegada ? (
+            fecha(c.fechaLlegada)
+          ) : c.fechaEnvio ? (
+            <span className={estaAtrasada(c, umbral, dia) ? "text-destructive" : "text-muted-foreground"}>en tránsito {diasEntre(c.fechaEnvio, dia)} d</span>
+          ) : (
+            "—"
+          ),
         ),
     }),
-    col("qtyTotal", "QTY Total", { ocultable: true, clase: "tabular-nums", render: (c) => c.qtyTotal ?? "—" }),
-    col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", render: (c) => usd(c.pagadoAProveedor) }),
+    col("qtyTotal", "QTY Total", { ocultable: true, clase: "tabular-nums", render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
+    col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("foto", "Foto", {
       ...resto,
@@ -172,38 +203,38 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
     }),
     col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
-    col("estado", "Estado", { ...resto, render: (c) => <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge> }),
+    col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("prioridad", "Prioridad", {
       ...resto,
       render: (c) => {
         const p = prioridadDe(c.prioridad);
-        return p ? <Badge color={p.color}>{p.etiqueta}</Badge> : "—";
+        return ed(c, "prioridad", p ? <Badge color={p.color}>{p.etiqueta}</Badge> : "—");
       },
     }),
-    col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => c.proveedor || "—" }),
-    col("tienda", "Tienda", { ...resto, clase: "text-muted-foreground", render: (c) => c.tienda || "—" }),
-    col("cliente", "Cliente", { ...resto, clase: "text-muted-foreground", render: (c) => c.cliente || "—" }),
-    col("etiquetas", "Etiquetas", { ...resto, clase: "text-muted-foreground", render: (c) => lista(c.etiquetas) }),
+    col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
+    col("tienda", "Tienda", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "tienda", c.tienda || "—") }),
+    col("cliente", "Cliente", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "cliente", c.cliente || "—") }),
+    col("etiquetas", "Etiquetas", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "etiquetas", lista(c.etiquetas)) }),
     col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
-    col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),
-    col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", render: (c) => usd(c.montoTotal) }),
+    col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "planificacion", c.planificacion || "—") }),
+    col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "montoTotal", usd(c.montoTotal)) }),
     col("valorUnitario", "Valor Unitario", { ...resto, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
-    col("primerPago", "Primer Pago", { ...resto, clase: "tabular-nums", render: (c) => usd(c.primerPago) }),
-    col("segundoPago", "Segundo Pago", { ...resto, clase: "tabular-nums", render: (c) => usd(c.segundoPago) }),
-    col("pagoPendiente", "Pago Pendiente", { ...resto, clase: "tabular-nums", render: (c) => usd(c.pagoPendiente) }),
-    col("cobradoCliente", "Cobrado Cliente", { ...resto, clase: "tabular-nums", render: (c) => usd(c.cobradoCliente) }),
-    col("pendienteCliente", "Pendiente Cliente", { ...resto, clase: "tabular-nums", render: (c) => usd(c.pendienteCliente) }),
-    col("pagoCliente", "Pago Cliente", { ...resto, render: (c) => c.pagoCliente || "—" }),
-    col("cuentaReceptora", "Cuenta receptora", { ...resto, clase: "text-muted-foreground", render: (c) => c.cuentaReceptora || "—" }),
-    col("factura", "Factura", { ...resto, render: (c) => siNo(c.factura) }),
-    col("financiamiento", "Financiamiento", { ...resto, render: (c) => siNo(c.financiamiento) }),
-    col("fechaPago1", "Fecha de Pago (1)", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago1) }),
-    col("fechaPago2", "Fecha de Pago (2)", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaPago2) }),
-    col("fechaEnvio", "Fecha de Envío", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaEnvio) }),
-    col("fechaLimite", "Fecha límite", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.fechaLimite) }),
-    col("trackId", "Track ID", { ...resto, clase: "text-muted-foreground", render: (c) => c.trackId || "—" }),
-    col("orden", "Orden", { ...resto, clase: "text-muted-foreground tabular-nums", render: (c) => c.orden || "—" }),
-    col("inconveniente", "Inconveniente", { ...resto, render: (c) => c.inconveniente || "—" }),
+    col("primerPago", "Primer Pago", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "primerPago", usd(c.primerPago)) }),
+    col("segundoPago", "Segundo Pago", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "segundoPago", usd(c.segundoPago)) }),
+    col("pagoPendiente", "Pago Pendiente", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "pagoPendiente", usd(c.pagoPendiente)) }),
+    col("cobradoCliente", "Cobrado Cliente", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "cobradoCliente", usd(c.cobradoCliente)) }),
+    col("pendienteCliente", "Pendiente Cliente", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "pendienteCliente", usd(c.pendienteCliente)) }),
+    col("pagoCliente", "Pago Cliente", { ...resto, render: (c) => ed(c, "pagoCliente", c.pagoCliente || "—") }),
+    col("cuentaReceptora", "Cuenta receptora", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "cuentaReceptora", c.cuentaReceptora || "—") }),
+    col("factura", "Factura", { ...resto, render: (c) => ed(c, "factura", siNo(c.factura)) }),
+    col("financiamiento", "Financiamiento", { ...resto, render: (c) => ed(c, "financiamiento", siNo(c.financiamiento)) }),
+    col("fechaPago1", "Fecha de Pago (1)", { ...resto, clase: "whitespace-nowrap", render: (c) => ed(c, "fechaPago1", fecha(c.fechaPago1)) }),
+    col("fechaPago2", "Fecha de Pago (2)", { ...resto, clase: "whitespace-nowrap", render: (c) => ed(c, "fechaPago2", fecha(c.fechaPago2)) }),
+    col("fechaEnvio", "Fecha de Envío", { ...resto, clase: "whitespace-nowrap", render: (c) => ed(c, "fechaEnvio", fecha(c.fechaEnvio)) }),
+    col("fechaLimite", "Fecha límite", { ...resto, clase: "whitespace-nowrap", render: (c) => ed(c, "fechaLimite", fecha(c.fechaLimite)) }),
+    col("trackId", "Track ID", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "trackId", c.trackId || "—") }),
+    col("orden", "Orden", { ...resto, clase: "text-muted-foreground tabular-nums", render: (c) => ed(c, "orden", c.orden || "—") }),
+    col("inconveniente", "Inconveniente", { ...resto, render: (c) => ed(c, "inconveniente", c.inconveniente || "—") }),
     col("cerrado", "Cerrada", { ...resto, clase: "whitespace-nowrap", render: (c) => fecha(c.cerradoEn) }),
   ];
 }
@@ -211,11 +242,12 @@ function columnas(umbral: Record<string, number>, dia: string): ColumnaTabla<Fil
 /**
  * El tablero de Compras, una sola vista: la tabla con la barra de herramientas común (agrupar —arranca por Etapa—, filtros,
  * columnas, cerrados, descarga y «Agregar»), los filtros de un toque (cotizando, producción, en tránsito, atrasadas) y la
- * ficha de resumen fija a la derecha, que se puede minimizar. Pulsar una fila la muestra en la ficha; «Abrir ficha
- * completa» abre la actividad (comentarios, adjuntos, historial). Con la ficha minimizada, la fila abre la ficha completa.
+ * ficha de resumen fija a la derecha, que se puede minimizar. Pulsar la descripción de una compra la muestra en la ficha
+ * (el resto de la fila no abre nada: sus celdas se editan en su sitio, ver `CeldaEditable`); «Abrir ficha completa» abre la
+ * actividad (comentarios, adjuntos, historial). Con la ficha minimizada, la descripción abre la ficha completa.
  */
 export function TablaCompras({
-  compras,
+  compras: comprasServidor,
   vista,
   paises,
   puedeEscribir,
@@ -239,6 +271,7 @@ export function TablaCompras({
   abrirInicial?: string | null;
   comentarioInicial?: string | null;
 }) {
+  const { mostrarToast } = useToast();
   const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
   const [soloSinProductos, setSoloSinProductos] = useState(false);
   const [etapa, setEtapa] = useState(etapaInicial);
@@ -247,9 +280,48 @@ export function TablaCompras({
   const guardadoFicha = almacen(CLAVE_FICHA, "local");
   const fichaMinimizada = useSyncExternalStore(guardadoFicha.suscribir, guardadoFicha.leer, () => "") === "minimizada";
 
+  // Lo editado en una celda se ve al instante, sin esperar a rearmar la página: son cambios sobre las filas que llegaron del
+  // servidor. Cuando llegan filas nuevas (otra edición, la ficha, recargar) se descarta lo que ya coincide con el servidor.
+  const [cambios, setCambios] = useState<Record<string, Partial<FilaCompra>>>({});
+  const [comprasPrevias, setComprasPrevias] = useState(comprasServidor);
+  if (comprasServidor !== comprasPrevias) {
+    setComprasPrevias(comprasServidor);
+    setCambios((actuales) => podarCambios(actuales, comprasServidor));
+  }
+  const compras = useMemo(
+    () => (Object.keys(cambios).length ? comprasServidor.map((c) => (cambios[c.id] ? { ...c, ...cambios[c.id] } : c)) : comprasServidor),
+    [comprasServidor, cambios],
+  );
+
+  /** Guarda un dato de una compra: se ve de inmediato y, si el servidor lo rechaza, vuelve a como estaba y se avisa. */
+  const guardarCelda = useCallback<GuardarCelda>(
+    async (compra, campo, bruto) => {
+      const def = campoEditable(campo);
+      if (!def) return;
+      const normalizado = normalizarValor(def, bruto);
+      if ("error" in normalizado) {
+        mostrarToast(normalizado.error, "destructive");
+        return;
+      }
+      const anterior = compra[def.prop];
+      const poner = (p: Partial<FilaCompra>) => setCambios((o) => ({ ...o, [compra.id]: { ...o[compra.id], ...p } }));
+      poner({ [def.prop]: normalizado.valor } as Partial<FilaCompra>);
+      const resultado = await actualizarCampoCompra(compra.id, campo, normalizado.valor).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }) as { error?: string; cerradoEn?: string | null });
+      if (resultado.error) {
+        poner({ [def.prop]: anterior } as Partial<FilaCompra>);
+        mostrarToast(resultado.error, "destructive");
+        return;
+      }
+      if ("cerradoEn" in resultado) poner({ cerradoEn: resultado.cerradoEn ?? null });
+      mostrarToast(`${def.etiqueta} guardado`);
+    },
+    [mostrarToast],
+  );
+  const edicion = useMemo(() => ({ puedeEscribir, guardar: guardarCelda }), [puedeEscribir, guardarCelda]);
+
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
   const dia = hoy();
-  const cols = useMemo(() => columnas(umbral, dia), [umbral, dia]);
+  const cols = useMemo(() => columnas(umbral, dia, edicion), [umbral, dia, edicion]);
   const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, compras.filter((c) => enGrupo(c, r.valor, umbral)).length])), [compras, umbral]);
   const filas = useMemo(
     () => compras.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
@@ -303,9 +375,12 @@ export function TablaCompras({
           anchoMinimo="72rem"
           porPagina={100}
           paginarSiempre
+          // La ficha se abre solo desde la descripción de la compra: el resto de las celdas se editan en su sitio.
           abrirFila={{
             etiqueta: (c) => `Ver la compra ${c.nombre}`,
             alAbrir: (c, orden) => (fichaMinimizada ? setAbierta({ id: c.id, orden }) : setElegida({ id: c.id, orden })),
+            columna: "nombre",
+            soloColumna: true,
           }}
           claseFila={(c) => (!fichaMinimizada && c.id === elegida?.id ? "bg-accent" : "")}
           accionPrincipal={

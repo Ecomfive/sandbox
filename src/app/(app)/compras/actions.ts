@@ -6,6 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, PRIORIDADES, VIAS_ENVIO } from "./def-compras";
+import { campoEditable, normalizarValor, textoDeValor } from "./def-edicion-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
@@ -194,6 +195,59 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
 
   revalidatePath("/compras");
   return {};
+}
+
+/**
+ * Cambia **un solo dato** de una compra, desde su celda en la lista (la ficha, en cambio, guarda todo junto). Lo que llega se
+ * vuelve a validar aquí con las mismas reglas de la celda (`normalizarValor`). Cambiar la etapa hace lo mismo que en la
+ * ficha: sella o quita la fecha de cierre y deja el evento con su hora. No llama a `revalidatePath`: la lista ya muestra el
+ * cambio y rearmar toda la página de Compras por cada celda la haría lenta. Devuelve el error como valor.
+ */
+export async function actualizarCampoCompra(id: string, campo: string, bruto: unknown): Promise<{ error?: string; cerradoEn?: string | null }> {
+  await requireModuloEscritura("compras");
+  if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
+  const def = campoEditable(String(campo));
+  if (!def) return { error: "Ese dato no se edita aquí." };
+  const normalizado = normalizarValor(def, bruto);
+  if ("error" in normalizado) return normalizado;
+
+  const supabase = createServiceClient();
+  const { data } = await supabase.from("wms_compras").select(`${def.columna}, etapa, estado`).eq("id", id).maybeSingle();
+  const actual = data as unknown as Record<string, unknown> | null;
+  if (!actual) return { error: "La compra ya no existe." };
+
+  if (def.soloSinProductos) {
+    const { count } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);
+    if ((count ?? 0) > 0) return { error: "Con productos vinculados, esto se calcula de ellos." };
+  }
+
+  const cambios: Record<string, unknown> = { [def.columna]: normalizado.valor, actualizado_en: new Date().toISOString() };
+  let cerradoEn: string | null | undefined;
+  if (campo === "etapa") {
+    const cierra = normalizado.valor === "completado" || normalizado.valor === "descartado";
+    const yaCerrada = actual.etapa === "completado" || actual.etapa === "descartado";
+    cerradoEn = cierra ? (yaCerrada ? undefined : new Date().toISOString()) : null;
+    if (cerradoEn !== undefined) cambios.cerrado_en = cerradoEn;
+  }
+
+  const { error } = await supabase.from("wms_compras").update(cambios).eq("id", id);
+  if (error) return { error: error.message.length < 200 ? error.message : "No se pudo guardar el cambio." };
+
+  if (campo === "etapa" || campo === "estado") {
+    await anotarEventos(
+      id,
+      { etapa: String(actual.etapa), estado: String(actual.estado) },
+      { etapa: campo === "etapa" ? String(normalizado.valor) : String(actual.etapa), estado: campo === "estado" ? String(normalizado.valor) : String(actual.estado) },
+    );
+  }
+  await registrarAuditoria({
+    accion: "editar_campo_compra",
+    entidad: "wms_compras",
+    entidadId: id,
+    antes: { [def.etiqueta]: textoDeValor(def, actual[def.columna]) },
+    despues: { [def.etiqueta]: textoDeValor(def, normalizado.valor) },
+  });
+  return cerradoEn === undefined ? {} : { cerradoEn };
 }
 
 export async function eliminarCompra(formData: FormData) {
