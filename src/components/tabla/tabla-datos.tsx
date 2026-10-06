@@ -47,6 +47,7 @@ export function TablaDatos<F, C = undefined>({
   anchoMinimo = "36rem",
   limiteSinFiltros,
   porPagina = POR_PAGINA,
+  paginarSiempre,
   descargaCompleta,
   accionPrincipal,
   vacio,
@@ -81,6 +82,8 @@ export function TablaDatos<F, C = undefined>({
   limiteSinFiltros?: number;
   /** Filas por página cuando no hay filtros ni grupos (50 por defecto); con menos filas que eso no se ve la paginación. */
   porPagina?: number;
+  /** Pagina también con filtros o grupos (por defecto se ven todas las filas en esos casos). */
+  paginarSiempre?: boolean;
   /** Descarga que arma el servidor con más filas que las cargadas; el botón Descargar la ofrece junto a «Lo que se ve». */
   descargaCompleta?: DescargaCompleta;
   /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
@@ -90,7 +93,7 @@ export function TablaDatos<F, C = undefined>({
   /** «lista»: más limpia, como una lista de ClickUp (sin rayas entre columnas y apenas una línea suave entre filas). */
   aspecto?: "tabla" | "lista";
 }) {
-  const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros, porPagina });
+  const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros, porPagina, paginarSiempre });
   const [guardadas, cambiarColumnas] = useColumnas(def.clave, columnas);
   const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
   const { raiz, alIrA } = useIrAPaginaArriba(tabla.irAPagina);

@@ -261,6 +261,8 @@ export function TablaCompras({
           claveFila={(c) => c.id}
           formatearTotal={(total) => formatearMoneda(total, MONEDA_COMPRAS)}
           anchoMinimo="56rem"
+          porPagina={100}
+          paginarSiempre
           abrirFila={{
             etiqueta: (c) => `Ver la compra ${c.nombre}`,
             alAbrir: (c, orden) => (fichaMinimizada ? setAbierta({ id: c.id, orden }) : setElegida({ id: c.id, orden })),

@@ -18,6 +18,8 @@ export function useTablaInteractiva<F>(
     limiteSinFiltros?: number;
     /** Filas por página cuando no hay filtros ni grupos: `visibles` es la página actual y `paginacion` dice cuál es. Con filtros o grupos se ven todas. */
     porPagina?: number;
+    /** Pagina también con filtros o grupos (tablas grandes como Compras): los grupos se arman con las filas de la página. */
+    paginarSiempre?: boolean;
   } = {}
 ) {
   const [filtros, cambiarFiltros] = useFiltros(def);
@@ -29,12 +31,20 @@ export function useTablaInteractiva<F>(
     () => aplicarVista(def, filas, filtros, vista.mostrarCerrados),
     [def, filas, filtros, vista.mostrarCerrados]
   );
-  const { limiteSinFiltros, porPagina } = opciones;
+  const { limiteSinFiltros, porPagina, paginarSiempre = false } = opciones;
 
   // Página pedida: vale solo mientras no cambien los filtros, los cerrados ni los grupos; si cambian, se vuelve a la 1.
   const firmaPagina = JSON.stringify([filtros, vista.mostrarCerrados, vista.agrupar]);
   const [paginaPedida, setPaginaPedida] = useState<{ firma: string; pagina: number }>({ firma: "", pagina: 1 });
-  const paginado = porPagina !== undefined && !hayFiltros && !agrupado;
+  const paginado = porPagina !== undefined && (paginarSiempre || (!hayFiltros && !agrupado));
+  // Agrupada, las páginas siguen el orden de los grupos (una fila con varios valores cuenta una vez, en el primero).
+  const ordenadas = useMemo(() => {
+    if (!paginado || !vista.agrupar) return resultado.filas;
+    const vistas = new Set<F>();
+    return agruparFilas(def, resultado.filas, vista.agrupar, vista.orden)
+      .flatMap((g) => g.filas)
+      .filter((f) => (vistas.has(f) ? false : (vistas.add(f), true)));
+  }, [paginado, def, resultado.filas, vista.agrupar, vista.orden]);
   const paginacion = useMemo(
     () =>
       paginado
@@ -45,11 +55,11 @@ export function useTablaInteractiva<F>(
   const irAPagina = (pagina: number) => setPaginaPedida({ firma: firmaPagina, pagina });
 
   const visibles = useMemo(() => {
-    if (paginacion) return resultado.filas.slice(paginacion.inicio, paginacion.fin);
+    if (paginacion) return ordenadas.slice(paginacion.inicio, paginacion.fin);
     return hayFiltros || agrupado || limiteSinFiltros === undefined
       ? resultado.filas
       : resultado.filas.slice(0, limiteSinFiltros);
-  }, [resultado.filas, paginacion, hayFiltros, agrupado, limiteSinFiltros]);
+  }, [resultado.filas, ordenadas, paginacion, hayFiltros, agrupado, limiteSinFiltros]);
   const grupos = useMemo(
     () => (vista.agrupar ? agruparFilas(def, visibles, vista.agrupar, vista.orden) : []),
     [def, visibles, vista.agrupar, vista.orden]
