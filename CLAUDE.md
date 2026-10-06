@@ -598,6 +598,12 @@ convenciones técnicas del código.
   son fórmulas), país, foto, responsable, ni la QTY y el monto de una compra con productos (se calculan de ellos), igual que
   en la ficha. Sin permiso de escritura las celdas son solo texto. Para sumar un dato editable: agrégalo a `CAMPOS_EDITABLES`
   y envuelve su celda con `ed(c, "<id>", …)` en `tabla-compras.tsx`.
+  **Productos en la ficha:** el bloque «Productos» (`productos-compra.tsx`, solo compras de país) va **dentro del formulario**,
+  en el bloque «Compra» justo debajo de Prioridad y Etiquetas (`FormularioCompra` recibe `productos` y `FichaCompra` se lo
+  pasa con `incrustado`). Como está dentro del `<form>` pero guarda por su cuenta (cada campo, al salir de él), su contenedor
+  frena `onChange`/`onInput` (si no, escribir unidades encendía «Guardar cambios» de la compra) y bloquea Enter en sus campos
+  (si no, enviaba la compra). Un campo nuevo ahí no debe llevar `name`: se colaría al guardar la compra. A solo lectura no hay
+  formulario y el bloque queda al final de la ficha.
   **Tiempos y fallas** (`/compras/tiempos`): tiempo por tramo (con las fechas), tiempo en cada estado (con `wms_compra_eventos`),
   comparación por proveedor, vía, país, tienda o responsable, atrasadas e inconvenientes. **Atrasada** = abierta, ya salió y
   lleva más días en tránsito que el 90 % de los envíos de su vía (`umbralesTransito`). Los cálculos son puros, en

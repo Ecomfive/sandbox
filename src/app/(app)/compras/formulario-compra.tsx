@@ -49,6 +49,7 @@ export function FormularioCompra({
   botonesArriba,
   encabezado,
   acciones,
+  productos,
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
   vista: string;
@@ -61,6 +62,8 @@ export function FormularioCompra({
   botonesArriba?: boolean;
   encabezado?: ReactNode;
   acciones?: ReactNode;
+  /** El bloque de productos de la compra: va en el bloque «Compra», justo debajo de Prioridad y Etiquetas. */
+  productos?: ReactNode;
 }) {
   const [modificado, setModificado] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -194,6 +197,19 @@ export function FormularioCompra({
               <input id="campo-etiquetas-compra" type="text" name="etiquetas" defaultValue={compra?.etiquetas.join(", ") ?? ""} placeholder="Ej: reposición, kenku" className={fieldClass} />
             </Campo>
           </div>
+          {productos && (
+            // Los productos viven dentro del formulario solo en el espacio: guardan solos (cada campo, al salir de él), así que
+            // lo que se escribe aquí no cuenta como «cambios sin guardar» de la compra y Enter no la envía.
+            <div
+              onChange={(e) => e.stopPropagation()}
+              onInput={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
+              }}
+            >
+              {productos}
+            </div>
+          )}
           <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
             <legend className="mb-1.5 text-xs font-medium text-muted-foreground">{conEmoji("viaEnvio", "Vía de envío")}</legend>
             <div className="flex flex-wrap gap-4">

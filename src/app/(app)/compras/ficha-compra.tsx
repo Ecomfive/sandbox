@@ -238,11 +238,14 @@ export function FichaCompra({
               alCancelar={alCancelar}
               alCambiarGuardando={setGuardando}
               alModificar={() => setSinGuardarId(compra.id)}
+              // Los productos van arriba, en el bloque «Compra» debajo de Prioridad (solo compras de país).
+              productos={compra.tipo === "pais" ? <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir incrustado /> : undefined}
             />
           ) : (
             <DatosDeLaCompra compra={compra} codigoPais={MONEDA_COMPRAS} />
           )}
-          {compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={puedeEscribir} />}
+          {/* A solo lectura no hay formulario: los productos se ven al final, como antes. */}
+          {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} />}
           <ActividadCompra key={compra.id} id={compra.id} comentarioResaltado={comentarioResaltado} />
         </div>
       )}
