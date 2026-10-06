@@ -12,6 +12,7 @@ import { MenuVistas } from "./menu-vistas";
 import type { EstadoTabla } from "@/lib/tabla/vistas";
 import type { ColumnaDef, EstadoColumnas } from "./ganchos";
 import { MenuColumnas } from "./menu-columnas";
+import { BotonBuscar } from "./boton-buscar";
 import type { TablaInteractiva } from "./usar-tabla";
 
 /**
@@ -71,6 +72,7 @@ export function BarraHerramientas<F>({
     >
       {extra && <div className="flex items-center gap-2">{extra}</div>}
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {def.campos.some((c) => c.tipo === "texto") && <BotonBuscar valor={tabla.busqueda} alCambiar={tabla.setBusqueda} nombreFilas={nombreFilas} />}
         <MenuVistas
           def={def}
           estado={{

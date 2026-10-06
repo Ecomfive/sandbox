@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { filtroActivo, type DefTabla } from "@/lib/tabla/motor";
+import { filtroActivo, normalizar, type DefTabla } from "@/lib/tabla/motor";
 import { calcularPagina } from "@/lib/tabla/paginacion";
 import { agruparFilas, aplicarVista } from "@/lib/tabla/vista";
 import { useFiltros, useVista } from "./ganchos";
@@ -24,17 +24,23 @@ export function useTablaInteractiva<F>(
 ) {
   const [filtros, cambiarFiltros] = useFiltros(def);
   const [vista, cambiarVista] = useVista(def);
-  const hayFiltros = filtros.some(filtroActivo);
+  // La lupa: busca en todos los textos de la fila (código, nombre…), también entre las cerradas.
+  const [busqueda, setBusqueda] = useState("");
+  const q = normalizar(busqueda.trim());
+  const hayFiltros = filtros.some(filtroActivo) || q !== "";
   const agrupado = vista.agrupar !== null;
 
-  const resultado = useMemo(
-    () => aplicarVista(def, filas, filtros, vista.mostrarCerrados),
-    [def, filas, filtros, vista.mostrarCerrados]
-  );
+  const resultado = useMemo(() => {
+    const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados || q !== "");
+    if (!q) return r;
+    const textos = def.campos.filter((c) => c.tipo === "texto");
+    const coincide = (fila: F) => textos.some((c) => c.tipo === "texto" && normalizar(c.valor(fila)).includes(q));
+    return { ...r, filas: r.filas.filter(coincide) };
+  }, [def, filas, filtros, vista.mostrarCerrados, q]);
   const { limiteSinFiltros, porPagina, paginarSiempre = false } = opciones;
 
   // Página pedida: vale solo mientras no cambien los filtros, los cerrados ni los grupos; si cambian, se vuelve a la 1.
-  const firmaPagina = JSON.stringify([filtros, vista.mostrarCerrados, vista.agrupar]);
+  const firmaPagina = JSON.stringify([filtros, vista.mostrarCerrados, vista.agrupar, q]);
   const [paginaPedida, setPaginaPedida] = useState<{ firma: string; pagina: number }>({ firma: "", pagina: 1 });
   const paginado = porPagina !== undefined && (paginarSiempre || (!hayFiltros && !agrupado));
   // Agrupada, las páginas siguen el orden de los grupos (una fila con varios valores cuenta una vez, en el primero).
@@ -83,6 +89,8 @@ export function useTablaInteractiva<F>(
   return {
     filtros,
     cambiarFiltros,
+    busqueda,
+    setBusqueda,
     vista,
     cambiarVista,
     hayFiltros,

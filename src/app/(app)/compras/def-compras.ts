@@ -313,6 +313,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       ],
       agrupable: true,
     },
+    { id: "nombreCompra", etiqueta: "Nombre", tipo: "texto", valor: (c) => `${c.nombre} ${c.proveedor ?? ""}` },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
     { id: "trackId", etiqueta: "Track ID", tipo: "texto", valor: (c) => c.trackId ?? "" },
     { id: "orden", etiqueta: "Orden", tipo: "texto", valor: (c) => c.orden ?? "" },
