@@ -183,7 +183,10 @@ function BabyYoda() {
       <div className="flex flex-col items-center gap-2 rounded-lg border border-border px-3 py-5 text-center">
         <BabyYodaIcon className="h-10 w-10 text-foreground-soft" />
         <p className="m-0 text-sm font-medium text-foreground">Próximamente</p>
-        <p className="m-0 text-xs text-muted-foreground">Un cerebro que te ayudará en el día a día y aprenderá solo de tu operación.</p>
+        <figure className="m-0 flex flex-col gap-1">
+          <blockquote className="m-0 text-xs text-muted-foreground italic">«Mucho que aprender todavía tienes, joven padawan»</blockquote>
+          <figcaption className="text-xs font-medium text-foreground-soft">— Baby Yoda</figcaption>
+        </figure>
       </div>
     </section>
   );
