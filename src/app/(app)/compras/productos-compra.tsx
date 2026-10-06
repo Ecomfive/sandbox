@@ -12,27 +12,100 @@ import { actualizarProductoCompra, agregarProductoCompra, obtenerProductosCompra
 import { useConfirmarProductoActivo } from "./confirmar-producto-activo";
 import { usd } from "./calculos-compras";
 
-const claseNumero = `${fieldClass} w-24 text-right tabular-nums`;
+const claseNumero = `${fieldClass} w-28 text-right tabular-nums`;
 const aNumero = (t: string): number | null => (t.trim() === "" ? null : Number(t.replace(",", ".")));
+/** El costo unitario se guarda con hasta 4 decimales; el total, en centavos. */
+const redondear = (n: number, decimales: number) => Math.round(n * 10 ** decimales) / 10 ** decimales;
+const texto = (n: number | null, decimales: number) => (n === null || !Number.isFinite(n) ? "" : String(redondear(n, decimales)));
 
-/** Una fila: lo pedido y el costo se editan en el lugar y se guardan al salir del campo. */
+/**
+ * El costo de una línea: unitario y total enlazados. Se escribe uno y el otro se calcula con la cantidad; si cambia la
+ * cantidad, se recalcula a partir del último que se escribió (escribir el total y luego la cantidad reparte ese total).
+ */
+function useCosto(cantidad: number, unitarioInicial: number | null) {
+  const [unitario, setUnitario] = useState(texto(unitarioInicial, 4));
+  const [total, setTotal] = useState(unitarioInicial !== null && cantidad > 0 ? texto(unitarioInicial * cantidad, 2) : "");
+  const [ultimo, setUltimo] = useState<"unitario" | "total">("unitario");
+
+  function escribirUnitario(t: string) {
+    setUltimo("unitario");
+    setUnitario(t);
+    const u = aNumero(t);
+    setTotal(u !== null && cantidad > 0 ? texto(u * cantidad, 2) : "");
+  }
+  function escribirTotal(t: string) {
+    setUltimo("total");
+    setTotal(t);
+    const tot = aNumero(t);
+    setUnitario(tot !== null && cantidad > 0 ? texto(tot / cantidad, 4) : "");
+  }
+  /** Al cambiar la cantidad: se mantiene lo último que se escribió y se recalcula el otro. */
+  function conCantidad(n: number) {
+    if (!(n > 0)) return;
+    if (ultimo === "total" && aNumero(total) !== null) setUnitario(texto(aNumero(total)! / n, 4));
+    else if (aNumero(unitario) !== null) setTotal(texto(aNumero(unitario)! * n, 2));
+  }
+  function reiniciar(u: number | null, n: number) {
+    setUnitario(texto(u, 4));
+    setTotal(u !== null && n > 0 ? texto(u * n, 2) : "");
+    setUltimo("unitario");
+  }
+  return { unitario, total, escribirUnitario, escribirTotal, conCantidad, reiniciar, valorUnitario: aNumero(unitario) };
+}
+
+function CamposCosto({ costo, deshabilitado, alSalir }: { costo: ReturnType<typeof useCosto>; deshabilitado?: boolean; alSalir?: () => void }) {
+  return (
+    <>
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">Costo unitario (USD)</span>
+        <input
+          type="number"
+          min={0}
+          step="0.0001"
+          inputMode="decimal"
+          value={costo.unitario}
+          disabled={deshabilitado}
+          onChange={(e) => costo.escribirUnitario(e.target.value)}
+          onBlur={alSalir}
+          className={claseNumero}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">Costo total (USD)</span>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          inputMode="decimal"
+          value={costo.total}
+          disabled={deshabilitado}
+          onChange={(e) => costo.escribirTotal(e.target.value)}
+          onBlur={alSalir}
+          className={claseNumero}
+        />
+      </label>
+    </>
+  );
+}
+
+/** Una línea de la orden: lo pedido y el costo (unitario o total) se editan en el lugar y se guardan al salir del campo. */
 function FilaItem({ item, puedeEscribir, alCambiar }: { item: ItemCompra; puedeEscribir: boolean; alCambiar: () => void }) {
   const { mostrarToast } = useToast();
   const [cantidad, setCantidad] = useState(String(item.cantidadPedida));
-  const [costo, setCosto] = useState(item.costoUnitario === null ? "" : String(item.costoUnitario));
+  const n = Number(cantidad);
+  const costo = useCosto(n, item.costoUnitario);
   const [pendiente, start] = useTransition();
   const recibido = item.cantidadRecibida !== null;
 
   function guardar() {
-    const n = Number(cantidad);
-    const c = aNumero(costo);
-    if (n === item.cantidadPedida && c === item.costoUnitario) return;
+    const u = costo.valorUnitario;
+    if (n === item.cantidadPedida && u === item.costoUnitario) return;
     start(async () => {
-      const r = await actualizarProductoCompra(item.id, n, c);
+      const r = await actualizarProductoCompra(item.id, n, u === null ? null : redondear(u, 4));
       if (r.error) {
         mostrarToast(r.error, "destructive");
         setCantidad(String(item.cantidadPedida));
-        setCosto(item.costoUnitario === null ? "" : String(item.costoUnitario));
+        costo.reiniciar(item.costoUnitario, item.cantidadPedida);
       } else alCambiar();
     });
   }
@@ -46,7 +119,6 @@ function FilaItem({ item, puedeEscribir, alCambiar }: { item: ItemCompra; puedeE
     });
   }
 
-  const subtotal = item.costoUnitario !== null ? item.costoUnitario * item.cantidadPedida : null;
   return (
     <li className="flex flex-col gap-2 rounded-lg border border-border p-3">
       <div className="flex items-start justify-between gap-2">
@@ -77,35 +149,25 @@ function FilaItem({ item, puedeEscribir, alCambiar }: { item: ItemCompra; puedeE
             inputMode="numeric"
             value={cantidad}
             disabled={!puedeEscribir || pendiente}
-            onChange={(e) => setCantidad(e.target.value)}
+            onChange={(e) => {
+              setCantidad(e.target.value);
+              costo.conCantidad(Number(e.target.value));
+            }}
             onBlur={guardar}
             className={claseNumero}
           />
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">Costo unitario (USD)</span>
-          <input
-            type="number"
-            min={0}
-            step="0.0001"
-            inputMode="decimal"
-            value={costo}
-            disabled={!puedeEscribir || pendiente}
-            onChange={(e) => setCosto(e.target.value)}
-            onBlur={guardar}
-            className={claseNumero}
-          />
-        </label>
-        <p className="m-0 ml-auto text-sm tabular-nums">{subtotal !== null ? usd(subtotal) : <span className="text-muted-foreground">—</span>}</p>
+        <CamposCosto costo={costo} deshabilitado={!puedeEscribir || pendiente} alSalir={guardar} />
       </div>
     </li>
   );
 }
 
 /**
- * Los productos de una orden de compra, de la ficha de producto: cada uno con lo pedido, su costo unitario y su número de
- * lote en el país de la compra (Lote #1, #2… se sigue solo). La QTY Total de la compra es la suma de lo pedido. Un
- * producto en Test pide pasarlo a Activo antes de agregarlo. Solo compras de país: Importadora compra para clientes.
+ * Los productos de una orden de compra, de la ficha de producto: cada línea con lo pedido y su costo (se escribe el unitario
+ * o el total y el otro se calcula), su número de lote en el país de la compra (Lote #1, #2… se sigue solo) y, al final, el
+ * total de la orden (unidades y monto). La QTY Total y el Monto Total de la compra salen de aquí. Un producto con variantes
+ * pide la cantidad de cada variante; uno en Test, pasarlo a Activo. Solo compras de país: Importadora compra para clientes.
  */
 export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string; puedeEscribir: boolean }) {
   const { mostrarToast } = useToast();
@@ -114,10 +176,16 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
   const [error, setError] = useState<string | null>(null);
   const [elegido, setElegido] = useState<OpcionSkuMaestro | null>(null);
   const [cantidad, setCantidad] = useState("");
-  const [costo, setCosto] = useState("");
   // Cantidades por variante cuando el producto elegido tiene variantes.
   const [porVariante, setPorVariante] = useState<Record<string, string>>({});
   const [pendiente, start] = useTransition();
+
+  const items = datos?.items ?? [];
+  const yaEstan = new Set(items.map((i) => i.skuId));
+  const variantesElegido = elegido ? (datos?.productos ?? []).filter((p) => p.padreId === elegido.id) : [];
+  // La cantidad de la línea nueva: la escrita, o la suma de las variantes (el costo total se reparte entre todas).
+  const cantidadNueva = variantesElegido.length ? variantesElegido.reduce((s, v) => s + (Number(porVariante[v.id]) || 0), 0) : Number(cantidad) || 0;
+  const costoNuevo = useCosto(cantidadNueva, null);
 
   const cargar = useCallback(async () => {
     const r = await obtenerProductosCompra(compraId);
@@ -137,8 +205,8 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
   function limpiar() {
     setElegido(null);
     setCantidad("");
-    setCosto("");
     setPorVariante({});
+    costoNuevo.reiniciar(null, 0);
   }
 
   async function agregar() {
@@ -152,10 +220,11 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
       : [[producto, Number(cantidad)]];
     if (pares.length === 0) return mostrarToast("Escribe la cantidad de al menos una variante.", "destructive");
     if (pares.some(([, n]) => !Number.isInteger(n) || n <= 0)) return mostrarToast("Las cantidades deben ser números enteros mayores que cero.", "destructive");
+    const unitario = costoNuevo.valorUnitario === null ? null : redondear(costoNuevo.valorUnitario, 4);
     for (const [p] of pares) if (!(await confirmar(p))) return;
     start(async () => {
       for (const [p, n] of pares) {
-        const r = await agregarProductoCompra(compraId, p.id, n, aNumero(costo));
+        const r = await agregarProductoCompra(compraId, p.id, n, unitario);
         if (r.error) {
           mostrarToast(`${p.codigo}: ${r.error}`, "destructive");
           break;
@@ -166,13 +235,13 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
     });
   }
 
-  const items = datos?.items ?? [];
-  const total = items.reduce((s, i) => s + i.cantidadPedida, 0);
-  const yaEstan = new Set(items.map((i) => i.skuId));
+  // El total de la orden.
+  const unidades = items.reduce((s, i) => s + i.cantidadPedida, 0);
+  const monto = items.reduce((s, i) => s + (i.costoUnitario !== null ? redondear(i.costoUnitario * i.cantidadPedida, 2) : 0), 0);
+  const sinCosto = items.filter((i) => i.costoUnitario === null).length;
   // Se busca el producto (o el padre); las variantes se piden al elegirlo.
   const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
-  const variantesElegido = elegido ? (datos?.productos ?? []).filter((p) => p.padreId === elegido.id) : [];
-  const listo = !!elegido && (variantesElegido.length ? Object.values(porVariante).some((v) => Number(v) > 0) : !!cantidad);
+  const listo = !!elegido && cantidadNueva > 0;
 
   return (
     <div className="border-t border-border p-5">
@@ -193,11 +262,24 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
             ))}
           </ul>
         )}
-        {items.length > 1 && <p className="m-0 text-xs text-muted-foreground">Total pedido: {total.toLocaleString("es-PA")} u.</p>}
+        {items.length > 0 && (
+          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-muted px-3 py-2" role="status">
+            <span className="text-sm font-medium">
+              Total de la orden · {items.length} producto{items.length === 1 ? "" : "s"} · {unidades.toLocaleString("es-PA")} u.
+            </span>
+            <span className="text-base font-semibold tabular-nums">{usd(monto)}</span>
+            {sinCosto > 0 && (
+              <span className="w-full text-xs text-warning">
+                {sinCosto} producto{sinCosto === 1 ? "" : "s"} sin costo: no {sinCosto === 1 ? "suma" : "suman"} al total.
+              </span>
+            )}
+          </div>
+        )}
         {puedeEscribir && datos && (
           <ProveedorSkusMaestros opciones={opciones}>
-            <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
-              <label className="flex min-w-[14rem] flex-1 flex-col gap-1 text-xs">
+            <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-3">
+              <p className="m-0 text-xs font-medium">Agregar producto</p>
+              <label className="flex flex-col gap-1 text-xs">
                 <span className="text-muted-foreground">Producto</span>
                 <CampoSkuMaestro
                   valor={elegido?.id ?? null}
@@ -209,21 +291,8 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
                   placeholder="Código o nombre del producto"
                 />
               </label>
-              {variantesElegido.length === 0 && (
-                <label className="flex flex-col gap-1 text-xs">
-                  <span className="text-muted-foreground">Pedido (u.)</span>
-                  <input type="number" min={1} step={1} inputMode="numeric" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className={claseNumero} />
-                </label>
-              )}
-              <label className="flex flex-col gap-1 text-xs">
-                <span className="text-muted-foreground">Costo unitario (USD)</span>
-                <input type="number" min={0} step="0.0001" inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} className={claseNumero} />
-              </label>
-              <BotonBarra principal disabled={!listo || pendiente} onClick={() => void agregar()}>
-                {pendiente ? "Agregando…" : "Agregar"}
-              </BotonBarra>
               {variantesElegido.length > 0 && (
-                <fieldset className="m-0 flex w-full flex-col gap-1.5 border-0 p-0">
+                <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
                   <legend className="mb-1 text-xs text-muted-foreground">Cantidad por variante (deja vacías las que no se compran):</legend>
                   {variantesElegido.map((v) => {
                     const ya = yaEstan.has(v.id);
@@ -241,7 +310,11 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
                             inputMode="numeric"
                             aria-label={`Cantidad de ${v.codigo}`}
                             value={porVariante[v.id] ?? ""}
-                            onChange={(e) => setPorVariante((c) => ({ ...c, [v.id]: e.target.value }))}
+                            onChange={(e) => {
+                              const siguiente = { ...porVariante, [v.id]: e.target.value };
+                              setPorVariante(siguiente);
+                              costoNuevo.conCantidad(variantesElegido.reduce((s, x) => s + (Number(siguiente[x.id]) || 0), 0));
+                            }}
                             className={claseNumero}
                           />
                         )}
@@ -250,6 +323,31 @@ export function ProductosCompra({ compraId, puedeEscribir }: { compraId: string;
                   })}
                 </fieldset>
               )}
+              <div className="flex flex-wrap items-end gap-3 text-xs">
+                {variantesElegido.length === 0 ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-muted-foreground">Pedido (u.)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      inputMode="numeric"
+                      value={cantidad}
+                      onChange={(e) => {
+                        setCantidad(e.target.value);
+                        costoNuevo.conCantidad(Number(e.target.value));
+                      }}
+                      className={claseNumero}
+                    />
+                  </label>
+                ) : (
+                  <p className="m-0 pb-2 text-muted-foreground">Pedido: {cantidadNueva.toLocaleString("es-PA")} u.</p>
+                )}
+                <CamposCosto costo={costoNuevo} />
+                <BotonBarra principal disabled={!listo || pendiente} onClick={() => void agregar()} className="ml-auto">
+                  {pendiente ? "Agregando…" : "Agregar a la orden"}
+                </BotonBarra>
+              </div>
             </div>
           </ProveedorSkusMaestros>
         )}

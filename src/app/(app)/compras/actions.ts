@@ -175,7 +175,10 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
 
   const supabase = createServiceClient();
   const { data: actual } = await supabase.from("wms_compras").select("foto_url, etapa, estado").eq("id", id).single();
-  const cambios = leerCambios(formData);
+  const { qty_total, monto_total, ...resto } = leerCambios(formData);
+  // Con productos vinculados, la cantidad y el monto los calcula el bloque «Productos»: el formulario no los pisa.
+  const { count: lineas } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);
+  const cambios = (lineas ?? 0) > 0 ? resto : { ...resto, qty_total, monto_total };
   // Al cerrar (completado o descartado) se sella la fecha de cierre; al reabrir se quita.
   const cierra = etapa === "completado" || etapa === "descartado";
   const cerrado_en = cierra ? (actual && (actual.etapa === "completado" || actual.etapa === "descartado") ? undefined : new Date().toISOString()) : null;
@@ -329,12 +332,25 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
 const ES_CANTIDAD = (n: number) => Number.isInteger(n) && n > 0 && n <= 10_000_000;
 const ES_COSTO = (n: number | null) => n === null || (Number.isFinite(n) && n >= 0 && n <= 100_000_000);
 
-/** La QTY Total de una compra con productos es la suma de lo pedido de cada uno. */
+/**
+ * El total de una compra con productos: la QTY Total es la suma de lo pedido y el Monto Total la de cada línea (cantidad ×
+ * costo unitario, en centavos) de las que tienen costo. Sin ninguna línea con costo, el Monto Total no se toca.
+ */
 async function sincronizarCantidad(compraId: string) {
   const supabase = createServiceClient();
-  const { data } = await supabase.from("wms_compra_items").select("cantidad_pedida").eq("compra_id", compraId);
-  const total = (data ?? []).reduce((suma, i) => suma + Number(i.cantidad_pedida), 0);
-  await supabase.from("wms_compras").update({ qty_total: data && data.length ? total : null, actualizado_en: new Date().toISOString() }).eq("id", compraId);
+  const { data } = await supabase.from("wms_compra_items").select("cantidad_pedida, costo_unitario").eq("compra_id", compraId);
+  const lineas = data ?? [];
+  const unidades = lineas.reduce((suma, i) => suma + Number(i.cantidad_pedida), 0);
+  const conCosto = lineas.filter((i) => i.costo_unitario !== null);
+  const monto = conCosto.reduce((suma, i) => suma + Math.round(Number(i.cantidad_pedida) * Number(i.costo_unitario) * 100) / 100, 0);
+  await supabase
+    .from("wms_compras")
+    .update({
+      qty_total: lineas.length ? unidades : null,
+      ...(conCosto.length ? { monto_total: Math.round(monto * 100) / 100 } : {}),
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq("id", compraId);
 }
 
 /**

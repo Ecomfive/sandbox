@@ -261,12 +261,26 @@ export function FormularioCompra({
 
         <Seccion icono={GastoIcon} titulo="Cantidad y pagos">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta={conEmoji("qtyTotal", "QTY Total")} id="campo-qty">
-              <input id="campo-qty" type="number" step="1" min="0" name="qty_total" defaultValue={compra?.qtyTotal ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
-              <input id="campo-monto-total" type="number" step="0.01" min="0" name="monto_total" defaultValue={compra?.montoTotal ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
+            {/* Con productos vinculados, la cantidad y el monto salen de ellos (bloque «Productos»): no se escriben aquí. */}
+            {compra && compra.productos > 0 ? (
+              <>
+                <Campo etiqueta={conEmoji("qtyTotal", "QTY Total")} id="campo-qty">
+                  <input id="campo-qty" type="text" readOnly value="Se calcula de los productos" className={`${fieldClass} bg-muted text-muted-foreground`} />
+                </Campo>
+                <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
+                  <input id="campo-monto-total" type="text" readOnly value="Se calcula de los productos" className={`${fieldClass} bg-muted text-muted-foreground`} />
+                </Campo>
+              </>
+            ) : (
+              <>
+                <Campo etiqueta={conEmoji("qtyTotal", "QTY Total")} id="campo-qty">
+                  <input id="campo-qty" type="number" step="1" min="0" name="qty_total" defaultValue={compra?.qtyTotal ?? ""} className={`${fieldClass} tabular-nums`} />
+                </Campo>
+                <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
+                  <input id="campo-monto-total" type="number" step="0.01" min="0" name="monto_total" defaultValue={compra?.montoTotal ?? ""} className={`${fieldClass} tabular-nums`} />
+                </Campo>
+              </>
+            )}
             <Campo etiqueta={conEmoji("primerPago", "Primer Pago")} id="campo-primer-pago">
               <input id="campo-primer-pago" type="number" step="0.01" min="0" name="primer_pago" defaultValue={compra?.primerPago ?? ""} className={`${fieldClass} tabular-nums`} />
             </Campo>
