@@ -27,3 +27,27 @@ export async function crearPais(formData: FormData): Promise<{ error?: string }>
   revalidatePath("/compras");
   return {};
 }
+
+/**
+ * El prefijo de las órdenes de compra de un país («ECOM05»): las compras nuevas de ese país toman el número siguiente
+ * («ECOM05-0001»…). Cambiar el prefijo no toca los códigos que ya existen ni reinicia la numeración. Dos países no pueden
+ * compartir prefijo. Pide poder modificar Configuración. Devuelve el error como valor.
+ */
+export async function guardarPrefijoCompras(codigoPais: string, prefijo: string): Promise<{ error?: string }> {
+  await requireModuloEscritura("configuracion");
+  const limpio = String(prefijo ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(codigoPais)) return { error: "País no válido." };
+  if (!/^[A-Z0-9]{2,12}$/.test(limpio)) return { error: "El prefijo son de 2 a 12 letras o números, sin espacios (Ej: ECOM05)." };
+  const supabase = createServiceClient();
+  const { data: pais } = await supabase.from("paises").select("id").eq("codigo", codigoPais).maybeSingle();
+  if (!pais) return { error: "País no válido." };
+  const { data: otro } = await supabase.from("wms_compras_correlativo").select("clave").eq("prefijo", limpio).neq("clave", codigoPais).maybeSingle();
+  if (otro) return { error: `Ese prefijo ya lo usa ${otro.clave === "importacion" ? "Importadora" : otro.clave}.` };
+  const { error } = await supabase
+    .from("wms_compras_correlativo")
+    .upsert({ clave: codigoPais, prefijo: limpio, actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
+  if (error) return { error: "No se pudo guardar el prefijo." };
+  await registrarAuditoria({ accion: "prefijo_compras", entidad: "paises", entidadId: pais.id, detalle: `${codigoPais} · ${limpio}` });
+  revalidatePath("/configuracion");
+  return {};
+}

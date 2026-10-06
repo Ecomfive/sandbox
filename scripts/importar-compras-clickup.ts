@@ -45,6 +45,11 @@ const REASIGNAR: Record<string, string> = {
   "fabiola concha": "Francis Aponte",
   "andreina andrade de morales": "Francis Aponte",
 };
+/**
+ * Los códigos de orden de compra como los lleva el sistema (migración 0077): Panamá «ECOM-0241» → «ECOM01-0241» y el
+ * «COM02-0076» mal escrito de México → «ECOM02-0076». El formato viejo (PA-00191) queda igual.
+ */
+const normalizarCodigos = (t: string) => t.replace(/\bECOM-(\d)/g, "ECOM01-$1").replace(/\bCOM02-(\d)/g, "ECOM02-$1");
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 const ESTADOS: Record<string, string> = {
@@ -201,8 +206,8 @@ async function main() {
         clickup_id: t.id,
         clickup_lista: lista.name,
         clickup: { ...crudo, _tiempo_en_estado },
-        nombre: String(t.name).trim() || "(sin nombre)",
-        codigo: String(t.name).match(/\b([A-Z]{2,3}-\d{3,})\b/)?.[1] ?? null,
+        nombre: normalizarCodigos(String(t.name).trim()) || "(sin nombre)",
+        codigo: normalizarCodigos(String(t.name)).match(/\b([A-Z]{2,5}\d{0,2}-\d{3,5})\b/)?.[1] ?? null,
         estado: mapEstado(t.status?.status),
         etapa: mapEtapa(texto(t, "Etapa", "drop_down")),
         proveedor: texto(t, "Proveedor", "drop_down") ?? texto(t, "Proveedor", "short_text"),

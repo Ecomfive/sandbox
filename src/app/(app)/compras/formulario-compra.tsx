@@ -152,7 +152,15 @@ export function FormularioCompra({
           </Campo>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta={conEmoji("codigo", "Código")} id="campo-codigo-compra">
-              <input id="campo-codigo-compra" type="text" name="codigo" maxLength={40} defaultValue={compra?.codigo ?? ""} placeholder="Ej: PA-00113" className={fieldClass} />
+              {/* El código lo pone el sistema al crear la compra (el siguiente de su país): no se escribe a mano. */}
+              <input
+                id="campo-codigo-compra"
+                type="text"
+                readOnly
+                value={compra?.codigo ?? ""}
+                placeholder="Se asigna al crear"
+                className={`${fieldClass} bg-muted text-muted-foreground`}
+              />
             </Campo>
             {esImportacion ? (
               <Campo etiqueta={conEmoji("pais", "Países de destino")} id="campo-destinos-compra">

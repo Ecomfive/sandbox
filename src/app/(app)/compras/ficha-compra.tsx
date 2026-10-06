@@ -14,6 +14,7 @@ import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS,
 import { ActividadCompra } from "./actividad-compra";
 import { EliminarCompraBoton } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
+import { ProductosCompra } from "./productos-compra";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
@@ -238,6 +239,7 @@ export function FichaCompra({
           ) : (
             <DatosDeLaCompra compra={compra} codigoPais={MONEDA_COMPRAS} />
           )}
+          {compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={puedeEscribir} />}
           <ActividadCompra key={compra.id} id={compra.id} />
         </div>
       )}

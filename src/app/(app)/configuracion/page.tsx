@@ -23,13 +23,14 @@ export default async function ConfiguracionPage() {
   const consultarCuentas = (columnas: string) =>
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
-  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }] = await Promise.all([
+  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }] = await Promise.all([
     supabase
       .from("pais_plataformas")
       .select("id, disponible_para_retiro, plataformas(nombre)")
       .eq("pais_id", pais.id),
     consultarCuentas(`${COLUMNAS_CUENTA}, datos_binance`),
     supabase.from("paises").select("id, codigo, nombre").order("nombre"),
+    supabase.from("wms_compras_correlativo").select("clave, prefijo, ultimo"),
   ]);
   const cuentas = (cuentasConBinance.error ? (await consultarCuentas(COLUMNAS_CUENTA)).data : cuentasConBinance.data) as unknown as
     | FilaCuenta[]
@@ -49,7 +50,13 @@ export default async function ConfiguracionPage() {
 
       <div id="paises" className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Países</h2>
-        <TablaPaises paises={(todosLosPaises ?? []) as { id: string; codigo: string; nombre: string }[]} puedeEscribir={puedeEscribir} />
+        <TablaPaises
+          paises={((todosLosPaises ?? []) as { id: string; codigo: string; nombre: string }[]).map((p) => {
+            const c = (correlativos ?? []).find((x) => x.clave === p.codigo);
+            return { ...p, prefijo: (c?.prefijo as string | null) ?? null, ultimo: (c?.ultimo as number | undefined) ?? 0 };
+          })}
+          puedeEscribir={puedeEscribir}
+        />
       </div>
 
       <div className="flex flex-col gap-3">

@@ -81,7 +81,6 @@ function leerCambios(formData: FormData) {
     planificacion: textoOptativo(formData, "planificacion"),
     documentos: textoOptativo(formData, "documentos"),
     notas: textoOptativo(formData, "notas"),
-    codigo: textoOptativo(formData, "codigo")?.slice(0, 40) ?? null,
     prioridad: PRIORIDADES_VALIDAS.has(String(formData.get("prioridad") ?? "")) ? String(formData.get("prioridad")) : null,
     via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)),
     etiquetas: listaDeTexto(textoOptativo(formData, "etiquetas")),
@@ -102,6 +101,22 @@ async function leerTipoYPais(formData: FormData): Promise<{ tipo: string; pais_i
   const { data } = await createServiceClient().from("paises").select("id").eq("codigo", codigo).maybeSingle();
   if (!data) return { error: "País no válido." };
   return { tipo, pais_id: data.id as string, paises_destino: [] };
+}
+
+/**
+ * El código de una compra nueva: el siguiente del correlativo de su país, o de Importadora («ECOM01-0450»). Sin prefijo
+ * configurado para ese país (Configuración › Países) la compra se crea sin código.
+ */
+async function siguienteCodigo(tipo: string, paisId: string | null): Promise<string | null> {
+  const supabase = createServiceClient();
+  let clave = "importacion";
+  if (tipo === "pais") {
+    const { data } = await supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle();
+    if (!data) return null;
+    clave = data.codigo as string;
+  }
+  const { data } = await supabase.rpc("wms_siguiente_codigo_compra", { p_clave: clave });
+  return (data as string | null) ?? null;
 }
 
 /** Anota los cambios de etapa y de estado con su hora: de ahí salen los tiempos por etapa del tablero de compras. */
@@ -129,15 +144,16 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string 
   if ("error" in tipoYPais) return tipoYPais;
 
   const supabase = createServiceClient();
+  const codigo = await siguienteCodigo(tipoYPais.tipo, tipoYPais.pais_id);
   const { data, error } = await supabase
     .from("wms_compras")
-    .insert({ ...tipoYPais, nombre, etapa, estado, ...leerCambios(formData) })
+    .insert({ ...tipoYPais, nombre, etapa, estado, ...leerCambios(formData), codigo })
     .select("id")
     .single();
   if (error) return { error: error.message };
   await anotarEventos(data.id, null, { etapa, estado });
 
-  await registrarAuditoria({ accion: "crear_compra", entidad: "wms_compras", entidadId: data.id, detalle: nombre });
+  await registrarAuditoria({ accion: "crear_compra", entidad: "wms_compras", entidadId: data.id, detalle: codigo ? `${codigo} · ${nombre}` : nombre });
   revalidatePath("/compras");
   return {};
 }
@@ -248,5 +264,143 @@ export async function comentarCompra(id: string, texto: string): Promise<{ error
     .from("wms_compra_comentarios")
     .insert({ compra_id: id, autor: usuario.nombre || usuario.email, texto: limpio });
   if (error) return { error: "No se pudo guardar el comentario." };
+  return {};
+}
+
+/** Un producto de una orden de compra, para su ficha. */
+export interface ItemCompra {
+  id: string;
+  skuId: string;
+  codigo: string;
+  nombre: string;
+  cantidadPedida: number;
+  costoUnitario: number | null;
+  loteNumero: number;
+  cantidadRecibida: number | null;
+  fechaRecepcion: string | null;
+  origen: string;
+}
+
+/** Un producto de la ficha que se puede agregar a una compra (los compuestos no: no se compran, salen de sus componentes). */
+export interface ProductoComprable {
+  id: string;
+  codigo: string;
+  nombre: string;
+  estado: string;
+  clase: string;
+}
+
+/** Los productos de una compra y los que se le pueden agregar. Basta poder abrir Compras. */
+export async function obtenerProductosCompra(compraId: string): Promise<{ items: ItemCompra[]; productos: ProductoComprable[] } | { error: string }> {
+  await requireModulo("compras");
+  if (!ES_ID(compraId)) return { error: "Compra no válida." };
+  const supabase = createServiceClient();
+  const [items, productos] = await Promise.all([
+    supabase
+      .from("wms_compra_items")
+      .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre)")
+      .eq("compra_id", compraId)
+      .order("creado_en"),
+    supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase").neq("tipo", "combo").order("nombre"),
+  ]);
+  if (items.error || productos.error) return { error: "No se pudieron cargar los productos." };
+  return {
+    items: (items.data ?? []).map((i) => {
+      const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string } | null;
+      return {
+        id: i.id,
+        skuId: i.sku_maestro_id,
+        codigo: sku?.codigo ?? "",
+        nombre: sku?.nombre ?? "",
+        cantidadPedida: i.cantidad_pedida,
+        costoUnitario: i.costo_unitario === null ? null : Number(i.costo_unitario),
+        loteNumero: i.lote_numero,
+        cantidadRecibida: i.cantidad_recibida,
+        fechaRecepcion: i.fecha_recepcion,
+        origen: i.origen,
+      };
+    }),
+    productos: (productos.data ?? []) as ProductoComprable[],
+  };
+}
+
+const ES_CANTIDAD = (n: number) => Number.isInteger(n) && n > 0 && n <= 10_000_000;
+const ES_COSTO = (n: number | null) => n === null || (Number.isFinite(n) && n >= 0 && n <= 100_000_000);
+
+/** La QTY Total de una compra con productos es la suma de lo pedido de cada uno. */
+async function sincronizarCantidad(compraId: string) {
+  const supabase = createServiceClient();
+  const { data } = await supabase.from("wms_compra_items").select("cantidad_pedida").eq("compra_id", compraId);
+  const total = (data ?? []).reduce((suma, i) => suma + Number(i.cantidad_pedida), 0);
+  await supabase.from("wms_compras").update({ qty_total: data && data.length ? total : null, actualizado_en: new Date().toISOString() }).eq("id", compraId);
+}
+
+/**
+ * Agrega un producto de la ficha a una compra de país, con lo pedido y su costo unitario. Toma el número de lote siguiente
+ * de ese producto en el país de la compra (Lote #1, #2…). Un producto en Test no se compra: primero pasa a Activo
+ * (`useConfirmarProductoActivo`).
+ */
+export async function agregarProductoCompra(compraId: string, skuId: string, cantidad: number, costo: number | null): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(compraId) || !ES_ID(skuId)) return { error: "Datos no válidos." };
+  if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
+  if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
+  const supabase = createServiceClient();
+  const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre, tipo, clase").eq("id", skuId).maybeSingle();
+  if (!sku) return { error: "El producto no existe." };
+  if (sku.tipo === "combo") return { error: "Un producto compuesto no se compra: se compran sus componentes." };
+  if (sku.clase === "test") return { error: "El producto está en Test: pásalo a Activo para comprarlo." };
+  const { error } = await supabase.rpc("wms_agregar_item_compra", {
+    p_compra: compraId,
+    p_sku: skuId,
+    p_cantidad: cantidad,
+    p_costo: costo,
+    p_lote: null,
+    p_origen: "sistema",
+    p_usuario: usuario.id,
+  });
+  if (error) {
+    if (error.code === "23505") return { error: "Ese producto ya está en la compra: cambia su cantidad." };
+    return { error: error.message.length < 200 ? error.message : "No se pudo agregar el producto." };
+  }
+  await sincronizarCantidad(compraId);
+  await registrarAuditoria({ accion: "agregar_producto_compra", entidad: "wms_compras", entidadId: compraId, detalle: `${sku.codigo} · ${cantidad} u.` });
+  revalidatePath("/compras");
+  return {};
+}
+
+/** Cambia lo pedido o el costo unitario de un producto de una compra. */
+export async function actualizarProductoCompra(itemId: string, cantidad: number, costo: number | null): Promise<{ error?: string }> {
+  await requireModuloEscritura("compras");
+  if (!ES_ID(itemId)) return { error: "Producto no válido." };
+  if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
+  if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("wms_compra_items")
+    .update({ cantidad_pedida: cantidad, costo_unitario: costo, actualizado_en: new Date().toISOString() })
+    .eq("id", itemId)
+    .select("compra_id")
+    .single();
+  if (error || !data) return { error: "No se pudo guardar el cambio." };
+  await sincronizarCantidad(data.compra_id);
+  revalidatePath("/compras");
+  return {};
+}
+
+/** Quita un producto de una compra, si todavía no se recibió nada de él. */
+export async function quitarProductoCompra(itemId: string): Promise<{ error?: string }> {
+  await requireModuloEscritura("compras");
+  if (!ES_ID(itemId)) return { error: "Producto no válido." };
+  const supabase = createServiceClient();
+  const { data: item } = await supabase.from("wms_compra_items").select("compra_id, cantidad_recibida, skus_maestros(codigo)").eq("id", itemId).maybeSingle();
+  if (!item) return { error: "El producto ya no está en la compra." };
+  if (item.cantidad_recibida !== null) return { error: "Ya se recibió mercancía de este producto: no se puede quitar." };
+  const { error } = await supabase.from("wms_compra_items").delete().eq("id", itemId);
+  if (error) return { error: "No se pudo quitar el producto." };
+  await sincronizarCantidad(item.compra_id);
+  const sku = (Array.isArray(item.skus_maestros) ? item.skus_maestros[0] : item.skus_maestros) as { codigo: string } | null;
+  await registrarAuditoria({ accion: "quitar_producto_compra", entidad: "wms_compras", entidadId: item.compra_id, detalle: sku?.codigo ?? itemId });
+  revalidatePath("/compras");
   return {};
 }
