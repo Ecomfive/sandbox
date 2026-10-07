@@ -1,7 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/tooltip";
-import { ContenedorTabla } from "./contenedor-tabla";
+import { ContenedorTabla, type CeldaFija } from "./contenedor-tabla";
 import { useState, type ReactNode } from "react";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import type { DefTabla } from "@/lib/tabla/motor";
@@ -29,6 +29,11 @@ export interface ColumnaTabla<F, C = undefined> extends ColumnaDef {
   render: (fila: F, contexto: C) => ReactNode;
   /** Clases de la celda (color, alineación...). */
   clase?: string;
+  /**
+   * La suma (o lo que corresponda) de esta columna sobre **todas** las filas que deja ver la tabla (con sus filtros, no solo la
+   * página). Si alguna columna a la vista la trae, la tabla muestra una fila de totales pegada abajo, como ClickUp.
+   */
+  total?: (filas: F[]) => ReactNode;
 }
 
 /**
@@ -58,6 +63,7 @@ export function TablaDatos<F, C = undefined>({
   descargaCompleta,
   accionPrincipal,
   seleccion,
+  fijarEncabezado,
   vacio,
   aspecto = "tabla",
 }: {
@@ -116,6 +122,12 @@ export function TablaDatos<F, C = undefined>({
     etiqueta: (fila: F) => string;
     barra: (marcadas: F[], quitar: () => void) => ReactNode;
   };
+  /**
+   * Deja el encabezado quieto al bajar aunque la tabla se desplace de lado (con muchas columnas): aparece una copia suya
+   * bajo la barra de herramientas y solo se mueven las filas (ver `ContenedorTabla`). Sin esto, una tabla que desborda de
+   * lado pierde su encabezado al bajar.
+   */
+  fijarEncabezado?: boolean;
   /** Mensaje cuando no hay filas cargadas. */
   vacio: string;
   /** «lista»: más limpia, como una lista de ClickUp (sin rayas entre columnas y apenas una línea suave entre filas). */
@@ -237,6 +249,26 @@ export function TablaDatos<F, C = undefined>({
     </tr>
   );
 
+  // Las copias fijas del encabezado y de los totales: una celda por cada columna de la tabla, en su mismo orden.
+  const encabezadoFijo: CeldaFija[] | undefined = fijarEncabezado
+    ? [
+        ...(seleccion ? [{ contenido: null, clase: claseEncabezadoCasilla }] : []),
+        ...visibles_.map((c) => ({ contenido: c.label, clase: claseEncabezadoColumna })),
+        ...(accion ? [{ contenido: accion.fija ? accion.etiqueta : null, clase: claseEncabezadoColumna }] : []),
+      ]
+    : undefined;
+  const hayTotales = visibles_.some((c) => c.total);
+  const totales: CeldaFija[] | undefined = hayTotales
+    ? [
+        ...(seleccion ? [{ contenido: null, clase: "w-10 px-2 py-3" }] : []),
+        ...visibles_.map((c, i) => ({
+          contenido: c.total ? c.total(resultado.filas) : i === 0 ? "Total" : null,
+          clase: `${claseCeldaColumna} tabular-nums whitespace-nowrap`,
+        })),
+        ...(accion ? [{ contenido: null, clase: "px-4 py-3" }] : []),
+      ]
+    : undefined;
+
   const notas = notasPie({
     hayFiltros,
     agrupado,
@@ -262,7 +294,7 @@ export function TablaDatos<F, C = undefined>({
         descargaCompleta={descargaCompleta}
         accionPrincipal={accionPrincipal}
       />
-      <ContenedorTabla ariaLabel={ariaLabel}>
+      <ContenedorTabla ariaLabel={ariaLabel} aspecto={aspecto} encabezadoFijo={encabezadoFijo} totales={totales}>
         <table data-aspecto={aspecto} className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
           <thead>
             <tr className={claseFilaEncabezado}>

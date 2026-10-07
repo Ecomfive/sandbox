@@ -10,6 +10,7 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { SIN_VALOR } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { combinarLista, type ModoLote } from "@/lib/compras/lote";
 import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta } from "./actions";
@@ -70,6 +71,19 @@ const ICONOS: Record<string, IconoComp> = {
 };
 
 const usd = (v: number | null) => (v !== null ? formatearMoneda(v, MONEDA_COMPRAS) : "—");
+/** La suma de un dato de todas las compras que deja ver la tabla (las que no lo tienen no cuentan); «—» si ninguna lo tiene. */
+const sumar = (filas: FilaCompra[], dato: (c: FilaCompra) => number | null, formato: (n: number) => string) => {
+  let total = 0;
+  let hay = false;
+  for (const c of filas) {
+    const v = dato(c);
+    if (v !== null) {
+      total += v;
+      hay = true;
+    }
+  }
+  return hay ? formato(Math.round(total * 100) / 100) : "—";
+};
 const fecha = (v: string | null) => (v ? formatearFecha(v) : "—");
 const siNo = (v: boolean) => (v ? "Sí" : <span className="text-muted-foreground">No</span>);
 const lista = (v: string[], f: (x: string) => string = (x) => x) => (v.length ? v.map(f).join(", ") : "—");
@@ -185,8 +199,8 @@ function columnas(
           ),
         ),
     }),
-    col("qtyTotal", "QTY Total", { ocultable: true, clase: "tabular-nums", render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
-    col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
+    col("qtyTotal", "QTY Total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
+    col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.pagadoAProveedor, usd), render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("foto", "Foto", {
       ...resto,
@@ -250,10 +264,10 @@ function columnas(
     }),
     col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
     col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "planificacion", c.planificacion || "—") }),
-    col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "montoTotal", usd(c.montoTotal)) }),
+    col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.montoTotal, usd), render: (c) => ed(c, "montoTotal", usd(c.montoTotal)) }),
     col("valorUnitario", "Valor Unitario", { ...resto, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
-    col("primerPago", "Primer Pago", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "primerPago", usd(c.primerPago)) }),
-    col("segundoPago", "Segundo Pago", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "segundoPago", usd(c.segundoPago)) }),
+    col("primerPago", "Primer Pago", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.primerPago, usd), render: (c) => ed(c, "primerPago", usd(c.primerPago)) }),
+    col("segundoPago", "Segundo Pago", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.segundoPago, usd), render: (c) => ed(c, "segundoPago", usd(c.segundoPago)) }),
     col("factura", "Factura", { ...resto, render: (c) => ed(c, "factura", siNo(c.factura)) }),
     col("financiamiento", "Financiamiento", { ...resto, render: (c) => ed(c, "financiamiento", siNo(c.financiamiento)) }),
     col("fechaPago1", "Fecha de Pago (1)", { ...resto, clase: "whitespace-nowrap", render: (c) => ed(c, "fechaPago1", fecha(c.fechaPago1)) }),
@@ -485,9 +499,23 @@ export function TablaCompras({
           nombre={NOMBRE}
           claveFila={(c) => c.id}
           formatearTotal={(total) => formatearMoneda(total, MONEDA_COMPRAS)}
+          // Al agrupar, el título de cada grupo lleva el color de su etapa o estado (como en ClickUp) y el de su etiqueta.
+          etiquetaGrupo={(campo, grupo) =>
+            campo === "etapa" ? (
+              <Badge color={colorEtapa(grupo.clave)}>{grupo.etiqueta}</Badge>
+            ) : campo === "estado" ? (
+              <Badge color={colorEstado(grupo.clave)}>{grupo.etiqueta}</Badge>
+            ) : campo === "etiquetas" && grupo.clave !== SIN_VALOR ? (
+              <PastillaEtiqueta nombre={grupo.etiqueta} color={colores[grupo.etiqueta]} />
+            ) : (
+              <span className="font-semibold">{grupo.etiqueta}</span>
+            )
+          }
           anchoMinimo="72rem"
           porPagina={100}
           paginarSiempre
+          // El encabezado se queda quieto al bajar aunque la tabla se desplace de lado, y las sumas quedan pegadas abajo.
+          fijarEncabezado
           // La ficha se abre solo desde la descripción de la compra: el resto de las celdas se editan en su sitio.
           abrirFila={{
             etiqueta: (c) => `Ver la compra ${c.nombre}`,

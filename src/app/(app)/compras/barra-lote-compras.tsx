@@ -74,7 +74,8 @@ export function BarraLoteCompras({
       role="region"
       aria-label="Compras seleccionadas"
       aria-busy={guardando}
-      className="sticky bottom-4 z-30 mx-auto my-3 flex w-fit max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-border-control bg-card px-3 py-2 text-sm shadow-lg"
+      // Más arriba que la barra de otras tablas: debajo van la fila de totales y la barra de desplazamiento, que no se tapan.
+      className="sticky bottom-24 z-30 mx-auto my-3 flex w-fit max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-border-control bg-card px-3 py-2 text-sm shadow-lg"
     >
       <p role="status" className="mr-1 font-medium tabular-nums">
         {cantidad}

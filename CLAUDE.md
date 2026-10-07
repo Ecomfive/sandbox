@@ -585,7 +585,10 @@ convenciones técnicas del código.
   el dato de cada compra pasó a un comentario con su título («Track ID: …») para poder buscarlo en la Actividad. No los
   vuelvas a poner como campo ni como indicador (el «pago pendiente» del Informe y del Dashboard se quitó con ellos); la
   fecha «Cerrada» sí sigue, porque la pone el sistema y de ella salen el ciclo y los tiempos. **Compras** (`/compras/lista`, `tabla-compras.tsx`): una sola vista, la `TablaDatos`
-  con aspecto de lista (agrupar —arranca por Etapa—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
+  con aspecto de lista (**lo que se archiva —«Cerrados», oculto por defecto— lo decide el Estado: solo `estado = completado`;
+  la etapa «Completado» no archiva**, porque el producto puede haber llegado y la compra seguir «En Gestión»; los tiempos y lo
+  atrasado siguen por etapa) (agrupar —arranca por Etapa; el título de cada grupo lleva el color de su etapa, estado o etiqueta, como
+  en ClickUp: `etiquetaGrupo` de `TablaDatos`—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
   de los campos de ClickUp ocultos (`oculta` en la columna) hasta mostrarlos en «Columnas»; filtros de un toque (Cotizando,
   Producción, En tránsito, Atrasadas; `?grupo=` y `?etapa=` los preseleccionan) y la ficha de resumen a la derecha, que se
   minimiza (`ficha-lateral-compra.tsx`: etapa N de las del recorrido, fechas clave con los días entre una y otra). **Pulsar la descripción de
@@ -628,6 +631,18 @@ convenciones técnicas del código.
   tiendas de todas las compras (`todasTiendas`), así que una tienda nueva queda disponible en cuanto se pone en una compra.
   Un nombre no lleva comas (separan la lista al guardar: `limpiarNombre`). Agrupar, filtrar y los tiempos por tienda cuentan
   la compra en cada una de sus tiendas.
+  **Comentarios con imágenes y PDF** (migración 0085, como los de ClickUp: la captura de un pago con su detalle debajo): el
+  campo de comentario de la Actividad (`actividad-compra.tsx`) tiene el botón «Adjuntar», y también se pega una captura
+  (Ctrl+V) o se arrastra un archivo encima. Cada archivo sube **al elegirlo** directo al bucket privado `wms-compras`
+  (`prepararSubidaAdjuntoComentario`, URL firmada, ruta `comentarios/<compra>/…`; hasta 10 por comentario y 10 MB cada uno,
+  `src/lib/compras/adjuntos.ts` con prueba), se ve como miniatura con su ✕ y viaja con «Comentar»
+  (`comentarCompra(id, texto, menciones, adjuntos)`; un comentario puede ir solo con archivos). El servidor **revisa el
+  contenido por su firma** (imagen JPG/PNG/WebP/GIF o PDF; SVG, HTML y lo demás se rechazan, nunca el nombre ni el tipo del
+  navegador), que la ruta sea de esa compra, y borra todo si algo falla; un archivo subido que se quita o se abandona se
+  borra (`descartarAdjuntoSubido`). Queda en `wms_compra_adjuntos` con `comentario_id` y se ve **debajo del texto de su
+  comentario** (`GaleriaAdjuntos`: miniaturas que se amplían con `VisorImagen`, PDF como enlace firmado de una hora); la
+  sección «Adjuntos» del final solo trae los sueltos (ClickUp, foto, documentos). Sin la columna, la actividad sigue cargando
+  y el comentario con archivos avisa que falta la migración.
   **Productos en la ficha:** el bloque «Productos» (`productos-compra.tsx`, solo compras de país) va **dentro del formulario**,
   en el bloque «Compra» justo debajo de Etiquetas (`FormularioCompra` recibe `productos` y `FichaCompra` se lo
   pasa con `incrustado`). Como está dentro del `<form>` pero guarda por su cuenta (cada campo, al salir de él), su contenedor
@@ -824,9 +839,18 @@ convenciones técnicas del código.
   cada persona y vale para todas las tablas (`densidad-filas-v1`). La barra de
   herramientas queda fija arriba al bajar la página y, si la tabla cabe sin
   desplazarse de lado, su encabezado queda fijo debajo de ella; si es más ancha
-  que su tarjeta se desplaza de lado (como región con teclado) y el encabezado no
-  se fija, porque un encabezado fijo no funciona dentro de una caja que se
-  desplaza de lado. No pongas `overflow-hidden` en una tarjeta que contenga una
+  que su tarjeta se desplaza de lado (como región con teclado) y el encabezado
+  real no se puede fijar (un `sticky` no funciona dentro de una caja que se
+  desplaza de lado). Una tabla con muchas columnas (Compras) pasa `fijarEncabezado`
+  a `TablaDatos` y entonces, cuando el encabezado real sale de la pantalla por
+  arriba, aparece una **copia** suya bajo la barra de herramientas (mismos anchos
+  medidos, siguiendo el desplazamiento de lado; solo para ver, `aria-hidden`): solo
+  se mueven las filas. Una columna con `total: (filas) => …` suma sobre **todas** las
+  filas que deja ver la tabla (con sus filtros, no solo la página) y la tabla pega
+  abajo una fila de totales (primera celda «Total»), encima de la barra de
+  desplazamiento; Compras suma QTY, Monto Total, Primer Pago, Segundo Pago y Pagado a
+  Proveedor. Una barra de acciones en lote de una tabla con totales debe ir por
+  encima de esa fila (`bottom-24`, no `bottom-4`). No pongas `overflow-hidden` en una tarjeta que contenga una
   tabla: rompe lo fijo. El encabezado fijo tiene `z-index: 15` (`globals.css`): lo
   que una fila eleve con `z-10` (casillas, desplegables, la celda de acciones fija)
   no debe pasar de 10 o se verá por encima del encabezado al bajar.
