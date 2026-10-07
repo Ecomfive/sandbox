@@ -154,27 +154,24 @@ export function TiraPendientes({ pendientes, alQuitar }: { pendientes: Pendiente
         <li
           key={p.id}
           title={p.estado === "error" ? p.error : p.nombre}
-          className={`group relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-md border bg-muted text-muted-foreground ${p.estado === "error" ? "border-destructive" : "border-border"}`}
+          className={`group relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border bg-muted text-muted-foreground ${p.estado === "error" ? "border-2 border-destructive" : "border-border"}`}
         >
           {p.vista ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={p.vista} alt={p.nombre} className={`h-full w-full object-cover ${p.estado === "subiendo" ? "opacity-50" : ""}`} />
           ) : (
-            <span className="flex flex-col items-center gap-0.5 px-1 text-center text-[0.65rem] leading-tight">
-              <AdjuntoIcon className="h-4 w-4" />
-              <span className="line-clamp-2 break-all">{p.nombre}</span>
-            </span>
+            <AdjuntoIcon className="h-4 w-4" aria-hidden="true" />
           )}
-          {p.estado === "subiendo" && <span className="absolute inset-x-0 bottom-0 bg-card/80 text-center text-[0.65rem]">Subiendo…</span>}
-          {p.estado === "error" && <span className="absolute inset-x-0 bottom-0 bg-destructive text-center text-[0.65rem] text-white">Falló</span>}
+          {p.estado === "subiendo" && <span className="sr-only">Subiendo…</span>}
+          {p.estado === "error" && <span className="sr-only">Falló: {p.error}</span>}
           <Tooltip texto="Quitar archivo">
             <button
               type="button"
               aria-label={`Quitar ${p.nombre}`}
               onClick={() => alQuitar(p.id)}
-              className={`absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-foreground/80 text-background hover:bg-foreground ${anilloFoco}`}
+              className={`absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-bl-md bg-foreground/80 text-background hover:bg-foreground ${anilloFoco}`}
             >
-              <CerrarIcon className="h-3 w-3" />
+              <CerrarIcon className="h-2.5 w-2.5" />
             </button>
           </Tooltip>
         </li>
@@ -183,7 +180,7 @@ export function TiraPendientes({ pendientes, alQuitar }: { pendientes: Pendiente
   );
 }
 
-/** Los archivos de un comentario ya enviado, debajo de su texto: las imágenes como miniaturas (se amplían al pulsarlas) y los PDF como enlace. */
+/** Los archivos de un comentario ya enviado, debajo de su texto: las imágenes como miniaturas de 40 × 40 (se amplían al pulsarlas) y los PDF como enlace. */
 export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoCompra[] }) {
   const [ampliada, setAmpliada] = useState<AdjuntoCompra | null>(null);
   if (adjuntos.length === 0) return null;
@@ -192,7 +189,7 @@ export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoCompra[] }) {
   return (
     <div className="mt-1.5 flex flex-col gap-2">
       {imagenes.length > 0 && (
-        <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+        <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
           {imagenes.map((a) => (
             <li key={a.id}>
               <button
@@ -202,7 +199,7 @@ export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoCompra[] }) {
                 className={`block overflow-hidden rounded-md border border-border ${anilloFoco}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.url!} alt={a.nombre} loading="lazy" className={imagenes.length === 1 ? "max-h-64 max-w-full object-contain" : "h-28 w-28 object-cover"} />
+                <img src={a.url!} alt={a.nombre} loading="lazy" className="h-10 w-10 object-cover" />
               </button>
             </li>
           ))}
