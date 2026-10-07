@@ -189,8 +189,13 @@ const ESTADO_COLOR: Record<string, string> = {
 
 export const colorEstado = (valor: string) => ESTADO_COLOR[valor] ?? "#8D8D8D";
 
-/** El ciclo termina en «Completado» o «Descartado»: como Cerrados en Retiros, se ocultan por defecto. */
-const ETAPAS_CERRADAS = ["completado", "descartado"];
+/**
+ * Lo que se archiva (se oculta por defecto, detrás del botón «Cerrados») lo decide el **Estado**, no la etapa: una compra se
+ * archiva cuando su Estado es «Completado». La etapa puede estar en «Completado» porque el producto ya llegó y la compra
+ * seguir «En Gestión» (falta pagar, reclamar…): mientras tanto se sigue viendo. Los tiempos y lo atrasado siguen
+ * midiéndose por etapa (ver `calculos-compras.ts`).
+ */
+const ESTADOS_ARCHIVADOS = ["completado"];
 
 /** Precio por unidad: no se guarda (es una fórmula, como en ClickUp), se calcula al mostrarla. */
 export const valorUnitario = (c: FilaCompra): number | null =>
@@ -331,9 +336,9 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
   ],
   cerrados: {
     etiqueta: "Cerrados",
-    esCerrado: (c) => ETAPAS_CERRADAS.includes(c.etapa),
-    campoEstado: "etapa",
-    valoresCerrados: ETAPAS_CERRADAS,
+    esCerrado: (c) => ESTADOS_ARCHIVADOS.includes(c.estado),
+    campoEstado: "estado",
+    valoresCerrados: ESTADOS_ARCHIVADOS,
     ocultosPorDefecto: true,
     exclusivo: true,
   },
