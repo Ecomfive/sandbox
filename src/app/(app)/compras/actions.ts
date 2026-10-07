@@ -571,3 +571,16 @@ export async function quitarProductoCompra(itemId: string): Promise<{ error?: st
   await registrarAuditoria({ accion: "quitar_producto_compra", entidad: "wms_compras", entidadId: item.compra_id, detalle: sku?.codigo ?? itemId });
   return {};
 }
+
+/** Elige el color de una etiqueta de Compras (como en ClickUp): vale para todas las compras que la tengan. */
+export async function guardarColorEtiqueta(nombre: string, color: string): Promise<{ error?: string }> {
+  await requireModuloEscritura("compras");
+  const limpio = String(nombre ?? "").trim().slice(0, 40);
+  if (!limpio) return { error: "Etiqueta no válida." };
+  if (!/^#[0-9a-fA-F]{6}$/.test(String(color))) return { error: "Color no válido." };
+  const { error } = await createServiceClient()
+    .from("wms_compras_etiquetas")
+    .upsert({ nombre: limpio, color, actualizado_en: new Date().toISOString() }, { onConflict: "nombre" });
+  if (error) return { error: "No se pudo guardar el color." };
+  return {};
+}

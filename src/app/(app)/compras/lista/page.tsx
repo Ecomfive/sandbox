@@ -1,7 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
-import { cargarCompras } from "../datos-compras";
+import { cargarColoresEtiquetas, cargarCompras } from "../datos-compras";
 import type { Grupo } from "../calculos-compras";
 import { TablaCompras } from "../tabla-compras";
 
@@ -15,7 +15,7 @@ const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atr
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("compras");
   const { ver, grupo, etapa, abrir, comentario } = await searchParams;
-  const { compras, paises, vista, error } = await cargarCompras(ver);
+  const [{ compras, paises, vista, error }, coloresEtiquetas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -35,6 +35,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
           grupoInicial={grupoInicial}
           etapaInicial={typeof etapa === "string" ? etapa : ""}
           abrirInicial={typeof abrir === "string" ? abrir : null}
+          coloresEtiquetas={coloresEtiquetas}
           comentarioInicial={typeof comentario === "string" ? comentario : null}
         />
       )}

@@ -11,7 +11,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, PrioridadIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
-import { actualizarCampoCompra } from "./actions";
+import { actualizarCampoCompra, guardarColorEtiqueta } from "./actions";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
 import { EtiquetasCompra } from "./selector-etiquetas";
 import { CrearCompraPanel } from "./crear-compra-panel";
@@ -120,7 +120,7 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
 function columnas(
   umbral: Record<string, number>,
   dia: string,
-  edicion: { puedeEscribir: boolean; guardar: GuardarCelda; etiquetas: string[] },
+  edicion: { puedeEscribir: boolean; guardar: GuardarCelda; etiquetas: string[]; colores: Record<string, string>; cambiarColor: (nombre: string, color: string) => void },
 ): ColumnaTabla<FilaCompra>[] {
   const resto = { ocultable: true } as const;
   /** El contenido de una celda, editable en su sitio si su dato se puede editar (ver `CAMPOS_EDITABLES`). */
@@ -151,7 +151,14 @@ function columnas(
                   Sin productos
                 </span>
               )}
-              <EtiquetasCompra compra={c} todas={edicion.etiquetas} puedeEscribir={edicion.puedeEscribir} guardar={edicion.guardar} />
+              <EtiquetasCompra
+                compra={c}
+                todas={edicion.etiquetas}
+                colores={edicion.colores}
+                puedeEscribir={edicion.puedeEscribir}
+                guardar={edicion.guardar}
+                cambiarColor={edicion.cambiarColor}
+              />
             </span>
             <span className="block text-xs text-muted-foreground">{[c.paisCodigo ?? "Importadora", c.proveedor, c.asignadoNombre].filter(Boolean).join(" · ")}</span>
             {c.lineas.length > 0 && (
@@ -259,6 +266,7 @@ export function TablaCompras({
   etapaInicial,
   abrirInicial = null,
   comentarioInicial = null,
+  coloresEtiquetas = {},
 }: {
   compras: FilaCompra[];
   vista: string;
@@ -273,6 +281,8 @@ export function TablaCompras({
   /** La compra que se abre al llegar (desde un aviso «Para ti») y el comentario que se señala. */
   abrirInicial?: string | null;
   comentarioInicial?: string | null;
+  /** El color elegido de cada etiqueta (por su nombre). */
+  coloresEtiquetas?: Record<string, string>;
 }) {
   const { mostrarToast } = useToast();
   const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
@@ -322,7 +332,29 @@ export function TablaCompras({
   );
   // Todas las etiquetas que existen en las compras, para el selector de etiquetas (como en ClickUp).
   const todasEtiquetas = useMemo(() => [...new Set(comprasServidor.flatMap((c) => c.etiquetas))].sort((a, b) => a.localeCompare(b, "es")), [comprasServidor]);
-  const edicion = useMemo(() => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas }), [puedeEscribir, guardarCelda, todasEtiquetas]);
+  // El color de cada etiqueta: se ve al instante al elegirlo; si el servidor lo rechaza, vuelve al de antes.
+  const [colores, setColores] = useState(coloresEtiquetas);
+  const cambiarColor = useCallback(
+    (nombre: string, color: string) => {
+      const antes = colores[nombre];
+      setColores((c) => ({ ...c, [nombre]: color }));
+      void guardarColorEtiqueta(nombre, color).then((r) => {
+        if (!r.error) return;
+        mostrarToast(r.error, "destructive");
+        setColores((c) => {
+          const siguiente = { ...c };
+          if (antes) siguiente[nombre] = antes;
+          else delete siguiente[nombre];
+          return siguiente;
+        });
+      });
+    },
+    [colores, mostrarToast],
+  );
+  const edicion = useMemo(
+    () => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas, colores, cambiarColor }),
+    [puedeEscribir, guardarCelda, todasEtiquetas, colores, cambiarColor],
+  );
 
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
   const dia = hoy();

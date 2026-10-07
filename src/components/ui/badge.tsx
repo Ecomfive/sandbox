@@ -12,7 +12,7 @@ const tones: Record<Tone, string> = {
 
 /** Texto blanco o casi negro según qué tanto contraste da cada uno sobre `fondo`, para que un color exacto
  * (traído de ClickUp, por ejemplo) siempre quede legible sin tener que fijarlo a mano caso por caso. */
-function textoLegibleSobre(fondo: string): string {
+export function textoLegibleSobre(fondo: string): string {
   const hex = fondo.replace("#", "");
   const r = parseInt(hex.slice(0, 2), 16);
   const g = parseInt(hex.slice(2, 4), 16);

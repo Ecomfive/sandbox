@@ -142,3 +142,10 @@ export async function cargarEventos(ids: Set<string>): Promise<{ compraId: strin
     return [];
   }
 }
+
+/** El color elegido para cada etiqueta de Compras (por su nombre). Sin la tabla todavía (migración 0082), ninguno. */
+export async function cargarColoresEtiquetas(): Promise<Record<string, string>> {
+  const { data, error } = await createServiceClient().from("wms_compras_etiquetas").select("nombre, color");
+  if (error) return {};
+  return Object.fromEntries((data ?? []).map((e) => [e.nombre as string, e.color as string]));
+}

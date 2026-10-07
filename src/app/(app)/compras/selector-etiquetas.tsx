@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { textoLegibleSobre } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { EtiquetaIcon } from "@/lib/nav-icons";
 import type { FilaCompra } from "./def-compras";
@@ -27,7 +28,31 @@ export function colorEtiqueta(nombre: string) {
   return PALETA[h % PALETA.length];
 }
 
-export function PastillaEtiqueta({ nombre }: { nombre: string }) {
+/** Los colores para elegir (como la paleta de etiquetas de ClickUp). */
+export const COLORES_ETIQUETA = [
+  "#7B68EE",
+  "#5B4FD8",
+  "#3E63DD",
+  "#0090FF",
+  "#12A594",
+  "#30A46C",
+  "#FFC53D",
+  "#F76B15",
+  "#E5484D",
+  "#D6409F",
+  "#8E4EC6",
+  "#8D8D8D",
+  "#202020",
+];
+
+/** Una etiqueta: con su color elegido (fondo lleno, como en ClickUp) o, si no tiene, el automático (suave). */
+export function PastillaEtiqueta({ nombre, color }: { nombre: string; color?: string }) {
+  if (color)
+    return (
+      <span style={{ backgroundColor: color, color: textoLegibleSobre(color) }} className="inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-[0.68rem] font-medium whitespace-nowrap">
+        {nombre}
+      </span>
+    );
   const c = colorEtiqueta(nombre);
   return (
     <span style={{ backgroundColor: c.fondo, color: c.texto }} className="inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-[0.68rem] font-medium whitespace-nowrap">
@@ -43,7 +68,24 @@ const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLower
  * abre el selector («Buscar o añadir etiquetas…»): pulsar una la pone o la quita; escribir una nueva y Enter la crea. Se
  * guarda al instante (igual que una celda) y queda en la Actividad. Sin permiso de escritura, solo se ven.
  */
-export function EtiquetasCompra({ compra, todas, puedeEscribir, guardar }: { compra: FilaCompra; todas: string[]; puedeEscribir: boolean; guardar: GuardarCelda }) {
+export function EtiquetasCompra({
+  compra,
+  todas,
+  colores,
+  puedeEscribir,
+  guardar,
+  cambiarColor,
+}: {
+  compra: FilaCompra;
+  todas: string[];
+  /** El color elegido de cada etiqueta (por su nombre). */
+  colores: Record<string, string>;
+  puedeEscribir: boolean;
+  guardar: GuardarCelda;
+  cambiarColor: (nombre: string, color: string) => void;
+}) {
+  // La etiqueta cuya paleta de colores está abierta en el selector.
+  const [pintando, setPintando] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -88,6 +130,7 @@ export function EtiquetasCompra({ compra, todas, puedeEscribir, guardar }: { com
   }
   function crear() {
     if (!puedeCrear) return;
+    setPintando(null);
     guardar(compra, "etiquetas", [...puestas, nueva]);
     setBusqueda("");
   }
@@ -95,7 +138,7 @@ export function EtiquetasCompra({ compra, todas, puedeEscribir, guardar }: { com
   return (
     <span className="inline-flex min-w-0 items-center gap-1">
       {puestas.map((e) => (
-        <PastillaEtiqueta key={e} nombre={e} />
+        <PastillaEtiqueta key={e} nombre={e} color={colores[e]} />
       ))}
       {puedeEscribir && (
         <button
@@ -151,24 +194,55 @@ export function EtiquetasCompra({ compra, todas, puedeEscribir, guardar }: { com
               {puedeCrear && (
                 <li>
                   <button type="button" onClick={crear} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted ${anilloFoco}`}>
-                    <span className="text-muted-foreground">Crear</span> <PastillaEtiqueta nombre={nueva} />
+                    <span className="text-muted-foreground">Crear</span> <PastillaEtiqueta nombre={nueva} color={colores[nueva]} />
                   </button>
                 </li>
               )}
               {opciones.map((e) => {
                 const puesta = puestas.includes(e);
+                const actual = colores[e] ?? colorEtiqueta(e).texto;
                 return (
-                  <li key={e}>
-                    <button
-                      type="button"
-                      role="menuitemcheckbox"
-                      aria-checked={puesta}
-                      onClick={() => alternar(e)}
-                      className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted ${anilloFoco}`}
-                    >
-                      <PastillaEtiqueta nombre={e} />
-                      {puesta && <span className="text-xs text-primario">✓</span>}
-                    </button>
+                  <li key={e} className="flex flex-col">
+                    <span className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        role="menuitemcheckbox"
+                        aria-checked={puesta}
+                        onClick={() => alternar(e)}
+                        className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted ${anilloFoco}`}
+                      >
+                        <PastillaEtiqueta nombre={e} color={colores[e]} />
+                        {puesta && <span className="text-xs text-primario">✓</span>}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Color de la etiqueta ${e}`}
+                        title="Color"
+                        aria-expanded={pintando === e}
+                        onClick={() => setPintando((p) => (p === e ? null : e))}
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-muted ${anilloFoco}`}
+                      >
+                        <span aria-hidden="true" style={{ backgroundColor: actual }} className="h-3 w-3 rounded-full ring-1 ring-border" />
+                      </button>
+                    </span>
+                    {pintando === e && (
+                      <span role="group" aria-label={`Colores para ${e}`} className="flex flex-wrap gap-1.5 px-2 pt-1 pb-2">
+                        {COLORES_ETIQUETA.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            aria-label={`Color ${color}`}
+                            aria-pressed={colores[e] === color}
+                            onClick={() => {
+                              cambiarColor(e, color);
+                              setPintando(null);
+                            }}
+                            style={{ backgroundColor: color }}
+                            className={`h-5 w-5 rounded-full ${colores[e] === color ? "ring-2 ring-foreground ring-offset-1 ring-offset-card" : ""} ${anilloFoco}`}
+                          />
+                        ))}
+                      </span>
+                    )}
                   </li>
                 );
               })}
