@@ -588,7 +588,10 @@ export async function comentarCompra(id: string, texto: string, menciones: strin
       // Sin la columna `comentario_id` (migración 0085) o por otro error: no queda un comentario a medias.
       await supabase.from("wms_compra_comentarios").delete().eq("id", data.id);
       await borrarSubidos(archivos.map((a) => a.ruta));
-      return { error: errorAdjuntos.code === "42703" ? "Falta correr la migración 0085 para adjuntar archivos a un comentario." : "No se pudieron guardar los archivos." };
+      // Al insertar, una columna que no existe llega como PGRST204 («Could not find the … column … in the schema cache»);
+      // 42703 es lo que devuelve Postgres directo (al leer). Las dos dicen lo mismo: falta correr la migración 0085.
+      const faltaLaColumna = errorAdjuntos.code === "42703" || errorAdjuntos.code === "PGRST204" || /comentario_id/i.test(errorAdjuntos.message ?? "");
+      return { error: faltaLaColumna ? "Falta correr la migración 0085 para adjuntar archivos a un comentario." : "No se pudieron guardar los archivos." };
     }
   }
 
