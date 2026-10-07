@@ -331,7 +331,8 @@ export function TablaCompras({
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
   return (
-    <div className={fichaMinimizada ? claseFichaMinimizada : claseConFicha}>
+    // El resumen de la derecha aparece al elegir una compra; sin elegir, la tabla usa todo el ancho.
+    <div className={!resumen ? "flex flex-col" : fichaMinimizada ? claseFichaMinimizada : claseConFicha}>
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtros rápidos">
           {RAPIDOS.map((r) => (
@@ -392,10 +393,11 @@ export function TablaCompras({
         />
       </div>
 
-      {fichaMinimizada ? (
+      {!resumen ? null : fichaMinimizada ? (
         <FichaMinimizada alAbrir={() => guardadoFicha.guardar("")} />
       ) : (
         <FichaLateralCompra
+          alCerrar={() => setElegida(null)}
           compra={resumen}
           orden={elegida?.orden ?? []}
           alIr={(id) => setElegida((e) => (e ? { ...e, id } : e))}

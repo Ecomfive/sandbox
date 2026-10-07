@@ -46,6 +46,7 @@ export function FichaLateralCompra({
   alIr,
   alAbrir,
   alMinimizar,
+  alCerrar,
 }: {
   compra: FilaCompra | null;
   orden: string[];
@@ -53,6 +54,8 @@ export function FichaLateralCompra({
   alAbrir: () => void;
   /** Guarda la ficha a la derecha para que la tabla use todo el ancho. */
   alMinimizar: () => void;
+  /** Cierra el resumen (la tabla vuelve a usar todo el ancho). */
+  alCerrar?: () => void;
 }) {
   if (!compra) {
     return (
@@ -88,6 +91,11 @@ export function FichaLateralCompra({
           <BotonBarra aria-label="Minimizar la ficha" title="Minimizar la ficha" onClick={alMinimizar} className="h-7 w-7 justify-center px-0">
             →
           </BotonBarra>
+          {alCerrar && (
+            <BotonBarra aria-label="Cerrar el resumen" title="Cerrar el resumen" onClick={alCerrar} className="h-7 w-7 justify-center px-0">
+              ×
+            </BotonBarra>
+          )}
         </span>
       </CabeceraTarjeta>
       <div className="flex flex-col gap-4 p-4">
