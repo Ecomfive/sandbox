@@ -17,7 +17,7 @@ async function main() {
   for (let d = 0; ; d += 1000) {
     const { data } = await sb
       .from("wms_compras")
-      .select("id, tipo, codigo, nombre, etapa, estado, proveedor, tienda, via_envio, qty_total, monto_total, pagado_a_proveedor, fecha_pago_1, fecha_envio, fecha_llegada, inconveniente, responsable_nombre, creado_en, cerrado_en, paises(codigo)")
+      .select("id, tipo, codigo, nombre, etapa, estado, proveedor, tiendas, via_envio, qty_total, monto_total, pagado_a_proveedor, fecha_pago_1, fecha_envio, fecha_llegada, inconveniente, responsable_nombre, creado_en, cerrado_en, paises(codigo)")
       .eq("tipo", "pais")
       .range(d, d + 999);
     if (!data?.length) break;
@@ -33,7 +33,7 @@ async function main() {
         etapa: c.etapa,
         estado: c.estado,
         proveedor: c.proveedor,
-        tienda: c.tienda,
+        tiendas: (c.tiendas as string[] | null) ?? [],
         viaEnvio: c.via_envio ?? [],
         qtyTotal: c.qty_total === null ? null : Number(c.qty_total),
         montoTotal: c.monto_total === null ? null : Number(c.monto_total),

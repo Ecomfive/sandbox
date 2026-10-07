@@ -66,6 +66,10 @@ export function PanelCelda({
       role="dialog"
       aria-label={etiqueta}
       onClick={(e) => e.stopPropagation()}
+      // Lo que se escribe aquí (buscar una tienda) no es del formulario que lo rodea en el árbol de React (la ficha): sin esto
+      // «Guardar cambios» se encendía con solo buscar.
+      onChange={(e) => e.stopPropagation()}
+      onInput={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();

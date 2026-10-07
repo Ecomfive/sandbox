@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { combinarLista, presenciaEnLote } from "@/lib/compras/lote";
 import { hoy } from "./calculos-compras";
 import { numeroOC, type FilaCompra } from "./def-compras";
 import { CAMPOS_EDITABLES, type CampoEditable } from "./def-edicion-compras";
 import { claseCampoPanel, claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
+import { PanelLista } from "./selector-lista";
 
 export type GuardarCelda = (compra: FilaCompra, campo: string, valor: unknown) => void;
 
@@ -31,6 +33,7 @@ export function CeldaEditable({
   campo,
   puedeEscribir,
   guardar,
+  opcionesLista,
   children,
 }: {
   compra: FilaCompra;
@@ -38,6 +41,8 @@ export function CeldaEditable({
   campo: string;
   puedeEscribir: boolean;
   guardar: GuardarCelda;
+  /** En un dato que es una lista (la tienda): todos los nombres que existen, para elegir; lo escrito que no esté se crea. */
+  opcionesLista?: string[];
   children: ReactNode;
 }) {
   const def = CAMPOS_EDITABLES[campo];
@@ -76,7 +81,22 @@ export function CeldaEditable({
         {children}
       </button>
       {abierto &&
-        (def.tipo === "multiple" ? (
+        (def.tipo === "lista" ? (
+          // Una lista abierta (la tienda): se elige una o varias y, si no existe, se crea ahí mismo; cada cambio se guarda al instante.
+          <PanelLista
+            ancla={boton}
+            etiqueta={aria}
+            opciones={[...(opcionesLista ?? []), ...(compra[def.prop] as string[])]}
+            marca={(n) => (presenciaEnLote([compra[def.prop] as string[]], n) === "todas" ? "si" : "no")}
+            placeholder={`Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
+            alAlternar={(n) => {
+              const puestas = compra[def.prop] as string[];
+              guardar(compra, campo, combinarLista(puestas, presenciaEnLote([puestas], n) === "todas" ? "quitar" : "agregar", [n]));
+            }}
+            alCrear={(n) => guardar(compra, campo, combinarLista(compra[def.prop] as string[], "agregar", [n]))}
+            alCerrar={cerrar}
+          />
+        ) : def.tipo === "multiple" ? (
           <EditorOpciones
             def={def}
             ancla={boton}

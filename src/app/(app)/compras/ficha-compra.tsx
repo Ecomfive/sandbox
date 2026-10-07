@@ -75,7 +75,7 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
           </Dato>
           <Dato etiqueta="Proveedor">{compra.proveedor || SIN_DATO}</Dato>
-          <Dato etiqueta="Tienda">{compra.tienda || SIN_DATO}</Dato>
+          <Dato etiqueta="Tienda">{compra.tiendas.length ? compra.tiendas.join(", ") : SIN_DATO}</Dato>
           <Dato etiqueta="Persona asignada">{compra.asignadoNombre || SIN_DATO}</Dato>
         </dl>
       </Seccion>
@@ -135,9 +135,12 @@ export function FichaCompra({
   alIr,
   alCerrar,
   comentarioResaltado,
+  tiendas,
 }: {
   /** El comentario al que lleva un aviso «Para ti» (se señala y se muestra). */
   comentarioResaltado?: string | null;
+  /** Las tiendas que ya existen en otras compras, para elegir en el campo Tienda. */
+  tiendas?: string[];
   /** La compra que se ve; sin ella el panel está cerrado. */
   compra: FilaCompra | undefined;
   /** Las claves de las compras en el orden de la tabla. */
@@ -222,6 +225,7 @@ export function FichaCompra({
               vista={compra.paisCodigo ?? "importacion"}
               paises={paises}
               compra={compra}
+              tiendas={tiendas}
               botonesArriba
               acciones={<EliminarCompraBoton id={compra.id} nombre={compra.nombre} alEliminar={alCerrar} />}
               alGuardar={alGuardar}

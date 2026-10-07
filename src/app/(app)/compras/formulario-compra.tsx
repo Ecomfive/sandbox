@@ -10,6 +10,7 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
+import { CampoLista } from "./campo-lista";
 import {
   CalendarioIcon,
   CheckIcon,
@@ -50,6 +51,7 @@ export function FormularioCompra({
   encabezado,
   acciones,
   productos,
+  tiendas = [],
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
   vista: string;
@@ -64,6 +66,8 @@ export function FormularioCompra({
   acciones?: ReactNode;
   /** El bloque de productos de la compra: va en el bloque «Compra», justo debajo de Etiquetas. */
   productos?: ReactNode;
+  /** Las tiendas que ya existen en otras compras, para elegir (la que no esté se crea al escribirla). */
+  tiendas?: string[];
 }) {
   const [modificado, setModificado] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -257,7 +261,7 @@ export function FormularioCompra({
               <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
             </Campo>
             <Campo etiqueta={conEmoji("tienda", "Tienda")} id="campo-tienda">
-              <input id="campo-tienda" type="text" name="tienda" defaultValue={compra?.tienda ?? ""} placeholder="Ej: EcomFive Dropi Panamá" className={fieldClass} />
+              <CampoLista id="campo-tienda" nombre="tiendas" etiqueta="tienda" inicial={compra?.tiendas ?? []} todas={tiendas} />
             </Campo>
           </div>
         </Seccion>
