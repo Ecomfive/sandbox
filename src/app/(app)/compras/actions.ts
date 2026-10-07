@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
+import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSeguro } from "@/lib/compras/adjuntos";
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
@@ -420,10 +421,21 @@ export async function eliminarCompra(formData: FormData) {
   revalidatePath("/compras");
 }
 
+/** Un archivo de la compra: con su enlace firmado de una hora (o el de ClickUp, en los videos). */
+export interface AdjuntoCompra {
+  id: string;
+  nombre: string;
+  clase: string;
+  url: string | null;
+  creadoEn: string;
+}
+
 export interface ActividadCompra {
-  comentarios: { id: string; autor: string | null; texto: string; creadoEn: string }[];
+  /** Cada comentario con los archivos que se adjuntaron en él (la captura de un pago, un comprobante…). */
+  comentarios: { id: string; autor: string | null; texto: string; creadoEn: string; adjuntos: AdjuntoCompra[] }[];
   subtareas: { id: string; nombre: string; estado: string | null; responsable: string | null; creadoEn: string; cerradoEn: string | null }[];
-  adjuntos: { id: string; nombre: string; clase: string; url: string | null; creadoEn: string }[];
+  /** Los archivos sueltos de la compra (los de ClickUp y la foto/documentos): los de un comentario van dentro de él. */
+  adjuntos: AdjuntoCompra[];
   eventos: { id: string; campo: string; antes: string | null; despues: string | null; ocurridoEn: string; autor: string | null; origen: string }[];
 }
 
@@ -437,47 +449,148 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   await requireModulo("compras");
   if (!ES_ID(id)) return { error: "Compra no válida." };
   const supabase = createServiceClient();
-  const [comentarios, subtareas, adjuntos, eventos] = await Promise.all([
+  const consultaAdjuntos = (columnas: string) => supabase.from("wms_compra_adjuntos").select(columnas).eq("compra_id", id).order("creado_en");
+  const [comentarios, subtareas, adjuntosConComentario, eventos] = await Promise.all([
     supabase.from("wms_compra_comentarios").select("id, autor, texto, creado_en").eq("compra_id", id).order("creado_en", { ascending: false }).limit(500),
     supabase.from("wms_compra_subtareas").select("id, nombre, estado, responsable_nombre, creado_en, cerrado_en").eq("compra_id", id).order("creado_en"),
-    supabase.from("wms_compra_adjuntos").select("id, nombre, clase, ruta, url_clickup, creado_en").eq("compra_id", id).order("creado_en"),
+    consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en, comentario_id"),
     supabase.from("wms_compra_eventos").select("id, campo, valor_antes, valor_despues, ocurrido_en, autor, origen").eq("compra_id", id).order("ocurrido_en", { ascending: false }),
   ]);
+  // Sin la migración 0085 (la columna `comentario_id`) la actividad sigue cargando, solo que sin archivos dentro de los comentarios.
+  const adjuntos = adjuntosConComentario.error ? await consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en") : adjuntosConComentario;
   if (comentarios.error || subtareas.error || adjuntos.error || eventos.error) return { error: "No se pudo cargar la actividad." };
 
-  const rutas = (adjuntos.data ?? []).map((a) => a.ruta as string | null).filter((r): r is string => !!r);
+  type FilaAdjunto = { id: string; nombre: string; clase: string; ruta: string | null; url_clickup: string | null; creado_en: string; comentario_id?: string | null };
+  const filasAdjuntos = (adjuntos.data ?? []) as unknown as FilaAdjunto[];
+  const rutas = filasAdjuntos.map((a) => a.ruta).filter((r): r is string => !!r);
   const firmadas = new Map<string, string>();
   if (rutas.length) {
     const { data } = await supabase.storage.from(BUCKET_COMPRAS).createSignedUrls(rutas, 3600);
     for (const f of data ?? []) if (f.path && f.signedUrl) firmadas.set(f.path, f.signedUrl);
   }
+  const aAdjunto = (a: FilaAdjunto): AdjuntoCompra => ({ id: a.id, nombre: a.nombre, clase: a.clase, url: (a.ruta && firmadas.get(a.ruta)) || a.url_clickup || null, creadoEn: a.creado_en });
+  const deComentario = new Map<string, AdjuntoCompra[]>();
+  for (const a of filasAdjuntos) if (a.comentario_id) deComentario.set(a.comentario_id, [...(deComentario.get(a.comentario_id) ?? []), aAdjunto(a)]);
   return {
-    comentarios: (comentarios.data ?? []).map((c) => ({ id: c.id, autor: c.autor, texto: c.texto, creadoEn: c.creado_en })),
+    comentarios: (comentarios.data ?? []).map((c) => ({ id: c.id, autor: c.autor, texto: c.texto, creadoEn: c.creado_en, adjuntos: deComentario.get(c.id) ?? [] })),
     subtareas: (subtareas.data ?? []).map((t) => ({ id: t.id, nombre: t.nombre, estado: t.estado, responsable: t.responsable_nombre, creadoEn: t.creado_en, cerradoEn: t.cerrado_en })),
-    adjuntos: (adjuntos.data ?? []).map((a) => ({
-      id: a.id,
-      nombre: a.nombre,
-      clase: a.clase,
-      url: (a.ruta && firmadas.get(a.ruta)) || a.url_clickup || null,
-      creadoEn: a.creado_en,
-    })),
+    adjuntos: filasAdjuntos.filter((a) => !a.comentario_id).map(aAdjunto),
     eventos: (eventos.data ?? []).map((e) => ({ id: e.id, campo: e.campo, antes: e.valor_antes, despues: e.valor_despues, ocurridoEn: e.ocurrido_en, autor: e.autor, origen: e.origen })),
   };
 }
 
+/** Un archivo que ya se subió al almacenamiento para un comentario (ver `prepararSubidaAdjuntoComentario`). */
+export interface AdjuntoSubido {
+  ruta: string;
+  nombre: string;
+}
+
 /**
- * Agrega un comentario a una compra (queda con el nombre de quien lo escribe y la hora). Las personas etiquetadas con «@»
+ * Da permiso (URL firmada) para subir un archivo de un comentario directo desde el navegador, sin pasarlo por la acción del
+ * servidor (que no admite archivos grandes). Va a una carpeta de esa compra del bucket privado; el archivo se revisa de verdad
+ * al comentar (`comentarCompra`). Devuelve el error como valor.
+ */
+export async function prepararSubidaAdjuntoComentario(compraId: string, nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
+  await requireModuloEscritura("compras");
+  if (typeof compraId !== "string" || !ES_ID(compraId)) return { error: "Compra no válida." };
+  if (typeof nombreArchivo !== "string" || !nombreArchivo.trim()) return { error: "El archivo no tiene nombre." };
+  const ruta = `comentarios/${compraId}/${crypto.randomUUID()}-${nombreSeguro(nombreArchivo)}`;
+  const { data, error } = await createServiceClient().storage.from(BUCKET_COMPRAS).createSignedUploadUrl(ruta);
+  if (error || !data) return { error: "No se pudo preparar la subida." };
+  return { ruta, token: data.token };
+}
+
+/** Borra archivos subidos que ya no se van a usar (se descartaron o no pasaron la revisión). Nunca lanza. */
+async function borrarSubidos(rutas: string[]) {
+  const propias = rutas.filter((r) => typeof r === "string" && r.startsWith("comentarios/"));
+  if (propias.length) await createServiceClient().storage.from(BUCKET_COMPRAS).remove(propias);
+}
+
+/** Descarta un archivo que se subió pero se quitó antes de comentar. Solo borra de la carpeta de esa compra. */
+export async function descartarAdjuntoSubido(compraId: string, ruta: string): Promise<void> {
+  await requireModuloEscritura("compras");
+  if (typeof compraId !== "string" || !ES_ID(compraId) || typeof ruta !== "string" || !ruta.startsWith(`comentarios/${compraId}/`) || ruta.includes("..")) return;
+  await borrarSubidos([ruta]);
+}
+
+/**
+ * Revisa los archivos de un comentario: que estén en la carpeta de esa compra, que existan, que no pasen del peso y que su
+ * contenido sea de verdad una imagen (JPG, PNG, WebP, GIF) o un PDF — se mira la firma de los primeros bytes, no lo que dice
+ * el nombre ni el navegador. Si alguno falla se borran todos y se devuelve el error.
+ */
+async function revisarAdjuntosSubidos(
+  compraId: string,
+  archivos: AdjuntoSubido[],
+): Promise<{ error: string } | { ruta: string; nombre: string; extension: string; tamano: number; clase: string }[]> {
+  const rutas = archivos.map((a) => (a && typeof a.ruta === "string" ? a.ruta : ""));
+  const falla = async (error: string) => {
+    await borrarSubidos(rutas);
+    return { error };
+  };
+  if (archivos.length > MAX_ADJUNTOS_COMENTARIO) return falla(`Un comentario lleva hasta ${MAX_ADJUNTOS_COMENTARIO} archivos.`);
+  const carpeta = `comentarios/${compraId}/`;
+  if (rutas.some((r) => !r.startsWith(carpeta) || r.includes("..") || r.length > 300)) return falla("Hay un archivo que no es de esta compra.");
+
+  const storage = createServiceClient().storage.from(BUCKET_COMPRAS);
+  const resultado: { ruta: string; nombre: string; extension: string; tamano: number; clase: string }[] = [];
+  for (const [i, archivo] of archivos.entries()) {
+    const ruta = rutas[i];
+    const { data, error } = await storage.download(ruta);
+    if (error || !data) return falla("No se encontró uno de los archivos. Vuelve a adjuntarlo.");
+    if (data.size > MAX_BYTES_ADJUNTO) return falla("Un archivo pesa más de lo permitido.");
+    const tipo = detectarAdjunto(new Uint8Array(await data.slice(0, 16).arrayBuffer()));
+    if (!tipo) return falla("Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF) y PDF.");
+    const nombreOriginal = String(archivo.nombre ?? "").trim().slice(0, 120) || `archivo.${tipo.extension}`;
+    resultado.push({ ruta, nombre: nombreOriginal, extension: tipo.extension, tamano: data.size, clase: tipo.clase });
+  }
+  return resultado;
+}
+
+/**
+ * Agrega un comentario a una compra (queda con el nombre de quien lo escribe y la hora), con o sin archivos adjuntos (la captura
+ * de un pago, un comprobante…) que se ven debajo de su texto. Las personas etiquetadas con «@»
  * (`menciones`) reciben un aviso «Para ti» que abre esta compra en ese comentario. Devuelve el error como valor.
  */
-export async function comentarCompra(id: string, texto: string, menciones: string[] = []): Promise<{ error?: string }> {
+export async function comentarCompra(id: string, texto: string, menciones: string[] = [], adjuntos: AdjuntoSubido[] = []): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(id)) return { error: "Compra no válida." };
   const limpio = String(texto ?? "").trim().slice(0, 5000);
-  if (!limpio) return { error: "Escribe el comentario." };
+  const archivos = Array.isArray(adjuntos) ? adjuntos : [];
+  if (!limpio && archivos.length === 0) return { error: "Escribe el comentario o adjunta un archivo." };
   const autor = usuario.nombre || usuario.email;
   const supabase = createServiceClient();
+
+  // Los archivos ya están en el almacenamiento (se subieron directo desde el navegador): antes de comentar se revisa que
+  // sean lo que dicen ser (por su firma, no por el nombre) y que sean de esta compra. Si algo no cuadra, se borran todos.
+  const revisados = archivos.length ? await revisarAdjuntosSubidos(id, archivos) : [];
+  if (revisados && "error" in revisados) return revisados;
+
   const { data, error } = await supabase.from("wms_compra_comentarios").insert({ compra_id: id, autor, texto: limpio }).select("id").single();
-  if (error || !data) return { error: "No se pudo guardar el comentario." };
+  if (error || !data) {
+    await borrarSubidos(archivos.map((a) => a.ruta));
+    return { error: "No se pudo guardar el comentario." };
+  }
+  if (revisados && revisados.length) {
+    const { error: errorAdjuntos } = await supabase.from("wms_compra_adjuntos").insert(
+      revisados.map((a) => ({
+        compra_id: id,
+        comentario_id: data.id,
+        nombre: a.nombre,
+        extension: a.extension,
+        tamano: a.tamano,
+        clase: a.clase,
+        origen: "sistema",
+        ruta: a.ruta,
+        subido_por: autor,
+      })),
+    );
+    if (errorAdjuntos) {
+      // Sin la columna `comentario_id` (migración 0085) o por otro error: no queda un comentario a medias.
+      await supabase.from("wms_compra_comentarios").delete().eq("id", data.id);
+      await borrarSubidos(archivos.map((a) => a.ruta));
+      return { error: errorAdjuntos.code === "42703" ? "Falta correr la migración 0085 para adjuntar archivos a un comentario." : "No se pudieron guardar los archivos." };
+    }
+  }
 
   const mencionados = await mencionadosValidos(menciones, limpio, usuario.id);
   if (mencionados.length) {

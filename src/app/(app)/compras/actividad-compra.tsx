@@ -9,6 +9,7 @@ import { AdjuntoIcon, HistorialIcon, ProductoIcon } from "@/lib/nav-icons";
 import { comentarCompra, obtenerActividadCompra, type ActividadCompra as Datos } from "./actions";
 import { CampoMenciones, TextoConMenciones } from "@/components/ui/campo-menciones";
 import { Badge } from "@/components/ui/badge";
+import { archivosDe, BotonAdjuntar, GaleriaAdjuntos, TiraPendientes, useAdjuntosPendientes } from "./adjuntos-comentario";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa } from "./def-compras";
 import { CAMPOS_EDITABLES } from "./def-edicion-compras";
 
@@ -81,6 +82,9 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
   // El campo se vuelve a armar (vacío) después de comentar.
   const [vueltaCampo, setVueltaCampo] = useState(0);
   const [pendiente, start] = useTransition();
+  // Los archivos del comentario que se escribe (la captura de un pago…): suben al elegirlos y viajan con el comentario.
+  const adjuntos = useAdjuntosPendientes(id);
+  const [sobreCampo, setSobreCampo] = useState(false);
 
   useEffect(() => {
     let vigente = true;
@@ -94,12 +98,13 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
 
   function comentar() {
     start(async () => {
-      const r = await comentarCompra(id, texto, menciones);
+      const r = await comentarCompra(id, texto, menciones, adjuntos.listos);
       if (r.error) mostrarToast(r.error, "destructive");
       else {
         if (menciones.length) mostrarToast(`Comentario guardado: se avisó a ${menciones.length} persona${menciones.length === 1 ? "" : "s"}`);
         setTexto("");
         setMenciones([]);
+        adjuntos.vaciar();
         setVueltaCampo((v) => v + 1);
         setVersion((v) => v + 1);
       }
@@ -153,7 +158,31 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
 
       <Seccion icono={HistorialIcon} titulo="Comentarios">
         {puedeComentar && (
-          <div className="flex flex-col gap-2">
+          <div
+            // Una imagen que se pega (Ctrl+V) o se suelta sobre el campo queda adjunta al comentario, como en ClickUp.
+            onPaste={(e) => {
+              const archivos = archivosDe(e);
+              if (archivos.length === 0) return;
+              e.preventDefault();
+              adjuntos.agregar(archivos);
+            }}
+            onDragOver={(e) => {
+              if (![...e.dataTransfer.types].includes("Files")) return;
+              e.preventDefault();
+              setSobreCampo(true);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSobreCampo(false);
+            }}
+            onDrop={(e) => {
+              setSobreCampo(false);
+              const archivos = archivosDe(e);
+              if (archivos.length === 0) return;
+              e.preventDefault();
+              adjuntos.agregar(archivos);
+            }}
+            className={`flex flex-col gap-2 rounded-lg ${sobreCampo ? "outline-2 outline-offset-2 outline-primario" : ""}`}
+          >
             <CampoMenciones
               key={vueltaCampo}
               ariaLabel="Nuevo comentario"
@@ -163,14 +192,18 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
               alMencionar={setMenciones}
               placeholder="Escribe un comentario… usa @ para etiquetar a alguien. Empieza con «Inconveniente:» para marcar una falla."
             />
-            <button
-              type="button"
-              disabled={pendiente || !texto.trim()}
-              onClick={comentar}
-              className={`w-fit rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
-            >
-              {pendiente ? "Guardando…" : "Comentar"}
-            </button>
+            <TiraPendientes pendientes={adjuntos.pendientes} alQuitar={adjuntos.quitar} />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={pendiente || adjuntos.subiendo || (!texto.trim() && adjuntos.listos.length === 0)}
+                onClick={comentar}
+                className={`w-fit rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
+              >
+                {pendiente ? "Guardando…" : adjuntos.subiendo ? "Subiendo…" : "Comentar"}
+              </button>
+              <BotonAdjuntar alElegir={adjuntos.agregar} deshabilitado={pendiente || adjuntos.lleno} />
+            </div>
           </div>
         )}
         {datos.comentarios.length === 0 ? (
@@ -187,9 +220,12 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
                 <span className="text-xs text-muted-foreground">
                   <strong className="font-medium text-foreground">{c.autor ?? "—"}</strong> · {fechaHora(c.creadoEn)}
                 </span>
-                <span className="whitespace-pre-wrap break-words">
-                  <TextoConMenciones texto={c.texto} />
-                </span>
+                {c.texto && (
+                  <span className="whitespace-pre-wrap break-words">
+                    <TextoConMenciones texto={c.texto} />
+                  </span>
+                )}
+                <GaleriaAdjuntos adjuntos={c.adjuntos} />
               </li>
             ))}
           </ul>
