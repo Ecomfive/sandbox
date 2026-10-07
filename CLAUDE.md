@@ -849,7 +849,10 @@ convenciones técnicas del código.
   filas que deja ver la tabla (con sus filtros, no solo la página) y la tabla pega
   abajo una fila de totales (primera celda «Total»), encima de la barra de
   desplazamiento; Compras suma QTY, Monto Total, Primer Pago, Segundo Pago y Pagado a
-  Proveedor. Una barra de acciones en lote de una tabla con totales debe ir por
+  Proveedor. **Al agrupar, cada grupo cierra con su propia fila de «Subtotal»** (`filaSubtotal` de `TablaDatos`: la misma
+  suma de cada columna con `total`, pero solo sobre las filas de ese grupo, y se ve también con el grupo contraído); la fila
+  fija de abajo sigue siendo el total de todo lo que se ve. Así en Compras se lee lo que se debe por etapa (Tracking,
+  Completado…) sin filtrar. Una barra de acciones en lote de una tabla con totales debe ir por
   encima de esa fila (`bottom-24`, no `bottom-4`). No pongas `overflow-hidden` en una tarjeta que contenga una
   tabla: rompe lo fijo. El encabezado fijo tiene `z-index: 15` (`globals.css`): lo
   que una fila eleve con `z-10` (casillas, desplegables, la celda de acciones fija)
