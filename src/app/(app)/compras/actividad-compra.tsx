@@ -20,6 +20,7 @@ const NOMBRE_CAMPO: Record<string, string> = {
   urlProducto: "URL del producto",
   documentos: "Documentos",
   paisesDestino: "Países de destino",
+  codigo: "Código",
 };
 const corto = (t: string | null, max = 120) => (t && t.length > max ? `${t.slice(0, max)}…` : t);
 

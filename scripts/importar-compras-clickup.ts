@@ -250,7 +250,13 @@ async function main() {
         cerrado_en: iso(t.date_closed),
       };
       if (!aplicar || soloHistorial) continue;
-      const { data, error } = await supabase.from("wms_compras").upsert(fila, { onConflict: "clickup_id" }).select("id").single();
+      // Sin código en el nombre de ClickUp, no se toca el que ya tenga en el sistema (el ECOM que se le asignó aquí).
+      const { codigo: codigoClickup, ...resto } = fila;
+      const { data, error } = await supabase
+        .from("wms_compras")
+        .upsert(codigoClickup ? fila : resto, { onConflict: "clickup_id" })
+        .select("id")
+        .single();
       if (error) {
         console.error(`✗ ${t.id} ${t.name}: ${error.message}`);
         continue;
