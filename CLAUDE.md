@@ -828,9 +828,18 @@ convenciones técnicas del código.
   cada persona y vale para todas las tablas (`densidad-filas-v1`). La barra de
   herramientas queda fija arriba al bajar la página y, si la tabla cabe sin
   desplazarse de lado, su encabezado queda fijo debajo de ella; si es más ancha
-  que su tarjeta se desplaza de lado (como región con teclado) y el encabezado no
-  se fija, porque un encabezado fijo no funciona dentro de una caja que se
-  desplaza de lado. No pongas `overflow-hidden` en una tarjeta que contenga una
+  que su tarjeta se desplaza de lado (como región con teclado) y el encabezado
+  real no se puede fijar (un `sticky` no funciona dentro de una caja que se
+  desplaza de lado). Una tabla con muchas columnas (Compras) pasa `fijarEncabezado`
+  a `TablaDatos` y entonces, cuando el encabezado real sale de la pantalla por
+  arriba, aparece una **copia** suya bajo la barra de herramientas (mismos anchos
+  medidos, siguiendo el desplazamiento de lado; solo para ver, `aria-hidden`): solo
+  se mueven las filas. Una columna con `total: (filas) => …` suma sobre **todas** las
+  filas que deja ver la tabla (con sus filtros, no solo la página) y la tabla pega
+  abajo una fila de totales (primera celda «Total»), encima de la barra de
+  desplazamiento; Compras suma QTY, Monto Total, Primer Pago, Segundo Pago y Pagado a
+  Proveedor. Una barra de acciones en lote de una tabla con totales debe ir por
+  encima de esa fila (`bottom-24`, no `bottom-4`). No pongas `overflow-hidden` en una tarjeta que contenga una
   tabla: rompe lo fijo. El encabezado fijo tiene `z-index: 15` (`globals.css`): lo
   que una fila eleve con `z-10` (casillas, desplegables, la celda de acciones fija)
   no debe pasar de 10 o se verá por encima del encabezado al bajar.
