@@ -223,7 +223,7 @@ export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }:
   const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
   const listo = !!elegido && cantidadNueva > 0;
 
-  // Incrustado (dentro del bloque «Compra» del formulario, bajo Prioridad) va entre dos líneas, sin el margen de una sección
+  // Incrustado (dentro del bloque «Compra» del formulario, bajo Etiquetas) va entre dos líneas, sin el margen de una sección
   // aparte; suelto (a solo lectura, al final de la ficha) es una sección propia.
   return (
     <div className={incrustado ? "border-y border-border py-4" : "border-t border-border p-5"}>

@@ -4,7 +4,7 @@ import { BotonBarra, CabeceraTarjeta, Pastilla } from "@/components/panel/piezas
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
-import { colorEtapa, etiquetaEstado, etiquetaEtapa, etiquetaVia, ETAPAS_COMPRA, prioridadDe, valorUnitario, type FilaCompra, numeroOC, resumenLineas } from "./def-compras";
+import { colorEtapa, etiquetaEstado, etiquetaEtapa, etiquetaVia, ETAPAS_COMPRA, valorUnitario, type FilaCompra, numeroOC, resumenLineas } from "./def-compras";
 import { diasEntre, estaAbierta, hoy, usd } from "./calculos-compras";
 
 // El recorrido de una compra (sin Backlog ni Descartado) para la barra de avance.
@@ -76,7 +76,6 @@ export function FichaLateralCompra({
     { nombre: compra.etapa === "descartado" ? "Descartada" : "Cerrada", fecha: compra.cerradoEn },
   ];
   const conFecha = hitos.filter((h) => h.fecha);
-  const prioridad = prioridadDe(compra.prioridad);
 
   return (
     <aside aria-label={`Resumen de ${compra.nombre}`} className="min-w-0 rounded-[10px] border border-border bg-card min-[1100px]:sticky min-[1100px]:top-[calc(var(--alto-barra,3.5rem)+1rem)]">
@@ -116,7 +115,6 @@ export function FichaLateralCompra({
             <div className="mt-1.5 flex flex-wrap gap-1">
               <Badge color={colorEtapa(compra.etapa)}>{etiquetaEtapa(compra.etapa)}</Badge>
               <Pastilla>{etiquetaEstado(compra.estado)}</Pastilla>
-              {prioridad && <Badge color={prioridad.color}>{prioridad.etiqueta}</Badge>}
             </div>
           </div>
         </div>

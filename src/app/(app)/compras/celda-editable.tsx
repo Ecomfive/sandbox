@@ -21,7 +21,7 @@ const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLower
 
 /**
  * Una celda de la lista de Compras que se edita en su sitio, igual en todas las columnas (como en ClickUp): se ve como
- * siempre y al pulsarla se abre bajo ella el mismo panel. Las listas (etapa, estado, prioridad, Sí/No) guardan al elegir;
+ * siempre y al pulsarla se abre bajo ella el mismo panel. Las listas (etapa, estado, Sí/No) guardan al elegir;
  * la vía de envío marca y desmarca; el texto, los números y las fechas se guardan con Enter o al pulsar fuera, y Escape
  * lo deja como estaba. Lo que no se puede editar (sin permiso de escritura, o la cantidad y el monto de una compra con
  * productos, que se calculan de ellos) se dibuja como texto, sin botón.
@@ -131,7 +131,7 @@ function Opcion({ def, valor, etiqueta }: { def: CampoEditable; valor: string; e
 }
 
 /**
- * Etapa, estado, prioridad, Sí/No y la vía de envío: la lista de opciones con buscador (si son muchas), flechas y Enter.
+ * Etapa, estado, Sí/No y la vía de envío: la lista de opciones con buscador (si son muchas), flechas y Enter.
  * Una sola opción guarda al elegirla y cierra; con `multiple` se marcan varias y cada una guarda al instante.
  */
 function EditorOpciones({

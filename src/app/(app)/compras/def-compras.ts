@@ -51,7 +51,6 @@ export interface FilaCompra {
   asignadoNombre: string | null;
   /** Aire, mar o tierra (puede ser más de una). */
   viaEnvio: string[];
-  prioridad: string | null;
   etiquetas: string[];
   creadorNombre: string | null;
   descripcion: string | null;
@@ -72,7 +71,6 @@ export const EMOJI_CAMPO: Record<string, string> = {
   tienda: "🏪",
   cliente: "👤",
   viaEnvio: "🏗️",
-  prioridad: "🚩",
   etiquetas: "🏷️",
   qtyTotal: "🧾",
   montoTotal: "💲",
@@ -119,14 +117,6 @@ export const VIAS_ENVIO = [
 ] as const;
 export const etiquetaVia = (v: string) => VIAS_ENVIO.find((x) => x.valor === v)?.etiqueta ?? v;
 
-/** Las prioridades de ClickUp con sus colores (urgente rojo, alta amarillo, normal azul, baja gris). */
-export const PRIORIDADES = [
-  { valor: "urgente", etiqueta: "Urgente", color: "#F50000" },
-  { valor: "alta", etiqueta: "Alta", color: "#F8AE00" },
-  { valor: "normal", etiqueta: "Normal", color: "#6FDDFF" },
-  { valor: "baja", etiqueta: "Baja", color: "#D8D8D8" },
-] as const;
-export const prioridadDe = (v: string | null) => PRIORIDADES.find((p) => p.valor === v) ?? null;
 
 /** Días que lleva (o llevó, si ya cerró) una compra desde que se creó. */
 export function diasDeCompra(c: Pick<FilaCompra, "creadoEn" | "cerradoEn">, ahora: number = Date.now()): number {
@@ -299,16 +289,6 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       opciones: () => VIAS_ENVIO.map((v) => ({ valor: v.valor, etiqueta: v.etiqueta })),
       etiquetaSinValor: "Sin vía",
       agrupable: true,
-    },
-    {
-      id: "prioridad",
-      etiqueta: "Prioridad",
-      tipo: "seleccion",
-      valores: (c) => [c.prioridad ?? SIN_VALOR],
-      opciones: () => PRIORIDADES.map((p) => ({ valor: p.valor, etiqueta: p.etiqueta })),
-      etiquetaSinValor: "Sin prioridad",
-      agrupable: true,
-      ordenGrupos: PRIORIDADES.map((p) => p.valor),
     },
     {
       id: "etiquetas",

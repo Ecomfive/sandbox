@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarCompra, crearCompra, prepararSubidaFotoCompra } from "./actions";
-import { conEmoji, ESTADOS_COMPRA, ETAPAS_COMPRA, PRIORIDADES, VIAS_ENVIO, type FilaCompra } from "./def-compras";
+import { conEmoji, ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { CampoFoto } from "@/components/ui/campo-foto";
@@ -62,7 +62,7 @@ export function FormularioCompra({
   botonesArriba?: boolean;
   encabezado?: ReactNode;
   acciones?: ReactNode;
-  /** El bloque de productos de la compra: va en el bloque «Compra», justo debajo de Prioridad y Etiquetas. */
+  /** El bloque de productos de la compra: va en el bloque «Compra», justo debajo de Etiquetas. */
   productos?: ReactNode;
 }) {
   const [modificado, setModificado] = useState(false);
@@ -183,16 +183,6 @@ export function FormularioCompra({
                 </select>
               </Campo>
             )}
-            <Campo etiqueta={conEmoji("prioridad", "Prioridad")} id="campo-prioridad-compra">
-              <select id="campo-prioridad-compra" name="prioridad" defaultValue={compra?.prioridad ?? ""} className={fieldClass}>
-                <option value="">Sin prioridad</option>
-                {PRIORIDADES.map((p) => (
-                  <option key={p.valor} value={p.valor}>
-                    {p.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </Campo>
             <Campo etiqueta={conEmoji("etiquetas", "Etiquetas")} id="campo-etiquetas-compra">
               <input id="campo-etiquetas-compra" type="text" name="etiquetas" defaultValue={compra?.etiquetas.join(", ") ?? ""} placeholder="Ej: reposición, kenku" className={fieldClass} />
             </Campo>

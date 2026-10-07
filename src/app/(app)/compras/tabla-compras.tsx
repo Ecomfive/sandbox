@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
-import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, PrioridadIcon, ProductoIcon } from "@/lib/nav-icons";
+import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { actualizarCampoCompra, guardarColorEtiqueta } from "./actions";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
@@ -30,7 +30,6 @@ import {
   numeroOC,
   resumenLineas,
   tituloCompra,
-  prioridadDe,
   valorUnitario,
   type FilaCompra,
 } from "./def-compras";
@@ -47,7 +46,6 @@ const ICONOS: Record<string, IconoComp> = {
   tienda: ComprasIcon,
   cliente: PersonaIcon,
   viaEnvio: ComprasIcon,
-  prioridad: PrioridadIcon,
   etiquetas: EtiquetaIcon,
   planificacionMes: CalendarioIcon,
   codigo: EtiquetaIcon,
@@ -210,13 +208,6 @@ function columnas(
     col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
-    col("prioridad", "Prioridad", {
-      ...resto,
-      render: (c) => {
-        const p = prioridadDe(c.prioridad);
-        return ed(c, "prioridad", p ? <Badge color={p.color}>{p.etiqueta}</Badge> : "—");
-      },
-    }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
     col("tienda", "Tienda", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "tienda", c.tienda || "—") }),
     col("cliente", "Cliente", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "cliente", c.cliente || "—") }),

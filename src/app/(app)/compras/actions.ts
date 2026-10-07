@@ -5,12 +5,11 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
-import { ESTADOS_COMPRA, ETAPAS_COMPRA, PRIORIDADES, VIAS_ENVIO } from "./def-compras";
+import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor } from "./def-edicion-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
-const PRIORIDADES_VALIDAS: Set<string> = new Set(PRIORIDADES.map((p) => p.valor));
 const VIAS_VALIDAS: Set<string> = new Set(VIAS_ENVIO.map((v) => v.valor));
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
@@ -80,7 +79,6 @@ function leerCambios(formData: FormData) {
     fecha_envio: fechaOptativa(formData, "fecha_envio"),
     planificacion: textoOptativo(formData, "planificacion"),
     documentos: textoOptativo(formData, "documentos"),
-    prioridad: PRIORIDADES_VALIDAS.has(String(formData.get("prioridad") ?? "")) ? String(formData.get("prioridad")) : null,
     via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)),
     etiquetas: listaDeTexto(textoOptativo(formData, "etiquetas")),
     url_producto: textoOptativo(formData, "url_producto"),

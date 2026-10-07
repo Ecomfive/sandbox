@@ -1,7 +1,7 @@
 // Qué datos de una compra se editan directo en su celda de la lista y cómo se validan. Es lógica pura (sin base ni React): la
 // usan la celda (para mostrar el cambio al instante) y la acción del servidor (que vuelve a validar, es la que manda).
 
-import { colorEstado, colorEtapa, ESTADOS_COMPRA, ETAPAS_COMPRA, PRIORIDADES, prioridadDe, VIAS_ENVIO, type FilaCompra } from "./def-compras";
+import { colorEstado, colorEtapa, ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 
 export type TipoCampoEditable = "texto" | "entero" | "dinero" | "fecha" | "seleccion" | "multiple" | "booleano" | "lista";
 
@@ -13,7 +13,7 @@ export interface CampoEditable {
   columna: string;
   tipo: TipoCampoEditable;
   opciones?: readonly { valor: string; etiqueta: string }[];
-  /** En una selección: se puede dejar sin valor (la prioridad). */
+  /** En una selección: se puede dejar sin valor. */
   admiteVacio?: boolean;
   /** El color de cada opción (la insignia que se ve en la celda y en su lista). */
   color?: (valor: string) => string | undefined;
@@ -29,7 +29,6 @@ export interface CampoEditable {
 export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   etapa: { etiqueta: "Etapa", prop: "etapa", columna: "etapa", tipo: "seleccion", opciones: ETAPAS_COMPRA, color: colorEtapa },
   estado: { etiqueta: "Estado", prop: "estado", columna: "estado", tipo: "seleccion", opciones: ESTADOS_COMPRA, color: colorEstado },
-  prioridad: { etiqueta: "Prioridad", prop: "prioridad", columna: "prioridad", tipo: "seleccion", opciones: PRIORIDADES, admiteVacio: true, color: (v) => prioridadDe(v)?.color },
   viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO },
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "texto" },
   tienda: { etiqueta: "Tienda", prop: "tienda", columna: "tienda", tipo: "texto" },

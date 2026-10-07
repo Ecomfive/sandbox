@@ -236,7 +236,7 @@ export function FichaCompra({
               alCancelar={alCancelar}
               alCambiarGuardando={setGuardando}
               alModificar={() => setSinGuardarId(compra.id)}
-              // Los productos van arriba, en el bloque «Compra» debajo de Prioridad (solo compras de país).
+              // Los productos van arriba, en el bloque «Compra» debajo de Etiquetas (solo compras de país).
               productos={compra.tipo === "pais" ? <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir incrustado /> : undefined}
             />
           ) : (
