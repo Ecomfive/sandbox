@@ -19,7 +19,8 @@ export interface FilaCompra {
   etapa: string;
   estado: string;
   proveedor: string | null;
-  tienda: string | null;
+  /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */
+  tiendas: string[];
   productoRelacionado: string | null;
   qtyTotal: number | null;
   montoTotal: number | null;
@@ -258,7 +259,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       id: "tienda",
       etiqueta: "Tienda",
       tipo: "seleccion",
-      valores: (c) => [c.tienda ?? SIN_VALOR],
+      valores: (c) => (c.tiendas.length ? c.tiendas : [SIN_VALOR]),
       etiquetaSinValor: "Sin tienda",
       agrupable: true,
     },

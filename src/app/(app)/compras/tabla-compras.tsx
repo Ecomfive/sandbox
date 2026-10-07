@@ -128,12 +128,19 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
 function columnas(
   umbral: Record<string, number>,
   dia: string,
-  edicion: { puedeEscribir: boolean; guardar: GuardarCelda; etiquetas: string[]; colores: Record<string, string>; cambiarColor: (nombre: string, color: string) => void },
+  edicion: {
+    puedeEscribir: boolean;
+    guardar: GuardarCelda;
+    etiquetas: string[];
+    tiendas: string[];
+    colores: Record<string, string>;
+    cambiarColor: (nombre: string, color: string) => void;
+  },
 ): ColumnaTabla<FilaCompra>[] {
   const resto = { ocultable: true } as const;
   /** El contenido de una celda, editable en su sitio si su dato se puede editar (ver `CAMPOS_EDITABLES`). */
-  const ed = (c: FilaCompra, campo: string, contenido: ReactNode) => (
-    <CeldaEditable compra={c} campo={campo} puedeEscribir={edicion.puedeEscribir} guardar={edicion.guardar}>
+  const ed = (c: FilaCompra, campo: string, contenido: ReactNode, opcionesLista?: string[]) => (
+    <CeldaEditable compra={c} campo={campo} puedeEscribir={edicion.puedeEscribir} guardar={edicion.guardar} opcionesLista={opcionesLista}>
       {contenido}
     </CeldaEditable>
   );
@@ -219,7 +226,26 @@ function columnas(
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
-    col("tienda", "Tienda", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "tienda", c.tienda || "—") }),
+    col("tienda", "Tienda", {
+      ...resto,
+      clase: "text-muted-foreground",
+      // Una o varias tiendas, cada una en su línea; al pulsar se elige o se crea una nueva, como las etiquetas.
+      render: (c) =>
+        ed(
+          c,
+          "tienda",
+          c.tiendas.length ? (
+            <span className="flex flex-col">
+              {c.tiendas.map((t) => (
+                <span key={t}>{t}</span>
+              ))}
+            </span>
+          ) : (
+            "—"
+          ),
+          edicion.tiendas,
+        ),
+    }),
     col("etiquetas", "Etiquetas", {
       ...resto,
       render: (c) => (
@@ -412,9 +438,11 @@ export function TablaCompras({
     },
     [colores, mostrarToast],
   );
+  // Las tiendas que ya existen en alguna compra (con lo recién creado, que se ve al instante), para elegir.
+  const todasTiendas = useMemo(() => [...new Set(compras.flatMap((c) => c.tiendas))].sort((a, b) => a.localeCompare(b, "es")), [compras]);
   const edicion = useMemo(
-    () => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas, colores, cambiarColor }),
-    [puedeEscribir, guardarCelda, todasEtiquetas, colores, cambiarColor],
+    () => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, colores, cambiarColor }),
+    [puedeEscribir, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
   );
 
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
@@ -521,6 +549,7 @@ export function TablaCompras({
                       alQuitar={quitar}
                       aplicar={(campo, valor, modo) => void guardarLote(marcadas, campo, valor, modo)}
                       etiquetas={todasEtiquetas}
+                      tiendas={todasTiendas}
                       colores={colores}
                       guardando={guardandoLote}
                     />
@@ -531,7 +560,7 @@ export function TablaCompras({
           accionPrincipal={
             <div className="flex items-center gap-2">
               <SelectorVista vista={vista} paises={paises} puedeAgregarPais={puedeAgregarPais} />
-              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} />}
+              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} />}
             </div>
           }
           ariaLabel="Tablero de compras"
@@ -553,6 +582,7 @@ export function TablaCompras({
         />
       )}
       <FichaCompra
+        tiendas={todasTiendas}
         compra={completa}
         orden={abierta?.orden ?? []}
         paises={paises}

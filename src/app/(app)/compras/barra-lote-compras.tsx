@@ -10,8 +10,9 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EditorFecha, EditorOpciones, EditorTexto } from "./celda-editable";
 import { DEF_COMPRAS, type FilaCompra } from "./def-compras";
 import { CAMPOS_EDITABLES } from "./def-edicion-compras";
-import { claseCampoPanel, claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
+import { claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
 import { PastillaEtiqueta } from "./selector-etiquetas";
+import { PanelLista } from "./selector-lista";
 
 /** Lo que la barra le pide a la lista: guardar un dato en todas las compras marcadas. */
 export type AplicarEnLote = (campo: string, valor: unknown, modo?: ModoLote) => void;
@@ -48,6 +49,7 @@ export function BarraLoteCompras({
   alQuitar,
   aplicar,
   etiquetas,
+  tiendas,
   colores,
   guardando,
 }: {
@@ -56,6 +58,8 @@ export function BarraLoteCompras({
   aplicar: AplicarEnLote;
   /** Todas las etiquetas que existen, para elegir. */
   etiquetas: string[];
+  /** Todas las tiendas que existen, para elegir (lo escrito que no estÃ© se crea). */
+  tiendas: string[];
   colores: Record<string, string>;
   guardando: boolean;
 }) {
@@ -77,7 +81,7 @@ export function BarraLoteCompras({
         {cantidad}
       </p>
       {PRINCIPALES.map((campo) => (
-        <BotonCampoLote key={campo} campo={campo} filas={filas} aplicar={aplicar} etiquetas={etiquetas} colores={colores} deshabilitado={guardando} />
+        <BotonCampoLote key={campo} campo={campo} filas={filas} aplicar={aplicar} etiquetas={etiquetas} tiendas={tiendas} colores={colores} deshabilitado={guardando} />
       ))}
       <button
         ref={botonMas}
@@ -126,6 +130,7 @@ export function BarraLoteCompras({
           filas={filas}
           aplicar={aplicar}
           etiquetas={etiquetas}
+          tiendas={tiendas}
           colores={colores}
           alCerrar={(m) => {
             setCampoMas(null);
@@ -154,6 +159,7 @@ function BotonCampoLote({
   filas,
   aplicar,
   etiquetas,
+  tiendas,
   colores,
   deshabilitado,
 }: {
@@ -161,6 +167,7 @@ function BotonCampoLote({
   filas: FilaCompra[];
   aplicar: AplicarEnLote;
   etiquetas: string[];
+  tiendas: string[];
   colores: Record<string, string>;
   deshabilitado: boolean;
 }) {
@@ -190,6 +197,7 @@ function BotonCampoLote({
           filas={filas}
           aplicar={aplicar}
           etiquetas={etiquetas}
+          tiendas={tiendas}
           colores={colores}
           alCerrar={(m) => {
             setAbierto(false);
@@ -212,6 +220,7 @@ function EditorCampoLote({
   filas,
   aplicar,
   etiquetas,
+  tiendas,
   colores,
   alCerrar,
 }: {
@@ -220,6 +229,7 @@ function EditorCampoLote({
   filas: FilaCompra[];
   aplicar: AplicarEnLote;
   etiquetas: string[];
+  tiendas: string[];
   colores: Record<string, string>;
   alCerrar: (motivo: MotivoCierre | "elegido") => void;
 }) {
@@ -228,7 +238,17 @@ function EditorCampoLote({
   const aria = `${def.etiqueta} de ${filas.length} ${filas.length === 1 ? "compra" : "compras"}`;
 
   if (def.tipo === "lista") {
-    return <EditorEtiquetasLote ancla={ancla} filas={filas} aplicar={aplicar} etiquetas={etiquetas} colores={colores} alCerrar={alCerrar} />;
+    return (
+      <EditorListaLote
+        campo={campo}
+        ancla={ancla}
+        filas={filas}
+        aplicar={aplicar}
+        opciones={campo === "etiquetas" ? etiquetas : tiendas}
+        colores={campo === "etiquetas" ? colores : undefined}
+        alCerrar={alCerrar}
+      />
+    );
   }
   if (def.tipo === "multiple") {
     return (
@@ -296,91 +316,44 @@ function EditorCampoLote({
 }
 
 /**
- * Las etiquetas para todas las marcadas: cada una dice si la tienen todas (âœ“), algunas (â€“) o ninguna. Pulsar una la pone en
- * todas, o la quita de todas si ya la tenÃ­an todas; escribir una nueva y Enter la crea y se la pone a todas. Cada pulsaciÃ³n se
- * guarda al instante, respetando las que cada compra ya tenÃ­a.
+ * Una lista (las etiquetas o la tienda) para todas las marcadas: cada nombre dice si lo tienen todas (?), algunas (–) o
+ * ninguna. Pulsar uno lo pone en todas, o lo quita de todas si ya lo tenían todas; escribir uno nuevo y Enter lo crea y se
+ * lo pone a todas. Cada pulsación se guarda al instante, respetando lo que cada compra ya tenía.
  */
-function EditorEtiquetasLote({
+function EditorListaLote({
+  campo,
   ancla,
   filas,
   aplicar,
-  etiquetas,
+  opciones,
   colores,
   alCerrar,
 }: {
+  campo: string;
   ancla: RefObject<HTMLButtonElement | null>;
   filas: FilaCompra[];
   aplicar: AplicarEnLote;
-  etiquetas: string[];
-  colores: Record<string, string>;
+  opciones: string[];
+  /** Con color por nombre (las etiquetas) se dibujan como pastillas; sin él (la tienda), como texto. */
+  colores?: Record<string, string>;
   alCerrar: (motivo: MotivoCierre | "elegido") => void;
 }) {
-  const [busqueda, setBusqueda] = useState("");
-  const normal = (t: string) => t.normalize("NFD").replace(/[Ì€-Í¯]/g, "").toLowerCase().trim();
-  const q = normal(busqueda);
-  const listas = filas.map((f) => f.etiquetas);
-  const todas = [...new Set([...etiquetas, ...listas.flat()])].sort((a, b) => a.localeCompare(b, "es"));
-  const opciones = q ? todas.filter((e) => normal(e).includes(q)) : todas;
-  const nueva = busqueda.trim().replace(/\s+/g, " ").slice(0, 40);
-  const puedeCrear = !!nueva && !todas.some((e) => normal(e) === normal(nueva));
-
-  function alternar(e: string) {
-    aplicar("etiquetas", [e], presenciaEnLote(listas, e) === "todas" ? "quitar" : "agregar");
-  }
-  function crear() {
-    if (!puedeCrear) return;
-    aplicar("etiquetas", [nueva], "agregar");
-    setBusqueda("");
-  }
-
+  const def = CAMPOS_EDITABLES[campo];
+  const listas = filas.map((f) => f[def.prop] as string[]);
   return (
-    <PanelCelda ancla={ancla} etiqueta={`Etiquetas de ${filas.length} compras`} ancho={280} alCerrar={alCerrar}>
-      <input
-        autoFocus
-        value={busqueda}
-        onChange={(ev) => setBusqueda(ev.target.value)}
-        onKeyDown={(ev) => {
-          if (ev.key === "Enter") {
-            ev.preventDefault();
-            if (puedeCrear) crear();
-            else if (opciones.length === 1) alternar(opciones[0]);
-          }
-        }}
-        placeholder="Buscar o aÃ±adir etiquetasâ€¦"
-        aria-label="Buscar o aÃ±adir etiquetas"
-        className={claseCampoPanel}
-      />
-      <ul className="m-0 flex max-h-64 list-none flex-col gap-0.5 overflow-y-auto p-1.5">
-        {puedeCrear && (
-          <li>
-            <button type="button" onClick={crear} className={`${claseOpcionPanel} justify-start hover:bg-muted ${anilloFoco}`}>
-              <span className="text-muted-foreground">Crear</span> <PastillaEtiqueta nombre={nueva} color={colores[nueva]} />
-            </button>
-          </li>
-        )}
-        {opciones.map((e) => {
-          const presencia = presenciaEnLote(listas, e);
-          return (
-            <li key={e}>
-              <button
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={presencia === "todas" ? true : presencia === "algunas" ? "mixed" : false}
-                onClick={() => alternar(e)}
-                className={`${claseOpcionPanel} hover:bg-muted ${anilloFoco}`}
-              >
-                <PastillaEtiqueta nombre={e} color={colores[e]} />
-                {presencia !== "ninguna" && (
-                  <span aria-hidden="true" className="text-xs text-primario">
-                    {presencia === "todas" ? "âœ“" : "â€“"}
-                  </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-        {opciones.length === 0 && !puedeCrear && <li className="px-2 py-1.5 text-xs text-muted-foreground">Sin etiquetas.</li>}
-      </ul>
-    </PanelCelda>
+    <PanelLista
+      ancla={ancla}
+      etiqueta={`${def.etiqueta} de ${filas.length} compras`}
+      opciones={[...opciones, ...listas.flat()]}
+      marca={(n) => {
+        const p = presenciaEnLote(listas, n);
+        return p === "todas" ? "si" : p === "algunas" ? "algunas" : "no";
+      }}
+      renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : undefined}
+      placeholder={campo === "etiquetas" ? "Buscar o añadir etiquetas…" : `Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
+      alAlternar={(n) => aplicar(campo, [n], presenciaEnLote(listas, n) === "todas" ? "quitar" : "agregar")}
+      alCrear={(n) => aplicar(campo, [n], "agregar")}
+      alCerrar={alCerrar}
+    />
   );
 }
