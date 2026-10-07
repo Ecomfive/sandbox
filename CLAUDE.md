@@ -585,7 +585,8 @@ convenciones técnicas del código.
   el dato de cada compra pasó a un comentario con su título («Track ID: …») para poder buscarlo en la Actividad. No los
   vuelvas a poner como campo ni como indicador (el «pago pendiente» del Informe y del Dashboard se quitó con ellos); la
   fecha «Cerrada» sí sigue, porque la pone el sistema y de ella salen el ciclo y los tiempos. **Compras** (`/compras/lista`, `tabla-compras.tsx`): una sola vista, la `TablaDatos`
-  con aspecto de lista (agrupar —arranca por Etapa—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
+  con aspecto de lista (agrupar —arranca por Etapa; el título de cada grupo lleva el color de su etapa, estado o etiqueta, como
+  en ClickUp: `etiquetaGrupo` de `TablaDatos`—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
   de los campos de ClickUp ocultos (`oculta` en la columna) hasta mostrarlos en «Columnas»; filtros de un toque (Cotizando,
   Producción, En tránsito, Atrasadas; `?grupo=` y `?etapa=` los preseleccionan) y la ficha de resumen a la derecha, que se
   minimiza (`ficha-lateral-compra.tsx`: etapa N de las del recorrido, fechas clave con los días entre una y otra). **Pulsar la descripción de

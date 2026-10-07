@@ -10,6 +10,7 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { SIN_VALOR } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { combinarLista, type ModoLote } from "@/lib/compras/lote";
 import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta } from "./actions";
@@ -470,6 +471,18 @@ export function TablaCompras({
           nombre={NOMBRE}
           claveFila={(c) => c.id}
           formatearTotal={(total) => formatearMoneda(total, MONEDA_COMPRAS)}
+          // Al agrupar, el título de cada grupo lleva el color de su etapa o estado (como en ClickUp) y el de su etiqueta.
+          etiquetaGrupo={(campo, grupo) =>
+            campo === "etapa" ? (
+              <Badge color={colorEtapa(grupo.clave)}>{grupo.etiqueta}</Badge>
+            ) : campo === "estado" ? (
+              <Badge color={colorEstado(grupo.clave)}>{grupo.etiqueta}</Badge>
+            ) : campo === "etiquetas" && grupo.clave !== SIN_VALOR ? (
+              <PastillaEtiqueta nombre={grupo.etiqueta} color={colores[grupo.etiqueta]} />
+            ) : (
+              <span className="font-semibold">{grupo.etiqueta}</span>
+            )
+          }
           anchoMinimo="72rem"
           porPagina={100}
           paginarSiempre
