@@ -31,7 +31,8 @@ export interface ColumnaTabla<F, C = undefined> extends ColumnaDef {
   clase?: string;
   /**
    * La suma (o lo que corresponda) de esta columna sobre **todas** las filas que deja ver la tabla (con sus filtros, no solo la
-   * página). Si alguna columna a la vista la trae, la tabla muestra una fila de totales pegada abajo, como ClickUp.
+   * página). Si alguna columna a la vista la trae, la tabla muestra una fila de totales pegada abajo, como ClickUp. Al agrupar,
+   * además, cada grupo cierra con una fila de subtotal que suma solo sus filas.
    */
   total?: (filas: F[]) => ReactNode;
 }
@@ -249,6 +250,20 @@ export function TablaDatos<F, C = undefined>({
     </tr>
   );
 
+  // Al agrupar, cada grupo cierra con su propio subtotal (como ClickUp): la misma suma de cada columna con `total`, pero solo
+  // sobre las filas de ese grupo. Se ve también con el grupo contraído, para leer las sumas por etapa sin abrirlos.
+  const filaSubtotal = (grupo: Grupo<F>) => (
+    <tr key={`${grupo.clave}-subtotal`} className="border-t border-border bg-muted/60 text-[13px] font-medium">
+      {seleccion && <td className="w-10 px-2 py-2" />}
+      {visibles_.map((c, i) => (
+        <td key={c.id} className={`border-r border-border/40 px-4 py-2 tabular-nums whitespace-nowrap ${c.total ? "" : "text-muted-foreground"}`}>
+          {c.total ? c.total(grupo.filas) : i === 0 ? "Subtotal" : null}
+        </td>
+      ))}
+      {accion && <td className="px-4 py-2" />}
+    </tr>
+  );
+
   // Las copias fijas del encabezado y de los totales: una celda por cada columna de la tabla, en su mismo orden.
   const encabezadoFijo: CeldaFija[] | undefined = fijarEncabezado
     ? [
@@ -383,6 +398,7 @@ export function TablaDatos<F, C = undefined>({
                     total={formatearTotal ? formatearTotal(grupo.total) : undefined}
                   />
                   {!contraido && grupo.filas.map((f) => fila(f))}
+                  {hayTotales && grupo.filas.length > 0 && filaSubtotal(grupo)}
                 </tbody>
               );
             })
