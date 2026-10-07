@@ -588,8 +588,12 @@ convenciones técnicas del código.
   la compra (la columna «Compra», y solo esa) la muestra en la ficha; el resto de las celdas se editan en su sitio** (ver abajo);
   «Abrir ficha completa» abre el formulario con la actividad (con la ficha minimizada, la descripción lo abre directo).
   **Edición en la celda** (`celda-editable.tsx`, qué se edita y cómo se valida en `def-edicion-compras.ts`): un clic en el
-  dato lo vuelve su campo (texto, número, fecha, selector o las casillas de la vía de envío); se guarda al salir del campo o con
-  Enter, Escape lo deja como estaba, y los selectores guardan al elegir. Guarda **un solo dato** con
+  dato abre bajo la celda **el mismo panel para todas las columnas** (`PanelCelda`, `panel-celda.tsx`, como los de ClickUp):
+  lista de opciones con sus colores, buscador, flechas y Enter (etapa, estado, prioridad, Sí/No; la vía de envío marca
+  varias), un campo limpio (texto y montos) o la fecha con atajos (Hoy, Mañana, En una semana, Quitar). Las opciones guardan
+  al elegir; lo escrito, con Enter o al pulsar fuera, y Escape lo deja como estaba. Las etiquetas usan su propio selector
+  (`selector-etiquetas.tsx`, en el mismo panel); su botón va junto al nombre de la compra con `abrirFila.junto`, fuera del
+  botón que abre la compra (un botón dentro de otro rompe la hidratación). Guarda **un solo dato** con
   `actualizarCampoCompra` (no la compra entera, que es lo que hace la ficha), que valida otra vez en el servidor con las mismas
   reglas (`normalizarValor`), sella o quita `cerrado_en` y anota el evento si cambia la etapa o el estado, y deja una línea en
   la auditoría. El cambio se ve al instante (`cambios` en `TablaCompras`, por encima de las filas del servidor); si el
