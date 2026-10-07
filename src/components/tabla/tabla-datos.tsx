@@ -11,7 +11,14 @@ import { BarraHerramientas } from "./barra-herramientas";
 import type { IconoComp } from "./botones-vista";
 import type { DescargaCompleta } from "./boton-descargar";
 import { EncabezadoGrupo } from "./encabezado-grupo";
-import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "./estilos-tabla";
+import {
+  claseCeldaCasilla,
+  claseCeldaColumna,
+  claseEncabezadoCasilla,
+  claseEncabezadoColumna,
+  claseFilaEncabezado,
+  fondoFilaMarcada,
+} from "./estilos-tabla";
 import { useColumnas, type ColumnaDef } from "./ganchos";
 import { Paginacion } from "./paginacion";
 import { POR_PAGINA, textoEstadoTabla, useIrAPaginaArriba } from "./usar-pagina-arriba";
@@ -50,6 +57,7 @@ export function TablaDatos<F, C = undefined>({
   paginarSiempre,
   descargaCompleta,
   accionPrincipal,
+  seleccion,
   vacio,
   aspecto = "tabla",
 }: {
@@ -97,6 +105,17 @@ export function TablaDatos<F, C = undefined>({
   descargaCompleta?: DescargaCompleta;
   /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
   accionPrincipal?: ReactNode;
+  /**
+   * Casillas para marcar filas (una por fila y una en el encabezado que marca todas las que se ven) y, con alguna marcada,
+   * la barra que dibuja el módulo (`barra`) fija abajo, como en Retiros y en ClickUp. Solo cuenta lo que se ve ahora (las
+   * filas de los grupos abiertos o las de la página): una acción nunca toca una fila que la persona no tiene delante.
+   * Lo marcado sigue marcado al cambiar de filtros, y la barra recibe `quitar` para vaciar la selección.
+   */
+  seleccion?: {
+    /** El nombre de la casilla de una fila, para lectores de pantalla («Seleccionar la compra OC-0123»). */
+    etiqueta: (fila: F) => string;
+    barra: (marcadas: F[], quitar: () => void) => ReactNode;
+  };
   /** Mensaje cuando no hay filas cargadas. */
   vacio: string;
   /** «lista»: más limpia, como una lista de ClickUp (sin rayas entre columnas y apenas una línea suave entre filas). */
@@ -126,11 +145,33 @@ export function TablaDatos<F, C = undefined>({
 
   const porId = new Map(columnas.map((c) => [c.id, c]));
   const visibles_ = guardadas.orden.filter((id) => !guardadas.ocultas.has(id)).map((id) => porId.get(id)!);
-  const anchoColumnas = visibles_.length + (accion ? 1 : 0);
+  const anchoColumnas = visibles_.length + (accion ? 1 : 0) + (seleccion ? 1 : 0);
 
   // Las filas en el orden en que se ven: con grupos, los que están abiertos; sin ellos, la página actual.
-  const ordenEnPantalla = () =>
-    (vista.agrupar ? grupos.filter((g) => !contraidos.has(g.clave)).flatMap((g) => g.filas) : visibles).map(claveFila);
+  const filasEnPantalla = vista.agrupar ? grupos.filter((g) => !contraidos.has(g.clave)).flatMap((g) => g.filas) : visibles;
+  const ordenEnPantalla = () => filasEnPantalla.map(claveFila);
+
+  // Lo marcado: solo cuenta lo que se ve ahora. Una fila marcada que un filtro esconde sigue marcada y reaparece marcada.
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const filasMarcadas = seleccion ? filasEnPantalla.filter((f) => marcados.has(claveFila(f))) : [];
+  const todasMarcadas = filasEnPantalla.length > 0 && filasMarcadas.length === filasEnPantalla.length;
+  function alternarFila(clave: string) {
+    setMarcados((actuales) => {
+      const nuevos = new Set(actuales);
+      if (!nuevos.delete(clave)) nuevos.add(clave);
+      return nuevos;
+    });
+  }
+  function alternarTodas() {
+    setMarcados((actuales) => {
+      const nuevos = new Set(actuales);
+      for (const f of filasEnPantalla) {
+        if (todasMarcadas) nuevos.delete(claveFila(f));
+        else nuevos.add(claveFila(f));
+      }
+      return nuevos;
+    });
+  }
 
   const fila = (f: F) => (
     <tr
@@ -145,8 +186,23 @@ export function TablaDatos<F, C = undefined>({
             }
           : undefined
       }
-      className={`group border-b border-border/60 last:border-0 ${abrirFila && !abrirFila.soloColumna ? "cursor-pointer" : ""} ${abrirFila ? "hover:bg-muted/50" : ""} ${claseFila?.(f) ?? ""}`}
+      className={`group border-b border-border/60 last:border-0 ${abrirFila && !abrirFila.soloColumna ? "cursor-pointer" : ""} ${
+        seleccion && marcados.has(claveFila(f)) ? fondoFilaMarcada : abrirFila ? "hover:bg-muted/50" : ""
+      } ${claseFila?.(f) ?? ""}`}
     >
+      {seleccion && (
+        <td className={claseCeldaCasilla}>
+          <label className="-my-2 flex h-8 w-8 cursor-pointer items-center justify-center">
+            <input
+              type="checkbox"
+              checked={marcados.has(claveFila(f))}
+              onChange={() => alternarFila(claveFila(f))}
+              aria-label={seleccion.etiqueta(f)}
+              className="h-4 w-4 cursor-pointer accent-foreground"
+            />
+          </label>
+        </td>
+      )}
       {visibles_.map((c, i) => (
         <td key={c.id} className={`${claseCeldaColumna} ${c.clase ?? ""}`}>
           {abrirFila && (abrirFila.columna ? c.id === abrirFila.columna : i === 0) ? (
@@ -210,6 +266,23 @@ export function TablaDatos<F, C = undefined>({
         <table data-aspecto={aspecto} className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
           <thead>
             <tr className={claseFilaEncabezado}>
+              {seleccion && (
+                <th scope="col" className={claseEncabezadoCasilla}>
+                  <label className="-my-2 flex h-8 w-8 cursor-pointer items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={todasMarcadas}
+                      ref={(el) => {
+                        if (el) el.indeterminate = filasMarcadas.length > 0 && !todasMarcadas;
+                      }}
+                      onChange={alternarTodas}
+                      disabled={filasEnPantalla.length === 0}
+                      aria-label={`Seleccionar todas las ${nombre.plural} que se ven`}
+                      className="h-4 w-4 cursor-pointer accent-foreground"
+                    />
+                  </label>
+                </th>
+              )}
               {visibles_.map((c) => (
                 <th
                   key={c.id}
@@ -305,6 +378,7 @@ export function TablaDatos<F, C = undefined>({
       {notas.length > 0 && (
         <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">{notas.join(" · ")}</p>
       )}
+      {seleccion && filasMarcadas.length > 0 && seleccion.barra(filasMarcadas, () => setMarcados(new Set()))}
     </div>
   );
 }

@@ -606,6 +606,20 @@ convenciones técnicas del código.
   son fórmulas), país, foto, responsable, ni la QTY y el monto de una compra con productos (se calculan de ellos), igual que
   en la ficha. Sin permiso de escritura las celdas son solo texto. Para sumar un dato editable: agrégalo a `CAMPOS_EDITABLES`
   y envuelve su celda con `ed(c, "<id>", …)` en `tabla-compras.tsx`.
+  **Cambiar varias compras a la vez** (como las acciones en lote de ClickUp, para armar un envío: etiqueta, fecha límite,
+  planificación…): con permiso de escritura la tabla trae una casilla por fila y una en el encabezado (marca las que se ven;
+  `seleccion` de `TablaDatos`, genérico: cuenta solo lo que está en pantalla, como Retiros). Al marcar alguna sale fija abajo
+  `BarraLoteCompras` (`barra-lote-compras.tsx`): «N compras seleccionadas», un botón por dato (Etiquetas, Fecha límite,
+  Planificación, Etapa, Estado, Vía de envío, Proveedor, Tienda y «Más» con el resto de `CAMPOS_EDITABLES`), descargar lo
+  marcado y quitar la selección. Cada botón abre **el mismo panel de las celdas** (los editores de `celda-editable.tsx`, ahora
+  exportados) sin valor de partida y lo elegido va a todas las marcadas; la selección queda para seguir con otro dato. Un texto
+  o monto vacío no hace nada (no se borra un dato de varias compras sin querer), una fecha se quita con «Quitar fecha», la vía
+  de envío marca varias y se guarda al cerrar el panel, y las etiquetas dicen si la tienen todas (✓), algunas (–) o ninguna:
+  pulsar una la pone en todas o, si ya la tenían todas, la quita (`agregar` / `quitar` respetan las que cada compra ya tenía).
+  Guarda `actualizarCampoComprasLote` (hasta 300 compras; valida con `normalizarValor`, una escritura por valor distinto, la
+  fecha de cierre al cambiar la etapa, evento de etapa/estado, línea en la Actividad y auditoría por compra, «En lote (N
+  compras)»; la QTY y el monto de una compra con productos no se tocan y se cuentan como omitidas). La lógica pura vive en
+  `src/lib/compras/lote.ts` (con prueba). Se ve al instante y, si el servidor lo rechaza, vuelve a como estaba.
   **Productos en la ficha:** el bloque «Productos» (`productos-compra.tsx`, solo compras de país) va **dentro del formulario**,
   en el bloque «Compra» justo debajo de Etiquetas (`FormularioCompra` recibe `productos` y `FichaCompra` se lo
   pasa con `incrustado`). Como está dentro del `<form>` pero guarda por su cuenta (cada campo, al salir de él), su contenedor

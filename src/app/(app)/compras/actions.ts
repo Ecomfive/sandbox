@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
+import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
-import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor } from "./def-edicion-compras";
+import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
@@ -291,6 +292,116 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
     despues: { [def.etiqueta]: textoDeValor(def, normalizado.valor) },
   });
   return cerradoEn === undefined ? {} : { cerradoEn };
+}
+
+/**
+ * Cambia **un mismo dato de varias compras a la vez**, desde la barra que sale al marcarlas en la lista (como las acciones en
+ * lote de ClickUp: por ejemplo, ponerle a todas las compras de un envío su etiqueta, su fecha límite o su planificación).
+ * Valida con las mismas reglas que una celda (`normalizarValor`) y cada compra deja lo mismo que dejaría el cambio hecho
+ * una por una: la fecha de cierre al cambiar la etapa, el evento de etapa o estado, su línea en la Actividad y la
+ * auditoría. Con las etiquetas, `agregar` y `quitar` respetan las que cada compra ya tenía. La cantidad y el monto de una
+ * compra con productos no se tocan (se calculan de ellos): esas se cuentan en `omitidas`. Devuelve el error como valor.
+ */
+export async function actualizarCampoComprasLote(
+  ids: string[],
+  campo: string,
+  bruto: unknown,
+  modo: ModoLote = "poner",
+): Promise<{ error?: string; aplicadas?: { id: string; valor: ValorCampo; cerradoEn?: string | null }[]; omitidas?: number }> {
+  await requireModuloEscritura("compras");
+  if (!Array.isArray(ids) || ids.length === 0) return { error: "Marca al menos una compra." };
+  const unicos = [...new Set(ids.map(String))];
+  if (unicos.length > MAX_COMPRAS_LOTE) return { error: `Se pueden cambiar hasta ${MAX_COMPRAS_LOTE} compras a la vez.` };
+  if (unicos.some((id) => !ES_ID(id))) return { error: "Hay una compra que no es válida." };
+  const def = campoEditable(String(campo));
+  if (!def) return { error: "Ese dato no se edita aquí." };
+  if (modo !== "poner" && (def.tipo !== "lista" || (modo !== "agregar" && modo !== "quitar"))) return { error: "Ese cambio solo sirve para las etiquetas." };
+  const normalizado = normalizarValor(def, bruto);
+  if ("error" in normalizado) return normalizado;
+
+  const supabase = createServiceClient();
+  const { data } = await supabase.from("wms_compras").select(`id, ${def.columna}, etapa, estado`).in("id", unicos);
+  const actuales = new Map(((data ?? []) as unknown as (Record<string, unknown> & { id: string })[]).map((c) => [c.id, c]));
+
+  // Con productos vinculados, la cantidad y el monto se calculan de ellos: esas compras no se tocan.
+  const conProductos = new Set<string>();
+  if (def.soloSinProductos) {
+    const { data: lineas } = await supabase.from("wms_compra_items").select("compra_id").in("compra_id", unicos);
+    for (const l of lineas ?? []) conProductos.add(String(l.compra_id));
+  }
+  const objetivo = unicos.filter((id) => actuales.has(id) && !conProductos.has(id));
+  const omitidas = unicos.length - objetivo.length;
+  if (objetivo.length === 0) return { error: def.soloSinProductos && conProductos.size ? "Con productos vinculados, esto se calcula de ellos." : "Las compras ya no existen.", omitidas };
+
+  const ahora = new Date().toISOString();
+  const nuevoValor = (id: string): ValorCampo => {
+    const antes = actuales.get(id)![def.columna];
+    return def.tipo === "lista" ? combinarLista(Array.isArray(antes) ? antes.map(String) : [], modo, normalizado.valor as string[]) : normalizado.valor;
+  };
+
+  // Las que quedan con el mismo valor (y la misma regla de cierre) se guardan juntas, en una sola escritura.
+  const grupos = new Map<string, { ids: string[]; cambios: Record<string, unknown> }>();
+  const cerradoEnDe = new Map<string, string | null>();
+  for (const id of objetivo) {
+    const valor = nuevoValor(id);
+    const cambios: Record<string, unknown> = { [def.columna]: valor, actualizado_en: ahora };
+    let cierre = "";
+    if (campo === "etapa") {
+      const accion = cierreAlCambiarEtapa(String(actuales.get(id)!.etapa), String(normalizado.valor));
+      if (accion === "sellar") cambios.cerrado_en = ahora;
+      if (accion === "quitar") cambios.cerrado_en = null;
+      cierre = accion;
+      if (accion !== "mantener") cerradoEnDe.set(id, accion === "sellar" ? ahora : null);
+    }
+    const clave = `${JSON.stringify(valor)}|${cierre}`;
+    const grupo = grupos.get(clave) ?? { ids: [], cambios };
+    grupo.ids.push(id);
+    grupos.set(clave, grupo);
+  }
+  const resultados = await Promise.all([...grupos.values()].map((g) => supabase.from("wms_compras").update(g.cambios).in("id", g.ids)));
+  const fallo = resultados.find((r) => r.error);
+  if (fallo?.error) {
+    // Pudo quedar guardada una parte: se vuelve a leer la lista para que se vea lo que de verdad quedó.
+    revalidatePath("/compras/lista");
+    return { error: fallo.error.message.length < 200 ? fallo.error.message : "No se pudo guardar el cambio." };
+  }
+
+  // Actividad, eventos y auditoría: una línea por compra que de verdad cambió, con una sola escritura cada una.
+  const usuario = await getUsuarioActual();
+  const autor = usuario?.nombre || usuario?.email || null;
+  const base = Date.now();
+  const cambiaron = objetivo.filter((id) => JSON.stringify(ordenada(actuales.get(id)![def.columna])) !== JSON.stringify(ordenada(nuevoValor(id))));
+  if (cambiaron.length > 0) {
+    const filas = cambiaron.map((id, i) => {
+      const antes = actuales.get(id)!;
+      return {
+        compra_id: id,
+        campo,
+        valor_antes: campo === "etapa" || campo === "estado" ? String(antes[campo]) : textoDeValor(def, antes[def.columna]),
+        valor_despues: campo === "etapa" || campo === "estado" ? String(normalizado.valor) : textoDeValor(def, nuevoValor(id)),
+        // La base no repite compra + campo + valor + hora: cada compra lleva unos milisegundos distintos.
+        ocurrido_en: new Date(base + i).toISOString(),
+        autor,
+        origen: "sistema",
+      };
+    });
+    await supabase.from("wms_compra_eventos").insert(filas);
+    await registrarAuditoriaLote(
+      cambiaron.map((id) => ({
+        accion: "editar_campo_compra",
+        entidad: "wms_compras",
+        entidadId: id,
+        detalle: `En lote (${cambiaron.length} compras)`,
+        antes: { [def.etiqueta]: textoDeValor(def, actuales.get(id)![def.columna]) },
+        despues: { [def.etiqueta]: textoDeValor(def, nuevoValor(id)) },
+      })),
+    );
+  }
+
+  return {
+    aplicadas: objetivo.map((id) => ({ id, valor: nuevoValor(id), ...(cerradoEnDe.has(id) ? { cerradoEn: cerradoEnDe.get(id) ?? null } : {}) })),
+    omitidas,
+  };
 }
 
 export async function eliminarCompra(formData: FormData) {
