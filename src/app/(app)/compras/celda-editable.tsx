@@ -134,7 +134,7 @@ function Opcion({ def, valor, etiqueta }: { def: CampoEditable; valor: string; e
  * Etapa, estado, Sí/No y la vía de envío: la lista de opciones con buscador (si son muchas), flechas y Enter.
  * Una sola opción guarda al elegirla y cierra; con `multiple` se marcan varias y cada una guarda al instante.
  */
-function EditorOpciones({
+export function EditorOpciones({
   def,
   ancla,
   aria,
@@ -258,7 +258,7 @@ function EditorOpciones({
 }
 
 /** Texto, números y dinero: un solo campo; Enter o pulsar fuera guarda, Escape descarta (`undefined` = sin cambio). */
-function EditorTexto({
+export function EditorTexto({
   def,
   ancla,
   aria,
@@ -316,15 +316,21 @@ const sumarDias = (iso: string, dias: number) => {
 };
 
 /** Fechas: el campo de fecha y atajos (Hoy, Mañana, En una semana, Quitar), como el selector de fechas de ClickUp. */
-function EditorFecha({
+export function EditorFecha({
   ancla,
   aria,
   inicial,
+  conQuitar = !!inicial,
+  alQuitar,
   alTerminar,
 }: {
-  ancla: RefObject<HTMLButtonElement | null>;
+  ancla: RefObject<HTMLElement | null>;
   aria: string;
   inicial: string;
+  /** Ofrece «Quitar fecha» (por defecto, solo si ya había una). En la barra de varias compras siempre. */
+  conQuitar?: boolean;
+  /** Si se da, «Quitar fecha» llama a esto en vez de `alTerminar("")`: así quien lo usa distingue quitarla de no haber elegido nada. */
+  alQuitar?: () => void;
   alTerminar: (valor: string | undefined, motivo: MotivoCierre | "elegido") => void;
 }) {
   const [texto, setTexto] = useState(inicial);
@@ -334,7 +340,7 @@ function EditorFecha({
     { etiqueta: "Hoy", valor: dia },
     { etiqueta: "Mañana", valor: sumarDias(dia, 1) },
     { etiqueta: "En una semana", valor: sumarDias(dia, 7) },
-    ...(inicial ? [{ etiqueta: "Quitar fecha", valor: "" }] : []),
+    ...(conQuitar ? [{ etiqueta: "Quitar fecha", valor: "" }] : []),
   ];
 
   useEffect(() => {
@@ -364,7 +370,7 @@ function EditorFecha({
           <li key={a.etiqueta}>
             <button
               type="button"
-              onClick={() => alTerminar(a.valor, "elegido")}
+              onClick={() => (!a.valor && alQuitar ? alQuitar() : alTerminar(a.valor, "elegido"))}
               className={`${claseOpcionPanel} hover:bg-muted ${a.valor ? "" : "text-muted-foreground"} ${anilloFoco}`}
             >
               <span>{a.etiqueta}</span>

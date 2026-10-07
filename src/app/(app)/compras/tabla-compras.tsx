@@ -11,7 +11,9 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
-import { actualizarCampoCompra, guardarColorEtiqueta } from "./actions";
+import { combinarLista, type ModoLote } from "@/lib/compras/lote";
+import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta } from "./actions";
+import { BarraLoteCompras } from "./barra-lote-compras";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
 import { EtiquetasCompra, PastillaEtiqueta } from "./selector-etiquetas";
 import { CrearCompraPanel } from "./crear-compra-panel";
@@ -317,6 +319,64 @@ export function TablaCompras({
     },
     [mostrarToast],
   );
+  /**
+   * Cambia un mismo dato de todas las compras marcadas (la barra de abajo): se ve de inmediato en la lista y, si el servidor lo
+   * rechaza, vuelve a como estaba y se avisa. Con las etiquetas, `agregar` y `quitar` respetan las que cada compra ya tenía.
+   */
+  const [guardandoLote, setGuardandoLote] = useState(false);
+  const guardarLote = useCallback(
+    async (marcadas: FilaCompra[], campo: string, bruto: unknown, modo: ModoLote = "poner") => {
+      const def = campoEditable(campo);
+      if (!def) return;
+      const normalizado = normalizarValor(def, bruto);
+      if ("error" in normalizado) {
+        mostrarToast(normalizado.error, "destructive");
+        return;
+      }
+      // Con productos vinculados, la cantidad y el monto se calculan de ellos: esas compras no se tocan.
+      const objetivo = marcadas.filter((c) => !(def.soloSinProductos && c.productos > 0));
+      if (objetivo.length === 0) {
+        mostrarToast("Con productos vinculados, esto se calcula de ellos.", "destructive");
+        return;
+      }
+      const nuevoDe = (c: FilaCompra) => (def.tipo === "lista" ? combinarLista(c[def.prop] as string[], modo, normalizado.valor as string[]) : normalizado.valor);
+      const anteriores = new Map(objetivo.map((c) => [c.id, c[def.prop]]));
+      setCambios((o) => {
+        const siguiente = { ...o };
+        for (const c of objetivo) siguiente[c.id] = { ...siguiente[c.id], [def.prop]: nuevoDe(c) } as Partial<FilaCompra>;
+        return siguiente;
+      });
+      setGuardandoLote(true);
+      const resultado = await actualizarCampoComprasLote(
+        objetivo.map((c) => c.id),
+        campo,
+        normalizado.valor,
+        modo,
+      ).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }) as Awaited<ReturnType<typeof actualizarCampoComprasLote>>);
+      setGuardandoLote(false);
+      if (resultado.error) {
+        setCambios((o) => {
+          const siguiente = { ...o };
+          for (const c of objetivo) siguiente[c.id] = { ...siguiente[c.id], [def.prop]: anteriores.get(c.id) } as Partial<FilaCompra>;
+          return siguiente;
+        });
+        mostrarToast(resultado.error, "destructive");
+        return;
+      }
+      const cerradas = (resultado.aplicadas ?? []).filter((a) => "cerradoEn" in a);
+      if (cerradas.length) {
+        setCambios((o) => {
+          const siguiente = { ...o };
+          for (const a of cerradas) siguiente[a.id] = { ...siguiente[a.id], cerradoEn: a.cerradoEn ?? null };
+          return siguiente;
+        });
+      }
+      const n = resultado.aplicadas?.length ?? objetivo.length;
+      const omitidas = resultado.omitidas ?? 0;
+      mostrarToast(`${def.etiqueta} guardado en ${n} ${n === 1 ? "compra" : "compras"}${omitidas ? ` (${omitidas} con productos no cambiaron)` : ""}`);
+    },
+    [mostrarToast],
+  );
   // Todas las etiquetas que existen en las compras, para el selector de etiquetas (como en ClickUp).
   const todasEtiquetas = useMemo(() => [...new Set(comprasServidor.flatMap((c) => c.etiquetas))].sort((a, b) => a.localeCompare(b, "es")), [comprasServidor]);
   // El color de cada etiqueta: se ve al instante al elegirlo; si el servidor lo rechaza, vuelve al de antes.
@@ -422,6 +482,24 @@ export function TablaCompras({
             ),
           }}
           claseFila={(c) => (!fichaMinimizada && c.id === elegida?.id ? "bg-accent" : "")}
+          // Casillas y la barra de abajo para cambiar un dato de varias compras a la vez (solo con permiso de escritura).
+          seleccion={
+            puedeEscribir
+              ? {
+                  etiqueta: (c) => `Seleccionar la compra ${c.productos > 0 ? numeroOC(c.numero) : c.nombre}`,
+                  barra: (marcadas, quitar) => (
+                    <BarraLoteCompras
+                      filas={marcadas}
+                      alQuitar={quitar}
+                      aplicar={(campo, valor, modo) => void guardarLote(marcadas, campo, valor, modo)}
+                      etiquetas={todasEtiquetas}
+                      colores={colores}
+                      guardando={guardandoLote}
+                    />
+                  ),
+                }
+              : undefined
+          }
           accionPrincipal={
             <div className="flex items-center gap-2">
               <SelectorVista vista={vista} paises={paises} puedeAgregarPais={puedeAgregarPais} />
