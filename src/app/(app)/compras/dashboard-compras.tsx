@@ -500,12 +500,6 @@ export function DashboardCompras({
               <span className="flex-1">{revisar.cotizacionLarga.length} esperando cotización hace más de 3 semanas</span>
             </li>
             <li className="flex items-center gap-2 border-b border-border px-3.5 py-2">
-              <Punto tono={revisar.pagoPendiente.length ? "aviso" : "gris"} />
-              <span className="flex-1">
-                {revisar.pagoPendiente.length} con pago pendiente ({usd(revisar.pagoPendiente.reduce((t, c) => t + (c.pagoPendiente ?? 0), 0), true)})
-              </span>
-            </li>
-            <li className="flex items-center gap-2 border-b border-border px-3.5 py-2">
               <Punto tono={k.inconvenientes ? "aviso" : "gris"} />
               <span className="flex-1">{k.inconvenientes} con inconveniente</span>
             </li>

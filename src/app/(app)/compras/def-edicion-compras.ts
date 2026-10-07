@@ -32,7 +32,6 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO },
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "texto" },
   tienda: { etiqueta: "Tienda", prop: "tienda", columna: "tienda", tipo: "texto" },
-  cliente: { etiqueta: "Cliente", prop: "cliente", columna: "cliente", tipo: "texto" },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
   planificacion: { etiqueta: "Planificación", prop: "planificacion", columna: "planificacion", tipo: "texto" },
   qtyTotal: { etiqueta: "QTY Total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
@@ -40,11 +39,6 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   primerPago: { etiqueta: "Primer Pago", prop: "primerPago", columna: "primer_pago", tipo: "dinero" },
   segundoPago: { etiqueta: "Segundo Pago", prop: "segundoPago", columna: "segundo_pago", tipo: "dinero" },
   pagadoAProveedor: { etiqueta: "Pagado a Proveedor", prop: "pagadoAProveedor", columna: "pagado_a_proveedor", tipo: "dinero" },
-  pagoPendiente: { etiqueta: "Pago Pendiente", prop: "pagoPendiente", columna: "pago_pendiente", tipo: "dinero" },
-  cobradoCliente: { etiqueta: "Cobrado Cliente", prop: "cobradoCliente", columna: "cobrado_cliente", tipo: "dinero" },
-  pendienteCliente: { etiqueta: "Pendiente Cliente", prop: "pendienteCliente", columna: "pendiente_cliente", tipo: "dinero" },
-  pagoCliente: { etiqueta: "Pago Cliente", prop: "pagoCliente", columna: "pago_cliente", tipo: "texto" },
-  cuentaReceptora: { etiqueta: "Cuenta receptora", prop: "cuentaReceptora", columna: "cuenta_receptora", tipo: "texto" },
   factura: { etiqueta: "Factura", prop: "factura", columna: "factura", tipo: "booleano" },
   financiamiento: { etiqueta: "Financiamiento", prop: "financiamiento", columna: "financiamiento", tipo: "booleano" },
   fechaLimite: { etiqueta: "Fecha límite", prop: "fechaLimite", columna: "fecha_limite", tipo: "fecha" },
@@ -52,8 +46,6 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   fechaPago1: { etiqueta: "Fecha de Pago (1)", prop: "fechaPago1", columna: "fecha_pago_1", tipo: "fecha" },
   fechaPago2: { etiqueta: "Fecha de Pago (2)", prop: "fechaPago2", columna: "fecha_pago_2", tipo: "fecha" },
   fechaEnvio: { etiqueta: "Fecha de Envío", prop: "fechaEnvio", columna: "fecha_envio", tipo: "fecha" },
-  trackId: { etiqueta: "Track ID", prop: "trackId", columna: "track_id", tipo: "texto" },
-  orden: { etiqueta: "Orden", prop: "orden", columna: "orden", tipo: "texto" },
 };
 
 export const campoEditable = (id: string): CampoEditable | undefined =>

@@ -75,7 +75,6 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
           </Dato>
           <Dato etiqueta="Proveedor">{compra.proveedor || SIN_DATO}</Dato>
-          <Dato etiqueta="Cliente">{compra.cliente || SIN_DATO}</Dato>
           <Dato etiqueta="Tienda">{compra.tienda || SIN_DATO}</Dato>
           <Dato etiqueta="Persona asignada">{compra.asignadoNombre || SIN_DATO}</Dato>
         </dl>
@@ -88,11 +87,6 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
           <Dato etiqueta="Primer Pago">{dinero(compra.primerPago)}</Dato>
           <Dato etiqueta="Segundo Pago">{dinero(compra.segundoPago)}</Dato>
           <Dato etiqueta="Pagado a Proveedor">{dinero(compra.pagadoAProveedor)}</Dato>
-          <Dato etiqueta="Pago Pendiente">{dinero(compra.pagoPendiente)}</Dato>
-          <Dato etiqueta="Cobrado Cliente">{dinero(compra.cobradoCliente)}</Dato>
-          <Dato etiqueta="Pendiente Cliente">{dinero(compra.pendienteCliente)}</Dato>
-          <Dato etiqueta="Pago Cliente">{compra.pagoCliente || SIN_DATO}</Dato>
-          <Dato etiqueta="Cuenta receptora">{compra.cuentaReceptora || SIN_DATO}</Dato>
           <Dato etiqueta="Factura">{compra.factura ? "Sí" : "No"}</Dato>
           <Dato etiqueta="Financiamiento">{compra.financiamiento ? "Sí" : "No"}</Dato>
         </dl>
@@ -108,8 +102,6 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
       </Seccion>
       <Seccion icono={EstadoIcon} titulo="Seguimiento">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Dato etiqueta="Track ID">{compra.trackId || SIN_DATO}</Dato>
-          <Dato etiqueta="Orden">{compra.orden || SIN_DATO}</Dato>
           <Dato etiqueta="Producto relacionado">{compra.productoRelacionado || SIN_DATO}</Dato>
         </dl>
         <dl className="flex flex-col gap-3">

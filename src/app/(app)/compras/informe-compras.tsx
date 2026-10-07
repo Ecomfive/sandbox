@@ -180,7 +180,6 @@ export function InformeCompras({
             href={`/compras/lista?${ver}grupo=atrasadas`}
           />
           <Indicador titulo="Con inconveniente" punto={revisar.conInconveniente.length ? "aviso" : undefined} valor={entero(revisar.conInconveniente.length)} detalle="aduana, retrasos…" />
-          <Indicador titulo="Pago pendiente" valor={usd(revisar.pagoPendiente.reduce((t, c) => t + (c.pagoPendiente ?? 0), 0), true)} detalle={`en ${revisar.pagoPendiente.length} compras`} />
         </div>
       </section>
 

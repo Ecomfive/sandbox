@@ -256,9 +256,6 @@ export function FormularioCompra({
             <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
               <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
             </Campo>
-            <Campo etiqueta={conEmoji("cliente", "Cliente")} id="campo-cliente">
-              <input id="campo-cliente" type="text" name="cliente" defaultValue={compra?.cliente ?? ""} className={fieldClass} />
-            </Campo>
             <Campo etiqueta={conEmoji("tienda", "Tienda")} id="campo-tienda">
               <input id="campo-tienda" type="text" name="tienda" defaultValue={compra?.tienda ?? ""} placeholder="Ej: EcomFive Dropi Panamá" className={fieldClass} />
             </Campo>
@@ -296,21 +293,6 @@ export function FormularioCompra({
             <Campo etiqueta={conEmoji("pagadoAProveedor", "Pagado a Proveedor")} id="campo-pagado-proveedor">
               <input id="campo-pagado-proveedor" type="number" step="0.01" min="0" name="pagado_a_proveedor" defaultValue={compra?.pagadoAProveedor ?? ""} className={`${fieldClass} tabular-nums`} />
             </Campo>
-            <Campo etiqueta={conEmoji("pagoPendiente", "Pago Pendiente")} id="campo-pago-pendiente">
-              <input id="campo-pago-pendiente" type="number" step="0.01" min="0" name="pago_pendiente" defaultValue={compra?.pagoPendiente ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta={conEmoji("cobradoCliente", "Cobrado Cliente")} id="campo-cobrado-cliente">
-              <input id="campo-cobrado-cliente" type="number" step="0.01" min="0" name="cobrado_cliente" defaultValue={compra?.cobradoCliente ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta={conEmoji("pendienteCliente", "Pendiente Cliente")} id="campo-pendiente-cliente">
-              <input id="campo-pendiente-cliente" type="number" step="0.01" min="0" name="pendiente_cliente" defaultValue={compra?.pendienteCliente ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta={conEmoji("pagoCliente", "Pago Cliente")} id="campo-pago-cliente">
-              <input id="campo-pago-cliente" type="text" name="pago_cliente" defaultValue={compra?.pagoCliente ?? ""} className={fieldClass} />
-            </Campo>
-            <Campo etiqueta={conEmoji("cuentaReceptora", "Cuenta receptora")} id="campo-cuenta-receptora">
-              <input id="campo-cuenta-receptora" type="text" name="cuenta_receptora" defaultValue={compra?.cuentaReceptora ?? ""} className={fieldClass} />
-            </Campo>
           </div>
           <div className="flex flex-wrap gap-4 pt-1">
             <Casilla id="factura" texto={conEmoji("factura", "Factura")} defaultChecked={compra?.factura} />
@@ -340,12 +322,6 @@ export function FormularioCompra({
 
         <Seccion icono={EstadoIcon} titulo="Seguimiento">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta={conEmoji("trackId", "Track ID")} id="campo-track-id">
-              <input id="campo-track-id" type="text" name="track_id" defaultValue={compra?.trackId ?? ""} className={fieldClass} />
-            </Campo>
-            <Campo etiqueta={conEmoji("orden", "Orden")} id="campo-orden">
-              <input id="campo-orden" type="text" name="orden" defaultValue={compra?.orden ?? ""} className={fieldClass} />
-            </Campo>
             <Campo etiqueta="Producto relacionado" id="campo-producto-relacionado">
               <input id="campo-producto-relacionado" type="text" name="producto_relacionado" defaultValue={compra?.productoRelacionado ?? ""} className={fieldClass} />
             </Campo>
