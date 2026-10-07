@@ -134,28 +134,31 @@ export function diasDeCompra(c: Pick<FilaCompra, "creadoEn" | "cerradoEn">, ahor
   return Math.max(0, Math.floor((fin - Date.parse(c.creadoEn)) / 86_400_000));
 }
 
-/** Las 14 etapas del flujo de compra y financiamiento, calcadas de la lista de ClickUp «Compras Dropi PA
- * Panamá» (Espacio > Carpeta Compras > Lista PA): del backlog a completado o descartado. */
+/** Las etapas del flujo de compra y financiamiento, calcadas de la lista de ClickUp «Compras Dropi PA
+ * Panamá» (Espacio > Carpeta Compras > Lista PA): del backlog a completado o descartado. «Solicitud Local» se quitó
+ * (6 oct 2026: ninguna compra estaba ahí y no se usaba desde marzo de 2025) y el resto se renumeró; solo cambian los
+ * nombres que se ven, las claves guardadas son las mismas. */
 export const ETAPAS_COMPRA = [
   { valor: "backlog", etiqueta: "Backlog - Pospuesto" },
-  { valor: "solicitud_local", etiqueta: "01 - Solicitud Local" },
-  { valor: "solicitud_internacional", etiqueta: "02 - Solicitud Internacional" },
-  { valor: "cotizar", etiqueta: "03 - Cotizar" },
-  { valor: "cotizado", etiqueta: "04 - Cotizado" },
-  { valor: "evaluacion_proveedor", etiqueta: "05 - Evaluación de Proveedor" },
-  { valor: "solicitud_proveedor", etiqueta: "06 - Solicitud a Proveedor" },
-  { valor: "compra_pago", etiqueta: "07 - Compra y Pago" },
-  { valor: "produccion", etiqueta: "08 - En Producción" },
-  { valor: "tracking", etiqueta: "09 - Tracking" },
-  { valor: "aviso_logistica", etiqueta: "10 - Aviso Logística" },
-  { valor: "arribo_mercancia", etiqueta: "11 - Arribo Mercancía" },
-  { valor: "completado", etiqueta: "12 - Completado" },
+  { valor: "solicitud_internacional", etiqueta: "01 - Solicitud Internacional" },
+  { valor: "cotizar", etiqueta: "02 - Cotizar" },
+  { valor: "cotizado", etiqueta: "03 - Cotizado" },
+  { valor: "evaluacion_proveedor", etiqueta: "04 - Evaluación de Proveedor" },
+  { valor: "solicitud_proveedor", etiqueta: "05 - Solicitud a Proveedor" },
+  { valor: "compra_pago", etiqueta: "06 - Compra y Pago" },
+  { valor: "produccion", etiqueta: "07 - En Producción" },
+  { valor: "tracking", etiqueta: "08 - Tracking" },
+  { valor: "aviso_logistica", etiqueta: "09 - Aviso Logística" },
+  { valor: "arribo_mercancia", etiqueta: "10 - Arribo Mercancía" },
+  { valor: "completado", etiqueta: "11 - Completado" },
   { valor: "descartado", etiqueta: "Descartado" },
 ] as const;
 
-export const ETAPA_ETIQUETA: Record<string, string> = Object.fromEntries(
-  ETAPAS_COMPRA.map((e) => [e.valor, e.etiqueta])
-);
+/** Los nombres de todas las etapas, también las que ya no se eligen (para leer la Actividad y los tiempos de antes). */
+export const ETAPA_ETIQUETA: Record<string, string> = {
+  ...Object.fromEntries(ETAPAS_COMPRA.map((e) => [e.valor, e.etiqueta])),
+  solicitud_local: "Solicitud Local (ya no se usa)",
+};
 
 export const etiquetaEtapa = (valor: string) => ETAPA_ETIQUETA[valor] ?? valor;
 

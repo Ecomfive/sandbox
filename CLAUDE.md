@@ -584,7 +584,7 @@ convenciones técnicas del código.
   con aspecto de lista (agrupar —arranca por Etapa—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
   de los campos de ClickUp ocultos (`oculta` en la columna) hasta mostrarlos en «Columnas»; filtros de un toque (Cotizando,
   Producción, En tránsito, Atrasadas; `?grupo=` y `?etapa=` los preseleccionan) y la ficha de resumen a la derecha, que se
-  minimiza (`ficha-lateral-compra.tsx`: etapa N de 11, fechas clave con los días entre una y otra). **Pulsar la descripción de
+  minimiza (`ficha-lateral-compra.tsx`: etapa N de las del recorrido, fechas clave con los días entre una y otra). **Pulsar la descripción de
   la compra (la columna «Compra», y solo esa) la muestra en la ficha; el resto de las celdas se editan en su sitio** (ver abajo);
   «Abrir ficha completa» abre el formulario con la actividad (con la ficha minimizada, la descripción lo abre directo).
   **Edición en la celda** (`celda-editable.tsx`, qué se edita y cómo se valida en `def-edicion-compras.ts`): un clic en el
@@ -633,7 +633,7 @@ convenciones técnicas del código.
   página pide a su servidor, con la hora en ms), quedó en la conversación como bloques `@@ACT@@`;
   `scripts/extraer-etapas-transcripcion.mjs <conversación.jsonl>` arma `datos-privados/clickup-etapas.json` y
   `scripts/importar-etapas-actividad.ts --aplicar` lo carga (`origen` «clickup_actividad», rehace los suyos). Lo anterior al
-  traspaso del 14 jul 2025 (todo a «12 - Completado») es del campo «Etapa» viejo, con otra numeración (06 compra y pago,
+  traspaso del 14 jul 2025 (todo a «12 - Completado», hoy «11 - Completado»: «Solicitud Local» se quitó el 6 oct 2026 y las etapas se renumeraron, mismas claves) es del campo «Etapa» viejo, con otra numeración (06 compra y pago,
   07 En China, 08 tracking, 10 completado); el traspaso no cuenta como cambio. Cargado el 7 oct 2026: 5.259 cambios de
   1.196 compras. **Países:** se agregan desde Configuración (sección Países) o con «＋ País» junto al
   selector de Compras (`crearPais`, `src/lib/paises-actions.ts`; pide poder modificar Configuración). El selector de país de la

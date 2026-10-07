@@ -29,7 +29,7 @@ const fechaHora = (iso: string) =>
 const ICONO_CLASE: Record<string, string> = { foto: "🖼️", documento: "📄", video: "🎬", otro: "📎" };
 
 /**
- * Un cambio de la actividad, como en ClickUp: «Etapa: [03 - Cotizar] → [09 - Tracking]», con la etiqueta de cada valor en su
+ * Un cambio de la actividad, como en ClickUp: «Etapa: [02 - Cotizar] → [08 - Tracking]», con la etiqueta de cada valor en su
  * color (etapa y estado); otro campo, en texto.
  */
 function CambioEvento({ e }: { e: Datos["eventos"][number] }) {
