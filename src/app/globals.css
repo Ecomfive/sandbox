@@ -213,6 +213,32 @@ html {
   filter: brightness(1.08);
 }
 
+/* Dashboards: las barras de progreso con el degradado neón (la elegida, además, con su brillo), una línea neón arriba
+   de un bloque destacado y las líneas de las gráficas con un halo suave de su color. */
+.barra-neon {
+  background-image: var(--neon);
+}
+.barra-neon[data-activa="true"] {
+  box-shadow: var(--neon-brillo);
+}
+.marco-neon {
+  position: relative;
+}
+.marco-neon::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background-image: var(--neon);
+  pointer-events: none;
+}
+.graficas-neon .recharts-line path.recharts-curve[stroke="#d74c81"] {
+  filter: drop-shadow(0 0 3px rgb(215 76 129 / 0.7));
+}
+.graficas-neon .recharts-line path.recharts-curve[stroke="#5f43d1"] {
+  filter: drop-shadow(0 0 3px rgb(95 67 209 / 0.7));
+}
+
 /* El brillo del área elegida en el riel: un halo difuminado naranja, magenta, morado y azul detrás del ícono. */
 .brillo-riel {
   position: absolute;

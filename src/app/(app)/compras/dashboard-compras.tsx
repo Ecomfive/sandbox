@@ -72,7 +72,32 @@ const CLAVE: Record<Dimension, (c: FilaCompra) => string[]> = {
 };
 
 const ejes = { tick: { fontSize: 11, fill: "var(--muted-foreground)" }, axisLine: false, tickLine: false } as const;
-const estiloTooltip = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 };
+const estiloTooltip = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, boxShadow: "0 8px 24px -12px rgb(95 67 209 / 0.45)" };
+/** Los colores de las gráficas, tomados del neón del riel y de los botones principales (`--neon`). */
+const NEON = { rosa: "#d74c81", magenta: "#b12a97", violeta: "#8a35c9", indigo: "#5f43d1" } as const;
+/** Degradados verticales de las barras de las gráficas (de arriba abajo), definidos en cada gráfica que los usa. */
+function DegradadosNeon() {
+  return (
+    <defs>
+      <linearGradient id="neon-violeta" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={NEON.magenta} />
+        <stop offset="100%" stopColor={NEON.indigo} />
+      </linearGradient>
+      <linearGradient id="neon-suave" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={NEON.violeta} stopOpacity={0.35} />
+        <stop offset="100%" stopColor={NEON.violeta} stopOpacity={0.12} />
+      </linearGradient>
+      <linearGradient id="neon-indigo" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#7b62e6" />
+        <stop offset="100%" stopColor={NEON.indigo} />
+      </linearGradient>
+      <linearGradient id="neon-rosa" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#e86a9a" />
+        <stop offset="100%" stopColor={NEON.rosa} />
+      </linearGradient>
+    </defs>
+  );
+}
 const claseSelect = `h-[34px] max-w-[11rem] rounded-lg border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`;
 const dias = (n: number | null) => (n === null ? "—" : `${n} d`);
 
@@ -96,7 +121,11 @@ function BarraH({ nombre, valor, maximo, texto, activo, alPulsar }: { nombre: st
         <b className="font-medium whitespace-nowrap tabular-nums">{texto}</b>
       </span>
       <span className="mt-1 block h-1.5 rounded-full bg-muted">
-        <span className={`block h-1.5 rounded-full ${activo ? "bg-foreground" : "bg-foreground/60"}`} style={{ width: `${maximo ? Math.max(2, (valor / maximo) * 100) : 0}%` }} />
+        <span
+          data-activa={activo || undefined}
+          className={`barra-neon block h-1.5 rounded-full transition-opacity ${activo ? "" : "opacity-70"}`}
+          style={{ width: `${maximo ? Math.max(2, (valor / maximo) * 100) : 0}%` }}
+        />
       </span>
     </>
   );
@@ -221,7 +250,7 @@ export function DashboardCompras({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="graficas-neon flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
         <SelectorVista vista={vista} paises={paises} />
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -279,7 +308,7 @@ export function DashboardCompras({
               type="button"
               onClick={() => setF((v) => ({ ...v, [x]: SIN_FILTROS[x] }))}
               aria-label={`Quitar el filtro ${NOMBRE_FILTRO[x]}`}
-              className={`rounded-full border border-border bg-card px-2 py-0.5 hover:bg-muted ${anilloFoco}`}
+              className={`rounded-full border border-primario/40 bg-primario-suave px-2 py-0.5 text-primario hover:border-primario ${anilloFoco}`}
             >
               {NOMBRE_FILTRO[x]}
               {typeof f[x] === "string" ? `: ${x === "etapa" ? etiquetaEtapa(f.etapa) : x === "via" ? (f.via === "sin" ? "Sin vía" : etiquetaVia(f.via)) : f[x]}` : ""} ×
@@ -291,7 +320,7 @@ export function DashboardCompras({
         </div>
       )}
 
-      <section aria-label="Indicadores" className="overflow-hidden rounded-[10px] border border-border bg-card">
+      <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
         <div className="flex flex-wrap">
           <Indicador titulo="Compras" valor={entero(k.compras)} detalle={`${entero(k.abiertas)} abiertas · ${entero(k.transito)} en tránsito`} />
           <Indicador titulo="Pagado a proveedores" valor={usd(k.pagado, true)} detalle={k.costoUnidad !== null ? `${usd(k.costoUnidad)} por unidad` : "—"} />
@@ -314,15 +343,16 @@ export function DashboardCompras({
           <div className="h-[280px] p-2">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={serie} margin={{ top: 8, right: 4, left: -8, bottom: 0 }} onClick={(e) => e?.activeLabel && serie.find((s) => s.etiqueta === e.activeLabel) && elegirMes(serie.find((s) => s.etiqueta === e.activeLabel)!.mes)}>
-                <CartesianGrid stroke="var(--border)" vertical={false} />
+                <DegradadosNeon />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
                 <XAxis dataKey="etiqueta" {...ejes} interval="preserveStartEnd" />
                 <YAxis yAxisId="n" {...ejes} allowDecimals={false} width={36} />
                 <YAxis yAxisId="usd" orientation="right" {...ejes} width={52} tickFormatter={(v: number) => usd(v, true)} />
                 <Tooltip contentStyle={estiloTooltip} formatter={(v, nombre) => (nombre === "Pagado" ? usd(Number(v)) : v)} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar yAxisId="n" dataKey="creadas" name="Creadas" fill="var(--border-control)" radius={[3, 3, 0, 0]} cursor="pointer" />
-                <Bar yAxisId="n" dataKey="completadas" name="Completadas" fill="var(--success)" radius={[3, 3, 0, 0]} cursor="pointer" />
-                <Line yAxisId="usd" type="monotone" dataKey="pagado" name="Pagado" stroke="var(--foreground)" strokeWidth={2} dot={false} />
+                <Bar yAxisId="n" dataKey="creadas" name="Creadas" fill="url(#neon-suave)" radius={[4, 4, 0, 0]} cursor="pointer" />
+                <Bar yAxisId="n" dataKey="completadas" name="Completadas" fill="url(#neon-violeta)" radius={[4, 4, 0, 0]} cursor="pointer" />
+                <Line yAxisId="usd" type="monotone" dataKey="pagado" name="Pagado" stroke={NEON.rosa} strokeWidth={2.5} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -349,13 +379,13 @@ export function DashboardCompras({
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={transitoMes} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                  <CartesianGrid stroke="var(--border)" vertical={false} />
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
                   <XAxis dataKey="etiqueta" {...ejes} interval="preserveStartEnd" />
                   <YAxis {...ejes} width={36} />
                   <Tooltip contentStyle={estiloTooltip} formatter={(v) => (v === null ? "—" : `${v} días`)} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Line type="monotone" dataKey="mar" name={etiquetaVia("mar")} stroke="var(--foreground)" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                  <Line type="monotone" dataKey="aire" name={etiquetaVia("aire")} stroke="var(--warning)" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Line type="monotone" dataKey="mar" name={etiquetaVia("mar")} stroke={NEON.indigo} strokeWidth={2.5} dot={{ r: 2.5, fill: NEON.indigo }} connectNulls />
+                  <Line type="monotone" dataKey="aire" name={etiquetaVia("aire")} stroke={NEON.rosa} strokeWidth={2.5} dot={{ r: 2.5, fill: NEON.rosa }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -366,14 +396,15 @@ export function DashboardCompras({
           <div className="h-[240px] p-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={histograma} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid stroke="var(--border)" vertical={false} />
+                <DegradadosNeon />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
                 <XAxis dataKey="rango" {...ejes} interval={0} angle={-30} textAnchor="end" height={42} />
                 <YAxis {...ejes} allowDecimals={false} width={32} />
                 <Tooltip contentStyle={estiloTooltip} labelFormatter={(l) => `${l} días`} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="mar" name={etiquetaVia("mar")} stackId="v" fill="var(--foreground)" />
-                <Bar dataKey="aire" name={etiquetaVia("aire")} stackId="v" fill="var(--warning)" />
-                <Bar dataKey="otra" name="Otra" stackId="v" fill="var(--border-control)" />
+                <Bar dataKey="mar" name={etiquetaVia("mar")} stackId="v" fill="url(#neon-indigo)" />
+                <Bar dataKey="aire" name={etiquetaVia("aire")} stackId="v" fill="url(#neon-rosa)" />
+                <Bar dataKey="otra" name="Otra" stackId="v" fill="url(#neon-suave)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -436,7 +467,7 @@ export function DashboardCompras({
                           poner(dimActual.filtro, valorFiltro);
                         }
                       }}
-                      className={`cursor-pointer hover:bg-muted aria-[current=true]:bg-accent ${anilloFoco}`}
+                      className={`cursor-pointer hover:bg-muted aria-[current=true]:bg-primario-suave aria-[current=true]:shadow-[inset_3px_0_0_var(--primario)] ${anilloFoco}`}
                     >
                       <td className={`${claseTd} font-medium`}>{dimension === "via" ? (r.nombre === "sin" ? "Sin vía" : etiquetaVia(r.nombre)) : r.nombre}</td>
                       <td className={`${claseTd} text-right tabular-nums`}>{r.compras}</td>
