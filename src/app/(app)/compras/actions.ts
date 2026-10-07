@@ -57,7 +57,7 @@ function leerCambios(formData: FormData) {
   return {
     foto_url: textoOptativo(formData, "foto_url"),
     proveedor: textoOptativo(formData, "proveedor"),
-    tienda: textoOptativo(formData, "tienda"),
+    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
     producto_relacionado: textoOptativo(formData, "producto_relacionado"),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),

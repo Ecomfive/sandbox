@@ -211,7 +211,7 @@ async function main() {
         estado: mapEstado(t.status?.status),
         etapa: mapEtapa(texto(t, "Etapa", "drop_down")),
         proveedor: texto(t, "Proveedor", "drop_down") ?? texto(t, "Proveedor", "short_text"),
-        tienda: texto(t, "Tienda", "drop_down"),
+        tiendas: [texto(t, "Tienda", "drop_down")].filter((x): x is string => !!x),
         planificacion: texto(t, "Planificación", "drop_down"),
         inconveniente: texto(t, "Inconveniente"),
         url_producto: texto(t, "URL", "url"),

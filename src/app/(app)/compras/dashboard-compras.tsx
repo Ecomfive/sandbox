@@ -65,7 +65,7 @@ const DIMENSIONES: { valor: Dimension; etiqueta: string; filtro: keyof Filtros }
 ];
 const CLAVE: Record<Dimension, (c: FilaCompra) => string[]> = {
   proveedor: (c) => [c.proveedor ?? "Sin proveedor"],
-  tienda: (c) => [c.tienda ?? "Sin tienda"],
+  tienda: (c) => (c.tiendas.length ? c.tiendas : ["Sin tienda"]),
   pais: (c) => [c.paisCodigo ?? "Importadora"],
   responsable: (c) => [c.asignadoNombre ?? "Sin responsable"],
   via: (c) => (c.viaEnvio.length ? c.viaEnvio : ["sin"]),
@@ -161,11 +161,11 @@ export function DashboardCompras({
   const dia = hoy();
 
   const opciones = useMemo(() => {
-    const unicos = (fn: (c: FilaCompra) => string | null) => [...new Set(compras.map(fn).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b));
+    const unicos = (fn: (c: FilaCompra) => string | null | string[]) => [...new Set(compras.flatMap((c) => fn(c) ?? []).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b));
     return {
       pais: unicos((c) => c.paisCodigo),
       proveedor: unicos((c) => c.proveedor),
-      tienda: unicos((c) => c.tienda),
+      tienda: unicos((c) => c.tiendas),
       responsable: unicos((c) => c.asignadoNombre),
     };
   }, [compras]);
@@ -179,7 +179,7 @@ export function DashboardCompras({
           (!f.pais || (c.paisCodigo ?? "Importadora") === f.pais) &&
           (!f.proveedor || (c.proveedor ?? "Sin proveedor") === f.proveedor) &&
           (!f.via || (f.via === "sin" ? c.viaEnvio.length === 0 : c.viaEnvio.includes(f.via))) &&
-          (!f.tienda || (c.tienda ?? "Sin tienda") === f.tienda) &&
+          (!f.tienda || (c.tiendas.length ? c.tiendas : ["Sin tienda"]).includes(f.tienda)) &&
           (!f.responsable || (c.asignadoNombre ?? "Sin responsable") === f.responsable) &&
           (!f.etapa || c.etapa === f.etapa) &&
           (!f.abiertas || estaAbierta(c)),

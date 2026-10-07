@@ -22,7 +22,7 @@ const CLAVE: Record<Dimension, (c: FilaCompra) => string[]> = {
   proveedor: (c) => [c.proveedor ?? "Sin proveedor"],
   via: (c) => (c.viaEnvio.length ? c.viaEnvio.map(etiquetaVia) : ["Sin vía"]),
   pais: (c) => [c.paisCodigo ?? "Importadora"],
-  tienda: (c) => [c.tienda ?? "Sin tienda"],
+  tienda: (c) => (c.tiendas.length ? c.tiendas : ["Sin tienda"]),
   responsable: (c) => [c.asignadoNombre ?? "Sin responsable"],
 };
 

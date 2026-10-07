@@ -9,7 +9,16 @@ import { Ventana } from "@/components/ui/ventana";
  * Botón «Agregar» y la ficha para crear una compra: un panel que sale por la derecha, igual que «Nueva
  * cuenta destino». Modificar y eliminar una compra ya creada se hacen desde su propia ficha (`FichaCompra`).
  */
-export function CrearCompraPanel({ vista, paises }: { vista: string; paises: { id: string; codigo: string; nombre: string }[] }) {
+export function CrearCompraPanel({
+  vista,
+  paises,
+  tiendas,
+}: {
+  vista: string;
+  paises: { id: string; codigo: string; nombre: string }[];
+  /** Las tiendas que ya existen en otras compras, para elegir en el campo Tienda. */
+  tiendas?: string[];
+}) {
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
@@ -30,7 +39,7 @@ export function CrearCompraPanel({ vista, paises }: { vista: string; paises: { i
       <BotonAgregar ref={botonAbrirRef} onClick={() => setAbierto(true)} />
 
       <Ventana abierto={abierto} alCerrar={cerrarVentana} lado="derecha" ancho="lg" titulo={<span className="text-lg font-semibold">Nueva compra</span>}>
-        <FormularioCompra vista={vista} paises={paises} alGuardar={cerrar} alCambiarGuardando={setGuardando} />
+        <FormularioCompra vista={vista} paises={paises} tiendas={tiendas} alGuardar={cerrar} alCambiarGuardando={setGuardando} />
       </Ventana>
     </>
   );
