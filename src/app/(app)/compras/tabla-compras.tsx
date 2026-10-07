@@ -13,6 +13,7 @@ import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, Gas
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { actualizarCampoCompra } from "./actions";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
+import { EtiquetasCompra } from "./selector-etiquetas";
 import { CrearCompraPanel } from "./crear-compra-panel";
 import { campoEditable, normalizarValor } from "./def-edicion-compras";
 import { SelectorVista } from "./selector-vista";
@@ -116,7 +117,11 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
  * de los campos de ClickUp; todas a la vista, y cada persona oculta o mueve las que quiera (arrastrando el título o desde
  * «Columnas»). La compra lleva un punto rojo si está atrasada (más días en tránsito de lo normal para su vía).
  */
-function columnas(umbral: Record<string, number>, dia: string, edicion: { puedeEscribir: boolean; guardar: GuardarCelda }): ColumnaTabla<FilaCompra>[] {
+function columnas(
+  umbral: Record<string, number>,
+  dia: string,
+  edicion: { puedeEscribir: boolean; guardar: GuardarCelda; etiquetas: string[] },
+): ColumnaTabla<FilaCompra>[] {
   const resto = { ocultable: true } as const;
   /** El contenido de una celda, editable en su sitio si su dato se puede editar (ver `CAMPOS_EDITABLES`). */
   const ed = (c: FilaCompra, campo: string, contenido: ReactNode) => (
@@ -146,6 +151,7 @@ function columnas(umbral: Record<string, number>, dia: string, edicion: { puedeE
                   Sin productos
                 </span>
               )}
+              <EtiquetasCompra compra={c} todas={edicion.etiquetas} puedeEscribir={edicion.puedeEscribir} guardar={edicion.guardar} />
             </span>
             <span className="block text-xs text-muted-foreground">{[c.paisCodigo ?? "Importadora", c.proveedor, c.asignadoNombre].filter(Boolean).join(" · ")}</span>
             {c.lineas.length > 0 && (
@@ -314,7 +320,9 @@ export function TablaCompras({
     },
     [mostrarToast],
   );
-  const edicion = useMemo(() => ({ puedeEscribir, guardar: guardarCelda }), [puedeEscribir, guardarCelda]);
+  // Todas las etiquetas que existen en las compras, para el selector de etiquetas (como en ClickUp).
+  const todasEtiquetas = useMemo(() => [...new Set(comprasServidor.flatMap((c) => c.etiquetas))].sort((a, b) => a.localeCompare(b, "es")), [comprasServidor]);
+  const edicion = useMemo(() => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas }), [puedeEscribir, guardarCelda, todasEtiquetas]);
 
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
   const dia = hoy();
