@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { textoLegibleSobre } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { EtiquetaIcon } from "@/lib/nav-icons";
 import type { FilaCompra } from "./def-compras";
 import type { GuardarCelda } from "./celda-editable";
+import { claseCampoPanel, PanelCelda } from "./panel-celda";
 
 // Colores de las etiquetas (como en ClickUp): cada nombre toma siempre el mismo, así una etiqueta se ve igual en todas las
 // compras. Fondo suave y texto del mismo tono, legible en claro y en oscuro.
@@ -75,6 +75,7 @@ export function EtiquetasCompra({
   puedeEscribir,
   guardar,
   cambiarColor,
+  sinPastillas = false,
 }: {
   compra: FilaCompra;
   todas: string[];
@@ -83,38 +84,19 @@ export function EtiquetasCompra({
   puedeEscribir: boolean;
   guardar: GuardarCelda;
   cambiarColor: (nombre: string, color: string) => void;
+  /** Solo el botón: las pastillas ya se ven en otro lado (junto al nombre de la compra, dentro de su botón). */
+  sinPastillas?: boolean;
 }) {
   // La etiqueta cuya paleta de colores está abierta en el selector.
   const [pintando, setPintando] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const boton = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
   const puestas = compra.etiquetas;
 
-  // El panel va fuera de la tabla (la tabla recorta lo que sobresale) y se ubica bajo el ícono.
-  useLayoutEffect(() => {
-    if (!abierto || !boton.current) return;
-    const r = boton.current.getBoundingClientRect();
-    const ancho = 280;
-    setPos({ top: Math.min(r.bottom + 4, window.innerHeight - 360), left: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)) });
-    requestAnimationFrame(() => campo.current?.focus());
-  }, [abierto]);
-
   useEffect(() => {
-    if (!abierto) return;
-    const fuera = (e: MouseEvent) => {
-      if (!panel.current?.contains(e.target as Node) && !boton.current?.contains(e.target as Node)) setAbierto(false);
-    };
-    const cerrar = () => setAbierto(false);
-    document.addEventListener("mousedown", fuera);
-    window.addEventListener("scroll", cerrar, true);
-    return () => {
-      document.removeEventListener("mousedown", fuera);
-      window.removeEventListener("scroll", cerrar, true);
-    };
+    if (abierto) campo.current?.focus();
   }, [abierto]);
 
   const q = normal(busqueda);
@@ -137,9 +119,10 @@ export function EtiquetasCompra({
 
   return (
     <span className="inline-flex min-w-0 items-center gap-1">
-      {puestas.map((e) => (
-        <PastillaEtiqueta key={e} nombre={e} color={colores[e]} />
-      ))}
+      {!sinPastillas &&
+        puestas.map((e) => (
+          <PastillaEtiqueta key={e} nombre={e} color={colores[e]} />
+        ))}
       {puedeEscribir && (
         <button
           ref={boton}
@@ -159,16 +142,15 @@ export function EtiquetasCompra({
           <EtiquetaIcon className="h-3 w-3" />
         </button>
       )}
-      {abierto &&
-        pos &&
-        createPortal(
-          <div
-            ref={panel}
-            role="dialog"
-            aria-label="Etiquetas de la compra"
-            onClick={(ev) => ev.stopPropagation()}
-            style={{ top: pos.top, left: pos.left, width: 280 }}
-            className="fixed z-50 flex flex-col rounded-xl border border-border bg-card shadow-lg"
+      {abierto && (
+          <PanelCelda
+            ancla={boton}
+            etiqueta="Etiquetas de la compra"
+            ancho={280}
+            alCerrar={(m) => {
+              setAbierto(false);
+              if (m === "escape") boton.current?.focus();
+            }}
           >
             <input
               ref={campo}
@@ -179,15 +161,11 @@ export function EtiquetasCompra({
                   ev.preventDefault();
                   if (puedeCrear) crear();
                   else if (opciones.length === 1) alternar(opciones[0]);
-                } else if (ev.key === "Escape") {
-                  ev.preventDefault();
-                  setAbierto(false);
-                  boton.current?.focus();
                 }
               }}
               placeholder="Buscar o añadir etiquetas…"
               aria-label="Buscar o añadir etiquetas"
-              className="border-b border-border bg-transparent px-3 py-2.5 text-sm outline-none"
+              className={claseCampoPanel}
             />
             <p className="m-0 px-3 pt-2 pb-1 text-xs text-muted-foreground">Selecciona una opción</p>
             <ul className="m-0 flex max-h-64 list-none flex-col gap-0.5 overflow-y-auto p-1.5 pt-0">
@@ -248,8 +226,7 @@ export function EtiquetasCompra({
               })}
               {opciones.length === 0 && !puedeCrear && <li className="px-2 py-1.5 text-xs text-muted-foreground">Sin etiquetas.</li>}
             </ul>
-          </div>,
-          document.body,
+          </PanelCelda>
         )}
     </span>
   );

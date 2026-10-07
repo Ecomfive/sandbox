@@ -13,7 +13,7 @@ import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, Gas
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { actualizarCampoCompra, guardarColorEtiqueta } from "./actions";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
-import { EtiquetasCompra } from "./selector-etiquetas";
+import { EtiquetasCompra, PastillaEtiqueta } from "./selector-etiquetas";
 import { CrearCompraPanel } from "./crear-compra-panel";
 import { campoEditable, normalizarValor } from "./def-edicion-compras";
 import { SelectorVista } from "./selector-vista";
@@ -151,14 +151,9 @@ function columnas(
                   Sin productos
                 </span>
               )}
-              <EtiquetasCompra
-                compra={c}
-                todas={edicion.etiquetas}
-                colores={edicion.colores}
-                puedeEscribir={edicion.puedeEscribir}
-                guardar={edicion.guardar}
-                cambiarColor={edicion.cambiarColor}
-              />
+              {c.etiquetas.map((e) => (
+                <PastillaEtiqueta key={e} nombre={e} color={edicion.colores[e]} />
+              ))}
             </span>
             <span className="block text-xs text-muted-foreground">{[c.paisCodigo ?? "Importadora", c.proveedor, c.asignadoNombre].filter(Boolean).join(" · ")}</span>
             {c.lineas.length > 0 && (
@@ -225,7 +220,22 @@ function columnas(
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
     col("tienda", "Tienda", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "tienda", c.tienda || "—") }),
     col("cliente", "Cliente", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "cliente", c.cliente || "—") }),
-    col("etiquetas", "Etiquetas", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "etiquetas", lista(c.etiquetas)) }),
+    col("etiquetas", "Etiquetas", {
+      ...resto,
+      render: (c) => (
+        <span className="flex min-h-6 items-center gap-1">
+          {c.etiquetas.length === 0 && <span className="text-muted-foreground">—</span>}
+          <EtiquetasCompra
+            compra={c}
+            todas={edicion.etiquetas}
+            colores={edicion.colores}
+            puedeEscribir={edicion.puedeEscribir}
+            guardar={edicion.guardar}
+            cambiarColor={edicion.cambiarColor}
+          />
+        </span>
+      ),
+    }),
     col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
     col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "planificacion", c.planificacion || "—") }),
     col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", render: (c) => ed(c, "montoTotal", usd(c.montoTotal)) }),
@@ -419,6 +429,20 @@ export function TablaCompras({
             alAbrir: (c, orden) => (fichaMinimizada ? setAbierta({ id: c.id, orden }) : setElegida({ id: c.id, orden })),
             columna: "nombre",
             soloColumna: true,
+            // El botón de etiquetas va junto al nombre, fuera del botón que abre la compra.
+            junto: (c) => (
+              <span className="flex h-5 items-center">
+                <EtiquetasCompra
+                  compra={c}
+                  todas={edicion.etiquetas}
+                  colores={edicion.colores}
+                  puedeEscribir={edicion.puedeEscribir}
+                  guardar={edicion.guardar}
+                  cambiarColor={edicion.cambiarColor}
+                  sinPastillas
+                />
+              </span>
+            ),
           }}
           claseFila={(c) => (!fichaMinimizada && c.id === elegida?.id ? "bg-accent" : "")}
           accionPrincipal={

@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { hoy } from "./calculos-compras";
 import { numeroOC, type FilaCompra } from "./def-compras";
 import { CAMPOS_EDITABLES, type CampoEditable } from "./def-edicion-compras";
-
-/** Un campo dentro de la celda: mismo borde de control que los demás campos, pero con el tamaño del texto de la tabla. */
-const claseCampo =
-  "w-full min-w-[8rem] rounded border border-border-control bg-card px-2 py-1 text-sm focus:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground";
+import { claseCampoPanel, claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
 
 export type GuardarCelda = (compra: FilaCompra, campo: string, valor: unknown) => void;
 
@@ -18,11 +17,14 @@ const valorInicial = (def: CampoEditable, compra: FilaCompra): string => {
   return v === null || v === undefined ? "" : String(v);
 };
 
+const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
 /**
- * Una celda de la lista de Compras que se edita en su sitio: se ve como siempre; al pulsarla se vuelve el campo que
- * corresponde a su dato (texto, número, fecha, selector o casillas de la vía de envío). Se guarda al salir del campo o con
- * Enter; Escape lo deja como estaba. Los selectores y las casillas guardan al elegir. Lo que no se puede editar (sin permiso
- * de escritura, o la cantidad y el monto de una compra con productos, que se calculan de ellos) se dibuja como texto, sin botón.
+ * Una celda de la lista de Compras que se edita en su sitio, igual en todas las columnas (como en ClickUp): se ve como
+ * siempre y al pulsarla se abre bajo ella el mismo panel. Las listas (etapa, estado, prioridad, Sí/No) guardan al elegir;
+ * la vía de envío marca y desmarca; el texto, los números y las fechas se guardan con Enter o al pulsar fuera, y Escape
+ * lo deja como estaba. Lo que no se puede editar (sin permiso de escritura, o la cantidad y el monto de una compra con
+ * productos, que se calculan de ellos) se dibuja como texto, sin botón.
  */
 export function CeldaEditable({
   compra,
@@ -39,225 +41,338 @@ export function CeldaEditable({
   children: ReactNode;
 }) {
   const def = CAMPOS_EDITABLES[campo];
-  const [editando, setEditando] = useState(false);
+  const [abierto, setAbierto] = useState(false);
   const boton = useRef<HTMLButtonElement>(null);
-  // Al terminar con el teclado el foco vuelve al botón de la celda; con el ratón sigue donde se pulsó.
-  const devolverFoco = useRef(false);
-
-  useEffect(() => {
-    if (!editando && devolverFoco.current) {
-      devolverFoco.current = false;
-      boton.current?.focus();
-    }
-  }, [editando]);
 
   if (!puedeEscribir || !def || (def.soloSinProductos && compra.productos > 0)) return <>{children}</>;
 
   const nombre = compra.productos > 0 ? numeroOC(compra.numero) : compra.nombre;
+  const aria = `${def.etiqueta} de ${nombre}`;
+  const inicial = valorInicial(def, compra);
 
-  function cerrar(conFoco: boolean) {
-    devolverFoco.current = conFoco;
-    setEditando(false);
+  /** Cierra el panel; con el teclado el foco vuelve a la celda. */
+  function cerrar(motivo: MotivoCierre | "elegido") {
+    setAbierto(false);
+    if (motivo !== "fuera") boton.current?.focus();
+  }
+  /** Guarda si el dato cambió. */
+  function enviar(valor: string) {
+    if (valor !== inicial) guardar(compra, campo, def.tipo === "booleano" ? valor === "si" : valor);
   }
 
-  if (!editando) {
-    return (
+  return (
+    <>
       <button
         ref={boton}
         type="button"
-        onClick={() => setEditando(true)}
-        className={`-mx-1 block min-h-6 w-[calc(100%+0.5rem)] cursor-text rounded px-1 py-0.5 text-left transition-colors hover:bg-muted ${anilloFoco}`}
+        aria-haspopup="dialog"
+        aria-expanded={abierto}
+        onClick={() => setAbierto(true)}
+        className={`-mx-1 block min-h-6 w-[calc(100%+0.5rem)] cursor-pointer rounded px-1 py-0.5 text-left transition-colors hover:bg-muted ${
+          abierto ? "bg-muted ring-1 ring-primario/60" : ""
+        } ${anilloFoco}`}
       >
-        <span className="sr-only">
-          Editar {def.etiqueta} de {nombre}:{" "}
-        </span>
+        <span className="sr-only">Editar {aria}: </span>
         {children}
       </button>
-    );
-  }
-
-  const aria = `${def.etiqueta} de ${nombre}`;
-  if (def.tipo === "multiple") {
-    return (
-      <EditorMultiple
-        def={def}
-        inicial={compra[def.prop] as string[]}
-        aria={aria}
-        alCambiar={(valor) => guardar(compra, campo, valor)}
-        alCerrar={cerrar}
-      />
-    );
-  }
-  if (def.tipo === "seleccion" || def.tipo === "booleano") {
-    return (
-      <EditorSeleccion
-        def={def}
-        inicial={valorInicial(def, compra)}
-        aria={aria}
-        alTerminar={(valor, conFoco) => {
-          cerrar(conFoco);
-          if (valor !== undefined && valor !== valorInicial(def, compra)) guardar(compra, campo, def.tipo === "booleano" ? valor === "si" : valor);
-        }}
-      />
-    );
-  }
-  return (
-    <EditorTexto
-      def={def}
-      inicial={valorInicial(def, compra)}
-      aria={aria}
-      alTerminar={(valor, conFoco) => {
-        cerrar(conFoco);
-        if (valor !== undefined && valor !== valorInicial(def, compra)) guardar(compra, campo, valor);
-      }}
-    />
+      {abierto &&
+        (def.tipo === "multiple" ? (
+          <EditorOpciones
+            def={def}
+            ancla={boton}
+            aria={aria}
+            multiple
+            elegidas={compra[def.prop] as string[]}
+            alElegir={(v) => guardar(compra, campo, v)}
+            alCerrar={cerrar}
+          />
+        ) : def.tipo === "seleccion" || def.tipo === "booleano" ? (
+          <EditorOpciones
+            def={def}
+            ancla={boton}
+            aria={aria}
+            elegidas={inicial ? [inicial] : []}
+            alElegir={(v) => {
+              cerrar("elegido");
+              enviar(v[0] ?? "");
+            }}
+            alCerrar={cerrar}
+          />
+        ) : def.tipo === "fecha" ? (
+          <EditorFecha
+            ancla={boton}
+            aria={aria}
+            inicial={inicial}
+            alTerminar={(valor, motivo) => {
+              cerrar(motivo);
+              if (valor !== undefined) enviar(valor);
+            }}
+          />
+        ) : (
+          <EditorTexto
+            def={def}
+            ancla={boton}
+            aria={aria}
+            inicial={inicial}
+            alTerminar={(valor, motivo) => {
+              cerrar(motivo);
+              if (valor !== undefined) enviar(valor);
+            }}
+          />
+        ))}
+    </>
   );
 }
 
-/** Texto, número, dinero, fecha y lista: un campo que se guarda al salir de él o con Enter (`undefined` = no hay cambio). */
-function EditorTexto({ def, inicial, aria, alTerminar }: { def: CampoEditable; inicial: string; aria: string; alTerminar: (valor: string | undefined, conFoco: boolean) => void }) {
+/** Cómo se ve una opción: con su color, la misma insignia de la celda; sin color, el texto tal cual. */
+function Opcion({ def, valor, etiqueta }: { def: CampoEditable; valor: string; etiqueta: string }) {
+  const color = def.color?.(valor);
+  return color ? <Badge color={color}>{etiqueta}</Badge> : <span className="truncate">{etiqueta}</span>;
+}
+
+/**
+ * Etapa, estado, prioridad, Sí/No y la vía de envío: la lista de opciones con buscador (si son muchas), flechas y Enter.
+ * Una sola opción guarda al elegirla y cierra; con `multiple` se marcan varias y cada una guarda al instante.
+ */
+function EditorOpciones({
+  def,
+  ancla,
+  aria,
+  elegidas: inicial,
+  multiple = false,
+  alElegir,
+  alCerrar,
+}: {
+  def: CampoEditable;
+  ancla: RefObject<HTMLButtonElement | null>;
+  aria: string;
+  elegidas: string[];
+  multiple?: boolean;
+  alElegir: (valores: string[]) => void;
+  alCerrar: (motivo: MotivoCierre) => void;
+}) {
+  const [elegidas, setElegidas] = useState(inicial);
+  const [busqueda, setBusqueda] = useState("");
+  const todas = useMemo(() => {
+    const base =
+      def.tipo === "booleano"
+        ? [
+            { valor: "si", etiqueta: "Sí" },
+            { valor: "no", etiqueta: "No" },
+          ]
+        : [...(def.opciones ?? [])];
+    return def.admiteVacio ? [...base, { valor: "", etiqueta: `Sin ${def.etiqueta.toLowerCase()}` }] : base;
+  }, [def]);
+  const conBuscador = todas.length > 6;
+  const q = normal(busqueda);
+  const opciones = q ? todas.filter((o) => normal(o.etiqueta).includes(q)) : todas;
+  const [activa, setActiva] = useState(() =>
+    Math.max(
+      0,
+      todas.findIndex((o) => inicial.includes(o.valor)),
+    ),
+  );
+  const lista = useRef<HTMLUListElement>(null);
+  const buscador = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (conBuscador) buscador.current?.focus();
+    else lista.current?.focus();
+  }, [conBuscador]);
+  useEffect(() => {
+    lista.current?.querySelector(`[data-indice="${activa}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [activa]);
+
+  function elegir(valor: string) {
+    if (!multiple) return alElegir([valor]);
+    const nuevas = elegidas.includes(valor) ? elegidas.filter((v) => v !== valor) : [...elegidas, valor];
+    setElegidas(nuevas);
+    alElegir(nuevas);
+  }
+
+  function teclas(e: KeyboardEvent) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = opciones.length;
+      if (n) setActiva((i) => (Math.min(i, n - 1) + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const o = opciones[Math.min(activa, opciones.length - 1)];
+      if (o) elegir(o.valor);
+    }
+  }
+
+  return (
+    <PanelCelda ancla={ancla} etiqueta={aria} alCerrar={alCerrar} ancho={240}>
+      {conBuscador && (
+        <input
+          ref={buscador}
+          value={busqueda}
+          onChange={(e) => {
+            setBusqueda(e.target.value);
+            setActiva(0);
+          }}
+          onKeyDown={teclas}
+          placeholder="Buscar…"
+          aria-label={`Buscar ${def.etiqueta.toLowerCase()}`}
+          className={claseCampoPanel}
+        />
+      )}
+      <ul
+        ref={lista}
+        role="listbox"
+        aria-label={aria}
+        aria-multiselectable={multiple || undefined}
+        aria-activedescendant={opciones.length ? `opcion-celda-${activa}` : undefined}
+        tabIndex={conBuscador ? -1 : 0}
+        onKeyDown={teclas}
+        className="m-0 flex max-h-72 list-none flex-col gap-0.5 overflow-y-auto p-1.5 outline-none"
+      >
+        {opciones.map((o, i) => {
+          const marcada = elegidas.includes(o.valor);
+          return (
+            <li
+              key={o.valor || "vacio"}
+              id={`opcion-celda-${i}`}
+              data-indice={i}
+              role="option"
+              aria-selected={marcada}
+              onMouseEnter={() => setActiva(i)}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => elegir(o.valor)}
+              className={`${claseOpcionPanel} cursor-pointer ${i === activa ? "bg-muted" : ""}`}
+            >
+              {o.valor ? <Opcion def={def} valor={o.valor} etiqueta={o.etiqueta} /> : <span className="text-muted-foreground">{o.etiqueta}</span>}
+              {marcada && (
+                <span aria-hidden="true" className="text-xs text-primario">
+                  ✓
+                </span>
+              )}
+            </li>
+          );
+        })}
+        {opciones.length === 0 && <li className="px-2 py-1.5 text-xs text-muted-foreground">Sin resultados.</li>}
+      </ul>
+    </PanelCelda>
+  );
+}
+
+/** Texto, números y dinero: un solo campo; Enter o pulsar fuera guarda, Escape descarta (`undefined` = sin cambio). */
+function EditorTexto({
+  def,
+  ancla,
+  aria,
+  inicial,
+  alTerminar,
+}: {
+  def: CampoEditable;
+  ancla: RefObject<HTMLButtonElement | null>;
+  aria: string;
+  inicial: string;
+  alTerminar: (valor: string | undefined, motivo: MotivoCierre | "elegido") => void;
+}) {
   const [texto, setTexto] = useState(inicial);
   const campo = useRef<HTMLInputElement>(null);
-  const terminado = useRef(false);
+  const numero = def.tipo === "entero" || def.tipo === "dinero";
 
   useEffect(() => {
     campo.current?.focus();
     campo.current?.select();
   }, []);
 
-  function terminar(guardarCambio: boolean, conFoco: boolean) {
-    if (terminado.current) return;
-    terminado.current = true;
-    alTerminar(guardarCambio ? texto : undefined, conFoco);
-  }
+  // En los números se acepta la coma decimal («12,5»).
+  const limpio = () => (numero ? texto.replace(/\s/g, "").replace(",", ".") : texto);
 
-  const tipo = def.tipo === "entero" || def.tipo === "dinero" ? "number" : def.tipo === "fecha" ? "date" : "text";
   return (
-    <input
-      ref={campo}
-      type={tipo}
-      aria-label={aria}
-      value={texto}
-      step={def.tipo === "dinero" ? "0.01" : def.tipo === "entero" ? "1" : undefined}
-      min={def.tipo === "dinero" || def.tipo === "entero" ? 0 : undefined}
-      inputMode={def.tipo === "dinero" ? "decimal" : def.tipo === "entero" ? "numeric" : undefined}
-      maxLength={tipo === "text" ? 500 : undefined}
-      placeholder={def.tipo === "lista" ? "Ej: reposición, kenku" : undefined}
-      onChange={(e) => setTexto(e.target.value)}
-      onBlur={() => terminar(true, false)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          terminar(true, true);
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          terminar(false, true);
-        }
-      }}
-      className={`${claseCampo} ${tipo === "number" ? "tabular-nums" : ""}`}
-    />
+    <PanelCelda ancla={ancla} etiqueta={aria} alCerrar={(m) => alTerminar(m === "escape" ? undefined : limpio(), m)} ancho={numero ? 200 : 280}>
+      <span className="flex items-center">
+        {def.tipo === "dinero" && <span className="pl-3 text-muted-foreground">$</span>}
+        <input
+          ref={campo}
+          type="text"
+          aria-label={aria}
+          value={texto}
+          inputMode={def.tipo === "dinero" ? "decimal" : def.tipo === "entero" ? "numeric" : undefined}
+          maxLength={500}
+          placeholder={numero ? "0" : def.etiqueta}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              alTerminar(limpio(), "elegido");
+            }
+          }}
+          className={`${claseCampoPanel} border-b-0 ${numero ? "tabular-nums" : ""} ${def.tipo === "dinero" ? "pl-1.5" : ""}`}
+        />
+      </span>
+    </PanelCelda>
   );
 }
 
-/** Etapa, estado, prioridad y Sí/No: un selector que se guarda al elegir (`undefined` = se cerró sin elegir). */
-function EditorSeleccion({ def, inicial, aria, alTerminar }: { def: CampoEditable; inicial: string; aria: string; alTerminar: (valor: string | undefined, conFoco: boolean) => void }) {
-  const campo = useRef<HTMLSelectElement>(null);
-  const terminado = useRef(false);
-  const opciones = def.tipo === "booleano" ? [{ valor: "si", etiqueta: "Sí" }, { valor: "no", etiqueta: "No" }] : (def.opciones ?? []);
+const sumarDias = (iso: string, dias: number) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Fechas: el campo de fecha y atajos (Hoy, Mañana, En una semana, Quitar), como el selector de fechas de ClickUp. */
+function EditorFecha({
+  ancla,
+  aria,
+  inicial,
+  alTerminar,
+}: {
+  ancla: RefObject<HTMLButtonElement | null>;
+  aria: string;
+  inicial: string;
+  alTerminar: (valor: string | undefined, motivo: MotivoCierre | "elegido") => void;
+}) {
+  const [texto, setTexto] = useState(inicial);
+  const campo = useRef<HTMLInputElement>(null);
+  const dia = hoy();
+  const atajos = [
+    { etiqueta: "Hoy", valor: dia },
+    { etiqueta: "Mañana", valor: sumarDias(dia, 1) },
+    { etiqueta: "En una semana", valor: sumarDias(dia, 7) },
+    ...(inicial ? [{ etiqueta: "Quitar fecha", valor: "" }] : []),
+  ];
 
   useEffect(() => {
     campo.current?.focus();
-    // La lista se despliega sola para elegir de una vez; donde el navegador no sabe, queda enfocado y se abre con un clic.
-    try {
-      (campo.current as unknown as { showPicker?: () => void } | null)?.showPicker?.();
-    } catch {
-      /* sin gesto del usuario o sin soporte */
-    }
   }, []);
 
-  function terminar(valor: string | undefined, conFoco: boolean) {
-    if (terminado.current) return;
-    terminado.current = true;
-    alTerminar(valor, conFoco);
-  }
-
   return (
-    <select
-      ref={campo}
-      aria-label={aria}
-      defaultValue={inicial}
-      onChange={(e) => terminar(e.target.value, true)}
-      onBlur={() => terminar(undefined, false)}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          terminar(undefined, true);
-        }
-      }}
-      className={claseCampo}
-    >
-      {def.admiteVacio && <option value="">Sin {def.etiqueta.toLowerCase()}</option>}
-      {opciones.map((o) => (
-        <option key={o.valor} value={o.valor}>
-          {o.etiqueta}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-/**
- * La vía de envío (se puede elegir más de una): una casilla por vía, en la misma celda. Cada una guarda al marcarla o
- * desmarcarla; la celda se cierra al salir del grupo o con Escape. Las casillas no roban el foco al pulsarlas con el
- * ratón (en Safari y Firefox un botón no recibe foco al clic, y el grupo se cerraba antes de tiempo).
- */
-function EditorMultiple({ def, inicial, aria, alCambiar, alCerrar }: { def: CampoEditable; inicial: string[]; aria: string; alCambiar: (valor: string[]) => void; alCerrar: (conFoco: boolean) => void }) {
-  const [elegidas, setElegidas] = useState(inicial);
-  const grupo = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    grupo.current?.querySelector("button")?.focus();
-  }, []);
-
-  function alternar(valor: string) {
-    const nuevas = elegidas.includes(valor) ? elegidas.filter((v) => v !== valor) : [...elegidas, valor];
-    setElegidas(nuevas);
-    alCambiar(nuevas);
-  }
-
-  return (
-    <div
-      ref={grupo}
-      role="group"
-      aria-label={aria}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) alCerrar(false);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          alCerrar(true);
-        }
-      }}
-      className="flex flex-wrap gap-1"
-    >
-      {(def.opciones ?? []).map((o) => {
-        const activa = elegidas.includes(o.valor);
-        return (
-          <button
-            key={o.valor}
-            type="button"
-            aria-pressed={activa}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => alternar(o.valor)}
-            className={`rounded border px-2 py-1 text-xs font-medium whitespace-nowrap ${anilloFoco} ${
-              activa ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"
-            }`}
-          >
-            {o.etiqueta}
-          </button>
-        );
-      })}
-    </div>
+    <PanelCelda ancla={ancla} etiqueta={aria} alCerrar={(m) => alTerminar(m === "escape" ? undefined : texto, m)} ancho={220}>
+      <input
+        ref={campo}
+        type="date"
+        aria-label={aria}
+        value={texto}
+        min="2000-01-01"
+        max="2100-12-31"
+        onChange={(e) => setTexto(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            alTerminar(texto, "elegido");
+          }
+        }}
+        className={`${claseCampoPanel} tabular-nums`}
+      />
+      <ul className="m-0 flex list-none flex-col gap-0.5 p-1.5">
+        {atajos.map((a) => (
+          <li key={a.etiqueta}>
+            <button
+              type="button"
+              onClick={() => alTerminar(a.valor, "elegido")}
+              className={`${claseOpcionPanel} hover:bg-muted ${a.valor ? "" : "text-muted-foreground"} ${anilloFoco}`}
+            >
+              <span>{a.etiqueta}</span>
+              {a.valor && <span className="text-xs text-muted-foreground tabular-nums">{a.valor.split("-").reverse().join("/")}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </PanelCelda>
   );
 }

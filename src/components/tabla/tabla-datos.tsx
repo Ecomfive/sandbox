@@ -75,9 +75,16 @@ export function TablaDatos<F, C = undefined>({
    * pantalla, el contenido de la primera columna es un botón (`etiqueta` es su nombre). `alAbrir` recibe, además de
    * la fila, las claves de las filas en el orden en que se ven (para pasar a la anterior o a la siguiente).
    * Con `soloColumna`, la ficha se abre **solo** desde el botón de la columna `columna` (la primera si no se dice): el resto
-   * de la fila no responde al clic, para que sus celdas puedan editarse en su sitio (Compras).
+   * de la fila no responde al clic, para que sus celdas puedan editarse en su sitio (Compras). `junto` va en la misma celda,
+   * al lado del botón y fuera de él (un botón no puede ir dentro de otro): el selector de etiquetas de Compras.
    */
-  abrirFila?: { etiqueta: (fila: F) => string; alAbrir: (fila: F, orden: string[]) => void; columna?: string; soloColumna?: boolean };
+  abrirFila?: {
+    etiqueta: (fila: F) => string;
+    alAbrir: (fila: F, orden: string[]) => void;
+    columna?: string;
+    soloColumna?: boolean;
+    junto?: (fila: F) => ReactNode;
+  };
   claseFila?: (fila: F) => string;
   ariaLabel: string;
   anchoMinimo?: string;
@@ -143,15 +150,18 @@ export function TablaDatos<F, C = undefined>({
       {visibles_.map((c, i) => (
         <td key={c.id} className={`${claseCeldaColumna} ${c.clase ?? ""}`}>
           {abrirFila && (abrirFila.columna ? c.id === abrirFila.columna : i === 0) ? (
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              aria-label={abrirFila.etiqueta(f)}
-              onClick={() => abrirFila.alAbrir(f, ordenEnPantalla())}
-              className="-mx-1 rounded px-1 text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-            >
-              {c.render(f, contexto as C)}
-            </button>
+            <span className={abrirFila.junto ? "flex items-start gap-1" : "contents"}>
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-label={abrirFila.etiqueta(f)}
+                onClick={() => abrirFila.alAbrir(f, ordenEnPantalla())}
+                className="-mx-1 min-w-0 rounded px-1 text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+              >
+                {c.render(f, contexto as C)}
+              </button>
+              {abrirFila.junto?.(f)}
+            </span>
           ) : (
             c.render(f, contexto as C)
           )}
