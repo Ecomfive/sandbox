@@ -19,21 +19,13 @@ export interface FilaCompra {
   etapa: string;
   estado: string;
   proveedor: string | null;
-  cliente: string | null;
   tienda: string | null;
-  trackId: string | null;
-  orden: string | null;
   productoRelacionado: string | null;
   qtyTotal: number | null;
   montoTotal: number | null;
   primerPago: number | null;
   segundoPago: number | null;
   pagadoAProveedor: number | null;
-  pagoPendiente: number | null;
-  cobradoCliente: number | null;
-  pendienteCliente: number | null;
-  pagoCliente: string | null;
-  cuentaReceptora: string | null;
   factura: boolean;
   financiamiento: boolean;
   fechaLimite: string | null;
@@ -69,7 +61,6 @@ export const EMOJI_CAMPO: Record<string, string> = {
   estado: "🚦",
   proveedor: "🏭",
   tienda: "🏪",
-  cliente: "👤",
   viaEnvio: "🏗️",
   etiquetas: "🏷️",
   qtyTotal: "🧾",
@@ -78,11 +69,6 @@ export const EMOJI_CAMPO: Record<string, string> = {
   primerPago: "⚠️",
   segundoPago: "⚠️",
   pagadoAProveedor: "💲",
-  pagoPendiente: "❗",
-  cobradoCliente: "💵",
-  pendienteCliente: "⏳",
-  pagoCliente: "💰",
-  cuentaReceptora: "🏦",
   factura: "✅",
   financiamiento: "💰",
   fechaLimite: "⏰",
@@ -90,8 +76,6 @@ export const EMOJI_CAMPO: Record<string, string> = {
   fechaPago1: "📆",
   fechaPago2: "🗓️",
   fechaEnvio: "🚚",
-  trackId: "🎫",
-  orden: "🧾",
   planificacion: "🗓️",
   urlProducto: "🔗",
   documentos: "📎",
@@ -274,14 +258,6 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       agrupable: true,
     },
     {
-      id: "cliente",
-      etiqueta: "Cliente",
-      tipo: "seleccion",
-      valores: (c) => [c.cliente ?? SIN_VALOR],
-      etiquetaSinValor: "Sin cliente",
-      agrupable: true,
-    },
-    {
       id: "viaEnvio",
       etiqueta: "Vía de envío",
       tipo: "seleccion",
@@ -320,17 +296,12 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     },
     { id: "nombreCompra", etiqueta: "Nombre", tipo: "texto", valor: (c) => `${numeroOC(c.numero)} ${c.nombre} ${c.proveedor ?? ""} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}` },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
-    { id: "trackId", etiqueta: "Track ID", tipo: "texto", valor: (c) => c.trackId ?? "" },
-    { id: "orden", etiqueta: "Orden", tipo: "texto", valor: (c) => c.orden ?? "" },
     { id: "qtyTotal", etiqueta: "QTY Total", tipo: "numero", valor: (c) => c.qtyTotal },
     { id: "montoTotal", etiqueta: "Monto Total", tipo: "numero", valor: (c) => c.montoTotal },
     { id: "valorUnitario", etiqueta: "Valor Unitario", tipo: "numero", valor: (c) => valorUnitario(c) },
     { id: "primerPago", etiqueta: "Primer Pago", tipo: "numero", valor: (c) => c.primerPago },
     { id: "segundoPago", etiqueta: "Segundo Pago", tipo: "numero", valor: (c) => c.segundoPago },
     { id: "pagadoAProveedor", etiqueta: "Pagado a Proveedor", tipo: "numero", valor: (c) => c.pagadoAProveedor },
-    { id: "pagoPendiente", etiqueta: "Pago Pendiente", tipo: "numero", valor: (c) => c.pagoPendiente },
-    { id: "cobradoCliente", etiqueta: "Cobrado Cliente", tipo: "numero", valor: (c) => c.cobradoCliente },
-    { id: "pendienteCliente", etiqueta: "Pendiente Cliente", tipo: "numero", valor: (c) => c.pendienteCliente },
     { id: "fechaLimite", etiqueta: "Fecha límite", tipo: "fecha", valor: (c) => c.fechaLimite },
     { id: "fechaLlegada", etiqueta: "Fecha de llegada", tipo: "fecha", valor: (c) => c.fechaLlegada },
     { id: "fechaPago1", etiqueta: "Fecha de Pago (1)", tipo: "fecha", valor: (c) => c.fechaPago1 },

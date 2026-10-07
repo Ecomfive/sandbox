@@ -171,7 +171,6 @@ export function paraRevisar(compras: FilaCompra[], umbral: Record<string, number
       .filter((c) => ["cotizar", "solicitud_local", "solicitud_internacional"].includes(c.etapa) && (diasEntre(c.creadoEn, dia) ?? 0) > 21)
       .sort((a, b) => a.creadoEn.localeCompare(b.creadoEn)),
     conInconveniente: abiertas.filter((c) => !!c.inconveniente),
-    pagoPendiente: abiertas.filter((c) => (c.pagoPendiente ?? 0) > 0),
   };
 }
 

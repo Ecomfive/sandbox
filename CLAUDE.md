@@ -579,8 +579,12 @@ convenciones técnicas del código.
   mismo umbral que «atrasada», calculado con todas las compras de la vista y no solo con las filtradas.
 - **Compras: Informe, lista y tiempos, como Productos Test.** **Informe** (`/compras`, `informe-compras.tsx`): por día, semana o mes
   (pulsar una barra elige el periodo), lo creado/pagado/enviado/llegado del periodo, «Hoy» (abiertas, en tránsito, atrasadas,
-  con inconveniente, pago pendiente: cada tarjeta lleva a la lista filtrada), abiertas por etapa, tránsito por vía de envío y
-  «Para revisar»; «Copiar informe». **Compras** (`/compras/lista`, `tabla-compras.tsx`): una sola vista, la `TablaDatos`
+  con inconveniente: cada tarjeta lleva a la lista filtrada), abiertas por etapa, tránsito por vía de envío y
+  «Para revisar»; «Copiar informe». **Campos que ya no existen** (migración 0083, 9 oct 2026): Cliente, Track ID, Orden, Pago
+  Pendiente, Cobrado Cliente, Pendiente Cliente, Pago Cliente y Cuenta receptora se quitaron de la tabla, la ficha y la base;
+  el dato de cada compra pasó a un comentario con su título («Track ID: …») para poder buscarlo en la Actividad. No los
+  vuelvas a poner como campo ni como indicador (el «pago pendiente» del Informe y del Dashboard se quitó con ellos); la
+  fecha «Cerrada» sí sigue, porque la pone el sistema y de ella salen el ciclo y los tiempos. **Compras** (`/compras/lista`, `tabla-compras.tsx`): una sola vista, la `TablaDatos`
   con aspecto de lista (agrupar —arranca por Etapa—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
   de los campos de ClickUp ocultos (`oculta` en la columna) hasta mostrarlos en «Columnas»; filtros de un toque (Cotizando,
   Producción, En tránsito, Atrasadas; `?grupo=` y `?etapa=` los preseleccionan) y la ficha de resumen a la derecha, que se

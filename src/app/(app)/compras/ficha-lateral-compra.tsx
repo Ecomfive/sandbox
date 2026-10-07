@@ -161,11 +161,9 @@ export function FichaLateralCompra({
           <Dato etiqueta="🧾 QTY">{compra.qtyTotal ?? "—"}</Dato>
           <Dato etiqueta="💲 Pagado a proveedor">{compra.pagadoAProveedor !== null ? usd(compra.pagadoAProveedor) : "—"}</Dato>
           <Dato etiqueta="💲 Valor unitario">{valorUnitario(compra) !== null ? usd(valorUnitario(compra)!) : "—"}</Dato>
-          <Dato etiqueta="❗ Pago pendiente">{compra.pagoPendiente ? usd(compra.pagoPendiente) : "—"}</Dato>
           <Dato etiqueta="🏭 Proveedor">{compra.proveedor ?? "—"}</Dato>
           <Dato etiqueta="🏗️ Vía">{compra.viaEnvio.length ? compra.viaEnvio.map(etiquetaVia).join(", ") : "—"}</Dato>
           <Dato etiqueta="🏪 Tienda">{compra.tienda ?? "—"}</Dato>
-          <Dato etiqueta="🎫 Track ID">{compra.trackId ?? "—"}</Dato>
         </dl>
         {compra.inconveniente && <p className="m-0 rounded-md border border-border px-3 py-2 text-[13px]">🚨 {compra.inconveniente}</p>}
 

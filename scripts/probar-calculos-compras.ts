@@ -17,7 +17,7 @@ async function main() {
   for (let d = 0; ; d += 1000) {
     const { data } = await sb
       .from("wms_compras")
-      .select("id, tipo, codigo, nombre, etapa, estado, proveedor, tienda, via_envio, qty_total, monto_total, pagado_a_proveedor, pago_pendiente, fecha_pago_1, fecha_envio, fecha_llegada, inconveniente, responsable_nombre, creado_en, cerrado_en, paises(codigo)")
+      .select("id, tipo, codigo, nombre, etapa, estado, proveedor, tienda, via_envio, qty_total, monto_total, pagado_a_proveedor, fecha_pago_1, fecha_envio, fecha_llegada, inconveniente, responsable_nombre, creado_en, cerrado_en, paises(codigo)")
       .eq("tipo", "pais")
       .range(d, d + 999);
     if (!data?.length) break;
@@ -38,7 +38,6 @@ async function main() {
         qtyTotal: c.qty_total === null ? null : Number(c.qty_total),
         montoTotal: c.monto_total === null ? null : Number(c.monto_total),
         pagadoAProveedor: c.pagado_a_proveedor === null ? null : Number(c.pagado_a_proveedor),
-        pagoPendiente: c.pago_pendiente === null ? null : Number(c.pago_pendiente),
         fechaPago1: c.fecha_pago_1,
         fechaEnvio: c.fecha_envio,
         fechaLlegada: c.fecha_llegada,
