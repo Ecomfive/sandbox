@@ -137,7 +137,8 @@ function datosDe(t: Json): Json {
     estado: mapEstado(t.status?.status),
     etapa: mapEtapa(texto(t, "Etapa", "drop_down")),
     proveedor: texto(t, "Proveedor", "drop_down") ?? texto(t, "Proveedor", "short_text"),
-    tienda: texto(t, "Tienda", "drop_down"),
+    // Desde la migración 0084 una compra puede tener varias tiendas; en ClickUp es una sola.
+    tiendas: ((v) => (v ? [v] : []))(texto(t, "Tienda", "drop_down")),
     planificacion: texto(t, "Planificación", "drop_down"),
     url_producto: texto(t, "URL", "url"),
     qty_total: numero(t, "QTY Total"),

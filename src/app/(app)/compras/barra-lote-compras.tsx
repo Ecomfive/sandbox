@@ -316,9 +316,9 @@ function EditorCampoLote({
 }
 
 /**
- * Una lista (las etiquetas o la tienda) para todas las marcadas: cada nombre dice si lo tienen todas (?), algunas (–) o
- * ninguna. Pulsar uno lo pone en todas, o lo quita de todas si ya lo tenían todas; escribir uno nuevo y Enter lo crea y se
- * lo pone a todas. Cada pulsación se guarda al instante, respetando lo que cada compra ya tenía.
+ * Una lista (las etiquetas o la tienda) para todas las marcadas: cada nombre dice si lo tienen todas (âœ“), algunas (â€“) o
+ * ninguna. Pulsar uno lo pone en todas, o lo quita de todas si ya lo tenÃ­an todas; escribir uno nuevo y Enter lo crea y se
+ * lo pone a todas. Cada pulsaciÃ³n se guarda al instante, respetando lo que cada compra ya tenÃ­a.
  */
 function EditorListaLote({
   campo,
@@ -334,7 +334,7 @@ function EditorListaLote({
   filas: FilaCompra[];
   aplicar: AplicarEnLote;
   opciones: string[];
-  /** Con color por nombre (las etiquetas) se dibujan como pastillas; sin él (la tienda), como texto. */
+  /** Con color por nombre (las etiquetas) se dibujan como pastillas; sin Ã©l (la tienda), como texto. */
   colores?: Record<string, string>;
   alCerrar: (motivo: MotivoCierre | "elegido") => void;
 }) {
@@ -350,7 +350,7 @@ function EditorListaLote({
         return p === "todas" ? "si" : p === "algunas" ? "algunas" : "no";
       }}
       renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : undefined}
-      placeholder={campo === "etiquetas" ? "Buscar o añadir etiquetas…" : `Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
+      placeholder={campo === "etiquetas" ? "Buscar o aÃ±adir etiquetasâ€¦" : `Buscar o aÃ±adir ${def.etiqueta.toLowerCase()}â€¦`}
       alAlternar={(n) => aplicar(campo, [n], presenciaEnLote(listas, n) === "todas" ? "quitar" : "agregar")}
       alCrear={(n) => aplicar(campo, [n], "agregar")}
       alCerrar={alCerrar}
