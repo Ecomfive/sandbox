@@ -8,6 +8,8 @@ import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSegu
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { descargarPublico } from "@/lib/seguridad/url-externa";
+import { detectarImagen } from "@/lib/seguridad/imagen";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 
@@ -55,6 +57,22 @@ export async function prepararSubidaFotoCompra(nombreArchivo: string): Promise<{
   const { data, error } = await createServiceClient().storage.from(BUCKET_FOTOS).createSignedUploadUrl(ruta);
   if (error || !data) return { error: error?.message ?? "No se pudo preparar la subida." };
   return { ruta, token: data.token };
+}
+
+/**
+ * La foto real de una compra desde una imagen de internet (arrastrada a la ficha): el servidor la descarga —solo de sitios
+ * públicos, hasta 5 MB y revisando que sea de verdad una imagen— y la sube como `prepararSubidaFotoCompra`. Devuelve su ruta.
+ */
+export async function subirFotoCompraDesdeUrl(direccion: string): Promise<{ ruta: string } | { error: string }> {
+  await requireModuloEscritura("compras");
+  const descarga = await descargarPublico(String(direccion ?? "").trim(), 5 * 1024 * 1024);
+  if ("error" in descarga) return descarga;
+  const imagen = detectarImagen(descarga.bytes.slice(0, 64));
+  if (!imagen) return { error: "Eso no es una imagen JPG, PNG, WebP o GIF." };
+  const ruta = `compras/${crypto.randomUUID()}/${Date.now()}-web.${imagen.extension}`;
+  const { error } = await createServiceClient().storage.from(BUCKET_FOTOS).upload(ruta, descarga.bytes, { contentType: imagen.tipo });
+  if (error) return { error: "No se pudo guardar la imagen." };
+  return { ruta };
 }
 
 /** Borra del bucket una foto que ya no queda referenciada (se reemplazó o se quitó). Nunca lanza. */

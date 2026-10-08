@@ -8,26 +8,10 @@ import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
 import { AdjuntoIcon } from "@/lib/nav-icons";
+import { urlArrastrada, pareceImagen } from "@/components/ui/soltar-imagen";
 import { guardarFotoProducto, prepararSubidaFotoProducto, subirFotoProductoDesdeUrl } from "./actions";
 
 const MAX_BYTES = 5 * 1024 * 1024;
-
-/** La dirección de la imagen que se arrastró desde otra página (la lista de enlaces, el `<img>` del HTML o el texto). */
-function urlArrastrada(dt: DataTransfer): string | null {
-  const html = dt.getData("text/html");
-  const deHtml = html ? new DOMParser().parseFromString(html, "text/html").querySelector("img")?.getAttribute("src") : null;
-  const lista = dt
-    .getData("text/uri-list")
-    .split(/\r?\n/)
-    .find((l) => l && !l.startsWith("#"));
-  const texto = dt.getData("text/plain").trim();
-  const candidata = deHtml || lista || (/^(https?:|data:image\/)/.test(texto) ? texto : null);
-  return candidata || null;
-}
-
-/** Si lo que se arrastra puede ser una imagen (un archivo o algo de otra página). */
-// (Un texto seleccionado que se arrastra trae HTML pero no `text/uri-list`: ese no cuenta.)
-const pareceImagen = (dt: DataTransfer | null) => !!dt && (dt.types.includes("Files") || dt.types.includes("text/uri-list"));
 
 /**
  * La foto del producto arriba de su ficha. Con permiso de escritura se sube, se cambia o se quita ahí mismo, y además:

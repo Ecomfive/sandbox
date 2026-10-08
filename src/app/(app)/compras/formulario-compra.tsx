@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
-import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, vistaPreviaCompra } from "./actions";
+import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, subirFotoCompraDesdeUrl, vistaPreviaCompra } from "./actions";
 import { numeroOC } from "./def-compras";
 import { SelectorPais } from "./selector-pais";
 import { useToast } from "@/components/ui/toast";
@@ -261,7 +261,17 @@ export function FormularioCompra({
           <Campo etiqueta="Descripción" id="campo-descripcion-compra">
             <textarea id="campo-descripcion-compra" name="descripcion" rows={4} defaultValue={compra?.descripcion ?? ""} className={`${fieldClass} resize-y`} />
           </Campo>
-          <CampoFoto nombreCampo="foto_url" etiqueta="Foto real del producto" valorInicial={compra?.fotoUrl ?? null} alCambiarSubiendo={setSubiendoFoto} prepararSubida={prepararSubidaFotoCompra} />
+          <CampoFoto
+            nombreCampo="foto_url"
+            etiqueta="Foto real del producto"
+            valorInicial={compra?.fotoUrl ?? null}
+            alCambiarSubiendo={setSubiendoFoto}
+            prepararSubida={prepararSubidaFotoCompra}
+            subirDesdeUrl={subirFotoCompraDesdeUrl}
+            // Al crear, la imagen se suelta en cualquier parte del panel; en la ficha, sobre el cuadro (los comentarios
+            // también reciben archivos).
+            soltarEnTodo={!editando}
+          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta={conEmoji("etapa", "Etapa")} id="campo-etapa" obligatorio faltante={faltante}>
               <select
