@@ -45,7 +45,7 @@ export function CrearCompraPanel({
     <>
       <BotonAgregar ref={botonAbrirRef} onClick={() => setAbierto(true)} />
 
-      <Ventana abierto={abierto} alCerrar={cerrarVentana} lado="derecha" ancho="lg" titulo={<span className="text-lg font-semibold">Nueva compra</span>}>
+      <Ventana abierto={abierto} alCerrar={cerrarVentana} lado="derecha" ancho="lg" titulo={<span className="text-lg font-semibold">Nueva orden de compra</span>}>
         <FormularioCompra
           vista={vista}
           paises={paises}

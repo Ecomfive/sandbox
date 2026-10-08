@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
-import { actualizarCompra, crearCompra, prepararSubidaFotoCompra } from "./actions";
+import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, vistaPreviaCompra } from "./actions";
+import { numeroOC } from "./def-compras";
+import { SelectorPais } from "./selector-pais";
+import { useToast } from "@/components/ui/toast";
 import { conEmoji, ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
@@ -90,6 +93,19 @@ export function FormularioCompra({
   const editando = !!compra;
   const esImportacion = compra ? compra.tipo === "importacion" : vista === "importacion";
   const paisInicial = compra?.paisCodigo ?? (vista !== "todos" && vista !== "importacion" ? vista : "");
+  const { mostrarToast } = useToast();
+  // Compra nueva: el país elegido y lo que tendrá al crearla (código del país y N.º OC), para verlo antes de crearla.
+  const [pais, setPais] = useState(paisInicial);
+  const [previa, setPrevia] = useState<{ codigo: string | null; numero: number } | null>(null);
+  useEffect(() => {
+    if (editando) return;
+    const clave = esImportacion ? "importacion" : pais;
+    let vigente = true;
+    void vistaPreviaCompra(clave).then((p) => vigente && setPrevia(p));
+    return () => {
+      vigente = false;
+    };
+  }, [editando, esImportacion, pais]);
 
   function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -100,6 +116,9 @@ export function FormularioCompra({
         const resultado = editando ? await actualizarCompra(formData) : await crearCompra(formData);
         if (resultado?.error) setError(resultado.error);
         else {
+          // Si otra persona creó una compra del mismo país mientras tanto, el código es el siguiente libre: se avisa.
+          const creado = !editando && "codigo" in resultado ? resultado.codigo : null;
+          if (creado && previa?.codigo && creado !== previa.codigo) mostrarToast(`La compra quedó como ${creado}: ${previa.codigo} ya lo había tomado otra compra.`, "info");
           setModificado(false);
           alGuardar();
         }
@@ -153,14 +172,12 @@ export function FormularioCompra({
 
       <div className="flex flex-1 flex-col divide-y divide-border p-5">
         <Seccion icono={ComprasIcon} titulo="Compra">
-          <Campo etiqueta="Nombre" id="campo-nombre-compra" obligatorio faltante={faltante}>
+          <Campo etiqueta="Nombre" id="campo-nombre-compra">
             <input
               id="campo-nombre-compra"
               type="text"
               name="nombre"
-              required
               data-enfocar
-              aria-invalid={invalido("campo-nombre-compra")}
               defaultValue={compra?.nombre}
               placeholder='Ej: Gotas Líquidas Clean "Lote #1, 1000"'
               className={fieldClass}
@@ -173,9 +190,14 @@ export function FormularioCompra({
                 id="campo-codigo-compra"
                 type="text"
                 readOnly
-                value={compra?.codigo ?? ""}
-                placeholder="Se asigna al crear"
-                className={`${fieldClass} bg-muted text-muted-foreground`}
+                value={
+                  editando
+                    ? (compra?.codigo ?? "")
+                    : previa
+                      ? [numeroOC(previa.numero), previa.codigo ?? (esImportacion ? "" : pais ? "sin prefijo" : "elige el país")].filter(Boolean).join(" · ")
+                      : "…"
+                }
+                className={`${fieldClass} bg-muted font-medium text-muted-foreground tabular-nums`}
               />
             </Campo>
             {esImportacion ? (
@@ -184,16 +206,18 @@ export function FormularioCompra({
               </Campo>
             ) : (
               <Campo etiqueta={conEmoji("pais", "País")} id="campo-pais-compra" obligatorio faltante={faltante}>
-                <select id="campo-pais-compra" name="pais" required defaultValue={paisInicial} aria-invalid={invalido("campo-pais-compra")} className={fieldClass}>
-                  <option value="" disabled>
-                    Elige el país
-                  </option>
-                  {paises.map((p) => (
-                    <option key={p.codigo} value={p.codigo}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
+                <SelectorPais
+                  id="campo-pais-compra"
+                  nombre="pais"
+                  paises={paises}
+                  valor={pais}
+                  invalido={invalido("campo-pais-compra")}
+                  alCambiar={(c) => {
+                    setPais(c);
+                    setModificado(true);
+                    alModificar?.();
+                  }}
+                />
               </Campo>
             )}
             <Campo etiqueta={conEmoji("etiquetas", "Etiquetas")} id="campo-etiquetas-compra">
@@ -237,7 +261,7 @@ export function FormularioCompra({
           <Campo etiqueta="Descripción" id="campo-descripcion-compra">
             <textarea id="campo-descripcion-compra" name="descripcion" rows={4} defaultValue={compra?.descripcion ?? ""} className={`${fieldClass} resize-y`} />
           </Campo>
-          <CampoFoto nombreCampo="foto_url" valorInicial={compra?.fotoUrl ?? null} alCambiarSubiendo={setSubiendoFoto} prepararSubida={prepararSubidaFotoCompra} />
+          <CampoFoto nombreCampo="foto_url" etiqueta="Foto real del producto" valorInicial={compra?.fotoUrl ?? null} alCambiarSubiendo={setSubiendoFoto} prepararSubida={prepararSubidaFotoCompra} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta={conEmoji("etapa", "Etapa")} id="campo-etapa" obligatorio faltante={faltante}>
               <select

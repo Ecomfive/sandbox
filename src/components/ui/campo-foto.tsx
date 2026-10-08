@@ -23,11 +23,14 @@ export function CampoFoto({
   valorInicial,
   alCambiarSubiendo,
   prepararSubida,
+  etiqueta = "Foto del producto",
 }: {
   nombreCampo: string;
   valorInicial: string | null;
   alCambiarSubiendo?: (subiendo: boolean) => void;
   prepararSubida: (nombreArchivo: string) => Promise<{ ruta: string; token: string } | { error: string }>;
+  /** El nombre del campo (en Compras, «Foto real del producto»: la que manda el proveedor). */
+  etiqueta?: string;
 }) {
   const [preview, setPreview] = useState<string | null>(valorInicial);
   const [subiendo, setSubiendo] = useState(false);
@@ -83,7 +86,7 @@ export function CampoFoto({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className={labelClass}>Foto del producto</span>
+      <span className={labelClass}>{etiqueta}</span>
       <input type="hidden" name={nombreCampo} value={preview ?? ""} readOnly />
       <input ref={inputArchivoRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="sr-only" onChange={alElegirArchivo} />
       <div className="flex items-center gap-3">

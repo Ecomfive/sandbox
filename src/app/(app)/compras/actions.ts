@@ -191,13 +191,13 @@ async function anotarEventos(compraId: string, antes: { etapa: string; estado: s
 }
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
-export async function crearCompra(formData: FormData): Promise<{ error?: string }> {
+export async function crearCompra(formData: FormData): Promise<{ error?: string; codigo?: string | null }> {
   await requireModuloEscritura("compras");
-  const nombre = (formData.get("nombre") as string).trim();
+  // El nombre es opcional (venía de ClickUp; una compra con productos se titula por su N.º OC). Sin nombre, toma su código.
+  const nombreEscrito = String(formData.get("nombre") ?? "").trim();
   const etapa = (formData.get("etapa") as string) || "backlog";
   const estado = (formData.get("estado") as string) || "backlog";
 
-  if (!nombre) return { error: "Escribe el nombre de la compra." };
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
@@ -224,6 +224,7 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string 
 
   const supabase = createServiceClient();
   const codigo = await siguienteCodigo(tipoYPais.tipo, tipoYPais.pais_id);
+  const nombre = nombreEscrito || codigo || "Orden de compra";
   const { data, error } = await supabase
     .from("wms_compras")
     .insert({ ...tipoYPais, nombre, etapa, estado, ...leerCambios(formData), codigo })
@@ -247,31 +248,49 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string 
 
   await registrarAuditoria({ accion: "crear_compra", entidad: "wms_compras", entidadId: data.id, detalle: codigo ? `${codigo} · ${nombre}` : nombre });
   revalidatePath("/compras");
-  return {};
+  return { codigo };
+}
+
+/**
+ * Lo que tendrá una compra nueva si se crea ahora (para verlo antes de crearla): el código del país (el siguiente de su
+ * correlativo, sin gastarlo) y el N.º OC. Si otra persona crea una antes, al crear se usa el siguiente libre.
+ */
+export async function vistaPreviaCompra(clave: string): Promise<{ codigo: string | null; numero: number }> {
+  await requireModulo("compras");
+  const supabase = createServiceClient();
+  const [correlativo, ultima] = await Promise.all([
+    clave ? supabase.from("wms_compras_correlativo").select("prefijo, ultimo").eq("clave", String(clave)).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from("wms_compras").select("numero").order("numero", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const c = correlativo.data as { prefijo: string | null; ultimo: number } | null;
+  return {
+    codigo: c?.prefijo ? `${c.prefijo}-${String(Number(c.ultimo) + 1).padStart(4, "0")}` : null,
+    numero: Number((ultima.data as { numero: number } | null)?.numero ?? 0) + 1,
+  };
 }
 
 /** Edita cualquier dato de una compra ya creada — todo junto, desde su ficha. */
 export async function actualizarCompra(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("compras");
   const id = formData.get("id") as string;
-  const nombre = (formData.get("nombre") as string).trim();
+  const nombreEscrito = String(formData.get("nombre") ?? "").trim();
   const etapa = formData.get("etapa") as string;
   const estado = formData.get("estado") as string;
   if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
   if (sinAcceso) return { error: sinAcceso };
 
-  if (!nombre) return { error: "Escribe el nombre de la compra." };
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
-  if (!ES_ID(id)) return { error: "Compra no válida." };
   const tipoYPais = await leerTipoYPais(formData);
   if ("error" in tipoYPais) return tipoYPais;
 
   const supabase = createServiceClient();
   const { data: actualCompleta } = await supabase.from("wms_compras").select("*").eq("id", id).single();
   const actual = actualCompleta as Record<string, unknown> & { foto_url: string | null; etapa: string; estado: string } | null;
+  // Sin nombre se conserva el que tenía (el nombre es opcional: el título sale del N.º OC o del código).
+  const nombre = nombreEscrito || String(actual?.nombre ?? "") || String(actual?.codigo ?? "") || "Orden de compra";
   const { qty_total, monto_total, ...resto } = leerCambios(formData);
   // Con productos vinculados, la cantidad y el monto los calcula el bloque «Productos»: el formulario no los pisa.
   const { count: lineas } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);
