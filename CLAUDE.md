@@ -208,6 +208,9 @@ convenciones técnicas del código.
   quien puede modificar Usuarios y roles; formato simple «## / - / 1.» que se muestra como texto, nunca HTML; borradores
   iniciales en `manuales-borrador.ts`, cargados con `scripts/cargar-manuales-borrador.ts`). Migración 0088. Una guía o un curso
   nuevo: agrégalo a esos archivos (con su `modulo`) y, si es de una página, su ruta a `MODULOS_CON_GUIA`.
+  **Regla: todo cambio que se vea en el sistema actualiza el Centro de ayuda en el mismo cambio** (su guía, el glosario y, si
+  lo enseña, el curso). Además, una tarea programada diaria (20:00, «Actualizar el Centro de ayuda») revisa lo publicado en
+  `main` y corrige solo esos tres archivos de `src/lib/ayuda/`.
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo
