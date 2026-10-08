@@ -511,7 +511,7 @@ export function TablaCompras({
             ) : campo === "estado" ? (
               <Badge color={colorEstado(grupo.clave)}>{grupo.etiqueta}</Badge>
             ) : campo === "etiquetas" && grupo.clave !== SIN_VALOR ? (
-              <PastillaEtiqueta nombre={grupo.etiqueta} color={colores[grupo.etiqueta]} />
+              <PastillaEtiqueta nombre={grupo.clave} color={colores[grupo.clave]} />
             ) : (
               <span className="font-semibold">{grupo.etiqueta}</span>
             )

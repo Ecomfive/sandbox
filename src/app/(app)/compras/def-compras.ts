@@ -293,6 +293,8 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       etiqueta: "Etiquetas",
       tipo: "seleccion",
       valores: (c) => (c.etiquetas.length ? c.etiquetas : [SIN_VALOR]),
+      // En los filtros y los grupos, en mayúsculas como en las pastillas.
+      formatearValor: (v) => v.toUpperCase(),
       etiquetaSinValor: "Sin etiquetas",
       agrupable: true,
     },
