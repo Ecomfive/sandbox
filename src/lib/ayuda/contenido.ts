@@ -90,7 +90,7 @@ export const GUIAS: GuiaModulo[] = [
     resumen: "El catálogo único de productos (el mismo para todos los países): SKU, foto, variantes, código de barras, envío y compras.",
     secciones: [
       { titulo: "Crear un producto", pasos: ["Pulsa «Agregar»: elige simple o compuesto, escribe SKU y nombre.", "Marca «Tiene variantes» si se vende en colores o tallas y define sus opciones.", "Arranca en Test; pásalo a Activo cuando se vaya a comprar."] },
-      { titulo: "La ficha del producto", pasos: ["Foto: «Subir foto» o «Cambiar» arriba de la ficha.", "Código de barras: el del fabricante o «Generar código interno».", "Envío, vencimiento por lote y variantes se configuran en sus bloques."] },
+      { titulo: "La ficha del producto", pasos: ["Nombre: escríbelo en el campo «Nombre» del bloque Producto; se guarda al salir del campo o con Enter.", "Foto: «Subir foto» o «Cambiar» arriba de la ficha.", "Código de barras: el del fabricante o «Generar código interno».", "Envío, vencimiento por lote y variantes se configuran en sus bloques."] },
       { titulo: "Histórico de compras", pasos: ["El bloque «Compras» muestra las unidades compradas desde la primera vez, lo invertido y cada compra.", "Solo cuenta las compras donde el producto está vinculado."] },
     ],
   },
@@ -231,6 +231,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-08", titulo: "Editar el nombre del producto", texto: "En la ficha del producto, el nombre ahora se edita ahí mismo y queda en su actividad.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-08", titulo: "Compras en secuencia por código", texto: "Dentro de cada etapa las compras quedan ordenadas por su código, de mayor a menor, aunque lleguen salteadas.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-07", titulo: "Centro de ayuda", texto: "Glosario, guías de cada módulo, la Universidad con cursos y examen, y los manuales de proceso del equipo.", href: "/ayuda" },
   { fecha: "2026-10-07", titulo: "Países permitidos por persona", texto: "Cada persona puede limitarse a sus países: solo ve las compras e histórico de esos países.", modulo: "usuarios", href: "/usuarios" },

@@ -18,6 +18,7 @@ import { EnvioProductoBloque } from "./envio-producto";
 import { VariantesProducto } from "./variantes-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FotoProducto } from "./foto-producto";
+import { NombreProducto } from "./nombre-producto";
 import { ComprasProducto } from "./compras-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -135,7 +136,9 @@ export function FichaProducto({
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">
             <Seccion icono={CatalogoIcon} titulo="Producto">
               <dl className="flex flex-col gap-3">
-                <Dato etiqueta="Nombre">{producto.nombre}</Dato>
+                <Dato etiqueta="Nombre">
+                  <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
+                </Dato>
                 <Dato etiqueta="SKU">{producto.codigo}</Dato>
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
                 <Dato etiqueta="Estado">

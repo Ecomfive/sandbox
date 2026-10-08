@@ -548,3 +548,21 @@ export async function guardarFotoProducto(id: string, ruta: string | null): Prom
   revalidatePath("/inventario");
   return {};
 }
+
+/** Cambia el nombre de un producto (desde su ficha). Queda en su actividad con el nombre de antes y el nuevo. */
+export async function renombrarProducto(id: string, nombre: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const limpio = String(nombre ?? "").trim().replace(/\s+/g, " ").slice(0, 200);
+  if (!limpio) return { error: "El nombre no puede quedar vacío." };
+  const supabase = createServiceClient();
+  const { data: antes } = await supabase.from("skus_maestros").select("codigo, nombre").eq("id", id).maybeSingle();
+  if (!antes) return { error: "No se encontró el producto." };
+  if (antes.nombre === limpio) return {};
+  const { error } = await supabase.from("skus_maestros").update({ nombre: limpio }).eq("id", id);
+  if (error) return { error: "No se pudo guardar el nombre." };
+  await registrarAuditoria({ accion: "renombrar_producto", entidad: "skus_maestros", entidadId: id, antes: { Nombre: antes.nombre }, despues: { Nombre: limpio } });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return {};
+}
