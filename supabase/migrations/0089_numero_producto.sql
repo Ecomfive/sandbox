@@ -2,8 +2,8 @@
 -- 2026). Tres identificadores, cada uno con su función:
 --   * id (uuid, no se ve): une el producto con compras, inventario, fotos y fichas. Nunca cambia.
 --   * numero (este): el correlativo que pone el sistema al crear; ordena la lista. Nunca cambia ni se repite.
---   * codigo (SKU): el que identifica el producto en el WMS, Shopify, las tiendas y Dropi. Único y, una vez creado, fijo
---     (si cambiara, las ventas que traen el código anterior ya no encontrarían el producto).
+--   * codigo (SKU): el que identifica el producto en el WMS, Shopify, las tiendas y Dropi. Lo escribe la persona, es único y
+--     se puede corregir después, siempre por uno que no exista (y cambiándolo también en las plataformas).
 -- Los productos que ya existen se numeran por fecha de creación (y por SKU entre los creados a la vez). Se puede correr más de
 -- una vez.
 
@@ -22,15 +22,7 @@ alter table skus_maestros alter column numero set default nextval('skus_maestros
 alter table skus_maestros alter column numero set not null;
 create unique index if not exists skus_maestros_numero_unico on skus_maestros (numero);
 
--- El SKU no se cambia después de crear el producto.
-create or replace function skus_maestros_sku_fijo() returns trigger
-language plpgsql as $$
-begin
-  if new.codigo is distinct from old.codigo then
-    raise exception 'El SKU de un producto no se cambia (lo usan las ventas de todas las plataformas).';
-  end if;
-  return new;
-end;
-$$;
+-- El SKU se puede corregir desde la ficha, siempre que no lo tenga otro producto (lo impide el índice único
+-- skus_maestros_codigo_unico). Por si una versión anterior de esta migración lo había bloqueado:
 drop trigger if exists skus_maestros_sku_fijo on skus_maestros;
-create trigger skus_maestros_sku_fijo before update of codigo on skus_maestros for each row execute function skus_maestros_sku_fijo();
+drop function if exists skus_maestros_sku_fijo();

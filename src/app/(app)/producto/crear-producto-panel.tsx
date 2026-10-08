@@ -6,7 +6,7 @@ import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CalendarioIcon, CatalogoIcon, ProductoIcon } from "@/lib/nav-icons";
-import { crearProducto } from "./actions";
+import { crearProducto, revisarSku } from "./actions";
 import { ComboBuilder } from "./combo-builder";
 import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 
@@ -21,6 +21,8 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
   // El nombre y el SKU se siguen para sugerir los de las variantes.
   const [nombre, setNombre] = useState("");
   const [codigo, setCodigo] = useState("");
+  // Si el SKU escrito ya lo tiene otro producto (se revisa al salir del campo; el servidor lo vuelve a revisar al crear).
+  const [skuOcupado, setSkuOcupado] = useState<string | null>(null);
   const [conVariantes, setConVariantes] = useState(false);
   const [armadas, setArmadas] = useState<VariantesArmadas>({ opciones: [], variantes: [] });
   // Un compuesto sin productos simples no se puede armar: el botón lleva a ese aviso.
@@ -91,11 +93,24 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 autoComplete="off"
                 maxLength={60}
                 value={codigo}
-                onChange={(e) => setCodigo(e.target.value.replace(/\s/g, ""))}
-                aria-invalid={invalido("campo-codigo-producto")}
+                onChange={(e) => {
+                  setCodigo(e.target.value.replace(/\s/g, ""));
+                  setSkuOcupado(null);
+                }}
+                onBlur={(e) => {
+                  const valor = e.target.value.trim();
+                  if (valor) void revisarSku(valor).then((r) => setSkuOcupado(r.error ?? null));
+                }}
+                aria-invalid={invalido("campo-codigo-producto") || !!skuOcupado}
+                aria-describedby={skuOcupado ? "sku-ocupado" : undefined}
                 placeholder={combo ? "Ej: KIT-LIMPIEZA-01" : "Ej: CREMA-50"}
                 className={`${fieldClass} w-full`}
               />
+              {skuOcupado && (
+                <p id="sku-ocupado" role="alert" className="mt-1 text-xs text-destructive">
+                  {skuOcupado}
+                </p>
+              )}
             </Campo>
             <Campo etiqueta="Código de barras del fabricante (opcional)" id="campo-barras-producto">
               <input

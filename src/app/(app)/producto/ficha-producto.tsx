@@ -19,6 +19,7 @@ import { VariantesProducto } from "./variantes-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FotoProducto } from "./foto-producto";
 import { NombreProducto } from "./nombre-producto";
+import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -141,7 +142,9 @@ export function FichaProducto({
                   <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
                 </Dato>
                 <Dato etiqueta="N.º">{numeroProducto(producto.numero)}</Dato>
-                <Dato etiqueta="SKU">{producto.codigo}</Dato>
+                <Dato etiqueta="SKU">
+                  <SkuProducto key={`${producto.id}-${producto.codigo}`} id={producto.id} codigo={producto.codigo} puedeEscribir={puedeEscribir} />
+                </Dato>
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
                 <Dato etiqueta="Estado">
                   {puedeEscribir ? (

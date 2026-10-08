@@ -36,7 +36,8 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   if (!nombre) return { error: "Escribe el nombre del producto." };
   if (nombre.length > 200) return { error: "El nombre es muy largo (máximo 200 caracteres)." };
   if (!codigo) return { error: "Escribe el SKU del producto." };
-  if (codigo.length > 60 || /\s/.test(codigo)) return { error: "El SKU no puede llevar espacios ni pasar de 60 caracteres." };
+  const errorSku = await errorDeSku(codigo, null);
+  if (errorSku) return { error: errorSku };
   if (tipo !== "simple" && tipo !== "combo") return { error: "Elige si es simple o compuesto." };
   if (clase !== "fisico" && clase !== "test") return { error: "Elige si es físico o de prueba (test)." };
   if (manejaVencimiento && tipo === "combo") return { error: "Un producto compuesto no maneja vencimiento: sale de sus componentes." };
@@ -562,6 +563,61 @@ export async function renombrarProducto(id: string, nombre: string): Promise<{ e
   const { error } = await supabase.from("skus_maestros").update({ nombre: limpio }).eq("id", id);
   if (error) return { error: "No se pudo guardar el nombre." };
   await registrarAuditoria({ accion: "renombrar_producto", entidad: "skus_maestros", entidadId: id, antes: { Nombre: antes.nombre }, despues: { Nombre: limpio } });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return {};
+}
+
+// --- SKU ------------------------------------------------------------------------------------------------------------
+// Lo escribe la persona y no puede repetirse (sin importar mayúsculas ni espacios: lo exige también el índice único de la
+// base). Se puede corregir después desde la ficha, siempre por uno que no tenga otro producto.
+
+/** El producto que ya usa ese SKU (sin contar `excepto`), o null. */
+async function productoConSku(codigo: string, excepto: string | null): Promise<{ codigo: string; nombre: string } | null> {
+  // `ilike` sin comodines: se escapan % y _ (y la barra invertida) para que solo encuentre ese código exacto.
+  const patron = codigo.trim().replace(/[\\%_]/g, (c) => `\\${c}`);
+  const { data } = await createServiceClient().from("skus_maestros").select("id, codigo, nombre").ilike("codigo", patron);
+  return (data ?? []).find((p) => p.id !== excepto && String(p.codigo).trim().toLowerCase() === codigo.trim().toLowerCase()) ?? null;
+}
+
+/** Por qué ese SKU no sirve (vacío, con espacios, muy largo o de otro producto), o null si sirve. */
+async function errorDeSku(codigo: string, excepto: string | null): Promise<string | null> {
+  if (!codigo) return "Escribe el SKU del producto.";
+  if (codigo.length > 60 || /\s/.test(codigo)) return "El SKU no puede llevar espacios ni pasar de 60 caracteres.";
+  const otro = await productoConSku(codigo, excepto);
+  return otro ? `Ya existe un producto con el SKU ${otro.codigo}: ${otro.nombre}.` : null;
+}
+
+/** Para el campo SKU mientras se escribe: si está libre o quién lo tiene. */
+export async function revisarSku(codigo: string, excepto: string | null = null): Promise<{ error?: string }> {
+  await requireModulo(MODULO);
+  if (excepto !== null && !ES_ID(excepto)) return {};
+  const error = await errorDeSku(String(codigo ?? "").trim(), excepto);
+  return error ? { error } : {};
+}
+
+/**
+ * Corrige el SKU de un producto por uno que no exista. Las fichas de Shopify y de Dropi enlazadas toman el SKU nuevo; en las
+ * plataformas hay que cambiarlo a mano (las ventas buscan el producto por su SKU). Queda en la actividad del producto.
+ */
+export async function cambiarSkuProducto(id: string, nuevo: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const codigo = String(nuevo ?? "").trim();
+  const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("skus_maestros").select("codigo").eq("id", id).maybeSingle();
+  if (!actual) return { error: "No se encontró el producto." };
+  if (actual.codigo === codigo) return {};
+  const errorSku = await errorDeSku(codigo, id);
+  if (errorSku) return { error: errorSku };
+  const { error } = await supabase.from("skus_maestros").update({ codigo }).eq("id", id);
+  if (error) return { error: error.code === "23505" ? "Ya existe un producto con ese SKU." : "No se pudo cambiar el SKU." };
+  // Las fichas de canal enlazadas guardan una copia del SKU: se actualiza.
+  await Promise.all([
+    supabase.from("wms_producto_variantes").update({ sku: codigo }).eq("sku_maestro_id", id),
+    supabase.from("wms_dropi_productos").update({ sku: codigo }).eq("sku_maestro_id", id),
+  ]);
+  await registrarAuditoria({ accion: "cambiar_sku_producto", entidad: "skus_maestros", entidadId: id, antes: { SKU: actual.codigo }, despues: { SKU: codigo } });
   revalidatePath("/producto");
   revalidatePath("/inventario");
   return {};
