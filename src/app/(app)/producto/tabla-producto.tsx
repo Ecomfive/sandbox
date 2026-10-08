@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
-import { CalendarioIcon, CatalogoIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearProductoPanel } from "./crear-producto-panel";
 import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
@@ -22,6 +22,7 @@ const ICONOS: Record<string, IconoComp> = {
   barras: ProductoIcon,
   vencimiento: CalendarioIcon,
   creado: CalendarioIcon,
+  comprado: ComprasIcon,
 };
 
 const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
@@ -33,6 +34,13 @@ const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
   { id: "barras", label: "Código de barras", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.codigoBarras ?? "—" },
   { id: "vencimiento", label: "Vencimiento", ocultable: true, clase: "text-muted-foreground", render: (p) => (p.manejaVencimiento ? "Por lote" : "—") },
   { id: "componentes", label: "Componentes", ocultable: true, clase: "text-muted-foreground", render: (p) => p.componentes || "—" },
+  {
+    id: "comprado",
+    label: "Unidades compradas",
+    ocultable: true,
+    clase: "text-right tabular-nums",
+    render: (p) => (p.unidadesCompradas ? p.unidadesCompradas.toLocaleString("es-PA") : <span className="text-muted-foreground">—</span>),
+  },
   { id: "asociaciones", label: "Fichas", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.asociaciones.length },
 ];
 

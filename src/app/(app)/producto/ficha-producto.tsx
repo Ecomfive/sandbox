@@ -9,7 +9,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
-import { CalendarioIcon, CatalogoIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import { formatearFecha } from "@/lib/formato";
 import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
@@ -18,6 +18,7 @@ import { EnvioProductoBloque } from "./envio-producto";
 import { VariantesProducto } from "./variantes-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FotoProducto } from "./foto-producto";
+import { ComprasProducto } from "./compras-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
@@ -160,6 +161,12 @@ export function FichaProducto({
                 </Dato>
               </dl>
             </Seccion>
+
+            {producto.tipo !== "combo" && (
+              <Seccion icono={ComprasIcon} titulo="Compras">
+                <ComprasProducto key={producto.id} id={producto.id} />
+              </Seccion>
+            )}
 
             {producto.tipo !== "combo" && (
               <Seccion icono={ProductoIcon} titulo="Variantes">

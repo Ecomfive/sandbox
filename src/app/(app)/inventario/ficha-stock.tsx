@@ -6,7 +6,8 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
-import { CalendarioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, ComprasIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { ComprasProducto } from "../producto/compras-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
@@ -185,6 +186,12 @@ export function FichaStock({
                 </div>
               )}
             </Seccion>
+
+            {!esCombo && (
+              <Seccion icono={ComprasIcon} titulo="Compras">
+                <ComprasProducto key={sku.id} id={sku.id} limite={5} />
+              </Seccion>
+            )}
 
             {sku.manejaVencimiento && !esCombo && !esTest && datos !== null && datos !== "error" && (
               <Seccion icono={CalendarioIcon} titulo="Lotes">

@@ -1,3 +1,4 @@
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -59,7 +60,7 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, lineasCompra] = await Promise.all([
     supabase.from("sku_maestro_componentes").select("combo_id, cantidad, componente:componente_id(codigo)"),
     supabase
       .from("wms_producto_variantes")
@@ -69,8 +70,20 @@ export default async function ProductoPage() {
     supabase.from("productos").select("sku_maestro_id, nombre, paises(codigo)").not("sku_maestro_id", "is", null),
     // La foto va aparte: sin la migración 0086 la columna no existe y la lista se carga igual, sin fotos.
     supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
+    traerTodasLasFilas<{ sku_maestro_id: string; cantidad_pedida: number }>((desde, hasta) =>
+      supabase.from("wms_compra_items").select("sku_maestro_id, cantidad_pedida").order("id").range(desde, hasta),
+    ),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
+  // Unidades compradas por producto (las líneas vinculadas en Compras); un producto con variantes suma las de sus variantes.
+  const padreDe = new Map(lista.filter((p) => p.padre_id).map((p) => [p.id as string, p.padre_id as string]));
+  const compradoPorId = new Map<string, number>();
+  for (const l of lineasCompra) {
+    const n = Number(l.cantidad_pedida);
+    compradoPorId.set(l.sku_maestro_id, (compradoPorId.get(l.sku_maestro_id) ?? 0) + n);
+    const padre = padreDe.get(l.sku_maestro_id);
+    if (padre) compradoPorId.set(padre, (compradoPorId.get(padre) ?? 0) + n);
+  }
 
   const componentesPorCombo = new Map<string, string[]>();
   for (const fila of componentesFilas.data ?? []) {
@@ -141,6 +154,7 @@ export default async function ProductoPage() {
       codigoSa: p.codigo_sa,
     },
     foto: fotoPorId.get(p.id) ?? null,
+    unidadesCompradas: compradoPorId.get(p.id) ?? 0,
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],

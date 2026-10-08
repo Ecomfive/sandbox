@@ -63,6 +63,8 @@ export interface FilaProducto {
   componentes: string;
   /** La foto del producto (bucket público `wms-productos`), o null. */
   foto: string | null;
+  /** Unidades compradas desde la primera compra (las líneas vinculadas en Compras; con variantes, suma las de ellas). */
+  unidadesCompradas: number;
   /** Día en que se creó (AAAA-MM-DD). */
   creado: string;
   asociaciones: Asociacion[];
@@ -96,6 +98,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
       opciones: () => Object.entries(ETIQUETA_TIPO).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
     },
+    { id: "comprado", etiqueta: "Unidades compradas", tipo: "numero", valor: (p) => p.unidadesCompradas },
   ],
   csvAntes: [
     { etiqueta: "SKU", valor: (p) => p.codigo },
