@@ -318,7 +318,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     },
     { id: "nombreCompra", etiqueta: "Nombre", tipo: "texto", valor: (c) => `${numeroOC(c.numero)} ${c.nombre} ${c.proveedor ?? ""} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}` },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
-    { id: "qtyTotal", etiqueta: "QTY Total", tipo: "numero", valor: (c) => c.qtyTotal },
+    { id: "qtyTotal", etiqueta: "Cantidad total", tipo: "numero", valor: (c) => c.qtyTotal },
     { id: "montoTotal", etiqueta: "Monto Total", tipo: "numero", valor: (c) => c.montoTotal },
     { id: "valorUnitario", etiqueta: "Valor Unitario", tipo: "numero", valor: (c) => valorUnitario(c) },
     { id: "primerPago", etiqueta: "Primer Pago", tipo: "numero", valor: (c) => c.primerPago },

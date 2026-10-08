@@ -34,7 +34,7 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "texto" },
   tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista" },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
-  qtyTotal: { etiqueta: "QTY Total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
+  qtyTotal: { etiqueta: "Cantidad total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
   montoTotal: { etiqueta: "Monto Total", prop: "montoTotal", columna: "monto_total", tipo: "dinero", soloSinProductos: true },
   primerPago: { etiqueta: "Primer Pago", prop: "primerPago", columna: "primer_pago", tipo: "dinero" },
   segundoPago: { etiqueta: "Segundo Pago", prop: "segundoPago", columna: "segundo_pago", tipo: "dinero" },

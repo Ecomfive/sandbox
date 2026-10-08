@@ -158,7 +158,7 @@ export function FichaLateralCompra({
         )}
 
         <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-2">
-          <Dato etiqueta="🧾 QTY">{compra.qtyTotal ?? "—"}</Dato>
+          <Dato etiqueta="🧾 Cantidad">{compra.qtyTotal ?? "—"}</Dato>
           <Dato etiqueta="💲 Pagado a proveedor">{compra.pagadoAProveedor !== null ? usd(compra.pagadoAProveedor) : "—"}</Dato>
           <Dato etiqueta="💲 Valor unitario">{valorUnitario(compra) !== null ? usd(valorUnitario(compra)!) : "—"}</Dato>
           <Dato etiqueta="🏭 Proveedor">{compra.proveedor ?? "—"}</Dato>

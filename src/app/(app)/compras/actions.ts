@@ -264,7 +264,7 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string;
   await requireModuloEscritura("compras");
   // El nombre es opcional (venía de ClickUp; una compra con productos se titula por su N.º OC). Sin nombre, toma su código.
   const nombreEscrito = String(formData.get("nombre") ?? "").trim();
-  const etapa = (formData.get("etapa") as string) || "backlog";
+  const etapa = (formData.get("etapa") as string) || "solicitud_internacional";
   const estado = (formData.get("estado") as string) || "backlog";
 
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };

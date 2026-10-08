@@ -287,7 +287,7 @@ export function FormularioCompra({
                 name="etapa"
                 required
                 aria-invalid={invalido("campo-etapa")}
-                defaultValue={compra?.etapa ?? "backlog"}
+                defaultValue={compra?.etapa ?? "solicitud_internacional"}
                 className={fieldClass}
               >
                 {ETAPAS_COMPRA.map((e) => (
@@ -329,7 +329,7 @@ export function FormularioCompra({
             {/* Con productos vinculados, la cantidad y el monto salen de ellos (bloque «Productos»): no se escriben aquí. */}
             {(compra && compra.productos > 0) || conProductos ? (
               <>
-                <Campo etiqueta={conEmoji("qtyTotal", "QTY Total")} id="campo-qty">
+                <Campo etiqueta={conEmoji("qtyTotal", "Cantidad total")} id="campo-qty">
                   <input id="campo-qty" type="text" readOnly value="Se calcula de los productos" className={`${fieldClass} bg-muted text-muted-foreground`} />
                 </Campo>
                 <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
@@ -338,7 +338,7 @@ export function FormularioCompra({
               </>
             ) : (
               <>
-                <Campo etiqueta={conEmoji("qtyTotal", "QTY Total")} id="campo-qty">
+                <Campo etiqueta={conEmoji("qtyTotal", "Cantidad total")} id="campo-qty">
                   <input id="campo-qty" type="number" step="1" min="0" name="qty_total" defaultValue={compra?.qtyTotal ?? ""} className={`${fieldClass} tabular-nums`} />
                 </Campo>
                 <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">

@@ -81,7 +81,7 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
       </Seccion>
       <Seccion icono={GastoIcon} titulo="Cantidad y pagos">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Dato etiqueta="QTY Total">{compra.qtyTotal ?? SIN_DATO}</Dato>
+          <Dato etiqueta="Cantidad total">{compra.qtyTotal ?? SIN_DATO}</Dato>
           <Dato etiqueta="Monto Total">{dinero(compra.montoTotal)}</Dato>
           <Dato etiqueta="Valor Unitario">{dinero(valorUnitario(compra))}</Dato>
           <Dato etiqueta="Primer Pago">{dinero(compra.primerPago)}</Dato>

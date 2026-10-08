@@ -124,7 +124,7 @@ export const CURSOS: Curso[] = [
       {
         titulo: "Productos, unidades y costo",
         parrafos: [
-          "En la ficha, bloque «Productos», agrega los productos que se compraron (por variante si las tiene) con sus unidades y el costo unitario o el total: el otro se calcula solo, con hasta 10 decimales. La QTY y el Monto Total de la compra salen de sus productos.",
+          "En la ficha, bloque «Productos», agrega los productos que se compraron (por variante si las tiene) con sus unidades y el costo unitario o el total: el otro se calcula solo, con hasta 10 decimales. La Cantidad total y el Monto Total de la compra salen de sus productos.",
           "Una compra sin productos lleva la marca «Sin productos». Vincular productos es lo que alimenta el histórico de compras de cada producto.",
         ],
       },
@@ -144,7 +144,7 @@ export const CURSOS: Curso[] = [
     ],
     examen: [
       { pregunta: "¿Cuándo se archiva una compra (pasa a Cerrados)?", opciones: ["Cuando su etapa es Completado", "Cuando su Estado es Completado", "Cuando llega la mercancía"], correcta: 1 },
-      { pregunta: "¿De dónde salen la QTY y el Monto Total de una compra con productos?", opciones: ["Se escriben a mano", "De sus productos vinculados", "De la descripción"], correcta: 1 },
+      { pregunta: "¿De dónde salen la Cantidad total y el Monto Total de una compra con productos?", opciones: ["Se escriben a mano", "De sus productos vinculados", "De la descripción"], correcta: 1 },
       { pregunta: "¿Cómo marcas una falla de una compra?", opciones: ["Con un comentario que empiece con «Inconveniente:»", "Cambiando la etapa a Descartado", "Con una etiqueta roja"], correcta: 0 },
       { pregunta: "¿Cómo se pone la Planificación de una compra?", opciones: ["Se escribe a mano el mes", "Se calcula sola con la fecha de envío y lo que tardan los envíos de su país por esa vía", "Es el mes en que se creó la compra"], correcta: 1 },
       { pregunta: "Una compra de Importadora…", opciones: ["Lleva el país de entrega", "No lleva país y no se mezcla con las de un país", "Es igual a una compra de Panamá"], correcta: 1 },

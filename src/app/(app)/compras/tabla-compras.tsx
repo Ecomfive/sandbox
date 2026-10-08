@@ -200,7 +200,7 @@ function columnas(
           ),
         ),
     }),
-    col("qtyTotal", "QTY Total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
+    col("qtyTotal", "Cantidad total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
     col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.pagadoAProveedor, usd), render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("foto", "Foto", {
