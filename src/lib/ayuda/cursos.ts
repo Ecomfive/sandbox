@@ -1,0 +1,191 @@
+// Universidad: los cursos del sistema. Contenido fijo (se cambia con un PR). Las respuestas correctas viven SOLO aquí, en el
+// servidor: al navegador llega el curso sin ellas (`cursoParaAlumno`) y la nota la pone `completarCurso`. Un curso con
+// `modulo` solo lo ve quien puede abrir ese módulo; sin módulo, lo ve todo el mundo.
+
+export interface Leccion {
+  titulo: string;
+  parrafos: string[];
+}
+export interface Pregunta {
+  pregunta: string;
+  opciones: string[];
+  /** Índice de la opción correcta. */
+  correcta: number;
+}
+export interface Curso {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  modulo: string | null;
+  minutos: number;
+  lecciones: Leccion[];
+  examen: Pregunta[];
+}
+
+/** Para aprobar hay que acertar al menos este porcentaje del examen. */
+export const APROBAR_DESDE = 0.75;
+
+export const CURSOS: Curso[] = [
+  {
+    id: "primeros-pasos",
+    titulo: "Primeros pasos en el sistema",
+    descripcion: "Cómo moverte por el sistema: áreas, fichas, tablas, menciones y permisos.",
+    modulo: null,
+    minutos: 6,
+    lecciones: [
+      {
+        titulo: "Moverte por el sistema",
+        parrafos: [
+          "La barra negra de la izquierda tiene las áreas (Desempeño, Marketing, Operación, Finanzas…). Al pulsar una, el panel de al lado muestra sus páginas, repartidas en tres frentes: Proveeduría, Gestión de tienda y Fulfillment.",
+          "Arriba tienes el buscador (Ctrl K o /): escribe el nombre de una página, un retiro, un producto o un dropshipper y ve directo. A la derecha está el país en que trabajas: Inventario, Retiros y Pedidos muestran los datos de ese país.",
+          "Con la estrella de las migas de pan guardas una página en Favoritos.",
+        ],
+      },
+      {
+        titulo: "Tablas y fichas",
+        parrafos: [
+          "Casi todo se ve en tablas con la misma barra: Agrupar, Filtros, Cerrados, Columnas, Vistas y Descargar. Lo que eliges se recuerda en tu navegador y puedes guardarlo como vista con nombre.",
+          "Al pulsar una fila se abre su ficha a la derecha: ahí ves todo el registro y, si tienes permiso, lo editas en el mismo lugar. Arriba de la ficha aparecen «Guardar cambios» y «Cancelar» solo cuando cambiaste algo.",
+        ],
+      },
+      {
+        titulo: "Comentarios, menciones y avisos",
+        parrafos: [
+          "En los comentarios de una compra o en las notas del CRM, escribe @ y elige a una persona: le llega un aviso en «Para ti» (botón Avisos) con el enlace al comentario.",
+          "Tu rol decide qué módulos ves y si puedes modificarlos o solo leerlos. Además, puedes tener países permitidos: entonces solo ves las compras y datos de esos países. Si te falta un acceso, pídelo a quien administra Usuarios y roles.",
+        ],
+      },
+    ],
+    examen: [
+      { pregunta: "¿Cómo abres rápido cualquier página o registro?", opciones: ["Con el buscador (Ctrl K o /)", "Recargando la página", "Desde Ajustes"], correcta: 0 },
+      { pregunta: "Mencionas a alguien con @ en un comentario. ¿Qué pasa?", opciones: ["Nada, es solo texto", "Le llega un aviso en «Para ti» con el enlace", "Se le envía un correo con el comentario"], correcta: 1 },
+      { pregunta: "¿Dónde se edita un registro (una compra, un retiro)?", opciones: ["En una página aparte", "En su ficha, que se abre a la derecha al pulsar la fila", "Solo descargando la tabla"], correcta: 1 },
+      { pregunta: "¿Qué decide qué módulos puedes abrir?", opciones: ["Tu rol", "El país de la barra de arriba", "Las vistas guardadas"], correcta: 0 },
+    ],
+  },
+  {
+    id: "producto",
+    titulo: "Producto: el catálogo único",
+    descripcion: "Crear productos, variantes, compuestos, estados Activo/Test, código de barras y foto.",
+    modulo: "producto",
+    minutos: 8,
+    lecciones: [
+      {
+        titulo: "Un catálogo para todos los países",
+        parrafos: [
+          "Cada producto vive una sola vez en el sistema y vale para todos los países: el mismo SKU, el mismo código de barras y la misma foto. El SKU es la llave con la que una venta de Dropi o Shopify encuentra el producto para descontar inventario, así que debe ser igual en todas las plataformas.",
+          "Un producto puede ser simple (se compra y se guarda tal cual) o compuesto (una combinación de simples con su cantidad: no guarda stock y al venderlo se descuenta cada componente).",
+        ],
+      },
+      {
+        titulo: "Variantes",
+        parrafos: [
+          "Si un producto se vende en colores o tallas, márcalo con «Tiene variantes» y define sus opciones. Cada variante tiene su SKU y su stock.",
+          "Las compras se hacen por variante, no por el producto padre: al agregar un producto con variantes a una compra, el sistema pide la cantidad de cada variante. Un compuesto también debe usar variantes, nunca el padre.",
+        ],
+      },
+      {
+        titulo: "Activo o Test, código de barras y foto",
+        parrafos: [
+          "Un producto nace en Test: se está probando, aparece en Inventario pero no tiene stock y no se compra. Cuando se decide comprarlo, pásalo a Activo desde su ficha.",
+          "Si no trae código de barras del fabricante, «Generar código interno» le asigna un EAN-13 que empieza por 20. La foto se sube desde la ficha y se ve en Producto e Inventario.",
+          "El bloque «Compras» de la ficha suma las unidades compradas desde la primera vez, a partir de las compras donde el producto está vinculado.",
+        ],
+      },
+    ],
+    examen: [
+      { pregunta: "¿Para qué sirve el SKU?", opciones: ["Es solo un nombre corto", "Es la llave con la que una venta encuentra el producto para descontar inventario", "Es el número de la compra"], correcta: 1 },
+      { pregunta: "Un producto se vende en tres colores. ¿Cómo se compra?", opciones: ["Por el producto padre", "Por cada variante, con su cantidad", "Como compuesto"], correcta: 1 },
+      { pregunta: "¿Qué pasa con un producto en Test?", opciones: ["Se compra normal", "Aparece en Inventario pero no tiene stock ni se compra", "No aparece en ningún lado"], correcta: 1 },
+      { pregunta: "Un producto compuesto (combo)…", opciones: ["Guarda su propio stock", "No guarda stock: al venderlo se descuenta cada componente", "Solo existe en Dropi"], correcta: 1 },
+    ],
+  },
+  {
+    id: "compras",
+    titulo: "Compras: de la cotización a la llegada",
+    descripcion: "Crear y seguir una orden de compra, vincular productos, costos, etapas y comentarios.",
+    modulo: "compras",
+    minutos: 10,
+    lecciones: [
+      {
+        titulo: "La orden de compra",
+        parrafos: [
+          "Cada compra a un proveedor es una orden con su N.º OC (OC-0001…) y el código de su país (ECOM01 Panamá, ECOM03 Costa Rica…), que se asigna solo al crearla. Las compras de Importadora son un servicio a un cliente: no llevan país y nunca se mezclan con las de un país.",
+          "Arriba de la lista eliges qué ver: todos los países, uno o Importadora. La lista arranca agrupada por etapa.",
+        ],
+      },
+      {
+        titulo: "Etapa y Estado",
+        parrafos: [
+          "La Etapa dice en qué paso va la compra: Backlog, 01 Solicitud Internacional, 02 Cotizar, 03 Cotizado… hasta 11 Completado o Descartado. De los cambios de etapa salen los tiempos y las alertas de atraso.",
+          "El Estado es el semáforo de gestión (Pendiente, En Gestión, En Revisión, Completado…). Una compra se archiva —pasa a «Cerrados»— cuando su Estado es Completado, aunque la mercancía ya haya llegado antes.",
+        ],
+      },
+      {
+        titulo: "Productos, unidades y costo",
+        parrafos: [
+          "En la ficha, bloque «Productos», agrega los productos que se compraron (por variante si las tiene) con sus unidades y el costo unitario o el total: el otro se calcula solo, con hasta 10 decimales. La QTY y el Monto Total de la compra salen de sus productos.",
+          "Una compra sin productos lleva la marca «Sin productos». Vincular productos es lo que alimenta el histórico de compras de cada producto.",
+        ],
+      },
+      {
+        titulo: "Editar rápido y comentar",
+        parrafos: [
+          "Pulsa una celda para editarla en un panel pequeño; para cambiar varias compras a la vez, márcalas y usa la barra de abajo.",
+          "Comenta con @ para avisar a alguien, pega capturas o adjunta PDF. Para marcar una falla, empieza el comentario con «Inconveniente:». Todo cambio queda en la Actividad con su autor y hora.",
+        ],
+      },
+    ],
+    examen: [
+      { pregunta: "¿Cuándo se archiva una compra (pasa a Cerrados)?", opciones: ["Cuando su etapa es Completado", "Cuando su Estado es Completado", "Cuando llega la mercancía"], correcta: 1 },
+      { pregunta: "¿De dónde salen la QTY y el Monto Total de una compra con productos?", opciones: ["Se escriben a mano", "De sus productos vinculados", "De la descripción"], correcta: 1 },
+      { pregunta: "¿Cómo marcas una falla de una compra?", opciones: ["Con un comentario que empiece con «Inconveniente:»", "Cambiando la etapa a Descartado", "Con una etiqueta roja"], correcta: 0 },
+      { pregunta: "Una compra de Importadora…", opciones: ["Lleva el país de entrega", "No lleva país y no se mezcla con las de un país", "Es igual a una compra de Panamá"], correcta: 1 },
+    ],
+  },
+  {
+    id: "inventario",
+    titulo: "Inventario: stock, movimientos y lotes",
+    descripcion: "Cubetas de stock, bodegas, entradas y salidas, lotes y vencimientos.",
+    modulo: "inventario",
+    minutos: 8,
+    lecciones: [
+      {
+        titulo: "Dónde está el stock",
+        parrafos: [
+          "El stock vive por producto y por bodega, en el país de la barra de arriba. Las bodegas propias las movemos nosotros; las externas (Dropi, Effi, Boxful, Dunamixfy) las tiene un tercero y su stock llega por sincronización: no se mueven a mano.",
+          "Dentro de una bodega, cada ubicación tiene una propiedad (normal, dañado, en inspección, retenido) que decide a qué cubeta suma lo que se guarda ahí.",
+        ],
+      },
+      {
+        titulo: "Las cubetas",
+        parrafos: [
+          "El stock se reparte en cubetas: físico, reservado, dañado, en inspección, retenido, vencido y en camino. Disponible es lo que se puede vender: el físico menos lo reservado, dañado, en inspección, retenido y vencido.",
+          "Un saldo puede quedar negativo si una salida llega antes que su entrada: se ve en rojo y se corrige con una entrada o un ajuste.",
+        ],
+      },
+      {
+        titulo: "Movimientos, lotes y vencimiento",
+        parrafos: [
+          "Desde la ficha de un producto registras Entrada, Salida o Ajuste. Cada movimiento queda en un libro que no se edita ni se borra.",
+          "Si el producto maneja vencimiento, la entrada pide lote y fecha. Una salida sin lote sale por FEFO —primero el que vence antes— y nunca toma un lote vencido. Los vencidos y por vencer se ven en la pestaña Vencimientos.",
+        ],
+      },
+    ],
+    examen: [
+      { pregunta: "¿Qué es el stock Disponible?", opciones: ["Todo el físico", "El físico menos reservado, dañado, en inspección, retenido y vencido", "Lo que está en camino"], correcta: 1 },
+      { pregunta: "¿Se puede hacer una entrada a mano en la bodega de Dropi?", opciones: ["Sí, como cualquier bodega", "No: es externa y su stock llega por sincronización", "Solo con permiso de Ajustes"], correcta: 1 },
+      { pregunta: "Una salida sin lote de un producto con vencimiento…", opciones: ["Toma el lote más nuevo", "Sale por FEFO y nunca toma un lote vencido", "Se rechaza siempre"], correcta: 1 },
+      { pregunta: "¿Se puede borrar un movimiento?", opciones: ["Sí, desde la ficha", "No: el libro no se edita ni se borra; se corrige con otro movimiento", "Solo el mismo día"], correcta: 1 },
+    ],
+  },
+];
+
+/** Los cursos que puede tomar una persona según sus módulos. */
+export const cursosPara = (modulos: string[]) => CURSOS.filter((c) => !c.modulo || modulos.includes(c.modulo));
+
+/** El curso sin las respuestas correctas, para el navegador. */
+export function cursoParaAlumno(c: Curso) {
+  return { ...c, examen: c.examen.map(({ pregunta, opciones }) => ({ pregunta, opciones })) };
+}
+export type CursoAlumno = ReturnType<typeof cursoParaAlumno>;

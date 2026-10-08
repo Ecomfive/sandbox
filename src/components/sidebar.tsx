@@ -10,7 +10,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
-import { AjustesIcon, AvisosIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -315,6 +315,10 @@ function RielYPanel({
           );
         })}
         <div className="mt-auto flex w-full flex-col gap-0.5">
+          <Link href="/ayuda" aria-current={pathname.startsWith("/ayuda") ? "page" : undefined} className={claseRiel(pathname.startsWith("/ayuda"))}>
+            <IconoRiel Icono={AyudaIcon} seleccionada={pathname.startsWith("/ayuda")} />
+            <span>Ayuda</span>
+          </Link>
           {puedeVerAvisos && (
             <Link
               href="/notificaciones"

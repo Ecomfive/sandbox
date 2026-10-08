@@ -26,6 +26,14 @@ const TITULOS_APARTE: Record<string, string> = {
   "/sin-acceso": "Sin acceso",
 };
 
+/** Las secciones del Centro de ayuda (`/ayuda`), en el orden en que se buscan. */
+const SUBPAGINAS_AYUDA: [string, string][] = [
+  ["/ayuda/glosario", "Glosario"],
+  ["/ayuda/guias", "Guías"],
+  ["/ayuda/universidad", "Universidad"],
+  ["/ayuda/manuales", "Manuales de proceso"],
+];
+
 /** Subpáginas fijas de un módulo (no dinámicas): cuelgan de su módulo y llevan este nombre. */
 const SUBPAGINAS: Record<string, string> = {
   "/retiros/cuentas": "Cuentas destino",
@@ -73,6 +81,14 @@ export function construirMigas(
   etiquetaDetalle?: string | null
 ): Migas {
   const ruta = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+
+  // El Centro de ayuda no es un módulo del menú ni lleva permiso: lo abre cualquiera (lo que muestra sale de sus módulos).
+  if (ruta === "/ayuda" || ruta.startsWith("/ayuda/")) {
+    const sub = SUBPAGINAS_AYUDA.find(([prefijo]) => ruta === prefijo || ruta.startsWith(`${prefijo}/`));
+    const migas: Miga[] = ruta === "/ayuda" ? [{ etiqueta: "Centro de ayuda" }] : [{ etiqueta: "Centro de ayuda", href: "/ayuda" }];
+    if (sub) migas.push(ruta === sub[0] ? { etiqueta: sub[1] } : { etiqueta: sub[1], href: sub[0] }, ...(ruta === sub[0] ? [] : [{ etiqueta: etiquetaDetalle ?? "Detalle" }]));
+    return { migas, favoritoHref: null, moduloHref: "/ayuda", moduloEtiqueta: "Centro de ayuda" };
+  }
 
   const titulo = TITULOS_APARTE[ruta];
   if (titulo) {

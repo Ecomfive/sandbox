@@ -199,6 +199,15 @@ convenciones técnicas del código.
   formulario, no una tabla), así que la actividad se despliega **dentro de la misma
   tarjeta** con un botón «Ver actividad» (`crm-dropshippers/lista-dropshippers.tsx`),
   reutilizando el mismo `HistorialGenerico`.
+- **Centro de ayuda** (`/ayuda`, botón «Ayuda» abajo en la barra negra; no es un módulo de permisos: lo abre cualquiera con
+  sesión y muestra solo lo de sus módulos). Pestañas: **Glosario** y **Guías** (contenido fijo en `src/lib/ayuda/contenido.ts`;
+  `MODULOS_CON_GUIA` en `guias-indice.ts` pone el «?» de la página en `BarraMigas`, que lleva a su guía), **Universidad**
+  (cursos en `src/lib/ayuda/cursos.ts` con lecciones y examen; las respuestas correctas **no salen del servidor**:
+  `cursoParaAlumno` las quita y `completarCurso` corrige; se aprueba con 75 %; progreso en `cursos_progreso`, y «Progreso del
+  equipo» para quien tiene Usuarios y roles) y **Manuales de proceso** (`manuales_proceso`, se escriben y editan desde el sistema
+  quien puede modificar Usuarios y roles; formato simple «## / - / 1.» que se muestra como texto, nunca HTML; borradores
+  iniciales en `manuales-borrador.ts`, cargados con `scripts/cargar-manuales-borrador.ts`). Migración 0088. Una guía o un curso
+  nuevo: agrégalo a esos archivos (con su `modulo`) y, si es de una página, su ruta a `MODULOS_CON_GUIA`.
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo

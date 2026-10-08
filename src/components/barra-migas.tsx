@@ -8,6 +8,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { useEtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
+import { MODULOS_CON_GUIA } from "@/lib/ayuda/guias-indice";
 import { construirMigas } from "@/lib/migas";
 import type { NavSection } from "@/lib/nav-data";
 import { pestanaActiva, pestanasDe } from "@/lib/pestanas";
@@ -119,7 +120,18 @@ export function BarraMigas({
         {/* Acciones de la página: mismo lugar en todas las secciones; Accesos siempre es la última. */}
         <div className="flex shrink-0 items-center gap-2">
           <div id="acciones-encabezado" className="flex items-center gap-2" />
-          {moduloHref && moduloEtiqueta && (
+          {moduloHref && MODULOS_CON_GUIA[moduloHref] && (
+            <Tooltip texto="Ayuda de esta página">
+              <Link
+                href={`/ayuda/guias/${MODULOS_CON_GUIA[moduloHref]}`}
+                aria-label={`Ayuda de ${moduloEtiqueta ?? "esta página"}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full border border-border text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${anilloFoco}`}
+              >
+                ?
+              </Link>
+            </Tooltip>
+          )}
+          {moduloHref && moduloEtiqueta && moduloHref !== "/ayuda" && (
             <BotonAccesos key={ruta} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />
           )}
         </div>
