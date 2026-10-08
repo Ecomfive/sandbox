@@ -263,7 +263,7 @@ convenciones técnicas del código.
   producto vive en `skus_maestros` (el nombre de la tabla se conserva) y se crea desde «Agregar»: **simple o compuesto** (un compuesto
   es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **Activo o Test** (se ve como «Estado» y se elige en la ficha; en la base es la columna `clase`, y Activo se guarda como `'fisico'`:
   un test se está probando, todavía no se compra, **aparece en Inventario pero no tiene stock** —`wms_aplicar_cambios` rechaza cualquier
-  movimiento— y se pasa a Activo desde el selector «Estado» de su ficha; volver a Test solo si nunca tuvo movimientos). **Compras: un producto en Test no se compra.** Al agregar un producto a una compra se usa `useConfirmarProductoActivo` (`compras/confirmar-producto-activo.tsx`): si está en Test advierte que debe pasar a Activo; Cancelar vuelve atrás y Aceptar lo pasa a Activo en su ficha (`activarProductoParaCompra`, basta poder modificar Compras; queda en su actividad «desde Compras»). Hoy Compras todavía no enlaza productos (`producto_relacionado` es texto): usarlo cuando se enlacen. Ya no hay flujo
+  movimiento— y se pasa a Activo desde el selector «Estado» de su ficha; volver a Test solo si nunca tuvo movimientos). **Compras: un producto en Test no se compra.** Al agregar un producto a una compra se usa `useConfirmarProductoActivo` (`compras/confirmar-producto-activo.tsx`): si está en Test advierte que debe pasar a Activo; Cancelar vuelve atrás y Aceptar lo pasa a Activo en su ficha (`activarProductoParaCompra`, basta poder modificar Compras; queda en su actividad «desde Compras»). Compras enlaza productos con el bloque «Productos» (`wms_compra_items`); el campo de texto «Producto relacionado» se quitó (migración 0090). Ya no hay flujo
   propuesto → en revisión → aprobado (todo queda `aprobado`). **El SKU (`codigo`) es la llave del descuento automático**: es
   obligatorio y único sin importar mayúsculas ni espacios, y una venta de cualquier plataforma (Dropi, las tiendas de Shopify) encuentra
   su producto por ese código, que debe ser el mismo en las dos. `wms_aplicar_venta(codigo, cantidad, bodega, fase)` ya lo implementa
@@ -634,7 +634,7 @@ convenciones técnicas del código.
   planificación…): con permiso de escritura la tabla trae una casilla por fila y una en el encabezado (marca las que se ven;
   `seleccion` de `TablaDatos`, genérico: cuenta solo lo que está en pantalla, como Retiros). Al marcar alguna sale fija abajo
   `BarraLoteCompras` (`barra-lote-compras.tsx`): «N compras seleccionadas», un botón por dato (Etiquetas, Fecha límite,
-  Planificación, Etapa, Estado, Vía de envío, Proveedor, Tienda y «Más» con el resto de `CAMPOS_EDITABLES`), descargar lo
+  Fecha de Envío, Etapa, Estado, Vía de envío, Proveedor, Tienda y «Más» con el resto de `CAMPOS_EDITABLES`), descargar lo
   marcado y quitar la selección. Cada botón abre **el mismo panel de las celdas** (los editores de `celda-editable.tsx`, ahora
   exportados) sin valor de partida y lo elegido va a todas las marcadas; la selección queda para seguir con otro dato. Un texto
   o monto vacío no hace nada (no se borra un dato de varias compras sin querer), una fecha se quita con «Quitar fecha», la vía
@@ -644,6 +644,15 @@ convenciones técnicas del código.
   fecha de cierre al cambiar la etapa, evento de etapa/estado, línea en la Actividad y auditoría por compra, «En lote (N
   compras)»; la QTY y el monto de una compra con productos no se tocan y se cuentan como omitidas). La lógica pura vive en
   `src/lib/compras/lote.ts` (con prueba). Se ve al instante y, si el servidor lo rechaza, vuelve a como estaba.
+  **Planificación automática** (8 oct 2026, `src/lib/compras/planificacion.ts` con prueba): la Planificación («Nov26») **no se
+  escribe** (no está en `CAMPOS_EDITABLES` ni en la barra de lote): es el mes de la fecha de envío + la mediana de días envío →
+  llegada de los envíos de su país por su vía (`clave|via`; con menos de 3, la de todos los países; sin datos, 60 mar / 16 aire
+  / 7 tierra; con varias vías, la más lenta). La calculan `crearCompra`, `actualizarCompra` (solo si cambió fecha de envío, vía,
+  país o tipo), `actualizarCampoCompra` y el lote al cambiar fecha de envío o vía (devuelven `planificacion` y la lista la
+  pinta). Sin fecha de envío: una compra que nunca la tuvo conserva la de ClickUp; si se le quita, queda vacía. La ficha la
+  muestra con `PlanificacionAutomatica` (llegada estimada y de dónde salen los días). `scripts/recalcular-planificacion.ts`
+  recalcula las abiertas con fecha de envío. **«Documentos» y «Producto relacionado» ya no existen** (migración 0090): los
+  archivos del campo Documentos de ClickUp quedaron dentro de un comentario «Documentos (factura o soporte)».
   **Tienda: una o varias, como las etiquetas** (migración 0084, 9 oct 2026): `wms_compras.tiendas text[]` (antes `tienda`, un
   solo texto; esa columna vieja se queda sin usarse hasta una migración que la borre). Se elige o se crea al escribirla en la
   celda (`CeldaEditable` con `opcionesLista`), en la ficha (`CampoLista`, `campo-lista.tsx`: pastillas con ✕ y «Añadir tienda»,

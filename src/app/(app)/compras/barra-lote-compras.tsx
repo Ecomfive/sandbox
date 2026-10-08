@@ -18,7 +18,7 @@ import { PanelLista } from "./selector-lista";
 export type AplicarEnLote = (campo: string, valor: unknown, modo?: ModoLote) => void;
 
 /** Los datos que van directo en la barra, en el orden en que se usan al armar un envío; el resto va en «Más». */
-const PRINCIPALES = ["etiquetas", "fechaLimite", "planificacion", "etapa", "estado", "viaEnvio", "proveedor", "tienda"] as const;
+const PRINCIPALES = ["etiquetas", "fechaLimite", "fechaEnvio", "etapa", "estado", "viaEnvio", "proveedor", "tienda"] as const;
 
 const ICONO: Record<string, IconoComp> = {
   etapa: EstadoIcon,
@@ -27,7 +27,6 @@ const ICONO: Record<string, IconoComp> = {
   viaEnvio: ComprasIcon,
   proveedor: ProductoIcon,
   tienda: ComprasIcon,
-  planificacion: CalendarioIcon,
   qtyTotal: ProductoIcon,
   montoTotal: GastoIcon,
   primerPago: GastoIcon,

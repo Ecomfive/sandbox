@@ -9,7 +9,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
-import { CalendarioIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
 import { EliminarCompraBoton } from "./eliminar-compra-boton";
@@ -98,23 +98,7 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
           <Dato etiqueta="Fecha de Pago (1)">{fecha(compra.fechaPago1)}</Dato>
           <Dato etiqueta="Fecha de Pago (2)">{fecha(compra.fechaPago2)}</Dato>
           <Dato etiqueta="Fecha de Envío">{fecha(compra.fechaEnvio)}</Dato>
-        </dl>
-      </Seccion>
-      <Seccion icono={EstadoIcon} titulo="Seguimiento">
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Dato etiqueta="Producto relacionado">{compra.productoRelacionado || SIN_DATO}</Dato>
-        </dl>
-        <dl className="flex flex-col gap-3">
           <Dato etiqueta="Planificación">{compra.planificacion || SIN_DATO}</Dato>
-          <Dato etiqueta="Documentos">
-            {compra.documentos ? (
-              <a href={compra.documentos} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">
-                Ver documento
-              </a>
-            ) : (
-              SIN_DATO
-            )}
-          </Dato>
         </dl>
       </Seccion>
     </div>

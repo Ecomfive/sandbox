@@ -264,7 +264,7 @@ function columnas(
       ),
     }),
     col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
-    col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "planificacion", c.planificacion || "—") }),
+    col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),
     col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.montoTotal, usd), render: (c) => ed(c, "montoTotal", usd(c.montoTotal)) }),
     col("valorUnitario", "Valor Unitario", { ...resto, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
     col("primerPago", "Primer Pago", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.primerPago, usd), render: (c) => ed(c, "primerPago", usd(c.primerPago)) }),
@@ -353,13 +353,15 @@ export function TablaCompras({
       const anterior = compra[def.prop];
       const poner = (p: Partial<FilaCompra>) => setCambios((o) => ({ ...o, [compra.id]: { ...o[compra.id], ...p } }));
       poner({ [def.prop]: normalizado.valor } as Partial<FilaCompra>);
-      const resultado = await actualizarCampoCompra(compra.id, campo, normalizado.valor).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }) as { error?: string; cerradoEn?: string | null });
+      const resultado = await actualizarCampoCompra(compra.id, campo, normalizado.valor).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }) as { error?: string; cerradoEn?: string | null; planificacion?: string | null });
       if (resultado.error) {
         poner({ [def.prop]: anterior } as Partial<FilaCompra>);
         mostrarToast(resultado.error, "destructive");
         return;
       }
       if ("cerradoEn" in resultado) poner({ cerradoEn: resultado.cerradoEn ?? null });
+      // La fecha de envío y la vía mueven la planificación: se ve la que calculó el servidor.
+      if ("planificacion" in resultado) poner({ planificacion: resultado.planificacion ?? null });
       mostrarToast(`${def.etiqueta} guardado`);
     },
     [mostrarToast],
@@ -408,11 +410,14 @@ export function TablaCompras({
         mostrarToast(resultado.error, "destructive");
         return;
       }
-      const cerradas = (resultado.aplicadas ?? []).filter((a) => "cerradoEn" in a);
+      const cerradas = (resultado.aplicadas ?? []).filter((a) => "cerradoEn" in a || "planificacion" in a);
       if (cerradas.length) {
         setCambios((o) => {
           const siguiente = { ...o };
-          for (const a of cerradas) siguiente[a.id] = { ...siguiente[a.id], cerradoEn: a.cerradoEn ?? null };
+          for (const a of cerradas) {
+            if ("cerradoEn" in a) siguiente[a.id] = { ...siguiente[a.id], cerradoEn: a.cerradoEn ?? null };
+            if ("planificacion" in a) siguiente[a.id] = { ...siguiente[a.id], planificacion: a.planificacion ?? null };
+          }
           return siguiente;
         });
       }

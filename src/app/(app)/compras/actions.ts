@@ -8,6 +8,8 @@ import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSegu
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { estimarPlanificacion, nuevaPlanificacion, tiemposDeTransito, type Estimacion, type TiemposTransito } from "@/lib/compras/planificacion";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
@@ -100,7 +102,6 @@ function leerCambios(formData: FormData) {
     foto_url: textoOptativo(formData, "foto_url"),
     proveedor: textoOptativo(formData, "proveedor"),
     tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
-    producto_relacionado: textoOptativo(formData, "producto_relacionado"),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),
     primer_pago: numeroOptativo(formData, "primer_pago"),
@@ -113,8 +114,6 @@ function leerCambios(formData: FormData) {
     fecha_pago_1: fechaOptativa(formData, "fecha_pago_1"),
     fecha_pago_2: fechaOptativa(formData, "fecha_pago_2"),
     fecha_envio: fechaOptativa(formData, "fecha_envio"),
-    planificacion: textoOptativo(formData, "planificacion"),
-    documentos: textoOptativo(formData, "documentos"),
     via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)),
     etiquetas: listaDeTexto(textoOptativo(formData, "etiquetas")),
     url_producto: textoOptativo(formData, "url_producto"),
@@ -139,6 +138,58 @@ async function leerTipoYPais(formData: FormData): Promise<{ tipo: string; pais_i
   const { data } = await createServiceClient().from("paises").select("id").eq("codigo", codigo).maybeSingle();
   if (!data) return { error: "País no válido." };
   return { tipo, pais_id: data.id as string, paises_destino: [] };
+}
+
+// --- Planificación automática (`src/lib/compras/planificacion.ts`) ---------------------------------------------------
+// No se escribe: es el mes de la llegada estimada (fecha de envío + lo que tardaron los envíos anteriores de su país por su
+// vía). Se calcula al crear la compra y cada vez que cambia su fecha de envío, su vía, su país o su tipo.
+
+/** De qué país es una compra para medir sus envíos: su país, o Importadora. */
+const claveTransito = (tipo: string, paisId: string | null) => (tipo === "importacion" ? "importacion" : (paisId ?? ""));
+
+/** Lo que tardaron los envíos que ya llegaron (fecha de envío → fecha de llegada), por país y vía. */
+async function cargarTiempos(): Promise<TiemposTransito> {
+  const filas = await traerTodasLasFilas<{ tipo: string; pais_id: string | null; via_envio: string[] | null; fecha_envio: string; fecha_llegada: string }>((desde, hasta) =>
+    createServiceClient()
+      .from("wms_compras")
+      .select("tipo, pais_id, via_envio, fecha_envio, fecha_llegada")
+      .not("fecha_envio", "is", null)
+      .not("fecha_llegada", "is", null)
+      .order("id")
+      .range(desde, hasta),
+  );
+  // Una compra que viajó por dos vías no dice cuánto tarda cada una: no se mide.
+  return tiemposDeTransito(
+    filas
+      .filter((f) => (f.via_envio ?? []).length === 1)
+      .map((f) => ({ clave: claveTransito(f.tipo, f.pais_id), via: f.via_envio![0], dias: Math.round((Date.parse(f.fecha_llegada) - Date.parse(f.fecha_envio)) / 864e5) })),
+  );
+}
+
+/** La planificación que tendría una compra con estos datos (para verla en la ficha antes de guardar). */
+export async function estimarPlanificacionCompra(tipo: string, pais: string, vias: string[], fechaEnvio: string): Promise<Estimacion | null> {
+  await requireModulo("compras");
+  let paisId: string | null = null;
+  if (tipo !== "importacion") {
+    const { data } = await createServiceClient().from("paises").select("id").eq("codigo", String(pais ?? "")).maybeSingle();
+    if (!data) return null;
+    paisId = data.id as string;
+  }
+  const validas = (Array.isArray(vias) ? vias : []).map(String).filter((v) => VIAS_VALIDAS.has(v));
+  return estimarPlanificacion(await cargarTiempos(), claveTransito(tipo, paisId), validas, /^\d{4}-\d{2}-\d{2}$/.test(String(fechaEnvio)) ? String(fechaEnvio) : null);
+}
+
+/** Si el cambio de una celda o de un lote mueve la planificación (la fecha de envío o la vía). */
+const MUEVE_PLANIFICACION = new Set(["fechaEnvio", "viaEnvio"]);
+type DatosEnvio = { tipo: string; pais_id: string | null; via_envio: string[] | null; fecha_envio: string | null; planificacion: string | null };
+/** La planificación de una compra después de cambiarle la fecha de envío o la vía (una celda o un lote). */
+function planificacionTrasCambio(tiempos: TiemposTransito, actual: DatosEnvio, columna: string, valor: unknown): string | null {
+  const despues = { ...actual, [columna]: valor } as DatosEnvio;
+  return nuevaPlanificacion(
+    tiempos,
+    { fechaEnvio: actual.fecha_envio, planificacion: actual.planificacion },
+    { clave: claveTransito(despues.tipo, despues.pais_id), vias: despues.via_envio ?? [], fechaEnvio: despues.fecha_envio },
+  );
 }
 
 /**
@@ -190,7 +241,7 @@ const OTROS_CAMPOS: { campo: string; columna: string }[] = [
   { campo: "nombre", columna: "nombre" },
   { campo: "descripcion", columna: "descripcion" },
   { campo: "urlProducto", columna: "url_producto" },
-  { campo: "documentos", columna: "documentos" },
+  { campo: "planificacion", columna: "planificacion" },
   { campo: "foto", columna: "foto_url" },
   { campo: "paisesDestino", columna: "paises_destino" },
 ];
@@ -243,9 +294,13 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string;
   const supabase = createServiceClient();
   const codigo = await siguienteCodigo(tipoYPais.tipo, tipoYPais.pais_id);
   const nombre = nombreEscrito || codigo || "Orden de compra";
+  const datos = leerCambios(formData);
+  const planificacion = datos.fecha_envio
+    ? nuevaPlanificacion(await cargarTiempos(), null, { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: datos.via_envio, fechaEnvio: datos.fecha_envio })
+    : null;
   const { data, error } = await supabase
     .from("wms_compras")
-    .insert({ ...tipoYPais, nombre, etapa, estado, ...leerCambios(formData), codigo })
+    .insert({ ...tipoYPais, nombre, etapa, estado, ...datos, planificacion, codigo })
     .select("id")
     .single();
   if (error) return { error: error.message };
@@ -312,7 +367,23 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   const { qty_total, monto_total, ...resto } = leerCambios(formData);
   // Con productos vinculados, la cantidad y el monto los calcula el bloque «Productos»: el formulario no los pisa.
   const { count: lineas } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);
-  const cambios = (lineas ?? 0) > 0 ? resto : { ...resto, qty_total, monto_total };
+  const sinPlanificar = (lineas ?? 0) > 0 ? resto : { ...resto, qty_total, monto_total };
+  // La planificación se vuelve a calcular solo si cambió lo que la mueve (si no, guardar otro dato la movería sola cada vez
+  // que llega un envío nuevo al historial).
+  const mueve =
+    !actual ||
+    (actual.fecha_envio ?? null) !== resto.fecha_envio ||
+    JSON.stringify(ordenada(actual.via_envio ?? [])) !== JSON.stringify(ordenada(resto.via_envio)) ||
+    actual.tipo !== tipoYPais.tipo ||
+    (actual.pais_id ?? null) !== tipoYPais.pais_id;
+  const planificacion = mueve
+    ? nuevaPlanificacion(
+        await cargarTiempos(),
+        actual ? { fechaEnvio: (actual.fecha_envio as string | null) ?? null, planificacion: (actual.planificacion as string | null) ?? null } : null,
+        { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: resto.via_envio, fechaEnvio: resto.fecha_envio },
+      )
+    : ((actual?.planificacion as string | null) ?? null);
+  const cambios = { ...sinPlanificar, planificacion };
   // Al cerrar (completado o descartado) se sella la fecha de cierre; al reabrir se quita.
   const cierra = etapa === "completado" || etapa === "descartado";
   const cerrado_en = cierra ? (actual && (actual.etapa === "completado" || actual.etapa === "descartado") ? undefined : new Date().toISOString()) : null;
@@ -345,7 +416,11 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
  * ficha: sella o quita la fecha de cierre y deja el evento con su hora. No llama a `revalidatePath`: la lista ya muestra el
  * cambio y rearmar toda la página de Compras por cada celda la haría lenta. Devuelve el error como valor.
  */
-export async function actualizarCampoCompra(id: string, campo: string, bruto: unknown): Promise<{ error?: string; cerradoEn?: string | null }> {
+export async function actualizarCampoCompra(
+  id: string,
+  campo: string,
+  bruto: unknown,
+): Promise<{ error?: string; cerradoEn?: string | null; planificacion?: string | null }> {
   await requireModuloEscritura("compras");
   if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
   const def = campoEditable(String(campo));
@@ -356,7 +431,7 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
   if (sinAcceso) return { error: sinAcceso };
 
   const supabase = createServiceClient();
-  const { data } = await supabase.from("wms_compras").select(`${def.columna}, etapa, estado`).eq("id", id).maybeSingle();
+  const { data } = await supabase.from("wms_compras").select(`${def.columna}, etapa, estado, tipo, pais_id, via_envio, fecha_envio, planificacion`).eq("id", id).maybeSingle();
   const actual = data as unknown as Record<string, unknown> | null;
   if (!actual) return { error: "La compra ya no existe." };
 
@@ -373,6 +448,8 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
     cerradoEn = cierra ? (yaCerrada ? undefined : new Date().toISOString()) : null;
     if (cerradoEn !== undefined) cambios.cerrado_en = cerradoEn;
   }
+  const planificacion = MUEVE_PLANIFICACION.has(campo) ? planificacionTrasCambio(await cargarTiempos(), actual as unknown as DatosEnvio, def.columna, normalizado.valor) : undefined;
+  if (planificacion !== undefined) cambios.planificacion = planificacion;
 
   const { error } = await supabase.from("wms_compras").update(cambios).eq("id", id);
   if (error) return { error: error.message.length < 200 ? error.message : "No se pudo guardar el cambio." };
@@ -385,7 +462,10 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
     );
   }
   if (campo !== "etapa" && campo !== "estado") {
-    await anotarCambios(id, [{ campo, antes: textoDeValor(def, actual[def.columna]), despues: textoDeValor(def, normalizado.valor) }]);
+    await anotarCambios(id, [
+      { campo, antes: textoDeValor(def, actual[def.columna]), despues: textoDeValor(def, normalizado.valor) },
+      ...(planificacion !== undefined ? [{ campo: "planificacion", antes: textoSimple(actual.planificacion), despues: textoSimple(planificacion) }] : []),
+    ]);
   }
   await registrarAuditoria({
     accion: "editar_campo_compra",
@@ -394,7 +474,7 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
     antes: { [def.etiqueta]: textoDeValor(def, actual[def.columna]) },
     despues: { [def.etiqueta]: textoDeValor(def, normalizado.valor) },
   });
-  return cerradoEn === undefined ? {} : { cerradoEn };
+  return { ...(cerradoEn === undefined ? {} : { cerradoEn }), ...(planificacion === undefined ? {} : { planificacion }) };
 }
 
 /**
@@ -410,7 +490,7 @@ export async function actualizarCampoComprasLote(
   campo: string,
   bruto: unknown,
   modo: ModoLote = "poner",
-): Promise<{ error?: string; aplicadas?: { id: string; valor: ValorCampo; cerradoEn?: string | null }[]; omitidas?: number }> {
+): Promise<{ error?: string; aplicadas?: { id: string; valor: ValorCampo; cerradoEn?: string | null; planificacion?: string | null }[]; omitidas?: number }> {
   await requireModuloEscritura("compras");
   if (!Array.isArray(ids) || ids.length === 0) return { error: "Marca al menos una compra." };
   const unicos = [...new Set(ids.map(String))];
@@ -425,7 +505,7 @@ export async function actualizarCampoComprasLote(
   if ("error" in normalizado) return normalizado;
 
   const supabase = createServiceClient();
-  const { data } = await supabase.from("wms_compras").select(`id, ${def.columna}, etapa, estado`).in("id", unicos);
+  const { data } = await supabase.from("wms_compras").select(`id, ${def.columna}, etapa, estado, tipo, pais_id, via_envio, fecha_envio, planificacion`).in("id", unicos);
   const actuales = new Map(((data ?? []) as unknown as (Record<string, unknown> & { id: string })[]).map((c) => [c.id, c]));
 
   // Con productos vinculados, la cantidad y el monto se calculan de ellos: esas compras no se tocan.
@@ -444,6 +524,11 @@ export async function actualizarCampoComprasLote(
     return def.tipo === "lista" ? combinarLista(Array.isArray(antes) ? antes.map(String) : [], modo, normalizado.valor as string[]) : normalizado.valor;
   };
 
+  // La fecha de envío o la vía mueven la planificación de cada compra (según su país).
+  const tiempos = MUEVE_PLANIFICACION.has(campo) ? await cargarTiempos() : null;
+  const planificacionDe = new Map<string, string | null>();
+  if (tiempos) for (const id of objetivo) planificacionDe.set(id, planificacionTrasCambio(tiempos, actuales.get(id) as unknown as DatosEnvio, def.columna, nuevoValor(id)));
+
   // Las que quedan con el mismo valor (y la misma regla de cierre) se guardan juntas, en una sola escritura.
   const grupos = new Map<string, { ids: string[]; cambios: Record<string, unknown> }>();
   const cerradoEnDe = new Map<string, string | null>();
@@ -458,7 +543,8 @@ export async function actualizarCampoComprasLote(
       cierre = accion;
       if (accion !== "mantener") cerradoEnDe.set(id, accion === "sellar" ? ahora : null);
     }
-    const clave = `${JSON.stringify(valor)}|${cierre}`;
+    if (planificacionDe.has(id)) cambios.planificacion = planificacionDe.get(id) ?? null;
+    const clave = `${JSON.stringify(valor)}|${cierre}|${planificacionDe.get(id) ?? ""}`;
     const grupo = grupos.get(clave) ?? { ids: [], cambios };
     grupo.ids.push(id);
     grupos.set(clave, grupo);
@@ -490,7 +576,18 @@ export async function actualizarCampoComprasLote(
         origen: "sistema",
       };
     });
-    await supabase.from("wms_compra_eventos").insert(filas);
+    // La planificación que se movió con ese cambio, en su propia línea de la Actividad.
+    const movidas = cambiaron.filter((id) => planificacionDe.has(id) && (planificacionDe.get(id) ?? null) !== ((actuales.get(id)!.planificacion as string | null) ?? null));
+    const filasPlan = movidas.map((id, i) => ({
+      compra_id: id,
+      campo: "planificacion",
+      valor_antes: textoSimple(actuales.get(id)!.planificacion),
+      valor_despues: textoSimple(planificacionDe.get(id)),
+      ocurrido_en: new Date(base + cambiaron.length + i).toISOString(),
+      autor,
+      origen: "sistema",
+    }));
+    await supabase.from("wms_compra_eventos").insert([...filas, ...filasPlan]);
     await registrarAuditoriaLote(
       cambiaron.map((id) => ({
         accion: "editar_campo_compra",
@@ -504,7 +601,12 @@ export async function actualizarCampoComprasLote(
   }
 
   return {
-    aplicadas: objetivo.map((id) => ({ id, valor: nuevoValor(id), ...(cerradoEnDe.has(id) ? { cerradoEn: cerradoEnDe.get(id) ?? null } : {}) })),
+    aplicadas: objetivo.map((id) => ({
+      id,
+      valor: nuevoValor(id),
+      ...(cerradoEnDe.has(id) ? { cerradoEn: cerradoEnDe.get(id) ?? null } : {}),
+      ...(planificacionDe.has(id) ? { planificacion: planificacionDe.get(id) ?? null } : {}),
+    })),
     omitidas,
   };
 }

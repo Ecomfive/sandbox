@@ -20,6 +20,8 @@ const NOMBRE_CAMPO: Record<string, string> = {
   descripcion: "Descripción",
   urlProducto: "URL del producto",
   documentos: "Documentos",
+  planificacion: "Planificación",
+  productoRelacionado: "Producto relacionado",
   paisesDestino: "Países de destino",
   codigo: "Código",
 };

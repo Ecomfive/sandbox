@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, subirFotoCompraDesdeUrl, vistaPreviaCompra } from "./actions";
 import { numeroOC } from "./def-compras";
 import { SelectorPais } from "./selector-pais";
+import { PlanificacionAutomatica } from "./planificacion-automatica";
 import { useToast } from "@/components/ui/toast";
 import { conEmoji, ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
@@ -20,7 +21,6 @@ import {
   CheckIcon,
   CerrarIcon,
   ComprasIcon,
-  EstadoIcon,
   GastoIcon,
 } from "@/lib/nav-icons";
 
@@ -379,22 +379,10 @@ export function FormularioCompra({
             <Campo etiqueta={conEmoji("fechaEnvio", "Fecha de Envío")} id="campo-fecha-envio">
               <input id="campo-fecha-envio" type="date" name="fecha_envio" defaultValue={compra?.fechaEnvio ?? ""} className={fieldClass} />
             </Campo>
+            <PlanificacionAutomatica planificacion={compra?.planificacion ?? null} fechaEnvio={compra?.fechaEnvio ?? null} />
           </div>
         </Seccion>
 
-        <Seccion icono={EstadoIcon} titulo="Seguimiento">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta="Producto relacionado" id="campo-producto-relacionado">
-              <input id="campo-producto-relacionado" type="text" name="producto_relacionado" defaultValue={compra?.productoRelacionado ?? ""} className={fieldClass} />
-            </Campo>
-            <Campo etiqueta={conEmoji("documentos", "Documentos")} id="campo-documentos">
-              <input id="campo-documentos" type="url" name="documentos" defaultValue={compra?.documentos ?? ""} placeholder="Enlace a la factura o soporte" className={fieldClass} />
-            </Campo>
-          </div>
-          <Campo etiqueta={conEmoji("planificacion", "Planificación")} id="campo-planificacion">
-            <input id="campo-planificacion" type="text" name="planificacion" defaultValue={compra?.planificacion ?? ""} className={fieldClass} />
-          </Campo>
-        </Seccion>
         {comentarios}
       </div>
 

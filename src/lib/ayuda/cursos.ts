@@ -129,6 +129,12 @@ export const CURSOS: Curso[] = [
         ],
       },
       {
+        titulo: "Planificación automática",
+        parrafos: [
+          "La Planificación es el mes en que se espera que llegue la compra (Oct26, Nov26…) y no se escribe: al poner la Fecha de Envío, el sistema le suma lo que tardaron los envíos anteriores de ese país por esa vía (marítimo, aéreo o terrestre) y pone el mes de llegada. Si cambia la fecha, la vía o el país, se vuelve a calcular.",
+        ],
+      },
+      {
         titulo: "Editar rápido y comentar",
         parrafos: [
           "Pulsa una celda para editarla en un panel pequeño; para cambiar varias compras a la vez, márcalas y usa la barra de abajo.",
@@ -140,6 +146,7 @@ export const CURSOS: Curso[] = [
       { pregunta: "¿Cuándo se archiva una compra (pasa a Cerrados)?", opciones: ["Cuando su etapa es Completado", "Cuando su Estado es Completado", "Cuando llega la mercancía"], correcta: 1 },
       { pregunta: "¿De dónde salen la QTY y el Monto Total de una compra con productos?", opciones: ["Se escriben a mano", "De sus productos vinculados", "De la descripción"], correcta: 1 },
       { pregunta: "¿Cómo marcas una falla de una compra?", opciones: ["Con un comentario que empiece con «Inconveniente:»", "Cambiando la etapa a Descartado", "Con una etiqueta roja"], correcta: 0 },
+      { pregunta: "¿Cómo se pone la Planificación de una compra?", opciones: ["Se escribe a mano el mes", "Se calcula sola con la fecha de envío y lo que tardan los envíos de su país por esa vía", "Es el mes en que se creó la compra"], correcta: 1 },
       { pregunta: "Una compra de Importadora…", opciones: ["Lleva el país de entrega", "No lleva país y no se mezcla con las de un país", "Es igual a una compra de Panamá"], correcta: 1 },
     ],
   },

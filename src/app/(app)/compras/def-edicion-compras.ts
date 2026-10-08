@@ -24,7 +24,8 @@ export interface CampoEditable {
 /**
  * Las columnas editables de la lista, por el `id` de la columna. Quedan fuera lo que pone el sistema (N.º OC, código, creada,
  * cerrada), lo que es una fórmula (días, valor unitario), el país (mueve la compra de lista y de código), la foto y la
- * persona asignada: eso se cambia en la ficha o no se cambia. El nombre de la compra se edita en su ficha.
+ * persona asignada: eso se cambia en la ficha o no se cambia. El nombre de la compra se edita en su ficha. La planificación
+ * no se escribe: se calcula de la fecha de envío y la vía (`src/lib/compras/planificacion.ts`).
  */
 export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   etapa: { etiqueta: "Etapa", prop: "etapa", columna: "etapa", tipo: "seleccion", opciones: ETAPAS_COMPRA, color: colorEtapa },
@@ -33,7 +34,6 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "texto" },
   tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista" },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
-  planificacion: { etiqueta: "Planificación", prop: "planificacion", columna: "planificacion", tipo: "texto" },
   qtyTotal: { etiqueta: "QTY Total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
   montoTotal: { etiqueta: "Monto Total", prop: "montoTotal", columna: "monto_total", tipo: "dinero", soloSinProductos: true },
   primerPago: { etiqueta: "Primer Pago", prop: "primerPago", columna: "primer_pago", tipo: "dinero" },

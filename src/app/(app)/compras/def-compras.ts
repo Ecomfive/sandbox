@@ -21,7 +21,6 @@ export interface FilaCompra {
   proveedor: string | null;
   /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */
   tiendas: string[];
-  productoRelacionado: string | null;
   qtyTotal: number | null;
   montoTotal: number | null;
   primerPago: number | null;
@@ -40,7 +39,6 @@ export interface FilaCompra {
    */
   inconveniente: string | null;
   planificacion: string | null;
-  documentos: string | null;
   asignadoNombre: string | null;
   /** Aire, mar o tierra (puede ser más de una). */
   viaEnvio: string[];
