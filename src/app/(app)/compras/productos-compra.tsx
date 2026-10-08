@@ -9,7 +9,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { ProductoIcon } from "@/lib/nav-icons";
-import { actualizarProductoCompra, agregarProductoCompra, obtenerProductosCompra, quitarProductoCompra, type ItemCompra, type ProductoComprable } from "./actions";
+import { actualizarProductoCompra, agregarProductoCompra, obtenerProductosCompra, productosComprables, quitarProductoCompra, type ItemCompra, type ProductoComprable } from "./actions";
 import { useConfirmarProductoActivo } from "./confirmar-producto-activo";
 import { usd } from "./calculos-compras";
 import { aNumero, CamposCosto, claseNumero, DECIMALES_UNITARIO, redondear, useCosto } from "./costo-linea";
@@ -134,9 +134,26 @@ function FilaItem({
  * total de la orden (unidades y monto). La QTY Total y el Monto Total de la compra salen de aquí. Un producto con variantes
  * pide la cantidad de cada variante; uno en Test, pasarlo a Activo. Solo compras de país: Importadora compra para clientes.
  * Con `incrustado` se dibuja dentro del formulario de la compra (ver `FormularioCompra`): guarda sus propios cambios, no
- * los de la compra.
+ * los de la compra. Sin `compraId` (una compra que todavía no se crea) las líneas quedan en borrador y viajan con «Crear
+ * compra» en el campo oculto `productos`: es el mismo bloque, en el mismo lugar que en la ficha.
  */
-export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }: { compraId: string; puedeEscribir: boolean; incrustado?: boolean }) {
+export function ProductosCompra({
+  compraId,
+  puedeEscribir,
+  incrustado = false,
+  alCambiarBorrador,
+}: {
+  compraId: string | null;
+  puedeEscribir: boolean;
+  incrustado?: boolean;
+  /** Compra nueva: cuántas líneas lleva el borrador (la QTY y el monto saldrán de ellas). */
+  alCambiarBorrador?: (lineas: number) => void;
+}) {
+  const borrador = compraId === null;
+  const [lineasBorrador, setLineasBorrador] = useState<{ skuId: string; codigo: string; nombre: string; cantidad: number; costoUnitario: number | null }[]>([]);
+  useEffect(() => {
+    alCambiarBorrador?.(lineasBorrador.length);
+  }, [lineasBorrador.length, alCambiarBorrador]);
   const { mostrarToast } = useToast();
   const { confirmar, dialogo } = useConfirmarProductoActivo();
   const [datos, setDatos] = useState<{ items: ItemCompra[]; productos: ProductoComprable[] } | null>(null);
@@ -152,14 +169,14 @@ export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }:
   const alEscribir = useCallback((id: string, v: { cantidad: number; subtotal: number | null }) => setVivo((x) => ({ ...x, [id]: v })), []);
 
   const items = datos?.items ?? [];
-  const yaEstan = new Set(items.map((i) => i.skuId));
+  const yaEstan = new Set([...items.map((i) => i.skuId), ...lineasBorrador.map((l) => l.skuId)]);
   const variantesElegido = elegido ? (datos?.productos ?? []).filter((p) => p.padreId === elegido.id) : [];
   // La cantidad de la línea nueva: la escrita, o la suma de las variantes (el costo total se reparte entre todas).
   const cantidadNueva = variantesElegido.length ? variantesElegido.reduce((s, v) => s + (Number(porVariante[v.id]) || 0), 0) : Number(cantidad) || 0;
   const costoNuevo = useCosto(cantidadNueva, null);
 
   const cargar = useCallback(async () => {
-    const r = await obtenerProductosCompra(compraId);
+    const r = compraId ? await obtenerProductosCompra(compraId) : await productosComprables().then((x) => ("error" in x ? x : { items: [] as ItemCompra[], productos: x.productos }));
     if ("error" in r) setError(r.error);
     else {
       setError(null);
@@ -199,9 +216,14 @@ export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }:
     if (pares.some(([, n]) => !Number.isInteger(n) || n <= 0)) return mostrarToast("Las cantidades deben ser números enteros mayores que cero.", "destructive");
     const unitario = costoNuevo.valorUnitario === null ? null : redondear(costoNuevo.valorUnitario, DECIMALES_UNITARIO);
     for (const [p] of pares) if (!(await confirmar(p))) return;
+    if (borrador) {
+      setLineasBorrador((x) => [...x, ...pares.map(([p, n]) => ({ skuId: p.id, codigo: p.codigo, nombre: p.nombre, cantidad: n, costoUnitario: unitario }))]);
+      limpiar();
+      return;
+    }
     start(async () => {
       for (const [p, n] of pares) {
-        const r = await agregarProductoCompra(compraId, p.id, n, unitario);
+        const r = await agregarProductoCompra(compraId!, p.id, n, unitario);
         if (r.error) {
           mostrarToast(`${p.codigo}: ${r.error}`, "destructive");
           break;
@@ -216,9 +238,14 @@ export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }:
   const lineaVivo = (i: ItemCompra) => vivo[i.id] ?? { cantidad: i.cantidadPedida, subtotal: i.costoUnitario !== null ? redondear(i.costoUnitario * i.cantidadPedida, 2) : null };
   const nuevaSubtotal = aNumero(costoNuevo.total);
   const hayNueva = !!elegido && cantidadNueva > 0;
-  const unidades = items.reduce((s, i) => s + lineaVivo(i).cantidad, 0) + (hayNueva ? cantidadNueva : 0);
-  const monto = items.reduce((s, i) => s + (lineaVivo(i).subtotal ?? 0), 0) + (hayNueva && nuevaSubtotal !== null ? nuevaSubtotal : 0);
-  const sinCosto = items.filter((i) => lineaVivo(i).subtotal === null).length;
+  const subtotalBorrador = (l: (typeof lineasBorrador)[number]) => (l.costoUnitario === null ? null : redondear(l.costoUnitario * l.cantidad, 2));
+  const unidades = items.reduce((s, i) => s + lineaVivo(i).cantidad, 0) + lineasBorrador.reduce((s, l) => s + l.cantidad, 0) + (hayNueva ? cantidadNueva : 0);
+  const monto =
+    items.reduce((s, i) => s + (lineaVivo(i).subtotal ?? 0), 0) +
+    lineasBorrador.reduce((s, l) => s + (subtotalBorrador(l) ?? 0), 0) +
+    (hayNueva && nuevaSubtotal !== null ? nuevaSubtotal : 0);
+  const sinCosto = items.filter((i) => lineaVivo(i).subtotal === null).length + lineasBorrador.filter((l) => l.costoUnitario === null).length;
+  const totalLineas = items.length + lineasBorrador.length;
   // Se busca el producto (o el padre); las variantes se piden al elegirlo.
   const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
   const listo = !!elegido && cantidadNueva > 0;
@@ -234,8 +261,34 @@ export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }:
           </p>
         )}
         {!datos && !error && <p className="m-0 text-sm text-muted-foreground">Cargando…</p>}
-        {datos && items.length === 0 && (
+        {borrador && <input type="hidden" name="productos" value={JSON.stringify(lineasBorrador.map((l) => ({ sku: l.skuId, cantidad: l.cantidad, costo: l.costoUnitario })))} />}
+        {datos && totalLineas === 0 && (
           <p className="m-0 text-sm text-muted-foreground">Todavía no tiene productos de la ficha{puedeEscribir ? ": búscalos abajo." : "."}</p>
+        )}
+        {lineasBorrador.length > 0 && (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {lineasBorrador.map((l) => (
+              <li key={l.skuId} className="flex items-start justify-between gap-2 rounded-lg border border-border p-3">
+                <div className="min-w-0 text-sm">
+                  <p className="m-0 font-medium">
+                    <span className="mr-1.5 text-muted-foreground">{l.codigo}</span>
+                    {l.nombre}
+                  </p>
+                  <p className="m-0 text-xs text-muted-foreground tabular-nums">
+                    {l.cantidad.toLocaleString("es-PA")} u.
+                    {l.costoUnitario !== null ? ` · ${usd(l.costoUnitario)} c/u · ${usd(subtotalBorrador(l) ?? 0)}` : " · sin costo"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLineasBorrador((x) => x.filter((y) => y.skuId !== l.skuId))}
+                  className={`shrink-0 text-xs text-muted-foreground hover:text-destructive ${anilloFoco}`}
+                >
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
         {items.length > 0 && (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -320,13 +373,16 @@ export function ProductosCompra({ compraId, puedeEscribir, incrustado = false }:
             </div>
           </ProveedorSkusMaestros>
         )}
-        {(items.length > 0 || hayNueva) && (
+        {(totalLineas > 0 || hayNueva) && (
           <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-muted px-3 py-2" role="status">
             <span className="text-sm font-medium">
-              Total de la orden · {items.length + (hayNueva ? 1 : 0)} producto{items.length + (hayNueva ? 1 : 0) === 1 ? "" : "s"} · {unidades.toLocaleString("es-PA")} u.
+              Total de la orden · {totalLineas + (hayNueva ? 1 : 0)} producto{totalLineas + (hayNueva ? 1 : 0) === 1 ? "" : "s"} · {unidades.toLocaleString("es-PA")} u.
             </span>
             <span className="text-base font-semibold tabular-nums">{usd(monto)}</span>
-            {hayNueva && <span className="w-full text-xs text-muted-foreground">Incluye la línea que estás agregando: pulsa «Agregar a la orden» para guardarla.</span>}
+            {hayNueva && (
+              <span className="w-full text-xs text-muted-foreground">Incluye la línea que estás agregando: pulsa «Agregar a la orden» para {borrador ? "sumarla" : "guardarla"}.</span>
+            )}
+            {borrador && lineasBorrador.length > 0 && <span className="w-full text-xs text-muted-foreground">Se guardan al pulsar «Crear compra».</span>}
             {sinCosto > 0 && (
               <span className="w-full text-xs text-warning">
                 {sinCosto} producto{sinCosto === 1 ? "" : "s"} sin costo: no {sinCosto === 1 ? "suma" : "suman"} al total.

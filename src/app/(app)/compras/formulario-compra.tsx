@@ -52,6 +52,7 @@ export function FormularioCompra({
   acciones,
   productos,
   tiendas = [],
+  conProductos = false,
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
   vista: string;
@@ -68,6 +69,8 @@ export function FormularioCompra({
   productos?: ReactNode;
   /** Las tiendas que ya existen en otras compras, para elegir (la que no esté se crea al escribirla). */
   tiendas?: string[];
+  /** Compra nueva que ya lleva productos en su bloque: la QTY y el monto saldrán de ellos. */
+  conProductos?: boolean;
 }) {
   const [modificado, setModificado] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -269,7 +272,7 @@ export function FormularioCompra({
         <Seccion icono={GastoIcon} titulo="Cantidad y pagos">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Con productos vinculados, la cantidad y el monto salen de ellos (bloque «Productos»): no se escriben aquí. */}
-            {compra && compra.productos > 0 ? (
+            {(compra && compra.productos > 0) || conProductos ? (
               <>
                 <Campo etiqueta={conEmoji("qtyTotal", "QTY Total")} id="campo-qty">
                   <input id="campo-qty" type="text" readOnly value="Se calcula de los productos" className={`${fieldClass} bg-muted text-muted-foreground`} />

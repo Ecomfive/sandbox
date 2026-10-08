@@ -204,6 +204,24 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string 
   const tipoYPais = await leerTipoYPais(formData);
   if ("error" in tipoYPais) return tipoYPais;
 
+  // Los productos que se eligieron al crearla (mismo bloque «Productos» que la ficha). Se revisan todos antes de crear nada.
+  let lineas: { sku: string; cantidad: number; costo: number | null }[] = [];
+  try {
+    const crudo = JSON.parse(String(formData.get("productos") || "[]")) as unknown;
+    lineas = Array.isArray(crudo) ? crudo.map((l) => ({ sku: String(l?.sku ?? ""), cantidad: Number(l?.cantidad), costo: l?.costo === null || l?.costo === undefined ? null : Number(l.costo) })) : [];
+  } catch {
+    return { error: "Los productos de la compra no son válidos." };
+  }
+  if (lineas.length > 0 && tipoYPais.tipo !== "pais") return { error: "Solo las compras de un país llevan productos del inventario." };
+  if (new Set(lineas.map((l) => l.sku)).size !== lineas.length) return { error: "Hay un producto repetido en la compra." };
+  for (const l of lineas) {
+    if (!ES_ID(l.sku)) return { error: "Hay un producto que no es válido." };
+    if (!ES_CANTIDAD(l.cantidad)) return { error: "Las cantidades deben ser números enteros mayores que cero." };
+    if (!ES_COSTO(l.costo)) return { error: "Hay un costo unitario que no es válido." };
+    const sku = await productoComprable(l.sku);
+    if ("error" in sku) return sku;
+  }
+
   const supabase = createServiceClient();
   const codigo = await siguienteCodigo(tipoYPais.tipo, tipoYPais.pais_id);
   const { data, error } = await supabase
@@ -213,6 +231,19 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string 
     .single();
   if (error) return { error: error.message };
   await anotarEventos(data.id, null, { etapa, estado });
+
+  if (lineas.length > 0) {
+    const usuario = await getUsuarioActual();
+    const agregadas: CambioActividad[] = [];
+    for (const l of lineas) {
+      const { error: errorLinea } = await supabase.rpc("wms_agregar_item_compra", { p_compra: data.id, p_sku: l.sku, p_cantidad: l.cantidad, p_costo: l.costo, p_lote: null, p_origen: "sistema", p_usuario: usuario?.id ?? null });
+      if (errorLinea) return { error: `La compra se creó, pero un producto no se pudo agregar: ${errorLinea.message}` };
+      const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre").eq("id", l.sku).maybeSingle();
+      agregadas.push({ campo: "productoAgregado", antes: null, despues: `${sku?.codigo ?? ""} · ${sku?.nombre ?? ""} · ${textoLinea(l.cantidad, l.costo)}` });
+    }
+    await sincronizarCantidad(data.id);
+    await anotarCambios(data.id, agregadas);
+  }
 
   await registrarAuditoria({ accion: "crear_compra", entidad: "wms_compras", entidadId: data.id, detalle: codigo ? `${codigo} · ${nombre}` : nombre });
   revalidatePath("/compras");
@@ -759,13 +790,9 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   if (sinAcceso) return { error: sinAcceso };
   if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
   if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
+  const sku = await productoComprable(skuId);
+  if ("error" in sku) return sku;
   const supabase = createServiceClient();
-  const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre, tipo, clase").eq("id", skuId).maybeSingle();
-  if (!sku) return { error: "El producto no existe." };
-  if (sku.tipo === "combo") return { error: "Un producto compuesto no se compra: se compran sus componentes." };
-  if (sku.clase === "test") return { error: "El producto está en Test: pásalo a Activo para comprarlo." };
-  const { count: variantes } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("padre_id", skuId);
-  if ((variantes ?? 0) > 0) return { error: "Ese producto tiene variantes: se compra por variante." };
   const { error } = await supabase.rpc("wms_agregar_item_compra", {
     p_compra: compraId,
     p_sku: skuId,
@@ -783,6 +810,26 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   await anotarCambios(compraId, [{ campo: "productoAgregado", antes: null, despues: `${sku.codigo} · ${sku.nombre} · ${textoLinea(cantidad, costo)}` }]);
   await registrarAuditoria({ accion: "agregar_producto_compra", entidad: "wms_compras", entidadId: compraId, detalle: `${sku.codigo} · ${cantidad} u.` });
   return {};
+}
+
+/** Un producto que se puede comprar (existe, no es compuesto, no está en Test y no tiene variantes), o por qué no. */
+async function productoComprable(skuId: string): Promise<{ codigo: string; nombre: string } | { error: string }> {
+  const supabase = createServiceClient();
+  const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre, tipo, clase").eq("id", skuId).maybeSingle();
+  if (!sku) return { error: "El producto no existe." };
+  if (sku.tipo === "combo") return { error: "Un producto compuesto no se compra: se compran sus componentes." };
+  if (sku.clase === "test") return { error: `${sku.codigo} está en Test: pásalo a Activo para comprarlo.` };
+  const { count: variantes } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("padre_id", skuId);
+  if ((variantes ?? 0) > 0) return { error: `${sku.codigo} tiene variantes: se compra por variante.` };
+  return { codigo: sku.codigo as string, nombre: sku.nombre as string };
+}
+
+/** Los productos que se pueden agregar a una compra nueva (la que todavía no se crea). Basta poder abrir Compras. */
+export async function productosComprables(): Promise<{ productos: ProductoComprable[] } | { error: string }> {
+  await requireModulo("compras");
+  const { data, error } = await createServiceClient().from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones").neq("tipo", "combo").order("nombre");
+  if (error) return { error: "No se pudieron cargar los productos." };
+  return { productos: (data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones })) };
 }
 
 /** Cambia lo pedido o el costo unitario de un producto de una compra. */
