@@ -17,6 +17,7 @@ import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
 import { VariantesProducto } from "./variantes-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
+import { FotoProducto } from "./foto-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
@@ -125,10 +126,7 @@ export function FichaProducto({
       {producto && (
         <div className="flex flex-1 flex-col">
           <div className="flex items-center gap-3 px-5 pt-5 pb-4">
-            {producto.foto && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={producto.foto} alt={producto.nombre} className="h-20 w-20 shrink-0 rounded-md border border-border object-cover" />
-            )}
+            <FotoProducto key={producto.id} id={producto.id} nombre={producto.nombre} foto={producto.foto} puedeEscribir={puedeEscribir} />
             <p className="text-sm text-muted-foreground">{producto.nombre}</p>
           </div>
 

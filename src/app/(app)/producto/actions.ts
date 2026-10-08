@@ -6,6 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esCodigoBarrasValido, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
+import { detectarImagen } from "@/lib/seguridad/imagen";
 import { ETIQUETA_CLASE } from "./def-producto";
 
 const MODULO = "producto";
@@ -488,6 +489,61 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
   const { error } = await supabase.from("skus_maestros").delete().eq("id", id);
   if (error) return { error: "No se pudo quitar la variante." };
   await registrarAuditoria({ accion: "quitar_variante", entidad: "skus_maestros", entidadId: v.padre_id, detalle: v.codigo });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return {};
+}
+
+// --- Foto del producto ---------------------------------------------------------------------------------------------
+// Vive en el bucket público `wms-productos`, bajo `productos/<id del producto>/`. Se sube directo desde el navegador con una
+// dirección firmada (sin pasar el archivo por la acción) y después se guarda su ruta.
+const BUCKET_FOTOS = "wms-productos";
+const PREFIJO_FOTOS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
+
+/** Da permiso para subir la foto de un producto. Devuelve el error como valor. */
+export async function prepararSubidaFotoProducto(id: string, nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const nombre = String(nombreArchivo ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "foto";
+  const ruta = `productos/${id}/${Date.now()}-${nombre}`;
+  const { data, error } = await createServiceClient().storage.from(BUCKET_FOTOS).createSignedUploadUrl(ruta);
+  if (error || !data) return { error: "No se pudo preparar la subida." };
+  return { ruta, token: data.token };
+}
+
+/**
+ * Guarda (o quita, con `ruta` null) la foto de un producto. La foto debe estar en la carpeta de ese producto y ser de verdad
+ * una imagen (se revisa su contenido, no el nombre). La anterior, si era nuestra, se borra. Devuelve el error como valor.
+ */
+export async function guardarFotoProducto(id: string, ruta: string | null): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const supabase = createServiceClient();
+  const { data: actual, error: errorActual } = await supabase.from("skus_maestros").select("codigo, foto_url").eq("id", id).single();
+  if (errorActual || !actual) return { error: "No se encontró el producto." };
+
+  let url: string | null = null;
+  if (ruta !== null) {
+    if (typeof ruta !== "string" || !ruta.startsWith(`productos/${id}/`) || ruta.includes("..")) return { error: "Foto no válida." };
+    const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(ruta);
+    const imagen = archivo ? detectarImagen(new Uint8Array(await archivo.slice(0, 64).arrayBuffer())) : null;
+    if (!imagen) {
+      await supabase.storage.from(BUCKET_FOTOS).remove([ruta]);
+      return { error: "El archivo no es una imagen (JPG, PNG, WebP o GIF)." };
+    }
+    url = PREFIJO_FOTOS + ruta;
+  }
+
+  const { error } = await supabase.from("skus_maestros").update({ foto_url: url }).eq("id", id);
+  if (error) return { error: "No se pudo guardar la foto." };
+  const anterior = actual.foto_url as string | null;
+  if (anterior && anterior !== url && anterior.startsWith(PREFIJO_FOTOS)) await supabase.storage.from(BUCKET_FOTOS).remove([anterior.slice(PREFIJO_FOTOS.length)]);
+  await registrarAuditoria({
+    accion: "cambiar_foto_producto",
+    entidad: "skus_maestros",
+    entidadId: id,
+    detalle: `SKU ${actual.codigo} · ${url ? (anterior ? "foto cambiada" : "foto agregada") : "foto quitada"}`,
+  });
   revalidatePath("/producto");
   revalidatePath("/inventario");
   return {};
