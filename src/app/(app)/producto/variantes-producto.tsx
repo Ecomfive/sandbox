@@ -1,5 +1,6 @@
 "use client";
 
+import { primeroLibre, sugerirSkuVariante } from "@/lib/wms/sugerir-sku";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
@@ -52,18 +53,17 @@ export function CamposVariantes({
   const yaHay = useMemo(() => new Set(existentes.map((v) => opciones.map((o) => v.opciones[o.nombre] ?? "").join("|"))), [existentes, opciones]);
   const usados = useMemo(() => new Set(existentes.map((v) => v.codigo.toLowerCase())), [existentes]);
 
-  // Las combinaciones que faltan, con el siguiente número libre del SKU base.
+  // Las combinaciones que faltan, con su SKU sugerido: el del producto más los valores («…/ROJO/M»), sin repetir.
   const nuevas = useMemo(() => {
-    let n = 1;
-    const siguienteCodigo = () => {
-      let c: string;
-      do c = `${codigoBase || "SKU"}-${String(n++).padStart(2, "0")}`;
-      while (usados.has(c.toLowerCase()));
-      return c;
+    const tomados = new Set(usados);
+    const codigoDe = (c: Record<string, string>) => {
+      const libre = primeroLibre(sugerirSkuVariante(codigoBase, opciones.map((o) => c[o.nombre])), (x) => tomados.has(x.toLowerCase()));
+      tomados.add(libre.toLowerCase());
+      return libre;
     };
     return combinaciones(opciones)
       .filter((c) => !yaHay.has(opciones.map((o) => c[o.nombre]).join("|")))
-      .map((c) => ({ clave: opciones.map((o) => c[o.nombre]).join("|"), opciones: c, codigo: siguienteCodigo(), nombre: `${nombreBase || "Producto"} · ${textoOpciones(c)}` }));
+      .map((c) => ({ clave: opciones.map((o) => c[o.nombre]).join("|"), opciones: c, codigo: codigoDe(c), nombre: `${nombreBase || "Producto"} · ${textoOpciones(c)}` }));
   }, [opciones, yaHay, usados, codigoBase, nombreBase]);
 
   // Avisa lo armado cada vez que cambia (con lo que se haya editado a mano).

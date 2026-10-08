@@ -8,6 +8,7 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esCodigoBarrasValido, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
+import { primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
 import { ETIQUETA_CLASE } from "./def-producto";
 
 const MODULO = "producto";
@@ -639,4 +640,14 @@ export async function subirFotoProductoDesdeUrl(id: string, direccion: string): 
   const { error } = await createServiceClient().storage.from(BUCKET_FOTOS).upload(ruta, descarga.bytes, { contentType: imagen.tipo });
   if (error) return { error: "No se pudo guardar la imagen." };
   return guardarFotoProducto(id, ruta);
+}
+
+/** El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. */
+export async function sugerirSkuLibre(nombre: string): Promise<{ codigo: string }> {
+  await requireModulo(MODULO);
+  const base = sugerirSku(String(nombre ?? "").slice(0, 200));
+  if (!base) return { codigo: "" };
+  const { data } = await createServiceClient().from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);
+  const usados = new Set((data ?? []).map((p) => String(p.codigo).trim().toUpperCase()));
+  return { codigo: primeroLibre(base, (c) => usados.has(c)) };
 }

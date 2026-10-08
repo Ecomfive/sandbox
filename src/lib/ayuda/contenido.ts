@@ -90,7 +90,7 @@ export const GUIAS: GuiaModulo[] = [
     ruta: "/producto",
     resumen: "El catálogo único de productos (el mismo para todos los países): SKU, foto, variantes, código de barras, envío y compras.",
     secciones: [
-      { titulo: "Crear un producto", pasos: ["Pulsa «Agregar»: elige simple o compuesto, escribe SKU y nombre. El N.º lo pone el sistema.", "El SKU no puede repetirse: si ya lo tiene otro producto, el sistema te dice cuál. Para corregirlo después, «Cambiar» junto al SKU en la ficha, y cámbialo también en Dropi y Shopify.", "Marca «Tiene variantes» si se vende en colores o tallas y define sus opciones.", "Arranca en Test; pásalo a Activo cuando se vaya a comprar."] },
+      { titulo: "Crear un producto", pasos: ["Pulsa «Agregar»: elige simple o compuesto y escribe el nombre. El N.º lo pone el sistema.", "Al salir del nombre, el sistema te sugiere un SKU con sus palabras separadas por barra (Ej: BALSAMO/PURPURA/MELAXIN); bórralo y escribe otro si prefieres. Las variantes agregan sus valores (…/ROJO/M).", "El SKU no puede repetirse: si ya lo tiene otro producto, el sistema te dice cuál. Para corregirlo después, «Cambiar» junto al SKU en la ficha, y cámbialo también en Dropi y Shopify.", "Marca «Tiene variantes» si se vende en colores o tallas y define sus opciones.", "Arranca en Test; pásalo a Activo cuando se vaya a comprar."] },
       { titulo: "La ficha del producto", pasos: ["Nombre: escríbelo en el campo «Nombre» del bloque Producto; se guarda al salir del campo o con Enter.", "Foto: con la ficha abierta, arrastra una imagen desde el escritorio o desde cualquier página de internet y suéltala, o pégala con Ctrl+V. También puedes usar «Subir foto» o «Cambiar».", "Código de barras: el del fabricante o «Generar código interno».", "Envío, vencimiento por lote y variantes se configuran en sus bloques."] },
       { titulo: "Histórico de compras", pasos: ["El bloque «Compras» muestra las unidades compradas desde la primera vez, lo invertido y cada compra.", "Solo cuenta las compras donde el producto está vinculado."] },
     ],
@@ -232,6 +232,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-08", titulo: "SKU sugerido", texto: "Al crear un producto, el sistema sugiere el SKU con las palabras del nombre separadas por barra; puedes cambiarlo.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-08", titulo: "Arrastrar la foto del producto", texto: "Con la ficha del producto abierta, arrastra una imagen del escritorio o de internet (o pégala con Ctrl+V) y queda como su foto.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-08", titulo: "N.º de producto y SKU sin repetir", texto: "Cada producto tiene su N.º correlativo, que ordena la lista. El SKU no se repite: el sistema avisa si ya existe, y se corrige desde la ficha por uno libre.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-08", titulo: "Editar el nombre del producto", texto: "En la ficha del producto, el nombre ahora se edita ahí mismo y queda en su actividad.", modulo: "producto", href: "/producto" },

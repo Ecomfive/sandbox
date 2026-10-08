@@ -6,7 +6,7 @@ import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CalendarioIcon, CatalogoIcon, ProductoIcon } from "@/lib/nav-icons";
-import { crearProducto, revisarSku } from "./actions";
+import { crearProducto, revisarSku, sugerirSkuLibre } from "./actions";
 import { ComboBuilder } from "./combo-builder";
 import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 
@@ -23,6 +23,16 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
   const [codigo, setCodigo] = useState("");
   // Si el SKU escrito ya lo tiene otro producto (se revisa al salir del campo; el servidor lo vuelve a revisar al crear).
   const [skuOcupado, setSkuOcupado] = useState<string | null>(null);
+  // Si la persona escribió el SKU a mano: entonces el sistema ya no lo cambia por su sugerencia.
+  const [skuTocado, setSkuTocado] = useState(false);
+  async function sugerir(desde: string) {
+    if (!desde.trim()) return;
+    const { codigo: sugerido } = await sugerirSkuLibre(desde);
+    if (sugerido) {
+      setCodigo(sugerido);
+      setSkuOcupado(null);
+    }
+  }
   const [conVariantes, setConVariantes] = useState(false);
   const [armadas, setArmadas] = useState<VariantesArmadas>({ opciones: [], variantes: [] });
   // Un compuesto sin productos simples no se puede armar: el botón lleva a ese aviso.
@@ -77,6 +87,9 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 data-enfocar
                 autoComplete="off"
                 maxLength={200}
+                onBlur={(e) => {
+                  if (!skuTocado) void sugerir(e.target.value);
+                }}
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 aria-invalid={invalido("campo-nombre-producto")}
@@ -95,6 +108,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 value={codigo}
                 onChange={(e) => {
                   setCodigo(e.target.value.replace(/\s/g, ""));
+                  setSkuTocado(true);
                   setSkuOcupado(null);
                 }}
                 onBlur={(e) => {
@@ -110,6 +124,18 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 <p id="sku-ocupado" role="alert" className="mt-1 text-xs text-destructive">
                   {skuOcupado}
                 </p>
+              )}
+              {nombre.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSkuTocado(false);
+                    void sugerir(nombre);
+                  }}
+                  className="mt-1 rounded text-xs font-medium text-primario hover:underline"
+                >
+                  Sugerir SKU con el nombre
+                </button>
               )}
             </Campo>
             <Campo etiqueta="Código de barras del fabricante (opcional)" id="campo-barras-producto">
