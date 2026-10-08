@@ -7,6 +7,7 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esCodigoBarrasValido, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
+import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { ETIQUETA_CLASE } from "./def-producto";
 
 const MODULO = "producto";
@@ -621,4 +622,21 @@ export async function cambiarSkuProducto(id: string, nuevo: string): Promise<{ e
   revalidatePath("/producto");
   revalidatePath("/inventario");
   return {};
+}
+
+/**
+ * La foto del producto desde una imagen de internet (arrastrada desde otra página a la ficha): el servidor la descarga —solo
+ * de sitios públicos, hasta 5 MB y revisando que sea de verdad una imagen— y la guarda como la foto del producto.
+ */
+export async function subirFotoProductoDesdeUrl(id: string, direccion: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const descarga = await descargarPublico(String(direccion ?? "").trim(), 5 * 1024 * 1024);
+  if ("error" in descarga) return descarga;
+  const imagen = detectarImagen(descarga.bytes.slice(0, 64));
+  if (!imagen) return { error: "Eso no es una imagen JPG, PNG, WebP o GIF." };
+  const ruta = `productos/${id}/${Date.now()}-web.${imagen.extension}`;
+  const { error } = await createServiceClient().storage.from(BUCKET_FOTOS).upload(ruta, descarga.bytes, { contentType: imagen.tipo });
+  if (error) return { error: "No se pudo guardar la imagen." };
+  return guardarFotoProducto(id, ruta);
 }
