@@ -124,7 +124,13 @@ export function FichaProducto({
     >
       {producto && (
         <div className="flex flex-1 flex-col">
-          <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{producto.nombre}</p>
+          <div className="flex items-center gap-3 px-5 pt-5 pb-4">
+            {producto.foto && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={producto.foto} alt={producto.nombre} className="h-20 w-20 shrink-0 rounded-md border border-border object-cover" />
+            )}
+            <p className="text-sm text-muted-foreground">{producto.nombre}</p>
+          </div>
 
 
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">

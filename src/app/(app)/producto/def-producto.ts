@@ -61,6 +61,8 @@ export interface FilaProducto {
   envio: EnvioProducto;
   /** Solo los compuestos: "2× 1001, 1× 1002". */
   componentes: string;
+  /** La foto del producto (bucket público `wms-productos`), o null. */
+  foto: string | null;
   /** Día en que se creó (AAAA-MM-DD). */
   creado: string;
   asociaciones: Asociacion[];

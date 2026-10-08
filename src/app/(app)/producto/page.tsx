@@ -59,7 +59,7 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos] = await Promise.all([
     supabase.from("sku_maestro_componentes").select("combo_id, cantidad, componente:componente_id(codigo)"),
     supabase
       .from("wms_producto_variantes")
@@ -67,7 +67,10 @@ export default async function ProductoPage() {
       .not("sku_maestro_id", "is", null),
     supabase.from("wms_dropi_productos").select("sku_maestro_id, nombre, publicacion, archivado, paises(codigo)").not("sku_maestro_id", "is", null),
     supabase.from("productos").select("sku_maestro_id, nombre, paises(codigo)").not("sku_maestro_id", "is", null),
+    // La foto va aparte: sin la migración 0086 la columna no existe y la lista se carga igual, sin fotos.
+    supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
   ]);
+  const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
 
   const componentesPorCombo = new Map<string, string[]>();
   for (const fila of componentesFilas.data ?? []) {
@@ -137,6 +140,7 @@ export default async function ProductoPage() {
       paisOrigen: p.pais_origen,
       codigoSa: p.codigo_sa,
     },
+    foto: fotoPorId.get(p.id) ?? null,
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],

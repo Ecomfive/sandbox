@@ -36,12 +36,15 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   const bodegaElegida = bodegaPedida && bodegas.some((b) => b.id === bodegaPedida) ? bodegaPedida : "";
 
   const idsPropias = bodegas.filter((b) => b.tipo === "propia" && b.activa).map((b) => b.id as string);
-  const [resumen, ubicaciones] = await Promise.all([
+  const [resumen, ubicaciones, fotos] = await Promise.all([
     supabase.rpc("wms_stock_resumen", { p_pais: pais.id, p_bodega: bodegaElegida || null }),
     idsPropias.length > 0
       ? supabase.from("wms_ubicaciones").select("id, bodega_id, codigo, propiedad").in("bodega_id", idsPropias).eq("activa", true).order("codigo")
       : Promise.resolve({ data: [] as { id: string; bodega_id: string; codigo: string; propiedad: string }[] }),
+    // Sin la migración 0086 no hay columna de foto: el inventario se carga igual, sin fotos.
+    supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
   ]);
+  const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
 
   const filas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: String(r.sku_maestro_id),
@@ -58,6 +61,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     enCamino: Number(r.en_camino),
     vencido: Number(r.vencido ?? 0),
     manejaVencimiento: r.maneja_vencimiento === true,
+    foto: fotoPorId.get(String(r.sku_maestro_id)) ?? null,
   }));
 
   return (

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
+import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -23,6 +24,7 @@ function celda(n: number) {
 
 const COLUMNAS: ColumnaTabla<FilaStock>[] = [
   { id: "codigo", label: "Código", ocultable: false, clase: "font-medium", render: (f) => f.codigo },
+  { id: "foto", label: "Foto", ocultable: true, render: (f) => <MiniaturaFoto url={f.foto} nombre={f.nombre} /> },
   { id: "nombre", label: "Producto", ocultable: true, render: (f) => f.nombre },
   {
     id: "tipo",

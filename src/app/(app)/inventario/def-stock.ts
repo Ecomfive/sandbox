@@ -19,6 +19,8 @@ export interface FilaStock {
   vencido: number;
   /** El producto se controla por lote y fecha de vencimiento. */
   manejaVencimiento: boolean;
+  /** La foto del producto (la de su ficha en Producto), o null. */
+  foto: string | null;
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };

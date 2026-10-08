@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CalendarioIcon, CatalogoIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
@@ -25,6 +26,7 @@ const ICONOS: Record<string, IconoComp> = {
 
 const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
   { id: "codigo", label: "SKU", ocultable: false, clase: "font-medium", render: (p) => p.codigo },
+  { id: "foto", label: "Foto", ocultable: true, render: (p) => <MiniaturaFoto url={p.foto} nombre={p.nombre} /> },
   { id: "nombre", label: "Producto", ocultable: true, render: (p) => p.nombre },
   { id: "tipo", label: "Tipo", ocultable: true, clase: "text-muted-foreground", render: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
   { id: "clase", label: "Estado", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },
