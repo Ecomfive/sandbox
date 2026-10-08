@@ -13,6 +13,7 @@ import { etiquetaVia, textoPrometido, UNIDADES_TARIFA, type ResumenReal } from "
 import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, GastoIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { actualizarRuta, agregarTarifa, cambiarActivoRuta, eliminarRuta, eliminarTarifa } from "./actions";
+import { BarraTiempos } from "./barra-tiempos";
 import { CamposRuta } from "./campos-ruta";
 import { tarifasVigentes, textoTarifa, type FilaRuta } from "./def-envios";
 
@@ -133,11 +134,13 @@ function Contenido({ ruta, agentes, tipos, puedeEscribir, alCerrar }: { ruta: Fi
             <CamposRuta ruta={ruta} agentes={agentes} />
           </Seccion>
           <Seccion icono={CalendarioIcon} titulo="Lo que de verdad tarda">
-            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <BarraTiempos prometido={ruta.diasMin !== null && ruta.diasMax !== null ? { min: ruta.diasMin, max: ruta.diasMax } : null} real={ruta.real} />
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <Dato titulo="Prometido" valor={textoPrometido(ruta.diasMin, ruta.diasMax)} />
               <DatoReal titulo="Histórico" r={ruta.real.historico} />
               <DatoReal titulo="Últimos 12 meses" r={ruta.real.ultimos12} alerta={ruta.incumple} />
               <DatoReal titulo="Año actual" r={ruta.real.anioActual} />
+              <DatoReal titulo="Últimos 2 meses" r={ruta.real.ultimos2} />
             </dl>
             {!ruta.agente && <p className="m-0 text-xs text-muted-foreground">Sin agente no se puede medir: las compras se cuentan por su agente de envío.</p>}
           </Seccion>

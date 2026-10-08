@@ -52,7 +52,8 @@ export async function cargarRutas(): Promise<{ rutas: FilaRuta[]; agentes: strin
   const filas: FilaRuta[] = (rutas.data ?? [])
     .filter((r) => permitidos === null || permitidos.includes(r.pais_codigo as string))
     .map((r) => {
-      const real = resumenReal(r.agente ? (envios.get(`${String(r.agente).toLowerCase()}|${r.pais_codigo}|${r.via}`) ?? []) : [], hoy);
+      const suyos = r.agente ? (envios.get(`${String(r.agente).toLowerCase()}|${r.pais_codigo}|${r.via}`) ?? []) : [];
+      const real = resumenReal(suyos, hoy);
       const diasMax = (r.dias_max as number | null) ?? null;
       return {
         id: r.id as string,
@@ -69,6 +70,7 @@ export async function cargarRutas(): Promise<{ rutas: FilaRuta[]; agentes: strin
         url: (r.url as string | null) ?? null,
         tarifas: porRuta.get(r.id as string) ?? [],
         real,
+        envios: suyos,
         incumple: incumple(diasMax, real),
       };
     });

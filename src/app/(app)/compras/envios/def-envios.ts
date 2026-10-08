@@ -1,5 +1,5 @@
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
-import { etiquetaVia, VIAS_RUTA, type ResumenReal } from "@/lib/compras/rutas-envio";
+import { etiquetaVia, VIAS_RUTA, type EnvioReal, type ResumenesReales } from "@/lib/compras/rutas-envio";
 
 export interface TarifaRuta {
   id: string;
@@ -26,7 +26,9 @@ export interface FilaRuta {
   url: string | null;
   /** Todas sus tarifas, de la más nueva a la más vieja. */
   tarifas: TarifaRuta[];
-  real: { historico: ResumenReal; ultimos12: ResumenReal; anioActual: ResumenReal };
+  real: ResumenesReales;
+  /** Los envíos que ya llegaron por esta ruta (para juntar los de un país o los de todos por vía). */
+  envios: EnvioReal[];
   incumple: boolean;
 }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { incumple, parsearTiempo, resumenReal, textoPrometido } from "./rutas-envio";
+import { incumple, parsearTiempo, prometidoJunto, resumenReal, textoPrometido } from "./rutas-envio";
 
 describe("parsearTiempo", () => {
   it("lee los formatos de ClickUp", () => {
@@ -43,9 +43,21 @@ describe("resumenReal", () => {
     assert.equal(r.anioActual.n, 1);
     assert.equal(r.anioActual.promedio, 58);
   });
+  it("los últimos 2 meses", () => {
+    const r2 = resumenReal([{ llegada: "2026-09-01", dias: 40 }, { llegada: "2026-07-01", dias: 90 }], "2026-10-08");
+    assert.equal(r2.ultimos2.n, 1);
+    assert.equal(r2.ultimos2.promedio, 40);
+  });
   it("incumple si lo real pasa del máximo prometido", () => {
     assert.equal(incumple(50, r), true);
     assert.equal(incumple(55, r), false);
     assert.equal(incumple(null, r), false);
+  });
+});
+
+describe("prometidoJunto", () => {
+  it("promedia mínimos y máximos de las rutas que prometen algo", () => {
+    assert.deepEqual(prometidoJunto([{ diasMin: 40, diasMax: 50 }, { diasMin: 60, diasMax: 70 }, { diasMin: null, diasMax: null }]), { min: 50, max: 60 });
+    assert.equal(prometidoJunto([{ diasMin: null, diasMax: null }]), null);
   });
 });
