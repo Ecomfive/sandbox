@@ -209,7 +209,7 @@ async function anotarEventos(compraId: string, antes: { etapa: string; estado: s
 }
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
-export async function crearCompra(formData: FormData): Promise<{ error?: string; codigo?: string | null }> {
+export async function crearCompra(formData: FormData): Promise<{ error?: string; codigo?: string | null; id?: string }> {
   await requireModuloEscritura("compras");
   // El nombre es opcional (venía de ClickUp; una compra con productos se titula por su N.º OC). Sin nombre, toma su código.
   const nombreEscrito = String(formData.get("nombre") ?? "").trim();
@@ -266,7 +266,7 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string;
 
   await registrarAuditoria({ accion: "crear_compra", entidad: "wms_compras", entidadId: data.id, detalle: codigo ? `${codigo} · ${nombre}` : nombre });
   revalidatePath("/compras");
-  return { codigo };
+  return { codigo, id: data.id as string };
 }
 
 /**

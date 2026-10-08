@@ -59,6 +59,8 @@ export function FormularioCompra({
   etiquetas = [],
   colores = {},
   conProductos = false,
+  comentarios,
+  alCreada,
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
   vista: string;
@@ -77,6 +79,10 @@ export function FormularioCompra({
   tiendas?: string[];
   /** Compra nueva que ya lleva productos en su bloque: la QTY y el monto saldrán de ellos. */
   conProductos?: boolean;
+  /** Compra nueva: el bloque de comentarios en borrador (va al final, como la actividad de la ficha). */
+  comentarios?: ReactNode;
+  /** Compra nueva: lo que se hace con la compra recién creada antes de cerrar (publicar los comentarios en borrador). */
+  alCreada?: (id: string) => Promise<void>;
   /** Las etiquetas que ya existen y el color de cada una, para el campo Etiquetas (el mismo selector de la columna). */
   etiquetas?: string[];
   colores?: Record<string, string>;
@@ -119,6 +125,8 @@ export function FormularioCompra({
           // Si otra persona creó una compra del mismo país mientras tanto, el código es el siguiente libre: se avisa.
           const creado = !editando && "codigo" in resultado ? resultado.codigo : null;
           if (creado && previa?.codigo && creado !== previa.codigo) mostrarToast(`La compra quedó como ${creado}: ${previa.codigo} ya lo había tomado otra compra.`, "info");
+          const idNueva = editando ? null : ((resultado as { id?: string }).id ?? null);
+          if (idNueva && alCreada) await alCreada(idNueva);
           setModificado(false);
           alGuardar();
         }
@@ -387,6 +395,7 @@ export function FormularioCompra({
             <input id="campo-planificacion" type="text" name="planificacion" defaultValue={compra?.planificacion ?? ""} className={fieldClass} />
           </Campo>
         </Seccion>
+        {comentarios}
       </div>
 
       {!botonesArriba && (
