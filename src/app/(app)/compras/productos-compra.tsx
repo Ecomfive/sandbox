@@ -247,7 +247,7 @@ export function ProductosCompra({
   const sinCosto = items.filter((i) => lineaVivo(i).subtotal === null).length + lineasBorrador.filter((l) => l.costoUnitario === null).length;
   const totalLineas = items.length + lineasBorrador.length;
   // Se busca el producto (o el padre); las variantes se piden al elegirlo.
-  const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado }));
+  const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.clase === "test" ? "test" : p.estado, numero: p.numero, foto: p.foto }));
   const listo = !!elegido && cantidadNueva > 0;
 
   // Incrustado (dentro del bloque «Compra» del formulario, bajo Etiquetas) va entre dos líneas, sin el margen de una sección
