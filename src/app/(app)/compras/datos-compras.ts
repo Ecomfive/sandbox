@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { getUsuarioActual } from "@/lib/auth";
+import { filtrarPaises, puedeVerPais } from "@/lib/paises-permitidos";
 import type { FilaCompra } from "./def-compras";
 
 /** La cookie con la última vista elegida (todos, un país o Importadora), para que se mantenga al cambiar de pestaña. */
@@ -31,6 +33,8 @@ export interface DatosCompras {
   /** 'todos', el código de un país o 'importacion'. */
   vista: string;
   error: boolean;
+  /** Si la persona puede ver Compras Importadora (sus países permitidos, migración 0087). */
+  verImportadora: boolean;
 }
 
 /**
@@ -39,23 +43,30 @@ export interface DatosCompras {
  */
 export async function cargarCompras(ver: string | string[] | undefined): Promise<DatosCompras> {
   const supabase = createServiceClient();
+  // Solo los países que la persona puede ver (y Importadora si la tiene): lo demás no se pide a la base.
+  const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
+  const verImportadora = puedeVerPais(permitidos, null);
   const { data: paisesBd } = await supabase.from("paises").select("id, codigo, nombre").order("nombre");
-  const paises = (paisesBd ?? []) as DatosCompras["paises"];
+  const paises = filtrarPaises(permitidos, (paisesBd ?? []) as DatosCompras["paises"]);
   const guardada = (await cookies()).get(COOKIE_VISTA_COMPRAS)?.value;
   const pedido = typeof ver === "string" ? ver : (guardada ?? "todos");
-  const vista = pedido === "importacion" || paises.some((p) => p.codigo === pedido) ? pedido : "todos";
+  const vista = (pedido === "importacion" && verImportadora) || paises.some((p) => p.codigo === pedido) ? pedido : "todos";
   const paisVista = paises.find((p) => p.codigo === vista) ?? null;
 
   let filas: Record<string, unknown>[] = [];
   let error = false;
   try {
-    filas = await traerTodasLasFilas<Record<string, unknown>>((desde, hasta) => {
-      let q = supabase.from("wms_compras").select(COLUMNAS);
-      if (vista === "importacion") q = q.eq("tipo", "importacion");
-      else if (paisVista) q = q.eq("tipo", "pais").eq("pais_id", paisVista.id);
-      else q = q.eq("tipo", "pais");
-      return q.order("creado_en", { ascending: false }).range(desde, hasta);
-    });
+    // «Todos» con países limitados: solo los suyos (sin ninguno, nada).
+    if (vista === "todos" && permitidos !== null && paises.length === 0) filas = [];
+    else
+      filas = await traerTodasLasFilas<Record<string, unknown>>((desde, hasta) => {
+        let q = supabase.from("wms_compras").select(COLUMNAS);
+        if (vista === "importacion") q = q.eq("tipo", "importacion");
+        else if (paisVista) q = q.eq("tipo", "pais").eq("pais_id", paisVista.id);
+        else if (permitidos !== null) q = q.eq("tipo", "pais").in("pais_id", paises.map((p) => p.id));
+        else q = q.eq("tipo", "pais");
+        return q.order("creado_en", { ascending: false }).range(desde, hasta);
+      });
   } catch {
     error = true;
   }
@@ -118,7 +129,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
     };
   });
 
-  return { compras, paises, vista, error };
+  return { compras, paises, vista, error, verImportadora };
 }
 
 /** Eventos de etapa y estado de las compras de la vista (para los tiempos por estado). */

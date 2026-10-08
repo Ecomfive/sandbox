@@ -20,7 +20,9 @@ function GloboIcon(props: React.SVGProps<SVGSVGElement>) {
  * Antes el país era un selector suelto y la plataforma un nivel del menú lateral. Hoy la plataforma solo se muestra:
  * Dropi es la única con datos y las demás se activan cuando los tengan.
  */
-export function SelectorContexto({ pais, plataforma }: { pais: string; plataforma: string | null }) {
+export function SelectorContexto({ pais, plataforma, permitidos = null }: { pais: string; plataforma: string | null; permitidos?: string[] | null }) {
+  // Solo los países que la persona puede ver (`null` = todos).
+  const paises = permitidos === null ? PAISES_NAV : PAISES_NAV.filter((p) => permitidos.includes(p.codigo));
   const [pending, startTransition] = useTransition();
   const nombrePais = PAISES_NAV.find((p) => p.codigo === pais)?.nombre ?? pais;
 
@@ -43,7 +45,7 @@ export function SelectorContexto({ pais, plataforma }: { pais: string; plataform
       {(cerrar) => (
         <>
           <TituloGrupoMenu>País</TituloGrupoMenu>
-          {PAISES_NAV.map((p) => (
+          {paises.map((p) => (
             <button
               key={p.codigo}
               type="button"

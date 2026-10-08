@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("compras");
   const { ver } = await searchParams;
-  const { compras, paises, vista, error } = await cargarCompras(ver);
+  const { compras, paises, vista, error, verImportadora } = await cargarCompras(ver);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Compras" oculto />
@@ -25,6 +25,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           key={vista}
           compras={compras}
           vista={vista}
+          verImportadora={verImportadora}
           paises={paises}
           puedeAgregarPais={usuario.modulos.includes("configuracion") && !usuario.modulosSoloLectura.includes("configuracion")}
         />

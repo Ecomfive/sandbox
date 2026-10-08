@@ -26,6 +26,8 @@ export interface FilaUsuario {
   ultimaActividadEn: string | null;
   /** Última vez que se le pidió la foto desde su ficha ("Recordar otra vez") — solo para mostrarlo, no manda nada. */
   fotoRecordadaEn: string | null;
+  /** Los países que puede ver (null = todos). `undefined` si falta la migración 0087. */
+  paisesPermitidos?: string[] | null;
 }
 
 /** Qué le falta a una persona para estar completa: cuenta creada (siempre), primer ingreso, foto y

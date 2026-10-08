@@ -21,6 +21,11 @@ export interface UsuarioActual {
   /** Si esta persona está probando la app como otro rol ("Ver así"): con qué rol, además de los suyos propios
    * (que quedan en `rolId`/`rolNombre`). `modulos`/`modulosSoloLectura` ya son los de ese rol mientras dura. */
   vistaPrevia: { rolId: string; rolNombre: string } | null;
+  /**
+   * Los países que puede ver (códigos, y «importacion» para Compras Importadora); `null` = todos. Limita Compras, el
+   * histórico de compras de Producto e Inventario y el país de la barra (ver `src/lib/paises-permitidos.ts`).
+   */
+  paisesPermitidos: string[] | null;
 }
 
 interface Permiso {
@@ -49,13 +54,11 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
   const supabase = createServiceClient();
   // Perfil, rol y permisos en una sola consulta (antes eran dos, una tras otra). Si la base no devuelve los permisos
   // incluidos (o la consulta falla), se piden aparte como antes: el acceso nunca depende de que esto funcione.
-  const completo = await supabase
-    .from("perfiles")
-    .select(
-      "id, email, nombre, avatar_url, activo, rol_id, primer_ingreso_en, roles(id, nombre, permisos_rol(modulo, solo_lectura))"
-    )
-    .eq("id", userId)
-    .maybeSingle();
+  // `paises_permitidos` (migración 0087) va en la misma consulta; sin la migración se pide como antes y la persona ve todos
+  // los países, que es lo que veía.
+  const columnas = "id, email, nombre, avatar_url, activo, rol_id, primer_ingreso_en, roles(id, nombre, permisos_rol(modulo, solo_lectura))";
+  let completo = await supabase.from("perfiles").select(`${columnas}, paises_permitidos`).eq("id", userId).maybeSingle();
+  if (completo.error) completo = (await supabase.from("perfiles").select(columnas).eq("id", userId).maybeSingle()) as typeof completo;
   const perfil = completo.error
     ? (
         await supabase
@@ -115,8 +118,14 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
     vistaPrevia,
     modulos,
     modulosSoloLectura,
+    paisesPermitidos: listaPaises((perfil as { paises_permitidos?: unknown }).paises_permitidos),
   };
 });
+
+/** `null` = todos los países; si no, los códigos que la persona puede ver (y «importacion»). */
+function listaPaises(v: unknown): string[] | null {
+  return Array.isArray(v) ? v.map(String) : null;
+}
 
 /** Exige sesión activa y acceso al módulo dado; redirige si no se cumple. */
 export async function requireModulo(clave: string): Promise<UsuarioActual> {

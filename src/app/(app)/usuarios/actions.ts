@@ -299,3 +299,39 @@ export async function alternarSoloLectura(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath("/usuarios");
 }
+
+/**
+ * Los países que puede ver una persona (migración 0087): `null` = todos; una lista = solo esos (códigos de `paises`, y
+ * «importacion» para Compras Importadora). Limita Compras, el histórico de compras y el país de la barra de arriba.
+ */
+export async function guardarPaisesUsuario(id: string, paises: string[] | null): Promise<{ error?: string }> {
+  await requireModuloEscritura("usuarios");
+  if (typeof id !== "string" || !/^[0-9a-fA-F-]{8,64}$/.test(id)) return { error: "Persona no válida." };
+  const supabase = createServiceClient();
+  let lista: string[] | null = null;
+  if (paises !== null) {
+    if (!Array.isArray(paises)) return { error: "Países no válidos." };
+    const { data: existentes } = await supabase.from("paises").select("codigo");
+    const validos = new Set([...(existentes ?? []).map((p) => p.codigo as string), "importacion"]);
+    lista = [...new Set(paises.map(String))].filter((c) => validos.has(c));
+  }
+  const { data: antes } = await supabase.from("perfiles").select("email, paises_permitidos").eq("id", id).maybeSingle();
+  const { error } = await supabase.from("perfiles").update({ paises_permitidos: lista }).eq("id", id);
+  if (error) return { error: error.message.includes("paises_permitidos") ? "Falta correr la migración 0087 en Supabase." : "No se pudo guardar." };
+  const texto = (v: unknown) => (Array.isArray(v) ? (v.length ? v.join(", ") : "ninguno") : "todos");
+  await registrarAuditoria({
+    accion: "cambiar_paises_usuario",
+    entidad: "perfiles",
+    entidadId: id,
+    detalle: `${antes?.email ?? id}: países ${texto(antes?.paises_permitidos)} → ${texto(lista)}`,
+  });
+  revalidatePath("/usuarios");
+  return {};
+}
+
+/** Los países que se pueden elegir en la ficha de una persona. */
+export async function listarPaisesParaPermisos(): Promise<{ codigo: string; nombre: string }[]> {
+  await requireModuloEscritura("usuarios");
+  const { data } = await createServiceClient().from("paises").select("codigo, nombre").order("nombre");
+  return (data ?? []) as { codigo: string; nombre: string }[];
+}

@@ -7,6 +7,7 @@ import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/a
 import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSeguro } from "@/lib/compras/adjuntos";
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
+import { puedeVerPais } from "@/lib/paises-permitidos";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 
@@ -14,6 +15,29 @@ const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
 const VIAS_VALIDAS: Set<string> = new Set(VIAS_ENVIO.map((v) => v.valor));
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
+
+// --- Países permitidos (migración 0087) -----------------------------------------------------------------------------
+// Quien tiene países limitados solo ve y cambia las compras de esos países (y las de Importadora si la tiene). La lista
+// ya llega filtrada (`cargarCompras`), pero cada acción lo vuelve a comprobar: el servidor no se fía de lo que pide la página.
+const SIN_ACCESO_PAIS = "No tienes acceso a las compras de ese país.";
+type CompraPais = { id: string; tipo: string; paises: { codigo: string } | { codigo: string }[] | null };
+const codigoDe = (c: CompraPais) => (c.tipo === "importacion" ? null : ((Array.isArray(c.paises) ? c.paises[0] : c.paises)?.codigo ?? null));
+
+/** El error si la persona no puede ver alguna de esas compras por su país; null si puede (o no tiene países limitados). */
+async function sinAccesoACompras(ids: string[]): Promise<string | null> {
+  const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
+  if (permitidos === null || ids.length === 0) return null;
+  const { data } = await createServiceClient().from("wms_compras").select("id, tipo, paises(codigo)").in("id", ids);
+  const filas = (data ?? []) as unknown as CompraPais[];
+  if (filas.length !== new Set(ids).size) return "Compra no válida.";
+  return filas.every((c) => puedeVerPais(permitidos, codigoDe(c))) ? null : SIN_ACCESO_PAIS;
+}
+/** Lo mismo, para una línea de producto de una compra. */
+async function sinAccesoALinea(itemId: string): Promise<string | null> {
+  if ((await getUsuarioActual())?.paisesPermitidos == null) return null;
+  const { data } = await createServiceClient().from("wms_compra_items").select("compra_id").eq("id", itemId).maybeSingle();
+  return data ? sinAccesoACompras([data.compra_id as string]) : "Producto no válido.";
+}
 
 /** «a, b ,c» → ["a", "b", "c"] (sin vacíos ni repetidos). */
 const listaDeTexto = (texto: string | null): string[] => [...new Set((texto ?? "").split(",").map((x) => x.trim()).filter(Boolean))];
@@ -86,9 +110,14 @@ function leerCambios(formData: FormData) {
  */
 async function leerTipoYPais(formData: FormData): Promise<{ tipo: string; pais_id: string | null; paises_destino: string[] } | { error: string }> {
   const tipo = formData.get("tipo") === "importacion" ? "importacion" : "pais";
-  if (tipo === "importacion") return { tipo, pais_id: null, paises_destino: listaDeTexto(textoOptativo(formData, "paises_destino")) };
+  const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
+  if (tipo === "importacion") {
+    if (!puedeVerPais(permitidos, null)) return { error: SIN_ACCESO_PAIS };
+    return { tipo, pais_id: null, paises_destino: listaDeTexto(textoOptativo(formData, "paises_destino")) };
+  }
   const codigo = String(formData.get("pais") ?? "");
   if (!codigo) return { error: "Elige el país de la compra." };
+  if (!puedeVerPais(permitidos, codigo)) return { error: SIN_ACCESO_PAIS };
   const { data } = await createServiceClient().from("paises").select("id").eq("codigo", codigo).maybeSingle();
   if (!data) return { error: "País no válido." };
   return { tipo, pais_id: data.id as string, paises_destino: [] };
@@ -197,6 +226,9 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   const nombre = (formData.get("nombre") as string).trim();
   const etapa = formData.get("etapa") as string;
   const estado = formData.get("estado") as string;
+  if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
 
   if (!nombre) return { error: "Escribe el nombre de la compra." };
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
@@ -252,6 +284,8 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
   if (!def) return { error: "Ese dato no se edita aquí." };
   const normalizado = normalizarValor(def, bruto);
   if ("error" in normalizado) return normalizado;
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
 
   const supabase = createServiceClient();
   const { data } = await supabase.from("wms_compras").select(`${def.columna}, etapa, estado`).eq("id", id).maybeSingle();
@@ -314,6 +348,8 @@ export async function actualizarCampoComprasLote(
   const unicos = [...new Set(ids.map(String))];
   if (unicos.length > MAX_COMPRAS_LOTE) return { error: `Se pueden cambiar hasta ${MAX_COMPRAS_LOTE} compras a la vez.` };
   if (unicos.some((id) => !ES_ID(id))) return { error: "Hay una compra que no es válida." };
+  const sinAcceso = await sinAccesoACompras(unicos);
+  if (sinAcceso) return { error: sinAcceso };
   const def = campoEditable(String(campo));
   if (!def) return { error: "Ese dato no se edita aquí." };
   if (modo !== "poner" && (def.tipo !== "lista" || (modo !== "agregar" && modo !== "quitar"))) return { error: "Ese cambio solo sirve para las etiquetas." };
@@ -409,6 +445,7 @@ export async function eliminarCompra(formData: FormData) {
   await requireModuloEscritura("compras");
   const id = formData.get("id") as string;
   const nombre = formData.get("nombre") as string;
+  if (typeof id !== "string" || !ES_ID(id) || (await sinAccesoACompras([id]))) throw new Error(SIN_ACCESO_PAIS);
 
   const supabase = createServiceClient();
   const { data: actual } = await supabase.from("wms_compras").select("foto_url").eq("id", id).single();
@@ -448,6 +485,8 @@ const BUCKET_COMPRAS = "wms-compras";
 export async function obtenerActividadCompra(id: string): Promise<ActividadCompra | { error: string }> {
   await requireModulo("compras");
   if (!ES_ID(id)) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
   const supabase = createServiceClient();
   const consultaAdjuntos = (columnas: string) => supabase.from("wms_compra_adjuntos").select(columnas).eq("compra_id", id).order("creado_en");
   const [comentarios, subtareas, adjuntosConComentario, eventos] = await Promise.all([
@@ -494,6 +533,8 @@ export async function prepararSubidaAdjuntoComentario(compraId: string, nombreAr
   await requireModuloEscritura("compras");
   if (typeof compraId !== "string" || !ES_ID(compraId)) return { error: "Compra no válida." };
   if (typeof nombreArchivo !== "string" || !nombreArchivo.trim()) return { error: "El archivo no tiene nombre." };
+  const sinAcceso = await sinAccesoACompras([compraId]);
+  if (sinAcceso) return { error: sinAcceso };
   const ruta = `comentarios/${compraId}/${crypto.randomUUID()}-${nombreSeguro(nombreArchivo)}`;
   const { data, error } = await createServiceClient().storage.from(BUCKET_COMPRAS).createSignedUploadUrl(ruta);
   if (error || !data) return { error: "No se pudo preparar la subida." };
@@ -510,6 +551,7 @@ async function borrarSubidos(rutas: string[]) {
 export async function descartarAdjuntoSubido(compraId: string, ruta: string): Promise<void> {
   await requireModuloEscritura("compras");
   if (typeof compraId !== "string" || !ES_ID(compraId) || typeof ruta !== "string" || !ruta.startsWith(`comentarios/${compraId}/`) || ruta.includes("..")) return;
+  if (await sinAccesoACompras([compraId])) return;
   await borrarSubidos([ruta]);
 }
 
@@ -554,6 +596,8 @@ async function revisarAdjuntosSubidos(
 export async function comentarCompra(id: string, texto: string, menciones: string[] = [], adjuntos: AdjuntoSubido[] = []): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(id)) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
   const limpio = String(texto ?? "").trim().slice(0, 5000);
   const archivos = Array.isArray(adjuntos) ? adjuntos : [];
   if (!limpio && archivos.length === 0) return { error: "Escribe el comentario o adjunta un archivo." };
@@ -643,6 +687,8 @@ export interface ProductoComprable {
 export async function obtenerProductosCompra(compraId: string): Promise<{ items: ItemCompra[]; productos: ProductoComprable[] } | { error: string }> {
   await requireModulo("compras");
   if (!ES_ID(compraId)) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([compraId]);
+  if (sinAcceso) return { error: sinAcceso };
   const supabase = createServiceClient();
   const [items, productos] = await Promise.all([
     supabase
@@ -709,6 +755,8 @@ async function sincronizarCantidad(compraId: string) {
 export async function agregarProductoCompra(compraId: string, skuId: string, cantidad: number, costo: number | null): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(compraId) || !ES_ID(skuId)) return { error: "Datos no válidos." };
+  const sinAcceso = await sinAccesoACompras([compraId]);
+  if (sinAcceso) return { error: sinAcceso };
   if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
   if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
   const supabase = createServiceClient();
@@ -741,6 +789,8 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
 export async function actualizarProductoCompra(itemId: string, cantidad: number, costo: number | null): Promise<{ error?: string }> {
   await requireModuloEscritura("compras");
   if (!ES_ID(itemId)) return { error: "Producto no válido." };
+  const sinAcceso = await sinAccesoALinea(itemId);
+  if (sinAcceso) return { error: sinAcceso };
   if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
   if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
   const supabase = createServiceClient();
@@ -766,6 +816,8 @@ export async function actualizarProductoCompra(itemId: string, cantidad: number,
 export async function quitarProductoCompra(itemId: string): Promise<{ error?: string }> {
   await requireModuloEscritura("compras");
   if (!ES_ID(itemId)) return { error: "Producto no válido." };
+  const sinAcceso = await sinAccesoALinea(itemId);
+  if (sinAcceso) return { error: sinAcceso };
   const supabase = createServiceClient();
   const { data: item } = await supabase
     .from("wms_compra_items")

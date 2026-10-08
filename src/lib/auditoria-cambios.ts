@@ -47,6 +47,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   configurar_vencimiento: "Cambió el control de vencimiento",
   guardar_envio: "Cambió los datos de envío",
   cambiar_foto_producto: "Cambió la foto",
+  cambiar_paises_usuario: "Cambió los países que ve",
   crear_pais: "Agregó un país",
   generar_codigo_barras: "Generó un código de barras interno",
   cambiar_clase_producto: "Cambió el estado del producto",

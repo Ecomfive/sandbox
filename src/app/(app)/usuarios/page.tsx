@@ -42,7 +42,7 @@ export default async function UsuariosPage() {
 
   if (!usuario.modulos.includes("usuarios")) redirect("/sin-acceso");
 
-  const [{ data: roles }, { data: perfiles }, { data: permisos }, { data: listaAuth }] = await Promise.all([
+  const [{ data: roles }, { data: perfiles }, { data: permisos }, { data: listaAuth }, paisesPersonas] = await Promise.all([
     supabase.from("roles").select("id, nombre, descripcion").order("nombre"),
     supabase
       .from("perfiles")
@@ -53,7 +53,12 @@ export default async function UsuariosPage() {
     supabase.from("permisos_rol").select("rol_id, modulo, solo_lectura"),
     // El último ingreso vive en auth.users, no en `perfiles` — se trae una sola vez para toda la lista.
     supabase.auth.admin.listUsers({ perPage: 1000 }),
+    // Aparte: sin la migración 0087 la columna no existe y la lista se carga igual.
+    supabase.from("perfiles").select("id, paises_permitidos"),
   ]);
+  const paisesPorPersona = paisesPersonas.error
+    ? null
+    : new Map(((paisesPersonas.data ?? []) as { id: string; paises_permitidos: string[] | null }[]).map((p) => [p.id, p.paises_permitidos]));
 
   const ultimoIngresoPorId = new Map<string, string | null>();
   for (const u of listaAuth?.users ?? []) ultimoIngresoPorId.set(u.id, u.last_sign_in_at ?? null);
@@ -83,6 +88,7 @@ export default async function UsuariosPage() {
     ultimoIngresoEn: ultimoIngresoPorId.get(p.id) ?? null,
     ultimaActividadEn: p.ultima_actividad_en,
     fotoRecordadaEn: p.foto_recordada_en,
+    paisesPermitidos: paisesPorPersona ? (paisesPorPersona.get(p.id) ?? null) : undefined,
   }));
 
   return (

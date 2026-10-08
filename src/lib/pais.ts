@@ -1,9 +1,9 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PAIS_COOKIE, PAIS_DEFAULT } from "@/lib/nav-data";
+import { PAIS_COOKIE, PAIS_DEFAULT, PAISES_NAV } from "@/lib/nav-data";
 import { conTtl } from "@/lib/cache-ttl";
-import { getUsuarioIdSesion } from "@/lib/auth";
+import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export interface PaisActual {
@@ -48,7 +48,12 @@ const paisPreferidoDeLaPersona = cache(async (): Promise<string | null> => {
  */
 export async function getPaisActual(supabase: SupabaseClient): Promise<PaisActual> {
   const cookieStore = await cookies();
-  const codigo = cookieStore.get(PAIS_COOKIE)?.value ?? (await paisPreferidoDeLaPersona()) ?? PAIS_DEFAULT;
+  let codigo = cookieStore.get(PAIS_COOKIE)?.value ?? (await paisPreferidoDeLaPersona()) ?? PAIS_DEFAULT;
+  // Con países limitados (migración 0087), solo uno de los suyos: si el elegido no lo es, el primero que tenga abierto.
+  const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
+  if (permitidos !== null && !permitidos.includes(codigo)) {
+    codigo = PAISES_NAV.find((p) => !p.pronto && permitidos.includes(p.codigo))?.codigo ?? permitidos.find((c) => c !== "importacion") ?? codigo;
+  }
 
   const pais = await paisPorCodigo(codigo, supabase);
   if (pais) return pais;

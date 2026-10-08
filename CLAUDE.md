@@ -199,6 +199,15 @@ convenciones técnicas del código.
   formulario, no una tabla), así que la actividad se despliega **dentro de la misma
   tarjeta** con un botón «Ver actividad» (`crm-dropshippers/lista-dropshippers.tsx`),
   reutilizando el mismo `HistorialGenerico`.
+- **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
+  y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
+  `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo
+  aplica **el servidor**: `cargarCompras` solo pide las compras de esos países (y el selector solo los ofrece), **cada acción de
+  Compras que recibe una compra o una línea lo vuelve a comprobar** (`sinAccesoACompras`, `sinAccesoALinea`; crear o mover una
+  compra a un país no permitido también se rechaza), el histórico de compras de Producto/Inventario y la columna «Unidades
+  compradas» cuentan solo esos países, y la barra de arriba (`getPaisActual`, `setPaisActual`, `SelectorContexto`) solo deja
+  elegir uno de ellos. Una acción nueva de Compras que reciba un id de compra debe llamar a `sinAccesoACompras`. Sin la
+  migración todos ven todo, como antes.
 - **País de cada persona.** `getPaisActual` (`src/lib/pais.ts`) resuelve el país con
   este orden: la cookie `pais_actual` de este navegador; si no hay, el último país que
   la persona eligió (`perfiles.pais_preferido`, migración 0038, que `setPaisActual`

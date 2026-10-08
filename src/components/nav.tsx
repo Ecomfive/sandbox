@@ -34,7 +34,7 @@ export async function NavBar({
       <div className="flex items-center justify-between gap-3 py-3 pr-6 pl-14 md:pl-6">
         <BusquedaGlobal paginas={paginas} acciones={accionesCrear} />
         <div className="flex items-center gap-2">
-          <SelectorContexto pais={pais.codigo} plataforma={plataforma} />
+          <SelectorContexto pais={pais.codigo} plataforma={plataforma} permitidos={usuario?.paisesPermitidos ?? null} />
           <MenuCrear acciones={accionesCrear} />
           {usuario?.modulos.includes("notificaciones") && <CampanaPendientes pendientes={pendientes} />}
           {/* Los atajos de teclado siguen activos; su ayuda se abre desde el menú de la persona. */}

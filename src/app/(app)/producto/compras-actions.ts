@@ -2,6 +2,7 @@
 
 import { getUsuarioActual } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { puedeVerPais } from "@/lib/paises-permitidos";
 
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
@@ -24,7 +25,8 @@ export interface CompraDeProducto {
 
 /**
  * El histórico de compras de un producto: cada orden en la que está vinculado (Compras › Productos), de la más nueva a la
- * más vieja. Un producto con variantes suma las compras de sus variantes. Lo pueden ver quienes abren Producto o Inventario.
+ * más vieja. Un producto con variantes suma las compras de sus variantes. Lo pueden ver quienes abren Producto o Inventario,
+ * y cada uno solo las de sus países permitidos.
  * Devuelve el error como valor.
  */
 export async function obtenerComprasProducto(id: string): Promise<{ compras: CompraDeProducto[] } | { error: string }> {
@@ -63,6 +65,8 @@ export async function obtenerComprasProducto(id: string): Promise<{ compras: Com
       };
     })
     .filter((c): c is CompraDeProducto => c !== null)
+    // Solo las de los países que la persona puede ver (migración 0087). Estas compras son siempre de un país.
+    .filter((c) => puedeVerPais(usuario.paisesPermitidos, c.pais))
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
   return { compras };
 }

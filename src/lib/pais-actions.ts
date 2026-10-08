@@ -3,12 +3,15 @@
 import { cookies } from "next/headers";
 import { refresh } from "next/cache";
 import { PAIS_COOKIE, PAISES_NAV } from "@/lib/nav-data";
-import { getUsuarioIdSesion } from "@/lib/auth";
+import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export async function setPaisActual(codigo: string) {
   // Solo países que existen y ya están abiertos (los «Pronto» no).
   if (!PAISES_NAV.some((p) => p.codigo === codigo && !p.pronto)) return;
+  // Ni uno fuera de los países permitidos de la persona (migración 0087).
+  const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
+  if (permitidos !== null && !permitidos.includes(codigo)) return;
 
   const cookieStore = await cookies();
   cookieStore.set(PAIS_COOKIE, codigo, { path: "/", maxAge: 60 * 60 * 24 * 365 });

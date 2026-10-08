@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { CheckIcon } from "@/lib/nav-icons";
 import { formatearFecha, formatearTiempoRelativo } from "@/lib/formato";
+import { PaisesPersona } from "./paises-persona";
 
 function FilaAlta({ etiqueta, completo, children }: { etiqueta: string; completo: boolean; children?: React.ReactNode }) {
   return (
@@ -263,6 +264,8 @@ export function FichaPersona({
                 </p>
               )}
             </section>
+
+            {puedeEditarse && <PaisesPersona key={persona.id} id={persona.id} nombre={persona.nombre ?? persona.email} inicial={persona.paisesPermitidos} />}
 
             <section className="p-5">
               <h3 className="mb-3 text-sm font-semibold">Acceso</h3>

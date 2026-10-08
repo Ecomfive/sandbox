@@ -29,10 +29,13 @@ export function SelectorVista({
   vista,
   paises,
   puedeAgregarPais = false,
+  verImportadora = true,
 }: {
   vista: string;
   paises: { codigo: string; nombre: string }[];
   puedeAgregarPais?: boolean;
+  /** Sin Importadora entre sus países permitidos, no se ofrece. */
+  verImportadora?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,7 +46,7 @@ export function SelectorVista({
   const opciones = [
     { valor: "todos", nombre: "Todos los países" },
     ...paises.map((p) => ({ valor: p.codigo, nombre: p.nombre })),
-    { valor: "importacion", nombre: "Importadora" },
+    ...(verImportadora ? [{ valor: "importacion", nombre: "Importadora" }] : []),
   ];
   const actual = opciones.find((o) => o.valor === vista) ?? opciones[0];
 

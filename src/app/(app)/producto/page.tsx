@@ -1,4 +1,5 @@
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { puedeVerPais } from "@/lib/paises-permitidos";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -70,8 +71,8 @@ export default async function ProductoPage() {
     supabase.from("productos").select("sku_maestro_id, nombre, paises(codigo)").not("sku_maestro_id", "is", null),
     // La foto va aparte: sin la migración 0086 la columna no existe y la lista se carga igual, sin fotos.
     supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
-    traerTodasLasFilas<{ sku_maestro_id: string; cantidad_pedida: number }>((desde, hasta) =>
-      supabase.from("wms_compra_items").select("sku_maestro_id, cantidad_pedida").order("id").range(desde, hasta),
+    traerTodasLasFilas<{ sku_maestro_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
+      supabase.from("wms_compra_items").select("sku_maestro_id, cantidad_pedida, wms_compras(paises(codigo))").order("id").range(desde, hasta),
     ),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
@@ -79,6 +80,10 @@ export default async function ProductoPage() {
   const padreDe = new Map(lista.filter((p) => p.padre_id).map((p) => [p.id as string, p.padre_id as string]));
   const compradoPorId = new Map<string, number>();
   for (const l of lineasCompra) {
+    // Solo lo comprado en los países que la persona puede ver (migración 0087).
+    const compra = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { paises: { codigo: string } | { codigo: string }[] | null } | null;
+    const paisCompra = compra ? ((Array.isArray(compra.paises) ? compra.paises[0] : compra.paises)?.codigo ?? null) : null;
+    if (!puedeVerPais(usuario.paisesPermitidos, paisCompra)) continue;
     const n = Number(l.cantidad_pedida);
     compradoPorId.set(l.sku_maestro_id, (compradoPorId.get(l.sku_maestro_id) ?? 0) + n);
     const padre = padreDe.get(l.sku_maestro_id);

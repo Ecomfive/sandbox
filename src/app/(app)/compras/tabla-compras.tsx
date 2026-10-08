@@ -288,6 +288,7 @@ function columnas(
 export function TablaCompras({
   compras: comprasServidor,
   vista,
+  verImportadora = true,
   paises,
   puedeEscribir,
   puedeAgregarPais,
@@ -299,6 +300,8 @@ export function TablaCompras({
 }: {
   compras: FilaCompra[];
   vista: string;
+  /** Si la persona puede ver Compras Importadora (países permitidos). */
+  verImportadora?: boolean;
   paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
   /** Puede modificar Configuración: ve «＋ País» junto al selector. */
@@ -559,7 +562,7 @@ export function TablaCompras({
           }
           accionPrincipal={
             <div className="flex items-center gap-2">
-              <SelectorVista vista={vista} paises={paises} puedeAgregarPais={puedeAgregarPais} />
+              <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} puedeAgregarPais={puedeAgregarPais} />
               {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} />}
             </div>
           }
