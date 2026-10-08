@@ -86,6 +86,54 @@ function tarifasDe(nota: string): { agente: string | null; tipo: string; precio:
     }
   }
 
+  // Correcciones de Hernán (8 oct 2026): en España y México los tiempos estaban en la tarea equivocada (el marítimo no puede
+  // ser más rápido que el aéreo), y Costa Rica se envía con Chin.
+  const ruta = (pais: string, via: string, agente: string | null) => filas.find((f) => f.pais_codigo === pais && f.via === via && f.agente === agente);
+  const espMar = ruta("ES", "mar", "Avery");
+  const espAireAvery = ruta("ES", "aire", "Avery");
+  const espAireChin = ruta("ES", "aire", "Chin");
+  if (espMar && espAireAvery && espAireChin) {
+    [espMar.dias_min, espMar.dias_max, espAireAvery.dias_min, espAireAvery.dias_max] = [espAireAvery.dias_min, espAireAvery.dias_max, espMar.dias_min, espMar.dias_max];
+    espAireChin.via = "mar"; // «Chin: about 60 days» era del marítimo
+  }
+  const mxMar = ruta("MX", "mar", "Chin");
+  const mxAire = ruta("MX", "aire", "Chin");
+  if (mxMar && mxAire) [mxMar.dias_min, mxMar.dias_max, mxAire.dias_min, mxAire.dias_max] = [mxAire.dias_min, mxAire.dias_max, mxMar.dias_min, mxMar.dias_max];
+  for (const f of filas) if (f.pais_codigo === "CR" && !f.agente) f.agente = "Chin";
+
+  // --sql: escribe la migración con las rutas (para pegarla en el editor SQL de Supabase).
+  if (process.argv.includes("--sql")) {
+    const q = (v: unknown) => (v === null || v === undefined ? "null" : typeof v === "number" || typeof v === "boolean" ? String(v) : `$q$${String(v)}$q$`);
+    const partes = filas.map((f) => {
+      const tarifas = (f._tarifas as Json[])
+        .map((x) => `  insert into wms_rutas_envio_tarifas (ruta_id, tipo_producto, precio, unidad, vigente_desde, creado_por) values (nueva, ${q(x.tipo)}, ${x.precio}, ${q(x.unidad)}, ${q(f._desde)}, 'Importado de ClickUp');`)
+        .join("\n");
+      return `  if not exists (select 1 from wms_rutas_envio where clickup_id = ${q(f.clickup_id)} and agente is not distinct from ${q(f.agente)} and via = ${q(f.via)}) then
+    insert into wms_rutas_envio (clickup_id, agente, pais_codigo, pais_nombre, via, modalidad, courier, dias_min, dias_max, activo, nota, url)
+    values (${[f.clickup_id, f.agente, f.pais_codigo, f.pais_nombre, f.via, f.modalidad, f.courier, f.dias_min, f.dias_max, f.activo, f.nota, f.url].map(q).join(", ")})
+    returning id into nueva;
+${tarifas ? tarifas.replace(/^ {2}/gm, "    ") + "\n" : ""}  end if;`;
+    });
+    const sql = `-- Compras › Envíos: las ${filas.length} rutas de la lista «Envíos desde China» de ClickUp (generado con
+-- scripts/importar-rutas-envio.ts --sql). Ya corregidas: España y México tenían el tiempo del marítimo y el del aéreo
+-- cambiados, y Costa Rica va con Chin. Además, las compras de Costa Rica quedan con agente de envío «Chin».
+-- Se puede repetir sin duplicar. Va después de la 0092.
+
+do $$
+declare
+  nueva uuid;
+begin
+${partes.join("\n")}
+end $$;
+
+update wms_compras set agente_envio = 'Chin'
+where agente_envio is null and tipo = 'pais' and pais_id = (select id from paises where codigo = 'CR');
+`;
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync("supabase/migrations/0093_importar_rutas_envio.sql", sql);
+    console.log("Escrita supabase/migrations/0093_importar_rutas_envio.sql");
+  }
+
   for (const f of filas)
     console.log(
       `${f.pais_nombre.padEnd(12)} ${f.via.padEnd(5)} ${(f.agente ?? "—").padEnd(6)} ${[f.modalidad, f.courier].filter(Boolean).join(" ").padEnd(8)} ${f.dias_min ?? "?"}–${f.dias_max ?? "?"} d («${f._tiempo}») · tarifas: ${
