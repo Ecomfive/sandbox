@@ -27,6 +27,7 @@ const ICONO: Record<string, IconoComp> = {
   etiquetas: EtiquetaIcon,
   viaEnvio: ComprasIcon,
   proveedor: ProductoIcon,
+  agenteEnvio: ComprasIcon,
   tienda: ComprasIcon,
   qtyTotal: ProductoIcon,
   montoTotal: GastoIcon,

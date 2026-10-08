@@ -163,6 +163,7 @@ export function FichaLateralCompra({
           <Dato etiqueta="💲 Pagado a proveedor">{compra.pagadoAProveedor !== null ? usd(compra.pagadoAProveedor) : "—"}</Dato>
           <Dato etiqueta="💲 Valor unitario">{valorUnitario(compra) !== null ? usd(valorUnitario(compra)!) : "—"}</Dato>
           <Dato etiqueta="🏭 Proveedor">{compra.proveedor ?? "—"}</Dato>
+          <Dato etiqueta="🚢 Agente de envío">{compra.agenteEnvio ?? "—"}</Dato>
           <Dato etiqueta="🏗️ Vía">{compra.viaEnvio.length ? compra.viaEnvio.map(etiquetaVia).join(", ") : "—"}</Dato>
           <Dato etiqueta="🏪 Tienda">{compra.tiendas.length ? <span className="flex flex-wrap gap-1">{compra.tiendas.map((t) => <PastillaTienda key={t} nombre={t} />)}</span> : "—"}</Dato>
         </dl>

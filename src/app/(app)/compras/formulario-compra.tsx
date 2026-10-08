@@ -332,6 +332,13 @@ export function FormularioCompra({
             <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
               <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
             </Campo>
+            <Campo etiqueta={conEmoji("agenteEnvio", "Agente de envío")} id="campo-agente-envio">
+              <input id="campo-agente-envio" type="text" name="agente_envio" list="agentes-envio" defaultValue={compra?.agenteEnvio ?? ""} placeholder="Ej: Chin" className={fieldClass} />
+              <datalist id="agentes-envio">
+                <option value="Chin" />
+                <option value="Avery" />
+              </datalist>
+            </Campo>
             <Campo etiqueta={conEmoji("tienda", "Tienda")} id="campo-tienda">
               <CampoLista
                 id="campo-tienda"

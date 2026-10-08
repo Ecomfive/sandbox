@@ -47,6 +47,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Informe", href: "/compras" },
     { etiqueta: "Compras", href: "/compras/lista" },
     { etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },
+    { etiqueta: "Envíos", href: "/compras/envios" },
   ],
 };
 

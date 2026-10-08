@@ -76,6 +76,7 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
           </Dato>
           <Dato etiqueta="Proveedor">{compra.proveedor || SIN_DATO}</Dato>
+          <Dato etiqueta="Agente de envío">{compra.agenteEnvio || SIN_DATO}</Dato>
           <Dato etiqueta="Tienda">{compra.tiendas.length ? <span className="flex flex-wrap gap-1">{compra.tiendas.map((t) => <PastillaTienda key={t} nombre={t} />)}</span> : SIN_DATO}</Dato>
           <Dato etiqueta="Persona asignada">{compra.asignadoNombre || SIN_DATO}</Dato>
         </dl>

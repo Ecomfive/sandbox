@@ -19,6 +19,8 @@ export interface FilaCompra {
   etapa: string;
   estado: string;
   proveedor: string | null;
+  /** Quién trae la mercancía (Chin, Avery…), aparte del proveedor que la vende (migración 0092). */
+  agenteEnvio: string | null;
   /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */
   tiendas: string[];
   qtyTotal: number | null;
@@ -59,6 +61,7 @@ export const EMOJI_CAMPO: Record<string, string> = {
   etapa: "👣",
   estado: "🚦",
   proveedor: "🏭",
+  agenteEnvio: "🚢",
   tienda: "🏪",
   viaEnvio: "🏗️",
   etiquetas: "🏷️",
@@ -267,6 +270,14 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       tipo: "seleccion",
       valores: (c) => [c.proveedor ?? SIN_VALOR],
       etiquetaSinValor: "Sin proveedor",
+      agrupable: true,
+    },
+    {
+      id: "agenteEnvio",
+      etiqueta: "Agente de envío",
+      tipo: "seleccion",
+      valores: (c) => [c.agenteEnvio ?? SIN_VALOR],
+      etiquetaSinValor: "Sin agente",
       agrupable: true,
     },
     {

@@ -21,6 +21,7 @@ const NOMBRE_CAMPO: Record<string, string> = {
   urlProducto: "URL del producto",
   documentos: "Documentos",
   planificacion: "Planificación",
+  agenteEnvio: "Agente de envío",
   productoRelacionado: "Producto relacionado",
   paisesDestino: "Países de destino",
   codigo: "Código",

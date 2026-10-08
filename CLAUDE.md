@@ -653,6 +653,14 @@ convenciones técnicas del código.
   muestra con `PlanificacionAutomatica` (llegada estimada y de dónde salen los días). `scripts/recalcular-planificacion.ts`
   recalcula las abiertas con fecha de envío. **«Documentos» y «Producto relacionado» ya no existen** (migración 0090): los
   archivos del campo Documentos de ClickUp quedaron dentro de un comentario «Documentos (factura o soporte)».
+  **Envíos** (`/compras/envios`, pestaña después de Tiempos y fallas; migración 0092; antes la lista «Envíos desde China» de
+  ClickUp, importada con `scripts/clickup-exportar-envios.mjs` + `scripts/importar-rutas-envio.ts`): `wms_rutas_envio` (agente,
+  país por código ISO —cualquiera del mundo, no hace falta que exista en `paises`—, vía, DDP/DAP, courier, días prometidos
+  mín/máx, activo, nota) y `wms_rutas_envio_tarifas` (tipo de producto, precio, por CBM o kg, vigente desde; una nueva no borra la
+  anterior). **Lo real** sale de las compras con `agente_envio` (campo nuevo de la compra, aparte del proveedor; las de proveedor
+  «Chin» quedaron con agente «Chin»), del mismo país y una sola vía, con fecha de envío y de llegada: histórico, últimos 12 meses
+  y año en curso por la fecha de llegada (`src/lib/compras/rutas-envio.ts`, con prueba); punto rojo si el promedio de 12 meses
+  pasa del máximo prometido. Quien tiene países limitados solo ve y toca las rutas de sus países.
   **Tiendas con color y nombre editable** (migración 0091, `wms_compras_tiendas`, como `wms_compras_etiquetas`; las que existían
   arrancan con colores distintos): `tiendas.tsx` da el contexto `ProveedorTiendas` (lo pone `TablaCompras`) con `colorDe`,
   `cambiarColor` (`guardarColorTienda`) y `renombrar` (`renombrarTienda`: cambia el nombre en todas las compras de todos los

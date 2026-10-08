@@ -48,6 +48,7 @@ const ICONOS: Record<string, IconoComp> = {
   etapa: EstadoIcon,
   estado: EstadoIcon,
   proveedor: ProductoIcon,
+  agenteEnvio: ComprasIcon,
   tienda: ComprasIcon,
   viaEnvio: ComprasIcon,
   etiquetas: EtiquetaIcon,
@@ -228,6 +229,7 @@ function columnas(
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
+    col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", c.agenteEnvio || "—") }),
     col("tienda", "Tienda", {
       ...resto,
       clase: "text-muted-foreground",
