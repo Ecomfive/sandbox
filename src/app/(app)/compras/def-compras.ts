@@ -206,6 +206,22 @@ export const valorUnitario = (c: FilaCompra): number | null =>
 export const numeroOC = (n: number) => `OC-${String(n).padStart(4, "0")}`;
 
 /**
+ * El orden de la lista de Compras (pedido de Hernán, 8 oct 2026): por código, para que dentro de cada grupo (etapa…) las
+ * compras queden en secuencia aunque hayan llegado salteadas. Cada prefijo junto (ECOM01, ECOM03, PA…) y, dentro de él, del
+ * número mayor al menor; las que no tienen código, al final, por N.º OC.
+ */
+export function compararPorCodigo(a: Pick<FilaCompra, "codigo" | "numero">, b: Pick<FilaCompra, "codigo" | "numero">): number {
+  const partes = (c: string | null) => {
+    const m = c?.match(/^(.*?)-?(\d+)$/);
+    return m ? { prefijo: m[1], n: Number(m[2]) } : null;
+  };
+  const pa = partes(a.codigo);
+  const pb = partes(b.codigo);
+  if (!pa || !pb) return pa ? -1 : pb ? 1 : b.numero - a.numero;
+  return pa.prefijo.localeCompare(pb.prefijo) || pb.n - pa.n || b.numero - a.numero;
+}
+
+/**
  * El título de una compra: con productos vinculados, su número de orden (los productos se ven debajo); sin ellos, el nombre
  * que traía de ClickUp (que decía el producto).
  */

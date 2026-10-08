@@ -23,6 +23,7 @@ import { SelectorVista } from "./selector-vista";
 import {
   colorEstado,
   colorEtapa,
+  compararPorCodigo,
   conEmoji,
   DEF_COMPRAS,
   diasDeCompra,
@@ -334,7 +335,8 @@ export function TablaCompras({
     setCambios((actuales) => podarCambios(actuales, comprasServidor));
   }
   const compras = useMemo(
-    () => (Object.keys(cambios).length ? comprasServidor.map((c) => (cambios[c.id] ? { ...c, ...cambios[c.id] } : c)) : comprasServidor),
+    // En secuencia por código (dentro de cada grupo se respeta este orden).
+    () => (Object.keys(cambios).length ? comprasServidor.map((c) => (cambios[c.id] ? { ...c, ...cambios[c.id] } : c)) : [...comprasServidor]).sort(compararPorCodigo),
     [comprasServidor, cambios],
   );
 
