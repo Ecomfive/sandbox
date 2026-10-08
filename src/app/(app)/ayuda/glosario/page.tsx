@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Glosario" };
 
 /** Los términos del sistema que usa la persona (los generales y los de sus módulos), con buscador. */
-export default async function GlosarioPage() {
+export default async function GlosarioPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+  const { q } = await searchParams;
   const usuario = await requireSesion();
   const terminos = glosarioPara(usuario.modulos)
     .map(({ termino, definicion }) => ({ termino, definicion }))
@@ -16,7 +17,7 @@ export default async function GlosarioPage() {
   return (
     <Pagina ancho="media" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Glosario" oculto />
-      <GlosarioBuscable terminos={terminos} />
+      <GlosarioBuscable key={typeof q === "string" ? q : ""} terminos={terminos} inicial={typeof q === "string" ? q : ""} />
     </Pagina>
   );
 }

@@ -5,6 +5,9 @@ import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { createServiceClient } from "@/lib/supabase/server";
 import { APROBAR_DESDE, cursosPara } from "@/lib/ayuda/cursos";
+import { novedadesPara, type Novedad } from "@/lib/ayuda/contenido";
+import type { EntradaIndice } from "@/lib/ayuda/indice";
+import { cargarManuales, cargarProgreso, construirIndice } from "./datos-ayuda";
 
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 /** Quien edita los manuales: quien puede modificar Usuarios y roles (la administración). */
@@ -83,4 +86,25 @@ export async function eliminarManual(id: string): Promise<{ error?: string }> {
   await registrarAuditoria({ accion: "eliminar_manual", entidad: "manuales_proceso", entidadId: id, detalle: (data?.titulo as string) ?? id });
   revalidatePath("/ayuda/manuales");
   return {};
+}
+
+/**
+ * Lo que necesita el panel de ayuda de la barra negra: el índice para buscar, las últimas novedades y el avance en la
+ * Universidad (con el siguiente curso). Solo lo de los módulos de la persona.
+ */
+export async function obtenerPanelAyuda(): Promise<
+  { indice: EntradaIndice[]; novedades: Novedad[]; completados: number; total: number; siguiente: { id: string; titulo: string } | null } | { error: string }
+> {
+  const usuario = await getUsuarioActual();
+  if (!usuario) return { error: "No hay sesión activa." };
+  const [manuales, progreso] = await Promise.all([cargarManuales(usuario), cargarProgreso(usuario.id)]);
+  const cursos = cursosPara(usuario.modulos);
+  const pendiente = cursos.find((c) => !progreso?.get(c.id)?.completadoEn);
+  return {
+    indice: construirIndice(usuario, manuales),
+    novedades: novedadesPara(usuario.modulos).slice(0, 4),
+    completados: cursos.filter((c) => progreso?.get(c.id)?.completadoEn).length,
+    total: cursos.length,
+    siguiente: pendiente ? { id: pendiente.id, titulo: pendiente.titulo } : null,
+  };
 }

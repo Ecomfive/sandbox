@@ -1,5 +1,6 @@
 "use client";
 
+import { PanelAyuda } from "@/components/ayuda/panel-ayuda";
 import { Fragment, Suspense, use, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -269,6 +270,7 @@ function RielYPanel({
   const titulo = elegida && elegida.ruta === pathname ? elegida.titulo : activa;
   const verFavoritos = titulo === "Favoritos";
   const verYoda = titulo === "Baby Yoda";
+  const verAyuda = titulo === "Ayuda";
   const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
   const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0;
@@ -302,7 +304,7 @@ function RielYPanel({
         </Link>
         {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
-          const boton = botonRiel(v.area.title, !verFavoritos && !verYoda && v.area.title === mostrada?.area.title, Icono);
+          const boton = botonRiel(v.area.title, !verFavoritos && !verYoda && !verAyuda && v.area.title === mostrada?.area.title, Icono);
           // «Favoritos» va justo después del primer botón, como acceso propio.
           return i === 0 ? (
             <Fragment key={v.area.title}>
@@ -315,10 +317,7 @@ function RielYPanel({
           );
         })}
         <div className="mt-auto flex w-full flex-col gap-0.5">
-          <Link href="/ayuda" aria-current={pathname.startsWith("/ayuda") ? "page" : undefined} className={claseRiel(pathname.startsWith("/ayuda"))}>
-            <IconoRiel Icono={AyudaIcon} seleccionada={pathname.startsWith("/ayuda")} />
-            <span>Ayuda</span>
-          </Link>
+          {botonRiel("Ayuda", verAyuda, AyudaIcon)}
           {puedeVerAvisos && (
             <Link
               href="/notificaciones"
@@ -351,12 +350,14 @@ function RielYPanel({
         </div>
       </nav>
 
-      {!panelOculto && (verFavoritos || verYoda || mostrada) && (
+      {!panelOculto && (verFavoritos || verYoda || verAyuda || mostrada) && (
         <nav
-          aria-label={verFavoritos ? "Páginas favoritas" : verYoda ? "Baby Yoda" : `Páginas de ${mostrada?.area.title}`}
+          aria-label={verFavoritos ? "Páginas favoritas" : verYoda ? "Baby Yoda" : verAyuda ? "Ayuda" : `Páginas de ${mostrada?.area.title}`}
           className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5"
         >
-          {verYoda ? (
+          {verAyuda ? (
+            <PanelAyuda pathname={pathname} />
+          ) : verYoda ? (
             <BabyYoda />
           ) : verFavoritos ? (
             <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} />
@@ -368,7 +369,7 @@ function RielYPanel({
               </section>
             )
           )}
-          <Proximamente className="mt-auto" />
+          {!verAyuda && <Proximamente className="mt-auto" />}
         </nav>
       )}
     </>
@@ -430,6 +431,18 @@ function ListaMovil({
           </Link>
         </section>
       )}
+      <section aria-label="Ayuda">
+        <Titulo>Ayuda</Titulo>
+        <Link
+          href="/ayuda"
+          onClick={alNavegar}
+          aria-current={pathname.startsWith("/ayuda") ? "page" : undefined}
+          className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${pathname.startsWith("/ayuda") ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted"}`}
+        >
+          <AyudaIcon className="h-4 w-4 text-muted-foreground" />
+          Centro de ayuda
+        </Link>
+      </section>
       <Proximamente />
     </nav>
   );

@@ -217,3 +217,32 @@ export const GUIAS: GuiaModulo[] = [
 export const guiasPara = (modulos: string[]) => GUIAS.filter((g) => modulos.includes(g.modulo));
 /** Los términos del glosario que le sirven: los generales y los de sus módulos. */
 export const glosarioPara = (modulos: string[]) => GLOSARIO.filter((t) => !t.modulos || t.modulos.some((m) => modulos.includes(m)));
+
+export interface Novedad {
+  /** AAAA-MM-DD. */
+  fecha: string;
+  titulo: string;
+  texto: string;
+  /** Módulo al que pertenece (para mostrarla solo a quien lo usa); sin módulo, para todos. */
+  modulo?: string;
+  /** Dónde verla. */
+  href?: string;
+}
+
+/** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
+export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-07", titulo: "Centro de ayuda", texto: "Glosario, guías de cada módulo, la Universidad con cursos y examen, y los manuales de proceso del equipo.", href: "/ayuda" },
+  { fecha: "2026-10-07", titulo: "Países permitidos por persona", texto: "Cada persona puede limitarse a sus países: solo ve las compras e histórico de esos países.", modulo: "usuarios", href: "/usuarios" },
+  { fecha: "2026-10-07", titulo: "Histórico de compras de cada producto", texto: "En la ficha del producto: unidades compradas desde la primera vez, total invertido, costo promedio y cada compra.", modulo: "producto", href: "/producto" },
+  { fecha: "2026-10-07", titulo: "Fotos de producto", texto: "Cada producto tiene su foto (en Producto e Inventario). Se sube o se cambia desde su ficha.", modulo: "producto", href: "/producto" },
+  { fecha: "2026-10-07", titulo: "Subtotales por grupo", texto: "Al agrupar una tabla, cada grupo cierra con su subtotal. En Compras: lo que se debe por etapa.", modulo: "compras", href: "/compras/lista" },
+  { fecha: "2026-10-07", titulo: "Varias tiendas por compra", texto: "La Tienda de una compra ahora puede ser una o varias, y se eligen o crean al escribirlas, como las etiquetas.", modulo: "compras", href: "/compras/lista" },
+  { fecha: "2026-10-07", titulo: "Comentarios con imágenes y PDF", texto: "Pega una captura o adjunta un PDF en un comentario de una compra; se ve como miniatura debajo del texto.", modulo: "compras", href: "/compras/lista" },
+  { fecha: "2026-10-07", titulo: "Cambiar varias compras a la vez", texto: "Marca varias compras con su casilla y cambia un dato a todas desde la barra de abajo.", modulo: "compras", href: "/compras/lista" },
+  { fecha: "2026-10-07", titulo: "Encabezado fijo y fila de totales", texto: "En Compras, los títulos de las columnas se quedan arriba al bajar y los totales quedan pegados abajo.", modulo: "compras", href: "/compras/lista" },
+  { fecha: "2026-10-06", titulo: "Editar las celdas como en ClickUp", texto: "Todas las celdas de Compras se editan con el mismo panel: opciones con color, buscador y fechas con atajos.", modulo: "compras", href: "/compras/lista" },
+  { fecha: "2026-10-06", titulo: "Etiquetas con color", texto: "Las etiquetas de las compras se crean, se ponen y se colorean desde el ícono junto al nombre.", modulo: "compras", href: "/compras/lista" },
+];
+
+/** Las novedades que le sirven a una persona (las generales y las de sus módulos). */
+export const novedadesPara = (modulos: string[]) => NOVEDADES.filter((n) => !n.modulo || modulos.includes(n.modulo));
