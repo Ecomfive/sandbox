@@ -29,7 +29,8 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Vista guardada", definicion: "Una combinación de filtros, agrupación y columnas que guardas con nombre en una tabla para volver a ella con un clic." },
   { termino: "Cerrados", definicion: "El botón de la barra de una tabla que muestra lo que ya terminó (compras completadas, retiros conciliados). Por defecto se ocultan." },
   { termino: "Mención (@)", definicion: "Escribir @ y el nombre de alguien en un comentario o nota: le llega un aviso en «Para ti» con el enlace al comentario." },
-  { termino: "SKU", definicion: "El código único de un producto. Es la llave con la que una venta de Dropi o Shopify encuentra el producto para descontar inventario.", modulos: ["producto", "inventario", "compras"] },
+  { termino: "SKU", definicion: "El código único de un producto: lo identifica en el WMS, Shopify, las tiendas y Dropi, y con él una venta encuentra el producto para descontar inventario. Se escribe al crear el producto y después no se cambia.", modulos: ["producto", "inventario", "compras"] },
+  { termino: "N.º de producto", definicion: "El correlativo que pone el sistema al crear un producto (#0001, #0002…). Ordena la lista de productos; no se repite ni se cambia.", modulos: ["producto"] },
   { termino: "Producto simple", definicion: "Un producto que se compra y se guarda tal cual.", modulos: ["producto", "inventario"] },
   { termino: "Producto compuesto (combo)", definicion: "Una combinación de productos simples con su cantidad. No guarda stock: al venderlo se descuenta cada componente.", modulos: ["producto", "inventario"] },
   { termino: "Variante", definicion: "Una versión de un producto (color, talla…). Cada variante tiene su propio SKU y su stock; las compras se hacen por variante, no por el producto padre.", modulos: ["producto", "inventario", "compras"] },
@@ -89,7 +90,7 @@ export const GUIAS: GuiaModulo[] = [
     ruta: "/producto",
     resumen: "El catálogo único de productos (el mismo para todos los países): SKU, foto, variantes, código de barras, envío y compras.",
     secciones: [
-      { titulo: "Crear un producto", pasos: ["Pulsa «Agregar»: elige simple o compuesto, escribe SKU y nombre.", "Marca «Tiene variantes» si se vende en colores o tallas y define sus opciones.", "Arranca en Test; pásalo a Activo cuando se vaya a comprar."] },
+      { titulo: "Crear un producto", pasos: ["Pulsa «Agregar»: elige simple o compuesto, escribe SKU y nombre. El N.º lo pone el sistema.", "Revisa bien el SKU: es el código del producto en todas las plataformas y después no se puede cambiar (el nombre sí).", "Marca «Tiene variantes» si se vende en colores o tallas y define sus opciones.", "Arranca en Test; pásalo a Activo cuando se vaya a comprar."] },
       { titulo: "La ficha del producto", pasos: ["Nombre: escríbelo en el campo «Nombre» del bloque Producto; se guarda al salir del campo o con Enter.", "Foto: «Subir foto» o «Cambiar» arriba de la ficha.", "Código de barras: el del fabricante o «Generar código interno».", "Envío, vencimiento por lote y variantes se configuran en sus bloques."] },
       { titulo: "Histórico de compras", pasos: ["El bloque «Compras» muestra las unidades compradas desde la primera vez, lo invertido y cada compra.", "Solo cuenta las compras donde el producto está vinculado."] },
     ],
@@ -231,6 +232,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-08", titulo: "N.º de producto y SKU fijo", texto: "Cada producto tiene su N.º correlativo, que ordena la lista; el SKU identifica el producto en todas las plataformas y ya no se cambia.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-08", titulo: "Editar el nombre del producto", texto: "En la ficha del producto, el nombre ahora se edita ahí mismo y queda en su actividad.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-08", titulo: "Compras en secuencia por código", texto: "Dentro de cada etapa las compras quedan ordenadas por su código, de mayor a menor, aunque lleguen salteadas.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-07", titulo: "Centro de ayuda", texto: "Glosario, guías de cada módulo, la Universidad con cursos y examen, y los manuales de proceso del equipo.", href: "/ayuda" },

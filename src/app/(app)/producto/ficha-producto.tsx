@@ -16,7 +16,7 @@ import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
 import { VariantesProducto } from "./variantes-producto";
-import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
+import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FotoProducto } from "./foto-producto";
 import { NombreProducto } from "./nombre-producto";
 import { ComprasProducto } from "./compras-producto";
@@ -112,6 +112,7 @@ export function FichaProducto({
       titulo={
         producto && (
           <>
+            {producto.numero !== null && <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroProducto(producto.numero)}</span>}
             <span className="text-lg font-semibold">{producto.codigo}</span>
             <Badge tone="neutral">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Badge>
             <Badge tone={TONO_CLASE[producto.clase]}>{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Badge>
@@ -139,6 +140,7 @@ export function FichaProducto({
                 <Dato etiqueta="Nombre">
                   <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
                 </Dato>
+                <Dato etiqueta="N.º">{numeroProducto(producto.numero)}</Dato>
                 <Dato etiqueta="SKU">{producto.codigo}</Dato>
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
                 <Dato etiqueta="Estado">

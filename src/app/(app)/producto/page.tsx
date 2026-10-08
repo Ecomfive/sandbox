@@ -61,7 +61,7 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos, lineasCompra] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra] = await Promise.all([
     supabase.from("sku_maestro_componentes").select("combo_id, cantidad, componente:componente_id(codigo)"),
     supabase
       .from("wms_producto_variantes")
@@ -71,10 +71,13 @@ export default async function ProductoPage() {
     supabase.from("productos").select("sku_maestro_id, nombre, paises(codigo)").not("sku_maestro_id", "is", null),
     // La foto va aparte: sin la migración 0086 la columna no existe y la lista se carga igual, sin fotos.
     supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
+    // El N.º correlativo va aparte: sin la migración 0089 la columna no existe y la lista se carga igual.
+    supabase.from("skus_maestros").select("id, numero"),
     traerTodasLasFilas<{ sku_maestro_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
       supabase.from("wms_compra_items").select("sku_maestro_id, cantidad_pedida, wms_compras(paises(codigo))").order("id").range(desde, hasta),
     ),
   ]);
+  const numeroPorId = new Map(numeros.error ? [] : ((numeros.data ?? []) as { id: string; numero: number }[]).map((n) => [n.id, Number(n.numero)]));
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
   // Unidades compradas por producto (las líneas vinculadas en Compras); un producto con variantes suma las de sus variantes.
   const padreDe = new Map(lista.filter((p) => p.padre_id).map((p) => [p.id as string, p.padre_id as string]));
@@ -158,6 +161,7 @@ export default async function ProductoPage() {
       paisOrigen: p.pais_origen,
       codigoSa: p.codigo_sa,
     },
+    numero: numeroPorId.get(p.id) ?? null,
     foto: fotoPorId.get(p.id) ?? null,
     unidadesCompradas: compradoPorId.get(p.id) ?? 0,
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
@@ -187,7 +191,7 @@ export default async function ProductoPage() {
       </KpiGroup>
 
       <TablaProducto
-        productos={filas}
+        productos={[...filas].sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0))}
         opcionesSimples={opcionesSimples}
         codigoPais={pais.codigo}
         puedeEscribir={!usuario.modulosSoloLectura.includes("producto")}

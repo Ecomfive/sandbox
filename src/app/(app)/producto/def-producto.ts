@@ -44,8 +44,13 @@ export interface EnvioProducto {
   codigoSa: string | null;
 }
 
+/** «#0195»: el N.º correlativo del producto como se muestra. */
+export const numeroProducto = (n: number | null) => (n === null ? "—" : `#${String(n).padStart(4, "0")}`);
+
 export interface FilaProducto {
   id: string;
+  /** El N.º correlativo (lo pone el sistema al crear; ordena la lista). Sin la migración 0089, null. */
+  numero: number | null;
   /** El SKU: la llave con la que una venta de cualquier plataforma encuentra el producto. */
   codigo: string;
   nombre: string;
@@ -101,6 +106,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
     { id: "comprado", etiqueta: "Unidades compradas", tipo: "numero", valor: (p) => p.unidadesCompradas },
   ],
   csvAntes: [
+    { etiqueta: "N.º", valor: (p) => (p.numero === null ? "" : String(p.numero)) },
     { etiqueta: "SKU", valor: (p) => p.codigo },
     { etiqueta: "Producto", valor: (p) => p.nombre },
     { etiqueta: "Tipo", valor: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },

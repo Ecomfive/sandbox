@@ -8,7 +8,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearProductoPanel } from "./crear-producto-panel";
-import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
+import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FichaProducto } from "./ficha-producto";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
@@ -26,7 +26,8 @@ const ICONOS: Record<string, IconoComp> = {
 };
 
 const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
-  { id: "codigo", label: "SKU", ocultable: false, clase: "font-medium", render: (p) => p.codigo },
+  { id: "numero", label: "N.º", ocultable: false, clase: "tabular-nums text-muted-foreground whitespace-nowrap", render: (p) => numeroProducto(p.numero) },
+  { id: "codigo", label: "SKU", ocultable: true, clase: "font-medium", render: (p) => p.codigo },
   { id: "foto", label: "Foto", ocultable: true, render: (p) => <MiniaturaFoto url={p.foto} nombre={p.nombre} /> },
   { id: "nombre", label: "Producto", ocultable: true, render: (p) => p.nombre },
   { id: "tipo", label: "Tipo", ocultable: true, clase: "text-muted-foreground", render: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
@@ -76,7 +77,7 @@ export function TablaProducto({
         anchoMinimo="48rem"
         accionPrincipal={puedeEscribir ? <CrearProductoPanel opcionesSimples={opcionesSimples} /> : undefined}
         abrirFila={{
-          etiqueta: (p) => `Abrir la ficha del producto ${p.codigo}`,
+          etiqueta: (p) => `Abrir la ficha del producto ${p.codigo} (${numeroProducto(p.numero)})`,
           alAbrir: (p, orden) => setAbierto({ id: p.id, orden }),
         }}
         ariaLabel="Productos"
