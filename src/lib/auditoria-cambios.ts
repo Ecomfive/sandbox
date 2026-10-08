@@ -52,6 +52,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   editar_manual: "Editó un manual de proceso",
   eliminar_manual: "Borró un manual de proceso",
   crear_pais: "Agregó un país",
+  renombrar_tienda: "Cambió el nombre de una tienda",
   generar_codigo_barras: "Generó un código de barras interno",
   cambiar_clase_producto: "Cambió el estado del producto",
   renombrar_producto: "Cambió el nombre",

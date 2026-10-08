@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, subirFotoCompraDesdeUrl, vistaPreviaCompra } from "./actions";
 import { numeroOC } from "./def-compras";
 import { SelectorPais } from "./selector-pais";
+import { PastillaTienda, useTiendas } from "./tiendas";
+import { useRouter } from "next/navigation";
 import { PlanificacionAutomatica } from "./planificacion-automatica";
 import { useToast } from "@/components/ui/toast";
 import { conEmoji, ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
@@ -61,6 +63,7 @@ export function FormularioCompra({
   conProductos = false,
   comentarios,
   alCreada,
+  puedeAgregarPais = false,
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
   vista: string;
@@ -79,6 +82,8 @@ export function FormularioCompra({
   tiendas?: string[];
   /** Compra nueva que ya lleva productos en su bloque: la QTY y el monto saldrán de ellos. */
   conProductos?: boolean;
+  /** Puede modificar Configuración: «Agregar país» al final de la lista de países. */
+  puedeAgregarPais?: boolean;
   /** Compra nueva: el bloque de comentarios en borrador (va al final, como la actividad de la ficha). */
   comentarios?: ReactNode;
   /** Compra nueva: lo que se hace con la compra recién creada antes de cerrar (publicar los comentarios en borrador). */
@@ -88,6 +93,10 @@ export function FormularioCompra({
   colores?: Record<string, string>;
 }) {
   const [modificado, setModificado] = useState(false);
+  const gestionTiendas = useTiendas();
+  const router = useRouter();
+  // Los países para elegir, con los que se agreguen desde aquí mismo.
+  const [listaPaises, setListaPaises] = useState(paises);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const invalido = (id: string) => (faltante === id ? true : undefined);
@@ -217,7 +226,12 @@ export function FormularioCompra({
                 <SelectorPais
                   id="campo-pais-compra"
                   nombre="pais"
-                  paises={paises}
+                  paises={listaPaises}
+                  puedeAgregar={puedeAgregarPais}
+                  alAgregado={(p) => {
+                    setListaPaises((l) => [...l, p]);
+                    router.refresh();
+                  }}
                   valor={pais}
                   invalido={invalido("campo-pais-compra")}
                   alCambiar={(c) => {
@@ -319,7 +333,15 @@ export function FormularioCompra({
               <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
             </Campo>
             <Campo etiqueta={conEmoji("tienda", "Tienda")} id="campo-tienda">
-              <CampoLista id="campo-tienda" nombre="tiendas" etiqueta="tienda" inicial={compra?.tiendas ?? []} todas={tiendas} />
+              <CampoLista
+                id="campo-tienda"
+                nombre="tiendas"
+                etiqueta="tienda"
+                inicial={compra?.tiendas ?? []}
+                todas={tiendas}
+                renderValor={(n) => <PastillaTienda nombre={n} />}
+                gestion={gestionTiendas}
+              />
             </Campo>
           </div>
         </Seccion>

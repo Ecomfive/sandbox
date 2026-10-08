@@ -1,10 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { anilloFoco } from "@/components/ui/field";
 import { MenuDesplegable, claseOpcionMenu } from "@/components/ui/menu-desplegable";
 import { Bandera } from "@/components/paises/bandera";
-import { CrearPaisPanel } from "@/components/paises/crear-pais-panel";
 
 const COOKIE = "compras-vista";
 
@@ -22,18 +20,16 @@ function Icono({ valor }: { valor: string }) {
 
 /**
  * Qué compras se ven: todos los países, uno solo o Importadora, cada país con su bandera. Va en la dirección (`?ver=`)
- * para poder compartirla y se recuerda en una cookie para que se mantenga al pasar de una pestaña a otra. Con permiso de
- * Configuración, «＋ País».
+ * para poder compartirla y se recuerda en una cookie para que se mantenga al pasar de una pestaña a otra. Un país nuevo se
+ * agrega desde «Elige el país» de la compra nueva (o en Configuración).
  */
 export function SelectorVista({
   vista,
   paises,
-  puedeAgregarPais = false,
   verImportadora = true,
 }: {
   vista: string;
   paises: { codigo: string; nombre: string }[];
-  puedeAgregarPais?: boolean;
   /** Sin Importadora entre sus países permitidos, no se ofrece. */
   verImportadora?: boolean;
 }) {
@@ -86,20 +82,6 @@ export function SelectorVista({
           ))
         }
       </MenuDesplegable>
-      {puedeAgregarPais && (
-        <CrearPaisPanel
-          boton={(abrir) => (
-            <button
-              type="button"
-              onClick={abrir}
-              aria-haspopup="dialog"
-              className={`h-[34px] rounded-lg border border-border bg-card px-2.5 text-[13px] whitespace-nowrap hover:bg-muted ${anilloFoco}`}
-            >
-              ＋ País
-            </button>
-          )}
-        />
-      )}
     </div>
   );
 }

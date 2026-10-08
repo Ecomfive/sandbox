@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Compras › Informe: el resumen de la operación de compras por día, semana o mes, de todos los países, uno o Importadora. */
 export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
-  const usuario = await requireModulo("compras");
+  await requireModulo("compras");
   const { ver } = await searchParams;
   const { compras, paises, vista, error, verImportadora } = await cargarCompras(ver);
   return (
@@ -27,7 +27,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           vista={vista}
           verImportadora={verImportadora}
           paises={paises}
-          puedeAgregarPais={usuario.modulos.includes("configuracion") && !usuario.modulosSoloLectura.includes("configuracion")}
         />
       )}
     </Pagina>

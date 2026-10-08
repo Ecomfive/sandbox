@@ -6,6 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { combinarLista } from "@/lib/compras/lote";
 import { CerrarIcon, MasIcon } from "@/lib/nav-icons";
 import { PanelLista } from "./selector-lista";
+import type { GestionTiendas } from "./tiendas";
 
 /**
  * Una lista de nombres dentro de la ficha de una compra (la tienda): los nombres puestos como pastillas, cada una con su ✕, y
@@ -20,6 +21,7 @@ export function CampoLista({
   inicial,
   todas,
   renderValor,
+  gestion,
 }: {
   /** El `id` del botón «Añadir» (la etiqueta del campo apunta a él). */
   id: string;
@@ -31,6 +33,8 @@ export function CampoLista({
   todas: string[];
   /** Cómo se dibuja cada nombre, en la ficha y en el panel (las etiquetas, con su color); por defecto, el texto. */
   renderValor?: (nombre: string) => ReactNode;
+  /** Las tiendas: color y nombre editables desde el panel. */
+  gestion?: GestionTiendas | null;
 }) {
   const [valores, setValores] = useState(inicial);
   const [abierto, setAbierto] = useState(false);
@@ -100,6 +104,8 @@ export function CampoLista({
             setAbierto(false);
             if (m === "escape") boton.current?.focus();
           }}
+          gestion={gestion}
+          alRenombrado={(antes, despues) => setValores((a) => (a.includes(antes) ? combinarLista(a.filter((x) => x !== antes), "agregar", [despues]) : a))}
         />
       )}
     </div>

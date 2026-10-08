@@ -1,7 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
-import { cargarColoresEtiquetas, cargarCompras } from "../datos-compras";
+import { cargarColoresEtiquetas, cargarColoresTiendas, cargarCompras } from "../datos-compras";
 import type { Grupo } from "../calculos-compras";
 import { TablaCompras } from "../tabla-compras";
 
@@ -15,7 +15,7 @@ const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atr
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("compras");
   const { ver, grupo, etapa, abrir, comentario } = await searchParams;
-  const [{ compras, paises, vista, error, verImportadora }, coloresEtiquetas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas()]);
+  const [{ compras, paises, vista, error, verImportadora }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -37,6 +37,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
           etapaInicial={typeof etapa === "string" ? etapa : ""}
           abrirInicial={typeof abrir === "string" ? abrir : null}
           coloresEtiquetas={coloresEtiquetas}
+          coloresTiendas={coloresTiendas}
           comentarioInicial={typeof comentario === "string" ? comentario : null}
         />
       )}

@@ -18,6 +18,7 @@ export function CrearCompraPanel({
   tiendas,
   etiquetas,
   colores,
+  puedeAgregarPais = false,
 }: {
   vista: string;
   paises: { id: string; codigo: string; nombre: string }[];
@@ -26,6 +27,7 @@ export function CrearCompraPanel({
   /** Las etiquetas que ya existen y sus colores. */
   etiquetas?: string[];
   colores?: Record<string, string>;
+  puedeAgregarPais?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -58,6 +60,7 @@ export function CrearCompraPanel({
           tiendas={tiendas}
           etiquetas={etiquetas}
           colores={colores}
+          puedeAgregarPais={puedeAgregarPais}
           alGuardar={cerrar}
           alCambiarGuardando={setGuardando}
           conProductos={lineas > 0}

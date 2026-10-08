@@ -9,6 +9,7 @@ import { numeroOC, type FilaCompra } from "./def-compras";
 import { CAMPOS_EDITABLES, type CampoEditable } from "./def-edicion-compras";
 import { claseCampoPanel, claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
 import { PanelLista } from "./selector-lista";
+import { PastillaTienda, useTiendas } from "./tiendas";
 
 export type GuardarCelda = (compra: FilaCompra, campo: string, valor: unknown) => void;
 
@@ -48,6 +49,7 @@ export function CeldaEditable({
   const def = CAMPOS_EDITABLES[campo];
   const [abierto, setAbierto] = useState(false);
   const boton = useRef<HTMLButtonElement>(null);
+  const tiendas = useTiendas();
 
   if (!puedeEscribir || !def || (def.soloSinProductos && compra.productos > 0)) return <>{children}</>;
 
@@ -95,6 +97,8 @@ export function CeldaEditable({
             }}
             alCrear={(n) => guardar(compra, campo, combinarLista(compra[def.prop] as string[], "agregar", [n]))}
             alCerrar={cerrar}
+            renderOpcion={campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
+            gestion={campo === "tienda" ? tiendas : null}
           />
         ) : def.tipo === "multiple" ? (
           <EditorOpciones

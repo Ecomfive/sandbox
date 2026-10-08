@@ -13,6 +13,7 @@ import { CAMPOS_EDITABLES } from "./def-edicion-compras";
 import { claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
 import { PastillaEtiqueta } from "./selector-etiquetas";
 import { PanelLista } from "./selector-lista";
+import { PastillaTienda, useTiendas } from "./tiendas";
 
 /** Lo que la barra le pide a la lista: guardar un dato en todas las compras marcadas. */
 export type AplicarEnLote = (campo: string, valor: unknown, modo?: ModoLote) => void;
@@ -339,6 +340,7 @@ function EditorListaLote({
 }) {
   const def = CAMPOS_EDITABLES[campo];
   const listas = filas.map((f) => f[def.prop] as string[]);
+  const tiendas = useTiendas();
   return (
     <PanelLista
       ancla={ancla}
@@ -348,7 +350,8 @@ function EditorListaLote({
         const p = presenciaEnLote(listas, n);
         return p === "todas" ? "si" : p === "algunas" ? "algunas" : "no";
       }}
-      renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : undefined}
+      renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
+      gestion={campo === "tienda" ? tiendas : null}
       placeholder={campo === "etiquetas" ? "Buscar o añadir etiquetas…" : `Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
       alAlternar={(n) => aplicar(campo, [n], presenciaEnLote(listas, n) === "todas" ? "quitar" : "agregar")}
       alCrear={(n) => aplicar(campo, [n], "agregar")}

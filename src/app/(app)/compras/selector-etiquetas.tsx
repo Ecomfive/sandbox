@@ -41,6 +41,8 @@ export const COLORES_ETIQUETA = [
   "#E5484D",
   "#D6409F",
   "#8E4EC6",
+  "#00A2C7",
+  "#A18072",
   "#8D8D8D",
   "#202020",
 ];

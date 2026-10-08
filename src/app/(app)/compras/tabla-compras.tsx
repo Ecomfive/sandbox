@@ -13,7 +13,8 @@ import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, Gas
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { combinarLista, type ModoLote } from "@/lib/compras/lote";
-import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta } from "./actions";
+import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta, guardarColorTienda, renombrarTienda } from "./actions";
+import { colorTiendaAutomatico, PastillaTienda, ProveedorTiendas, type GestionTiendas } from "./tiendas";
 import { BarraLoteCompras } from "./barra-lote-compras";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
 import { EtiquetasCompra, PastillaEtiqueta } from "./selector-etiquetas";
@@ -236,9 +237,9 @@ function columnas(
           c,
           "tienda",
           c.tiendas.length ? (
-            <span className="flex flex-col">
+            <span className="flex flex-col items-start gap-0.5">
               {c.tiendas.map((t) => (
-                <span key={t}>{t}</span>
+                <PastillaTienda key={t} nombre={t} />
               ))}
             </span>
           ) : (
@@ -298,6 +299,7 @@ export function TablaCompras({
   abrirInicial = null,
   comentarioInicial = null,
   coloresEtiquetas = {},
+  coloresTiendas: coloresTiendasServidor = {},
 }: {
   compras: FilaCompra[];
   vista: string;
@@ -305,7 +307,7 @@ export function TablaCompras({
   verImportadora?: boolean;
   paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
-  /** Puede modificar Configuración: ve «＋ País» junto al selector. */
+  /** Puede modificar Configuración: agrega un país desde «Elige el país» de la compra nueva. */
   puedeAgregarPais: boolean;
   /** Filtro de un toque con que se llega (los enlaces del informe y del dashboard). */
   grupoInicial: Grupo | null;
@@ -316,6 +318,8 @@ export function TablaCompras({
   comentarioInicial?: string | null;
   /** El color elegido de cada etiqueta (por su nombre). */
   coloresEtiquetas?: Record<string, string>;
+  /** El color elegido de cada tienda (por su nombre). */
+  coloresTiendas?: Record<string, string>;
 }) {
   const { mostrarToast } = useToast();
   const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
@@ -450,6 +454,50 @@ export function TablaCompras({
   );
   // Las tiendas que ya existen en alguna compra (con lo recién creado, que se ve al instante), para elegir.
   const todasTiendas = useMemo(() => [...new Set(compras.flatMap((c) => c.tiendas))].sort((a, b) => a.localeCompare(b, "es")), [compras]);
+  // Las tiendas, como las etiquetas: su color (se ve al instante; si el servidor lo rechaza, vuelve) y su nombre, que se cambia
+  // en todas las compras a la vez.
+  const [coloresTiendas, setColoresTiendas] = useState(coloresTiendasServidor);
+  const gestionTiendas = useMemo<GestionTiendas>(
+    () => ({
+      colorDe: (nombre) => coloresTiendas[nombre] ?? colorTiendaAutomatico(nombre),
+      cambiarColor: (nombre, color) => {
+        const antes = coloresTiendas[nombre];
+        setColoresTiendas((c) => ({ ...c, [nombre]: color }));
+        void guardarColorTienda(nombre, color).then((r) => {
+          if (!r.error) return;
+          mostrarToast(r.error, "destructive");
+          setColoresTiendas((c) => {
+            const siguiente = { ...c };
+            if (antes) siguiente[nombre] = antes;
+            else delete siguiente[nombre];
+            return siguiente;
+          });
+        });
+      },
+      renombrar: async (antes, despues) => {
+        const r = await renombrarTienda(antes, despues).catch(() => ({ error: "No se pudo cambiar el nombre." }) as { error?: string; compras?: number; nombre?: string });
+        if (r.error) {
+          mostrarToast(r.error, "destructive");
+          return false;
+        }
+        const nombre = r.nombre ?? despues;
+        setCambios((o) => {
+          const siguiente = { ...o };
+          for (const c of compras) if (c.tiendas.includes(antes)) siguiente[c.id] = { ...siguiente[c.id], tiendas: [...new Set(c.tiendas.map((t) => (t === antes ? nombre : t)))] };
+          return siguiente;
+        });
+        setColoresTiendas((c) => {
+          const siguiente = { ...c };
+          if (siguiente[antes] && !siguiente[nombre]) siguiente[nombre] = siguiente[antes];
+          delete siguiente[antes];
+          return siguiente;
+        });
+        mostrarToast(`Tienda renombrada en ${r.compras ?? 0} ${r.compras === 1 ? "compra" : "compras"}`);
+        return true;
+      },
+    }),
+    [coloresTiendas, compras, mostrarToast],
+  );
   const edicion = useMemo(
     () => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, colores, cambiarColor }),
     [puedeEscribir, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
@@ -470,7 +518,8 @@ export function TablaCompras({
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
   return (
-    // El resumen de la derecha aparece al elegir una compra; sin elegir, la tabla usa todo el ancho.
+    <ProveedorTiendas value={gestionTiendas}>
+    {/* El resumen de la derecha aparece al elegir una compra; sin elegir, la tabla usa todo el ancho. */}
     <div className={!resumen ? "flex flex-col" : fichaMinimizada ? claseFichaMinimizada : claseConFicha}>
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtros rápidos">
@@ -569,8 +618,8 @@ export function TablaCompras({
           }
           accionPrincipal={
             <div className="flex items-center gap-2">
-              <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} puedeAgregarPais={puedeAgregarPais} />
-              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} />}
+              <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} />
+              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} />}
             </div>
           }
           ariaLabel="Tablero de compras"
@@ -604,5 +653,6 @@ export function TablaCompras({
         comentarioResaltado={abierta?.id === abrirInicial ? comentarioInicial : null}
       />
     </div>
+    </ProveedorTiendas>
   );
 }

@@ -21,9 +21,22 @@ async function siguientePrefijoLibre(): Promise<string> {
  * Los países son de toda la empresa, así que pide poder modificar Configuración. Devuelve el error como valor.
  */
 export async function crearPais(formData: FormData): Promise<{ error?: string }> {
+  const r = await agregarPais(String(formData.get("codigo") ?? ""), String(formData.get("nombre") ?? ""));
+  return r.error ? { error: r.error } : {};
+}
+
+/**
+ * Lo mismo, desde «Agregar país» de la compra nueva (se elige de la lista de países del mundo): devuelve el país agregado
+ * para elegirlo ahí mismo.
+ */
+export async function agregarPaisRapido(codigo: string, nombre: string): Promise<{ error?: string; pais?: { id: string; codigo: string; nombre: string } }> {
+  return agregarPais(codigo, nombre);
+}
+
+async function agregarPais(codigoBruto: string, nombreBruto: string): Promise<{ error?: string; pais?: { id: string; codigo: string; nombre: string } }> {
   await requireModuloEscritura("configuracion");
-  const codigo = String(formData.get("codigo") ?? "").trim().toUpperCase();
-  const nombre = String(formData.get("nombre") ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+  const codigo = String(codigoBruto ?? "").trim().toUpperCase();
+  const nombre = String(nombreBruto ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
   if (!/^[A-Z]{2}$/.test(codigo)) return { error: "El código son dos letras (el código ISO del país, Ej: MX)." };
   if (!nombre) return { error: "Escribe el nombre del país." };
 
@@ -38,7 +51,7 @@ export async function crearPais(formData: FormData): Promise<{ error?: string }>
   await registrarAuditoria({ accion: "crear_pais", entidad: "paises", entidadId: data.id, detalle: `${codigo} · ${nombre} · compras ${prefijo}` });
   revalidatePath("/configuracion");
   revalidatePath("/compras");
-  return {};
+  return { pais: { id: data.id as string, codigo, nombre } };
 }
 
 /**

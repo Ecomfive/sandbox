@@ -1030,6 +1030,71 @@ export async function quitarProductoCompra(itemId: string): Promise<{ error?: st
   return {};
 }
 
+/** Elige el color de una tienda de Compras (como el de las etiquetas): vale para todas las compras que la tengan. */
+export async function guardarColorTienda(nombre: string, color: string): Promise<{ error?: string }> {
+  await requireModuloEscritura("compras");
+  const limpio = String(nombre ?? "").trim().slice(0, 60);
+  if (!limpio) return { error: "Tienda no válida." };
+  if (!/^#[0-9a-fA-F]{6}$/.test(String(color))) return { error: "Color no válido." };
+  const { error } = await createServiceClient()
+    .from("wms_compras_tiendas")
+    .upsert({ nombre: limpio, color, actualizado_en: new Date().toISOString() }, { onConflict: "nombre" });
+  if (error) return { error: "No se pudo guardar el color." };
+  return {};
+}
+
+/**
+ * Cambia el nombre de una tienda **en todas las compras** que la tienen (de todos los países), con su color. Si el nombre
+ * nuevo ya es otra tienda, se juntan. Como toca compras de todos los países, solo lo hace quien ve todos. Cada compra deja
+ * la línea en su Actividad. Devuelve cuántas compras cambiaron.
+ */
+export async function renombrarTienda(antes: string, despues: string): Promise<{ error?: string; compras?: number; nombre?: string }> {
+  await requireModuloEscritura("compras");
+  if ((await getUsuarioActual())?.paisesPermitidos != null) return { error: "Renombrar una tienda cambia las compras de todos los países: pídeselo a quien los ve todos." };
+  const viejo = String(antes ?? "").trim();
+  const escrito = String(despues ?? "").replace(/,/g, " ").trim().replace(/\s+/g, " ").slice(0, 60);
+  if (!viejo || !escrito) return { error: "Escribe el nombre nuevo de la tienda." };
+  if (viejo === escrito) return { compras: 0, nombre: viejo };
+  const supabase = createServiceClient();
+
+  const filas = await traerTodasLasFilas<{ id: string; tiendas: string[] }>((desde, hasta) =>
+    supabase.from("wms_compras").select("id, tiendas").contains("tiendas", [viejo]).order("id").range(desde, hasta),
+  );
+  // Si ya existe una tienda con ese nombre (sin importar mayúsculas), se usa como está escrita: se juntan.
+  const { data: conColor } = await supabase.from("wms_compras_tiendas").select("nombre, color");
+  const colores = (conColor ?? []) as { nombre: string; color: string }[];
+  const nombre = colores.find((c) => c.nombre !== viejo && c.nombre.toLowerCase() === escrito.toLowerCase())?.nombre ?? escrito;
+
+  const nuevas = (t: string[]) => [...new Set(t.map((x) => (x === viejo ? nombre : x)))];
+  for (let i = 0; i < filas.length; i += 20) {
+    const tramo = filas.slice(i, i + 20);
+    const r = await Promise.all(tramo.map((f) => supabase.from("wms_compras").update({ tiendas: nuevas(f.tiendas), actualizado_en: new Date().toISOString() }).eq("id", f.id)));
+    if (r.some((x) => x.error)) return { error: "No se pudo cambiar el nombre en todas las compras; vuelve a intentarlo." };
+  }
+
+  const color = colores.find((c) => c.nombre === viejo)?.color;
+  if (color) await supabase.from("wms_compras_tiendas").upsert({ nombre, color }, { onConflict: "nombre", ignoreDuplicates: true });
+  await supabase.from("wms_compras_tiendas").delete().eq("nombre", viejo);
+
+  if (filas.length) {
+    const usuario = await getUsuarioActual();
+    const base = Date.now();
+    await supabase.from("wms_compra_eventos").insert(
+      filas.map((f, i) => ({
+        compra_id: f.id,
+        campo: "tienda",
+        valor_antes: textoSimple(f.tiendas),
+        valor_despues: textoSimple(nuevas(f.tiendas)),
+        ocurrido_en: new Date(base + i).toISOString(),
+        autor: usuario?.nombre || usuario?.email || null,
+        origen: "sistema",
+      })),
+    );
+  }
+  await registrarAuditoria({ accion: "renombrar_tienda", entidad: "wms_compras", detalle: `${viejo} → ${nombre} (${filas.length} compras)` });
+  return { compras: filas.length, nombre };
+}
+
 /** Elige el color de una etiqueta de Compras (como en ClickUp): vale para todas las compras que la tengan. */
 export async function guardarColorEtiqueta(nombre: string, color: string): Promise<{ error?: string }> {
   await requireModuloEscritura("compras");
