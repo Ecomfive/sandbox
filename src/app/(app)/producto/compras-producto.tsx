@@ -15,10 +15,11 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  * El histórico de compras de un producto (bloque «Compras» de su ficha en Producto y en Inventario): arriba lo comprado desde
  * la primera vez (unidades, total, costo promedio, cuántas compras y entre qué fechas; por país si se compra en varios) y
  * debajo cada compra, de la más nueva a la más vieja, que se abre en Compras. Solo cuenta las compras con el producto
- * vinculado (Compras › Productos). Con `limite` muestra solo las últimas.
+ * vinculado (Compras › Productos). Con `limite` muestra solo las últimas. Con `pais` (Inventario, que es de un país) cuenta y
+ * lista solo las compras de ese país, y dice aparte lo comprado en todos.
  */
-export function ComprasProducto({ id, limite }: { id: string; limite?: number }) {
-  const [datos, setDatos] = useState<CompraDeProducto[] | "error" | null>(null);
+export function ComprasProducto({ id, limite, pais }: { id: string; limite?: number; pais?: string }) {
+  const [cargadas, setDatos] = useState<CompraDeProducto[] | "error" | null>(null);
 
   useEffect(() => {
     let vigente = true;
@@ -30,14 +31,28 @@ export function ComprasProducto({ id, limite }: { id: string; limite?: number })
     };
   }, [id]);
 
-  if (datos === null) return <p className="text-sm text-muted-foreground">Cargando…</p>;
-  if (datos === "error")
+  if (cargadas === null) return <p className="text-sm text-muted-foreground">Cargando…</p>;
+  if (cargadas === "error")
     return (
       <p role="alert" className="text-sm text-destructive">
         No se pudieron cargar las compras.
       </p>
     );
-  if (datos.length === 0) return <p className="text-sm text-muted-foreground">Todavía no hay compras vinculadas a este producto.</p>;
+  const todas = cargadas;
+  let datos = cargadas;
+  const unidadesTodas = todas.reduce((t, c) => t + c.unidades, 0);
+  const enOtros = pais ? todas.some((c) => c.pais !== pais) : false;
+  if (pais) datos = datos.filter((c) => c.pais === pais);
+  const otrosPaises = enOtros && (
+    <p className="m-0 text-xs text-muted-foreground">En todos los países: {entero(unidadesTodas)} u. en {entero(todas.length)} compras (el detalle está en la ficha del producto).</p>
+  );
+  if (datos.length === 0)
+    return (
+      <div className="flex flex-col gap-1">
+        <p className="m-0 text-sm text-muted-foreground">{pais ? `Todavía no hay compras de este producto en ${pais}.` : "Todavía no hay compras vinculadas a este producto."}</p>
+        {otrosPaises}
+      </div>
+    );
 
   const unidades = datos.reduce((t, c) => t + c.unidades, 0);
   const conCosto = datos.filter((c) => c.total !== null);
@@ -59,7 +74,8 @@ export function ComprasProducto({ id, limite }: { id: string; limite?: number })
       </dl>
       <p className="m-0 text-xs text-muted-foreground">
         {datos.length === 1 ? `El ${formatearFecha(primera)}` : `Del ${formatearFecha(primera)} al ${formatearFecha(ultima)}`}
-        {porPais.size > 1 &&
+        {!pais &&
+          porPais.size > 1 &&
           ` · ${[...porPais]
             .sort((a, b) => b[1] - a[1])
             .map(([p, n]) => `${p}: ${entero(n)} u.`)
@@ -82,6 +98,7 @@ export function ComprasProducto({ id, limite }: { id: string; limite?: number })
           </li>
         ))}
       </ul>
+      {otrosPaises}
       {limite && datos.length > limite && (
         <p className="m-0 text-xs text-muted-foreground">
           Y {datos.length - limite} compras más: el histórico completo está en la ficha del producto (Producto).

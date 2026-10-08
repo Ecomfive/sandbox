@@ -54,6 +54,7 @@ export function FichaStock({
   bodegasPropias,
   ubicaciones,
   puedeEscribir,
+  codigoPais,
   alCerrar,
   alCambiar,
 }: {
@@ -61,6 +62,8 @@ export function FichaStock({
   bodegasPropias: BodegaOpcion[];
   ubicaciones: UbicacionOpcion[];
   puedeEscribir: boolean;
+  /** Las compras que se ven son las de este país, como el stock. */
+  codigoPais: string;
   alCerrar: () => void;
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
@@ -189,7 +192,7 @@ export function FichaStock({
 
             {!esCombo && (
               <Seccion icono={ComprasIcon} titulo="Compras">
-                <ComprasProducto key={sku.id} id={sku.id} limite={5} />
+                <ComprasProducto key={sku.id} id={sku.id} limite={5} pais={codigoPais} />
               </Seccion>
             )}
 

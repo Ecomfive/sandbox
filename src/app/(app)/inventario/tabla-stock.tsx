@@ -84,6 +84,7 @@ export function TablaStock({
   bodegasPropias,
   ubicaciones,
   puedeEscribir,
+  codigoPais,
 }: {
   filas: FilaStock[];
   bodegas: { id: string; nombre: string; externa: boolean }[];
@@ -91,6 +92,8 @@ export function TablaStock({
   bodegasPropias: BodegaOpcion[];
   ubicaciones: UbicacionOpcion[];
   puedeEscribir: boolean;
+  /** El país de la barra de arriba: la ficha muestra las compras de ese país (el stock también es de ese país). */
+  codigoPais: string;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -116,6 +119,7 @@ export function TablaStock({
         bodegasPropias={bodegasPropias}
         ubicaciones={ubicaciones}
         puedeEscribir={puedeEscribir}
+        codigoPais={codigoPais}
         alCerrar={() => setAbierto(null)}
         alCambiar={() => router.refresh()}
       />
