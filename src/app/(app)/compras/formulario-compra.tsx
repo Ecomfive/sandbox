@@ -11,6 +11,7 @@ import { fieldClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { CampoLista } from "./campo-lista";
+import { PastillaEtiqueta } from "./selector-etiquetas";
 import {
   CalendarioIcon,
   CheckIcon,
@@ -52,6 +53,8 @@ export function FormularioCompra({
   acciones,
   productos,
   tiendas = [],
+  etiquetas = [],
+  colores = {},
   conProductos = false,
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
@@ -71,6 +74,9 @@ export function FormularioCompra({
   tiendas?: string[];
   /** Compra nueva que ya lleva productos en su bloque: la QTY y el monto saldrán de ellos. */
   conProductos?: boolean;
+  /** Las etiquetas que ya existen y el color de cada una, para el campo Etiquetas (el mismo selector de la columna). */
+  etiquetas?: string[];
+  colores?: Record<string, string>;
 }) {
   const [modificado, setModificado] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -191,7 +197,14 @@ export function FormularioCompra({
               </Campo>
             )}
             <Campo etiqueta={conEmoji("etiquetas", "Etiquetas")} id="campo-etiquetas-compra">
-              <input id="campo-etiquetas-compra" type="text" name="etiquetas" defaultValue={compra?.etiquetas.join(", ") ?? ""} placeholder="Ej: reposición, kenku" className={fieldClass} />
+              <CampoLista
+                id="campo-etiquetas-compra"
+                nombre="etiquetas"
+                etiqueta="etiqueta"
+                inicial={compra?.etiquetas ?? []}
+                todas={etiquetas}
+                renderValor={(n) => <PastillaEtiqueta nombre={n} color={colores[n]} />}
+              />
             </Campo>
           </div>
           {productos && (

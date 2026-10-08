@@ -14,11 +14,16 @@ export function CrearCompraPanel({
   vista,
   paises,
   tiendas,
+  etiquetas,
+  colores,
 }: {
   vista: string;
   paises: { id: string; codigo: string; nombre: string }[];
   /** Las tiendas que ya existen en otras compras, para elegir en el campo Tienda. */
   tiendas?: string[];
+  /** Las etiquetas que ya existen y sus colores. */
+  etiquetas?: string[];
+  colores?: Record<string, string>;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -45,6 +50,8 @@ export function CrearCompraPanel({
           vista={vista}
           paises={paises}
           tiendas={tiendas}
+          etiquetas={etiquetas}
+          colores={colores}
           alGuardar={cerrar}
           alCambiarGuardando={setGuardando}
           conProductos={lineas > 0}

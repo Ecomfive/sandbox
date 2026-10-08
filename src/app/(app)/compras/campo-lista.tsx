@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { combinarLista } from "@/lib/compras/lote";
@@ -19,6 +19,7 @@ export function CampoLista({
   etiqueta,
   inicial,
   todas,
+  renderValor,
 }: {
   /** El `id` del botón «Añadir» (la etiqueta del campo apunta a él). */
   id: string;
@@ -28,6 +29,8 @@ export function CampoLista({
   etiqueta: string;
   inicial: string[];
   todas: string[];
+  /** Cómo se dibuja cada nombre, en la ficha y en el panel (las etiquetas, con su color); por defecto, el texto. */
+  renderValor?: (nombre: string) => ReactNode;
 }) {
   const [valores, setValores] = useState(inicial);
   const [abierto, setAbierto] = useState(false);
@@ -54,8 +57,11 @@ export function CampoLista({
       {/* El valor que viaja al guardar; no se ve ni se usa con el teclado. */}
       <input ref={oculto} type="text" name={nombre} aria-label={etiqueta} defaultValue={inicial.join(", ")} tabIndex={-1} readOnly aria-hidden="true" className="sr-only" />
       {valores.map((v) => (
-        <span key={v} className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted py-0.5 pr-1 pl-2.5 text-xs">
-          <span className="truncate">{v}</span>
+        <span
+          key={v}
+          className={`inline-flex max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs ${renderValor ? "pl-0.5" : "border border-border bg-muted pl-2.5"}`}
+        >
+          {renderValor ? renderValor(v) : <span className="truncate">{v}</span>}
           <Tooltip texto={`Quitar ${v}`}>
             <button
               type="button"
@@ -86,6 +92,7 @@ export function CampoLista({
           etiqueta={`Elegir ${etiqueta}`}
           opciones={[...todas, ...valores]}
           marca={(n) => (hay(n) ? "si" : "no")}
+          renderOpcion={renderValor}
           placeholder={`Buscar o añadir ${etiqueta}…`}
           alAlternar={(n) => setValores((a) => combinarLista(a, hay(n) ? "quitar" : "agregar", [n]))}
           alCrear={(n) => setValores((a) => combinarLista(a, "agregar", [n]))}

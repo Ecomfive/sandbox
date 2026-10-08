@@ -136,11 +136,16 @@ export function FichaCompra({
   alCerrar,
   comentarioResaltado,
   tiendas,
+  etiquetas,
+  colores,
 }: {
   /** El comentario al que lleva un aviso «Para ti» (se señala y se muestra). */
   comentarioResaltado?: string | null;
   /** Las tiendas que ya existen en otras compras, para elegir en el campo Tienda. */
   tiendas?: string[];
+  /** Las etiquetas que ya existen y sus colores, para el campo Etiquetas. */
+  etiquetas?: string[];
+  colores?: Record<string, string>;
   /** La compra que se ve; sin ella el panel está cerrado. */
   compra: FilaCompra | undefined;
   /** Las claves de las compras en el orden de la tabla. */
@@ -226,6 +231,8 @@ export function FichaCompra({
               paises={paises}
               compra={compra}
               tiendas={tiendas}
+              etiquetas={etiquetas}
+              colores={colores}
               botonesArriba
               acciones={<EliminarCompraBoton id={compra.id} nombre={compra.nombre} alEliminar={alCerrar} />}
               alGuardar={alGuardar}

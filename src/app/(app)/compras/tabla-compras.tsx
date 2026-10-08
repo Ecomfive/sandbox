@@ -565,7 +565,7 @@ export function TablaCompras({
           accionPrincipal={
             <div className="flex items-center gap-2">
               <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} puedeAgregarPais={puedeAgregarPais} />
-              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} />}
+              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} />}
             </div>
           }
           ariaLabel="Tablero de compras"
@@ -588,6 +588,8 @@ export function TablaCompras({
       )}
       <FichaCompra
         tiendas={todasTiendas}
+        etiquetas={todasEtiquetas}
+        colores={colores}
         compra={completa}
         orden={abierta?.orden ?? []}
         paises={paises}
