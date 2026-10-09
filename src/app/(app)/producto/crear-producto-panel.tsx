@@ -6,7 +6,9 @@ import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CalendarioIcon, CatalogoIcon, ProductoIcon } from "@/lib/nav-icons";
-import { crearProducto, revisarSku, sugerirSkuLibre } from "./actions";
+import { svgCodigoBarras } from "@/lib/wms/codigo-barras";
+import { crearProducto, reservarCodigoBarrasInterno, revisarSku, sugerirSkuLibre } from "./actions";
+import { imprimirEtiqueta } from "./codigo-barras-producto";
 import { ComboBuilder } from "./combo-builder";
 import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 
@@ -22,6 +24,17 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
   // uno interno; si trae el del fabricante, se elige y se escribe. Un compuesto normalmente no lleva.
   const [origenBarras, setOrigenBarras] = useState<"interno" | "fabricante" | "ninguno" | null>(null);
   const barras = origenBarras ?? (combo ? "ninguno" : "interno");
+  // El código interno que tendrá: se separa al elegir «Interno» para verlo (número y etiqueta) antes de crear.
+  const [interno, setInterno] = useState<string | null>(null);
+  const [pidiendo, setPidiendo] = useState(false);
+  async function pedirInterno() {
+    if (interno || pidiendo) return;
+    setPidiendo(true);
+    const r = await reservarCodigoBarrasInterno().catch(() => ({ codigo: undefined }));
+    setPidiendo(false);
+    if (r.codigo) setInterno(r.codigo);
+  }
+  const svgInterno = interno ? svgCodigoBarras(interno, { modulo: 2, alto: 56 }) : null;
   // El nombre y el SKU se siguen para sugerir los de las variantes.
   const [nombre, setNombre] = useState("");
   const [codigo, setCodigo] = useState("");
@@ -54,7 +67,10 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
         setCodigo("");
         setConVariantes(false);
         setOrigenBarras(null);
+        // El interno se separa al abrir (y se conserva hasta crear el producto: abrir y cerrar no gasta otro número).
+        void pedirInterno();
       }}
+      alGuardar={() => setInterno(null)}
       puedeExtra={!sinComponentes}
       alPulsarSinCompletar={() => document.getElementById("campo-componentes")?.scrollIntoView({ block: "center" })}
     >
@@ -153,11 +169,37 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 ] as const
               ).map((o) => (
                 <label key={o.valor} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="radio" name="barras_origen" value={o.valor} checked={barras === o.valor} onChange={() => setOrigenBarras(o.valor)} className="h-4 w-4 accent-[var(--foreground)]" />
+                  <input type="radio" name="barras_origen" value={o.valor} checked={barras === o.valor} onChange={() => {
+                      setOrigenBarras(o.valor);
+                      if (o.valor === "interno") void pedirInterno();
+                    }} className="h-4 w-4 accent-[var(--foreground)]" />
                   {o.etiqueta}
                 </label>
               ))}
             </fieldset>
+            {barras === "interno" && (
+              <div className="flex flex-col gap-2">
+                <input type="hidden" name="codigo_barras_interno" value={interno ?? ""} />
+                {svgInterno ? (
+                  <>
+                    <p className="m-0 text-sm">
+                      Código: <span className="font-mono font-medium tracking-wide">{interno}</span>
+                    </p>
+                    {/* El SVG lo arma `svgCodigoBarras` solo con los números del código interno: no lleva texto de ninguna persona. */}
+                    <div className="w-fit max-w-full overflow-x-auto rounded-md border border-border bg-white p-2" dangerouslySetInnerHTML={{ __html: svgInterno }} />
+                    <button
+                      type="button"
+                      onClick={() => imprimirEtiqueta(svgInterno, nombre || "Producto nuevo", codigo || "—")}
+                      className="w-fit rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+                    >
+                      Imprimir etiqueta
+                    </button>
+                  </>
+                ) : (
+                  <p className="m-0 text-xs text-muted-foreground">{pidiendo ? "Generando el código…" : "El código se genera al crear el producto."}</p>
+                )}
+              </div>
+            )}
             {barras === "fabricante" && (
               <Campo etiqueta="Código de barras del fabricante" id="campo-barras-producto" obligatorio faltante={faltante}>
                 <input

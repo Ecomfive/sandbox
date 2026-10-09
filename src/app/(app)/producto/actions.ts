@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { esCodigoBarrasValido, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
+import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
@@ -33,6 +33,9 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   const barras = origenBarras === "interno" || origenBarras === "ninguno" ? "" : normalizarCodigoBarras(texto(formData, "codigo_barras"));
   const generarBarras = origenBarras ? origenBarras === "interno" : texto(formData, "generar_barras") === "1";
   if (origenBarras === "fabricante" && !barras) return { error: "Escribe el código de barras del fabricante (o elige uno interno)." };
+  // El interno que ya se vio en la ficha (separado al abrirla); se revisa que sea de verdad uno interno.
+  const reservado = normalizarCodigoBarras(texto(formData, "codigo_barras_interno"));
+  const internoVisto = generarBarras && esCodigoInterno(reservado) ? reservado : "";
   // Un producto que caduca se controla por lote y fecha de vencimiento; un compuesto no (sale de sus componentes).
   const manejaVencimiento = texto(formData, "maneja_vencimiento") === "1";
   const diasAvisoTexto = texto(formData, "dias_aviso_vencimiento");
@@ -74,7 +77,16 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
 
   const { data, error } = await supabase
     .from("skus_maestros")
-    .insert({ codigo, nombre, tipo, clase, estado: "aprobado", creado_por: usuario.id, ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : {}), ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso } : {}) })
+    .insert({
+      codigo,
+      nombre,
+      tipo,
+      clase,
+      estado: "aprobado",
+      creado_por: usuario.id,
+      ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : internoVisto ? { codigo_barras: internoVisto, codigo_barras_origen: "interno" } : {}),
+      ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso } : {}),
+    })
     .select("id")
     .single();
   if (error) {
@@ -109,7 +121,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   }
 
   // Si se pidió un código interno y no se pudo generar, el producto queda creado: se genera después desde su ficha.
-  if (generarBarras) await supabase.rpc("wms_asignar_codigo_barras_interno", { p_sku: data.id });
+  if (generarBarras && !internoVisto) await supabase.rpc("wms_asignar_codigo_barras_interno", { p_sku: data.id });
 
   await registrarAuditoria({
     accion: "crear_producto",
@@ -196,6 +208,18 @@ export async function vincularProductoASku(formData: FormData) {
   const { error } = await supabase.from("productos").update({ sku_maestro_id: skuMaestroId }).eq("id", productoId);
   if (error) throw new Error(error.message);
   revalidatePath("/productos");
+}
+
+/**
+ * Separa el siguiente código de barras interno (EAN-13 con prefijo 20) para verlo en la ficha de un producto nuevo antes de
+ * crearlo; al crear se guarda ese mismo. Si la ficha se cierra sin crear, ese número queda sin usar (no hace falta que sean
+ * seguidos).
+ */
+export async function reservarCodigoBarrasInterno(): Promise<{ codigo?: string; error?: string }> {
+  await requireModuloEscritura(MODULO);
+  const { data, error } = await createServiceClient().rpc("wms_generar_codigo_barras");
+  if (error || !data) return { error: "No se pudo generar el código de barras." };
+  return { codigo: String(data) };
 }
 
 /**
