@@ -18,6 +18,10 @@ import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id: string; codigo: string; nombre: string }[] }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
+  // El código de barras (decisión de Hernán, 8 oct 2026): lo normal es que el producto venga sin código, así que se le genera
+  // uno interno; si trae el del fabricante, se elige y se escribe. Un compuesto normalmente no lleva.
+  const [origenBarras, setOrigenBarras] = useState<"interno" | "fabricante" | "ninguno" | null>(null);
+  const barras = origenBarras ?? (combo ? "ninguno" : "interno");
   // El nombre y el SKU se siguen para sugerir los de las variantes.
   const [nombre, setNombre] = useState("");
   const [codigo, setCodigo] = useState("");
@@ -49,6 +53,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
         setNombre("");
         setCodigo("");
         setConVariantes(false);
+        setOrigenBarras(null);
       }}
       puedeExtra={!sinComponentes}
       alPulsarSinCompletar={() => document.getElementById("campo-componentes")?.scrollIntoView({ block: "center" })}
@@ -138,22 +143,37 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id:
                 </button>
               )}
             </Campo>
-            <Campo etiqueta="Código de barras del fabricante (opcional)" id="campo-barras-producto">
-              <input
-                id="campo-barras-producto"
-                type="text"
-                name="codigo_barras"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={20}
-                placeholder="Ej: 4006381333931"
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="generar_barras" value="1" className="h-4 w-4" />
-              Generar un código de barras interno
-            </label>
+            <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
+              <legend className="mb-1 text-xs font-medium text-muted-foreground">Código de barras</legend>
+              {(
+                [
+                  { valor: "interno", etiqueta: "Interno (lo genera el sistema)" },
+                  { valor: "fabricante", etiqueta: "Del fabricante" },
+                  { valor: "ninguno", etiqueta: "Sin código de barras" },
+                ] as const
+              ).map((o) => (
+                <label key={o.valor} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="radio" name="barras_origen" value={o.valor} checked={barras === o.valor} onChange={() => setOrigenBarras(o.valor)} className="h-4 w-4 accent-[var(--foreground)]" />
+                  {o.etiqueta}
+                </label>
+              ))}
+            </fieldset>
+            {barras === "fabricante" && (
+              <Campo etiqueta="Código de barras del fabricante" id="campo-barras-producto" obligatorio faltante={faltante}>
+                <input
+                  id="campo-barras-producto"
+                  type="text"
+                  name="codigo_barras"
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={20}
+                  aria-invalid={invalido("campo-barras-producto")}
+                  placeholder="Ej: 4006381333931"
+                  className={`${fieldClass} w-full`}
+                />
+              </Campo>
+            )}
           </Seccion>
 
           {!combo && (

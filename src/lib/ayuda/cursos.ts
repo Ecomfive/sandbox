@@ -88,7 +88,7 @@ export const CURSOS: Curso[] = [
         titulo: "Activo o Test, código de barras y foto",
         parrafos: [
           "Un producto nace en Test: se está probando, aparece en Inventario pero no tiene stock y no se compra. Cuando se decide comprarlo, pásalo a Activo desde su ficha.",
-          "Si no trae código de barras del fabricante, «Generar código interno» le asigna un EAN-13 que empieza por 20. La foto se sube desde la ficha y se ve en Producto e Inventario.",
+          "Al crear el producto se le genera un código de barras interno (un EAN-13 que empieza por 20); si trae el del fabricante, se elige «Del fabricante» y se escribe. La foto se sube desde la ficha y se ve en Producto e Inventario.",
           "El bloque «Compras» de la ficha suma las unidades compradas desde la primera vez, a partir de las compras donde el producto está vinculado.",
         ],
       },

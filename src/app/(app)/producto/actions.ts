@@ -27,9 +27,12 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   const codigo = texto(formData, "codigo");
   const tipo = texto(formData, "tipo");
   const clase = texto(formData, "clase");
-  // El código de barras es opcional: se escribe el del fabricante o se pide uno interno (no las dos cosas).
-  const barras = normalizarCodigoBarras(texto(formData, "codigo_barras"));
-  const generarBarras = texto(formData, "generar_barras") === "1";
+  // El código de barras: por defecto uno interno (lo normal es que el producto venga sin código); o el del fabricante, que se
+  // escribe; o ninguno (un compuesto). Sin `barras_origen` (otra pantalla), interno solo si se pidió con `generar_barras`.
+  const origenBarras = texto(formData, "barras_origen");
+  const barras = origenBarras === "interno" || origenBarras === "ninguno" ? "" : normalizarCodigoBarras(texto(formData, "codigo_barras"));
+  const generarBarras = origenBarras ? origenBarras === "interno" : texto(formData, "generar_barras") === "1";
+  if (origenBarras === "fabricante" && !barras) return { error: "Escribe el código de barras del fabricante (o elige uno interno)." };
   // Un producto que caduca se controla por lote y fecha de vencimiento; un compuesto no (sale de sus componentes).
   const manejaVencimiento = texto(formData, "maneja_vencimiento") === "1";
   const diasAvisoTexto = texto(formData, "dias_aviso_vencimiento");
