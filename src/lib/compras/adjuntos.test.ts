@@ -5,9 +5,14 @@ import { detectarAdjunto, MAX_BYTES_ADJUNTO, motivoDeRechazo, nombreSeguro } fro
 const bytes = (...partes: (number | string)[]) => Uint8Array.from(partes.flatMap((p) => (typeof p === "number" ? [p] : [...p].map((c) => c.charCodeAt(0)))));
 
 describe("motivoDeRechazo", () => {
+  it("acepta Excel, Word, CSV por su extensión aunque el navegador no diga el tipo", () => {
+    assert.equal(motivoDeRechazo({ tipo: "", tamano: 500, nombre: "cotizacion.xlsx" }), null);
+    assert.equal(motivoDeRechazo({ tipo: "", tamano: 500, nombre: "lista.csv" }), null);
+    assert.match(motivoDeRechazo({ tipo: "application/zip", tamano: 500, nombre: "cosas.zip" }) ?? "", /imágenes/);
+  });
   it("acepta imágenes y PDF de un peso razonable", () => {
     assert.equal(motivoDeRechazo({ tipo: "image/png", tamano: 2_000_000 }), null);
-    assert.equal(motivoDeRechazo({ tipo: "application/pdf", tamano: 500 }), null);
+    assert.equal(motivoDeRechazo({ tipo: "application/pdf", tamano: 500, nombre: "pago.pdf" }), null);
   });
   it("rechaza SVG, HTML y lo que no es imagen ni PDF", () => {
     assert.match(motivoDeRechazo({ tipo: "image/svg+xml", tamano: 100 }) ?? "", /imágenes/);
@@ -26,6 +31,24 @@ describe("detectarAdjunto", () => {
   });
   it("reconoce un PDF", () => {
     assert.deepEqual(detectarAdjunto(bytes("%PDF-1.7 resto")), { clase: "documento", tipo: "application/pdf", extension: "pdf" });
+  });
+  it("reconoce Excel, Word y PowerPoint modernos por su carpeta interna", () => {
+    assert.equal(detectarAdjunto(bytes(0x50, 0x4b, 0x03, 0x04, "....[Content_Types].xml....xl/workbook.xml"), "cotizacion.xlsx")?.extension, "xlsx");
+    assert.equal(detectarAdjunto(bytes(0x50, 0x4b, 0x03, 0x04, "....word/document.xml"), "carta.docx")?.extension, "docx");
+    assert.equal(detectarAdjunto(bytes(0x50, 0x4b, 0x03, 0x04, "....ppt/presentation.xml"), "x.pptx")?.extension, "pptx");
+  });
+  it("un ZIP cualquiera no pasa aunque se llame .xlsx", () => {
+    assert.equal(detectarAdjunto(bytes(0x50, 0x4b, 0x03, 0x04, "programa.exe"), "falso.xlsx"), null);
+  });
+  it("un Excel o Word viejo según su extensión", () => {
+    const ole = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+    assert.equal(detectarAdjunto(bytes(...ole, 0, 0), "viejo.xls")?.extension, "xls");
+    assert.equal(detectarAdjunto(bytes(...ole, 0, 0), "raro.bin"), null);
+  });
+  it("CSV y texto, siempre como texto plano; una página web con nombre .csv no pasa", () => {
+    assert.deepEqual(detectarAdjunto(bytes("sku,cantidad\nA,10\n"), "lista.csv"), { clase: "documento", tipo: "text/plain; charset=utf-8", extension: "csv" });
+    assert.equal(detectarAdjunto(bytes("<html><script>alert(1)</script>"), "truco.csv"), null);
+    assert.equal(detectarAdjunto(bytes("hola", 0, "mundo"), "binario.txt"), null);
   });
   it("rechaza un HTML o un SVG que se hace pasar por imagen o PDF", () => {
     assert.equal(detectarAdjunto(bytes("<html><script>alert(1)</script></html>")), null);

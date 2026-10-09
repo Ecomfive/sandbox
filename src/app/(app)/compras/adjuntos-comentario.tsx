@@ -5,7 +5,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
-import { ACEPTAR_ADJUNTOS, MAX_ADJUNTOS_COMENTARIO, motivoDeRechazo } from "@/lib/compras/adjuntos";
+import { ACEPTAR_ADJUNTOS, iconoArchivo, MAX_ADJUNTOS_COMENTARIO, motivoDeRechazo } from "@/lib/compras/adjuntos";
 import { AdjuntoIcon, CerrarIcon } from "@/lib/nav-icons";
 import { supabase } from "@/lib/supabase/client";
 import { descartarAdjuntoSubido, prepararSubidaAdjuntoComentario, type AdjuntoCompra, type AdjuntoSubido } from "./actions";
@@ -54,7 +54,7 @@ export function useAdjuntosPendientes(compraId: string) {
     (archivos: File[]) => {
       let sitio = MAX_ADJUNTOS_COMENTARIO - actuales.current.length;
       for (const archivo of archivos) {
-        const motivo = motivoDeRechazo({ tipo: archivo.type, tamano: archivo.size });
+        const motivo = motivoDeRechazo({ tipo: archivo.type, tamano: archivo.size, nombre: archivo.name });
         if (motivo) {
           mostrarToast(`${archivo.name}: ${motivo}`, "destructive");
           continue;
@@ -114,7 +114,7 @@ export function archivosDe(origen: ClipboardEvent | DragEvent): File[] {
   return [...(datos?.files ?? [])];
 }
 
-/** El botón «Adjuntar»: abre el selector de archivos (imágenes y PDF). */
+/** El botón «Adjuntar»: abre el selector de archivos (imágenes, PDF, Excel, Word, PowerPoint, CSV y texto). */
 export function BotonAdjuntar({ alElegir, deshabilitado }: { alElegir: (archivos: File[]) => void; deshabilitado?: boolean }) {
   const entrada = useRef<HTMLInputElement>(null);
   return (
@@ -180,7 +180,7 @@ export function TiraPendientes({ pendientes, alQuitar }: { pendientes: Pendiente
   );
 }
 
-/** Los archivos de un comentario ya enviado, debajo de su texto: las imágenes como miniaturas de 40 × 40 (se amplían al pulsarlas) y los PDF como enlace. */
+/** Los archivos de un comentario ya enviado, debajo de su texto: las imágenes como miniaturas de 40 × 40 (se amplían al pulsarlas) y los documentos (PDF, Excel, Word…) como enlace con su ícono. */
 export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoCompra[] }) {
   const [ampliada, setAmpliada] = useState<AdjuntoCompra | null>(null);
   if (adjuntos.length === 0) return null;
@@ -210,8 +210,10 @@ export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoCompra[] }) {
           {otros.map((a) => (
             <li key={a.id} className="min-w-0">
               {a.url ? (
-                <a href={a.url} target="_blank" rel="noreferrer" className={`inline-flex max-w-full items-center gap-1.5 rounded-md border border-border px-2 py-1 hover:bg-muted ${anilloFoco}`}>
-                  <AdjuntoIcon className="h-3.5 w-3.5 shrink-0" />
+                <a href={a.url} target="_blank" rel="noreferrer" className={`inline-flex h-10 max-w-60 items-center gap-2 rounded-md border border-border px-2.5 hover:bg-muted ${anilloFoco}`}>
+                  <span aria-hidden="true" className="text-lg leading-none">
+                    {iconoArchivo(a.nombre)}
+                  </span>
                   <span className="truncate">{a.nombre}</span>
                 </a>
               ) : (

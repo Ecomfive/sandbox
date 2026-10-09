@@ -690,6 +690,14 @@ convenciones técnicas del código.
   comentario** (`GaleriaAdjuntos`: miniaturas que se amplían con `VisorImagen`, PDF como enlace firmado de una hora); la
   sección «Adjuntos» del final solo trae los sueltos (ClickUp, foto, documentos). Sin la columna, la actividad sigue cargando
   y el comentario con archivos avisa que falta la migración.
+  **Actividad como ClickUp** (8 oct 2026; `actividad-compra.tsx` + `comentario-compra.tsx`): un solo bloque con comentarios,
+  cambios y archivos en orden de tiempo (filtro Todo / Comentarios / Cambios, «Ver anteriores», campo abajo). Cada comentario
+  tiene **respuestas** de un nivel (`respuesta_a`; avisa a quien lo escribió por `autor_id`) y **reacciones**
+  (`wms_compra_comentario_reacciones`, emojis fijos de `src/lib/compras/reacciones.ts`, `alternarReaccion`), migración 0095;
+  sin ella todo carga igual, sin respuestas ni reacciones. **Adjuntos:** además de imágenes y PDF, Excel, Word y PowerPoint
+  (modernos por su carpeta interna del ZIP; viejos por el contenedor OLE + extensión), CSV y texto (sin bytes nulos ni HTML), hasta
+  25 MB (`detectarAdjunto(bytes, nombre)`); el servidor vuelve a guardar el archivo con el tipo de su contenido (un texto se sirve
+  como `text/plain`, nunca como página).
   **Productos en la ficha:** el bloque «Productos» (`productos-compra.tsx`, solo compras de país) va **dentro del formulario**,
   en el bloque «Compra» justo debajo de Etiquetas (`FormularioCompra` recibe `productos` y `FichaCompra` se lo
   pasa con `incrustado`). Como está dentro del `<form>` pero guarda por su cuenta (cada campo, al salir de él), su contenedor

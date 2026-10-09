@@ -61,7 +61,7 @@ export function ComentariosNuevaCompra({ borradores, alCambiar }: { borradores: 
   function agregarArchivos(nuevos: File[]) {
     const aceptados: File[] = [];
     for (const f of nuevos) {
-      const motivo = motivoDeRechazo({ tipo: f.type, tamano: f.size });
+      const motivo = motivoDeRechazo({ tipo: f.type, tamano: f.size, nombre: f.name });
       if (motivo) mostrarToast(`${f.name}: ${motivo}`, "destructive");
       else aceptados.push(f);
     }

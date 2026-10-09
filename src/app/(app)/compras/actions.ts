@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
+import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
 import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSeguro } from "@/lib/compras/adjuntos";
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
@@ -640,9 +641,20 @@ export interface AdjuntoCompra {
   creadoEn: string;
 }
 
+/** Las reacciones de un comentario, por emoji: cuántas, si una es mía y de quiénes. */
+export interface ReaccionComentario {
+  emoji: string;
+  n: number;
+  mia: boolean;
+  nombres: string[];
+}
+
 export interface ActividadCompra {
-  /** Cada comentario con los archivos que se adjuntaron en él (la captura de un pago, un comprobante…). */
-  comentarios: { id: string; autor: string | null; texto: string; creadoEn: string; adjuntos: AdjuntoCompra[] }[];
+  /**
+   * Cada comentario con los archivos que se adjuntaron en él (la captura de un pago, un comprobante…), a qué comentario responde
+   * (si es una respuesta) y sus reacciones.
+   */
+  comentarios: { id: string; autor: string | null; texto: string; creadoEn: string; adjuntos: AdjuntoCompra[]; respuestaA: string | null; reacciones: ReaccionComentario[] }[];
   subtareas: { id: string; nombre: string; estado: string | null; responsable: string | null; creadoEn: string; cerradoEn: string | null }[];
   /** Los archivos sueltos de la compra (los de ClickUp y la foto/documentos): los de un comentario van dentro de él. */
   adjuntos: AdjuntoCompra[];
@@ -662,14 +674,37 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   if (sinAcceso) return { error: sinAcceso };
   const supabase = createServiceClient();
   const consultaAdjuntos = (columnas: string) => supabase.from("wms_compra_adjuntos").select(columnas).eq("compra_id", id).order("creado_en");
-  const [comentarios, subtareas, adjuntosConComentario, eventos] = await Promise.all([
-    supabase.from("wms_compra_comentarios").select("id, autor, texto, creado_en").eq("compra_id", id).order("creado_en", { ascending: false }).limit(500),
+  const consultaComentarios = (columnas: string) => supabase.from("wms_compra_comentarios").select(columnas).eq("compra_id", id).order("creado_en", { ascending: false }).limit(500);
+  const [comentariosCompletos, subtareas, adjuntosConComentario, eventos] = await Promise.all([
+    consultaComentarios("id, autor, texto, creado_en, respuesta_a"),
     supabase.from("wms_compra_subtareas").select("id, nombre, estado, responsable_nombre, creado_en, cerrado_en").eq("compra_id", id).order("creado_en"),
     consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en, comentario_id"),
     supabase.from("wms_compra_eventos").select("id, campo, valor_antes, valor_despues, ocurrido_en, autor, origen").eq("compra_id", id).order("ocurrido_en", { ascending: false }),
   ]);
   // Sin la migración 0085 (la columna `comentario_id`) la actividad sigue cargando, solo que sin archivos dentro de los comentarios.
   const adjuntos = adjuntosConComentario.error ? await consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en") : adjuntosConComentario;
+  // Sin la migración 0095 (respuestas y reacciones) los comentarios se cargan igual, todos sueltos.
+  const comentarios = comentariosCompletos.error ? await consultaComentarios("id, autor, texto, creado_en") : comentariosCompletos;
+  type FilaComentario = { id: string; autor: string | null; texto: string; creado_en: string; respuesta_a?: string | null };
+  const filasComentarios = (comentarios.data ?? []) as unknown as FilaComentario[];
+  const yo = (await getUsuarioActual())?.id ?? null;
+  const reacciones = new Map<string, ReaccionComentario[]>();
+  if (filasComentarios.length) {
+    const { data: filasReacciones } = await supabase
+      .from("wms_compra_comentario_reacciones")
+      .select("comentario_id, usuario_id, usuario_nombre, emoji, creado_en")
+      .in("comentario_id", filasComentarios.map((c) => c.id))
+      .order("creado_en");
+    for (const r of filasReacciones ?? []) {
+      const lista = reacciones.get(r.comentario_id) ?? [];
+      let grupo = lista.find((g) => g.emoji === r.emoji);
+      if (!grupo) lista.push((grupo = { emoji: r.emoji, n: 0, mia: false, nombres: [] }));
+      grupo.n++;
+      grupo.mia ||= r.usuario_id === yo;
+      grupo.nombres.push(r.usuario_nombre ?? "—");
+      reacciones.set(r.comentario_id, lista);
+    }
+  }
   if (comentarios.error || subtareas.error || adjuntos.error || eventos.error) return { error: "No se pudo cargar la actividad." };
 
   type FilaAdjunto = { id: string; nombre: string; clase: string; ruta: string | null; url_clickup: string | null; creado_en: string; comentario_id?: string | null };
@@ -684,7 +719,15 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   const deComentario = new Map<string, AdjuntoCompra[]>();
   for (const a of filasAdjuntos) if (a.comentario_id) deComentario.set(a.comentario_id, [...(deComentario.get(a.comentario_id) ?? []), aAdjunto(a)]);
   return {
-    comentarios: (comentarios.data ?? []).map((c) => ({ id: c.id, autor: c.autor, texto: c.texto, creadoEn: c.creado_en, adjuntos: deComentario.get(c.id) ?? [] })),
+    comentarios: filasComentarios.map((c) => ({
+      id: c.id,
+      autor: c.autor,
+      texto: c.texto,
+      creadoEn: c.creado_en,
+      adjuntos: deComentario.get(c.id) ?? [],
+      respuestaA: c.respuesta_a ?? null,
+      reacciones: reacciones.get(c.id) ?? [],
+    })),
     subtareas: (subtareas.data ?? []).map((t) => ({ id: t.id, nombre: t.nombre, estado: t.estado, responsable: t.responsable_nombre, creadoEn: t.creado_en, cerradoEn: t.cerrado_en })),
     adjuntos: filasAdjuntos.filter((a) => !a.comentario_id).map(aAdjunto),
     eventos: (eventos.data ?? []).map((e) => ({ id: e.id, campo: e.campo, antes: e.valor_antes, despues: e.valor_despues, ocurridoEn: e.ocurrido_en, autor: e.autor, origen: e.origen })),
@@ -730,8 +773,8 @@ export async function descartarAdjuntoSubido(compraId: string, ruta: string): Pr
 
 /**
  * Revisa los archivos de un comentario: que estén en la carpeta de esa compra, que existan, que no pasen del peso y que su
- * contenido sea de verdad una imagen (JPG, PNG, WebP, GIF) o un PDF — se mira la firma de los primeros bytes, no lo que dice
- * el nombre ni el navegador. Si alguno falla se borran todos y se devuelve el error.
+ * contenido sea de verdad una imagen (JPG, PNG, WebP, GIF), un PDF, un Excel, Word o PowerPoint, un CSV o un texto — se mira
+ * el contenido, no lo que dice el nombre ni el navegador. Si alguno falla se borran todos y se devuelve el error.
  */
 async function revisarAdjuntosSubidos(
   compraId: string,
@@ -753,9 +796,17 @@ async function revisarAdjuntosSubidos(
     const { data, error } = await storage.download(ruta);
     if (error || !data) return falla("No se encontró uno de los archivos. Vuelve a adjuntarlo.");
     if (data.size > MAX_BYTES_ADJUNTO) return falla("Un archivo pesa más de lo permitido.");
-    const tipo = detectarAdjunto(new Uint8Array(await data.slice(0, 16).arrayBuffer()));
-    if (!tipo) return falla("Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF) y PDF.");
-    const nombreOriginal = String(archivo.nombre ?? "").trim().slice(0, 120) || `archivo.${tipo.extension}`;
+    const contenido = new Uint8Array(await data.arrayBuffer());
+    const nombreOriginal0 = String(archivo.nombre ?? "").trim().slice(0, 120);
+    const tipo = detectarAdjunto(contenido, nombreOriginal0 || ruta);
+    if (!tipo) return falla("Se pueden adjuntar imágenes, PDF, Excel, Word, PowerPoint, CSV y texto (se revisa el contenido, no el nombre).");
+    // Se vuelve a guardar con el tipo que corresponde a su contenido (no el que mandó el navegador), así un texto se abre
+    // siempre como texto y nunca como página web.
+    if ((data.type || "").split(";")[0] !== tipo.tipo.split(";")[0]) {
+      const { error: errorTipo } = await storage.update(ruta, contenido, { contentType: tipo.tipo, upsert: true });
+      if (errorTipo) return falla("No se pudo guardar uno de los archivos.");
+    }
+    const nombreOriginal = nombreOriginal0 || `archivo.${tipo.extension}`;
     resultado.push({ ruta, nombre: nombreOriginal, extension: tipo.extension, tamano: data.size, clase: tipo.clase });
   }
   return resultado;
@@ -766,7 +817,14 @@ async function revisarAdjuntosSubidos(
  * de un pago, un comprobante…) que se ven debajo de su texto. Las personas etiquetadas con «@»
  * (`menciones`) reciben un aviso «Para ti» que abre esta compra en ese comentario. Devuelve el error como valor.
  */
-export async function comentarCompra(id: string, texto: string, menciones: string[] = [], adjuntos: AdjuntoSubido[] = []): Promise<{ error?: string }> {
+export async function comentarCompra(
+  id: string,
+  texto: string,
+  menciones: string[] = [],
+  adjuntos: AdjuntoSubido[] = [],
+  /** El comentario al que responde (de esta misma compra); se le avisa a quien lo escribió. */
+  respuestaA: string | null = null,
+): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(id)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
@@ -779,10 +837,29 @@ export async function comentarCompra(id: string, texto: string, menciones: strin
 
   // Los archivos ya están en el almacenamiento (se subieron directo desde el navegador): antes de comentar se revisa que
   // sean lo que dicen ser (por su firma, no por el nombre) y que sean de esta compra. Si algo no cuadra, se borran todos.
+  // Una respuesta va a un comentario de esta compra (a uno que no sea, a su vez, una respuesta: un solo nivel, como ClickUp).
+  let padre: { id: string; autor_id: string | null; respuesta_a: string | null } | null = null;
+  if (respuestaA !== null) {
+    if (!ES_ID(String(respuestaA))) return { error: "El comentario al que respondes no es válido." };
+    const { data: p } = await supabase.from("wms_compra_comentarios").select("id, autor_id, respuesta_a").eq("id", respuestaA).eq("compra_id", id).maybeSingle();
+    if (!p) return { error: "El comentario al que respondes ya no existe." };
+    padre = { id: p.respuesta_a ?? p.id, autor_id: p.autor_id, respuesta_a: p.respuesta_a };
+  }
+
   const revisados = archivos.length ? await revisarAdjuntosSubidos(id, archivos) : [];
   if (revisados && "error" in revisados) return revisados;
 
-  const { data, error } = await supabase.from("wms_compra_comentarios").insert({ compra_id: id, autor, texto: limpio }).select("id").single();
+  const fila = { compra_id: id, autor, texto: limpio, autor_id: usuario.id, ...(padre ? { respuesta_a: padre.id } : {}) };
+  let insercion = await supabase.from("wms_compra_comentarios").insert(fila).select("id").single();
+  // Sin la migración 0095 (columnas `autor_id` y `respuesta_a`): se guarda como antes, sin responder.
+  if (insercion.error && (insercion.error.code === "PGRST204" || insercion.error.code === "42703")) {
+    if (padre) {
+      await borrarSubidos(archivos.map((a) => a.ruta));
+      return { error: "Falta correr la migración 0095 para responder comentarios." };
+    }
+    insercion = await supabase.from("wms_compra_comentarios").insert({ compra_id: id, autor, texto: limpio }).select("id").single();
+  }
+  const { data, error } = insercion;
   if (error || !data) {
     await borrarSubidos(archivos.map((a) => a.ruta));
     return { error: "No se pudo guardar el comentario." };
@@ -813,19 +890,17 @@ export async function comentarCompra(id: string, texto: string, menciones: strin
   }
 
   const mencionados = await mencionadosValidos(menciones, limpio, usuario.id);
-  if (mencionados.length) {
+  // A quien escribió el comentario que se responde también le llega el aviso (si no es uno mismo ni ya está mencionado).
+  const respondido = padre?.autor_id && padre.autor_id !== usuario.id && !mencionados.some((m) => m.id === padre!.autor_id) ? padre.autor_id : null;
+  if (mencionados.length || respondido) {
     const { data: compra } = await supabase.from("wms_compras").select("numero, nombre, tipo, paises(codigo)").eq("id", id).maybeSingle();
     const pais = (Array.isArray(compra?.paises) ? compra?.paises[0] : compra?.paises) as { codigo: string } | null | undefined;
     const ver = compra?.tipo === "importacion" ? "importacion" : (pais?.codigo ?? "todos");
     const oc = compra ? `OC-${String(compra.numero).padStart(4, "0")}` : "una compra";
-    await notificarMenciones({
-      mencionados,
-      autorId: usuario.id,
-      autorNombre: autor,
-      titulo: `${autor} te mencionó en la compra ${oc}${compra?.nombre ? ` · ${compra.nombre}` : ""}`,
-      texto: limpio,
-      href: `/compras/lista?ver=${encodeURIComponent(ver)}&abrir=${id}&comentario=${data.id}`,
-    });
+    const href = `/compras/lista?ver=${encodeURIComponent(ver)}&abrir=${id}&comentario=${data.id}`;
+    const deLaCompra = `la compra ${oc}${compra?.nombre ? ` · ${compra.nombre}` : ""}`;
+    await notificarMenciones({ mencionados, autorId: usuario.id, autorNombre: autor, titulo: `${autor} te mencionó en ${deLaCompra}`, texto: limpio, href });
+    if (respondido) await notificarMenciones({ mencionados: [{ id: respondido }], autorId: usuario.id, autorNombre: autor, titulo: `${autor} respondió tu comentario en ${deLaCompra}`, texto: limpio, href });
   }
   return {};
 }
@@ -1109,4 +1184,38 @@ export async function guardarColorEtiqueta(nombre: string, color: string): Promi
     .upsert({ nombre: limpio, color, actualizado_en: new Date().toISOString() }, { onConflict: "nombre" });
   if (error) return { error: "No se pudo guardar el color." };
   return {};
+}
+
+/**
+ * Pone o quita una reacción (👍, ❤️…) de la persona en un comentario de una compra, como en ClickUp. Devuelve las reacciones de
+ * ese comentario como quedaron. Devuelve el error como valor.
+ */
+export async function alternarReaccion(comentarioId: string, emoji: string): Promise<{ error?: string; reacciones?: ReaccionComentario[] }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
+  if (!(EMOJIS_REACCION as readonly string[]).includes(emoji)) return { error: "Esa reacción no está permitida." };
+  const supabase = createServiceClient();
+  const { data: comentario } = await supabase.from("wms_compra_comentarios").select("compra_id").eq("id", comentarioId).maybeSingle();
+  if (!comentario) return { error: "El comentario ya no existe." };
+  const sinAcceso = await sinAccesoACompras([comentario.compra_id as string]);
+  if (sinAcceso) return { error: sinAcceso };
+
+  const tabla = supabase.from("wms_compra_comentario_reacciones");
+  const { data: ya, error: errorLeer } = await tabla.select("emoji").eq("comentario_id", comentarioId).eq("usuario_id", usuario.id).eq("emoji", emoji).maybeSingle();
+  if (errorLeer) return { error: errorLeer.code === "42P01" || errorLeer.code === "PGRST205" ? "Falta correr la migración 0095 para reaccionar." : "No se pudo guardar la reacción." };
+  const { error } = ya
+    ? await supabase.from("wms_compra_comentario_reacciones").delete().eq("comentario_id", comentarioId).eq("usuario_id", usuario.id).eq("emoji", emoji)
+    : await supabase.from("wms_compra_comentario_reacciones").insert({ comentario_id: comentarioId, usuario_id: usuario.id, usuario_nombre: usuario.nombre || usuario.email, emoji });
+  if (error) return { error: "No se pudo guardar la reacción." };
+
+  const { data: filas } = await supabase.from("wms_compra_comentario_reacciones").select("usuario_id, usuario_nombre, emoji").eq("comentario_id", comentarioId).order("creado_en");
+  const reacciones: ReaccionComentario[] = [];
+  for (const r of filas ?? []) {
+    let g = reacciones.find((x) => x.emoji === r.emoji);
+    if (!g) reacciones.push((g = { emoji: r.emoji, n: 0, mia: false, nombres: [] }));
+    g.n++;
+    g.mia ||= r.usuario_id === usuario.id;
+    g.nombres.push(r.usuario_nombre ?? "—");
+  }
+  return { reacciones };
 }

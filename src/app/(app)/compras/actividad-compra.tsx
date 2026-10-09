@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { anilloFoco } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { HistorialIcon, ProductoIcon } from "@/lib/nav-icons";
 import { comentarCompra, obtenerActividadCompra, type ActividadCompra as Datos } from "./actions";
-import { CampoMenciones, TextoConMenciones } from "@/components/ui/campo-menciones";
+import { CampoMenciones } from "@/components/ui/campo-menciones";
+import { TarjetaComentario } from "./comentario-compra";
 import { Badge } from "@/components/ui/badge";
 import { archivosDe, BotonAdjuntar, GaleriaAdjuntos, TiraPendientes, useAdjuntosPendientes } from "./adjuntos-comentario";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa } from "./def-compras";
@@ -130,13 +130,22 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
   const items: Item[] = useMemo(() => {
     if (!datos || datos === "error") return [];
     const todos: Item[] = [
-      ...datos.comentarios.map((c) => ({ tipo: "comentario" as const, fecha: c.creadoEn, c })),
+      // Las respuestas no van sueltas: se ven dentro del comentario al que responden.
+      ...datos.comentarios.filter((c) => !c.respuestaA).map((c) => ({ tipo: "comentario" as const, fecha: c.creadoEn, c })),
       ...datos.eventos.map((e) => ({ tipo: "cambio" as const, fecha: e.ocurridoEn, e })),
       ...datos.adjuntos.map((a) => ({ tipo: "archivo" as const, fecha: a.creadoEn, a })),
     ];
     return todos.sort((x, y) => x.fecha.localeCompare(y.fecha));
   }, [datos]);
   const nComentarios = items.filter((it) => it.tipo === "comentario").length;
+  // Las respuestas de cada comentario, de la más vieja a la más nueva.
+  const respuestas = useMemo(() => {
+    const m = new Map<string, Datos["comentarios"]>();
+    if (!datos || datos === "error") return m;
+    for (const c of [...datos.comentarios].sort((x, y) => x.creadoEn.localeCompare(y.creadoEn)))
+      if (c.respuestaA) m.set(c.respuestaA, [...(m.get(c.respuestaA) ?? []), c]);
+    return m;
+  }, [datos]);
   const filtrados = items.filter((it) => filtro === "todo" || (filtro === "comentarios" ? it.tipo === "comentario" : it.tipo !== "comentario"));
   // Se ven los últimos 30 (todo si hay un comentario que señalar); el resto con «Ver anteriores».
   const ocultos = verTodo || comentarioResaltado ? 0 : Math.max(0, filtrados.length - 30);
@@ -214,28 +223,15 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
           {visibles.length === 0 && <p className="m-auto text-sm text-muted-foreground">{filtro === "comentarios" ? "Sin comentarios todavía." : "Sin actividad todavía."}</p>}
           {visibles.map((it) =>
             it.tipo === "comentario" ? (
-              <article
+              <TarjetaComentario
                 key={`c-${it.c.id}`}
-                id={`comentario-${it.c.id}`}
-                ref={it.c.id === comentarioResaltado ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
-                className={`my-1.5 flex gap-2.5 rounded-lg border p-3 text-sm ${it.c.id === comentarioResaltado ? "border-primario bg-primario-suave ring-2 ring-primario" : "border-border bg-card"}`}
-              >
-                <AvatarPersona nombre={it.c.autor} email="?" avatarUrl={null} tamano="sm" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="flex flex-wrap items-baseline justify-between gap-x-2">
-                    <strong className="font-semibold">{it.c.autor ?? "—"}</strong>
-                    <time dateTime={it.c.creadoEn} className="text-xs text-muted-foreground">
-                      {fechaHora(it.c.creadoEn)}
-                    </time>
-                  </span>
-                  {it.c.texto && (
-                    <p className={`m-0 whitespace-pre-wrap break-words ${/^inconveniente/i.test(it.c.texto) ? "rounded-md bg-destructive/10 px-2 py-1 text-destructive" : ""}`}>
-                      <TextoConMenciones texto={it.c.texto} />
-                    </p>
-                  )}
-                  <GaleriaAdjuntos adjuntos={it.c.adjuntos} />
-                </div>
-              </article>
+                compraId={id}
+                comentario={it.c}
+                respuestas={respuestas.get(it.c.id) ?? []}
+                resaltado={comentarioResaltado}
+                puedeComentar={puedeComentar}
+                alResponder={() => setVersion((v) => v + 1)}
+              />
             ) : it.tipo === "archivo" ? (
               <div key={`a-${it.a.id}`} className="flex items-start gap-2 py-1 text-[13px]">
                 <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-border-control" />
