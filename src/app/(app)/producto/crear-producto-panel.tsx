@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
@@ -15,16 +15,17 @@ import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
- * el tipo (Simple o Compuesto) decide si aparece el bloque de componentes. El SKU es obligatorio: con él una venta de Dropi
+ * el tipo (Simple o Compuesto) decide si aparece el bloque de componentes (con el mapa de cómo se arma). Los dos se eligen con
+ * botones de opción, como la vía de envío de una compra. El SKU se sugiere solo mientras se escribe el nombre. El SKU es obligatorio: con él una venta de Dropi
  * o de una tienda de Shopify encuentra el producto para descontar el inventario.
  */
 export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: OpcionSkuMaestro[] }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
-  // El código de barras (decisión de Hernán, 8 oct 2026): lo normal es que el producto venga sin código, así que se le genera
-  // uno interno; si trae el del fabricante, se elige y se escribe. Un compuesto normalmente no lleva.
+  // El código de barras (decisión de Hernán, 8 oct 2026): lo normal es que el producto venga sin código, así que viene marcado
+  // «Interno» (también en un compuesto); si trae el del fabricante, se elige y se escribe.
   const [origenBarras, setOrigenBarras] = useState<"interno" | "fabricante" | "ninguno" | null>(null);
-  const barras = origenBarras ?? (combo ? "ninguno" : "interno");
+  const barras = origenBarras ?? "interno";
   // El código interno que tendrá: se separa al elegir «Interno» para verlo (número y etiqueta) antes de crear.
   const [interno, setInterno] = useState<string | null>(null);
   const [pidiendo, setPidiendo] = useState(false);
@@ -51,6 +52,14 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
       setSkuOcupado(null);
     }
   }
+  // Mientras se escribe el nombre, el SKU se sugiere solo (si no se escribió a mano), un momento después de dejar de teclear.
+  const espera = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function alEscribirNombre(valor: string) {
+    setNombre(valor);
+    if (skuTocado) return;
+    if (espera.current) clearTimeout(espera.current);
+    espera.current = setTimeout(() => void sugerir(valor), 450);
+  }
   const [conVariantes, setConVariantes] = useState(false);
   const [armadas, setArmadas] = useState<VariantesArmadas>({ opciones: [], variantes: [] });
   // Un compuesto sin productos simples no se puede armar: el botón lleva a ese aviso.
@@ -66,6 +75,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
         setTipo("simple");
         setNombre("");
         setCodigo("");
+        setSkuTocado(false);
         setConVariantes(false);
         setOrigenBarras(null);
         // El interno se separa al abrir (y se conserva hasta crear el producto: abrir y cerrar no gasta otro número).
@@ -78,27 +88,26 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
       {({ faltante, invalido }) => (
         <>
           <Seccion icono={CatalogoIcon} titulo="Producto">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Estado" id="campo-clase-producto" obligatorio faltante={faltante}>
-                <select id="campo-clase-producto" name="clase" required defaultValue="fisico" aria-invalid={invalido("campo-clase-producto")} className={`${fieldClass} w-full`}>
-                  <option value="fisico">Activo (se compra)</option>
-                  <option value="test">Test (se está probando)</option>
-                </select>
-              </Campo>
-              <Campo etiqueta="Tipo" id="campo-tipo-producto" obligatorio faltante={faltante}>
-                <select
-                  id="campo-tipo-producto"
-                  name="tipo"
-                  required
-                  aria-invalid={invalido("campo-tipo-producto")}
-                  value={tipo}
-                  onChange={(e) => setTipo(e.target.value)}
-                  className={`${fieldClass} w-full`}
-                >
-                  <option value="simple">Simple</option>
-                  <option value="combo">Compuesto</option>
-                </select>
-              </Campo>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Opciones
+                titulo="Estado"
+                nombre="clase"
+                inicial="fisico"
+                opciones={[
+                  { valor: "fisico", etiqueta: "Activo", detalle: "se compra" },
+                  { valor: "test", etiqueta: "Test", detalle: "se está probando" },
+                ]}
+              />
+              <Opciones
+                titulo="Tipo"
+                nombre="tipo"
+                valor={tipo}
+                alCambiar={setTipo}
+                opciones={[
+                  { valor: "simple", etiqueta: "Simple", detalle: "un solo producto" },
+                  { valor: "combo", etiqueta: "Compuesto", detalle: "lleva otros productos" },
+                ]}
+              />
             </div>
             <Campo etiqueta="Nombre" id="campo-nombre-producto" obligatorio faltante={faltante}>
               <input
@@ -109,11 +118,8 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
                 data-enfocar
                 autoComplete="off"
                 maxLength={200}
-                onBlur={(e) => {
-                  if (!skuTocado) void sugerir(e.target.value);
-                }}
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => alEscribirNombre(e.target.value)}
                 aria-invalid={invalido("campo-nombre-producto")}
                 placeholder={combo ? "Ej: Kit de limpieza facial" : "Ej: Crema hidratante 50 ml"}
                 className={`${fieldClass} w-full`}
@@ -250,7 +256,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
             <Seccion icono={ProductoIcon} titulo="Componentes">
               {opcionesSimples.length > 0 ? (
                 <div id="campo-componentes">
-                  <ComboBuilder opciones={opcionesSimples} />
+                  <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} />
                 </div>
               ) : (
                 <p id="campo-componentes" role="alert" className="py-1 text-xs text-destructive">
@@ -262,5 +268,51 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
         </>
       )}
     </FichaCrear>
+  );
+}
+
+/** Un grupo de botones de opción (Estado, Tipo), como la vía de envío de una compra: cada opción con su nombre y su detalle. */
+function Opciones({
+  titulo,
+  nombre,
+  opciones,
+  inicial,
+  valor,
+  alCambiar,
+}: {
+  titulo: string;
+  nombre: string;
+  opciones: { valor: string; etiqueta: string; detalle: string }[];
+  inicial?: string;
+  valor?: string;
+  alCambiar?: (v: string) => void;
+}) {
+  return (
+    <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
+      <legend className="mb-1.5 text-xs font-medium text-muted-foreground">
+        {titulo}
+        <span aria-hidden="true" className="text-destructive">
+          {" "}
+          *
+        </span>
+      </legend>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        {opciones.map((o) => (
+          <label key={o.valor} className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={nombre}
+              value={o.valor}
+              required
+              {...(alCambiar ? { checked: valor === o.valor, onChange: () => alCambiar(o.valor) } : { defaultChecked: inicial === o.valor })}
+              className="h-4 w-4 accent-[var(--foreground)]"
+            />
+            <span>
+              {o.etiqueta} <span className="text-xs text-muted-foreground">({o.detalle})</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
