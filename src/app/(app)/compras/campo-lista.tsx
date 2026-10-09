@@ -63,7 +63,25 @@ export function CampoLista({
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       {/* El valor que viaja al guardar; no se ve ni se usa con el teclado. */}
       <input ref={oculto} type="text" name={nombre} aria-label={etiqueta} defaultValue={inicial.join(", ")} tabIndex={-1} readOnly aria-hidden="true" className="sr-only" />
-      {valores.map((v) => (
+      {/* Uno solo (la tienda): todo el campo se pulsa, como la celda de la columna, y abre la lista para elegir otra. */}
+      {unica && (
+        <button
+          ref={boton}
+          id={id}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={abierto}
+          aria-label={valores[0] ? `${etiqueta}: ${valores[0]}. Pulsa para cambiarla` : `Elegir ${etiqueta}`}
+          onClick={() => setAbierto((v) => !v)}
+          className={`${fieldClass} flex min-h-9 w-full cursor-pointer items-center justify-between gap-2 text-left hover:bg-muted`}
+        >
+          {valores[0] ? (renderValor ? renderValor(valores[0]) : <span className="truncate">{valores[0]}</span>) : <span className="text-muted-foreground">Elige la {etiqueta}</span>}
+          <span aria-hidden="true" className="text-muted-foreground">
+            ▾
+          </span>
+        </button>
+      )}
+      {!unica && valores.map((v) => (
         <span
           key={v}
           className={`inline-flex max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs ${renderValor ? "pl-0.5" : "border border-border bg-muted pl-2.5"}`}
@@ -81,18 +99,20 @@ export function CampoLista({
           </Tooltip>
         </span>
       ))}
-      <button
-        ref={boton}
-        id={id}
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={abierto}
-        onClick={() => setAbierto((v) => !v)}
-        className={`${fieldClass} !w-auto inline-flex min-h-8 items-center gap-1 !px-2.5 !py-1 text-xs`}
-      >
-        <MasIcon className="h-3 w-3" />
-        {unica && valores.length ? `Cambiar ${etiqueta}` : `Añadir ${etiqueta}`}
-      </button>
+      {!unica && (
+        <button
+          ref={boton}
+          id={id}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={abierto}
+          onClick={() => setAbierto((v) => !v)}
+          className={`${fieldClass} !w-auto inline-flex min-h-8 items-center gap-1 !px-2.5 !py-1 text-xs`}
+        >
+          <MasIcon className="h-3 w-3" />
+          Añadir {etiqueta}
+        </button>
+      )}
       {abierto && (
         <PanelLista
           ancla={boton}
