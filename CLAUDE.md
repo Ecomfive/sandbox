@@ -676,7 +676,7 @@ convenciones técnicas del código.
   `cambiarColor` (`guardarColorTienda`) y `renombrar` (`renombrarTienda`: cambia el nombre en todas las compras de todos los
   países —solo quien los ve todos—, se juntan si ya existe, mueve el color, deja la línea en la Actividad). `PastillaTienda` las
   dibuja; `PanelLista` con `gestion` muestra el lápiz de color y nombre en la celda, la ficha y la barra de varias compras.
-  **Tienda: una o varias, como las etiquetas** (migración 0084, 9 oct 2026): `wms_compras.tiendas text[]` (antes `tienda`, un
+  **Tienda: una sola por orden** (desde el 9 oct 2026, `unica` en `CAMPOS_EDITABLES` y `CampoLista`; antes podían ser varias) (migración 0084, 9 oct 2026): `wms_compras.tiendas text[]` (antes `tienda`, un
   solo texto; esa columna vieja se queda sin usarse hasta una migración que la borre). Se elige o se crea al escribirla en la
   celda (`CeldaEditable` con `opcionesLista`), en la ficha (`CampoLista`, `campo-lista.tsx`: pastillas con ✕ y «Añadir tienda»,
   viaja como `tiendas` separadas por comas) y en la barra de varias compras. Los tres usan el mismo panel `PanelLista`

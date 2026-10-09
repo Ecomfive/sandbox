@@ -241,6 +241,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-09", titulo: "Una sola tienda por orden", texto: "La Tienda de una orden de compra es una sola: al elegir otra se cambia, en la columna, en la ficha y en la barra de varias compras.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-09", titulo: "Filtros con colores", texto: "Al filtrar Compras por Etapa o Estado, cada opción sale con el mismo color que en la columna.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-09", titulo: "Columna «Orden de compra»", texto: "La columna principal de Compras se llama «Orden de compra» y lleva las etiquetas; ya no hay una columna aparte de Etiquetas.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-09", titulo: "Anular en vez de eliminar compras", texto: "El botón de la ficha ahora es «Anular»: la compra conserva su código y su historial, pasa a la etapa Descartado con la insignia «Anulada» y se puede restaurar.", modulo: "compras", href: "/compras/lista" },

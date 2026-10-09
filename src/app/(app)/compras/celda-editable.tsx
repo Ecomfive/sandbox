@@ -93,9 +93,21 @@ export function CeldaEditable({
             placeholder={`Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
             alAlternar={(n) => {
               const puestas = compra[def.prop] as string[];
-              guardar(compra, campo, combinarLista(puestas, presenciaEnLote([puestas], n) === "todas" ? "quitar" : "agregar", [n]));
+              const ya = presenciaEnLote([puestas], n) === "todas";
+              // Una sola (la tienda): elegir otra la cambia y cierra; pulsar la que ya está la quita.
+              if (def.unica) {
+                cerrar("elegido");
+                return guardar(compra, campo, ya ? [] : [n]);
+              }
+              guardar(compra, campo, combinarLista(puestas, ya ? "quitar" : "agregar", [n]));
             }}
-            alCrear={(n) => guardar(compra, campo, combinarLista(compra[def.prop] as string[], "agregar", [n]))}
+            alCrear={(n) => {
+              if (def.unica) {
+                cerrar("elegido");
+                return guardar(compra, campo, [n]);
+              }
+              guardar(compra, campo, combinarLista(compra[def.prop] as string[], "agregar", [n]));
+            }}
             alCerrar={cerrar}
             renderOpcion={campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
             gestion={campo === "tienda" ? tiendas : null}

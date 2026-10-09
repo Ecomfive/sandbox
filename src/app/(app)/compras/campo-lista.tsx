@@ -22,6 +22,7 @@ export function CampoLista({
   todas,
   renderValor,
   gestion,
+  unica = false,
 }: {
   /** El `id` del botón «Añadir» (la etiqueta del campo apunta a él). */
   id: string;
@@ -35,6 +36,8 @@ export function CampoLista({
   renderValor?: (nombre: string) => ReactNode;
   /** Las tiendas: color y nombre editables desde el panel. */
   gestion?: GestionTiendas | null;
+  /** Se elige uno solo (la tienda): elegir otro lo cambia y cierra el panel. */
+  unica?: boolean;
 }) {
   const [valores, setValores] = useState(inicial);
   const [abierto, setAbierto] = useState(false);
@@ -88,7 +91,7 @@ export function CampoLista({
         className={`${fieldClass} !w-auto inline-flex min-h-8 items-center gap-1 !px-2.5 !py-1 text-xs`}
       >
         <MasIcon className="h-3 w-3" />
-        Añadir {etiqueta}
+        {unica && valores.length ? `Cambiar ${etiqueta}` : `Añadir ${etiqueta}`}
       </button>
       {abierto && (
         <PanelLista
@@ -98,8 +101,20 @@ export function CampoLista({
           marca={(n) => (hay(n) ? "si" : "no")}
           renderOpcion={renderValor}
           placeholder={`Buscar o añadir ${etiqueta}…`}
-          alAlternar={(n) => setValores((a) => combinarLista(a, hay(n) ? "quitar" : "agregar", [n]))}
-          alCrear={(n) => setValores((a) => combinarLista(a, "agregar", [n]))}
+          alAlternar={(n) => {
+            if (unica) {
+              setValores((a) => (a.some((v) => v.toLowerCase() === n.toLowerCase()) ? [] : [n]));
+              return setAbierto(false);
+            }
+            setValores((a) => combinarLista(a, hay(n) ? "quitar" : "agregar", [n]));
+          }}
+          alCrear={(n) => {
+            if (unica) {
+              setValores([n]);
+              return setAbierto(false);
+            }
+            setValores((a) => combinarLista(a, "agregar", [n]));
+          }}
           alCerrar={(m) => {
             setAbierto(false);
             if (m === "escape") boton.current?.focus();

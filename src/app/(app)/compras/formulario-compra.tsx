@@ -362,6 +362,7 @@ export function FormularioCompra({
                 todas={tiendas}
                 renderValor={(n) => <PastillaTienda nombre={n} />}
                 gestion={gestionTiendas}
+                unica
               />
             </Campo>
           </div>

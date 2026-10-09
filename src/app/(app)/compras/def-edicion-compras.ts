@@ -19,7 +19,7 @@ export interface CampoEditable {
   color?: (valor: string) => string | undefined;
   /** Con productos vinculados la cantidad y el monto se calculan de ellos, así que no se escriben a mano (igual que en la ficha). */
   soloSinProductos?: boolean;
-  /** En una lista de opciones guardada como lista (la vía de envío): se elige una sola. */
+  /** En una lista guardada como lista (la vía de envío, la tienda): se elige una sola. */
   unica?: boolean;
   /** En un sí/no: cómo se llama cada lado («Venta de importación» / «Proveeduría»); por defecto «Sí» y «No». */
   siNo?: { si: string; no: string };
@@ -44,7 +44,8 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
     tipo: "booleano",
     siNo: { si: "Venta de importación", no: "Proveeduría" },
   },
-  tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista" },
+  // Una sola tienda por orden (pedido de Hernán, 9 oct 2026); se guarda como lista por las de antes.
+  tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista", unica: true },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
   qtyTotal: { etiqueta: "Cantidad total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
   montoTotal: { etiqueta: "Monto Total", prop: "montoTotal", columna: "monto_total", tipo: "dinero", soloSinProductos: true },
@@ -117,8 +118,11 @@ export function normalizarValor(def: CampoEditable, bruto: unknown): { valor: Va
     }
     case "booleano":
       return { valor: bruto === true };
-    case "lista":
-      return { valor: listaDeTexto(bruto) };
+    case "lista": {
+      const lista = listaDeTexto(bruto);
+      if (def.unica && lista.length > 1) return { error: `Elige una sola ${def.etiqueta.toLowerCase()}.` };
+      return { valor: lista };
+    }
   }
 }
 

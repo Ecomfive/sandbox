@@ -370,8 +370,21 @@ function EditorListaLote({
       renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
       gestion={campo === "tienda" ? tiendas : null}
       placeholder={campo === "etiquetas" ? "Buscar o añadir etiquetas…" : `Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
-      alAlternar={(n) => aplicar(campo, [n], presenciaEnLote(listas, n) === "todas" ? "quitar" : "agregar")}
-      alCrear={(n) => aplicar(campo, [n], "agregar")}
+      // Una sola (la tienda): elegir una la pone en todas en lugar de la que tenían (o la quita si ya la tenían todas) y cierra.
+      alAlternar={(n) => {
+        if (def.unica) {
+          alCerrar("elegido");
+          return aplicar(campo, presenciaEnLote(listas, n) === "todas" ? [] : [n], "poner");
+        }
+        aplicar(campo, [n], presenciaEnLote(listas, n) === "todas" ? "quitar" : "agregar");
+      }}
+      alCrear={(n) => {
+        if (def.unica) {
+          alCerrar("elegido");
+          return aplicar(campo, [n], "poner");
+        }
+        aplicar(campo, [n], "agregar");
+      }}
       alCerrar={alCerrar}
     />
   );

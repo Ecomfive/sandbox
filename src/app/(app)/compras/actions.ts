@@ -104,7 +104,8 @@ function leerCambios(formData: FormData) {
     proveedor: textoOptativo(formData, "proveedor"),
     agente_envio: textoOptativo(formData, "agente_envio"),
     venta_importacion: formData.get("venta_importacion") === "si",
-    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
+    // Una sola tienda por orden (se guarda como lista por las de antes).
+    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")).slice(0, 1),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),
     primer_pago: numeroOptativo(formData, "primer_pago"),
