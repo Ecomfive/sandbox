@@ -32,7 +32,9 @@ export function useTablaInteractiva<F>(
   const agrupado = vista.agrupar !== null;
 
   const resultado = useMemo(() => {
-    const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados || q !== "");
+    // Al buscar se busca en todas, abiertas y cerradas (antes, en una tabla con «Cerrados» exclusivo, buscar dejaba solo las
+    // cerradas y no se encontraba una compra abierta).
+    const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados, q !== "");
     if (!q) return r;
     const textos = def.campos.filter((c) => c.tipo === "texto");
     // Perdona errores de escritura («escalvo» encuentra «Excalvo»): ver `src/lib/tabla/busqueda.ts`.
