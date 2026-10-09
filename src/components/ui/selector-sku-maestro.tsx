@@ -69,6 +69,7 @@ export function CampoSkuMaestro({
   etiquetaAria = "SKU maestro",
   placeholder = "Código o nombre del SKU maestro",
   className = "",
+  claseContenedor = "",
   deshabilitado,
 }: {
   valor: string | null;
@@ -76,6 +77,8 @@ export function CampoSkuMaestro({
   etiquetaAria?: string;
   placeholder?: string;
   className?: string;
+  /** Clases del contenedor (la miniatura y el campo): para que ocupe todo el ancho de una fila, `min-w-0 flex-1` o `w-full`. */
+  claseContenedor?: string;
   deshabilitado?: boolean;
 }) {
   const opciones = useContext(SkusMaestrosContext);
@@ -118,7 +121,7 @@ export function CampoSkuMaestro({
 
   return (
     <>
-      <span className="flex items-center gap-2">
+      <span className={`flex items-center gap-2 ${claseContenedor}`.trim()}>
         {actual && texto === null && <Miniatura foto={actual.foto} />}
         <input
           ref={campo}

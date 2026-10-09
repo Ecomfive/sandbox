@@ -21,8 +21,14 @@ export function ComboBuilder({ opciones, nombreProducto }: { opciones: OpcionSku
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
+        {/* De punta a punta: el producto ocupa todo el ancho y la cantidad va al lado, en columnas alineadas. */}
+        <div aria-hidden="true" className="grid grid-cols-[minmax(0,1fr)_6rem_3.5rem] gap-2 text-xs font-medium text-muted-foreground">
+          <span>Producto</span>
+          <span>Cantidad</span>
+          <span />
+        </div>
         {filas.map((fila, i) => (
-          <div key={fila.clave} className="flex items-center gap-2">
+          <div key={fila.clave} className="grid grid-cols-[minmax(0,1fr)_6rem_3.5rem] items-center gap-2">
             <input type="hidden" name="componente_id" value={fila.id ?? ""} />
             {/* Cada fila ofrece los productos que no se eligieron en otra (y el suyo). */}
             <ProveedorSkusMaestros opciones={opciones.filter((o) => o.id === fila.id || !elegidos.has(o.id))}>
@@ -31,7 +37,7 @@ export function ComboBuilder({ opciones, nombreProducto }: { opciones: OpcionSku
                 alCambiar={(sku) => cambiar(fila.clave, { id: sku?.id ?? null })}
                 etiquetaAria={`Producto del componente ${i + 1}`}
                 placeholder="Busca por SKU, nombre o N.º"
-                className="min-w-0 flex-1"
+                claseContenedor="w-full min-w-0"
               />
             </ProveedorSkusMaestros>
             <input
@@ -41,10 +47,10 @@ export function ComboBuilder({ opciones, nombreProducto }: { opciones: OpcionSku
               min={1}
               value={fila.cantidad}
               onChange={(e) => cambiar(fila.clave, { cantidad: e.target.value })}
-              className={`${fieldClass} w-20 tabular-nums`}
+              className={`${fieldClass} w-full tabular-nums`}
               required
             />
-            {filas.length > 1 && (
+            {filas.length > 1 ? (
               <button
                 type="button"
                 onClick={() => setFilas((fs) => fs.filter((f) => f.clave !== fila.clave))}
@@ -53,6 +59,8 @@ export function ComboBuilder({ opciones, nombreProducto }: { opciones: OpcionSku
               >
                 Quitar
               </button>
+            ) : (
+              <span />
             )}
           </div>
         ))}
@@ -79,12 +87,12 @@ function MapaComponentes({ componentes, nombre }: { componentes: { producto: Opc
     <figure className="m-0 flex flex-col gap-2 rounded-xl border border-dashed border-border bg-muted/40 p-3">
       <figcaption className="text-xs font-medium text-muted-foreground">Cómo se arma</figcaption>
       <div className="overflow-x-auto">
-        <div className="flex w-max min-w-full items-center">
-          <ul className="relative m-0 flex list-none flex-col gap-2 p-0 pr-7">
+        <div className="flex w-full min-w-[32rem] items-center">
+          <ul className="relative m-0 flex min-w-0 flex-1 list-none flex-col gap-2 p-0 pr-7">
             {componentes.map(({ producto, cantidad }) => (
               <li
                 key={producto.id}
-                className="relative flex h-14 w-60 items-center gap-2 rounded-lg border border-border bg-card px-2"
+                className="relative flex h-14 w-full items-center gap-2 rounded-lg border border-border bg-card px-2"
               >
                 {/* La línea que une este componente con la de todos. */}
                 <span aria-hidden="true" className="absolute top-1/2 left-full h-0.5 w-7 bg-primario/50" />
@@ -108,7 +116,7 @@ function MapaComponentes({ componentes, nombre }: { componentes: { producto: Opc
           <span aria-hidden="true" className="-ml-1 text-primario">
             ▶
           </span>
-          <div className="ml-1 flex w-56 flex-col gap-0.5 rounded-xl border-2 border-primario bg-card px-3 py-2.5 shadow-sm">
+          <div className="ml-1 flex w-56 shrink-0 flex-col gap-0.5 rounded-xl border-2 border-primario bg-card px-3 py-2.5 shadow-sm">
             <span className="text-xs font-medium text-primario">Producto compuesto</span>
             <span className="truncate text-sm font-semibold">{nombre.trim() || "Nuevo producto"}</span>
             <span className="text-xs text-muted-foreground tabular-nums">
