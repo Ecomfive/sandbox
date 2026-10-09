@@ -60,13 +60,10 @@ function Barra({ nombre, valor, maximo, href }: { nombre: string; valor: number;
 export function InformeCompras({
   compras,
   vista,
-  verImportadora = true,
   paises,
 }: {
   compras: FilaCompra[];
   vista: string;
-  /** Si la persona puede ver Compras Importadora (países permitidos). */
-  verImportadora?: boolean;
   paises: { codigo: string; nombre: string }[];
 }) {
   const { mostrarToast } = useToast();
@@ -81,7 +78,7 @@ export function InformeCompras({
 
   const barraSuperior = (
     <div className="flex flex-wrap items-center gap-2">
-      <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} />
+      <SelectorVista vista={vista} paises={paises} />
       <Segmentado
         etiqueta="Agrupar por"
         valor={g}

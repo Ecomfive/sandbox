@@ -653,6 +653,10 @@ convenciones técnicas del código.
   muestra con `PlanificacionAutomatica` (llegada estimada y de dónde salen los días). `scripts/recalcular-planificacion.ts`
   recalcula las abiertas con fecha de envío. **«Documentos» y «Producto relacionado» ya no existen** (migración 0090): los
   archivos del campo Documentos de ClickUp quedaron dentro de un comentario «Documentos (factura o soporte)».
+  **Venta de importación** (migración 0094, 8 oct 2026): «Importadora» ya no es una vista ni un país. Una venta de
+  importación es una compra de país con `venta_importacion = true` (casilla en la compra nueva y en la ficha, columna y filtro
+  «Venta de importación», editable en la celda). Las 12 compras `tipo = 'importacion'` pasaron a México marcadas. El código
+  aún entiende `tipo = 'importacion'` por si queda alguna, pero ya no se crean ni se ofrecen (ni en Países de la persona).
   **Envíos** (`/compras/envios`, pestaña después de Tiempos y fallas; migración 0092; antes la lista «Envíos desde China» de
   ClickUp, importada con `scripts/clickup-exportar-envios.mjs` + `scripts/importar-rutas-envio.ts`): `wms_rutas_envio` (agente,
   país por código ISO —cualquiera del mundo, no hace falta que exista en `paises`—, vía, DDP/DAP, courier, días prometidos

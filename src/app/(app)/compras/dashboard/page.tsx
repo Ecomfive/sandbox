@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   await requireModulo("compras");
   const { ver } = await searchParams;
-  const { compras, paises, vista, error, verImportadora } = await cargarCompras(ver);
+  const { compras, paises, vista, error } = await cargarCompras(ver);
   const eventos = error ? [] : await cargarEventos(new Set(compras.map((c) => c.id)));
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -22,7 +22,7 @@ export default async function DashboardComprasPage({ searchParams }: { searchPar
           No se pudieron cargar las compras.
         </p>
       ) : (
-        <DashboardCompras key={vista} compras={compras} eventos={eventos} vista={vista} verImportadora={verImportadora} paises={paises} />
+        <DashboardCompras key={vista} compras={compras} eventos={eventos} vista={vista} paises={paises} />
       )}
     </Pagina>
   );

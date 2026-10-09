@@ -102,6 +102,7 @@ function leerCambios(formData: FormData) {
     foto_url: textoOptativo(formData, "foto_url"),
     proveedor: textoOptativo(formData, "proveedor"),
     agente_envio: textoOptativo(formData, "agente_envio"),
+    venta_importacion: formData.get("venta_importacion") === "on",
     tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),

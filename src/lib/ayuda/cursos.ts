@@ -110,8 +110,8 @@ export const CURSOS: Curso[] = [
       {
         titulo: "La orden de compra",
         parrafos: [
-          "Cada compra a un proveedor es una orden con su N.º OC (OC-0001…) y el código de su país (ECOM01 Panamá, ECOM03 Costa Rica…), que se asigna solo al crearla. Las compras de Importadora son un servicio a un cliente: no llevan país y nunca se mezclan con las de un país.",
-          "Arriba de la lista eliges qué ver: todos los países, uno o Importadora. La lista arranca agrupada por etapa.",
+          "Cada compra a un proveedor es una orden con su N.º OC (OC-0001…) y el código de su país (ECOM01 Panamá, ECOM03 Costa Rica…), que se asigna solo al crearla. Una venta de importación (para un cliente) es una compra de un país con la casilla «Venta de importación» marcada.",
+          "Arriba de la lista eliges qué ver: todos los países o uno. La lista arranca agrupada por etapa.",
         ],
       },
       {
@@ -147,7 +147,7 @@ export const CURSOS: Curso[] = [
       { pregunta: "¿De dónde salen la Cantidad total y el Monto Total de una compra con productos?", opciones: ["Se escriben a mano", "De sus productos vinculados", "De la descripción"], correcta: 1 },
       { pregunta: "¿Cómo marcas una falla de una compra?", opciones: ["Con un comentario que empiece con «Inconveniente:»", "Cambiando la etapa a Descartado", "Con una etiqueta roja"], correcta: 0 },
       { pregunta: "¿Cómo se pone la Planificación de una compra?", opciones: ["Se escribe a mano el mes", "Se calcula sola con la fecha de envío y lo que tardan los envíos de su país por esa vía", "Es el mes en que se creó la compra"], correcta: 1 },
-      { pregunta: "Una compra de Importadora…", opciones: ["Lleva el país de entrega", "No lleva país y no se mezcla con las de un país", "Es igual a una compra de Panamá"], correcta: 1 },
+      { pregunta: "¿Cómo marcas una venta de importación (para un cliente)?", opciones: ["Eligiendo el país Importadora", "Con la casilla «Venta de importación» de la compra", "Con una etiqueta"], correcta: 1 },
     ],
   },
   {

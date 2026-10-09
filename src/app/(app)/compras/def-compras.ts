@@ -19,6 +19,8 @@ export interface FilaCompra {
   etapa: string;
   estado: string;
   proveedor: string | null;
+  /** Venta de importación: la compra es para un cliente que nos pide mercancía (antes «Importadora»; migración 0094). */
+  ventaImportacion: boolean;
   /** Quién trae la mercancía (Chin, Avery…), aparte del proveedor que la vende (migración 0092). */
   agenteEnvio: string | null;
   /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */
@@ -62,6 +64,7 @@ export const EMOJI_CAMPO: Record<string, string> = {
   estado: "🚦",
   proveedor: "🏭",
   agenteEnvio: "🚢",
+  ventaImportacion: "🌍",
   tienda: "🏪",
   viaEnvio: "🏗️",
   etiquetas: "🏷️",
@@ -270,6 +273,17 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       tipo: "seleccion",
       valores: (c) => [c.proveedor ?? SIN_VALOR],
       etiquetaSinValor: "Sin proveedor",
+      agrupable: true,
+    },
+    {
+      id: "ventaImportacion",
+      etiqueta: "Venta de importación",
+      tipo: "seleccion",
+      valores: (c) => [c.ventaImportacion ? "si" : "no"],
+      opciones: () => [
+        { valor: "si", etiqueta: "Venta de importación" },
+        { valor: "no", etiqueta: "Compra propia" },
+      ],
       agrupable: true,
     },
     {

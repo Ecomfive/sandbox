@@ -28,6 +28,7 @@ const ICONO: Record<string, IconoComp> = {
   viaEnvio: ComprasIcon,
   proveedor: ProductoIcon,
   agenteEnvio: ComprasIcon,
+  ventaImportacion: ComprasIcon,
   tienda: ComprasIcon,
   qtyTotal: ProductoIcon,
   montoTotal: GastoIcon,

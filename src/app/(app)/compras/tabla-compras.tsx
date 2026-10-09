@@ -49,6 +49,7 @@ const ICONOS: Record<string, IconoComp> = {
   estado: EstadoIcon,
   proveedor: ProductoIcon,
   agenteEnvio: ComprasIcon,
+  ventaImportacion: ComprasIcon,
   tienda: ComprasIcon,
   viaEnvio: ComprasIcon,
   etiquetas: EtiquetaIcon,
@@ -229,6 +230,10 @@ function columnas(
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
+    col("ventaImportacion", "Venta de importación", {
+      ...resto,
+      render: (c) => ed(c, "ventaImportacion", c.ventaImportacion ? <Badge tone="info">🌍 Importación</Badge> : <span className="text-muted-foreground">—</span>),
+    }),
     col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", c.agenteEnvio || "—") }),
     col("tienda", "Tienda", {
       ...resto,
@@ -292,7 +297,6 @@ function columnas(
 export function TablaCompras({
   compras: comprasServidor,
   vista,
-  verImportadora = true,
   paises,
   puedeEscribir,
   puedeAgregarPais,
@@ -305,8 +309,6 @@ export function TablaCompras({
 }: {
   compras: FilaCompra[];
   vista: string;
-  /** Si la persona puede ver Compras Importadora (países permitidos). */
-  verImportadora?: boolean;
   paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
   /** Puede modificar Configuración: agrega un país desde «Elige el país» de la compra nueva. */
@@ -620,13 +622,13 @@ export function TablaCompras({
           }
           accionPrincipal={
             <div className="flex items-center gap-2">
-              <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} />
+              <SelectorVista vista={vista} paises={paises} />
               {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} />}
             </div>
           }
           ariaLabel="Tablero de compras"
           aspecto="lista"
-          vacio={vista === "importacion" ? "Todavía no hay compras de Importadora." : "Todavía no hay compras registradas."}
+          vacio="Todavía no hay compras registradas."
         />
       </div>
 

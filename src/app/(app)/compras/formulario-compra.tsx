@@ -277,6 +277,7 @@ export function FormularioCompra({
               ))}
             </div>
           </fieldset>
+          <Casilla id="venta_importacion" texto={conEmoji("ventaImportacion", "Venta de importación")} defaultChecked={compra?.ventaImportacion} />
           <Campo etiqueta={conEmoji("urlProducto", "URL del producto")} id="campo-url-compra">
             <input id="campo-url-compra" type="url" name="url_producto" defaultValue={compra?.urlProducto ?? ""} placeholder="Ej: https://www.alibaba.com/product-detail/…" className={fieldClass} />
           </Campo>

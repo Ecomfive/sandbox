@@ -33,6 +33,7 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO },
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "texto" },
   agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "texto" },
+  ventaImportacion: { etiqueta: "Venta de importación", prop: "ventaImportacion", columna: "venta_importacion", tipo: "booleano" },
   tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista" },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
   qtyTotal: { etiqueta: "Cantidad total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },

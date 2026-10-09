@@ -37,14 +37,11 @@ export function TiemposCompras({
   compras,
   eventos,
   vista,
-  verImportadora = true,
   paises,
 }: {
   compras: FilaCompra[];
   eventos: Evento[];
   vista: string;
-  /** Si la persona puede ver Compras Importadora (países permitidos). */
-  verImportadora?: boolean;
   paises: { codigo: string; nombre: string }[];
 }) {
   const [dimension, setDimension] = useState<Dimension>("proveedor");
@@ -61,7 +58,7 @@ export function TiemposCompras({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
-        <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} />
+        <SelectorVista vista={vista} paises={paises} />
         <span className="text-xs text-muted-foreground">
           {entero(compras.length)} compras · {entero(compras.filter(estaAbierta).length)} abiertas
         </span>
