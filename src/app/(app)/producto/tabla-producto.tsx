@@ -1,5 +1,6 @@
 "use client";
 
+import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
@@ -57,7 +58,7 @@ export function TablaProducto({
   puedeEscribir,
 }: {
   productos: FilaProducto[];
-  opcionesSimples: { id: string; codigo: string; nombre: string }[];
+  opcionesSimples: OpcionSkuMaestro[];
   codigoPais: string;
   puedeEscribir: boolean;
 }) {

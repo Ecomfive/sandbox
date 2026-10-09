@@ -180,7 +180,7 @@ export default async function ProductoPage() {
   const opcionesSimples = lista
     .filter((p) => p.tipo === "simple" && !variantesPorPadre.has(p.id))
     .sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }))
-    .map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre }));
+    .map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.clase, numero: numeroPorId.get(p.id) ?? null, foto: fotoPorId.get(p.id) ?? null }));
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">

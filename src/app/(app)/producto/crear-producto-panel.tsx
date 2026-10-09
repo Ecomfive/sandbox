@@ -10,6 +10,7 @@ import { svgCodigoBarras } from "@/lib/wms/codigo-barras";
 import { crearProducto, reservarCodigoBarrasInterno, revisarSku, sugerirSkuLibre } from "./actions";
 import { imprimirEtiqueta } from "./codigo-barras-producto";
 import { ComboBuilder } from "./combo-builder";
+import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 
 /**
@@ -17,7 +18,7 @@ import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
  * el tipo (Simple o Compuesto) decide si aparece el bloque de componentes. El SKU es obligatorio: con él una venta de Dropi
  * o de una tienda de Shopify encuentra el producto para descontar el inventario.
  */
-export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: { id: string; codigo: string; nombre: string }[] }) {
+export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: OpcionSkuMaestro[] }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
   // El código de barras (decisión de Hernán, 8 oct 2026): lo normal es que el producto venga sin código, así que se le genera
