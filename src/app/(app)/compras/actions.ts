@@ -13,7 +13,7 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { estimarPlanificacion, nuevaPlanificacion, tiemposDeTransito, type Estimacion, type TiemposTransito } from "@/lib/compras/planificacion";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
-import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
+import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
@@ -159,6 +159,7 @@ async function cargarTiempos(): Promise<TiemposTransito> {
       .select("tipo, pais_id, via_envio, fecha_envio, fecha_llegada")
       .not("fecha_envio", "is", null)
       .not("fecha_llegada", "is", null)
+      .is("anulada_en", null)
       .order("id")
       .range(desde, hasta),
   );
@@ -615,6 +616,53 @@ export async function actualizarCampoComprasLote(
   };
 }
 
+/**
+ * Anula una compra (en vez de borrarla): queda guardada con su N.º OC, su código, su actividad y sus productos, pero sale de la
+ * lista (se ve con «Anuladas») y deja de contar en informes, tiempos, envíos e históricos. Pide el motivo, que queda en su
+ * Actividad y en la auditoría. Se puede restaurar. Devuelve el error como valor.
+ */
+export async function anularCompra(id: string, motivo: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(id))) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
+  const razon = String(motivo ?? "").trim().replace(/\s+/g, " ").slice(0, 500);
+  if (razon.length < 3) return { error: "Escribe por qué se anula la compra." };
+  const supabase = createServiceClient();
+  const { data: compra } = await supabase.from("wms_compras").select("numero, codigo, nombre, anulada_en").eq("id", id).maybeSingle();
+  if (!compra) return { error: "La compra ya no existe." };
+  if (compra.anulada_en) return { error: "La compra ya está anulada." };
+  const autor = usuario.nombre || usuario.email;
+  const { error } = await supabase
+    .from("wms_compras")
+    .update({ anulada_en: new Date().toISOString(), anulada_por: autor, motivo_anulacion: razon, actualizado_en: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0096 para anular compras." : "No se pudo anular la compra." };
+  await supabase.from("wms_compra_eventos").insert({ compra_id: id, campo: "anulacion", valor_antes: null, valor_despues: razon, autor, origen: "sistema" });
+  await registrarAuditoria({ accion: "anular_compra", entidad: "wms_compras", entidadId: id, detalle: `${numeroOC(Number(compra.numero))} · ${compra.codigo ?? ""} · ${compra.nombre} — ${razon}` });
+  revalidatePath("/compras", "layout");
+  return {};
+}
+
+/** Devuelve a la lista una compra anulada, tal como estaba. Queda en su Actividad y en la auditoría. */
+export async function restaurarCompra(id: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(id))) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
+  const supabase = createServiceClient();
+  const { data: compra } = await supabase.from("wms_compras").select("numero, codigo, nombre, anulada_en").eq("id", id).maybeSingle();
+  if (!compra) return { error: "La compra ya no existe." };
+  if (!compra.anulada_en) return {};
+  const { error } = await supabase.from("wms_compras").update({ anulada_en: null, anulada_por: null, motivo_anulacion: null, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudo restaurar la compra." };
+  await supabase.from("wms_compra_eventos").insert({ compra_id: id, campo: "restauracion", valor_antes: null, valor_despues: "Restaurada", autor: usuario.nombre || usuario.email, origen: "sistema" });
+  await registrarAuditoria({ accion: "restaurar_compra", entidad: "wms_compras", entidadId: id, detalle: `${numeroOC(Number(compra.numero))} · ${compra.codigo ?? ""} · ${compra.nombre}` });
+  revalidatePath("/compras", "layout");
+  return {};
+}
+
+/** Borra una compra de verdad. Ya no se ofrece en la ficha (se anula); queda para casos puntuales desde el servidor. */
 export async function eliminarCompra(formData: FormData) {
   await requireModuloEscritura("compras");
   const id = formData.get("id") as string;

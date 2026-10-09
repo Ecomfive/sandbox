@@ -53,6 +53,8 @@ function CambioEvento({ e }: { e: Datos["eventos"][number] }) {
         Cambió {e.antes} <span className="text-muted-foreground">→</span> {e.despues}
       </span>
     );
+  if (e.campo === "anulacion") return <span className="text-destructive">Anuló la compra: {e.despues}</span>;
+  if (e.campo === "restauracion") return <span>Restauró la compra</span>;
   if (e.campo === "foto") return <span>{e.despues && e.despues !== "—" ? "Cambió la foto del producto" : "Quitó la foto del producto"}</span>;
   const nombre = e.campo === "etapa" ? "Etapa" : e.campo === "estado" ? "Estado" : (NOMBRE_CAMPO[e.campo] ?? e.campo);
   const valor = (v: string | null) => {

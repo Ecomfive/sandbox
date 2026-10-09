@@ -9,7 +9,7 @@ import type { FilaCompra } from "./def-compras";
 export const COOKIE_VISTA_COMPRAS = "compras-vista";
 
 const COLUMNAS =
-  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))";
+  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? null) : ((r as T) ?? null));
@@ -41,7 +41,7 @@ export interface DatosCompras {
  * Las compras de la vista pedida (`?ver=`, o la última elegida): todos los países, uno solo o Importadora (que nunca se
  * mezcla con las de un país). La usan Informe, Compras y Tiempos y fallas.
  */
-export async function cargarCompras(ver: string | string[] | undefined): Promise<DatosCompras> {
+export async function cargarCompras(ver: string | string[] | undefined, opciones: { conAnuladas?: boolean } = {}): Promise<DatosCompras> {
   const supabase = createServiceClient();
   // Solo los países que la persona puede ver (y Importadora si la tiene): lo demás no se pide a la base.
   const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
@@ -61,6 +61,8 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
     else
       filas = await traerTodasLasFilas<Record<string, unknown>>((desde, hasta) => {
         let q = supabase.from("wms_compras").select(COLUMNAS);
+        // Las anuladas solo las pide la lista (para el botón «Anuladas»); el informe, el dashboard y los tiempos no las cuentan.
+        if (!opciones.conAnuladas) q = q.is("anulada_en", null);
         if (vista === "importacion") q = q.eq("tipo", "importacion");
         else if (paisVista) q = q.eq("tipo", "pais").eq("pais_id", paisVista.id);
         else if (permitidos !== null) q = q.eq("tipo", "pais").in("pais_id", paises.map((p) => p.id));
@@ -99,6 +101,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       proveedor: txt(c.proveedor),
       agenteEnvio: txt(c.agente_envio),
       ventaImportacion: c.venta_importacion === true,
+      anulada: c.anulada_en ? { en: String(c.anulada_en), por: txt(c.anulada_por), motivo: txt(c.motivo_anulacion) } : null,
       tiendas: (c.tiendas as string[] | null) ?? [],
       qtyTotal: num(c.qty_total),
       montoTotal: num(c.monto_total),

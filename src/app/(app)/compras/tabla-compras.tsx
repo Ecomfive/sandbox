@@ -508,16 +508,21 @@ export function TablaCompras({
     [puedeEscribir, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
   );
 
-  const umbral = useMemo(() => umbralesTransito(compras), [compras]);
+  // Las anuladas no se ven ni cuentan en la lista: aparte, con el botón «Anuladas» (migración 0096).
+  const [verAnuladas, setVerAnuladas] = useState(false);
+  const anuladas = useMemo(() => compras.filter((c) => c.anulada), [compras]);
+  const vivas = useMemo(() => compras.filter((c) => !c.anulada), [compras]);
+  const base = verAnuladas ? anuladas : vivas;
+  const umbral = useMemo(() => umbralesTransito(vivas), [vivas]);
   const dia = hoy();
   const cols = useMemo(() => columnas(umbral, dia, edicion), [umbral, dia, edicion]);
-  const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, compras.filter((c) => enGrupo(c, r.valor, umbral)).length])), [compras, umbral]);
+  const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, base.filter((c) => enGrupo(c, r.valor, umbral)).length])), [base, umbral]);
   const filas = useMemo(
-    () => compras.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
-    [compras, rapido, etapa, umbral, soloSinProductos],
+    () => base.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
+    [base, rapido, etapa, umbral, soloSinProductos],
   );
   // El avance de vincular productos a las compras de país (las de ClickUp llegaron sin productos).
-  const dePais = compras.filter((c) => c.tipo === "pais");
+  const dePais = vivas.filter((c) => c.tipo === "pais");
   const sinProductos = dePais.filter((c) => c.productos === 0);
   const resumen = elegida ? (compras.find((c) => c.id === elegida.id) ?? null) : null;
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
@@ -537,6 +542,11 @@ export function TablaCompras({
           {etapa && (
             <BotonBarra activo onClick={() => setEtapa("")} aria-label={`Quitar el filtro de etapa ${etiquetaEtapa(etapa)}`}>
               Etapa: {etiquetaEtapa(etapa)} ✕
+            </BotonBarra>
+          )}
+          {(anuladas.length > 0 || verAnuladas) && (
+            <BotonBarra activo={verAnuladas} onClick={() => setVerAnuladas((v) => !v)} aria-label={verAnuladas ? "Volver a las compras (salir de Anuladas)" : "Ver las compras anuladas"}>
+              Anuladas <span className="text-muted-foreground tabular-nums">{anuladas.length}</span>
             </BotonBarra>
           )}
           {dePais.length > 0 && (

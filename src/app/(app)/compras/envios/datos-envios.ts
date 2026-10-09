@@ -24,6 +24,7 @@ export async function cargarRutas(): Promise<{ rutas: FilaRuta[]; agentes: strin
         .not("agente_envio", "is", null)
         .not("fecha_envio", "is", null)
         .not("fecha_llegada", "is", null)
+        .is("anulada_en", null)
         .order("id")
         .range(desde, hasta),
     ).catch(() => null),

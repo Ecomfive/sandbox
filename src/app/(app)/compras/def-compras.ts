@@ -22,6 +22,8 @@ export interface FilaCompra {
   /** Tipo de venta: venta de importación (para un cliente que nos pide mercancía, antes «Importadora»; migración 0094) o
    * proveeduría (false). */
   ventaImportacion: boolean;
+  /** Si se anuló (no se borra: sale de la lista y de los cálculos, migración 0096): cuándo, quién y por qué. */
+  anulada: { en: string; por: string | null; motivo: string | null } | null;
   /** Quién trae la mercancía (Chin, Avery…), aparte del proveedor que la vende (migración 0092). */
   agenteEnvio: string | null;
   /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */

@@ -74,7 +74,7 @@ export default async function ProductoPage() {
     // El N.º correlativo va aparte: sin la migración 0089 la columna no existe y la lista se carga igual.
     supabase.from("skus_maestros").select("id, numero"),
     traerTodasLasFilas<{ sku_maestro_id: string; compra_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
-      supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, paises(codigo))").order("id").range(desde, hasta),
+      supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, anulada_en, paises(codigo))").order("id").range(desde, hasta),
     ),
   ]);
   const numeroPorId = new Map(numeros.error ? [] : ((numeros.data ?? []) as { id: string; numero: number }[]).map((n) => [n.id, Number(n.numero)]));
@@ -86,7 +86,9 @@ export default async function ProductoPage() {
   const ordenesPorId = new Map<string, Map<string, { numero: number; fecha: string }>>();
   for (const l of lineasCompra) {
     // Solo lo comprado en los países que la persona puede ver (migración 0087).
-    const compra = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { numero: number; creado_en: string; paises: { codigo: string } | { codigo: string }[] | null } | null;
+    const compra = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { numero: number; creado_en: string; anulada_en: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null;
+    // Una compra anulada no cuenta.
+    if (compra?.anulada_en) continue;
     const paisCompra = compra ? ((Array.isArray(compra.paises) ? compra.paises[0] : compra.paises)?.codigo ?? null) : null;
     if (!puedeVerPais(usuario.paisesPermitidos, paisCompra)) continue;
     const n = Number(l.cantidad_pedida);

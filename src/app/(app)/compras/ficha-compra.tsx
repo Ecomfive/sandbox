@@ -12,7 +12,7 @@ import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
-import { EliminarCompraBoton } from "./eliminar-compra-boton";
+import { AnularCompraBoton, AvisoAnulada } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
 import { ProductosCompra } from "./productos-compra";
 import { PastillaTienda } from "./tiendas";
@@ -199,6 +199,7 @@ export function FichaCompra({
             {compra.productos === 0 && <span className="text-lg font-semibold">{compra.nombre}</span>}
             <Badge color={colorEtapa(compra.etapa)}>{etiquetaEtapa(compra.etapa)}</Badge>
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
+            {compra.anulada && <Badge tone="destructive">Anulada</Badge>}
           </>
         )
       }
@@ -211,6 +212,7 @@ export function FichaCompra({
     >
       {compra && (
         <div ref={raiz} className="flex flex-1 flex-col">
+          <AvisoAnulada compra={compra} puedeEscribir={puedeEscribir} />
           {puedeEscribir ? (
             <FormularioCompra
               key={`${compra.id}-${version}`}
@@ -221,7 +223,7 @@ export function FichaCompra({
               etiquetas={etiquetas}
               colores={colores}
               botonesArriba
-              acciones={<EliminarCompraBoton id={compra.id} nombre={compra.nombre} alEliminar={alCerrar} />}
+              acciones={compra.anulada ? undefined : <AnularCompraBoton id={compra.id} nombre={compra.nombre} alAnular={alCerrar} />}
               alGuardar={alGuardar}
               alCancelar={alCancelar}
               alCambiarGuardando={setGuardando}
