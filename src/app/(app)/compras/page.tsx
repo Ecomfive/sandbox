@@ -1,34 +1,14 @@
-import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
-import { Pagina } from "@/components/ui/pagina";
+import { redirect } from "next/navigation";
 import { requireModulo } from "@/lib/auth";
-import { cargarCompras } from "./datos-compras";
-import { InformeCompras } from "./informe-compras";
-
-export const metadata = { title: "Compras" };
 
 export const dynamic = "force-dynamic";
 
-/** Compras › Informe: el resumen de la operación de compras por día, semana o mes, de todos los países, uno o Importadora. */
+/**
+ * Compras abre en la pestaña «Compras» (la lista), pedido de Hernán (8 oct 2026). El Informe vive en `/compras/informe`. Se
+ * conserva la vista pedida (`?ver=PA`).
+ */
 export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   await requireModulo("compras");
   const { ver } = await searchParams;
-  const { compras, paises, vista, error } = await cargarCompras(ver);
-  return (
-    <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Compras" oculto />
-      {error ? (
-        <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          No se pudieron cargar las compras.
-        </p>
-      ) : (
-        <InformeCompras
-          key={vista}
-          compras={compras}
-          vista={vista}
-         
-          paises={paises}
-        />
-      )}
-    </Pagina>
-  );
+  redirect(typeof ver === "string" ? `/compras/lista?ver=${encodeURIComponent(ver)}` : "/compras/lista");
 }

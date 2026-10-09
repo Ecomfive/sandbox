@@ -240,6 +240,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-08", titulo: "Compras abre en la lista", texto: "Al entrar a Compras se abre directo la pestaña «Compras»; el Informe sigue en su pestaña.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-08", titulo: "Responder, reaccionar y adjuntar Excel", texto: "En la actividad de una compra puedes responder un comentario (le avisa a quien lo escribió), darle «Me gusta» o un emoji, y adjuntar Excel, Word, PowerPoint, CSV o texto además de imágenes y PDF.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-08", titulo: "Actividad de la compra como ClickUp", texto: "Comentarios, cambios y archivos en un solo bloque, en orden de tiempo, con filtro Todo / Comentarios / Cambios, imágenes en miniatura y el campo para comentar abajo.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-08", titulo: "Código de barras interno por defecto", texto: "Al crear un producto, el código de barras interno se genera solo y se ve de una vez con su etiqueta; si trae el del fabricante, eliges «Del fabricante» y lo escribes.", modulo: "producto", href: "/producto" },
