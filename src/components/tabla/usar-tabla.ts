@@ -1,5 +1,6 @@
 "use client";
 
+import { crearBuscador } from "@/lib/tabla/busqueda";
 import { useMemo, useState } from "react";
 import { filtroActivo, normalizar, type DefTabla } from "@/lib/tabla/motor";
 import { calcularPagina } from "@/lib/tabla/paginacion";
@@ -34,7 +35,9 @@ export function useTablaInteractiva<F>(
     const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados || q !== "");
     if (!q) return r;
     const textos = def.campos.filter((c) => c.tipo === "texto");
-    const coincide = (fila: F) => textos.some((c) => c.tipo === "texto" && normalizar(c.valor(fila)).includes(q));
+    // Perdona errores de escritura («escalvo» encuentra «Excalvo»): ver `src/lib/tabla/busqueda.ts`.
+    const buscar = crearBuscador(q);
+    const coincide = (fila: F) => textos.some((c) => c.tipo === "texto" && buscar(c.valor(fila)));
     return { ...r, filas: r.filas.filter(coincide) };
   }, [def, filas, filtros, vista.mostrarCerrados, q]);
   const { limiteSinFiltros, porPagina, paginarSiempre = false } = opciones;
