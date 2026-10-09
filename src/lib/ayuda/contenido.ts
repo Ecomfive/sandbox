@@ -240,7 +240,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
-  { fecha: "2026-10-08", titulo: "La lupa busca en todas y perdona errores", texto: "La búsqueda de las tablas encuentra abiertas y cerradas a la vez (en Compras no salían las abiertas) y perdona errores: «escalvo» encuentra «Excalvo»." },
+  { fecha: "2026-10-08", titulo: "La lupa busca en abiertas y cerradas", texto: "La búsqueda de las tablas encuentra abiertas y cerradas a la vez (en Compras no salían las compras abiertas)." },
   { fecha: "2026-10-08", titulo: "Una sola vía de envío y «Tipo de venta»", texto: "La vía de envío de una compra es una sola (marítimo, aéreo o terrestre). «Tipo de venta» elige entre Proveeduría y Venta de importación.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-08", titulo: "«Mostrar todas» las columnas", texto: "El menú Columnas de cualquier tabla trae «Mostrar todas» y «Ocultar todas», y su lista se desplaza por dentro sin mover la página." },
   { fecha: "2026-10-08", titulo: "Venta de importación en vez de Importadora", texto: "Importadora ya no está entre los países: una venta de importación es una compra con su casilla marcada (al crearla o en su ficha) y se filtra por esa columna. Las 12 de antes quedaron en México.", modulo: "compras", href: "/compras/lista" },
