@@ -1,5 +1,6 @@
 "use client";
 
+import { MapaComponentes } from "./mapa-componentes";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
@@ -184,7 +185,11 @@ export function FichaProducto({
 
             {producto.tipo === "combo" && (
               <Seccion icono={ProductoIcon} titulo="Componentes">
-                <p className="text-sm">{producto.componentes || "—"}</p>
+                {producto.listaComponentes.length ? (
+                  <MapaComponentes componentes={producto.listaComponentes} nombre={producto.nombre} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sin componentes.</p>
+                )}
               </Seccion>
             )}
 

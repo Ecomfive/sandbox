@@ -66,6 +66,10 @@ export interface FilaProducto {
   envio: EnvioProducto;
   /** Solo los compuestos: "2× 1001, 1× 1002". */
   componentes: string;
+  /** Los componentes de un compuesto, para su mapa (ficha y tarjeta de la lista). */
+  listaComponentes: { id: string; codigo: string; nombre: string; foto: string | null; cantidad: number }[];
+  /** Sus compras (en los países que la persona ve): en cuántas órdenes está y la última. */
+  compras: { ordenes: number; ultima: { oc: string; fecha: string } | null };
   /** La foto del producto (bucket público `wms-productos`), o null. */
   foto: string | null;
   /** Unidades compradas desde la primera compra (las líneas vinculadas en Compras; con variantes, suma las de ellas). */

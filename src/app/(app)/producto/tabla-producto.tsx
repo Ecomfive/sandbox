@@ -11,6 +11,8 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearProductoPanel } from "./crear-producto-panel";
 import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FichaProducto } from "./ficha-producto";
+import { VistaRapidaProducto } from "./vista-rapida-producto";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
@@ -30,7 +32,17 @@ const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
   { id: "numero", label: "N.º", ocultable: false, clase: "tabular-nums text-muted-foreground whitespace-nowrap", render: (p) => numeroProducto(p.numero) },
   { id: "codigo", label: "SKU", ocultable: true, clase: "font-medium", render: (p) => p.codigo },
   { id: "foto", label: "Foto", ocultable: true, render: (p) => <MiniaturaFoto url={p.foto} nombre={p.nombre} /> },
-  { id: "nombre", label: "Producto", ocultable: true, render: (p) => p.nombre },
+  {
+    id: "nombre",
+    label: "Producto",
+    ocultable: true,
+    // Al pasar el cursor: el mapa de un compuesto, o la foto grande y las compras de un producto simple.
+    render: (p) => (
+      <TarjetaEmergente ancho={p.tipo === "combo" ? "34rem" : "17rem"} contenido={<VistaRapidaProducto producto={p} />}>
+        <span className="cursor-default underline decoration-dotted decoration-border-control underline-offset-4">{p.nombre}</span>
+      </TarjetaEmergente>
+    ),
+  },
   { id: "tipo", label: "Tipo", ocultable: true, clase: "text-muted-foreground", render: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
   { id: "clase", label: "Estado", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },
   { id: "barras", label: "Código de barras", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.codigoBarras ?? "—" },
