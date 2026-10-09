@@ -152,7 +152,7 @@ function columnas(
     { id: "numero", label: "N.º OC", ocultable: true, clase: "whitespace-nowrap tabular-nums text-muted-foreground", render: (c) => numeroOC(c.numero) },
     {
       id: "nombre",
-      label: "Compra",
+      label: "Orden de compra",
       ocultable: false,
       render: (c) => {
         const atrasada = estaAtrasada(c, umbral, dia);
@@ -255,22 +255,6 @@ function columnas(
           ),
           edicion.tiendas,
         ),
-    }),
-    col("etiquetas", "Etiquetas", {
-      ...resto,
-      render: (c) => (
-        <span className="flex min-h-6 items-center gap-1">
-          {c.etiquetas.length === 0 && <span className="text-muted-foreground">—</span>}
-          <EtiquetasCompra
-            compra={c}
-            todas={edicion.etiquetas}
-            colores={edicion.colores}
-            puedeEscribir={edicion.puedeEscribir}
-            guardar={edicion.guardar}
-            cambiarColor={edicion.cambiarColor}
-          />
-        </span>
-      ),
     }),
     col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
     col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),

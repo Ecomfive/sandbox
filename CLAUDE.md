@@ -613,7 +613,7 @@ convenciones técnicas del código.
   de los campos de ClickUp ocultos (`oculta` en la columna) hasta mostrarlos en «Columnas»; filtros de un toque (Cotizando,
   Producción, En tránsito, Atrasadas; `?grupo=` y `?etapa=` los preseleccionan) y la ficha de resumen a la derecha, que se
   minimiza (`ficha-lateral-compra.tsx`: etapa N de las del recorrido, fechas clave con los días entre una y otra). **Pulsar la descripción de
-  la compra (la columna «Compra», y solo esa) la muestra en la ficha; el resto de las celdas se editan en su sitio** (ver abajo);
+  la compra (la columna «Orden de compra», y solo esa; las etiquetas van dentro de ella, ya no hay columna «Etiquetas») la muestra en la ficha; el resto de las celdas se editan en su sitio** (ver abajo);
   «Abrir ficha completa» abre el formulario con la actividad (con la ficha minimizada, la descripción lo abre directo).
   **Edición en la celda** (`celda-editable.tsx`, qué se edita y cómo se valida en `def-edicion-compras.ts`): un clic en el
   dato abre bajo la celda **el mismo panel para todas las columnas** (`PanelCelda`, `panel-celda.tsx`, como los de ClickUp):

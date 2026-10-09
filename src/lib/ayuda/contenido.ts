@@ -241,6 +241,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-09", titulo: "Columna «Orden de compra»", texto: "La columna principal de Compras se llama «Orden de compra» y lleva las etiquetas; ya no hay una columna aparte de Etiquetas.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-09", titulo: "Anular en vez de eliminar compras", texto: "El botón de la ficha ahora es «Anular»: la compra conserva su código y su historial, sale de la lista (se ve con «Anuladas») y se puede restaurar.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-09", titulo: "Vista rápida de productos", texto: "En Producto, pasa el cursor sobre el nombre: un compuesto muestra el mapa de sus componentes y uno simple su foto grande y sus compras. La ficha de un compuesto también muestra su mapa.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-09", titulo: "Producto nuevo más visual", texto: "Estado y Tipo se marcan con botones, el SKU se sugiere mientras escribes el nombre, el código de barras interno viene marcado y un compuesto muestra el mapa de sus componentes.", modulo: "producto", href: "/producto" },
