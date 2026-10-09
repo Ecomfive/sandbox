@@ -260,6 +260,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       opciones: () => ETAPAS_COMPRA.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
       agrupable: true,
       ordenGrupos: ETAPAS_COMPRA.map((e) => e.valor),
+      colorValor: (v) => colorEtapa(v),
     },
     {
       id: "estado",
@@ -269,6 +270,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       opciones: () => ESTADOS_COMPRA.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
       agrupable: true,
       ordenGrupos: ESTADOS_COMPRA.map((e) => e.valor),
+      colorValor: (v) => colorEstado(v),
     },
     {
       id: "proveedor",

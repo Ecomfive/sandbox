@@ -33,6 +33,8 @@ export interface CampoSeleccion<F> extends CampoComun {
   agrupable?: boolean;
   /** Orden preferido de los grupos (por valor); los que falten van después. */
   ordenGrupos?: string[];
+  /** El color de cada valor (la etapa y el estado de una compra): las opciones del filtro salen con él, como en la columna. */
+  colorValor?: (valor: string) => string | undefined;
 }
 
 export interface CampoFecha<F> extends CampoComun {
