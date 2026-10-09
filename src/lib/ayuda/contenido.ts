@@ -240,6 +240,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-08", titulo: "«Mostrar todas» las columnas", texto: "El menú Columnas de cualquier tabla trae «Mostrar todas» y «Ocultar todas», y su lista se desplaza por dentro sin mover la página." },
   { fecha: "2026-10-08", titulo: "Venta de importación en vez de Importadora", texto: "Importadora ya no está entre los países: una venta de importación es una compra con su casilla marcada (al crearla o en su ficha) y se filtra por esa columna. Las 12 de antes quedaron en México.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-08", titulo: "Envíos rediseñado", texto: "Compras › Envíos ahora es un tablero: indicadores, prometido vs. real por vía, ranking de agentes y una tarjeta por país donde agregas rutas y las activas o desactivas.", modulo: "compras", href: "/compras/envios" },
   { fecha: "2026-10-08", titulo: "Envíos: barras de prometido vs. real", texto: "En Compras › Envíos, un resumen de todos los países con una barra por vía, el tiempo de cada país por vía y la columna «Últimos 2 meses».", modulo: "compras", href: "/compras/envios" },
