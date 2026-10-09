@@ -11,21 +11,21 @@ import type { FilaCompra } from "./def-compras";
 
 /**
  * Botón «Anular» de la ficha de una compra (antes «Eliminar»; pedido de Hernán, 9 oct 2026): pide el motivo y la anula. La
- * compra no se borra: conserva su N.º OC, su código, su actividad y sus productos, sale de la lista (se ve con «Anuladas») y se
- * puede restaurar.
+ * compra no se borra: pasa a la etapa Descartado (Estado Completado) con su N.º OC, su código, su actividad y sus productos, y
+ * se puede restaurar a la etapa que tenía.
  */
 export function AnularCompraBoton({ id, nombre, alAnular }: { id: string; nombre: string; alAnular: () => void }) {
   const [pending, startTransition] = useTransition();
   const { mostrarToast } = useToast();
 
   function alHacerClic() {
-    const motivo = prompt(`¿Por qué se anula la compra «${nombre}»?\n\nNo se borra: queda en «Anuladas» con su código y su historial, y se puede restaurar.`);
+    const motivo = prompt(`¿Por qué se anula la compra «${nombre}»?\n\nNo se borra: pasa a la etapa Descartado con su código y su historial, y se puede restaurar.`);
     if (motivo === null) return;
     if (motivo.trim().length < 3) return mostrarToast("Escribe el motivo para anular la compra.", "destructive");
     startTransition(async () => {
       const r = await anularCompra(id, motivo).catch(() => ({ error: "No se pudo anular. Inténtalo de nuevo." }));
       if (r.error) return mostrarToast(r.error, "destructive");
-      mostrarToast("Compra anulada: está en «Anuladas»");
+      mostrarToast("Compra anulada: pasó a Descartado");
       alAnular();
     });
   }
@@ -60,7 +60,7 @@ export function AvisoAnulada({ compra, puedeEscribir }: { compra: FilaCompra; pu
             startTransition(async () => {
               const r = await restaurarCompra(compra.id).catch(() => ({ error: "No se pudo restaurar." }));
               if (r.error) mostrarToast(r.error, "destructive");
-              else mostrarToast("Compra restaurada: vuelve a la lista");
+              else mostrarToast("Compra restaurada a su etapa anterior");
             })
           }
           className={`rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}

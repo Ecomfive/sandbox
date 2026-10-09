@@ -617,9 +617,10 @@ export async function actualizarCampoComprasLote(
 }
 
 /**
- * Anula una compra (en vez de borrarla): queda guardada con su N.º OC, su código, su actividad y sus productos, pero sale de la
- * lista (se ve con «Anuladas») y deja de contar en informes, tiempos, envíos e históricos. Pide el motivo, que queda en su
- * Actividad y en la auditoría. Se puede restaurar. Devuelve el error como valor.
+ * Anula una compra (en vez de borrarla; pedido de Hernán, 9 oct 2026): pasa a la etapa **Descartado** con el Estado Completado
+ * (como las demás descartadas, se sella su cierre) y queda marcada como anulada con el motivo. Conserva su N.º OC, su código,
+ * su actividad y sus productos; deja de contar en la planificación, los envíos y el histórico de compras de los productos.
+ * Se puede restaurar a la etapa y el estado que tenía. Devuelve el error como valor.
  */
 export async function anularCompra(id: string, motivo: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
@@ -629,22 +630,35 @@ export async function anularCompra(id: string, motivo: string): Promise<{ error?
   const razon = String(motivo ?? "").trim().replace(/\s+/g, " ").slice(0, 500);
   if (razon.length < 3) return { error: "Escribe por qué se anula la compra." };
   const supabase = createServiceClient();
-  const { data: compra } = await supabase.from("wms_compras").select("numero, codigo, nombre, anulada_en").eq("id", id).maybeSingle();
+  const { data: compra } = await supabase.from("wms_compras").select("numero, codigo, nombre, anulada_en, etapa, estado, cerrado_en").eq("id", id).maybeSingle();
   if (!compra) return { error: "La compra ya no existe." };
   if (compra.anulada_en) return { error: "La compra ya está anulada." };
   const autor = usuario.nombre || usuario.email;
+  const ahora = new Date().toISOString();
   const { error } = await supabase
     .from("wms_compras")
-    .update({ anulada_en: new Date().toISOString(), anulada_por: autor, motivo_anulacion: razon, actualizado_en: new Date().toISOString() })
+    .update({
+      anulada_en: ahora,
+      anulada_por: autor,
+      motivo_anulacion: razon,
+      etapa: "descartado",
+      estado: "completado",
+      ...(compra.cerrado_en ? {} : { cerrado_en: ahora }),
+      actualizado_en: ahora,
+    })
     .eq("id", id);
   if (error) return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0096 para anular compras." : "No se pudo anular la compra." };
+  await anotarEventos(id, { etapa: String(compra.etapa), estado: String(compra.estado) }, { etapa: "descartado", estado: "completado" });
   await supabase.from("wms_compra_eventos").insert({ compra_id: id, campo: "anulacion", valor_antes: null, valor_despues: razon, autor, origen: "sistema" });
   await registrarAuditoria({ accion: "anular_compra", entidad: "wms_compras", entidadId: id, detalle: `${numeroOC(Number(compra.numero))} · ${compra.codigo ?? ""} · ${compra.nombre} — ${razon}` });
   revalidatePath("/compras", "layout");
   return {};
 }
 
-/** Devuelve a la lista una compra anulada, tal como estaba. Queda en su Actividad y en la auditoría. */
+/**
+ * Restaura una compra anulada: vuelve a la etapa y el estado que tenía antes de anularla (los del último paso a Descartado en
+ * su historial) y deja de estar marcada. Queda en su Actividad y en la auditoría.
+ */
 export async function restaurarCompra(id: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(String(id))) return { error: "Compra no válida." };
@@ -654,8 +668,28 @@ export async function restaurarCompra(id: string): Promise<{ error?: string }> {
   const { data: compra } = await supabase.from("wms_compras").select("numero, codigo, nombre, anulada_en").eq("id", id).maybeSingle();
   if (!compra) return { error: "La compra ya no existe." };
   if (!compra.anulada_en) return {};
-  const { error } = await supabase.from("wms_compras").update({ anulada_en: null, anulada_por: null, motivo_anulacion: null, actualizado_en: new Date().toISOString() }).eq("id", id);
+  // La etapa y el estado de antes: los del cambio que la llevó a Descartado y a Completado al anularla.
+  const anterior = async (campo: string, valor: string) => {
+    const { data } = await supabase
+      .from("wms_compra_eventos")
+      .select("valor_antes")
+      .eq("compra_id", id)
+      .eq("campo", campo)
+      .eq("valor_despues", valor)
+      .order("ocurrido_en", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return (data?.valor_antes as string | null) ?? null;
+  };
+  const etapa = (await anterior("etapa", "descartado")) ?? "cotizar";
+  const estado = (await anterior("estado", "completado")) ?? "pendiente";
+  const cierra = etapa === "completado" || etapa === "descartado";
+  const { error } = await supabase
+    .from("wms_compras")
+    .update({ anulada_en: null, anulada_por: null, motivo_anulacion: null, etapa, estado, ...(cierra ? {} : { cerrado_en: null }), actualizado_en: new Date().toISOString() })
+    .eq("id", id);
   if (error) return { error: "No se pudo restaurar la compra." };
+  await anotarEventos(id, { etapa: "descartado", estado: "completado" }, { etapa, estado });
   await supabase.from("wms_compra_eventos").insert({ compra_id: id, campo: "restauracion", valor_antes: null, valor_despues: "Restaurada", autor: usuario.nombre || usuario.email, origen: "sistema" });
   await registrarAuditoria({ accion: "restaurar_compra", entidad: "wms_compras", entidadId: id, detalle: `${numeroOC(Number(compra.numero))} · ${compra.codigo ?? ""} · ${compra.nombre}` });
   revalidatePath("/compras", "layout");

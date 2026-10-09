@@ -41,7 +41,7 @@ export interface DatosCompras {
  * Las compras de la vista pedida (`?ver=`, o la última elegida): todos los países, uno solo o Importadora (que nunca se
  * mezcla con las de un país). La usan Informe, Compras y Tiempos y fallas.
  */
-export async function cargarCompras(ver: string | string[] | undefined, opciones: { conAnuladas?: boolean } = {}): Promise<DatosCompras> {
+export async function cargarCompras(ver: string | string[] | undefined): Promise<DatosCompras> {
   const supabase = createServiceClient();
   // Solo los países que la persona puede ver (y Importadora si la tiene): lo demás no se pide a la base.
   const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
@@ -61,8 +61,6 @@ export async function cargarCompras(ver: string | string[] | undefined, opciones
     else
       filas = await traerTodasLasFilas<Record<string, unknown>>((desde, hasta) => {
         let q = supabase.from("wms_compras").select(COLUMNAS);
-        // Las anuladas solo las pide la lista (para el botón «Anuladas»); el informe, el dashboard y los tiempos no las cuentan.
-        if (!opciones.conAnuladas) q = q.is("anulada_en", null);
         if (vista === "importacion") q = q.eq("tipo", "importacion");
         else if (paisVista) q = q.eq("tipo", "pais").eq("pais_id", paisVista.id);
         else if (permitidos !== null) q = q.eq("tipo", "pais").in("pais_id", paises.map((p) => p.id));

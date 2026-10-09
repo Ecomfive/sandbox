@@ -654,11 +654,11 @@ convenciones técnicas del código.
   recalcula las abiertas con fecha de envío. **«Documentos» y «Producto relacionado» ya no existen** (migración 0090): los
   archivos del campo Documentos de ClickUp quedaron dentro de un comentario «Documentos (factura o soporte)».
   **Anular, no borrar** (migración 0096, 9 oct 2026): la ficha tiene «Anular» (pide motivo; `anularCompra`) en vez de
-  «Eliminar». Una anulada (`anulada_en`, `anulada_por`, `motivo_anulacion`) conserva N.º OC, código, actividad y productos; la
-  lista la separa con el botón «Anuladas» (`cargarCompras(ver, { conAnuladas: true })` solo en `/compras/lista`) y queda fuera
-  del informe, el dashboard, los tiempos, la planificación, los envíos y el histórico de compras de los productos.
-  `restaurarCompra` la devuelve. `eliminarCompra` sigue en el servidor pero ya no se ofrece. Toda consulta nueva que cuente
-  compras debe filtrar `anulada_en is null`.
+  «Eliminar». Anular pasa la compra a la etapa **Descartado** con Estado Completado (sella `cerrado_en`, deja los eventos) y la
+  marca (`anulada_en`, `anulada_por`, `motivo_anulacion`; insignia «Anulada» en la lista y aviso con «Restaurar» en la ficha).
+  Se ve con las descartadas (no va aparte) y cuenta como descartada en informe, dashboard y tiempos; queda fuera de la
+  planificación, los envíos y el histórico de compras de los productos (filtran `anulada_en is null`). `restaurarCompra` vuelve a
+  la etapa y el estado de antes (los del último paso a Descartado en `wms_compra_eventos`). `eliminarCompra` ya no se ofrece.
   **Venta de importación** (migración 0094, 8 oct 2026): «Importadora» ya no es una vista ni un país. Una venta de
   importación es una compra de país con `venta_importacion = true`: el campo «Tipo de venta» (Proveeduría / Venta de importación,
   `siNo` en `CAMPOS_EDITABLES`; radio en la compra nueva y la ficha, columna, filtro y celda). La vía de envío es una sola. Las 12 compras `tipo = 'importacion'` pasaron a México marcadas. El código

@@ -15,7 +15,7 @@ const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atr
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("compras");
   const { ver, grupo, etapa, abrir, comentario } = await searchParams;
-  const [{ compras, paises, vista, error }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver, { conAnuladas: true }), cargarColoresEtiquetas(), cargarColoresTiendas()]);
+  const [{ compras, paises, vista, error }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
