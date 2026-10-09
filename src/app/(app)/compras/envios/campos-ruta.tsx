@@ -11,14 +11,14 @@ import type { FilaRuta } from "./def-envios";
  * Los datos de una ruta, iguales al crear y en su ficha: el país (cualquiera del mundo: no hace falta que exista en el
  * sistema), el agente, la vía, DDP o DAP, el courier y el tiempo que promete el agente (días mínimo y máximo).
  */
-export function CamposRuta({ ruta, agentes, faltante, invalido }: { ruta?: FilaRuta; agentes: string[]; faltante?: string | null; invalido?: (id: string) => true | undefined }) {
+export function CamposRuta({ ruta, agentes, paisInicial, faltante, invalido }: { ruta?: FilaRuta; agentes: string[]; paisInicial?: string; faltante?: string | null; invalido?: (id: string) => true | undefined }) {
   const paises = useMemo(() => paisesDelMundo(), []);
-  const sufijo = ruta?.id ?? "nueva";
+  const sufijo = ruta?.id ?? `nueva-${paisInicial ?? ""}`;
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo etiqueta="País" id={`ruta-pais-${sufijo}`} obligatorio faltante={faltante}>
-          <select id={`ruta-pais-${sufijo}`} name="pais_codigo" required defaultValue={ruta?.paisCodigo ?? ""} aria-invalid={invalido?.(`ruta-pais-${sufijo}`)} className={fieldClass}>
+          <select id={`ruta-pais-${sufijo}`} name="pais_codigo" required defaultValue={ruta?.paisCodigo ?? paisInicial ?? ""} aria-invalid={invalido?.(`ruta-pais-${sufijo}`)} className={fieldClass}>
             <option value="" disabled>
               Elige el país
             </option>

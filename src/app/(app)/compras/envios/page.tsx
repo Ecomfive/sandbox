@@ -2,7 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { cargarRutas } from "./datos-envios";
-import { TablaEnvios } from "./tabla-envios";
+import { PanelEnvios } from "./panel-envios";
 
 export const metadata = { title: "Envíos · Compras" };
 
@@ -20,7 +20,7 @@ export default async function EnviosComprasPage() {
           No se pudieron cargar los envíos (¿falta correr la migración 0092?).
         </p>
       ) : (
-        <TablaEnvios rutas={rutas} agentes={agentes} tipos={tipos} puedeEscribir={!usuario.modulosSoloLectura.includes("compras")} />
+        <PanelEnvios rutas={rutas} agentes={agentes} tipos={tipos} puedeEscribir={!usuario.modulosSoloLectura.includes("compras")} />
       )}
     </Pagina>
   );

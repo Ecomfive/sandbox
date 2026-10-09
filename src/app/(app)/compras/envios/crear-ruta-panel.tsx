@@ -9,13 +9,13 @@ import { crearRuta } from "./actions";
 import { CamposRuta } from "./campos-ruta";
 
 /** «Agregar» de Envíos: una ruta nueva (un agente para un país por una vía), con su tarifa General si ya se sabe. */
-export function CrearRutaPanel({ agentes }: { agentes: string[] }) {
+export function CrearRutaPanel({ agentes, paisInicial, boton }: { agentes: string[]; /** El país ya elegido (desde la tarjeta de un país). */ paisInicial?: string; boton?: (abrir: () => void) => React.ReactNode }) {
   return (
-    <FichaCrear titulo="Nueva ruta de envío" etiquetaCrear="Crear ruta" action={crearRuta} mensajeExito="Ruta creada">
+    <FichaCrear titulo="Nueva ruta de envío" etiquetaCrear="Crear ruta" action={crearRuta} mensajeExito="Ruta creada" boton={boton}>
       {({ faltante, invalido }) => (
         <>
           <Seccion icono={ComprasIcon} titulo="Ruta">
-            <CamposRuta agentes={agentes} faltante={faltante} invalido={invalido} />
+            <CamposRuta agentes={agentes} paisInicial={paisInicial} faltante={faltante} invalido={invalido} />
           </Seccion>
           <Seccion icono={GastoIcon} titulo="Tarifa General">
             <Campo etiqueta="Precio (USD, por CBM en marítimo o por kg en aéreo)" id="ruta-tarifa-nueva">

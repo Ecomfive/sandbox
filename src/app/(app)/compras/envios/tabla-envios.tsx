@@ -131,12 +131,12 @@ const COLUMNAS: ColumnaTabla<FilaRuta>[] = [
  * está activo. Toda la fila abre la ficha de la ruta. Arriba, todos los países juntos con una barra por vía; en la fila de cada
  * país, lo que tarda por vía juntando a sus agentes, y al final del grupo su subtotal con las mismas columnas.
  */
-export function TablaEnvios({ rutas, agentes, tipos, puedeEscribir }: { rutas: FilaRuta[]; agentes: string[]; tipos: string[]; puedeEscribir: boolean }) {
+export function TablaEnvios({ rutas, agentes, tipos, puedeEscribir, sinResumen = false }: { rutas: FilaRuta[]; agentes: string[]; tipos: string[]; puedeEscribir: boolean; /** Sin el resumen de arriba (ya lo da el panel). */ sinResumen?: boolean }) {
   const [abierta, setAbierta] = useState<string | null>(null);
   const hoy = hoyPanama();
   return (
     <>
-      <ResumenGlobal rutas={rutas} />
+      {!sinResumen && <ResumenGlobal rutas={rutas} />}
       <TablaDatos
         def={DEF_ENVIOS}
         filas={rutas}
