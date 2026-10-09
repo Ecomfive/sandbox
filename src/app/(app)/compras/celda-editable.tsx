@@ -100,6 +100,20 @@ export function CeldaEditable({
             renderOpcion={campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
             gestion={campo === "tienda" ? tiendas : null}
           />
+        ) : def.tipo === "multiple" && def.unica ? (
+          // Una sola opción aunque se guarde como lista (la vía de envío): elegir guarda y cierra; «Sin …» la deja vacía.
+          <EditorOpciones
+            def={def}
+            ancla={boton}
+            aria={aria}
+            elegidas={(compra[def.prop] as string[]).slice(0, 1)}
+            alElegir={(v) => {
+              cerrar("elegido");
+              const nueva = v[0] ? [v[0]] : [];
+              if (JSON.stringify(nueva) !== JSON.stringify(compra[def.prop])) guardar(compra, campo, nueva);
+            }}
+            alCerrar={cerrar}
+          />
         ) : def.tipo === "multiple" ? (
           <EditorOpciones
             def={def}
@@ -181,8 +195,8 @@ export function EditorOpciones({
     const base =
       def.tipo === "booleano"
         ? [
-            { valor: "si", etiqueta: "Sí" },
-            { valor: "no", etiqueta: "No" },
+            { valor: "si", etiqueta: def.siNo?.si ?? "Sí" },
+            { valor: "no", etiqueta: def.siNo?.no ?? "No" },
           ]
         : [...(def.opciones ?? [])];
     return def.admiteVacio ? [...base, { valor: "", etiqueta: `Sin ${def.etiqueta.toLowerCase()}` }] : base;

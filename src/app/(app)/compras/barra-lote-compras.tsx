@@ -252,6 +252,21 @@ function EditorCampoLote({
       />
     );
   }
+  if (def.tipo === "multiple" && def.unica) {
+    return (
+      <EditorOpciones
+        def={def}
+        ancla={ancla}
+        aria={aria}
+        elegidas={[]}
+        alElegir={(v) => {
+          alCerrar("elegido");
+          aplicar(campo, v[0] ? [v[0]] : []);
+        }}
+        alCerrar={alCerrar}
+      />
+    );
+  }
   if (def.tipo === "multiple") {
     return (
       <EditorOpciones

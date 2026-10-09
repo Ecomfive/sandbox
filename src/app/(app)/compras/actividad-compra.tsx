@@ -23,6 +23,7 @@ const NOMBRE_CAMPO: Record<string, string> = {
   planificacion: "Planificación",
   agenteEnvio: "Agente de envío",
   pais: "País",
+  ventaImportacion: "Tipo de venta",
   productoRelacionado: "Producto relacionado",
   paisesDestino: "Países de destino",
   codigo: "Código",

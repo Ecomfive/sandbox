@@ -19,6 +19,10 @@ export interface CampoEditable {
   color?: (valor: string) => string | undefined;
   /** Con productos vinculados la cantidad y el monto se calculan de ellos, así que no se escriben a mano (igual que en la ficha). */
   soloSinProductos?: boolean;
+  /** En una lista de opciones guardada como lista (la vía de envío): se elige una sola. */
+  unica?: boolean;
+  /** En un sí/no: cómo se llama cada lado («Venta de importación» / «Proveeduría»); por defecto «Sí» y «No». */
+  siNo?: { si: string; no: string };
 }
 
 /**
@@ -30,10 +34,16 @@ export interface CampoEditable {
 export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   etapa: { etiqueta: "Etapa", prop: "etapa", columna: "etapa", tipo: "seleccion", opciones: ETAPAS_COMPRA, color: colorEtapa },
   estado: { etiqueta: "Estado", prop: "estado", columna: "estado", tipo: "seleccion", opciones: ESTADOS_COMPRA, color: colorEstado },
-  viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO },
+  viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO, unica: true, admiteVacio: true },
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "texto" },
   agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "texto" },
-  ventaImportacion: { etiqueta: "Venta de importación", prop: "ventaImportacion", columna: "venta_importacion", tipo: "booleano" },
+  ventaImportacion: {
+    etiqueta: "Tipo de venta",
+    prop: "ventaImportacion",
+    columna: "venta_importacion",
+    tipo: "booleano",
+    siNo: { si: "Venta de importación", no: "Proveeduría" },
+  },
   tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista" },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
   qtyTotal: { etiqueta: "Cantidad total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
@@ -102,6 +112,7 @@ export function normalizarValor(def: CampoEditable, bruto: unknown): { valor: Va
       const elegidas = Array.isArray(bruto) ? bruto.map(String) : [];
       const validas = (def.opciones ?? []).map((o) => o.valor);
       if (elegidas.some((v) => !validas.includes(v))) return { error: `${def.etiqueta} no es válida.` };
+      if (def.unica && elegidas.length > 1) return { error: `Elige una sola ${def.etiqueta.toLowerCase()}.` };
       return { valor: validas.filter((v) => elegidas.includes(v)) };
     }
     case "booleano":
@@ -114,7 +125,7 @@ export function normalizarValor(def: CampoEditable, bruto: unknown): { valor: Va
 /** El valor como se lee en el historial de cambios («Chin», «Sí», «Marítimo, Aéreo», «—»). */
 export function textoDeValor(def: CampoEditable, valor: unknown): string {
   if (valor === null || valor === undefined || valor === "") return "—";
-  if (typeof valor === "boolean") return valor ? "Sí" : "No";
+  if (typeof valor === "boolean") return valor ? (def.siNo?.si ?? "Sí") : (def.siNo?.no ?? "No");
   if (Array.isArray(valor)) return valor.length ? valor.map((v) => def.opciones?.find((o) => o.valor === v)?.etiqueta ?? String(v)).join(", ") : "—";
   return def.opciones?.find((o) => o.valor === valor)?.etiqueta ?? String(valor);
 }

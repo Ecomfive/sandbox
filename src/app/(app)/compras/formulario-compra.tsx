@@ -271,13 +271,26 @@ export function FormularioCompra({
             <div className="flex flex-wrap gap-4">
               {VIAS_ENVIO.map((v) => (
                 <label key={v.valor} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input type="checkbox" name="via_envio" value={v.valor} defaultChecked={compra?.viaEnvio.includes(v.valor)} className="h-4 w-4 accent-[var(--foreground)]" />
+                  <input type="radio" name="via_envio" value={v.valor} defaultChecked={compra?.viaEnvio[0] === v.valor} className="h-4 w-4 accent-[var(--foreground)]" />
                   {v.etiqueta}
                 </label>
               ))}
             </div>
           </fieldset>
-          <Casilla id="venta_importacion" texto={conEmoji("ventaImportacion", "Venta de importación")} defaultChecked={compra?.ventaImportacion} />
+          <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
+            <legend className="mb-1.5 text-xs font-medium text-muted-foreground">{conEmoji("ventaImportacion", "Tipo de venta")}</legend>
+            <div className="flex flex-wrap gap-4">
+              {[
+                { valor: "no", etiqueta: "Proveeduría" },
+                { valor: "si", etiqueta: "Venta de importación" },
+              ].map((o) => (
+                <label key={o.valor} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="radio" name="venta_importacion" value={o.valor} defaultChecked={(o.valor === "si") === !!compra?.ventaImportacion} className="h-4 w-4 accent-[var(--foreground)]" />
+                  {o.etiqueta}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <Campo etiqueta={conEmoji("urlProducto", "URL del producto")} id="campo-url-compra">
             <input id="campo-url-compra" type="url" name="url_producto" defaultValue={compra?.urlProducto ?? ""} placeholder="Ej: https://www.alibaba.com/product-detail/…" className={fieldClass} />
           </Campo>

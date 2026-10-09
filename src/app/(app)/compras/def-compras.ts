@@ -19,7 +19,8 @@ export interface FilaCompra {
   etapa: string;
   estado: string;
   proveedor: string | null;
-  /** Venta de importación: la compra es para un cliente que nos pide mercancía (antes «Importadora»; migración 0094). */
+  /** Tipo de venta: venta de importación (para un cliente que nos pide mercancía, antes «Importadora»; migración 0094) o
+   * proveeduría (false). */
   ventaImportacion: boolean;
   /** Quién trae la mercancía (Chin, Avery…), aparte del proveedor que la vende (migración 0092). */
   agenteEnvio: string | null;
@@ -277,12 +278,12 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     },
     {
       id: "ventaImportacion",
-      etiqueta: "Venta de importación",
+      etiqueta: "Tipo de venta",
       tipo: "seleccion",
       valores: (c) => [c.ventaImportacion ? "si" : "no"],
       opciones: () => [
+        { valor: "no", etiqueta: "Proveeduría" },
         { valor: "si", etiqueta: "Venta de importación" },
-        { valor: "no", etiqueta: "Compra propia" },
       ],
       agrupable: true,
     },

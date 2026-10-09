@@ -230,9 +230,10 @@ function columnas(
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
-    col("ventaImportacion", "Venta de importación", {
+    col("ventaImportacion", "Tipo de venta", {
       ...resto,
-      render: (c) => ed(c, "ventaImportacion", c.ventaImportacion ? <Badge tone="info">🌍 Importación</Badge> : <span className="text-muted-foreground">—</span>),
+      clase: "whitespace-nowrap",
+      render: (c) => ed(c, "ventaImportacion", c.ventaImportacion ? <Badge tone="info">🌍 Venta de importación</Badge> : <span className="text-muted-foreground">Proveeduría</span>),
     }),
     col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", c.agenteEnvio || "—") }),
     col("tienda", "Tienda", {

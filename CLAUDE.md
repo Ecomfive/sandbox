@@ -617,7 +617,7 @@ convenciones técnicas del código.
   «Abrir ficha completa» abre el formulario con la actividad (con la ficha minimizada, la descripción lo abre directo).
   **Edición en la celda** (`celda-editable.tsx`, qué se edita y cómo se valida en `def-edicion-compras.ts`): un clic en el
   dato abre bajo la celda **el mismo panel para todas las columnas** (`PanelCelda`, `panel-celda.tsx`, como los de ClickUp):
-  lista de opciones con sus colores, buscador, flechas y Enter (etapa, estado, Sí/No; la vía de envío marca
+  lista de opciones con sus colores, buscador, flechas y Enter (etapa, estado, Sí/No; la vía de envío es una sola, `unica`, aunque se guarde como lista y la marca
   varias), un campo limpio (texto y montos) o la fecha con atajos (Hoy, Mañana, En una semana, Quitar). Las opciones guardan
   al elegir; lo escrito, con Enter o al pulsar fuera, y Escape lo deja como estaba. Las etiquetas usan su propio selector
   (`selector-etiquetas.tsx`, en el mismo panel); su botón va junto al nombre de la compra con `abrirFila.junto`, fuera del
@@ -654,8 +654,8 @@ convenciones técnicas del código.
   recalcula las abiertas con fecha de envío. **«Documentos» y «Producto relacionado» ya no existen** (migración 0090): los
   archivos del campo Documentos de ClickUp quedaron dentro de un comentario «Documentos (factura o soporte)».
   **Venta de importación** (migración 0094, 8 oct 2026): «Importadora» ya no es una vista ni un país. Una venta de
-  importación es una compra de país con `venta_importacion = true` (casilla en la compra nueva y en la ficha, columna y filtro
-  «Venta de importación», editable en la celda). Las 12 compras `tipo = 'importacion'` pasaron a México marcadas. El código
+  importación es una compra de país con `venta_importacion = true`: el campo «Tipo de venta» (Proveeduría / Venta de importación,
+  `siNo` en `CAMPOS_EDITABLES`; radio en la compra nueva y la ficha, columna, filtro y celda). La vía de envío es una sola. Las 12 compras `tipo = 'importacion'` pasaron a México marcadas. El código
   aún entiende `tipo = 'importacion'` por si queda alguna, pero ya no se crean ni se ofrecen (ni en Países de la persona).
   **Envíos** (`/compras/envios`, pestaña después de Tiempos y fallas; migración 0092; antes la lista «Envíos desde China» de
   ClickUp, importada con `scripts/clickup-exportar-envios.mjs` + `scripts/importar-rutas-envio.ts`): `wms_rutas_envio` (agente,

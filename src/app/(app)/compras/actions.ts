@@ -102,7 +102,7 @@ function leerCambios(formData: FormData) {
     foto_url: textoOptativo(formData, "foto_url"),
     proveedor: textoOptativo(formData, "proveedor"),
     agente_envio: textoOptativo(formData, "agente_envio"),
-    venta_importacion: formData.get("venta_importacion") === "on",
+    venta_importacion: formData.get("venta_importacion") === "si",
     tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),
@@ -116,7 +116,8 @@ function leerCambios(formData: FormData) {
     fecha_pago_1: fechaOptativa(formData, "fecha_pago_1"),
     fecha_pago_2: fechaOptativa(formData, "fecha_pago_2"),
     fecha_envio: fechaOptativa(formData, "fecha_envio"),
-    via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)),
+    // Una sola vía de envío (se guarda como lista por las compras de antes que llevaban dos).
+    via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)).slice(0, 1),
     etiquetas: listaDeTexto(textoOptativo(formData, "etiquetas")),
     url_producto: textoOptativo(formData, "url_producto"),
     descripcion: textoOptativo(formData, "descripcion"),
