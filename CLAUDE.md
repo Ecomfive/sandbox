@@ -700,7 +700,7 @@ convenciones técnicas del código.
   cambios y archivos en orden de tiempo (filtro Todo / Comentarios / Cambios, «Ver anteriores», campo abajo). Cada comentario
   tiene **respuestas** de un nivel (`respuesta_a`; avisa a quien lo escribió por `autor_id`) y **reacciones**
   (`wms_compra_comentario_reacciones`, emojis fijos de `src/lib/compras/reacciones.ts`, `alternarReaccion`), migración 0095;
-  sin ella todo carga igual, sin respuestas ni reacciones. **Adjuntos:** además de imágenes y PDF, Excel, Word y PowerPoint
+  sin ella todo carga igual, sin respuestas ni reacciones. **Editar:** solo quien lo escribió (`autor_id`, o por nombre en los de antes; `editarComentarioCompra`), queda `editado_en` y se ve «(editado)» (migración 0097). **Adjuntos:** además de imágenes y PDF, Excel, Word y PowerPoint
   (modernos por su carpeta interna del ZIP; viejos por el contenedor OLE + extensión), CSV y texto (sin bytes nulos ni HTML), hasta
   25 MB (`detectarAdjunto(bytes, nombre)`); el servidor vuelve a guardar el archivo con el tipo de su contenido (un texto se sirve
   como `text/plain`, nunca como página).

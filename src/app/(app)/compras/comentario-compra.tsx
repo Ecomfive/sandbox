@@ -8,7 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
-import { alternarReaccion, comentarCompra, type ActividadCompra, type ReaccionComentario } from "./actions";
+import { alternarReaccion, comentarCompra, editarComentarioCompra, type ActividadCompra, type ReaccionComentario } from "./actions";
 import { archivosDe, BotonAdjuntar, GaleriaAdjuntos, TiraPendientes, useAdjuntosPendientes } from "./adjuntos-comentario";
 
 type Comentario = ActividadCompra["comentarios"][number];
@@ -47,7 +47,7 @@ export function TarjetaComentario({
       ref={comentario.id === resaltado ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
       className={`my-1.5 flex flex-col gap-2 rounded-lg border p-3 text-sm ${comentario.id === resaltado ? "border-primario bg-primario-suave ring-2 ring-primario" : "border-border bg-card"}`}
     >
-      <Cuerpo comentario={comentario} puedeComentar={puedeComentar} alResponder={() => setRespondiendo((v) => !v)} />
+      <Cuerpo comentario={comentario} puedeComentar={puedeComentar} alResponder={() => setRespondiendo((v) => !v)} alEditar={alResponder} />
       {(respuestas.length > 0 || respondiendo) && (
         <div className="ml-4 flex flex-col gap-2 border-l-2 border-border pl-3">
           {respuestas.map((r) => (
@@ -57,7 +57,7 @@ export function TarjetaComentario({
               ref={r.id === resaltado && enHilo ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
               className={r.id === resaltado ? "-mx-1 rounded-md bg-primario-suave px-1 py-1 ring-2 ring-primario" : ""}
             >
-              <Cuerpo comentario={r} puedeComentar={puedeComentar} pequeno alResponder={() => setRespondiendo(true)} />
+              <Cuerpo comentario={r} puedeComentar={puedeComentar} pequeno alResponder={() => setRespondiendo(true)} alEditar={alResponder} />
             </div>
           ))}
           {respondiendo && puedeComentar && (
@@ -77,32 +77,83 @@ export function TarjetaComentario({
   );
 }
 
-/** Lo de un comentario (o una respuesta): autor, hora, texto, archivos, reacciones y «Responder». */
-function Cuerpo({ comentario, puedeComentar, pequeno = false, alResponder }: { comentario: Comentario; puedeComentar: boolean; pequeno?: boolean; alResponder: () => void }) {
+/** Lo de un comentario (o una respuesta): autor, hora, texto, archivos, reacciones, «Responder» y, si es suyo, «Editar». */
+function Cuerpo({
+  comentario,
+  puedeComentar,
+  pequeno = false,
+  alResponder,
+  alEditar,
+}: {
+  comentario: Comentario;
+  puedeComentar: boolean;
+  pequeno?: boolean;
+  alResponder: () => void;
+  /** Después de guardar la edición: la actividad se vuelve a pedir. */
+  alEditar: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
   return (
     <div className="flex gap-2.5">
       <AvatarPersona nombre={comentario.autor} email="?" avatarUrl={null} tamano="sm" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex flex-wrap items-baseline justify-between gap-x-2">
           <strong className={`font-semibold ${pequeno ? "text-[13px]" : ""}`}>{comentario.autor ?? "—"}</strong>
-          <time dateTime={comentario.creadoEn} className="text-xs text-muted-foreground">
-            {fechaHora(comentario.creadoEn)}
-          </time>
+          <span className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
+            <time dateTime={comentario.creadoEn}>{fechaHora(comentario.creadoEn)}</time>
+            {comentario.editadoEn && (
+              <Tooltip texto={`Editado: ${fechaHora(comentario.editadoEn)}`}>
+                <span tabIndex={0} className="italic">
+                  (editado)
+                </span>
+              </Tooltip>
+            )}
+          </span>
         </span>
-        {comentario.texto && (
+        {editando ? (
+          <EditarTexto
+            comentario={comentario}
+            alCancelar={() => setEditando(false)}
+            alGuardar={() => {
+              setEditando(false);
+              alEditar();
+            }}
+          />
+        ) : comentario.texto && (
           <p className={`m-0 whitespace-pre-wrap break-words ${pequeno ? "text-[13px]" : ""} ${/^inconveniente/i.test(comentario.texto) ? "rounded-md bg-destructive/10 px-2 py-1 text-destructive" : ""}`}>
             <TextoConMenciones texto={comentario.texto} />
           </p>
         )}
         <GaleriaAdjuntos adjuntos={comentario.adjuntos} />
-        <Reacciones comentarioId={comentario.id} iniciales={comentario.reacciones} puedeReaccionar={puedeComentar} alResponder={alResponder} />
+        {!editando && (
+          <Reacciones
+            comentarioId={comentario.id}
+            iniciales={comentario.reacciones}
+            puedeReaccionar={puedeComentar}
+            alResponder={alResponder}
+            alEditar={puedeComentar && comentario.mio ? () => setEditando(true) : undefined}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 /** Las reacciones de un comentario (cada emoji con cuántas y de quiénes), «Me gusta», el selector de emojis y «Responder». */
-function Reacciones({ comentarioId, iniciales, puedeReaccionar, alResponder }: { comentarioId: string; iniciales: ReaccionComentario[]; puedeReaccionar: boolean; alResponder: () => void }) {
+function Reacciones({
+  comentarioId,
+  iniciales,
+  puedeReaccionar,
+  alResponder,
+  alEditar,
+}: {
+  comentarioId: string;
+  iniciales: ReaccionComentario[];
+  puedeReaccionar: boolean;
+  alResponder: () => void;
+  /** Solo en los comentarios propios. */
+  alEditar?: () => void;
+}) {
   const { mostrarToast } = useToast();
   const [reacciones, setReacciones] = useState(iniciales);
   const [eligiendo, setEligiendo] = useState(false);
@@ -172,6 +223,11 @@ function Reacciones({ comentarioId, iniciales, puedeReaccionar, alResponder }: {
           <button type="button" onClick={alResponder} className={claseAccion}>
             Responder
           </button>
+          {alEditar && (
+            <button type="button" onClick={alEditar} className={claseAccion}>
+              Editar
+            </button>
+          )}
         </>
       )}
     </div>
@@ -217,6 +273,48 @@ function Respuesta({ compraId, respuestaA, alCancelar, alEnviar }: { compraId: s
           {pendiente ? "Guardando…" : "Responder"}
         </button>
         <BotonAdjuntar alElegir={adjuntos.agregar} deshabilitado={pendiente || adjuntos.lleno} />
+        <button type="button" onClick={alCancelar} className={`rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** El texto de un comentario propio, para corregirlo ahí mismo (con @menciones). Escape cancela. */
+function EditarTexto({ comentario, alCancelar, alGuardar }: { comentario: Comentario; alCancelar: () => void; alGuardar: () => void }) {
+  const { mostrarToast } = useToast();
+  const [texto, setTexto] = useState(comentario.texto);
+  const [menciones, setMenciones] = useState<string[]>([]);
+  const [pendiente, empezar] = useTransition();
+  function guardar() {
+    empezar(async () => {
+      const r = await editarComentarioCompra(comentario.id, texto, menciones).catch(() => ({ error: "No se pudo guardar el cambio." }));
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast("Comentario editado");
+      alGuardar();
+    });
+  }
+  return (
+    <div
+      className="flex flex-col gap-2"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          alCancelar();
+        }
+      }}
+    >
+      <CampoMenciones ariaLabel="Editar el comentario" filas={3} valor={texto} alCambiar={setTexto} alMencionar={setMenciones} enfocar />
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={pendiente || texto.trim() === comentario.texto.trim()}
+          onClick={guardar}
+          className={`rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
+        >
+          {pendiente ? "Guardando…" : "Guardar"}
+        </button>
         <button type="button" onClick={alCancelar} className={`rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
           Cancelar
         </button>

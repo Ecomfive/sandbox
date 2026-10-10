@@ -737,7 +737,19 @@ export interface ActividadCompra {
    * Cada comentario con los archivos que se adjuntaron en él (la captura de un pago, un comprobante…), a qué comentario responde
    * (si es una respuesta) y sus reacciones.
    */
-  comentarios: { id: string; autor: string | null; texto: string; creadoEn: string; adjuntos: AdjuntoCompra[]; respuestaA: string | null; reacciones: ReaccionComentario[] }[];
+  comentarios: {
+    id: string;
+    autor: string | null;
+    texto: string;
+    creadoEn: string;
+    adjuntos: AdjuntoCompra[];
+    respuestaA: string | null;
+    reacciones: ReaccionComentario[];
+    /** Cuándo se editó por última vez (null si nunca). */
+    editadoEn: string | null;
+    /** Si lo escribió la persona que mira (entonces lo puede editar). */
+    mio: boolean;
+  }[];
   subtareas: { id: string; nombre: string; estado: string | null; responsable: string | null; creadoEn: string; cerradoEn: string | null }[];
   /** Los archivos sueltos de la compra (los de ClickUp y la foto/documentos): los de un comentario van dentro de él. */
   adjuntos: AdjuntoCompra[];
@@ -759,7 +771,7 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   const consultaAdjuntos = (columnas: string) => supabase.from("wms_compra_adjuntos").select(columnas).eq("compra_id", id).order("creado_en");
   const consultaComentarios = (columnas: string) => supabase.from("wms_compra_comentarios").select(columnas).eq("compra_id", id).order("creado_en", { ascending: false }).limit(500);
   const [comentariosCompletos, subtareas, adjuntosConComentario, eventos] = await Promise.all([
-    consultaComentarios("id, autor, texto, creado_en, respuesta_a"),
+    consultaComentarios("id, autor, autor_id, texto, creado_en, respuesta_a, editado_en"),
     supabase.from("wms_compra_subtareas").select("id, nombre, estado, responsable_nombre, creado_en, cerrado_en").eq("compra_id", id).order("creado_en"),
     consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en, comentario_id"),
     supabase.from("wms_compra_eventos").select("id, campo, valor_antes, valor_despues, ocurrido_en, autor, origen").eq("compra_id", id).order("ocurrido_en", { ascending: false }),
@@ -767,10 +779,15 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   // Sin la migración 0085 (la columna `comentario_id`) la actividad sigue cargando, solo que sin archivos dentro de los comentarios.
   const adjuntos = adjuntosConComentario.error ? await consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en") : adjuntosConComentario;
   // Sin la migración 0095 (respuestas y reacciones) los comentarios se cargan igual, todos sueltos.
-  const comentarios = comentariosCompletos.error ? await consultaComentarios("id, autor, texto, creado_en") : comentariosCompletos;
-  type FilaComentario = { id: string; autor: string | null; texto: string; creado_en: string; respuesta_a?: string | null };
+  // Sin la migración 0097 (`editado_en`) o la 0095 (`autor_id`, `respuesta_a`): lo que haya, sin editar.
+  const comentarios = comentariosCompletos.error
+    ? await consultaComentarios("id, autor, autor_id, texto, creado_en, respuesta_a").then((r) => (r.error ? consultaComentarios("id, autor, texto, creado_en") : r))
+    : comentariosCompletos;
+  type FilaComentario = { id: string; autor: string | null; autor_id?: string | null; texto: string; creado_en: string; respuesta_a?: string | null; editado_en?: string | null };
   const filasComentarios = (comentarios.data ?? []) as unknown as FilaComentario[];
-  const yo = (await getUsuarioActual())?.id ?? null;
+  const usuarioActual = await getUsuarioActual();
+  const yo = usuarioActual?.id ?? null;
+  const miNombre = usuarioActual ? usuarioActual.nombre || usuarioActual.email : null;
   const reacciones = new Map<string, ReaccionComentario[]>();
   if (filasComentarios.length) {
     const { data: filasReacciones } = await supabase
@@ -810,11 +827,63 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
       adjuntos: deComentario.get(c.id) ?? [],
       respuestaA: c.respuesta_a ?? null,
       reacciones: reacciones.get(c.id) ?? [],
+      editadoEn: c.editado_en ?? null,
+      mio: esAutor(c, yo, miNombre),
     })),
     subtareas: (subtareas.data ?? []).map((t) => ({ id: t.id, nombre: t.nombre, estado: t.estado, responsable: t.responsable_nombre, creadoEn: t.creado_en, cerradoEn: t.cerrado_en })),
     adjuntos: filasAdjuntos.filter((a) => !a.comentario_id).map(aAdjunto),
     eventos: (eventos.data ?? []).map((e) => ({ id: e.id, campo: e.campo, antes: e.valor_antes, despues: e.valor_despues, ocurridoEn: e.ocurrido_en, autor: e.autor, origen: e.origen })),
   };
+}
+
+/**
+ * Si una persona escribió un comentario: por su id (desde la migración 0095) o, en los de antes (sin id), por su nombre. Los
+ * que vinieron de ClickUp con el nombre de alguien también cuentan como suyos.
+ */
+function esAutor(c: { autor: string | null; autor_id?: string | null }, yo: string | null, miNombre: string | null): boolean {
+  if (!yo) return false;
+  if (c.autor_id) return c.autor_id === yo;
+  return !!miNombre && !!c.autor && c.autor.trim().toLowerCase() === miNombre.trim().toLowerCase();
+}
+
+/**
+ * Edita el texto de un comentario: solo quien lo escribió. Queda marcado «(editado)» con la hora. A las personas que se
+ * mencionan por primera vez al editar les llega el aviso. Los archivos del comentario no cambian. Devuelve el error como valor.
+ */
+export async function editarComentarioCompra(comentarioId: string, texto: string, menciones: string[] = []): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
+  const supabase = createServiceClient();
+  const { data: c, error: errorLeer } = await supabase.from("wms_compra_comentarios").select("id, compra_id, autor, autor_id, texto").eq("id", comentarioId).maybeSingle();
+  if (errorLeer || !c) return { error: "El comentario ya no existe." };
+  const sinAcceso = await sinAccesoACompras([c.compra_id as string]);
+  if (sinAcceso) return { error: sinAcceso };
+  if (!esAutor(c, usuario.id, usuario.nombre || usuario.email)) return { error: "Solo quien escribió el comentario lo puede editar." };
+  const limpio = String(texto ?? "").trim().slice(0, 5000);
+  if (limpio === c.texto) return {};
+  if (!limpio) {
+    const { count } = await supabase.from("wms_compra_adjuntos").select("id", { count: "exact", head: true }).eq("comentario_id", comentarioId);
+    if (!count) return { error: "El comentario no puede quedar vacío." };
+  }
+  const { error } = await supabase.from("wms_compra_comentarios").update({ texto: limpio, editado_en: new Date().toISOString() }).eq("id", comentarioId);
+  if (error) return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0097 para editar comentarios." : "No se pudo guardar el cambio." };
+
+  // Solo se avisa a quien se menciona ahora y no estaba mencionado antes.
+  const nuevos = (await mencionadosValidos(menciones, limpio, usuario.id)).filter((m) => !String(c.texto ?? "").includes(`@${m.nombre}`));
+  if (nuevos.length) {
+    const { data: compra } = await supabase.from("wms_compras").select("numero, nombre, paises(codigo)").eq("id", c.compra_id).maybeSingle();
+    const pais = (Array.isArray(compra?.paises) ? compra?.paises[0] : compra?.paises) as { codigo: string } | null | undefined;
+    const autor = usuario.nombre || usuario.email;
+    await notificarMenciones({
+      mencionados: nuevos,
+      autorId: usuario.id,
+      autorNombre: autor,
+      titulo: `${autor} te mencionó en la compra ${compra ? numeroOC(Number(compra.numero)) : ""}${compra?.nombre ? ` · ${compra.nombre}` : ""}`,
+      texto: limpio,
+      href: `/compras/lista?ver=${encodeURIComponent(pais?.codigo ?? "todos")}&abrir=${c.compra_id}&comentario=${comentarioId}`,
+    });
+  }
+  return {};
 }
 
 /** Un archivo que ya se subió al almacenamiento para un comentario (ver `prepararSubidaAdjuntoComentario`). */
