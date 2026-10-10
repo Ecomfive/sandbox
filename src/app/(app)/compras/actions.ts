@@ -1,14 +1,19 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
+import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
 import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSeguro } from "@/lib/compras/adjuntos";
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { puedeVerPais } from "@/lib/paises-permitidos";
-import { ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO } from "./def-compras";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { estimarPlanificacion, nuevaPlanificacion, tiemposDeTransito, type Estimacion, type TiemposTransito } from "@/lib/compras/planificacion";
+import { descargarPublico } from "@/lib/seguridad/url-externa";
+import { detectarImagen } from "@/lib/seguridad/imagen";
+import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
@@ -57,6 +62,22 @@ export async function prepararSubidaFotoCompra(nombreArchivo: string): Promise<{
   return { ruta, token: data.token };
 }
 
+/**
+ * La foto real de una compra desde una imagen de internet (arrastrada a la ficha): el servidor la descarga —solo de sitios
+ * públicos, hasta 5 MB y revisando que sea de verdad una imagen— y la sube como `prepararSubidaFotoCompra`. Devuelve su ruta.
+ */
+export async function subirFotoCompraDesdeUrl(direccion: string): Promise<{ ruta: string } | { error: string }> {
+  await requireModuloEscritura("compras");
+  const descarga = await descargarPublico(String(direccion ?? "").trim(), 5 * 1024 * 1024);
+  if ("error" in descarga) return descarga;
+  const imagen = detectarImagen(descarga.bytes.slice(0, 64));
+  if (!imagen) return { error: "Eso no es una imagen JPG, PNG, WebP o GIF." };
+  const ruta = `compras/${crypto.randomUUID()}/${Date.now()}-web.${imagen.extension}`;
+  const { error } = await createServiceClient().storage.from(BUCKET_FOTOS).upload(ruta, descarga.bytes, { contentType: imagen.tipo });
+  if (error) return { error: "No se pudo guardar la imagen." };
+  return { ruta };
+}
+
 /** Borra del bucket una foto que ya no queda referenciada (se reemplazó o se quitó). Nunca lanza. */
 async function borrarFotoSiEsNuestra(url: string | null) {
   if (!url || !url.startsWith(PREFIJO_URL_PUBLICA)) return;
@@ -81,8 +102,10 @@ function leerCambios(formData: FormData) {
   return {
     foto_url: textoOptativo(formData, "foto_url"),
     proveedor: textoOptativo(formData, "proveedor"),
-    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
-    producto_relacionado: textoOptativo(formData, "producto_relacionado"),
+    agente_envio: textoOptativo(formData, "agente_envio"),
+    venta_importacion: formData.get("venta_importacion") === "si",
+    // Una sola tienda por orden (se guarda como lista por las de antes).
+    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")).slice(0, 1),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),
     primer_pago: numeroOptativo(formData, "primer_pago"),
@@ -95,9 +118,8 @@ function leerCambios(formData: FormData) {
     fecha_pago_1: fechaOptativa(formData, "fecha_pago_1"),
     fecha_pago_2: fechaOptativa(formData, "fecha_pago_2"),
     fecha_envio: fechaOptativa(formData, "fecha_envio"),
-    planificacion: textoOptativo(formData, "planificacion"),
-    documentos: textoOptativo(formData, "documentos"),
-    via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)),
+    // Una sola vía de envío (se guarda como lista por las compras de antes que llevaban dos).
+    via_envio: formData.getAll("via_envio").map(String).filter((v) => VIAS_VALIDAS.has(v)).slice(0, 1),
     etiquetas: listaDeTexto(textoOptativo(formData, "etiquetas")),
     url_producto: textoOptativo(formData, "url_producto"),
     descripcion: textoOptativo(formData, "descripcion"),
@@ -121,6 +143,59 @@ async function leerTipoYPais(formData: FormData): Promise<{ tipo: string; pais_i
   const { data } = await createServiceClient().from("paises").select("id").eq("codigo", codigo).maybeSingle();
   if (!data) return { error: "País no válido." };
   return { tipo, pais_id: data.id as string, paises_destino: [] };
+}
+
+// --- Planificación automática (`src/lib/compras/planificacion.ts`) ---------------------------------------------------
+// No se escribe: es el mes de la llegada estimada (fecha de envío + lo que tardaron los envíos anteriores de su país por su
+// vía). Se calcula al crear la compra y cada vez que cambia su fecha de envío, su vía, su país o su tipo.
+
+/** De qué país es una compra para medir sus envíos: su país, o Importadora. */
+const claveTransito = (tipo: string, paisId: string | null) => (tipo === "importacion" ? "importacion" : (paisId ?? ""));
+
+/** Lo que tardaron los envíos que ya llegaron (fecha de envío → fecha de llegada), por país y vía. */
+async function cargarTiempos(): Promise<TiemposTransito> {
+  const filas = await traerTodasLasFilas<{ tipo: string; pais_id: string | null; via_envio: string[] | null; fecha_envio: string; fecha_llegada: string }>((desde, hasta) =>
+    createServiceClient()
+      .from("wms_compras")
+      .select("tipo, pais_id, via_envio, fecha_envio, fecha_llegada")
+      .not("fecha_envio", "is", null)
+      .not("fecha_llegada", "is", null)
+      .is("anulada_en", null)
+      .order("id")
+      .range(desde, hasta),
+  );
+  // Una compra que viajó por dos vías no dice cuánto tarda cada una: no se mide.
+  return tiemposDeTransito(
+    filas
+      .filter((f) => (f.via_envio ?? []).length === 1)
+      .map((f) => ({ clave: claveTransito(f.tipo, f.pais_id), via: f.via_envio![0], dias: Math.round((Date.parse(f.fecha_llegada) - Date.parse(f.fecha_envio)) / 864e5) })),
+  );
+}
+
+/** La planificación que tendría una compra con estos datos (para verla en la ficha antes de guardar). */
+export async function estimarPlanificacionCompra(tipo: string, pais: string, vias: string[], fechaEnvio: string): Promise<Estimacion | null> {
+  await requireModulo("compras");
+  let paisId: string | null = null;
+  if (tipo !== "importacion") {
+    const { data } = await createServiceClient().from("paises").select("id").eq("codigo", String(pais ?? "")).maybeSingle();
+    if (!data) return null;
+    paisId = data.id as string;
+  }
+  const validas = (Array.isArray(vias) ? vias : []).map(String).filter((v) => VIAS_VALIDAS.has(v));
+  return estimarPlanificacion(await cargarTiempos(), claveTransito(tipo, paisId), validas, /^\d{4}-\d{2}-\d{2}$/.test(String(fechaEnvio)) ? String(fechaEnvio) : null);
+}
+
+/** Si el cambio de una celda o de un lote mueve la planificación (la fecha de envío o la vía). */
+const MUEVE_PLANIFICACION = new Set(["fechaEnvio", "viaEnvio"]);
+type DatosEnvio = { tipo: string; pais_id: string | null; via_envio: string[] | null; fecha_envio: string | null; planificacion: string | null };
+/** La planificación de una compra después de cambiarle la fecha de envío o la vía (una celda o un lote). */
+function planificacionTrasCambio(tiempos: TiemposTransito, actual: DatosEnvio, columna: string, valor: unknown): string | null {
+  const despues = { ...actual, [columna]: valor } as DatosEnvio;
+  return nuevaPlanificacion(
+    tiempos,
+    { fechaEnvio: actual.fecha_envio, planificacion: actual.planificacion },
+    { clave: claveTransito(despues.tipo, despues.pais_id), vias: despues.via_envio ?? [], fechaEnvio: despues.fecha_envio },
+  );
 }
 
 /**
@@ -172,7 +247,7 @@ const OTROS_CAMPOS: { campo: string; columna: string }[] = [
   { campo: "nombre", columna: "nombre" },
   { campo: "descripcion", columna: "descripcion" },
   { campo: "urlProducto", columna: "url_producto" },
-  { campo: "documentos", columna: "documentos" },
+  { campo: "planificacion", columna: "planificacion" },
   { campo: "foto", columna: "foto_url" },
   { campo: "paisesDestino", columna: "paises_destino" },
 ];
@@ -191,61 +266,131 @@ async function anotarEventos(compraId: string, antes: { etapa: string; estado: s
 }
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
-export async function crearCompra(formData: FormData): Promise<{ error?: string }> {
+export async function crearCompra(formData: FormData): Promise<{ error?: string; codigo?: string | null; id?: string }> {
   await requireModuloEscritura("compras");
-  const nombre = (formData.get("nombre") as string).trim();
-  const etapa = (formData.get("etapa") as string) || "backlog";
+  // El nombre es opcional (venía de ClickUp; una compra con productos se titula por su N.º OC). Sin nombre, toma su código.
+  const nombreEscrito = String(formData.get("nombre") ?? "").trim();
+  const etapa = (formData.get("etapa") as string) || "cotizar";
   const estado = (formData.get("estado") as string) || "backlog";
 
-  if (!nombre) return { error: "Escribe el nombre de la compra." };
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   const tipoYPais = await leerTipoYPais(formData);
   if ("error" in tipoYPais) return tipoYPais;
 
+  // Los productos que se eligieron al crearla (mismo bloque «Productos» que la ficha). Se revisan todos antes de crear nada.
+  let lineas: { sku: string; cantidad: number; costo: number | null }[] = [];
+  try {
+    const crudo = JSON.parse(String(formData.get("productos") || "[]")) as unknown;
+    lineas = Array.isArray(crudo) ? crudo.map((l) => ({ sku: String(l?.sku ?? ""), cantidad: Number(l?.cantidad), costo: l?.costo === null || l?.costo === undefined ? null : Number(l.costo) })) : [];
+  } catch {
+    return { error: "Los productos de la compra no son válidos." };
+  }
+  if (lineas.length > 0 && tipoYPais.tipo !== "pais") return { error: "Solo las compras de un país llevan productos del inventario." };
+  if (new Set(lineas.map((l) => l.sku)).size !== lineas.length) return { error: "Hay un producto repetido en la compra." };
+  for (const l of lineas) {
+    if (!ES_ID(l.sku)) return { error: "Hay un producto que no es válido." };
+    if (!ES_CANTIDAD(l.cantidad)) return { error: "Las cantidades deben ser números enteros mayores que cero." };
+    if (!ES_COSTO(l.costo)) return { error: "Hay un costo unitario que no es válido." };
+    const sku = await productoComprable(l.sku);
+    if ("error" in sku) return sku;
+  }
+
   const supabase = createServiceClient();
   const codigo = await siguienteCodigo(tipoYPais.tipo, tipoYPais.pais_id);
+  const nombre = nombreEscrito || codigo || "Orden de compra";
+  const datos = leerCambios(formData);
+  const planificacion = datos.fecha_envio
+    ? nuevaPlanificacion(await cargarTiempos(), null, { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: datos.via_envio, fechaEnvio: datos.fecha_envio })
+    : null;
   const { data, error } = await supabase
     .from("wms_compras")
-    .insert({ ...tipoYPais, nombre, etapa, estado, ...leerCambios(formData), codigo })
+    .insert({ ...tipoYPais, nombre, etapa, estado, ...datos, planificacion, codigo })
     .select("id")
     .single();
   if (error) return { error: error.message };
   await anotarEventos(data.id, null, { etapa, estado });
 
+  if (lineas.length > 0) {
+    const usuario = await getUsuarioActual();
+    const agregadas: CambioActividad[] = [];
+    for (const l of lineas) {
+      const { error: errorLinea } = await supabase.rpc("wms_agregar_item_compra", { p_compra: data.id, p_sku: l.sku, p_cantidad: l.cantidad, p_costo: l.costo, p_lote: null, p_origen: "sistema", p_usuario: usuario?.id ?? null });
+      if (errorLinea) return { error: `La compra se creó, pero un producto no se pudo agregar: ${errorLinea.message}` };
+      const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre").eq("id", l.sku).maybeSingle();
+      agregadas.push({ campo: "productoAgregado", antes: null, despues: `${sku?.codigo ?? ""} · ${sku?.nombre ?? ""} · ${textoLinea(l.cantidad, l.costo)}` });
+    }
+    await sincronizarCantidad(data.id);
+    await anotarCambios(data.id, agregadas);
+  }
+
   await registrarAuditoria({ accion: "crear_compra", entidad: "wms_compras", entidadId: data.id, detalle: codigo ? `${codigo} · ${nombre}` : nombre });
   revalidatePath("/compras");
-  return {};
+  return { codigo, id: data.id as string };
+}
+
+/**
+ * Lo que tendrá una compra nueva si se crea ahora (para verlo antes de crearla): el código del país (el siguiente de su
+ * correlativo, sin gastarlo) y el N.º OC. Si otra persona crea una antes, al crear se usa el siguiente libre.
+ */
+export async function vistaPreviaCompra(clave: string): Promise<{ codigo: string | null; numero: number }> {
+  await requireModulo("compras");
+  const supabase = createServiceClient();
+  const [correlativo, ultima] = await Promise.all([
+    clave ? supabase.from("wms_compras_correlativo").select("prefijo, ultimo").eq("clave", String(clave)).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from("wms_compras").select("numero").order("numero", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const c = correlativo.data as { prefijo: string | null; ultimo: number } | null;
+  return {
+    codigo: c?.prefijo ? `${c.prefijo}-${String(Number(c.ultimo) + 1).padStart(4, "0")}` : null,
+    numero: Number((ultima.data as { numero: number } | null)?.numero ?? 0) + 1,
+  };
 }
 
 /** Edita cualquier dato de una compra ya creada — todo junto, desde su ficha. */
 export async function actualizarCompra(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("compras");
   const id = formData.get("id") as string;
-  const nombre = (formData.get("nombre") as string).trim();
+  const nombreEscrito = String(formData.get("nombre") ?? "").trim();
   const etapa = formData.get("etapa") as string;
   const estado = formData.get("estado") as string;
   if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
   if (sinAcceso) return { error: sinAcceso };
 
-  if (!nombre) return { error: "Escribe el nombre de la compra." };
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
-  if (!ES_ID(id)) return { error: "Compra no válida." };
   const tipoYPais = await leerTipoYPais(formData);
   if ("error" in tipoYPais) return tipoYPais;
 
   const supabase = createServiceClient();
   const { data: actualCompleta } = await supabase.from("wms_compras").select("*").eq("id", id).single();
   const actual = actualCompleta as Record<string, unknown> & { foto_url: string | null; etapa: string; estado: string } | null;
-  // Una compra que sigue en una etapa que ya no se elige (la migración 0089 las mueve) puede guardarse sin cambiarla.
+  // Una compra que sigue en una etapa que ya no se elige (la migración 0098 las mueve) puede guardarse sin cambiarla.
   if (!ETAPAS_VALIDAS.has(etapa) && etapa !== actual?.etapa) return { error: "Elige una etapa válida." };
+  // Sin nombre se conserva el que tenía (el nombre es opcional: el título sale del N.º OC o del código).
+  const nombre = nombreEscrito || String(actual?.nombre ?? "") || String(actual?.codigo ?? "") || "Orden de compra";
   const { qty_total, monto_total, ...resto } = leerCambios(formData);
   // Con productos vinculados, la cantidad y el monto los calcula el bloque «Productos»: el formulario no los pisa.
   const { count: lineas } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);
-  const cambios = (lineas ?? 0) > 0 ? resto : { ...resto, qty_total, monto_total };
+  const sinPlanificar = (lineas ?? 0) > 0 ? resto : { ...resto, qty_total, monto_total };
+  // La planificación se vuelve a calcular solo si cambió lo que la mueve (si no, guardar otro dato la movería sola cada vez
+  // que llega un envío nuevo al historial).
+  const mueve =
+    !actual ||
+    (actual.fecha_envio ?? null) !== resto.fecha_envio ||
+    JSON.stringify(ordenada(actual.via_envio ?? [])) !== JSON.stringify(ordenada(resto.via_envio)) ||
+    actual.tipo !== tipoYPais.tipo ||
+    (actual.pais_id ?? null) !== tipoYPais.pais_id;
+  const planificacion = mueve
+    ? nuevaPlanificacion(
+        await cargarTiempos(),
+        actual ? { fechaEnvio: (actual.fecha_envio as string | null) ?? null, planificacion: (actual.planificacion as string | null) ?? null } : null,
+        { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: resto.via_envio, fechaEnvio: resto.fecha_envio },
+      )
+    : ((actual?.planificacion as string | null) ?? null);
+  const cambios = { ...sinPlanificar, planificacion };
   // Al cerrar (completado o descartado) se sella la fecha de cierre; al reabrir se quita.
   const cierra = etapa === "completado" || etapa === "descartado";
   const cerrado_en = cierra ? (actual && (actual.etapa === "completado" || actual.etapa === "descartado") ? undefined : new Date().toISOString()) : null;
@@ -278,7 +423,11 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
  * ficha: sella o quita la fecha de cierre y deja el evento con su hora. No llama a `revalidatePath`: la lista ya muestra el
  * cambio y rearmar toda la página de Compras por cada celda la haría lenta. Devuelve el error como valor.
  */
-export async function actualizarCampoCompra(id: string, campo: string, bruto: unknown): Promise<{ error?: string; cerradoEn?: string | null }> {
+export async function actualizarCampoCompra(
+  id: string,
+  campo: string,
+  bruto: unknown,
+): Promise<{ error?: string; cerradoEn?: string | null; planificacion?: string | null }> {
   await requireModuloEscritura("compras");
   if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
   const def = campoEditable(String(campo));
@@ -289,7 +438,7 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
   if (sinAcceso) return { error: sinAcceso };
 
   const supabase = createServiceClient();
-  const { data } = await supabase.from("wms_compras").select(`${def.columna}, etapa, estado`).eq("id", id).maybeSingle();
+  const { data } = await supabase.from("wms_compras").select(`${def.columna}, etapa, estado, tipo, pais_id, via_envio, fecha_envio, planificacion`).eq("id", id).maybeSingle();
   const actual = data as unknown as Record<string, unknown> | null;
   if (!actual) return { error: "La compra ya no existe." };
 
@@ -306,6 +455,8 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
     cerradoEn = cierra ? (yaCerrada ? undefined : new Date().toISOString()) : null;
     if (cerradoEn !== undefined) cambios.cerrado_en = cerradoEn;
   }
+  const planificacion = MUEVE_PLANIFICACION.has(campo) ? planificacionTrasCambio(await cargarTiempos(), actual as unknown as DatosEnvio, def.columna, normalizado.valor) : undefined;
+  if (planificacion !== undefined) cambios.planificacion = planificacion;
 
   const { error } = await supabase.from("wms_compras").update(cambios).eq("id", id);
   if (error) return { error: error.message.length < 200 ? error.message : "No se pudo guardar el cambio." };
@@ -318,7 +469,10 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
     );
   }
   if (campo !== "etapa" && campo !== "estado") {
-    await anotarCambios(id, [{ campo, antes: textoDeValor(def, actual[def.columna]), despues: textoDeValor(def, normalizado.valor) }]);
+    await anotarCambios(id, [
+      { campo, antes: textoDeValor(def, actual[def.columna]), despues: textoDeValor(def, normalizado.valor) },
+      ...(planificacion !== undefined ? [{ campo: "planificacion", antes: textoSimple(actual.planificacion), despues: textoSimple(planificacion) }] : []),
+    ]);
   }
   await registrarAuditoria({
     accion: "editar_campo_compra",
@@ -327,7 +481,7 @@ export async function actualizarCampoCompra(id: string, campo: string, bruto: un
     antes: { [def.etiqueta]: textoDeValor(def, actual[def.columna]) },
     despues: { [def.etiqueta]: textoDeValor(def, normalizado.valor) },
   });
-  return cerradoEn === undefined ? {} : { cerradoEn };
+  return { ...(cerradoEn === undefined ? {} : { cerradoEn }), ...(planificacion === undefined ? {} : { planificacion }) };
 }
 
 /**
@@ -343,7 +497,7 @@ export async function actualizarCampoComprasLote(
   campo: string,
   bruto: unknown,
   modo: ModoLote = "poner",
-): Promise<{ error?: string; aplicadas?: { id: string; valor: ValorCampo; cerradoEn?: string | null }[]; omitidas?: number }> {
+): Promise<{ error?: string; aplicadas?: { id: string; valor: ValorCampo; cerradoEn?: string | null; planificacion?: string | null }[]; omitidas?: number }> {
   await requireModuloEscritura("compras");
   if (!Array.isArray(ids) || ids.length === 0) return { error: "Marca al menos una compra." };
   const unicos = [...new Set(ids.map(String))];
@@ -358,7 +512,7 @@ export async function actualizarCampoComprasLote(
   if ("error" in normalizado) return normalizado;
 
   const supabase = createServiceClient();
-  const { data } = await supabase.from("wms_compras").select(`id, ${def.columna}, etapa, estado`).in("id", unicos);
+  const { data } = await supabase.from("wms_compras").select(`id, ${def.columna}, etapa, estado, tipo, pais_id, via_envio, fecha_envio, planificacion`).in("id", unicos);
   const actuales = new Map(((data ?? []) as unknown as (Record<string, unknown> & { id: string })[]).map((c) => [c.id, c]));
 
   // Con productos vinculados, la cantidad y el monto se calculan de ellos: esas compras no se tocan.
@@ -377,6 +531,11 @@ export async function actualizarCampoComprasLote(
     return def.tipo === "lista" ? combinarLista(Array.isArray(antes) ? antes.map(String) : [], modo, normalizado.valor as string[]) : normalizado.valor;
   };
 
+  // La fecha de envío o la vía mueven la planificación de cada compra (según su país).
+  const tiempos = MUEVE_PLANIFICACION.has(campo) ? await cargarTiempos() : null;
+  const planificacionDe = new Map<string, string | null>();
+  if (tiempos) for (const id of objetivo) planificacionDe.set(id, planificacionTrasCambio(tiempos, actuales.get(id) as unknown as DatosEnvio, def.columna, nuevoValor(id)));
+
   // Las que quedan con el mismo valor (y la misma regla de cierre) se guardan juntas, en una sola escritura.
   const grupos = new Map<string, { ids: string[]; cambios: Record<string, unknown> }>();
   const cerradoEnDe = new Map<string, string | null>();
@@ -391,7 +550,8 @@ export async function actualizarCampoComprasLote(
       cierre = accion;
       if (accion !== "mantener") cerradoEnDe.set(id, accion === "sellar" ? ahora : null);
     }
-    const clave = `${JSON.stringify(valor)}|${cierre}`;
+    if (planificacionDe.has(id)) cambios.planificacion = planificacionDe.get(id) ?? null;
+    const clave = `${JSON.stringify(valor)}|${cierre}|${planificacionDe.get(id) ?? ""}`;
     const grupo = grupos.get(clave) ?? { ids: [], cambios };
     grupo.ids.push(id);
     grupos.set(clave, grupo);
@@ -423,7 +583,18 @@ export async function actualizarCampoComprasLote(
         origen: "sistema",
       };
     });
-    await supabase.from("wms_compra_eventos").insert(filas);
+    // La planificación que se movió con ese cambio, en su propia línea de la Actividad.
+    const movidas = cambiaron.filter((id) => planificacionDe.has(id) && (planificacionDe.get(id) ?? null) !== ((actuales.get(id)!.planificacion as string | null) ?? null));
+    const filasPlan = movidas.map((id, i) => ({
+      compra_id: id,
+      campo: "planificacion",
+      valor_antes: textoSimple(actuales.get(id)!.planificacion),
+      valor_despues: textoSimple(planificacionDe.get(id)),
+      ocurrido_en: new Date(base + cambiaron.length + i).toISOString(),
+      autor,
+      origen: "sistema",
+    }));
+    await supabase.from("wms_compra_eventos").insert([...filas, ...filasPlan]);
     await registrarAuditoriaLote(
       cambiaron.map((id) => ({
         accion: "editar_campo_compra",
@@ -437,11 +608,97 @@ export async function actualizarCampoComprasLote(
   }
 
   return {
-    aplicadas: objetivo.map((id) => ({ id, valor: nuevoValor(id), ...(cerradoEnDe.has(id) ? { cerradoEn: cerradoEnDe.get(id) ?? null } : {}) })),
+    aplicadas: objetivo.map((id) => ({
+      id,
+      valor: nuevoValor(id),
+      ...(cerradoEnDe.has(id) ? { cerradoEn: cerradoEnDe.get(id) ?? null } : {}),
+      ...(planificacionDe.has(id) ? { planificacion: planificacionDe.get(id) ?? null } : {}),
+    })),
     omitidas,
   };
 }
 
+/**
+ * Anula una compra (en vez de borrarla; pedido de Hernán, 9 oct 2026): pasa a la etapa **Descartado** con el Estado Completado
+ * (como las demás descartadas, se sella su cierre) y queda marcada como anulada con el motivo. Conserva su N.º OC, su código,
+ * su actividad y sus productos; deja de contar en la planificación, los envíos y el histórico de compras de los productos.
+ * Se puede restaurar a la etapa y el estado que tenía. Devuelve el error como valor.
+ */
+export async function anularCompra(id: string, motivo: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(id))) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
+  const razon = String(motivo ?? "").trim().replace(/\s+/g, " ").slice(0, 500);
+  if (razon.length < 3) return { error: "Escribe por qué se anula la compra." };
+  const supabase = createServiceClient();
+  const { data: compra } = await supabase.from("wms_compras").select("numero, codigo, nombre, anulada_en, etapa, estado, cerrado_en").eq("id", id).maybeSingle();
+  if (!compra) return { error: "La compra ya no existe." };
+  if (compra.anulada_en) return { error: "La compra ya está anulada." };
+  const autor = usuario.nombre || usuario.email;
+  const ahora = new Date().toISOString();
+  const { error } = await supabase
+    .from("wms_compras")
+    .update({
+      anulada_en: ahora,
+      anulada_por: autor,
+      motivo_anulacion: razon,
+      etapa: "descartado",
+      estado: "completado",
+      ...(compra.cerrado_en ? {} : { cerrado_en: ahora }),
+      actualizado_en: ahora,
+    })
+    .eq("id", id);
+  if (error) return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0096 para anular compras." : "No se pudo anular la compra." };
+  await anotarEventos(id, { etapa: String(compra.etapa), estado: String(compra.estado) }, { etapa: "descartado", estado: "completado" });
+  await supabase.from("wms_compra_eventos").insert({ compra_id: id, campo: "anulacion", valor_antes: null, valor_despues: razon, autor, origen: "sistema" });
+  await registrarAuditoria({ accion: "anular_compra", entidad: "wms_compras", entidadId: id, detalle: `${numeroOC(Number(compra.numero))} · ${compra.codigo ?? ""} · ${compra.nombre} — ${razon}` });
+  revalidatePath("/compras", "layout");
+  return {};
+}
+
+/**
+ * Restaura una compra anulada: vuelve a la etapa y el estado que tenía antes de anularla (los del último paso a Descartado en
+ * su historial) y deja de estar marcada. Queda en su Actividad y en la auditoría.
+ */
+export async function restaurarCompra(id: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(id))) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([id]);
+  if (sinAcceso) return { error: sinAcceso };
+  const supabase = createServiceClient();
+  const { data: compra } = await supabase.from("wms_compras").select("numero, codigo, nombre, anulada_en").eq("id", id).maybeSingle();
+  if (!compra) return { error: "La compra ya no existe." };
+  if (!compra.anulada_en) return {};
+  // La etapa y el estado de antes: los del cambio que la llevó a Descartado y a Completado al anularla.
+  const anterior = async (campo: string, valor: string) => {
+    const { data } = await supabase
+      .from("wms_compra_eventos")
+      .select("valor_antes")
+      .eq("compra_id", id)
+      .eq("campo", campo)
+      .eq("valor_despues", valor)
+      .order("ocurrido_en", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return (data?.valor_antes as string | null) ?? null;
+  };
+  const etapa = (await anterior("etapa", "descartado")) ?? "cotizar";
+  const estado = (await anterior("estado", "completado")) ?? "pendiente";
+  const cierra = etapa === "completado" || etapa === "descartado";
+  const { error } = await supabase
+    .from("wms_compras")
+    .update({ anulada_en: null, anulada_por: null, motivo_anulacion: null, etapa, estado, ...(cierra ? {} : { cerrado_en: null }), actualizado_en: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { error: "No se pudo restaurar la compra." };
+  await anotarEventos(id, { etapa: "descartado", estado: "completado" }, { etapa, estado });
+  await supabase.from("wms_compra_eventos").insert({ compra_id: id, campo: "restauracion", valor_antes: null, valor_despues: "Restaurada", autor: usuario.nombre || usuario.email, origen: "sistema" });
+  await registrarAuditoria({ accion: "restaurar_compra", entidad: "wms_compras", entidadId: id, detalle: `${numeroOC(Number(compra.numero))} · ${compra.codigo ?? ""} · ${compra.nombre}` });
+  revalidatePath("/compras", "layout");
+  return {};
+}
+
+/** Borra una compra de verdad. Ya no se ofrece en la ficha (se anula); queda para casos puntuales desde el servidor. */
 export async function eliminarCompra(formData: FormData) {
   await requireModuloEscritura("compras");
   const id = formData.get("id") as string;
@@ -468,9 +725,32 @@ export interface AdjuntoCompra {
   creadoEn: string;
 }
 
+/** Las reacciones de un comentario, por emoji: cuántas, si una es mía y de quiénes. */
+export interface ReaccionComentario {
+  emoji: string;
+  n: number;
+  mia: boolean;
+  nombres: string[];
+}
+
 export interface ActividadCompra {
-  /** Cada comentario con los archivos que se adjuntaron en él (la captura de un pago, un comprobante…). */
-  comentarios: { id: string; autor: string | null; texto: string; creadoEn: string; adjuntos: AdjuntoCompra[] }[];
+  /**
+   * Cada comentario con los archivos que se adjuntaron en él (la captura de un pago, un comprobante…), a qué comentario responde
+   * (si es una respuesta) y sus reacciones.
+   */
+  comentarios: {
+    id: string;
+    autor: string | null;
+    texto: string;
+    creadoEn: string;
+    adjuntos: AdjuntoCompra[];
+    respuestaA: string | null;
+    reacciones: ReaccionComentario[];
+    /** Cuándo se editó por última vez (null si nunca). */
+    editadoEn: string | null;
+    /** Si lo escribió la persona que mira (entonces lo puede editar). */
+    mio: boolean;
+  }[];
   subtareas: { id: string; nombre: string; estado: string | null; responsable: string | null; creadoEn: string; cerradoEn: string | null }[];
   /** Los archivos sueltos de la compra (los de ClickUp y la foto/documentos): los de un comentario van dentro de él. */
   adjuntos: AdjuntoCompra[];
@@ -490,14 +770,42 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   if (sinAcceso) return { error: sinAcceso };
   const supabase = createServiceClient();
   const consultaAdjuntos = (columnas: string) => supabase.from("wms_compra_adjuntos").select(columnas).eq("compra_id", id).order("creado_en");
-  const [comentarios, subtareas, adjuntosConComentario, eventos] = await Promise.all([
-    supabase.from("wms_compra_comentarios").select("id, autor, texto, creado_en").eq("compra_id", id).order("creado_en", { ascending: false }).limit(500),
+  const consultaComentarios = (columnas: string) => supabase.from("wms_compra_comentarios").select(columnas).eq("compra_id", id).order("creado_en", { ascending: false }).limit(500);
+  const [comentariosCompletos, subtareas, adjuntosConComentario, eventos] = await Promise.all([
+    consultaComentarios("id, autor, autor_id, texto, creado_en, respuesta_a, editado_en"),
     supabase.from("wms_compra_subtareas").select("id, nombre, estado, responsable_nombre, creado_en, cerrado_en").eq("compra_id", id).order("creado_en"),
     consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en, comentario_id"),
     supabase.from("wms_compra_eventos").select("id, campo, valor_antes, valor_despues, ocurrido_en, autor, origen").eq("compra_id", id).order("ocurrido_en", { ascending: false }),
   ]);
   // Sin la migración 0085 (la columna `comentario_id`) la actividad sigue cargando, solo que sin archivos dentro de los comentarios.
   const adjuntos = adjuntosConComentario.error ? await consultaAdjuntos("id, nombre, clase, ruta, url_clickup, creado_en") : adjuntosConComentario;
+  // Sin la migración 0095 (respuestas y reacciones) los comentarios se cargan igual, todos sueltos.
+  // Sin la migración 0097 (`editado_en`) o la 0095 (`autor_id`, `respuesta_a`): lo que haya, sin editar.
+  const comentarios = comentariosCompletos.error
+    ? await consultaComentarios("id, autor, autor_id, texto, creado_en, respuesta_a").then((r) => (r.error ? consultaComentarios("id, autor, texto, creado_en") : r))
+    : comentariosCompletos;
+  type FilaComentario = { id: string; autor: string | null; autor_id?: string | null; texto: string; creado_en: string; respuesta_a?: string | null; editado_en?: string | null };
+  const filasComentarios = (comentarios.data ?? []) as unknown as FilaComentario[];
+  const usuarioActual = await getUsuarioActual();
+  const yo = usuarioActual?.id ?? null;
+  const miNombre = usuarioActual ? usuarioActual.nombre || usuarioActual.email : null;
+  const reacciones = new Map<string, ReaccionComentario[]>();
+  if (filasComentarios.length) {
+    const { data: filasReacciones } = await supabase
+      .from("wms_compra_comentario_reacciones")
+      .select("comentario_id, usuario_id, usuario_nombre, emoji, creado_en")
+      .in("comentario_id", filasComentarios.map((c) => c.id))
+      .order("creado_en");
+    for (const r of filasReacciones ?? []) {
+      const lista = reacciones.get(r.comentario_id) ?? [];
+      let grupo = lista.find((g) => g.emoji === r.emoji);
+      if (!grupo) lista.push((grupo = { emoji: r.emoji, n: 0, mia: false, nombres: [] }));
+      grupo.n++;
+      grupo.mia ||= r.usuario_id === yo;
+      grupo.nombres.push(r.usuario_nombre ?? "—");
+      reacciones.set(r.comentario_id, lista);
+    }
+  }
   if (comentarios.error || subtareas.error || adjuntos.error || eventos.error) return { error: "No se pudo cargar la actividad." };
 
   type FilaAdjunto = { id: string; nombre: string; clase: string; ruta: string | null; url_clickup: string | null; creado_en: string; comentario_id?: string | null };
@@ -512,11 +820,71 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   const deComentario = new Map<string, AdjuntoCompra[]>();
   for (const a of filasAdjuntos) if (a.comentario_id) deComentario.set(a.comentario_id, [...(deComentario.get(a.comentario_id) ?? []), aAdjunto(a)]);
   return {
-    comentarios: (comentarios.data ?? []).map((c) => ({ id: c.id, autor: c.autor, texto: c.texto, creadoEn: c.creado_en, adjuntos: deComentario.get(c.id) ?? [] })),
+    comentarios: filasComentarios.map((c) => ({
+      id: c.id,
+      autor: c.autor,
+      texto: c.texto,
+      creadoEn: c.creado_en,
+      adjuntos: deComentario.get(c.id) ?? [],
+      respuestaA: c.respuesta_a ?? null,
+      reacciones: reacciones.get(c.id) ?? [],
+      editadoEn: c.editado_en ?? null,
+      mio: esAutor(c, yo, miNombre),
+    })),
     subtareas: (subtareas.data ?? []).map((t) => ({ id: t.id, nombre: t.nombre, estado: t.estado, responsable: t.responsable_nombre, creadoEn: t.creado_en, cerradoEn: t.cerrado_en })),
     adjuntos: filasAdjuntos.filter((a) => !a.comentario_id).map(aAdjunto),
     eventos: (eventos.data ?? []).map((e) => ({ id: e.id, campo: e.campo, antes: e.valor_antes, despues: e.valor_despues, ocurridoEn: e.ocurrido_en, autor: e.autor, origen: e.origen })),
   };
+}
+
+/**
+ * Si una persona escribió un comentario: por su id (desde la migración 0095) o, en los de antes (sin id), por su nombre. Los
+ * que vinieron de ClickUp con el nombre de alguien también cuentan como suyos.
+ */
+function esAutor(c: { autor: string | null; autor_id?: string | null }, yo: string | null, miNombre: string | null): boolean {
+  if (!yo) return false;
+  if (c.autor_id) return c.autor_id === yo;
+  return !!miNombre && !!c.autor && c.autor.trim().toLowerCase() === miNombre.trim().toLowerCase();
+}
+
+/**
+ * Edita el texto de un comentario: solo quien lo escribió. Queda marcado «(editado)» con la hora. A las personas que se
+ * mencionan por primera vez al editar les llega el aviso. Los archivos del comentario no cambian. Devuelve el error como valor.
+ */
+export async function editarComentarioCompra(comentarioId: string, texto: string, menciones: string[] = []): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
+  const supabase = createServiceClient();
+  const { data: c, error: errorLeer } = await supabase.from("wms_compra_comentarios").select("id, compra_id, autor, autor_id, texto").eq("id", comentarioId).maybeSingle();
+  if (errorLeer || !c) return { error: "El comentario ya no existe." };
+  const sinAcceso = await sinAccesoACompras([c.compra_id as string]);
+  if (sinAcceso) return { error: sinAcceso };
+  if (!esAutor(c, usuario.id, usuario.nombre || usuario.email)) return { error: "Solo quien escribió el comentario lo puede editar." };
+  const limpio = String(texto ?? "").trim().slice(0, 5000);
+  if (limpio === c.texto) return {};
+  if (!limpio) {
+    const { count } = await supabase.from("wms_compra_adjuntos").select("id", { count: "exact", head: true }).eq("comentario_id", comentarioId);
+    if (!count) return { error: "El comentario no puede quedar vacío." };
+  }
+  const { error } = await supabase.from("wms_compra_comentarios").update({ texto: limpio, editado_en: new Date().toISOString() }).eq("id", comentarioId);
+  if (error) return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0097 para editar comentarios." : "No se pudo guardar el cambio." };
+
+  // Solo se avisa a quien se menciona ahora y no estaba mencionado antes.
+  const nuevos = (await mencionadosValidos(menciones, limpio, usuario.id)).filter((m) => !String(c.texto ?? "").includes(`@${m.nombre}`));
+  if (nuevos.length) {
+    const { data: compra } = await supabase.from("wms_compras").select("numero, nombre, paises(codigo)").eq("id", c.compra_id).maybeSingle();
+    const pais = (Array.isArray(compra?.paises) ? compra?.paises[0] : compra?.paises) as { codigo: string } | null | undefined;
+    const autor = usuario.nombre || usuario.email;
+    await notificarMenciones({
+      mencionados: nuevos,
+      autorId: usuario.id,
+      autorNombre: autor,
+      titulo: `${autor} te mencionó en la compra ${compra ? numeroOC(Number(compra.numero)) : ""}${compra?.nombre ? ` · ${compra.nombre}` : ""}`,
+      texto: limpio,
+      href: `/compras/lista?ver=${encodeURIComponent(pais?.codigo ?? "todos")}&abrir=${c.compra_id}&comentario=${comentarioId}`,
+    });
+  }
+  return {};
 }
 
 /** Un archivo que ya se subió al almacenamiento para un comentario (ver `prepararSubidaAdjuntoComentario`). */
@@ -558,8 +926,8 @@ export async function descartarAdjuntoSubido(compraId: string, ruta: string): Pr
 
 /**
  * Revisa los archivos de un comentario: que estén en la carpeta de esa compra, que existan, que no pasen del peso y que su
- * contenido sea de verdad una imagen (JPG, PNG, WebP, GIF) o un PDF — se mira la firma de los primeros bytes, no lo que dice
- * el nombre ni el navegador. Si alguno falla se borran todos y se devuelve el error.
+ * contenido sea de verdad una imagen (JPG, PNG, WebP, GIF), un PDF, un Excel, Word o PowerPoint, un CSV o un texto — se mira
+ * el contenido, no lo que dice el nombre ni el navegador. Si alguno falla se borran todos y se devuelve el error.
  */
 async function revisarAdjuntosSubidos(
   compraId: string,
@@ -581,9 +949,17 @@ async function revisarAdjuntosSubidos(
     const { data, error } = await storage.download(ruta);
     if (error || !data) return falla("No se encontró uno de los archivos. Vuelve a adjuntarlo.");
     if (data.size > MAX_BYTES_ADJUNTO) return falla("Un archivo pesa más de lo permitido.");
-    const tipo = detectarAdjunto(new Uint8Array(await data.slice(0, 16).arrayBuffer()));
-    if (!tipo) return falla("Solo se pueden adjuntar imágenes (JPG, PNG, WebP, GIF) y PDF.");
-    const nombreOriginal = String(archivo.nombre ?? "").trim().slice(0, 120) || `archivo.${tipo.extension}`;
+    const contenido = new Uint8Array(await data.arrayBuffer());
+    const nombreOriginal0 = String(archivo.nombre ?? "").trim().slice(0, 120);
+    const tipo = detectarAdjunto(contenido, nombreOriginal0 || ruta);
+    if (!tipo) return falla("Se pueden adjuntar imágenes, PDF, Excel, Word, PowerPoint, CSV y texto (se revisa el contenido, no el nombre).");
+    // Se vuelve a guardar con el tipo que corresponde a su contenido (no el que mandó el navegador), así un texto se abre
+    // siempre como texto y nunca como página web.
+    if ((data.type || "").split(";")[0] !== tipo.tipo.split(";")[0]) {
+      const { error: errorTipo } = await storage.update(ruta, contenido, { contentType: tipo.tipo, upsert: true });
+      if (errorTipo) return falla("No se pudo guardar uno de los archivos.");
+    }
+    const nombreOriginal = nombreOriginal0 || `archivo.${tipo.extension}`;
     resultado.push({ ruta, nombre: nombreOriginal, extension: tipo.extension, tamano: data.size, clase: tipo.clase });
   }
   return resultado;
@@ -594,7 +970,14 @@ async function revisarAdjuntosSubidos(
  * de un pago, un comprobante…) que se ven debajo de su texto. Las personas etiquetadas con «@»
  * (`menciones`) reciben un aviso «Para ti» que abre esta compra en ese comentario. Devuelve el error como valor.
  */
-export async function comentarCompra(id: string, texto: string, menciones: string[] = [], adjuntos: AdjuntoSubido[] = []): Promise<{ error?: string }> {
+export async function comentarCompra(
+  id: string,
+  texto: string,
+  menciones: string[] = [],
+  adjuntos: AdjuntoSubido[] = [],
+  /** El comentario al que responde (de esta misma compra); se le avisa a quien lo escribió. */
+  respuestaA: string | null = null,
+): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(id)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
@@ -607,10 +990,29 @@ export async function comentarCompra(id: string, texto: string, menciones: strin
 
   // Los archivos ya están en el almacenamiento (se subieron directo desde el navegador): antes de comentar se revisa que
   // sean lo que dicen ser (por su firma, no por el nombre) y que sean de esta compra. Si algo no cuadra, se borran todos.
+  // Una respuesta va a un comentario de esta compra (a uno que no sea, a su vez, una respuesta: un solo nivel, como ClickUp).
+  let padre: { id: string; autor_id: string | null; respuesta_a: string | null } | null = null;
+  if (respuestaA !== null) {
+    if (!ES_ID(String(respuestaA))) return { error: "El comentario al que respondes no es válido." };
+    const { data: p } = await supabase.from("wms_compra_comentarios").select("id, autor_id, respuesta_a").eq("id", respuestaA).eq("compra_id", id).maybeSingle();
+    if (!p) return { error: "El comentario al que respondes ya no existe." };
+    padre = { id: p.respuesta_a ?? p.id, autor_id: p.autor_id, respuesta_a: p.respuesta_a };
+  }
+
   const revisados = archivos.length ? await revisarAdjuntosSubidos(id, archivos) : [];
   if (revisados && "error" in revisados) return revisados;
 
-  const { data, error } = await supabase.from("wms_compra_comentarios").insert({ compra_id: id, autor, texto: limpio }).select("id").single();
+  const fila = { compra_id: id, autor, texto: limpio, autor_id: usuario.id, ...(padre ? { respuesta_a: padre.id } : {}) };
+  let insercion = await supabase.from("wms_compra_comentarios").insert(fila).select("id").single();
+  // Sin la migración 0095 (columnas `autor_id` y `respuesta_a`): se guarda como antes, sin responder.
+  if (insercion.error && (insercion.error.code === "PGRST204" || insercion.error.code === "42703")) {
+    if (padre) {
+      await borrarSubidos(archivos.map((a) => a.ruta));
+      return { error: "Falta correr la migración 0095 para responder comentarios." };
+    }
+    insercion = await supabase.from("wms_compra_comentarios").insert({ compra_id: id, autor, texto: limpio }).select("id").single();
+  }
+  const { data, error } = insercion;
   if (error || !data) {
     await borrarSubidos(archivos.map((a) => a.ruta));
     return { error: "No se pudo guardar el comentario." };
@@ -641,19 +1043,17 @@ export async function comentarCompra(id: string, texto: string, menciones: strin
   }
 
   const mencionados = await mencionadosValidos(menciones, limpio, usuario.id);
-  if (mencionados.length) {
+  // A quien escribió el comentario que se responde también le llega el aviso (si no es uno mismo ni ya está mencionado).
+  const respondido = padre?.autor_id && padre.autor_id !== usuario.id && !mencionados.some((m) => m.id === padre!.autor_id) ? padre.autor_id : null;
+  if (mencionados.length || respondido) {
     const { data: compra } = await supabase.from("wms_compras").select("numero, nombre, tipo, paises(codigo)").eq("id", id).maybeSingle();
     const pais = (Array.isArray(compra?.paises) ? compra?.paises[0] : compra?.paises) as { codigo: string } | null | undefined;
     const ver = compra?.tipo === "importacion" ? "importacion" : (pais?.codigo ?? "todos");
     const oc = compra ? `OC-${String(compra.numero).padStart(4, "0")}` : "una compra";
-    await notificarMenciones({
-      mencionados,
-      autorId: usuario.id,
-      autorNombre: autor,
-      titulo: `${autor} te mencionó en la compra ${oc}${compra?.nombre ? ` · ${compra.nombre}` : ""}`,
-      texto: limpio,
-      href: `/compras/lista?ver=${encodeURIComponent(ver)}&abrir=${id}&comentario=${data.id}`,
-    });
+    const href = `/compras/lista?ver=${encodeURIComponent(ver)}&abrir=${id}&comentario=${data.id}`;
+    const deLaCompra = `la compra ${oc}${compra?.nombre ? ` · ${compra.nombre}` : ""}`;
+    await notificarMenciones({ mencionados, autorId: usuario.id, autorNombre: autor, titulo: `${autor} te mencionó en ${deLaCompra}`, texto: limpio, href });
+    if (respondido) await notificarMenciones({ mencionados: [{ id: respondido }], autorId: usuario.id, autorNombre: autor, titulo: `${autor} respondió tu comentario en ${deLaCompra}`, texto: limpio, href });
   }
   return {};
 }
@@ -682,6 +1082,9 @@ export interface ProductoComprable {
   /** Si es una variante, su producto padre; un producto con variantes se compra por variante. */
   padreId: string | null;
   opciones: Record<string, string> | null;
+  /** El N.º correlativo y la foto, para reconocerlo al buscarlo. */
+  numero: number | null;
+  foto: string | null;
 }
 
 /** Los productos de una compra y los que se le pueden agregar. Basta poder abrir Compras. */
@@ -697,7 +1100,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
       .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre)")
       .eq("compra_id", compraId)
       .order("creado_en"),
-    supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones").neq("tipo", "combo").order("nombre"),
+    supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones, numero, foto_url").neq("tipo", "combo").order("nombre"),
   ]);
   if (items.error || productos.error) return { error: "No se pudieron cargar los productos." };
   return {
@@ -716,7 +1119,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
         origen: i.origen,
       };
     }),
-    productos: (productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones })),
+    productos: (productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones, numero: p.numero ?? null, foto: p.foto_url ?? null })),
   };
 }
 
@@ -760,13 +1163,9 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   if (sinAcceso) return { error: sinAcceso };
   if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
   if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
+  const sku = await productoComprable(skuId);
+  if ("error" in sku) return sku;
   const supabase = createServiceClient();
-  const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre, tipo, clase").eq("id", skuId).maybeSingle();
-  if (!sku) return { error: "El producto no existe." };
-  if (sku.tipo === "combo") return { error: "Un producto compuesto no se compra: se compran sus componentes." };
-  if (sku.clase === "test") return { error: "El producto está en Test: pásalo a Activo para comprarlo." };
-  const { count: variantes } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("padre_id", skuId);
-  if ((variantes ?? 0) > 0) return { error: "Ese producto tiene variantes: se compra por variante." };
   const { error } = await supabase.rpc("wms_agregar_item_compra", {
     p_compra: compraId,
     p_sku: skuId,
@@ -784,6 +1183,26 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   await anotarCambios(compraId, [{ campo: "productoAgregado", antes: null, despues: `${sku.codigo} · ${sku.nombre} · ${textoLinea(cantidad, costo)}` }]);
   await registrarAuditoria({ accion: "agregar_producto_compra", entidad: "wms_compras", entidadId: compraId, detalle: `${sku.codigo} · ${cantidad} u.` });
   return {};
+}
+
+/** Un producto que se puede comprar (existe, no es compuesto, no está en Test y no tiene variantes), o por qué no. */
+async function productoComprable(skuId: string): Promise<{ codigo: string; nombre: string } | { error: string }> {
+  const supabase = createServiceClient();
+  const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre, tipo, clase").eq("id", skuId).maybeSingle();
+  if (!sku) return { error: "El producto no existe." };
+  if (sku.tipo === "combo") return { error: "Un producto compuesto no se compra: se compran sus componentes." };
+  if (sku.clase === "test") return { error: `${sku.codigo} está en Test: pásalo a Activo para comprarlo.` };
+  const { count: variantes } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("padre_id", skuId);
+  if ((variantes ?? 0) > 0) return { error: `${sku.codigo} tiene variantes: se compra por variante.` };
+  return { codigo: sku.codigo as string, nombre: sku.nombre as string };
+}
+
+/** Los productos que se pueden agregar a una compra nueva (la que todavía no se crea). Basta poder abrir Compras. */
+export async function productosComprables(): Promise<{ productos: ProductoComprable[] } | { error: string }> {
+  await requireModulo("compras");
+  const { data, error } = await createServiceClient().from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones, numero, foto_url").neq("tipo", "combo").order("nombre");
+  if (error) return { error: "No se pudieron cargar los productos." };
+  return { productos: (data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones, numero: p.numero ?? null, foto: p.foto_url ?? null })) };
 }
 
 /** Cambia lo pedido o el costo unitario de un producto de una compra. */
@@ -842,6 +1261,71 @@ export async function quitarProductoCompra(itemId: string): Promise<{ error?: st
   return {};
 }
 
+/** Elige el color de una tienda de Compras (como el de las etiquetas): vale para todas las compras que la tengan. */
+export async function guardarColorTienda(nombre: string, color: string): Promise<{ error?: string }> {
+  await requireModuloEscritura("compras");
+  const limpio = String(nombre ?? "").trim().slice(0, 60);
+  if (!limpio) return { error: "Tienda no válida." };
+  if (!/^#[0-9a-fA-F]{6}$/.test(String(color))) return { error: "Color no válido." };
+  const { error } = await createServiceClient()
+    .from("wms_compras_tiendas")
+    .upsert({ nombre: limpio, color, actualizado_en: new Date().toISOString() }, { onConflict: "nombre" });
+  if (error) return { error: "No se pudo guardar el color." };
+  return {};
+}
+
+/**
+ * Cambia el nombre de una tienda **en todas las compras** que la tienen (de todos los países), con su color. Si el nombre
+ * nuevo ya es otra tienda, se juntan. Como toca compras de todos los países, solo lo hace quien ve todos. Cada compra deja
+ * la línea en su Actividad. Devuelve cuántas compras cambiaron.
+ */
+export async function renombrarTienda(antes: string, despues: string): Promise<{ error?: string; compras?: number; nombre?: string }> {
+  await requireModuloEscritura("compras");
+  if ((await getUsuarioActual())?.paisesPermitidos != null) return { error: "Renombrar una tienda cambia las compras de todos los países: pídeselo a quien los ve todos." };
+  const viejo = String(antes ?? "").trim();
+  const escrito = String(despues ?? "").replace(/,/g, " ").trim().replace(/\s+/g, " ").slice(0, 60);
+  if (!viejo || !escrito) return { error: "Escribe el nombre nuevo de la tienda." };
+  if (viejo === escrito) return { compras: 0, nombre: viejo };
+  const supabase = createServiceClient();
+
+  const filas = await traerTodasLasFilas<{ id: string; tiendas: string[] }>((desde, hasta) =>
+    supabase.from("wms_compras").select("id, tiendas").contains("tiendas", [viejo]).order("id").range(desde, hasta),
+  );
+  // Si ya existe una tienda con ese nombre (sin importar mayúsculas), se usa como está escrita: se juntan.
+  const { data: conColor } = await supabase.from("wms_compras_tiendas").select("nombre, color");
+  const colores = (conColor ?? []) as { nombre: string; color: string }[];
+  const nombre = colores.find((c) => c.nombre !== viejo && c.nombre.toLowerCase() === escrito.toLowerCase())?.nombre ?? escrito;
+
+  const nuevas = (t: string[]) => [...new Set(t.map((x) => (x === viejo ? nombre : x)))];
+  for (let i = 0; i < filas.length; i += 20) {
+    const tramo = filas.slice(i, i + 20);
+    const r = await Promise.all(tramo.map((f) => supabase.from("wms_compras").update({ tiendas: nuevas(f.tiendas), actualizado_en: new Date().toISOString() }).eq("id", f.id)));
+    if (r.some((x) => x.error)) return { error: "No se pudo cambiar el nombre en todas las compras; vuelve a intentarlo." };
+  }
+
+  const color = colores.find((c) => c.nombre === viejo)?.color;
+  if (color) await supabase.from("wms_compras_tiendas").upsert({ nombre, color }, { onConflict: "nombre", ignoreDuplicates: true });
+  await supabase.from("wms_compras_tiendas").delete().eq("nombre", viejo);
+
+  if (filas.length) {
+    const usuario = await getUsuarioActual();
+    const base = Date.now();
+    await supabase.from("wms_compra_eventos").insert(
+      filas.map((f, i) => ({
+        compra_id: f.id,
+        campo: "tienda",
+        valor_antes: textoSimple(f.tiendas),
+        valor_despues: textoSimple(nuevas(f.tiendas)),
+        ocurrido_en: new Date(base + i).toISOString(),
+        autor: usuario?.nombre || usuario?.email || null,
+        origen: "sistema",
+      })),
+    );
+  }
+  await registrarAuditoria({ accion: "renombrar_tienda", entidad: "wms_compras", detalle: `${viejo} → ${nombre} (${filas.length} compras)` });
+  return { compras: filas.length, nombre };
+}
+
 /** Elige el color de una etiqueta de Compras (como en ClickUp): vale para todas las compras que la tengan. */
 export async function guardarColorEtiqueta(nombre: string, color: string): Promise<{ error?: string }> {
   await requireModuloEscritura("compras");
@@ -853,4 +1337,38 @@ export async function guardarColorEtiqueta(nombre: string, color: string): Promi
     .upsert({ nombre: limpio, color, actualizado_en: new Date().toISOString() }, { onConflict: "nombre" });
   if (error) return { error: "No se pudo guardar el color." };
   return {};
+}
+
+/**
+ * Pone o quita una reacción (👍, ❤️…) de la persona en un comentario de una compra, como en ClickUp. Devuelve las reacciones de
+ * ese comentario como quedaron. Devuelve el error como valor.
+ */
+export async function alternarReaccion(comentarioId: string, emoji: string): Promise<{ error?: string; reacciones?: ReaccionComentario[] }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
+  if (!(EMOJIS_REACCION as readonly string[]).includes(emoji)) return { error: "Esa reacción no está permitida." };
+  const supabase = createServiceClient();
+  const { data: comentario } = await supabase.from("wms_compra_comentarios").select("compra_id").eq("id", comentarioId).maybeSingle();
+  if (!comentario) return { error: "El comentario ya no existe." };
+  const sinAcceso = await sinAccesoACompras([comentario.compra_id as string]);
+  if (sinAcceso) return { error: sinAcceso };
+
+  const tabla = supabase.from("wms_compra_comentario_reacciones");
+  const { data: ya, error: errorLeer } = await tabla.select("emoji").eq("comentario_id", comentarioId).eq("usuario_id", usuario.id).eq("emoji", emoji).maybeSingle();
+  if (errorLeer) return { error: errorLeer.code === "42P01" || errorLeer.code === "PGRST205" ? "Falta correr la migración 0095 para reaccionar." : "No se pudo guardar la reacción." };
+  const { error } = ya
+    ? await supabase.from("wms_compra_comentario_reacciones").delete().eq("comentario_id", comentarioId).eq("usuario_id", usuario.id).eq("emoji", emoji)
+    : await supabase.from("wms_compra_comentario_reacciones").insert({ comentario_id: comentarioId, usuario_id: usuario.id, usuario_nombre: usuario.nombre || usuario.email, emoji });
+  if (error) return { error: "No se pudo guardar la reacción." };
+
+  const { data: filas } = await supabase.from("wms_compra_comentario_reacciones").select("usuario_id, usuario_nombre, emoji").eq("comentario_id", comentarioId).order("creado_en");
+  const reacciones: ReaccionComentario[] = [];
+  for (const r of filas ?? []) {
+    let g = reacciones.find((x) => x.emoji === r.emoji);
+    if (!g) reacciones.push((g = { emoji: r.emoji, n: 0, mia: false, nombres: [] }));
+    g.n++;
+    g.mia ||= r.usuario_id === usuario.id;
+    g.nombres.push(r.usuario_nombre ?? "—");
+  }
+  return { reacciones };
 }

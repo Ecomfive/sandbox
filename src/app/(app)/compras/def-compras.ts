@@ -19,9 +19,15 @@ export interface FilaCompra {
   etapa: string;
   estado: string;
   proveedor: string | null;
+  /** Tipo de venta: venta de importación (para un cliente que nos pide mercancía, antes «Importadora»; migración 0094) o
+   * proveeduría (false). */
+  ventaImportacion: boolean;
+  /** Si se anuló (no se borra: sale de la lista y de los cálculos, migración 0096): cuándo, quién y por qué. */
+  anulada: { en: string; por: string | null; motivo: string | null } | null;
+  /** Quién trae la mercancía (Chin, Avery…), aparte del proveedor que la vende (migración 0092). */
+  agenteEnvio: string | null;
   /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */
   tiendas: string[];
-  productoRelacionado: string | null;
   qtyTotal: number | null;
   montoTotal: number | null;
   primerPago: number | null;
@@ -40,7 +46,6 @@ export interface FilaCompra {
    */
   inconveniente: string | null;
   planificacion: string | null;
-  documentos: string | null;
   asignadoNombre: string | null;
   /** Aire, mar o tierra (puede ser más de una). */
   viaEnvio: string[];
@@ -61,6 +66,8 @@ export const EMOJI_CAMPO: Record<string, string> = {
   etapa: "👣",
   estado: "🚦",
   proveedor: "🏭",
+  agenteEnvio: "🚢",
+  ventaImportacion: "🌍",
   tienda: "🏪",
   viaEnvio: "🏗️",
   etiquetas: "🏷️",
@@ -260,6 +267,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       opciones: () => ETAPAS_COMPRA.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
       agrupable: true,
       ordenGrupos: ETAPAS_COMPRA.map((e) => e.valor),
+      colorValor: (v) => colorEtapa(v),
     },
     {
       id: "estado",
@@ -269,6 +277,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       opciones: () => ESTADOS_COMPRA.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
       agrupable: true,
       ordenGrupos: ESTADOS_COMPRA.map((e) => e.valor),
+      colorValor: (v) => colorEstado(v),
     },
     {
       id: "proveedor",
@@ -276,6 +285,25 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       tipo: "seleccion",
       valores: (c) => [c.proveedor ?? SIN_VALOR],
       etiquetaSinValor: "Sin proveedor",
+      agrupable: true,
+    },
+    {
+      id: "ventaImportacion",
+      etiqueta: "Tipo de venta",
+      tipo: "seleccion",
+      valores: (c) => [c.ventaImportacion ? "si" : "no"],
+      opciones: () => [
+        { valor: "no", etiqueta: "Proveeduría" },
+        { valor: "si", etiqueta: "Venta de importación" },
+      ],
+      agrupable: true,
+    },
+    {
+      id: "agenteEnvio",
+      etiqueta: "Agente de envío",
+      tipo: "seleccion",
+      valores: (c) => [c.agenteEnvio ?? SIN_VALOR],
+      etiquetaSinValor: "Sin agente",
       agrupable: true,
     },
     {
@@ -300,6 +328,8 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       etiqueta: "Etiquetas",
       tipo: "seleccion",
       valores: (c) => (c.etiquetas.length ? c.etiquetas : [SIN_VALOR]),
+      // En los filtros y los grupos, en mayúsculas como en las pastillas.
+      formatearValor: (v) => v.toUpperCase(),
       etiquetaSinValor: "Sin etiquetas",
       agrupable: true,
     },
@@ -325,7 +355,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     },
     { id: "nombreCompra", etiqueta: "Nombre", tipo: "texto", valor: (c) => `${numeroOC(c.numero)} ${c.nombre} ${c.proveedor ?? ""} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}` },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
-    { id: "qtyTotal", etiqueta: "QTY Total", tipo: "numero", valor: (c) => c.qtyTotal },
+    { id: "qtyTotal", etiqueta: "Cantidad total", tipo: "numero", valor: (c) => c.qtyTotal },
     { id: "montoTotal", etiqueta: "Monto Total", tipo: "numero", valor: (c) => c.montoTotal },
     { id: "valorUnitario", etiqueta: "Valor Unitario", tipo: "numero", valor: (c) => valorUnitario(c) },
     { id: "primerPago", etiqueta: "Primer Pago", tipo: "numero", valor: (c) => c.primerPago },

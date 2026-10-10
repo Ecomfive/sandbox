@@ -1,6 +1,7 @@
 "use client";
 
 import { BotonBarra, CabeceraTarjeta, Pastilla } from "@/components/panel/piezas-panel";
+import { PastillaTienda } from "./tiendas";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
@@ -158,12 +159,14 @@ export function FichaLateralCompra({
         )}
 
         <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-2">
-          <Dato etiqueta="🧾 QTY">{compra.qtyTotal ?? "—"}</Dato>
+          <Dato etiqueta="🧾 Cantidad">{compra.qtyTotal ?? "—"}</Dato>
           <Dato etiqueta="💲 Pagado a proveedor">{compra.pagadoAProveedor !== null ? usd(compra.pagadoAProveedor) : "—"}</Dato>
           <Dato etiqueta="💲 Valor unitario">{valorUnitario(compra) !== null ? usd(valorUnitario(compra)!) : "—"}</Dato>
           <Dato etiqueta="🏭 Proveedor">{compra.proveedor ?? "—"}</Dato>
+          <Dato etiqueta="🚢 Agente de envío">{compra.agenteEnvio ?? "—"}</Dato>
+          <Dato etiqueta="🌍 Tipo de venta">{compra.ventaImportacion ? "Venta de importación" : "Proveeduría"}</Dato>
           <Dato etiqueta="🏗️ Vía">{compra.viaEnvio.length ? compra.viaEnvio.map(etiquetaVia).join(", ") : "—"}</Dato>
-          <Dato etiqueta="🏪 Tienda">{compra.tiendas.length ? compra.tiendas.join(", ") : "—"}</Dato>
+          <Dato etiqueta="🏪 Tienda">{compra.tiendas.length ? <span className="flex flex-wrap gap-1">{compra.tiendas.map((t) => <PastillaTienda key={t} nombre={t} />)}</span> : "—"}</Dato>
         </dl>
         {compra.inconveniente && <p className="m-0 rounded-md border border-border px-3 py-2 text-[13px]">🚨 {compra.inconveniente}</p>}
 

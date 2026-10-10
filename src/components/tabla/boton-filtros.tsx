@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import {
   PRESETS_FECHA,
   campoDe,
@@ -27,7 +28,23 @@ const OPERADOR: Record<TipoCampo, string> = {
   texto: "contiene",
 };
 
-function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
+function Chip({ activo, onClick, color, children }: { activo: boolean; onClick: () => void; color?: string; children: ReactNode }) {
+  // Con color (etapa, estado): la opción es la misma insignia de la columna; elegida, lleva un anillo y su ✓.
+  if (color)
+    return (
+      <button
+        type="button"
+        aria-pressed={activo}
+        onClick={onClick}
+        title={typeof children === "string" ? children : undefined}
+        className={`max-w-full rounded-full p-0.5 ${anilloFoco} ${activo ? "ring-2 ring-foreground" : "opacity-80 hover:opacity-100"}`}
+      >
+        <Badge color={color}>
+          {activo && <span aria-hidden="true">✓ </span>}
+          {children}
+        </Badge>
+      </button>
+    );
   return (
     <button
       type="button"
@@ -61,6 +78,8 @@ function EditorValor<F>({
   switch (valor.tipo) {
     case "seleccion": {
       const opciones = opcionesDeSeleccion(def, filas, campo);
+      const definicion = def.campos.find((c) => c.id === campo);
+      const colorDe = definicion?.tipo === "seleccion" ? definicion.colorValor : undefined;
       if (opciones.length === 0) {
         return <p className="text-xs text-muted-foreground">Todavía no hay valores para elegir.</p>;
       }
@@ -72,6 +91,7 @@ function EditorValor<F>({
               <Chip
                 key={opcion.valor}
                 activo={activo}
+                color={colorDe?.(opcion.valor)}
                 onClick={() =>
                   alCambiar({
                     tipo: "seleccion",

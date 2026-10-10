@@ -10,7 +10,8 @@ import type { ColumnaDef, EstadoColumnas } from "./ganchos";
 
 /**
  * Menú "Columnas": casilla para ocultar, arrastrar (o flechas) para reordenar, y la densidad de las filas
- * (cómoda o compacta, para todas las tablas). Cada persona guarda lo suyo.
+ * (cómoda o compacta, para todas las tablas). Cada persona guarda lo suyo. Arriba, «Mostrar todas» y «Ocultar todas» (las que
+ * se pueden ocultar) para no marcarlas una a una; la lista se desplaza dentro del menú, sin mover la página.
  */
 export function MenuColumnas({
   columnas,
@@ -63,6 +64,10 @@ export function MenuColumnas({
     alCambiar({ orden: copia });
   }
 
+  const ocultables = estado.orden.filter((id) => porId.get(id)?.ocultable);
+  const todasVisibles = ocultables.every((id) => !estado.ocultas.has(id));
+  const todasOcultas = ocultables.every((id) => estado.ocultas.has(id));
+
   function alternarVisible(id: string) {
     const siguiente = new Set(estado.ocultas);
     if (siguiente.has(id)) siguiente.delete(id);
@@ -86,7 +91,32 @@ export function MenuColumnas({
         </button>
       </Tooltip>
       {abierto && (
-        <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-border bg-card p-1 shadow-lg">
+        <div className="absolute right-0 z-20 mt-1 flex max-h-[min(70vh,34rem)] w-60 flex-col rounded-xl border border-border bg-card p-1 shadow-lg">
+          <div className="flex items-center justify-between gap-1 border-b border-border px-1 pt-0.5 pb-1.5">
+            <span className="px-1 text-xs font-semibold text-muted-foreground">
+              {estado.orden.length - estado.ocultas.size} de {estado.orden.length} a la vista
+            </span>
+            <span className="flex gap-1">
+              <button
+                type="button"
+                disabled={todasVisibles}
+                onClick={() => alCambiar({ ocultas: [] })}
+                className={`rounded-md px-2 py-1 text-xs font-medium text-primario hover:bg-primario-suave disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
+              >
+                Mostrar todas
+              </button>
+              <button
+                type="button"
+                disabled={todasOcultas}
+                onClick={() => alCambiar({ ocultas: ocultables })}
+                className={`rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
+              >
+                Ocultar todas
+              </button>
+            </span>
+          </div>
+          {/* La lista se desplaza aquí dentro (sin arrastrar la página al llegar al final). */}
+          <div role="group" aria-label="Columnas" className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1">
           {estado.orden.map((id, indice) => {
             const columna = porId.get(id);
             if (!columna) return null;
@@ -136,7 +166,8 @@ export function MenuColumnas({
               </div>
             );
           })}
-          <div role="group" aria-label="Densidad de las filas" className="mt-1 border-t border-border p-1">
+          </div>
+          <div role="group" aria-label="Densidad de las filas" className="shrink-0 border-t border-border p-1">
             <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Densidad de las filas</p>
             <div className="flex gap-1 px-1 pb-1">
               {DENSIDADES.map(({ valor, etiqueta }) => (

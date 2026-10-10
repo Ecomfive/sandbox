@@ -5,8 +5,10 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { esCodigoBarrasValido, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
+import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
+import { descargarPublico } from "@/lib/seguridad/url-externa";
+import { primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
 import { ETIQUETA_CLASE } from "./def-producto";
 
 const MODULO = "producto";
@@ -25,9 +27,15 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   const codigo = texto(formData, "codigo");
   const tipo = texto(formData, "tipo");
   const clase = texto(formData, "clase");
-  // El código de barras es opcional: se escribe el del fabricante o se pide uno interno (no las dos cosas).
-  const barras = normalizarCodigoBarras(texto(formData, "codigo_barras"));
-  const generarBarras = texto(formData, "generar_barras") === "1";
+  // El código de barras: por defecto uno interno (lo normal es que el producto venga sin código); o el del fabricante, que se
+  // escribe; o ninguno (un compuesto). Sin `barras_origen` (otra pantalla), interno solo si se pidió con `generar_barras`.
+  const origenBarras = texto(formData, "barras_origen");
+  const barras = origenBarras === "interno" || origenBarras === "ninguno" ? "" : normalizarCodigoBarras(texto(formData, "codigo_barras"));
+  const generarBarras = origenBarras ? origenBarras === "interno" : texto(formData, "generar_barras") === "1";
+  if (origenBarras === "fabricante" && !barras) return { error: "Escribe el código de barras del fabricante (o elige uno interno)." };
+  // El interno que ya se vio en la ficha (separado al abrirla); se revisa que sea de verdad uno interno.
+  const reservado = normalizarCodigoBarras(texto(formData, "codigo_barras_interno"));
+  const internoVisto = generarBarras && esCodigoInterno(reservado) ? reservado : "";
   // Un producto que caduca se controla por lote y fecha de vencimiento; un compuesto no (sale de sus componentes).
   const manejaVencimiento = texto(formData, "maneja_vencimiento") === "1";
   const diasAvisoTexto = texto(formData, "dias_aviso_vencimiento");
@@ -36,7 +44,8 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   if (!nombre) return { error: "Escribe el nombre del producto." };
   if (nombre.length > 200) return { error: "El nombre es muy largo (máximo 200 caracteres)." };
   if (!codigo) return { error: "Escribe el SKU del producto." };
-  if (codigo.length > 60 || /\s/.test(codigo)) return { error: "El SKU no puede llevar espacios ni pasar de 60 caracteres." };
+  const errorSku = await errorDeSku(codigo, null);
+  if (errorSku) return { error: errorSku };
   if (tipo !== "simple" && tipo !== "combo") return { error: "Elige si es simple o compuesto." };
   if (clase !== "fisico" && clase !== "test") return { error: "Elige si es físico o de prueba (test)." };
   if (manejaVencimiento && tipo === "combo") return { error: "Un producto compuesto no maneja vencimiento: sale de sus componentes." };
@@ -68,7 +77,16 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
 
   const { data, error } = await supabase
     .from("skus_maestros")
-    .insert({ codigo, nombre, tipo, clase, estado: "aprobado", creado_por: usuario.id, ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : {}), ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso } : {}) })
+    .insert({
+      codigo,
+      nombre,
+      tipo,
+      clase,
+      estado: "aprobado",
+      creado_por: usuario.id,
+      ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : internoVisto ? { codigo_barras: internoVisto, codigo_barras_origen: "interno" } : {}),
+      ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso } : {}),
+    })
     .select("id")
     .single();
   if (error) {
@@ -103,7 +121,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   }
 
   // Si se pidió un código interno y no se pudo generar, el producto queda creado: se genera después desde su ficha.
-  if (generarBarras) await supabase.rpc("wms_asignar_codigo_barras_interno", { p_sku: data.id });
+  if (generarBarras && !internoVisto) await supabase.rpc("wms_asignar_codigo_barras_interno", { p_sku: data.id });
 
   await registrarAuditoria({
     accion: "crear_producto",
@@ -190,6 +208,18 @@ export async function vincularProductoASku(formData: FormData) {
   const { error } = await supabase.from("productos").update({ sku_maestro_id: skuMaestroId }).eq("id", productoId);
   if (error) throw new Error(error.message);
   revalidatePath("/productos");
+}
+
+/**
+ * Separa el siguiente código de barras interno (EAN-13 con prefijo 20) para verlo en la ficha de un producto nuevo antes de
+ * crearlo; al crear se guarda ese mismo. Si la ficha se cierra sin crear, ese número queda sin usar (no hace falta que sean
+ * seguidos).
+ */
+export async function reservarCodigoBarrasInterno(): Promise<{ codigo?: string; error?: string }> {
+  await requireModuloEscritura(MODULO);
+  const { data, error } = await createServiceClient().rpc("wms_generar_codigo_barras");
+  if (error || !data) return { error: "No se pudo generar el código de barras." };
+  return { codigo: String(data) };
 }
 
 /**
@@ -547,4 +577,104 @@ export async function guardarFotoProducto(id: string, ruta: string | null): Prom
   revalidatePath("/producto");
   revalidatePath("/inventario");
   return {};
+}
+
+/** Cambia el nombre de un producto (desde su ficha). Queda en su actividad con el nombre de antes y el nuevo. */
+export async function renombrarProducto(id: string, nombre: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const limpio = String(nombre ?? "").trim().replace(/\s+/g, " ").slice(0, 200);
+  if (!limpio) return { error: "El nombre no puede quedar vacío." };
+  const supabase = createServiceClient();
+  const { data: antes } = await supabase.from("skus_maestros").select("codigo, nombre").eq("id", id).maybeSingle();
+  if (!antes) return { error: "No se encontró el producto." };
+  if (antes.nombre === limpio) return {};
+  const { error } = await supabase.from("skus_maestros").update({ nombre: limpio }).eq("id", id);
+  if (error) return { error: "No se pudo guardar el nombre." };
+  await registrarAuditoria({ accion: "renombrar_producto", entidad: "skus_maestros", entidadId: id, antes: { Nombre: antes.nombre }, despues: { Nombre: limpio } });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return {};
+}
+
+// --- SKU ------------------------------------------------------------------------------------------------------------
+// Lo escribe la persona y no puede repetirse (sin importar mayúsculas ni espacios: lo exige también el índice único de la
+// base). Se puede corregir después desde la ficha, siempre por uno que no tenga otro producto.
+
+/** El producto que ya usa ese SKU (sin contar `excepto`), o null. */
+async function productoConSku(codigo: string, excepto: string | null): Promise<{ codigo: string; nombre: string } | null> {
+  // `ilike` sin comodines: se escapan % y _ (y la barra invertida) para que solo encuentre ese código exacto.
+  const patron = codigo.trim().replace(/[\\%_]/g, (c) => `\\${c}`);
+  const { data } = await createServiceClient().from("skus_maestros").select("id, codigo, nombre").ilike("codigo", patron);
+  return (data ?? []).find((p) => p.id !== excepto && String(p.codigo).trim().toLowerCase() === codigo.trim().toLowerCase()) ?? null;
+}
+
+/** Por qué ese SKU no sirve (vacío, con espacios, muy largo o de otro producto), o null si sirve. */
+async function errorDeSku(codigo: string, excepto: string | null): Promise<string | null> {
+  if (!codigo) return "Escribe el SKU del producto.";
+  if (codigo.length > 60 || /\s/.test(codigo)) return "El SKU no puede llevar espacios ni pasar de 60 caracteres.";
+  const otro = await productoConSku(codigo, excepto);
+  return otro ? `Ya existe un producto con el SKU ${otro.codigo}: ${otro.nombre}.` : null;
+}
+
+/** Para el campo SKU mientras se escribe: si está libre o quién lo tiene. */
+export async function revisarSku(codigo: string, excepto: string | null = null): Promise<{ error?: string }> {
+  await requireModulo(MODULO);
+  if (excepto !== null && !ES_ID(excepto)) return {};
+  const error = await errorDeSku(String(codigo ?? "").trim(), excepto);
+  return error ? { error } : {};
+}
+
+/**
+ * Corrige el SKU de un producto por uno que no exista. Las fichas de Shopify y de Dropi enlazadas toman el SKU nuevo; en las
+ * plataformas hay que cambiarlo a mano (las ventas buscan el producto por su SKU). Queda en la actividad del producto.
+ */
+export async function cambiarSkuProducto(id: string, nuevo: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const codigo = String(nuevo ?? "").trim();
+  const supabase = createServiceClient();
+  const { data: actual } = await supabase.from("skus_maestros").select("codigo").eq("id", id).maybeSingle();
+  if (!actual) return { error: "No se encontró el producto." };
+  if (actual.codigo === codigo) return {};
+  const errorSku = await errorDeSku(codigo, id);
+  if (errorSku) return { error: errorSku };
+  const { error } = await supabase.from("skus_maestros").update({ codigo }).eq("id", id);
+  if (error) return { error: error.code === "23505" ? "Ya existe un producto con ese SKU." : "No se pudo cambiar el SKU." };
+  // Las fichas de canal enlazadas guardan una copia del SKU: se actualiza.
+  await Promise.all([
+    supabase.from("wms_producto_variantes").update({ sku: codigo }).eq("sku_maestro_id", id),
+    supabase.from("wms_dropi_productos").update({ sku: codigo }).eq("sku_maestro_id", id),
+  ]);
+  await registrarAuditoria({ accion: "cambiar_sku_producto", entidad: "skus_maestros", entidadId: id, antes: { SKU: actual.codigo }, despues: { SKU: codigo } });
+  revalidatePath("/producto");
+  revalidatePath("/inventario");
+  return {};
+}
+
+/**
+ * La foto del producto desde una imagen de internet (arrastrada desde otra página a la ficha): el servidor la descarga —solo
+ * de sitios públicos, hasta 5 MB y revisando que sea de verdad una imagen— y la guarda como la foto del producto.
+ */
+export async function subirFotoProductoDesdeUrl(id: string, direccion: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const descarga = await descargarPublico(String(direccion ?? "").trim(), 5 * 1024 * 1024);
+  if ("error" in descarga) return descarga;
+  const imagen = detectarImagen(descarga.bytes.slice(0, 64));
+  if (!imagen) return { error: "Eso no es una imagen JPG, PNG, WebP o GIF." };
+  const ruta = `productos/${id}/${Date.now()}-web.${imagen.extension}`;
+  const { error } = await createServiceClient().storage.from(BUCKET_FOTOS).upload(ruta, descarga.bytes, { contentType: imagen.tipo });
+  if (error) return { error: "No se pudo guardar la imagen." };
+  return guardarFotoProducto(id, ruta);
+}
+
+/** El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. */
+export async function sugerirSkuLibre(nombre: string): Promise<{ codigo: string }> {
+  await requireModulo(MODULO);
+  const base = sugerirSku(String(nombre ?? "").slice(0, 200));
+  if (!base) return { codigo: "" };
+  const { data } = await createServiceClient().from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);
+  const usados = new Set((data ?? []).map((p) => String(p.codigo).trim().toUpperCase()));
+  return { codigo: primeroLibre(base, (c) => usados.has(c)) };
 }

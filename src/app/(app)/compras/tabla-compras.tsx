@@ -13,7 +13,8 @@ import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, Gas
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { combinarLista, type ModoLote } from "@/lib/compras/lote";
-import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta } from "./actions";
+import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta, guardarColorTienda, renombrarTienda } from "./actions";
+import { colorTiendaAutomatico, PastillaTienda, ProveedorTiendas, type GestionTiendas } from "./tiendas";
 import { BarraLoteCompras } from "./barra-lote-compras";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
 import { EtiquetasCompra, PastillaEtiqueta } from "./selector-etiquetas";
@@ -47,6 +48,8 @@ const ICONOS: Record<string, IconoComp> = {
   etapa: EstadoIcon,
   estado: EstadoIcon,
   proveedor: ProductoIcon,
+  agenteEnvio: ComprasIcon,
+  ventaImportacion: ComprasIcon,
   tienda: ComprasIcon,
   viaEnvio: ComprasIcon,
   etiquetas: EtiquetaIcon,
@@ -149,7 +152,7 @@ function columnas(
     { id: "numero", label: "N.º OC", ocultable: true, clase: "whitespace-nowrap tabular-nums text-muted-foreground", render: (c) => numeroOC(c.numero) },
     {
       id: "nombre",
-      label: "Compra",
+      label: "Orden de compra",
       ocultable: false,
       render: (c) => {
         const atrasada = estaAtrasada(c, umbral, dia);
@@ -162,7 +165,12 @@ function columnas(
                 {c.codigo && <span className="mr-1.5 font-normal text-muted-foreground">{c.codigo}</span>}
                 {tituloCompra(c)}
               </span>
-              {c.tipo === "pais" && c.productos === 0 && (
+              {c.anulada && (
+                <span className="shrink-0 rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-px text-[0.65rem] font-medium whitespace-nowrap text-destructive">
+                  Anulada
+                </span>
+              )}
+              {c.tipo === "pais" && c.productos === 0 && !c.anulada && (
                 <span className="shrink-0 rounded-full border border-warning/40 bg-warning-soft px-1.5 py-px text-[0.65rem] font-medium whitespace-nowrap text-warning">
                   Sin productos
                 </span>
@@ -200,7 +208,7 @@ function columnas(
           ),
         ),
     }),
-    col("qtyTotal", "QTY Total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
+    col("qtyTotal", "Cantidad total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
     col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.pagadoAProveedor, usd), render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("foto", "Foto", {
@@ -227,6 +235,12 @@ function columnas(
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
+    col("ventaImportacion", "Tipo de venta", {
+      ...resto,
+      clase: "whitespace-nowrap",
+      render: (c) => ed(c, "ventaImportacion", c.ventaImportacion ? <Badge tone="info">🌍 Venta de importación</Badge> : <span className="text-muted-foreground">Proveeduría</span>),
+    }),
+    col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", c.agenteEnvio || "—") }),
     col("tienda", "Tienda", {
       ...resto,
       clase: "text-muted-foreground",
@@ -236,9 +250,9 @@ function columnas(
           c,
           "tienda",
           c.tiendas.length ? (
-            <span className="flex flex-col">
+            <span className="flex flex-col items-start gap-0.5">
               {c.tiendas.map((t) => (
-                <span key={t}>{t}</span>
+                <PastillaTienda key={t} nombre={t} />
               ))}
             </span>
           ) : (
@@ -247,24 +261,8 @@ function columnas(
           edicion.tiendas,
         ),
     }),
-    col("etiquetas", "Etiquetas", {
-      ...resto,
-      render: (c) => (
-        <span className="flex min-h-6 items-center gap-1">
-          {c.etiquetas.length === 0 && <span className="text-muted-foreground">—</span>}
-          <EtiquetasCompra
-            compra={c}
-            todas={edicion.etiquetas}
-            colores={edicion.colores}
-            puedeEscribir={edicion.puedeEscribir}
-            guardar={edicion.guardar}
-            cambiarColor={edicion.cambiarColor}
-          />
-        </span>
-      ),
-    }),
     col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
-    col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "planificacion", c.planificacion || "—") }),
+    col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),
     col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.montoTotal, usd), render: (c) => ed(c, "montoTotal", usd(c.montoTotal)) }),
     col("valorUnitario", "Valor Unitario", { ...resto, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
     col("primerPago", "Primer Pago", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.primerPago, usd), render: (c) => ed(c, "primerPago", usd(c.primerPago)) }),
@@ -289,7 +287,6 @@ function columnas(
 export function TablaCompras({
   compras: comprasServidor,
   vista,
-  verImportadora = true,
   paises,
   puedeEscribir,
   puedeAgregarPais,
@@ -298,14 +295,13 @@ export function TablaCompras({
   abrirInicial = null,
   comentarioInicial = null,
   coloresEtiquetas = {},
+  coloresTiendas: coloresTiendasServidor = {},
 }: {
   compras: FilaCompra[];
   vista: string;
-  /** Si la persona puede ver Compras Importadora (países permitidos). */
-  verImportadora?: boolean;
   paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
-  /** Puede modificar Configuración: ve «＋ País» junto al selector. */
+  /** Puede modificar Configuración: agrega un país desde «Elige el país» de la compra nueva. */
   puedeAgregarPais: boolean;
   /** Filtro de un toque con que se llega (los enlaces del informe y del dashboard). */
   grupoInicial: Grupo | null;
@@ -316,6 +312,8 @@ export function TablaCompras({
   comentarioInicial?: string | null;
   /** El color elegido de cada etiqueta (por su nombre). */
   coloresEtiquetas?: Record<string, string>;
+  /** El color elegido de cada tienda (por su nombre). */
+  coloresTiendas?: Record<string, string>;
 }) {
   const { mostrarToast } = useToast();
   const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
@@ -353,13 +351,15 @@ export function TablaCompras({
       const anterior = compra[def.prop];
       const poner = (p: Partial<FilaCompra>) => setCambios((o) => ({ ...o, [compra.id]: { ...o[compra.id], ...p } }));
       poner({ [def.prop]: normalizado.valor } as Partial<FilaCompra>);
-      const resultado = await actualizarCampoCompra(compra.id, campo, normalizado.valor).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }) as { error?: string; cerradoEn?: string | null });
+      const resultado = await actualizarCampoCompra(compra.id, campo, normalizado.valor).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }) as { error?: string; cerradoEn?: string | null; planificacion?: string | null });
       if (resultado.error) {
         poner({ [def.prop]: anterior } as Partial<FilaCompra>);
         mostrarToast(resultado.error, "destructive");
         return;
       }
       if ("cerradoEn" in resultado) poner({ cerradoEn: resultado.cerradoEn ?? null });
+      // La fecha de envío y la vía mueven la planificación: se ve la que calculó el servidor.
+      if ("planificacion" in resultado) poner({ planificacion: resultado.planificacion ?? null });
       mostrarToast(`${def.etiqueta} guardado`);
     },
     [mostrarToast],
@@ -408,11 +408,14 @@ export function TablaCompras({
         mostrarToast(resultado.error, "destructive");
         return;
       }
-      const cerradas = (resultado.aplicadas ?? []).filter((a) => "cerradoEn" in a);
+      const cerradas = (resultado.aplicadas ?? []).filter((a) => "cerradoEn" in a || "planificacion" in a);
       if (cerradas.length) {
         setCambios((o) => {
           const siguiente = { ...o };
-          for (const a of cerradas) siguiente[a.id] = { ...siguiente[a.id], cerradoEn: a.cerradoEn ?? null };
+          for (const a of cerradas) {
+            if ("cerradoEn" in a) siguiente[a.id] = { ...siguiente[a.id], cerradoEn: a.cerradoEn ?? null };
+            if ("planificacion" in a) siguiente[a.id] = { ...siguiente[a.id], planificacion: a.planificacion ?? null };
+          }
           return siguiente;
         });
       }
@@ -445,27 +448,74 @@ export function TablaCompras({
   );
   // Las tiendas que ya existen en alguna compra (con lo recién creado, que se ve al instante), para elegir.
   const todasTiendas = useMemo(() => [...new Set(compras.flatMap((c) => c.tiendas))].sort((a, b) => a.localeCompare(b, "es")), [compras]);
+  // Las tiendas, como las etiquetas: su color (se ve al instante; si el servidor lo rechaza, vuelve) y su nombre, que se cambia
+  // en todas las compras a la vez.
+  const [coloresTiendas, setColoresTiendas] = useState(coloresTiendasServidor);
+  const gestionTiendas = useMemo<GestionTiendas>(
+    () => ({
+      colorDe: (nombre) => coloresTiendas[nombre] ?? colorTiendaAutomatico(nombre),
+      cambiarColor: (nombre, color) => {
+        const antes = coloresTiendas[nombre];
+        setColoresTiendas((c) => ({ ...c, [nombre]: color }));
+        void guardarColorTienda(nombre, color).then((r) => {
+          if (!r.error) return;
+          mostrarToast(r.error, "destructive");
+          setColoresTiendas((c) => {
+            const siguiente = { ...c };
+            if (antes) siguiente[nombre] = antes;
+            else delete siguiente[nombre];
+            return siguiente;
+          });
+        });
+      },
+      renombrar: async (antes, despues) => {
+        const r = await renombrarTienda(antes, despues).catch(() => ({ error: "No se pudo cambiar el nombre." }) as { error?: string; compras?: number; nombre?: string });
+        if (r.error) {
+          mostrarToast(r.error, "destructive");
+          return false;
+        }
+        const nombre = r.nombre ?? despues;
+        setCambios((o) => {
+          const siguiente = { ...o };
+          for (const c of compras) if (c.tiendas.includes(antes)) siguiente[c.id] = { ...siguiente[c.id], tiendas: [...new Set(c.tiendas.map((t) => (t === antes ? nombre : t)))] };
+          return siguiente;
+        });
+        setColoresTiendas((c) => {
+          const siguiente = { ...c };
+          if (siguiente[antes] && !siguiente[nombre]) siguiente[nombre] = siguiente[antes];
+          delete siguiente[antes];
+          return siguiente;
+        });
+        mostrarToast(`Tienda renombrada en ${r.compras ?? 0} ${r.compras === 1 ? "compra" : "compras"}`);
+        return true;
+      },
+    }),
+    [coloresTiendas, compras, mostrarToast],
+  );
   const edicion = useMemo(
     () => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, colores, cambiarColor }),
     [puedeEscribir, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
   );
 
+  // Una anulada es una descartada más (etapa Descartado, con su insignia «Anulada»): no va aparte.
+  const base = compras;
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
   const dia = hoy();
   const cols = useMemo(() => columnas(umbral, dia, edicion), [umbral, dia, edicion]);
-  const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, compras.filter((c) => enGrupo(c, r.valor, umbral)).length])), [compras, umbral]);
+  const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, base.filter((c) => enGrupo(c, r.valor, umbral)).length])), [base, umbral]);
   const filas = useMemo(
-    () => compras.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
-    [compras, rapido, etapa, umbral, soloSinProductos],
+    () => base.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
+    [base, rapido, etapa, umbral, soloSinProductos],
   );
   // El avance de vincular productos a las compras de país (las de ClickUp llegaron sin productos).
-  const dePais = compras.filter((c) => c.tipo === "pais");
+  const dePais = compras.filter((c) => c.tipo === "pais" && !c.anulada);
   const sinProductos = dePais.filter((c) => c.productos === 0);
   const resumen = elegida ? (compras.find((c) => c.id === elegida.id) ?? null) : null;
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
   return (
-    // El resumen de la derecha aparece al elegir una compra; sin elegir, la tabla usa todo el ancho.
+    <ProveedorTiendas value={gestionTiendas}>
+    {/* El resumen de la derecha aparece al elegir una compra; sin elegir, la tabla usa todo el ancho. */}
     <div className={!resumen ? "flex flex-col" : fichaMinimizada ? claseFichaMinimizada : claseConFicha}>
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtros rápidos">
@@ -511,7 +561,7 @@ export function TablaCompras({
             ) : campo === "estado" ? (
               <Badge color={colorEstado(grupo.clave)}>{grupo.etiqueta}</Badge>
             ) : campo === "etiquetas" && grupo.clave !== SIN_VALOR ? (
-              <PastillaEtiqueta nombre={grupo.etiqueta} color={colores[grupo.etiqueta]} />
+              <PastillaEtiqueta nombre={grupo.clave} color={colores[grupo.clave]} />
             ) : (
               <span className="font-semibold">{grupo.etiqueta}</span>
             )
@@ -564,13 +614,13 @@ export function TablaCompras({
           }
           accionPrincipal={
             <div className="flex items-center gap-2">
-              <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} puedeAgregarPais={puedeAgregarPais} />
-              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} />}
+              <SelectorVista vista={vista} paises={paises} />
+              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} />}
             </div>
           }
           ariaLabel="Tablero de compras"
           aspecto="lista"
-          vacio={vista === "importacion" ? "Todavía no hay compras de Importadora." : "Todavía no hay compras registradas."}
+          vacio="Todavía no hay compras registradas."
         />
       </div>
 
@@ -588,6 +638,8 @@ export function TablaCompras({
       )}
       <FichaCompra
         tiendas={todasTiendas}
+        etiquetas={todasEtiquetas}
+        colores={colores}
         compra={completa}
         orden={abierta?.orden ?? []}
         paises={paises}
@@ -597,5 +649,6 @@ export function TablaCompras({
         comentarioResaltado={abierta?.id === abrirInicial ? comentarioInicial : null}
       />
     </div>
+    </ProveedorTiendas>
   );
 }

@@ -61,8 +61,8 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos, lineasCompra] = await Promise.all([
-    supabase.from("sku_maestro_componentes").select("combo_id, cantidad, componente:componente_id(codigo)"),
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra] = await Promise.all([
+    supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)"),
     supabase
       .from("wms_producto_variantes")
       .select("sku_maestro_id, opciones, wms_productos(id, titulo, estado, paises(codigo))")
@@ -71,30 +71,55 @@ export default async function ProductoPage() {
     supabase.from("productos").select("sku_maestro_id, nombre, paises(codigo)").not("sku_maestro_id", "is", null),
     // La foto va aparte: sin la migración 0086 la columna no existe y la lista se carga igual, sin fotos.
     supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
-    traerTodasLasFilas<{ sku_maestro_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
-      supabase.from("wms_compra_items").select("sku_maestro_id, cantidad_pedida, wms_compras(paises(codigo))").order("id").range(desde, hasta),
+    // El N.º correlativo va aparte: sin la migración 0089 la columna no existe y la lista se carga igual.
+    supabase.from("skus_maestros").select("id, numero"),
+    traerTodasLasFilas<{ sku_maestro_id: string; compra_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
+      supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, anulada_en, paises(codigo))").order("id").range(desde, hasta),
     ),
   ]);
+  const numeroPorId = new Map(numeros.error ? [] : ((numeros.data ?? []) as { id: string; numero: number }[]).map((n) => [n.id, Number(n.numero)]));
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
   // Unidades compradas por producto (las líneas vinculadas en Compras); un producto con variantes suma las de sus variantes.
   const padreDe = new Map(lista.filter((p) => p.padre_id).map((p) => [p.id as string, p.padre_id as string]));
   const compradoPorId = new Map<string, number>();
+  // En qué órdenes está cada producto y la última (por su fecha de creación), para la tarjeta de la lista.
+  const ordenesPorId = new Map<string, Map<string, { numero: number; fecha: string }>>();
   for (const l of lineasCompra) {
     // Solo lo comprado en los países que la persona puede ver (migración 0087).
-    const compra = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { paises: { codigo: string } | { codigo: string }[] | null } | null;
+    const compra = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { numero: number; creado_en: string; anulada_en: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null;
+    // Una compra anulada no cuenta.
+    if (compra?.anulada_en) continue;
     const paisCompra = compra ? ((Array.isArray(compra.paises) ? compra.paises[0] : compra.paises)?.codigo ?? null) : null;
     if (!puedeVerPais(usuario.paisesPermitidos, paisCompra)) continue;
     const n = Number(l.cantidad_pedida);
-    compradoPorId.set(l.sku_maestro_id, (compradoPorId.get(l.sku_maestro_id) ?? 0) + n);
     const padre = padreDe.get(l.sku_maestro_id);
-    if (padre) compradoPorId.set(padre, (compradoPorId.get(padre) ?? 0) + n);
+    for (const id of padre ? [l.sku_maestro_id, padre] : [l.sku_maestro_id]) {
+      compradoPorId.set(id, (compradoPorId.get(id) ?? 0) + n);
+      if (compra) {
+        const m = ordenesPorId.get(id) ?? new Map<string, { numero: number; fecha: string }>();
+        m.set(l.compra_id, { numero: Number(compra.numero), fecha: compra.creado_en });
+        ordenesPorId.set(id, m);
+      }
+    }
   }
+  const comprasDe = (id: string): FilaProducto["compras"] => {
+    const ordenes = [...(ordenesPorId.get(id)?.values() ?? [])];
+    const ultima = ordenes.sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+    return { ordenes: ordenes.length, ultima: ultima ? { oc: `OC-${String(ultima.numero).padStart(4, "0")}`, fecha: ultima.fecha.slice(0, 10) } : null };
+  };
 
   const componentesPorCombo = new Map<string, string[]>();
+  const listaPorCombo = new Map<string, FilaProducto["listaComponentes"]>();
+  const nombrePorId = new Map(lista.map((p) => [p.id as string, p.nombre as string]));
   for (const fila of componentesFilas.data ?? []) {
     const componente = unoDe(fila.componente as unknown as { codigo: string } | { codigo: string }[] | null);
     if (!componente) continue;
     componentesPorCombo.set(fila.combo_id, [...(componentesPorCombo.get(fila.combo_id) ?? []), `${fila.cantidad}× ${componente.codigo}`]);
+    const idComponente = fila.componente_id as string;
+    listaPorCombo.set(fila.combo_id, [
+      ...(listaPorCombo.get(fila.combo_id) ?? []),
+      { id: idComponente, codigo: componente.codigo, nombre: nombrePorId.get(idComponente) ?? componente.codigo, foto: null, cantidad: Number(fila.cantidad) },
+    ]);
   }
 
   const asociacionesPorSku = new Map<string, Asociacion[]>();
@@ -158,9 +183,12 @@ export default async function ProductoPage() {
       paisOrigen: p.pais_origen,
       codigoSa: p.codigo_sa,
     },
+    numero: numeroPorId.get(p.id) ?? null,
     foto: fotoPorId.get(p.id) ?? null,
     unidadesCompradas: compradoPorId.get(p.id) ?? 0,
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
+    listaComponentes: p.tipo === "combo" ? (listaPorCombo.get(p.id) ?? []).map((c) => ({ ...c, foto: fotoPorId.get(c.id) ?? null })) : [],
+    compras: comprasDe(p.id),
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],
     padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre } : null,
@@ -176,7 +204,7 @@ export default async function ProductoPage() {
   const opcionesSimples = lista
     .filter((p) => p.tipo === "simple" && !variantesPorPadre.has(p.id))
     .sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }))
-    .map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre }));
+    .map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.clase, numero: numeroPorId.get(p.id) ?? null, foto: fotoPorId.get(p.id) ?? null }));
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -187,7 +215,7 @@ export default async function ProductoPage() {
       </KpiGroup>
 
       <TablaProducto
-        productos={filas}
+        productos={[...filas].sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0))}
         opcionesSimples={opcionesSimples}
         codigoPais={pais.codigo}
         puedeEscribir={!usuario.modulosSoloLectura.includes("producto")}

@@ -13,12 +13,13 @@ import { CAMPOS_EDITABLES } from "./def-edicion-compras";
 import { claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
 import { PastillaEtiqueta } from "./selector-etiquetas";
 import { PanelLista } from "./selector-lista";
+import { PastillaTienda, useTiendas } from "./tiendas";
 
 /** Lo que la barra le pide a la lista: guardar un dato en todas las compras marcadas. */
 export type AplicarEnLote = (campo: string, valor: unknown, modo?: ModoLote) => void;
 
 /** Los datos que van directo en la barra, en el orden en que se usan al armar un envío; el resto va en «Más». */
-const PRINCIPALES = ["etiquetas", "fechaLimite", "planificacion", "etapa", "estado", "viaEnvio", "proveedor", "tienda"] as const;
+const PRINCIPALES = ["etiquetas", "fechaLimite", "fechaEnvio", "etapa", "estado", "viaEnvio", "proveedor", "tienda"] as const;
 
 const ICONO: Record<string, IconoComp> = {
   etapa: EstadoIcon,
@@ -26,8 +27,9 @@ const ICONO: Record<string, IconoComp> = {
   etiquetas: EtiquetaIcon,
   viaEnvio: ComprasIcon,
   proveedor: ProductoIcon,
+  agenteEnvio: ComprasIcon,
+  ventaImportacion: ComprasIcon,
   tienda: ComprasIcon,
-  planificacion: CalendarioIcon,
   qtyTotal: ProductoIcon,
   montoTotal: GastoIcon,
   primerPago: GastoIcon,
@@ -250,6 +252,21 @@ function EditorCampoLote({
       />
     );
   }
+  if (def.tipo === "multiple" && def.unica) {
+    return (
+      <EditorOpciones
+        def={def}
+        ancla={ancla}
+        aria={aria}
+        elegidas={[]}
+        alElegir={(v) => {
+          alCerrar("elegido");
+          aplicar(campo, v[0] ? [v[0]] : []);
+        }}
+        alCerrar={alCerrar}
+      />
+    );
+  }
   if (def.tipo === "multiple") {
     return (
       <EditorOpciones
@@ -340,6 +357,7 @@ function EditorListaLote({
 }) {
   const def = CAMPOS_EDITABLES[campo];
   const listas = filas.map((f) => f[def.prop] as string[]);
+  const tiendas = useTiendas();
   return (
     <PanelLista
       ancla={ancla}
@@ -349,10 +367,24 @@ function EditorListaLote({
         const p = presenciaEnLote(listas, n);
         return p === "todas" ? "si" : p === "algunas" ? "algunas" : "no";
       }}
-      renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : undefined}
+      renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
+      gestion={campo === "tienda" ? tiendas : null}
       placeholder={campo === "etiquetas" ? "Buscar o añadir etiquetas…" : `Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
-      alAlternar={(n) => aplicar(campo, [n], presenciaEnLote(listas, n) === "todas" ? "quitar" : "agregar")}
-      alCrear={(n) => aplicar(campo, [n], "agregar")}
+      // Una sola (la tienda): elegir una la pone en todas en lugar de la que tenían (o la quita si ya la tenían todas) y cierra.
+      alAlternar={(n) => {
+        if (def.unica) {
+          alCerrar("elegido");
+          return aplicar(campo, presenciaEnLote(listas, n) === "todas" ? [] : [n], "poner");
+        }
+        aplicar(campo, [n], presenciaEnLote(listas, n) === "todas" ? "quitar" : "agregar");
+      }}
+      alCrear={(n) => {
+        if (def.unica) {
+          alCerrar("elegido");
+          return aplicar(campo, [n], "poner");
+        }
+        aplicar(campo, [n], "agregar");
+      }}
       alCerrar={alCerrar}
     />
   );

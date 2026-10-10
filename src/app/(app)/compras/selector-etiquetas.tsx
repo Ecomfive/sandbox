@@ -41,21 +41,23 @@ export const COLORES_ETIQUETA = [
   "#E5484D",
   "#D6409F",
   "#8E4EC6",
+  "#00A2C7",
+  "#A18072",
   "#8D8D8D",
   "#202020",
 ];
 
-/** Una etiqueta: con su color elegido (fondo lleno, como en ClickUp) o, si no tiene, el automático (suave). */
+/** Una etiqueta, siempre en mayúsculas: con su color elegido (fondo lleno, como en ClickUp) o, si no tiene, el automático (suave). */
 export function PastillaEtiqueta({ nombre, color }: { nombre: string; color?: string }) {
   if (color)
     return (
-      <span style={{ backgroundColor: color, color: textoLegibleSobre(color) }} className="inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-[0.68rem] font-medium whitespace-nowrap">
+      <span style={{ backgroundColor: color, color: textoLegibleSobre(color) }} className="inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-[0.68rem] font-medium tracking-wide whitespace-nowrap uppercase">
         {nombre}
       </span>
     );
   const c = colorEtiqueta(nombre);
   return (
-    <span style={{ backgroundColor: c.fondo, color: c.texto }} className="inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-[0.68rem] font-medium whitespace-nowrap">
+    <span style={{ backgroundColor: c.fondo, color: c.texto }} className="inline-flex shrink-0 items-center rounded-full px-1.5 py-px text-[0.68rem] font-medium tracking-wide whitespace-nowrap uppercase">
       {nombre}
     </span>
   );

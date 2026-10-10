@@ -9,6 +9,7 @@ import { numeroOC, type FilaCompra } from "./def-compras";
 import { CAMPOS_EDITABLES, type CampoEditable } from "./def-edicion-compras";
 import { claseCampoPanel, claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
 import { PanelLista } from "./selector-lista";
+import { PastillaTienda, useTiendas } from "./tiendas";
 
 export type GuardarCelda = (compra: FilaCompra, campo: string, valor: unknown) => void;
 
@@ -48,6 +49,7 @@ export function CeldaEditable({
   const def = CAMPOS_EDITABLES[campo];
   const [abierto, setAbierto] = useState(false);
   const boton = useRef<HTMLButtonElement>(null);
+  const tiendas = useTiendas();
 
   if (!puedeEscribir || !def || (def.soloSinProductos && compra.productos > 0)) return <>{children}</>;
 
@@ -91,9 +93,37 @@ export function CeldaEditable({
             placeholder={`Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
             alAlternar={(n) => {
               const puestas = compra[def.prop] as string[];
-              guardar(compra, campo, combinarLista(puestas, presenciaEnLote([puestas], n) === "todas" ? "quitar" : "agregar", [n]));
+              const ya = presenciaEnLote([puestas], n) === "todas";
+              // Una sola (la tienda): elegir otra la cambia y cierra; pulsar la que ya está la quita.
+              if (def.unica) {
+                cerrar("elegido");
+                return guardar(compra, campo, ya ? [] : [n]);
+              }
+              guardar(compra, campo, combinarLista(puestas, ya ? "quitar" : "agregar", [n]));
             }}
-            alCrear={(n) => guardar(compra, campo, combinarLista(compra[def.prop] as string[], "agregar", [n]))}
+            alCrear={(n) => {
+              if (def.unica) {
+                cerrar("elegido");
+                return guardar(compra, campo, [n]);
+              }
+              guardar(compra, campo, combinarLista(compra[def.prop] as string[], "agregar", [n]));
+            }}
+            alCerrar={cerrar}
+            renderOpcion={campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
+            gestion={campo === "tienda" ? tiendas : null}
+          />
+        ) : def.tipo === "multiple" && def.unica ? (
+          // Una sola opción aunque se guarde como lista (la vía de envío): elegir guarda y cierra; «Sin …» la deja vacía.
+          <EditorOpciones
+            def={def}
+            ancla={boton}
+            aria={aria}
+            elegidas={(compra[def.prop] as string[]).slice(0, 1)}
+            alElegir={(v) => {
+              cerrar("elegido");
+              const nueva = v[0] ? [v[0]] : [];
+              if (JSON.stringify(nueva) !== JSON.stringify(compra[def.prop])) guardar(compra, campo, nueva);
+            }}
             alCerrar={cerrar}
           />
         ) : def.tipo === "multiple" ? (
@@ -177,8 +207,8 @@ export function EditorOpciones({
     const base =
       def.tipo === "booleano"
         ? [
-            { valor: "si", etiqueta: "Sí" },
-            { valor: "no", etiqueta: "No" },
+            { valor: "si", etiqueta: def.siNo?.si ?? "Sí" },
+            { valor: "no", etiqueta: def.siNo?.no ?? "No" },
           ]
         : [...(def.opciones ?? [])];
     return def.admiteVacio ? [...base, { valor: "", etiqueta: `Sin ${def.etiqueta.toLowerCase()}` }] : base;

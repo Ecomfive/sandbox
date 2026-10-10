@@ -9,12 +9,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
-import { CalendarioIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
-import { EliminarCompraBoton } from "./eliminar-compra-boton";
+import { AnularCompraBoton, AvisoAnulada } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
 import { ProductosCompra } from "./productos-compra";
+import { PastillaTienda } from "./tiendas";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
@@ -75,13 +76,15 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
           </Dato>
           <Dato etiqueta="Proveedor">{compra.proveedor || SIN_DATO}</Dato>
-          <Dato etiqueta="Tienda">{compra.tiendas.length ? compra.tiendas.join(", ") : SIN_DATO}</Dato>
+          <Dato etiqueta="Agente de envío">{compra.agenteEnvio || SIN_DATO}</Dato>
+          <Dato etiqueta="Tipo de venta">{compra.ventaImportacion ? "Venta de importación" : "Proveeduría"}</Dato>
+          <Dato etiqueta="Tienda">{compra.tiendas.length ? <span className="flex flex-wrap gap-1">{compra.tiendas.map((t) => <PastillaTienda key={t} nombre={t} />)}</span> : SIN_DATO}</Dato>
           <Dato etiqueta="Persona asignada">{compra.asignadoNombre || SIN_DATO}</Dato>
         </dl>
       </Seccion>
       <Seccion icono={GastoIcon} titulo="Cantidad y pagos">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Dato etiqueta="QTY Total">{compra.qtyTotal ?? SIN_DATO}</Dato>
+          <Dato etiqueta="Cantidad total">{compra.qtyTotal ?? SIN_DATO}</Dato>
           <Dato etiqueta="Monto Total">{dinero(compra.montoTotal)}</Dato>
           <Dato etiqueta="Valor Unitario">{dinero(valorUnitario(compra))}</Dato>
           <Dato etiqueta="Primer Pago">{dinero(compra.primerPago)}</Dato>
@@ -98,23 +101,7 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
           <Dato etiqueta="Fecha de Pago (1)">{fecha(compra.fechaPago1)}</Dato>
           <Dato etiqueta="Fecha de Pago (2)">{fecha(compra.fechaPago2)}</Dato>
           <Dato etiqueta="Fecha de Envío">{fecha(compra.fechaEnvio)}</Dato>
-        </dl>
-      </Seccion>
-      <Seccion icono={EstadoIcon} titulo="Seguimiento">
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Dato etiqueta="Producto relacionado">{compra.productoRelacionado || SIN_DATO}</Dato>
-        </dl>
-        <dl className="flex flex-col gap-3">
           <Dato etiqueta="Planificación">{compra.planificacion || SIN_DATO}</Dato>
-          <Dato etiqueta="Documentos">
-            {compra.documentos ? (
-              <a href={compra.documentos} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">
-                Ver documento
-              </a>
-            ) : (
-              SIN_DATO
-            )}
-          </Dato>
         </dl>
       </Seccion>
     </div>
@@ -136,11 +123,16 @@ export function FichaCompra({
   alCerrar,
   comentarioResaltado,
   tiendas,
+  etiquetas,
+  colores,
 }: {
   /** El comentario al que lleva un aviso «Para ti» (se señala y se muestra). */
   comentarioResaltado?: string | null;
   /** Las tiendas que ya existen en otras compras, para elegir en el campo Tienda. */
   tiendas?: string[];
+  /** Las etiquetas que ya existen y sus colores, para el campo Etiquetas. */
+  etiquetas?: string[];
+  colores?: Record<string, string>;
   /** La compra que se ve; sin ella el panel está cerrado. */
   compra: FilaCompra | undefined;
   /** Las claves de las compras en el orden de la tabla. */
@@ -207,6 +199,7 @@ export function FichaCompra({
             {compra.productos === 0 && <span className="text-lg font-semibold">{compra.nombre}</span>}
             <Badge color={colorEtapa(compra.etapa)}>{etiquetaEtapa(compra.etapa)}</Badge>
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
+            {compra.anulada && <Badge tone="destructive">Anulada</Badge>}
           </>
         )
       }
@@ -219,6 +212,7 @@ export function FichaCompra({
     >
       {compra && (
         <div ref={raiz} className="flex flex-1 flex-col">
+          <AvisoAnulada compra={compra} puedeEscribir={puedeEscribir} />
           {puedeEscribir ? (
             <FormularioCompra
               key={`${compra.id}-${version}`}
@@ -226,8 +220,10 @@ export function FichaCompra({
               paises={paises}
               compra={compra}
               tiendas={tiendas}
+              etiquetas={etiquetas}
+              colores={colores}
               botonesArriba
-              acciones={<EliminarCompraBoton id={compra.id} nombre={compra.nombre} alEliminar={alCerrar} />}
+              acciones={compra.anulada ? undefined : <AnularCompraBoton id={compra.id} nombre={compra.nombre} alAnular={alCerrar} />}
               alGuardar={alGuardar}
               alCancelar={alCancelar}
               alCambiarGuardando={setGuardando}

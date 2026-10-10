@@ -1,5 +1,6 @@
 "use client";
 
+import { MapaComponentes } from "./mapa-componentes";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
@@ -16,8 +17,10 @@ import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
 import { VariantesProducto } from "./variantes-producto";
-import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
+import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FotoProducto } from "./foto-producto";
+import { NombreProducto } from "./nombre-producto";
+import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -111,6 +114,7 @@ export function FichaProducto({
       titulo={
         producto && (
           <>
+            {producto.numero !== null && <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroProducto(producto.numero)}</span>}
             <span className="text-lg font-semibold">{producto.codigo}</span>
             <Badge tone="neutral">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Badge>
             <Badge tone={TONO_CLASE[producto.clase]}>{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Badge>
@@ -135,8 +139,13 @@ export function FichaProducto({
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">
             <Seccion icono={CatalogoIcon} titulo="Producto">
               <dl className="flex flex-col gap-3">
-                <Dato etiqueta="Nombre">{producto.nombre}</Dato>
-                <Dato etiqueta="SKU">{producto.codigo}</Dato>
+                <Dato etiqueta="Nombre">
+                  <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
+                </Dato>
+                <Dato etiqueta="N.º">{numeroProducto(producto.numero)}</Dato>
+                <Dato etiqueta="SKU">
+                  <SkuProducto key={`${producto.id}-${producto.codigo}`} id={producto.id} codigo={producto.codigo} puedeEscribir={puedeEscribir} />
+                </Dato>
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
                 <Dato etiqueta="Estado">
                   {puedeEscribir ? (
@@ -176,7 +185,11 @@ export function FichaProducto({
 
             {producto.tipo === "combo" && (
               <Seccion icono={ProductoIcon} titulo="Componentes">
-                <p className="text-sm">{producto.componentes || "—"}</p>
+                {producto.listaComponentes.length ? (
+                  <MapaComponentes componentes={producto.listaComponentes} nombre={producto.nombre} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sin componentes.</p>
+                )}
               </Seccion>
             )}
 

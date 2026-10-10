@@ -38,15 +38,15 @@ export async function obtenerComprasProducto(id: string): Promise<{ compras: Com
   const ids = [id, ...(variantes ?? []).map((v) => v.id as string)];
   const { data, error } = await supabase
     .from("wms_compra_items")
-    .select("cantidad_pedida, costo_unitario, lote_numero, sku_maestro_id, skus_maestros(codigo, nombre, opciones), wms_compras(id, numero, codigo, etapa, creado_en, paises(codigo))")
+    .select("cantidad_pedida, costo_unitario, lote_numero, sku_maestro_id, skus_maestros(codigo, nombre, opciones), wms_compras(id, numero, codigo, etapa, creado_en, anulada_en, paises(codigo))")
     .in("sku_maestro_id", ids);
   if (error) return { error: "No se pudieron cargar las compras." };
   const uno = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
   const compras: CompraDeProducto[] = (data ?? [])
     .map((l) => {
-      const c = uno(l.wms_compras as unknown as { id: string; numero: number; codigo: string | null; etapa: string; creado_en: string; paises: { codigo: string } | { codigo: string }[] | null } | null);
+      const c = uno(l.wms_compras as unknown as { id: string; numero: number; codigo: string | null; etapa: string; creado_en: string; anulada_en: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null);
       const sku = uno(l.skus_maestros as unknown as { codigo: string; nombre: string; opciones: Record<string, string> | null } | null);
-      if (!c) return null;
+      if (!c || c.anulada_en) return null; // una compra anulada no cuenta en el histórico
       const unidades = Number(l.cantidad_pedida);
       const costo = l.costo_unitario === null ? null : Number(l.costo_unitario);
       return {

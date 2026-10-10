@@ -3,12 +3,11 @@
 import { useEffect, useState, useTransition } from "react";
 import { Bandera } from "@/components/paises/bandera";
 import { useToast } from "@/components/ui/toast";
-import { CLAVE_IMPORTADORA } from "@/lib/paises-permitidos";
 import { guardarPaisesUsuario, listarPaisesParaPermisos } from "./actions";
 
 /**
  * «Países» en la ficha de una persona: todos (lo de siempre) o solo los marcados. Con países limitados solo ve las compras
- * de esos países (y las de Importadora si se marca), su histórico de compras y, en la barra de arriba, esos países. Cada
+ * de esos países, su histórico de compras y, en la barra de arriba, esos países. Cada
  * cambio se guarda al instante.
  */
 export function PaisesPersona({ id, nombre, inicial }: { id: string; nombre: string; inicial: string[] | null | undefined }) {
@@ -43,7 +42,8 @@ export function PaisesPersona({ id, nombre, inicial }: { id: string; nombre: str
     guardar(actuales.includes(codigo) ? actuales.filter((c) => c !== codigo) : [...actuales, codigo]);
   };
 
-  const opciones = [...(paises ?? []), { codigo: CLAVE_IMPORTADORA, nombre: "Importadora (Compras)" }];
+  // Importadora ya no es una opción: las ventas de importación son compras de un país (migración 0094).
+  const opciones = paises ?? [];
   return (
     <section className="p-5" aria-labelledby={`paises-${id}`}>
       <h3 id={`paises-${id}`} className="mb-3 text-sm font-semibold">
@@ -73,7 +73,7 @@ export function PaisesPersona({ id, nombre, inicial }: { id: string; nombre: str
                   <li key={p.codigo}>
                     <label className="flex items-center gap-2">
                       <input type="checkbox" checked={elegidos.includes(p.codigo)} onChange={() => alternar(p.codigo)} />
-                      {p.codigo === CLAVE_IMPORTADORA ? <span aria-hidden="true">🌍</span> : <Bandera codigo={p.codigo} />}
+                      <Bandera codigo={p.codigo} />
                       {p.nombre}
                     </label>
                   </li>

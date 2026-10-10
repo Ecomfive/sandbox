@@ -9,7 +9,7 @@ import type { FilaCompra } from "./def-compras";
 export const COOKIE_VISTA_COMPRAS = "compras-vista";
 
 const COLUMNAS =
-  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, tiendas, producto_relacionado, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, documentos, via_envio, etiquetas, responsable_nombre, creador_nombre, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))";
+  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? null) : ((r as T) ?? null));
@@ -50,7 +50,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
   const paises = filtrarPaises(permitidos, (paisesBd ?? []) as DatosCompras["paises"]);
   const guardada = (await cookies()).get(COOKIE_VISTA_COMPRAS)?.value;
   const pedido = typeof ver === "string" ? ver : (guardada ?? "todos");
-  const vista = (pedido === "importacion" && verImportadora) || paises.some((p) => p.codigo === pedido) ? pedido : "todos";
+  const vista = paises.some((p) => p.codigo === pedido) ? pedido : "todos";
   const paisVista = paises.find((p) => p.codigo === vista) ?? null;
 
   let filas: Record<string, unknown>[] = [];
@@ -97,8 +97,10 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       etapa: String(c.etapa),
       estado: String(c.estado),
       proveedor: txt(c.proveedor),
+      agenteEnvio: txt(c.agente_envio),
+      ventaImportacion: c.venta_importacion === true,
+      anulada: c.anulada_en ? { en: String(c.anulada_en), por: txt(c.anulada_por), motivo: txt(c.motivo_anulacion) } : null,
       tiendas: (c.tiendas as string[] | null) ?? [],
-      productoRelacionado: txt(c.producto_relacionado),
       qtyTotal: num(c.qty_total),
       montoTotal: num(c.monto_total),
       primerPago: num(c.primer_pago),
@@ -113,7 +115,6 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       fechaEnvio: txt(c.fecha_envio),
       inconveniente: inconvenientes.get(String(c.id)) ?? null,
       planificacion: txt(c.planificacion),
-      documentos: txt(c.documentos),
       asignadoNombre: asignado ? asignado.nombre || asignado.email : txt(c.responsable_nombre),
       viaEnvio: (c.via_envio as string[] | null) ?? [],
       etiquetas: (c.etiquetas as string[] | null) ?? [],
@@ -146,6 +147,13 @@ export async function cargarEventos(ids: Set<string>): Promise<{ compraId: strin
 }
 
 /** El color elegido para cada etiqueta de Compras (por su nombre). Sin la tabla todavía (migración 0082), ninguno. */
+/** El color elegido de cada tienda (migración 0091; sin ella, todas con su color automático). */
+export async function cargarColoresTiendas(): Promise<Record<string, string>> {
+  const { data, error } = await createServiceClient().from("wms_compras_tiendas").select("nombre, color");
+  if (error) return {};
+  return Object.fromEntries((data ?? []).map((e) => [e.nombre as string, e.color as string]));
+}
+
 export async function cargarColoresEtiquetas(): Promise<Record<string, string>> {
   const { data, error } = await createServiceClient().from("wms_compras_etiquetas").select("nombre, color");
   if (error) return {};

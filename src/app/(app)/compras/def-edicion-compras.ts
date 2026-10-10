@@ -19,22 +19,35 @@ export interface CampoEditable {
   color?: (valor: string) => string | undefined;
   /** Con productos vinculados la cantidad y el monto se calculan de ellos, así que no se escriben a mano (igual que en la ficha). */
   soloSinProductos?: boolean;
+  /** En una lista guardada como lista (la vía de envío, la tienda): se elige una sola. */
+  unica?: boolean;
+  /** En un sí/no: cómo se llama cada lado («Venta de importación» / «Proveeduría»); por defecto «Sí» y «No». */
+  siNo?: { si: string; no: string };
 }
 
 /**
  * Las columnas editables de la lista, por el `id` de la columna. Quedan fuera lo que pone el sistema (N.º OC, código, creada,
  * cerrada), lo que es una fórmula (días, valor unitario), el país (mueve la compra de lista y de código), la foto y la
- * persona asignada: eso se cambia en la ficha o no se cambia. El nombre de la compra se edita en su ficha.
+ * persona asignada: eso se cambia en la ficha o no se cambia. El nombre de la compra se edita en su ficha. La planificación
+ * no se escribe: se calcula de la fecha de envío y la vía (`src/lib/compras/planificacion.ts`).
  */
 export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   etapa: { etiqueta: "Etapa", prop: "etapa", columna: "etapa", tipo: "seleccion", opciones: ETAPAS_COMPRA, color: colorEtapa },
   estado: { etiqueta: "Estado", prop: "estado", columna: "estado", tipo: "seleccion", opciones: ESTADOS_COMPRA, color: colorEstado },
-  viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO },
+  viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO, unica: true, admiteVacio: true },
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "texto" },
-  tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista" },
+  agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "texto" },
+  ventaImportacion: {
+    etiqueta: "Tipo de venta",
+    prop: "ventaImportacion",
+    columna: "venta_importacion",
+    tipo: "booleano",
+    siNo: { si: "Venta de importación", no: "Proveeduría" },
+  },
+  // Una sola tienda por orden (pedido de Hernán, 9 oct 2026); se guarda como lista por las de antes.
+  tienda: { etiqueta: "Tienda", prop: "tiendas", columna: "tiendas", tipo: "lista", unica: true },
   etiquetas: { etiqueta: "Etiquetas", prop: "etiquetas", columna: "etiquetas", tipo: "lista" },
-  planificacion: { etiqueta: "Planificación", prop: "planificacion", columna: "planificacion", tipo: "texto" },
-  qtyTotal: { etiqueta: "QTY Total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
+  qtyTotal: { etiqueta: "Cantidad total", prop: "qtyTotal", columna: "qty_total", tipo: "entero", soloSinProductos: true },
   montoTotal: { etiqueta: "Monto Total", prop: "montoTotal", columna: "monto_total", tipo: "dinero", soloSinProductos: true },
   primerPago: { etiqueta: "Primer Pago", prop: "primerPago", columna: "primer_pago", tipo: "dinero" },
   segundoPago: { etiqueta: "Segundo Pago", prop: "segundoPago", columna: "segundo_pago", tipo: "dinero" },
@@ -100,19 +113,23 @@ export function normalizarValor(def: CampoEditable, bruto: unknown): { valor: Va
       const elegidas = Array.isArray(bruto) ? bruto.map(String) : [];
       const validas = (def.opciones ?? []).map((o) => o.valor);
       if (elegidas.some((v) => !validas.includes(v))) return { error: `${def.etiqueta} no es válida.` };
+      if (def.unica && elegidas.length > 1) return { error: `Elige una sola ${def.etiqueta.toLowerCase()}.` };
       return { valor: validas.filter((v) => elegidas.includes(v)) };
     }
     case "booleano":
       return { valor: bruto === true };
-    case "lista":
-      return { valor: listaDeTexto(bruto) };
+    case "lista": {
+      const lista = listaDeTexto(bruto);
+      if (def.unica && lista.length > 1) return { error: `Elige una sola ${def.etiqueta.toLowerCase()}.` };
+      return { valor: lista };
+    }
   }
 }
 
 /** El valor como se lee en el historial de cambios («Chin», «Sí», «Marítimo, Aéreo», «—»). */
 export function textoDeValor(def: CampoEditable, valor: unknown): string {
   if (valor === null || valor === undefined || valor === "") return "—";
-  if (typeof valor === "boolean") return valor ? "Sí" : "No";
+  if (typeof valor === "boolean") return valor ? (def.siNo?.si ?? "Sí") : (def.siNo?.no ?? "No");
   if (Array.isArray(valor)) return valor.length ? valor.map((v) => def.opciones?.find((o) => o.valor === v)?.etiqueta ?? String(v)).join(", ") : "—";
   return def.opciones?.find((o) => o.valor === valor)?.etiqueta ?? String(valor);
 }

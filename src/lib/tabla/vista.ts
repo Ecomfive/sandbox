@@ -81,12 +81,14 @@ export function aplicarVista<F>(
   def: DefTabla<F>,
   filas: F[],
   filtros: Filtro[],
-  mostrarCerrados: boolean
+  mostrarCerrados: boolean,
+  /** La lupa busca en todas: abiertas y cerradas juntas, también donde el botón «Cerrados» las aísla (`exclusivo`). */
+  todas = false,
 ): ResultadoVista<F> {
   const cerrados = def.cerrados;
   const forzadoPorFiltro = !mostrarCerrados && filtroPideCerrados(def, filtros);
   const cerradosVisibles = !cerrados || mostrarCerrados || forzadoPorFiltro;
-  const base = !cerrados
+  const base = !cerrados || todas
     ? filas
     : cerrados.exclusivo
       ? filas.filter((fila) => cerrados.esCerrado(fila) === cerradosVisibles)

@@ -12,7 +12,7 @@ const claseBoton = `rounded-md border border-border bg-card px-3 py-1.5 text-xs 
 const escapar = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 
 /** Abre una ventana con la etiqueta (nombre, SKU y código de barras) y la manda a imprimir. */
-function imprimirEtiqueta(svg: string, nombre: string, sku: string) {
+export function imprimirEtiqueta(svg: string, nombre: string, sku: string) {
   const ventana = window.open("", "_blank", "width=420,height=320");
   if (!ventana) return;
   ventana.document.write(

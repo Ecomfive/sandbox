@@ -31,7 +31,9 @@ export function useTablaInteractiva<F>(
   const agrupado = vista.agrupar !== null;
 
   const resultado = useMemo(() => {
-    const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados || q !== "");
+    // Al buscar se busca en todas, abiertas y cerradas (antes, en una tabla con «Cerrados» exclusivo, buscar dejaba solo las
+    // cerradas y no se encontraba una compra abierta).
+    const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados, q !== "");
     if (!q) return r;
     const textos = def.campos.filter((c) => c.tipo === "texto");
     const coincide = (fila: F) => textos.some((c) => c.tipo === "texto" && normalizar(c.valor(fila)).includes(q));

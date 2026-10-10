@@ -148,14 +148,11 @@ export function DashboardCompras({
   compras,
   eventos,
   vista,
-  verImportadora = true,
   paises,
 }: {
   compras: FilaCompra[];
   eventos: Evento[];
   vista: string;
-  /** Si la persona puede ver Compras Importadora (países permitidos). */
-  verImportadora?: boolean;
   paises: { codigo: string; nombre: string }[];
 }) {
   const [f, setF] = useState<Filtros>(SIN_FILTROS);
@@ -255,7 +252,7 @@ export function DashboardCompras({
   return (
     <div className="graficas-neon flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
-        <SelectorVista vista={vista} paises={paises} verImportadora={verImportadora} />
+        <SelectorVista vista={vista} paises={paises} />
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           Desde
           <input type="date" value={f.desde} onChange={(e) => setF((x) => ({ ...x, desde: e.target.value }))} className={claseSelect} />

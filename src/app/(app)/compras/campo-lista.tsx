@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { combinarLista } from "@/lib/compras/lote";
 import { CerrarIcon, MasIcon } from "@/lib/nav-icons";
 import { PanelLista } from "./selector-lista";
+import type { GestionTiendas } from "./tiendas";
 
 /**
  * Una lista de nombres dentro de la ficha de una compra (la tienda): los nombres puestos como pastillas, cada una con su ✕, y
@@ -19,6 +20,9 @@ export function CampoLista({
   etiqueta,
   inicial,
   todas,
+  renderValor,
+  gestion,
+  unica = false,
 }: {
   /** El `id` del botón «Añadir» (la etiqueta del campo apunta a él). */
   id: string;
@@ -28,6 +32,12 @@ export function CampoLista({
   etiqueta: string;
   inicial: string[];
   todas: string[];
+  /** Cómo se dibuja cada nombre, en la ficha y en el panel (las etiquetas, con su color); por defecto, el texto. */
+  renderValor?: (nombre: string) => ReactNode;
+  /** Las tiendas: color y nombre editables desde el panel. */
+  gestion?: GestionTiendas | null;
+  /** Se elige uno solo (la tienda): elegir otro lo cambia y cierra el panel. */
+  unica?: boolean;
 }) {
   const [valores, setValores] = useState(inicial);
   const [abierto, setAbierto] = useState(false);
@@ -53,9 +63,30 @@ export function CampoLista({
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       {/* El valor que viaja al guardar; no se ve ni se usa con el teclado. */}
       <input ref={oculto} type="text" name={nombre} aria-label={etiqueta} defaultValue={inicial.join(", ")} tabIndex={-1} readOnly aria-hidden="true" className="sr-only" />
-      {valores.map((v) => (
-        <span key={v} className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted py-0.5 pr-1 pl-2.5 text-xs">
-          <span className="truncate">{v}</span>
+      {/* Uno solo (la tienda): todo el campo se pulsa, como la celda de la columna, y abre la lista para elegir otra. */}
+      {unica && (
+        <button
+          ref={boton}
+          id={id}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={abierto}
+          aria-label={valores[0] ? `${etiqueta}: ${valores[0]}. Pulsa para cambiarla` : `Elegir ${etiqueta}`}
+          onClick={() => setAbierto((v) => !v)}
+          className={`${fieldClass} flex min-h-9 w-full cursor-pointer items-center justify-between gap-2 text-left hover:bg-muted`}
+        >
+          {valores[0] ? (renderValor ? renderValor(valores[0]) : <span className="truncate">{valores[0]}</span>) : <span className="text-muted-foreground">Elige la {etiqueta}</span>}
+          <span aria-hidden="true" className="text-muted-foreground">
+            ▾
+          </span>
+        </button>
+      )}
+      {!unica && valores.map((v) => (
+        <span
+          key={v}
+          className={`inline-flex max-w-full items-center gap-1 rounded-full py-0.5 pr-1 text-xs ${renderValor ? "pl-0.5" : "border border-border bg-muted pl-2.5"}`}
+        >
+          {renderValor ? renderValor(v) : <span className="truncate">{v}</span>}
           <Tooltip texto={`Quitar ${v}`}>
             <button
               type="button"
@@ -68,31 +99,48 @@ export function CampoLista({
           </Tooltip>
         </span>
       ))}
-      <button
-        ref={boton}
-        id={id}
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={abierto}
-        onClick={() => setAbierto((v) => !v)}
-        className={`${fieldClass} !w-auto inline-flex min-h-8 items-center gap-1 !px-2.5 !py-1 text-xs`}
-      >
-        <MasIcon className="h-3 w-3" />
-        Añadir {etiqueta}
-      </button>
+      {!unica && (
+        <button
+          ref={boton}
+          id={id}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={abierto}
+          onClick={() => setAbierto((v) => !v)}
+          className={`${fieldClass} !w-auto inline-flex min-h-8 items-center gap-1 !px-2.5 !py-1 text-xs`}
+        >
+          <MasIcon className="h-3 w-3" />
+          Añadir {etiqueta}
+        </button>
+      )}
       {abierto && (
         <PanelLista
           ancla={boton}
           etiqueta={`Elegir ${etiqueta}`}
           opciones={[...todas, ...valores]}
           marca={(n) => (hay(n) ? "si" : "no")}
+          renderOpcion={renderValor}
           placeholder={`Buscar o añadir ${etiqueta}…`}
-          alAlternar={(n) => setValores((a) => combinarLista(a, hay(n) ? "quitar" : "agregar", [n]))}
-          alCrear={(n) => setValores((a) => combinarLista(a, "agregar", [n]))}
+          alAlternar={(n) => {
+            if (unica) {
+              setValores((a) => (a.some((v) => v.toLowerCase() === n.toLowerCase()) ? [] : [n]));
+              return setAbierto(false);
+            }
+            setValores((a) => combinarLista(a, hay(n) ? "quitar" : "agregar", [n]));
+          }}
+          alCrear={(n) => {
+            if (unica) {
+              setValores([n]);
+              return setAbierto(false);
+            }
+            setValores((a) => combinarLista(a, "agregar", [n]));
+          }}
           alCerrar={(m) => {
             setAbierto(false);
             if (m === "escape") boton.current?.focus();
           }}
+          gestion={gestion}
+          alRenombrado={(antes, despues) => setValores((a) => (a.includes(antes) ? combinarLista(a.filter((x) => x !== antes), "agregar", [despues]) : a))}
         />
       )}
     </div>

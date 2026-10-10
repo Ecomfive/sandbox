@@ -1,5 +1,6 @@
 "use client";
 
+import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
@@ -8,8 +9,10 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearProductoPanel } from "./crear-producto-panel";
-import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, TONO_CLASE, type FilaProducto } from "./def-producto";
+import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
 import { FichaProducto } from "./ficha-producto";
+import { VistaRapidaProducto } from "./vista-rapida-producto";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
@@ -26,9 +29,20 @@ const ICONOS: Record<string, IconoComp> = {
 };
 
 const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
-  { id: "codigo", label: "SKU", ocultable: false, clase: "font-medium", render: (p) => p.codigo },
+  { id: "numero", label: "N.º", ocultable: false, clase: "tabular-nums text-muted-foreground whitespace-nowrap", render: (p) => numeroProducto(p.numero) },
+  { id: "codigo", label: "SKU", ocultable: true, clase: "font-medium", render: (p) => p.codigo },
   { id: "foto", label: "Foto", ocultable: true, render: (p) => <MiniaturaFoto url={p.foto} nombre={p.nombre} /> },
-  { id: "nombre", label: "Producto", ocultable: true, render: (p) => p.nombre },
+  {
+    id: "nombre",
+    label: "Producto",
+    ocultable: true,
+    // Al pasar el cursor: el mapa de un compuesto, o la foto grande y las compras de un producto simple.
+    render: (p) => (
+      <TarjetaEmergente ancho={p.tipo === "combo" ? "34rem" : "17rem"} contenido={<VistaRapidaProducto producto={p} />}>
+        <span className="cursor-default underline decoration-dotted decoration-border-control underline-offset-4">{p.nombre}</span>
+      </TarjetaEmergente>
+    ),
+  },
   { id: "tipo", label: "Tipo", ocultable: true, clase: "text-muted-foreground", render: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
   { id: "clase", label: "Estado", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },
   { id: "barras", label: "Código de barras", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.codigoBarras ?? "—" },
@@ -56,7 +70,7 @@ export function TablaProducto({
   puedeEscribir,
 }: {
   productos: FilaProducto[];
-  opcionesSimples: { id: string; codigo: string; nombre: string }[];
+  opcionesSimples: OpcionSkuMaestro[];
   codigoPais: string;
   puedeEscribir: boolean;
 }) {
@@ -76,7 +90,7 @@ export function TablaProducto({
         anchoMinimo="48rem"
         accionPrincipal={puedeEscribir ? <CrearProductoPanel opcionesSimples={opcionesSimples} /> : undefined}
         abrirFila={{
-          etiqueta: (p) => `Abrir la ficha del producto ${p.codigo}`,
+          etiqueta: (p) => `Abrir la ficha del producto ${p.codigo} (${numeroProducto(p.numero)})`,
           alAbrir: (p, orden) => setAbierto({ id: p.id, orden }),
         }}
         ariaLabel="Productos"
