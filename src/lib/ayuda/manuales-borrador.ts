@@ -10,7 +10,7 @@ export const MANUALES_BORRADOR: { titulo: string; modulos: string[]; contenido: 
 - Ten la cotización del proveedor: unidades, costo total, incoterm y vía de envío.
 
 ## Crear la compra
-1. Compras › «Agregar». Elige el país (o Importadora si es para un cliente).
+1. Compras › «Agregar». Elige el país (si es para un cliente, marca el Tipo de venta «Venta de importación»).
 2. Escribe el nombre. El código ECOM se asigna solo.
 3. Abre la ficha y, en «Productos», agrega cada producto o variante con sus unidades y el costo total de la cotización.
 4. Etapa: 02 Cotizar mientras se negocia; 06 Compra y Pago al pagar.
@@ -50,7 +50,7 @@ Vincular cada compra con su producto alimenta el histórico de compras: unidades
 ## Cómo
 1. En Compras, usa el filtro rápido «Sin productos».
 2. Abre una compra y, en «Productos», busca el producto (por variante si tiene).
-3. Unidades: la QTY Total de la compra. Costo: el monto total que dice la descripción de la compra.
+3. Unidades: la Cantidad total de la compra. Costo: el monto total que dice la descripción de la compra.
 4. Si no estás seguro de qué producto es, compara la foto y el nombre; ante la duda, déjala sin vincular y coméntala.
 
 ## Notas

@@ -75,6 +75,7 @@ export const CURSOS: Curso[] = [
         parrafos: [
           "Cada producto vive una sola vez en el sistema y vale para todos los países: el mismo SKU, el mismo código de barras y la misma foto. El SKU es la llave con la que una venta de Dropi o Shopify encuentra el producto para descontar inventario, así que debe ser igual en todas las plataformas.",
           "Un producto puede ser simple (se compra y se guarda tal cual) o compuesto (una combinación de simples con su cantidad: no guarda stock y al venderlo se descuenta cada componente).",
+          "Al crear un compuesto, cada componente se busca como en una orden de compra (foto, SKU, nombre y N.º) y se ve el mapa de cómo se arma. En la lista, al pasar el cursor por el nombre, un compuesto muestra su mapa y un simple su foto grande y sus compras.",
         ],
       },
       {
@@ -112,6 +113,7 @@ export const CURSOS: Curso[] = [
         parrafos: [
           "Cada compra a un proveedor es una orden con su N.º OC (OC-0001…) y el código de su país (ECOM01 Panamá, ECOM03 Costa Rica…), que se asigna solo al crearla. Una venta de importación (para un cliente) es una compra de un país con el «Tipo de venta» en «Venta de importación» (si no, es de Proveeduría).",
           "Arriba de la lista eliges qué ver: todos los países o uno. La lista arranca agrupada por etapa.",
+          "Cada orden lleva una sola Vía de envío (marítimo, aéreo o terrestre), una sola Tienda y su Agente de envío (quien la trae: Chin, Avery…). Con la vía, el país y la fecha de envío se calcula su Planificación.",
         ],
       },
       {
@@ -138,7 +140,15 @@ export const CURSOS: Curso[] = [
         titulo: "Editar rápido y comentar",
         parrafos: [
           "Pulsa una celda para editarla en un panel pequeño; para cambiar varias compras a la vez, márcalas y usa la barra de abajo.",
-          "Comenta con @ para avisar a alguien, pega capturas o adjunta PDF. Para marcar una falla, empieza el comentario con «Inconveniente:». Todo cambio queda en la Actividad con su autor y hora.",
+          "La Actividad, al final de la ficha, junta comentarios, cambios y archivos en orden de tiempo (filtro Todo / Comentarios / Cambios). Comenta con @ para avisar a alguien, pega capturas o adjunta PDF, Excel, Word o CSV. Para marcar una falla, empieza el comentario con «Inconveniente:».",
+          "Debajo de cada comentario puedes darle 👍, reaccionar con un emoji o «Responder» (le avisa a quien lo escribió). Tus propios comentarios se pueden «Editar» y quedan marcados «(editado)».",
+        ],
+      },
+      {
+        titulo: "Anular y Envíos",
+        parrafos: [
+          "Una compra no se borra: «Anular» pide el motivo y la pasa a la etapa Descartado con la insignia «Anulada», conservando su código y su historial. «Restaurar» la devuelve a la etapa que tenía.",
+          "En la pestaña Envíos ves, por país, cada agente y vía: lo que promete, lo que de verdad tarda (histórico, últimos 12 meses y últimos 2 meses) y su tarifa por CBM o kg; ahí activas o desactivas cada ruta.",
         ],
       },
     ],
@@ -147,6 +157,8 @@ export const CURSOS: Curso[] = [
       { pregunta: "¿De dónde salen la Cantidad total y el Monto Total de una compra con productos?", opciones: ["Se escriben a mano", "De sus productos vinculados", "De la descripción"], correcta: 1 },
       { pregunta: "¿Cómo marcas una falla de una compra?", opciones: ["Con un comentario que empiece con «Inconveniente:»", "Cambiando la etapa a Descartado", "Con una etiqueta roja"], correcta: 0 },
       { pregunta: "¿Cómo se pone la Planificación de una compra?", opciones: ["Se escribe a mano el mes", "Se calcula sola con la fecha de envío y lo que tardan los envíos de su país por esa vía", "Es el mes en que se creó la compra"], correcta: 1 },
+      { pregunta: "Una compra se pidió por error. ¿Qué haces?", opciones: ["La elimino para que no quede rastro", "La anulo con su motivo: pasa a Descartado y se puede restaurar", "Le cambio el nombre"], correcta: 1 },
+      { pregunta: "Escribiste mal un comentario tuyo. ¿Qué haces?", opciones: ["Pulso «Editar» en mi comentario y lo corrijo: queda marcado «(editado)»", "Pido a otra persona que lo borre", "No se puede cambiar"], correcta: 0 },
       { pregunta: "¿Cómo marcas una venta de importación (para un cliente)?", opciones: ["Eligiendo el país Importadora", "Con su «Tipo de venta»: Venta de importación", "Con una etiqueta"], correcta: 1 },
     ],
   },
