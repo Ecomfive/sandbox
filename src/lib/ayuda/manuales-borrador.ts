@@ -13,7 +13,7 @@ export const MANUALES_BORRADOR: { titulo: string; modulos: string[]; contenido: 
 1. Compras › «Agregar». Elige el país (o Importadora si es para un cliente).
 2. Escribe el nombre. El código ECOM se asigna solo.
 3. Abre la ficha y, en «Productos», agrega cada producto o variante con sus unidades y el costo total de la cotización.
-4. Etapa: 02 Cotizar mientras se negocia; 06 Compra y Pago al pagar.
+4. Etapa: 01 Cotizar mientras se negocia; 04 Tracking al pagar.
 
 ## Seguimiento
 1. Registra los pagos (Primer y Segundo Pago, Pagado a Proveedor) y sus fechas.

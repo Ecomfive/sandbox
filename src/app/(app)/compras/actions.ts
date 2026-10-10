@@ -231,7 +231,6 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   if (sinAcceso) return { error: sinAcceso };
 
   if (!nombre) return { error: "Escribe el nombre de la compra." };
-  if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   if (!ES_ID(id)) return { error: "Compra no válida." };
@@ -241,6 +240,8 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   const supabase = createServiceClient();
   const { data: actualCompleta } = await supabase.from("wms_compras").select("*").eq("id", id).single();
   const actual = actualCompleta as Record<string, unknown> & { foto_url: string | null; etapa: string; estado: string } | null;
+  // Una compra que sigue en una etapa que ya no se elige (la migración 0089 las mueve) puede guardarse sin cambiarla.
+  if (!ETAPAS_VALIDAS.has(etapa) && etapa !== actual?.etapa) return { error: "Elige una etapa válida." };
   const { qty_total, monto_total, ...resto } = leerCambios(formData);
   // Con productos vinculados, la cantidad y el monto los calcula el bloque «Productos»: el formulario no los pisa.
   const { count: lineas } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);

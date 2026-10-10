@@ -44,7 +44,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "FEFO", definicion: "«Primero en vencer, primero en salir»: una salida sin lote toma primero el lote que vence antes y nunca uno vencido.", modulos: ["inventario"] },
   { termino: "Orden de compra (OC)", definicion: "Cada compra a un proveedor. Tiene su N.º OC (OC-0001…) y su código del país (ECOM01-0450).", modulos: ["compras"] },
   { termino: "Código ECOM", definicion: "El correlativo de las compras de cada país: ECOM01 Panamá, ECOM02 México, ECOM03 Costa Rica… Se asigna solo al crear la compra.", modulos: ["compras"] },
-  { termino: "Etapa", definicion: "En qué paso va una compra: Backlog, 01 Solicitud Internacional, 02 Cotizar… hasta 11 Completado (o Descartado). De ella salen los tiempos.", modulos: ["compras"] },
+  { termino: "Etapa", definicion: "En qué paso va una compra: Backlog, 01 Cotizar, 02 Cotizado… hasta 06 Completado (o Descartado). De ella salen los tiempos.", modulos: ["compras"] },
   { termino: "Estado", definicion: "El semáforo de gestión de una compra (Pendiente, En Gestión, En Revisión, Completado…). Es distinto de la etapa: la compra se archiva cuando el Estado es Completado.", modulos: ["compras"] },
   { termino: "Compras Importadora", definicion: "Un servicio a un cliente que nos pide mercancía de cualquier parte: no es nuestra, no lleva país y nunca se mezcla con las compras de un país.", modulos: ["compras"] },
   { termino: "Vincular productos", definicion: "Agregar a una compra los productos del sistema que se compraron, con unidades y costo. Así se suma el histórico de cada producto.", modulos: ["compras", "producto"] },

@@ -695,7 +695,7 @@ convenciones técnicas del código.
   página pide a su servidor, con la hora en ms), quedó en la conversación como bloques `@@ACT@@`;
   `scripts/extraer-etapas-transcripcion.mjs <conversación.jsonl>` arma `datos-privados/clickup-etapas.json` y
   `scripts/importar-etapas-actividad.ts --aplicar` lo carga (`origen` «clickup_actividad», rehace los suyos). Lo anterior al
-  traspaso del 14 jul 2025 (todo a «12 - Completado», hoy «11 - Completado»: «Solicitud Local» se quitó el 6 oct 2026 y las etapas se renumeraron, mismas claves) es del campo «Etapa» viejo, con otra numeración (06 compra y pago,
+  traspaso del 14 jul 2025 (todo a «12 - Completado», hoy «06 - Completado»: «Solicitud Local» se quitó el 6 oct 2026 y, el 10 oct 2026, Solicitud Internacional, Evaluación de Proveedor, Solicitud a Proveedor, Compra y Pago y Aviso Logística; las etapas se renumeraron, mismas claves, y la migración 0089 mueve las compras que siguieran en una quitada: ficha y Actividad las siguen leyendo como «… (ya no se usa)») es del campo «Etapa» viejo, con otra numeración (06 compra y pago,
   07 En China, 08 tracking, 10 completado); el traspaso no cuenta como cambio. Cargado el 7 oct 2026: 5.259 cambios de
   1.196 compras. **Países:** se agregan desde Configuración (sección Países) o con «＋ País» junto al
   selector de Compras (`crearPais`, `src/lib/paises-actions.ts`; pide poder modificar Configuración). El selector de país de la
