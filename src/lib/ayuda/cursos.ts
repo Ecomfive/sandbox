@@ -119,7 +119,7 @@ export const CURSOS: Curso[] = [
       {
         titulo: "Etapa y Estado",
         parrafos: [
-          "La Etapa dice en qué paso va la compra: Backlog, 01 Solicitud Internacional, 02 Cotizar, 03 Cotizado… hasta 11 Completado o Descartado. De los cambios de etapa salen los tiempos y las alertas de atraso.",
+          "La Etapa dice en qué paso va la compra: Backlog, 01 Cotizar, 02 Cotizado… hasta 06 Completado o Descartado. De los cambios de etapa salen los tiempos y las alertas de atraso.",
           "El Estado es el semáforo de gestión (Pendiente, En Gestión, En Revisión, Completado…). Una compra se archiva —pasa a «Cerrados»— cuando su Estado es Completado, aunque la mercancía ya haya llegado antes.",
         ],
       },

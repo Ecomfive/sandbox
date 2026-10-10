@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, subirFotoCompraDesdeUrl, vistaPreviaCompra } from "./actions";
@@ -8,7 +8,7 @@ import { PastillaTienda, useTiendas } from "./tiendas";
 import { useRouter } from "next/navigation";
 import { PlanificacionAutomatica } from "./planificacion-automatica";
 import { useToast } from "@/components/ui/toast";
-import { conEmoji, ESTADOS_COMPRA, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
+import { conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { CampoFoto } from "@/components/ui/campo-foto";
@@ -315,7 +315,7 @@ export function FormularioCompra({
                 name="etapa"
                 required
                 aria-invalid={invalido("campo-etapa")}
-                defaultValue={compra?.etapa ?? "solicitud_internacional"}
+                defaultValue={compra?.etapa ?? "cotizar"}
                 className={fieldClass}
               >
                 {ETAPAS_COMPRA.map((e) => (
@@ -323,6 +323,9 @@ export function FormularioCompra({
                     {e.etiqueta}
                   </option>
                 ))}
+                {compra && !ETAPAS_COMPRA.some((e) => e.valor === compra.etapa) && (
+                  <option value={compra.etapa}>{etiquetaEtapa(compra.etapa)}</option>
+                )}
               </select>
             </Campo>
             <Campo etiqueta={conEmoji("estado", "Estado")} id="campo-estado" obligatorio faltante={faltante}>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { anilloFoco } from "@/components/ui/field";
@@ -40,7 +40,7 @@ type Item =
   | { tipo: "archivo"; fecha: string; a: Datos["adjuntos"][number] };
 
 /**
- * Un cambio de la actividad, como en ClickUp: «Etapa: [02 - Cotizar] → [08 - Tracking]», con la etiqueta de cada valor en su
+ * Un cambio de la actividad, como en ClickUp: «Etapa: [01 - Cotizar] → [04 - Tracking]», con la etiqueta de cada valor en su
  * color (etapa y estado); otro campo, en texto.
  */
 function CambioEvento({ e }: { e: Datos["eventos"][number] }) {
