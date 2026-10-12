@@ -50,7 +50,7 @@ const AREAS: NavSection[] = [
     panel: "Marketing y ventas",
     frentes: true,
     items: [
-      { label: "Productos Test", href: "/productos-test", frente: "proveeduria" },
+      { label: "Test productos", href: "/productos-test", frente: "proveeduria" },
       { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria" },
     ],
   },

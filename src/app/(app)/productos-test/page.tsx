@@ -6,7 +6,7 @@ import { requireModulo } from "@/lib/auth";
 import { obtenerProductosTest } from "./datos-test";
 import { InformeTest } from "./informe-test";
 
-export const metadata = { title: "Productos Test" };
+export const metadata = { title: "Test productos" };
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export default async function InformeProductosTestPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo={`Productos Test ${pais.codigo}`} oculto />
+      <EncabezadoPagina titulo={`Test productos ${pais.codigo}`} oculto />
       <InformeTest productos={productos} codigoPais={pais.codigo} />
     </Pagina>
   );

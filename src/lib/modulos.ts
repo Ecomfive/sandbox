@@ -23,7 +23,7 @@ export const MODULOS: Modulo[] = [
   { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi (WMS)" },
   { clave: "compras", etiqueta: "Compras (WMS)" },
   { clave: "filtro-productos", etiqueta: "Filtro de productos" },
-  { clave: "productos-test", etiqueta: "Productos Test (WMS)" },
+  { clave: "productos-test", etiqueta: "Test productos (WMS)" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
   { clave: "configuracion", etiqueta: "Configuración del sistema" },
   { clave: "notificaciones", etiqueta: "Centro de notificaciones" },

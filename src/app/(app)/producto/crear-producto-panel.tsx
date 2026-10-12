@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
@@ -22,7 +22,21 @@ import { EnvioIcon } from "@/lib/nav-icons";
  * botones de opción, como la vía de envío de una compra. El SKU se sugiere solo mientras se escribe el nombre. El SKU es obligatorio: con él una venta de Dropi
  * o de una tienda de Shopify encuentra el producto para descontar el inventario.
  */
-export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: OpcionSkuMaestro[] }) {
+export function CrearProductoPanel({
+  opcionesSimples,
+  action = crearProducto,
+  mensajeExito = "Producto creado",
+  ocultos,
+  boton,
+}: {
+  opcionesSimples: OpcionSkuMaestro[];
+  /** Otra acción que crea el producto y hace algo más (Test productos lo agrega además a su lista). */
+  action?: (formData: FormData) => Promise<{ error?: string } | void>;
+  mensajeExito?: string;
+  ocultos?: Record<string, string>;
+  /** Otro botón que abre la ficha en vez de «Agregar». */
+  boton?: (abrir: () => void) => ReactNode;
+}) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
   // El código de barras (decisión de Hernán, 8 oct 2026): lo normal es que el producto venga sin código, así que viene marcado
@@ -75,8 +89,10 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
     <FichaCrear
       titulo="Nuevo producto"
       etiquetaCrear="Crear producto"
-      action={crearProducto}
-      mensajeExito="Producto creado"
+      action={action}
+      mensajeExito={mensajeExito}
+      ocultos={ocultos}
+      boton={boton}
       alAbrir={() => {
         setTipo("simple");
         setNombre("");

@@ -24,7 +24,7 @@ const texto = (formData: FormData, campo: string) => String(formData.get(campo) 
  * importar mayúsculas ni espacios. Un compuesto se arma con productos simples. Devuelve el error como valor, porque en
  * producción Next.js oculta el mensaje de una excepción de una acción.
  */
-export async function crearProducto(formData: FormData): Promise<{ error?: string }> {
+export async function crearProducto(formData: FormData): Promise<{ error?: string; id?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   const nombre = texto(formData, "nombre");
   const codigo = texto(formData, "codigo");
@@ -164,7 +164,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");
-  return {};
+  return { id: data.id as string };
 }
 
 /**

@@ -179,10 +179,10 @@ export const GUIAS: GuiaModulo[] = [
   },
   {
     modulo: "productos-test",
-    titulo: "Productos Test",
+    titulo: "Test productos",
     ruta: "/productos-test",
     resumen: "Los productos que se prueban en marketing y cuáles resultaron winners.",
-    secciones: [{ titulo: "Uso", pasos: ["Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Arriba de la lista: Total en test, Winners, En consulta, Fallidos, Otros estados y Sin vincular, cada uno con su número (púlsalos para filtrar), y cuántos faltan por vincular a Producto.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto."] }],
+    secciones: [{ titulo: "Uso", pasos: ["Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Arriba de la lista: Total en test, Winners, En consulta, Fallidos, Otros estados y Sin vincular, cada uno con su número (púlsalos para filtrar), y cuántos faltan por vincular a Producto.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto.", "Si el producto todavía no existe, «Nuevo producto» abre la misma ficha de Producto (estado, tipo, foto, SKU, código de barras, envío…): se crea en Producto y queda en esta lista ya vinculado. Hace falta poder modificar Producto."] }],
   },
   {
     modulo: "filtro-productos",
@@ -244,6 +244,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-12", titulo: "Test productos: nombre nuevo y «Nuevo producto»", texto: "Productos Test ahora se llama Test productos. Su lista trae «Nuevo producto», con la misma ficha de Producto: el producto se crea en Producto y queda en Test productos ya vinculado.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Resumen en Productos Test", texto: "La lista de Productos Test muestra arriba el total en test, los winners y los que faltan por vincular a Producto, con su número y como filtro de un toque.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Productos Test vinculados a Producto", texto: "Al agregar un producto en prueba lo eliges de los que ya existen en Producto, con el mismo buscador de la orden de compra; el nombre se llena solo.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Elige cuántas filas ver por página", texto: "En el pie de las tablas con varias páginas (Compras, Retiros, Pedidos…) está «Filas por página»: 50, 100, 500 o Todas. Se recuerda para ti en todas las tablas. Con Todas ves toda la lista en una sola página, como en un tablero de ClickUp.", modulo: "compras", href: "/compras/lista" },

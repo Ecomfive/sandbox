@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { ESTADOS, NIVELES_EXPLOTACION, TEST_NUMEROS } from "./def-productos-test";
+import { crearProducto } from "../producto/actions";
 
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
 const TEST_NUMEROS_VALIDOS: Set<string> = new Set(TEST_NUMEROS.map((t) => t.valor));
@@ -114,4 +115,30 @@ export async function eliminarProductoTest(formData: FormData) {
 
   await registrarAuditoria({ accion: "eliminar_producto_test", entidad: "wms_productos_test", entidadId: id, detalle: nombre });
   revalidatePath("/productos-test");
+}
+
+/**
+ * «Nuevo producto» de Test productos: crea el producto en Producto con la misma ficha (y las mismas reglas: `crearProducto`
+ * pide poder modificar Producto) y lo agrega a la lista de Test productos del país, ya vinculado y con fecha de hoy.
+ */
+export async function crearProductoNuevoEnTest(formData: FormData): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("productos-test");
+  const pais_id = String(formData.get("pais_id") ?? "");
+  if (!/^[0-9a-fA-F-]{36}$/.test(pais_id)) return { error: "País no válido." };
+  const creado = await crearProducto(formData);
+  if (creado.error || !creado.id) return { error: creado.error ?? "No se pudo crear el producto." };
+
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("wms_productos_test")
+    .insert({ pais_id, nombre, estado: "pendiente", creado_por: usuario.id, sku_maestro_id: creado.id, fecha_creacion: hoy })
+    .select("id")
+    .single();
+  if (error) return { error: "El producto se creó en Producto, pero no se pudo agregar a Test productos: agrégalo con «Agregar»." };
+
+  await registrarAuditoria({ accion: "crear_producto_test", entidad: "wms_productos_test", entidadId: data.id, detalle: `${nombre} (nuevo en Producto)` });
+  revalidatePath("/productos-test");
+  return {};
 }

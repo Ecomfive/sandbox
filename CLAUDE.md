@@ -303,7 +303,7 @@ convenciones técnicas del código.
   día, semana o mes según `fecha_test`, con indicadores, gráfica (pulsar una barra elige el periodo), winners vs
   fallidos, categorías, winners y «Para revisar», y el botón «Copiar informe» (`textoInforme`). **Productos**
   (`lista-productos-test.tsx`): búsqueda, filtros, orden por columna y ficha fija a la derecha
-  (`ficha-lateral-test.tsx`); «Editar producto» y «Agregar» siguen usando la ficha y el formulario de siempre.
+  (`ficha-lateral-test.tsx`); «Editar producto» y «Agregar» siguen usando la ficha y el formulario de siempre (en «Agregar» se elige el producto de Producto, `sku_maestro_id`, migración 0099). **Se llama «Test productos»** en el menú y los títulos (12 oct 2026; la ruta y el módulo siguen siendo `productos-test`). **«Nuevo producto»** abre la misma ficha de Producto (`CrearProductoPanel` con `action={crearProductoNuevoEnTest}`, `boton` y `ocultos` con el país): `crearProducto` (que ahora devuelve el `id`) lo crea en Producto y la acción lo agrega a `wms_productos_test` ya vinculado; solo se ofrece a quien puede modificar Producto y Test productos.
   Los datos salen de `wms_productos_test` (`datos-test.ts`, hasta 1 000 filas) y las sumas se hacen en el navegador
   con esas filas: si la tabla crece mucho, pasarlas a Postgres. El criterio de winner es **solo el CPA menor a $4**
   (`CPA_OBJETIVO` en `informe.ts`, confirmado por el equipo; no hay mínimo de compras) y **no está guardado en la base**.

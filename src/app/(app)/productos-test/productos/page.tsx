@@ -29,7 +29,16 @@ export default async function ProductosEnTestPage({
       <EncabezadoPagina titulo="Productos" oculto />
       {/* Los productos de Producto, para elegir el de cada producto en prueba (el buscador de la orden de compra). */}
       <ProveedorSkusMaestros opciones={opcionesProducto}>
-        <ListaProductosTest key={buscarInicial} buscarInicial={buscarInicial} productos={productos} paisId={pais.id} puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")} />
+        <ListaProductosTest
+          key={buscarInicial}
+          buscarInicial={buscarInicial}
+          productos={productos}
+          paisId={pais.id}
+          puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")}
+          // «Nuevo producto» crea en Producto: hace falta poder modificarlo.
+          puedeCrearProducto={usuario.modulos.includes("producto") && !usuario.modulosSoloLectura.includes("producto")}
+          opcionesSimples={opcionesProducto}
+        />
       </ProveedorSkusMaestros>
     </Pagina>
   );
