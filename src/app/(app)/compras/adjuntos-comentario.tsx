@@ -105,7 +105,27 @@ export function useAdjuntosPendientes(compraId: string) {
 
   const listos: AdjuntoSubido[] = pendientes.filter((p) => p.estado === "listo" && p.ruta).map((p) => ({ ruta: p.ruta!, nombre: p.nombre }));
   const subiendo = pendientes.some((p) => p.estado === "subiendo");
-  return { pendientes, agregar, quitar, vaciar, listos, subiendo, lleno: pendientes.length >= MAX_ADJUNTOS_COMENTARIO };
+
+  // Tras elegir archivos con el botón «Adjuntar», el foco se queda en ese botón y un Enter volvería a abrir el selector. En
+  // cuanto terminan de subir pasa al botón de enviar (`botonEnvio`), para que Enter comente. Pegar o soltar una imagen no
+  // mueve el foco: la persona sigue escribiendo.
+  const botonEnvio = useRef<HTMLButtonElement>(null);
+  const foco = useRef(false);
+  const agregarDesdeBoton = useCallback(
+    (archivos: File[]) => {
+      foco.current = archivos.length > 0;
+      agregar(archivos);
+    },
+    [agregar],
+  );
+  useEffect(() => {
+    if (!foco.current || subiendo || pendientes.length === 0) return;
+    foco.current = false;
+    // El botón sigue deshabilitado hasta el siguiente pintado, así que el foco se pide después de él.
+    requestAnimationFrame(() => botonEnvio.current?.focus());
+  }, [subiendo, pendientes]);
+
+  return { pendientes, agregar, agregarDesdeBoton, botonEnvio, quitar, vaciar, listos, subiendo, lleno: pendientes.length >= MAX_ADJUNTOS_COMENTARIO };
 }
 
 /** Las imágenes que se pegan (una captura con Ctrl+V) o se sueltan sobre el campo del comentario. */

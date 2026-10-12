@@ -302,8 +302,9 @@ export function ActividadCompra({ id, puedeComentar = true, comentarioResaltado 
             />
             <TiraPendientes pendientes={adjuntos.pendientes} alQuitar={adjuntos.quitar} />
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <BotonAdjuntar alElegir={adjuntos.agregar} deshabilitado={pendiente || adjuntos.lleno} />
+              <BotonAdjuntar alElegir={adjuntos.agregarDesdeBoton} deshabilitado={pendiente || adjuntos.lleno} />
               <button
+                ref={adjuntos.botonEnvio}
                 type="button"
                 disabled={pendiente || adjuntos.subiendo || (!texto.trim() && adjuntos.listos.length === 0)}
                 onClick={comentar}
