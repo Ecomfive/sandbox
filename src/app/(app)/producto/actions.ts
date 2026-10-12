@@ -36,6 +36,18 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   const barras = origenBarras === "interno" || origenBarras === "ninguno" ? "" : normalizarCodigoBarras(texto(formData, "codigo_barras"));
   const generarBarras = origenBarras ? origenBarras === "interno" : texto(formData, "generar_barras") === "1";
   if (origenBarras === "fabricante" && !barras) return { error: "Escribe el código de barras del fabricante (o elige uno interno)." };
+  // El envío (producto físico, embalaje, tamaño, peso, país de origen, código SA), con las mismas reglas de la ficha.
+  let envio: Exclude<ReturnType<typeof leerEnvio>, { error: string }> | null = null;
+  const envioTexto = texto(formData, "envio");
+  if (envioTexto) {
+    try {
+      const leido = leerEnvio(JSON.parse(envioTexto) as DatosEnvio);
+      if ("error" in leido) return leido;
+      envio = leido;
+    } catch {
+      return { error: "Los datos de envío no son válidos." };
+    }
+  }
   // El interno que ya se vio en la ficha (separado al abrirla); se revisa que sea de verdad uno interno.
   const reservado = normalizarCodigoBarras(texto(formData, "codigo_barras_interno"));
   const internoVisto = generarBarras && esCodigoInterno(reservado) ? reservado : "";
@@ -89,6 +101,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
       creado_por: usuario.id,
       ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : internoVisto ? { codigo_barras: internoVisto, codigo_barras_origen: "interno" } : {}),
       ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso } : {}),
+      ...(envio ?? {}),
     })
     .select("id")
     .single();
@@ -358,10 +371,10 @@ export interface DatosEnvio {
  * Guarda el bloque «Envío» de un producto: si es físico y, entonces, su embalaje, tamaño empacado, peso, país de origen y
  * código SA. Con «físico» apagado los datos se conservan (por si se vuelve a encender). Devuelve el error como valor.
  */
-export async function guardarEnvio(id: string, d: DatosEnvio): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
-  if (!ES_ID(id)) return { error: "Producto no válido." };
-
+/** Revisa los datos de envío (los mismos en la ficha y al crear) y los deja como columnas de `skus_maestros`. */
+function leerEnvio(d: DatosEnvio):
+  | { error: string }
+  | { es_fisico: boolean; embalaje: string | null; largo: number | null; ancho: number | null; alto: number | null; unidad_medida: string; peso: number | null; unidad_peso: string; pais_origen: string | null; codigo_sa: string | null } {
   const medida = (v: string, nombre: string): number | null | { error: string } => {
     const t = String(v ?? "").trim().replace(",", ".");
     if (!t) return null;
@@ -380,7 +393,7 @@ export async function guardarEnvio(id: string, d: DatosEnvio): Promise<{ error?:
   const codigoSa = String(d.codigoSa ?? "").trim();
   if (codigoSa && !/^[0-9]{4}([.]?[0-9]{2}){0,3}$/.test(codigoSa)) return { error: "El código SA debe tener de 4 a 10 cifras (Ej: 8424.89)." };
 
-  const nuevo = {
+  return {
     es_fisico: d.esFisico === true,
     embalaje: String(d.embalaje ?? "").trim().slice(0, 120) || null,
     largo: valores.largo,
@@ -392,6 +405,14 @@ export async function guardarEnvio(id: string, d: DatosEnvio): Promise<{ error?:
     pais_origen: String(d.paisOrigen ?? "").trim().slice(0, 80) || null,
     codigo_sa: codigoSa || null,
   };
+}
+
+export async function guardarEnvio(id: string, d: DatosEnvio): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (!ES_ID(id)) return { error: "Producto no válido." };
+  const leido = leerEnvio(d);
+  if ("error" in leido) return leido;
+  const nuevo = leido;
 
   const supabase = createServiceClient();
   const { data: actual } = await supabase

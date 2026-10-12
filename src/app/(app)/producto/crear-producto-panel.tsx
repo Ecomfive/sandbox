@@ -13,6 +13,8 @@ import { ComboBuilder } from "./combo-builder";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 import { CampoFoto } from "@/components/ui/campo-foto";
+import { ENVIO_VACIO, EnvioProductoBloque } from "./envio-producto";
+import { EnvioIcon } from "@/lib/nav-icons";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
@@ -62,6 +64,8 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
     espera.current = setTimeout(() => void sugerir(valor), 450);
   }
   const [subiendoFoto, setSubiendoFoto] = useState(false);
+  // Se vuelve a armar vacío al abrir la ficha otra vez.
+  const [vueltaEnvio, setVueltaEnvio] = useState(0);
   const [conVariantes, setConVariantes] = useState(false);
   const [armadas, setArmadas] = useState<VariantesArmadas>({ opciones: [], variantes: [] });
   // Un compuesto sin productos simples no se puede armar: el botón lleva a ese aviso.
@@ -80,6 +84,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
         setSkuTocado(false);
         setConVariantes(false);
         setOrigenBarras(null);
+        setVueltaEnvio((v) => v + 1);
         // El interno se separa al abrir (y se conserva hasta crear el producto: abrir y cerrar no gasta otro número).
         void pedirInterno();
       }}
@@ -235,6 +240,11 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
                 />
               </Campo>
             )}
+          </Seccion>
+
+          {/* El mismo bloque «Envío» de la ficha del producto; viaja con «Crear producto». */}
+          <Seccion icono={EnvioIcon} titulo="Envío">
+            <EnvioProductoBloque key={vueltaEnvio} id="nuevo" envio={ENVIO_VACIO} puedeEscribir enFormulario />
           </Seccion>
 
           {!combo && (

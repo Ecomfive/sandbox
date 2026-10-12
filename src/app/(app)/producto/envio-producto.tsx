@@ -37,7 +37,18 @@ const aTexto = (n: number | null) => (n === null ? "" : String(n));
  * embalaje, el tamaño ya empacado, el peso, el país de origen y el código SA. Sin el interruptor los campos quedan
  * apagados (se conservan por si se vuelve a encender). «Guardar» y «Descartar» aparecen solo con cambios.
  */
-export function EnvioProductoBloque({ id, envio, puedeEscribir }: { id: string; envio: EnvioProducto; puedeEscribir: boolean }) {
+export function EnvioProductoBloque({
+  id,
+  envio,
+  puedeEscribir,
+  enFormulario = false,
+}: {
+  id: string;
+  envio: EnvioProducto;
+  puedeEscribir: boolean;
+  /** En la ficha de crear: sin «Guardar» propio; los datos viajan con el formulario (campo oculto `envio`). */
+  enFormulario?: boolean;
+}) {
   const { mostrarToast } = useToast();
   const [pendiente, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -180,7 +191,8 @@ export function EnvioProductoBloque({ id, envio, puedeEscribir }: { id: string; 
         </Fila>
       </fieldset>
 
-      {puedeEscribir && cambio && (
+      {enFormulario && <input type="hidden" name="envio" value={JSON.stringify(d)} />}
+      {!enFormulario && puedeEscribir && cambio && (
         <div className="flex gap-2">
           <button type="button" disabled={pendiente} onClick={guardar} className={`${claseBoton} border-foreground bg-foreground text-background hover:bg-foreground/90`}>
             {pendiente ? "Guardando…" : "Guardar"}
@@ -206,3 +218,17 @@ export function EnvioProductoBloque({ id, envio, puedeEscribir }: { id: string; 
     </div>
   );
 }
+
+/** El envío de un producto nuevo: físico, en cm y kg, sin datos todavía. */
+export const ENVIO_VACIO: EnvioProducto = {
+  esFisico: true,
+  embalaje: null,
+  largo: null,
+  ancho: null,
+  alto: null,
+  unidadMedida: "cm",
+  peso: null,
+  unidadPeso: "kg",
+  paisOrigen: null,
+  codigoSa: null,
+};
