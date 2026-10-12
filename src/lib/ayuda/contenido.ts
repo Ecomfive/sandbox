@@ -244,6 +244,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-12", titulo: "Elige cuántas filas ver por página", texto: "En el pie de las tablas con varias páginas (Compras, Retiros, Pedidos…) está «Filas por página»: 50, 100, 500 o Todas. Se recuerda para ti en todas las tablas. Con Todas ves toda la lista en una sola página, como en un tablero de ClickUp.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-12", titulo: "Eliminar comentarios y quitar sus archivos", texto: "En tus propios comentarios de una compra puedes pulsar Eliminar (con confirmación) o, al Editar, quitar un archivo con su ✕ y adjuntar otro. Un comentario con respuestas de otras personas no se puede eliminar.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-12", titulo: "Envío al crear un producto", texto: "La ficha «Nuevo producto» trae el bloque Envío (producto físico, embalaje, tamaño empacado, peso, país de origen y código SA).", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-12", titulo: "Producto aprobado pasa solo a Compras", texto: "Al pasar un producto de Test a Activo, se crea su orden de compra en «01 - Cotizar» en el país de la barra de arriba. Además, el producto nuevo arranca en Test y se le puede poner la foto al crearlo.", modulo: "producto", href: "/producto" },
