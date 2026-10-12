@@ -49,8 +49,8 @@ function Medida({ nombre, valor, maximo, referencia, texto }: { nombre: string; 
   return (
     <div className="mb-2.5 grid grid-cols-[5.5rem_minmax(0,1fr)_4.75rem] items-center gap-2 text-[13px]">
       <span className="text-muted-foreground">{nombre}</span>
-      <span className="relative h-1.5 rounded-[3px] bg-accent" role="img" aria-label={`${nombre}: ${texto}`}>
-        {valor !== null && <i className="absolute inset-y-0 left-0 rounded-[3px] bg-foreground-soft" style={{ width: `${Math.min(100, (valor / maximo) * 100)}%` }} />}
+      <span className="relative h-1.5 rounded-full bg-muted" role="img" aria-label={`${nombre}: ${texto}`}>
+        {valor !== null && <i className="barra-neon absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, (valor / maximo) * 100)}%` }} />}
         {referencia !== null && <u aria-hidden="true" className="absolute -top-[3px] -bottom-[3px] w-0.5 bg-foreground no-underline" style={{ left: `${Math.min(100, (referencia / maximo) * 100)}%` }} />}
       </span>
       <span className="text-right font-medium tabular-nums">{texto}</span>
