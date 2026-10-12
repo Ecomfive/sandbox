@@ -6,11 +6,8 @@ import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
 import { BuscarIcon } from "@/lib/nav-icons";
 import { normalizar } from "@/lib/tabla/motor";
-import { CrearProductoTestPanel } from "./crear-producto-test-panel";
-import { CrearProductoPanel } from "../producto/crear-producto-panel";
-import { crearProductoNuevoEnTest } from "./actions";
+import { AgregarProductoTest } from "./agregar-producto-test";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
-import { ProductoIcon } from "@/lib/nav-icons";
 import { DEF_PRODUCTOS_TEST, ESTADOS, etiquetaEstado, etiquetaTestNumero, TEST_NUMEROS, type FilaProductoTest } from "./def-productos-test";
 import { FichaLateralTest } from "./ficha-lateral-test";
 import { FichaProductoTest } from "./ficha-producto-test";
@@ -183,21 +180,7 @@ export function ListaProductosTest({
           </select>
           <span className="flex-1" />
           <BotonDescargar def={DEF_PRODUCTOS_TEST} filas={filas} />
-          {puedeEscribir && puedeCrearProducto && (
-            <CrearProductoPanel
-              opcionesSimples={opcionesSimples}
-              action={crearProductoNuevoEnTest}
-              mensajeExito="Producto creado y agregado a Test productos"
-              ocultos={{ pais_id: paisId }}
-              boton={(abrir) => (
-                <BotonBarra onClick={abrir}>
-                  <ProductoIcon className="h-4 w-4" />
-                  Nuevo producto
-                </BotonBarra>
-              )}
-            />
-          )}
-          {puedeEscribir && <CrearProductoTestPanel paisId={paisId} />}
+          {puedeEscribir && <AgregarProductoTest paisId={paisId} puedeCrearProducto={puedeCrearProducto} opcionesSimples={opcionesSimples} />}
         </div>
 
         <MarcoTabla ariaLabel="Productos en test">
