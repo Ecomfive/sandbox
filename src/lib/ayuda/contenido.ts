@@ -182,7 +182,7 @@ export const GUIAS: GuiaModulo[] = [
     titulo: "Productos Test",
     ruta: "/productos-test",
     resumen: "Los productos que se prueban en marketing y cuáles resultaron winners.",
-    secciones: [{ titulo: "Uso", pasos: ["Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Productos: la lista con su ficha; «Copiar informe» para compartir."] }],
+    secciones: [{ titulo: "Uso", pasos: ["Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto."] }],
   },
   {
     modulo: "filtro-productos",
@@ -244,6 +244,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-12", titulo: "Productos Test vinculados a Producto", texto: "Al agregar un producto en prueba lo eliges de los que ya existen en Producto, con el mismo buscador de la orden de compra; el nombre se llena solo.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Envío al crear un producto", texto: "La ficha «Nuevo producto» trae el bloque Envío (producto físico, embalaje, tamaño empacado, peso, país de origen y código SA).", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-12", titulo: "Producto aprobado pasa solo a Compras", texto: "Al pasar un producto de Test a Activo, se crea su orden de compra en «01 - Cotizar» en el país de la barra de arriba. Además, el producto nuevo arranca en Test y se le puede poner la foto al crearlo.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-12", titulo: "Enter comenta después de adjuntar", texto: "Al adjuntar un archivo a un comentario, el cursor pasa al botón Comentar (o Responder) en cuanto termina de subir: pulsar Enter lo envía, en vez de volver a abrir el selector de archivos.", modulo: "compras", href: "/compras/lista" },

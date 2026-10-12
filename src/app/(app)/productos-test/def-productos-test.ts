@@ -3,6 +3,8 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 export interface FilaProductoTest {
   id: string;
   nombre: string;
+  /** El producto de Producto con que se vinculó (migración 0099); null si todavía no existe ahí. */
+  skuMaestroId: string | null;
   fechaCreacion: string | null;
   fuente: string | null;
   paginaProductoUrl: string | null;

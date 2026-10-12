@@ -26,7 +26,10 @@ const fechaOptativa = (formData: FormData, campo: string): string | null => text
 function leerCambios(formData: FormData) {
   const testNumero = (formData.get("test_numero") as string | null) || null;
   const explotacion = (formData.get("explotacion") as string | null) || null;
+  const sku = String(formData.get("sku_maestro_id") ?? "").trim();
   return {
+    // El producto de Producto con que se vincula (vacío = ninguno).
+    sku_maestro_id: /^[0-9a-fA-F-]{36}$/.test(sku) ? sku : null,
     fecha_creacion: fechaOptativa(formData, "fecha_creacion"),
     fuente: textoOptativo(formData, "fuente"),
     pagina_producto_url: textoOptativo(formData, "pagina_producto_url"),

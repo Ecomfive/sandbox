@@ -3,7 +3,8 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
-import { obtenerProductosTest } from "../datos-test";
+import { obtenerOpcionesProducto, obtenerProductosTest } from "../datos-test";
+import { ProveedorSkusMaestros } from "@/components/ui/selector-sku-maestro";
 import { ListaProductosTest } from "../lista-productos-test";
 
 export const metadata = { title: "Productos" };
@@ -21,12 +22,15 @@ export default async function ProductosEnTestPage({
   const buscarInicial = typeof buscar === "string" ? buscar : "";
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const productos = await obtenerProductosTest(supabase, pais.id);
+  const [productos, opcionesProducto] = await Promise.all([obtenerProductosTest(supabase, pais.id), obtenerOpcionesProducto(supabase)]);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Productos" oculto />
-      <ListaProductosTest key={buscarInicial} buscarInicial={buscarInicial} productos={productos} paisId={pais.id} puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")} />
+      {/* Los productos de Producto, para elegir el de cada producto en prueba (el buscador de la orden de compra). */}
+      <ProveedorSkusMaestros opciones={opcionesProducto}>
+        <ListaProductosTest key={buscarInicial} buscarInicial={buscarInicial} productos={productos} paisId={pais.id} puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")} />
+      </ProveedorSkusMaestros>
     </Pagina>
   );
 }

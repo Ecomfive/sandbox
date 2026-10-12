@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FilaProductoTest } from "./def-productos-test";
 
 const COLUMNAS =
-  "id, nombre, fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, revisado, ultima_revision, observacion, explotacion, creado_en";
+  "id, nombre, sku_maestro_id, fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, revisado, ultima_revision, observacion, explotacion, creado_en";
 
 const numero = (v: string | number | null) => (v === null ? null : Number(v));
 
@@ -18,6 +18,7 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
   return (data ?? []).map((p) => ({
     id: p.id,
     nombre: p.nombre,
+    skuMaestroId: (p as { sku_maestro_id?: string | null }).sku_maestro_id ?? null,
     fechaCreacion: p.fecha_creacion,
     fuente: p.fuente,
     paginaProductoUrl: p.pagina_producto_url,
@@ -47,4 +48,24 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
     explotacion: p.explotacion,
     creadoEn: p.creado_en,
   }));
+}
+
+/**
+ * Los productos de Producto para elegir el de un producto en prueba (el mismo buscador de la orden de compra: foto, SKU, nombre y
+ * N.º). Sin los compuestos ni los productos padre con variantes.
+ */
+export async function obtenerOpcionesProducto(supabase: SupabaseClient): Promise<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto: string | null }[]> {
+  const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre, clase, tipo, padre_id, numero, foto_url").neq("tipo", "combo").order("nombre");
+  const filas = data ?? [];
+  const padres = new Set(filas.filter((p) => p.padre_id).map((p) => p.padre_id as string));
+  return filas
+    .filter((p) => !padres.has(p.id as string))
+    .map((p) => ({
+      id: p.id as string,
+      codigo: p.codigo as string,
+      nombre: p.nombre as string,
+      estado: p.clase === "test" ? "test" : "aprobado",
+      numero: (p.numero as number | null) ?? null,
+      foto: (p.foto_url as string | null) ?? null,
+    }));
 }

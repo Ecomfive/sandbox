@@ -1,5 +1,6 @@
 "use client";
 
+import { CampoSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { actualizarProductoTest, crearProductoTest } from "./actions";
 import {
@@ -103,6 +104,9 @@ export function FormularioProductoTest({
   acciones?: ReactNode;
 }) {
   const [modificado, setModificado] = useState(false);
+  // El producto de Producto que se eligió (el buscador de la orden de compra) y el nombre, que se llena al elegirlo.
+  const [skuId, setSkuId] = useState<string | null>(producto?.skuMaestroId ?? null);
+  const [nombre, setNombre] = useState(producto?.nombre ?? "");
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const invalido = (id: string) => (faltante === id ? true : undefined);
   const [pending, startTransition] = useTransition();
@@ -174,6 +178,21 @@ export function FormularioProductoTest({
 
       <div className="flex flex-1 flex-col divide-y divide-border p-5">
         <Seccion icono={EtiquetaIcon} titulo="Producto">
+          <Campo etiqueta="Producto (de Producto)" id="campo-producto-test">
+            <input type="hidden" name="sku_maestro_id" value={skuId ?? ""} />
+            <CampoSkuMaestro
+              valor={skuId}
+              alCambiar={(sku) => {
+                setSkuId(sku?.id ?? null);
+                if (sku) setNombre(sku.nombre);
+                setModificado(true);
+                alModificar?.();
+              }}
+              etiquetaAria="Producto de Producto"
+              placeholder="Busca por SKU, nombre o N.º"
+              claseContenedor="w-full min-w-0"
+            />
+          </Campo>
           <Campo etiqueta="Nombre" id="campo-nombre-test" obligatorio faltante={faltante}>
             <input
               id="campo-nombre-test"
@@ -182,7 +201,8 @@ export function FormularioProductoTest({
               required
               data-enfocar
               aria-invalid={invalido("campo-nombre-test")}
-              defaultValue={producto?.nombre}
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
               placeholder="Ej: OreganoOil Aceite de orégano"
               className={fieldClass}
             />
