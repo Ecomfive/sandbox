@@ -265,6 +265,7 @@ function Respuesta({ compraId, respuestaA, alCancelar, alEnviar }: { compraId: s
       <TiraPendientes pendientes={adjuntos.pendientes} alQuitar={adjuntos.quitar} />
       <div className="flex flex-wrap items-center gap-2">
         <button
+          ref={adjuntos.botonEnvio}
           type="button"
           disabled={pendiente || adjuntos.subiendo || (!texto.trim() && adjuntos.listos.length === 0)}
           onClick={enviar}
@@ -272,7 +273,7 @@ function Respuesta({ compraId, respuestaA, alCancelar, alEnviar }: { compraId: s
         >
           {pendiente ? "Guardando…" : "Responder"}
         </button>
-        <BotonAdjuntar alElegir={adjuntos.agregar} deshabilitado={pendiente || adjuntos.lleno} />
+        <BotonAdjuntar alElegir={adjuntos.agregarDesdeBoton} deshabilitado={pendiente || adjuntos.lleno} />
         <button type="button" onClick={alCancelar} className={`rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
           Cancelar
         </button>
