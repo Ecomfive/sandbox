@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { AvatarPersona } from "@/components/ui/avatar-persona";
@@ -7,9 +7,10 @@ import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
+import { MAX_ADJUNTOS_COMENTARIO } from "@/lib/compras/adjuntos";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
-import { alternarReaccion, comentarCompra, editarComentarioCompra, type ActividadCompra, type ReaccionComentario } from "./actions";
-import { archivosDe, BotonAdjuntar, GaleriaAdjuntos, TiraPendientes, useAdjuntosPendientes } from "./adjuntos-comentario";
+import { alternarReaccion, comentarCompra, editarComentarioCompra, eliminarComentarioCompra, type ActividadCompra, type ReaccionComentario } from "./actions";
+import { archivosDe, BotonAdjuntar, GaleriaAdjuntos, TiraExistentes, TiraPendientes, useAdjuntosPendientes } from "./adjuntos-comentario";
 
 type Comentario = ActividadCompra["comentarios"][number];
 
@@ -47,7 +48,7 @@ export function TarjetaComentario({
       ref={comentario.id === resaltado ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
       className={`my-1.5 flex flex-col gap-2 rounded-lg border p-3 text-sm ${comentario.id === resaltado ? "border-primario bg-primario-suave ring-2 ring-primario" : "border-border bg-card"}`}
     >
-      <Cuerpo comentario={comentario} puedeComentar={puedeComentar} alResponder={() => setRespondiendo((v) => !v)} alEditar={alResponder} />
+      <Cuerpo compraId={compraId} comentario={comentario} numRespuestas={respuestas.length} puedeComentar={puedeComentar} alResponder={() => setRespondiendo((v) => !v)} alEditar={alResponder} />
       {(respuestas.length > 0 || respondiendo) && (
         <div className="ml-4 flex flex-col gap-2 border-l-2 border-border pl-3">
           {respuestas.map((r) => (
@@ -57,7 +58,7 @@ export function TarjetaComentario({
               ref={r.id === resaltado && enHilo ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
               className={r.id === resaltado ? "-mx-1 rounded-md bg-primario-suave px-1 py-1 ring-2 ring-primario" : ""}
             >
-              <Cuerpo comentario={r} puedeComentar={puedeComentar} pequeno alResponder={() => setRespondiendo(true)} alEditar={alResponder} />
+              <Cuerpo compraId={compraId} comentario={r} numRespuestas={0} puedeComentar={puedeComentar} pequeno alResponder={() => setRespondiendo(true)} alEditar={alResponder} />
             </div>
           ))}
           {respondiendo && puedeComentar && (
@@ -77,22 +78,41 @@ export function TarjetaComentario({
   );
 }
 
-/** Lo de un comentario (o una respuesta): autor, hora, texto, archivos, reacciones, «Responder» y, si es suyo, «Editar». */
+/** Lo de un comentario (o una respuesta): autor, hora, texto, archivos, reacciones, «Responder» y, si es suyo, «Editar» y «Eliminar». */
 function Cuerpo({
+  compraId,
   comentario,
+  numRespuestas,
   puedeComentar,
   pequeno = false,
   alResponder,
   alEditar,
 }: {
+  compraId: string;
   comentario: Comentario;
+  /** Cuántas respuestas tiene (para avisarlo al eliminar). */
+  numRespuestas: number;
   puedeComentar: boolean;
   pequeno?: boolean;
   alResponder: () => void;
-  /** Después de guardar la edición: la actividad se vuelve a pedir. */
+  /** Después de editar o eliminar: la actividad se vuelve a pedir. */
   alEditar: () => void;
 }) {
+  const { mostrarToast } = useToast();
   const [editando, setEditando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [eliminando, empezarEliminar] = useTransition();
+  function eliminar() {
+    empezarEliminar(async () => {
+      const r = await eliminarComentarioCompra(comentario.id).catch(() => ({ error: "No se pudo eliminar el comentario." }));
+      if (r.error) {
+        setConfirmando(false);
+        return mostrarToast(r.error, "destructive");
+      }
+      mostrarToast("Comentario eliminado");
+      alEditar();
+    });
+  }
   return (
     <div className="flex gap-2.5">
       <AvatarPersona nombre={comentario.autor} email="?" avatarUrl={null} tamano="sm" />
@@ -112,6 +132,7 @@ function Cuerpo({
         </span>
         {editando ? (
           <EditarTexto
+            compraId={compraId}
             comentario={comentario}
             alCancelar={() => setEditando(false)}
             alGuardar={() => {
@@ -124,14 +145,35 @@ function Cuerpo({
             <TextoConMenciones texto={comentario.texto} />
           </p>
         )}
-        <GaleriaAdjuntos adjuntos={comentario.adjuntos} />
-        {!editando && (
+        {!editando && <GaleriaAdjuntos adjuntos={comentario.adjuntos} />}
+        {!editando && confirmando && (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-xs">
+            <span>
+              ¿Eliminar este comentario
+              {numRespuestas > 0 ? ` y sus ${numRespuestas === 1 ? "respuesta" : `${numRespuestas} respuestas`}` : ""}
+              {comentario.adjuntos.length > 0 ? ` con sus ${comentario.adjuntos.length === 1 ? "archivo" : `${comentario.adjuntos.length} archivos`}` : ""}? No se puede deshacer.
+            </span>
+            <button
+              type="button"
+              disabled={eliminando}
+              onClick={eliminar}
+              className={`rounded-md border border-destructive bg-destructive px-2.5 py-1 font-medium text-background hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
+            >
+              {eliminando ? "Eliminando…" : "Eliminar"}
+            </button>
+            <button type="button" disabled={eliminando} onClick={() => setConfirmando(false)} className={`rounded-md px-2 py-1 text-muted-foreground hover:text-foreground ${anilloFoco}`}>
+              Cancelar
+            </button>
+          </div>
+        )}
+        {!editando && !confirmando && (
           <Reacciones
             comentarioId={comentario.id}
             iniciales={comentario.reacciones}
             puedeReaccionar={puedeComentar}
             alResponder={alResponder}
             alEditar={puedeComentar && comentario.mio ? () => setEditando(true) : undefined}
+            alEliminar={puedeComentar && comentario.mio ? () => setConfirmando(true) : undefined}
           />
         )}
       </div>
@@ -146,6 +188,7 @@ function Reacciones({
   puedeReaccionar,
   alResponder,
   alEditar,
+  alEliminar,
 }: {
   comentarioId: string;
   iniciales: ReaccionComentario[];
@@ -153,6 +196,7 @@ function Reacciones({
   alResponder: () => void;
   /** Solo en los comentarios propios. */
   alEditar?: () => void;
+  alEliminar?: () => void;
 }) {
   const { mostrarToast } = useToast();
   const [reacciones, setReacciones] = useState(iniciales);
@@ -228,6 +272,11 @@ function Reacciones({
               Editar
             </button>
           )}
+          {alEliminar && (
+            <button type="button" onClick={alEliminar} className={claseAccion}>
+              Eliminar
+            </button>
+          )}
         </>
       )}
     </div>
@@ -282,16 +331,25 @@ function Respuesta({ compraId, respuestaA, alCancelar, alEnviar }: { compraId: s
   );
 }
 
-/** El texto de un comentario propio, para corregirlo ahí mismo (con @menciones). Escape cancela. */
-function EditarTexto({ comentario, alCancelar, alGuardar }: { comentario: Comentario; alCancelar: () => void; alGuardar: () => void }) {
+/**
+ * Un comentario propio, para corregirlo ahí mismo: su texto (con @menciones) y sus archivos (quitar los que ya tiene, que se
+ * borran al guardar, y agregar otros). Escape cancela; un comentario no puede quedar sin texto ni archivos.
+ */
+function EditarTexto({ compraId, comentario, alCancelar, alGuardar }: { compraId: string; comentario: Comentario; alCancelar: () => void; alGuardar: () => void }) {
   const { mostrarToast } = useToast();
   const [texto, setTexto] = useState(comentario.texto);
   const [menciones, setMenciones] = useState<string[]>([]);
+  const [quitados, setQuitados] = useState<string[]>([]);
   const [pendiente, empezar] = useTransition();
+  const adjuntos = useAdjuntosPendientes(compraId);
+  const quedan = comentario.adjuntos.filter((a) => !quitados.includes(a.id));
+  const hayCambios = texto.trim() !== comentario.texto.trim() || quitados.length > 0 || adjuntos.listos.length > 0;
+  const vacio = !texto.trim() && quedan.length === 0 && adjuntos.listos.length === 0;
   function guardar() {
     empezar(async () => {
-      const r = await editarComentarioCompra(comentario.id, texto, menciones).catch(() => ({ error: "No se pudo guardar el cambio." }));
+      const r = await editarComentarioCompra(comentario.id, texto, menciones, { quitar: quitados, agregar: adjuntos.listos }).catch(() => ({ error: "No se pudo guardar el cambio." }));
       if (r.error) return mostrarToast(r.error, "destructive");
+      adjuntos.vaciar();
       mostrarToast("Comentario editado");
       alGuardar();
     });
@@ -305,17 +363,27 @@ function EditarTexto({ comentario, alCancelar, alGuardar }: { comentario: Coment
           alCancelar();
         }
       }}
+      onPaste={(e) => {
+        const archivos = archivosDe(e);
+        if (archivos.length === 0) return;
+        e.preventDefault();
+        adjuntos.agregar(archivos);
+      }}
     >
       <CampoMenciones ariaLabel="Editar el comentario" filas={3} valor={texto} alCambiar={setTexto} alMencionar={setMenciones} enfocar />
+      <TiraExistentes adjuntos={quedan} alQuitar={(id) => setQuitados((q) => [...q, id])} />
+      <TiraPendientes pendientes={adjuntos.pendientes} alQuitar={adjuntos.quitar} />
       <div className="flex flex-wrap items-center gap-2">
         <button
+          ref={adjuntos.botonEnvio}
           type="button"
-          disabled={pendiente || texto.trim() === comentario.texto.trim()}
+          disabled={pendiente || adjuntos.subiendo || vacio || !hayCambios}
           onClick={guardar}
           className={`rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`}
         >
           {pendiente ? "Guardando…" : "Guardar"}
         </button>
+        <BotonAdjuntar alElegir={adjuntos.agregarDesdeBoton} deshabilitado={pendiente || quedan.length + adjuntos.pendientes.length >= MAX_ADJUNTOS_COMENTARIO} />
         <button type="button" onClick={alCancelar} className={`rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
           Cancelar
         </button>
