@@ -10,14 +10,15 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
-import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
+import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
 import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
 import { VariantesProducto } from "./variantes-producto";
-import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
+import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto, type ReferenciasTest } from "./def-producto";
 import { FotoProducto } from "./foto-producto";
 import { NombreProducto } from "./nombre-producto";
 import { SkuProducto } from "./sku-producto";
@@ -62,6 +63,7 @@ export function FichaProducto({
   orden,
   codigoPais,
   puedeEscribir,
+  referenciasTest,
   alIr,
   alCerrar,
 }: {
@@ -72,6 +74,8 @@ export function FichaProducto({
   /** El producto es igual para todos los países; el código de país solo da formato a las fechas de la actividad. */
   codigoPais: string;
   puedeEscribir: boolean;
+  /** El promedio de los winners: la marca negra del «Resultado del test». */
+  referenciasTest: ReferenciasTest;
   alIr: (id: string) => void;
   alCerrar: () => void;
 }) {
@@ -174,6 +178,13 @@ export function FichaProducto({
                 </Dato>
               </dl>
             </Seccion>
+
+            {/* Si salió de Test productos: cómo le fue, con las mismas barras de su ficha allá. */}
+            {producto.tests.length > 0 && (
+              <Seccion icono={TestIcon} titulo="Resultado del test">
+                <ResultadoTestProducto producto={producto} referencias={referenciasTest} />
+              </Seccion>
+            )}
 
             {producto.tipo !== "combo" && (
               <Seccion icono={ComprasIcon} titulo="Compras">

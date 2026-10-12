@@ -4,8 +4,10 @@ import Link from "next/link";
 import { formatearFecha } from "@/lib/formato";
 import { colorEstado, etiquetaEstado, etiquetaTestNumero } from "../productos-test/def-productos-test";
 import { CPA_OBJETIVO, porcentaje, usd } from "../productos-test/informe";
+import { Medida } from "../productos-test/ficha-lateral-test";
+import { Punto } from "@/components/panel/piezas-panel";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
-import type { FilaProducto } from "./def-producto";
+import type { FilaProducto, ReferenciasTest } from "./def-producto";
 
 /** El estado del test con su punto de color (los colores de Test productos). */
 function EstadoTest({ estado }: { estado: string }) {
@@ -82,6 +84,52 @@ function DatosTest({ producto }: { producto: FilaProducto }) {
       <Link href={`/productos-test/productos?buscar=${encodeURIComponent(producto.tests[0].nombre)}`} className="text-xs font-medium text-primario hover:underline">
         Ver en Test productos
       </Link>
+    </div>
+  );
+}
+
+/**
+ * «Resultado del test» en la ficha del producto (si salió de Test productos): por cada test, si cumple el criterio (CPA menor
+ * a $4) y las barras de CPA, compras, CTR, hook y CVR con la misma marca negra de Test productos (el criterio o el promedio
+ * de los winners).
+ */
+export function ResultadoTestProducto({ producto, referencias }: { producto: FilaProducto; referencias: ReferenciasTest }) {
+  return (
+    <div className="flex flex-col gap-4">
+      {producto.tests.map((t) => {
+        const cumple = t.cpa === null ? null : t.cpa < CPA_OBJETIVO;
+        return (
+          <div key={t.id} className="flex flex-col">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <EstadoTest estado={t.estado} />
+              <span className="text-muted-foreground">
+                {[t.pais, etiquetaTestNumero(t.testNumero), t.fechaTest ? formatearFecha(t.fechaTest) : null, t.gasto === null ? null : `gasto ${usd(t.gasto)}`].filter(Boolean).join(" · ")}
+              </span>
+            </div>
+            <p className="mb-2.5 flex items-start gap-1.5 text-[13px]">
+              <Punto tono={cumple === null ? "gris" : cumple ? "exito" : "peligro"} className="mt-1.5" />
+              <span>
+                {cumple === null
+                  ? "Falta el CPA para evaluar el criterio."
+                  : cumple
+                    ? `Cumple el criterio: CPA ${usd(t.cpa ?? 0)}, menor a ${usd(CPA_OBJETIVO)}.`
+                    : `No cumple: CPA ${usd(t.cpa ?? 0)}, no es menor a ${usd(CPA_OBJETIVO)}.`}
+              </span>
+            </p>
+            <Medida nombre="CPA" valor={t.cpa} maximo={20} referencia={CPA_OBJETIVO} texto={t.cpa === null ? "—" : usd(t.cpa)} />
+            <Medida nombre="Compras" valor={t.compras} maximo={12} referencia={referencias.compras} texto={t.compras === null ? "—" : String(t.compras)} />
+            <Medida nombre="CTR" valor={t.ctr} maximo={10} referencia={referencias.ctr} texto={t.ctr === null ? "—" : porcentaje(t.ctr)} />
+            <Medida nombre="Hook rate" valor={t.hook} maximo={80} referencia={referencias.hook} texto={t.hook === null ? "—" : porcentaje(t.hook)} />
+            <Medida nombre="CVR" valor={t.cvr} maximo={20} referencia={referencias.cvr} texto={t.cvr === null ? "—" : porcentaje(t.cvr)} />
+          </div>
+        );
+      })}
+      <p className="m-0 text-xs text-muted-foreground">
+        La marca negra es el criterio (CPA) o el promedio de los winners (compras, CTR, Hook y CVR).{" "}
+        <Link href={`/productos-test/productos?buscar=${encodeURIComponent(producto.tests[0].nombre)}`} className="font-medium text-primario hover:underline">
+          Ver en Test productos
+        </Link>
+      </p>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearProductoPanel } from "./crear-producto-panel";
-import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto } from "./def-producto";
+import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto, type ReferenciasTest } from "./def-producto";
 import { FichaProducto } from "./ficha-producto";
 import { VistaRapidaProducto } from "./vista-rapida-producto";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
@@ -72,11 +72,13 @@ export function TablaProducto({
   opcionesSimples,
   codigoPais,
   puedeEscribir,
+  referenciasTest,
 }: {
   productos: FilaProducto[];
   opcionesSimples: OpcionSkuMaestro[];
   codigoPais: string;
   puedeEscribir: boolean;
+  referenciasTest: ReferenciasTest;
 }) {
   // Qué producto está abierto y en qué orden se veían las filas al abrirlo (para las flechas de anterior y siguiente).
   const [abierto, setAbierto] = useState<{ id: string; orden: string[] } | null>(null);
@@ -105,6 +107,7 @@ export function TablaProducto({
         orden={abierto?.orden ?? []}
         codigoPais={codigoPais}
         puedeEscribir={puedeEscribir}
+        referenciasTest={referenciasTest}
         alIr={(id) => setAbierto((a) => (a ? { ...a, id } : a))}
         alCerrar={() => setAbierto(null)}
       />

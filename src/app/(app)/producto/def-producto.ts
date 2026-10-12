@@ -103,6 +103,14 @@ export interface TestProducto {
   cvr: number | null;
 }
 
+/** El promedio de los winners de Test productos: la marca negra de «Resultado del test» (compras, CTR, hook y CVR). */
+export interface ReferenciasTest {
+  compras: number | null;
+  ctr: number | null;
+  hook: number | null;
+  cvr: number | null;
+}
+
 /** Cómo se filtra y agrupa la lista de productos. */
 export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
   clave: "producto",

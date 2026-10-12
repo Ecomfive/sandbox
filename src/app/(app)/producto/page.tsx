@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { KpiGroup } from "@/components/ui/kpi-card";
-import type { Asociacion, FilaProducto, TestProducto } from "./def-producto";
+import type { Asociacion, FilaProducto, ReferenciasTest, TestProducto } from "./def-producto";
 import { TablaProducto } from "./tabla-producto";
 import { TarjetasClase } from "./tarjetas-clase";
 
@@ -61,7 +61,7 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners] = await Promise.all([
     supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)"),
     supabase
       .from("wms_producto_variantes")
@@ -84,7 +84,19 @@ export default async function ProductoPage() {
           .not("sku_maestro_id", "is", null)
           .order("fecha_test", { ascending: false, nullsFirst: false })
       : Promise.resolve({ data: [] as never[] }),
+    // Los winners de Test productos: su promedio es la referencia del «Resultado del test» en la ficha.
+    usuario.modulos.includes("productos-test")
+      ? supabase.from("wms_productos_test").select("metrica_compras, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)").in("estado", ["winner", "enviado_a_compras"])
+      : Promise.resolve({ data: [] as never[] }),
   ]);
+  const deWinners = ((winners.data ?? []) as Record<string, unknown>[]).filter((w) =>
+    puedeVerPais(usuario.paisesPermitidos, unoDe(w.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? null),
+  );
+  const promedioDe = (campo: string) => {
+    const v = deWinners.map((w) => w[campo]).filter((x) => x !== null && x !== undefined).map(Number);
+    return v.length ? v.reduce((t, x) => t + x, 0) / v.length : null;
+  };
+  const referenciasTest: ReferenciasTest = { compras: promedioDe("metrica_compras"), ctr: promedioDe("metrica_ctr"), hook: promedioDe("metrica_hook_rate"), cvr: promedioDe("metrica_cvr") };
   const numero = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   const testsPorId = new Map<string, TestProducto[]>();
   for (const t of (tests.data ?? []) as Record<string, unknown>[]) {
@@ -252,6 +264,7 @@ export default async function ProductoPage() {
         opcionesSimples={opcionesSimples}
         codigoPais={pais.codigo}
         puedeEscribir={!usuario.modulosSoloLectura.includes("producto")}
+        referenciasTest={referenciasTest}
       />
     </Pagina>
   );

@@ -45,7 +45,7 @@ function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
 }
 
 /** Una métrica sobre una pista: la barra es el valor y la marca negra es la referencia (criterio o promedio de winners). */
-function Medida({ nombre, valor, maximo, referencia, texto }: { nombre: string; valor: number | null; maximo: number; referencia: number | null; texto: string }) {
+export function Medida({ nombre, valor, maximo, referencia, texto }: { nombre: string; valor: number | null; maximo: number; referencia: number | null; texto: string }) {
   return (
     <div className="mb-2.5 grid grid-cols-[5.5rem_minmax(0,1fr)_4.75rem] items-center gap-2 text-[13px]">
       <span className="text-muted-foreground">{nombre}</span>
