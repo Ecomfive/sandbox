@@ -39,6 +39,16 @@ const TITULO_GRAFICA: Record<Granularidad, string> = {
 const TITULO_INFORME: Record<Granularidad, string> = { dia: "Informe diario", semana: "Informe semanal", mes: "Informe mensual" };
 
 const celda = "border-b border-border px-3.5 py-2 text-[13px] last:border-b-0";
+/**
+ * Los colores del informe, los mismos del Dashboard de Compras (el neón del riel): winner con el degradado magenta → índigo,
+ * en consulta en rosa, fallido en violeta suave y los otros estados en gris.
+ */
+const COLOR = {
+  ganador: { backgroundImage: "linear-gradient(180deg, #b12a97, #5f43d1)" },
+  consulta: { backgroundImage: "linear-gradient(180deg, #e86a9a, #d74c81)" },
+  fallido: { backgroundImage: "linear-gradient(180deg, rgb(138 53 201 / 0.35), rgb(138 53 201 / 0.12))" },
+} as const;
+
 const th = "border-b border-border bg-muted px-3.5 py-2 text-left text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase";
 
 /**
@@ -137,7 +147,7 @@ export function InformeTest({ productos, codigoPais }: { productos: FilaProducto
         </BotonBarra>
       </div>
 
-      <section aria-label="Indicadores" className="overflow-hidden rounded-[10px] border border-border bg-card">
+      <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
         <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 border-b border-border bg-muted px-3.5 py-2 text-xs">
           <span className="font-semibold tracking-[0.04em] text-muted-foreground uppercase">{TITULO_INFORME[granularidad]}</span>
           <span className="text-muted-foreground">
@@ -200,10 +210,10 @@ export function InformeTest({ productos, codigoPais }: { productos: FilaProducto
                     className={`relative z-[1] flex h-full min-w-0 flex-1 flex-col justify-end rounded p-0 aria-pressed:bg-muted aria-pressed:outline aria-pressed:outline-1 aria-pressed:outline-offset-1 aria-pressed:outline-border-control hover:bg-muted ${anilloFoco}`}
                   >
                     <span className="flex flex-col justify-end gap-px" style={{ height: `${alto}%` }}>
-                      <i className="block rounded-sm bg-success" style={{ flex: st.ganadores }} />
-                      <i className="block rounded-sm bg-warning" style={{ flex: st.consulta }} />
-                      <i className="block rounded-sm bg-accent-hover" style={{ flex: st.fallidos }} />
-                      <i className="block rounded-sm bg-border-control/40" style={{ flex: st.otros }} />
+                      <i className="block rounded-sm" style={{ flex: st.ganadores, ...COLOR.ganador }} />
+                      <i className="block rounded-sm" style={{ flex: st.consulta, ...COLOR.consulta }} />
+                      <i className="block rounded-sm" style={{ flex: st.fallidos, ...COLOR.fallido }} />
+                      <i className="block rounded-sm bg-muted" style={{ flex: st.otros }} />
                     </span>
                   </button>
                 );
@@ -217,10 +227,10 @@ export function InformeTest({ productos, codigoPais }: { productos: FilaProducto
               ))}
             </div>
             <div className="mt-2.5 flex flex-wrap gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
-              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-success align-[-1px]" />Winner</span>
-              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-warning align-[-1px]" />En consulta</span>
-              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-accent-hover align-[-1px]" />Fallido</span>
-              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-border-control/40 align-[-1px]" />Otros estados</span>
+              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={COLOR.ganador} />Winner</span>
+              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={COLOR.consulta} />En consulta</span>
+              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={COLOR.fallido} />Fallido</span>
+              <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm border border-border bg-muted align-[-1px]" />Otros estados</span>
             </div>
             <p className="mt-2.5 flex flex-wrap gap-x-4.5 gap-y-1 border-t border-border pt-2.5 text-[13px]">
               <span><b className="tabular-nums">{s.testeados}</b> testeados</span>
@@ -277,8 +287,8 @@ export function InformeTest({ productos, codigoPais }: { productos: FilaProducto
                   <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{c.ganadores} de {c.testeados}</span>
                 </span>
                 <span className="min-w-12 text-right text-[13px] font-semibold tabular-nums">{c.ganadores ? porcentaje((c.ganadores / c.testeados) * 100, 0) : "0 %"}</span>
-                <span role="img" aria-label={`${c.categoria}: ${c.ganadores} winners de ${c.testeados}`} className="col-span-full flex h-1.5 overflow-hidden rounded-[3px] bg-accent-hover">
-                  <i className="block h-full bg-success" style={{ width: `${(c.ganadores / c.testeados) * 100}%` }} />
+                <span role="img" aria-label={`${c.categoria}: ${c.ganadores} winners de ${c.testeados}`} className="col-span-full flex h-1.5 overflow-hidden rounded-full bg-muted">
+                  <i className="barra-neon block h-full rounded-full" style={{ width: `${(c.ganadores / c.testeados) * 100}%` }} />
                 </span>
               </li>
             ))}
