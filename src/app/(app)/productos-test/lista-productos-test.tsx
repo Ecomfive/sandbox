@@ -75,6 +75,8 @@ export function ListaProductosTest({
   const [elegido, setElegido] = useState<string | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
 
+  // El SKU de cada producto de Producto, para decir con cuál está vinculado cada fila.
+  const skuPorId = useMemo(() => new Map(opcionesSimples.map((o) => [o.id, o.codigo])), [opcionesSimples]);
   const categorias = useMemo(() => [...new Set(productos.map((p) => limpiarCategoria(p.categoria)))].sort((a, b) => a.localeCompare(b)), [productos]);
   const ganadores = useMemo(() => productos.filter((p) => resultadoDe(p.estado) === "ganador"), [productos]);
 
@@ -243,7 +245,21 @@ export function ListaProductosTest({
                   >
                     <td className={claseTd}>
                       <span className="block max-w-[26rem] truncate font-medium" title={p.nombre}>{p.nombre}</span>
-                      <span className="block text-xs text-muted-foreground">{limpiarCategoria(p.categoria)}</span>
+                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                        {limpiarCategoria(p.categoria)}
+                        {/* Vinculado a su producto de Producto (con su SKU) o pendiente de vincular. */}
+                        {p.skuMaestroId ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Punto tono="exito" />
+                            Vinculado{skuPorId.get(p.skuMaestroId) ? ` · ${skuPorId.get(p.skuMaestroId)}` : ""}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                            <Punto tono="aviso" />
+                            Sin vincular
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className={claseTd}>{p.testNumero ? etiquetaTestNumero(p.testNumero) : "—"}</td>
                     <td className={claseTd}><Pastilla tono={tonoEstado(p.estado)}>{etiquetaEstado(p.estado)}</Pastilla></td>
