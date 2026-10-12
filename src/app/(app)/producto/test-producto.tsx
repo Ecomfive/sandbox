@@ -20,17 +20,18 @@ function EstadoTest({ estado }: { estado: string }) {
 const dato = (v: number | null, f: (n: number) => string) => (v === null ? "—" : f(v));
 
 /**
- * La celda «Test» de la lista de Producto: si el producto pasó por Test productos dice cómo le fue (el más reciente) y, al
- * pasar el cursor, muestra los datos de cada test (país, fecha, gasto, compras, CPA, CTR, hook y CVR).
+ * La celda «Test» de la lista de Producto: si el producto pasó por Test productos dice «Test» y, al pasar el cursor, muestra
+ * cómo le fue y los datos de cada test (país, fecha, gasto, compras, CPA, CTR, hook y CVR).
  */
 export function CeldaTestProducto({ producto }: { producto: FilaProducto }) {
   const tests = producto.tests;
   if (!tests.length) return <span className="text-muted-foreground">—</span>;
   return (
     <TarjetaEmergente ancho="20rem" contenido={<DatosTest producto={producto} />}>
+      {/* Todos los que vienen de Test productos dicen «Test»; el resultado y las métricas salen al pasar el cursor. */}
       <span className="inline-flex cursor-default items-center gap-1 underline decoration-dotted decoration-border-control underline-offset-4">
-        <EstadoTest estado={tests[0].estado} />
-        {tests.length > 1 && <span className="text-xs text-muted-foreground">+{tests.length - 1}</span>}
+        Test
+        {tests.length > 1 && <span className="text-xs text-muted-foreground">×{tests.length}</span>}
       </span>
     </TarjetaEmergente>
   );
