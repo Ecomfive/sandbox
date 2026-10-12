@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FilaProductoTest } from "./def-productos-test";
 
 const COLUMNAS =
-  "id, nombre, sku_maestro_id, fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, revisado, ultima_revision, observacion, explotacion, creado_en";
+  "id, nombre, sku_maestro_id, skus_maestros(foto_url), fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, revisado, ultima_revision, observacion, explotacion, creado_en";
 
 const numero = (v: string | number | null) => (v === null ? null : Number(v));
 
@@ -14,11 +14,19 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
     .eq("pais_id", paisId)
     .order("creado_en", { ascending: false })
     .limit(1000);
+  // Sin producto vinculado (o sin foto), la foto de Filtro de productos con el mismo nombre en el país.
+  const { data: filtros } = await supabase.from("wms_filtro_productos").select("nombre, foto_url").eq("pais_id", paisId).not("foto_url", "is", null);
+  const fotoFiltro = new Map((filtros ?? []).map((f) => [String(f.nombre).toLowerCase().trim(), f.foto_url as string]));
+  const fotoDe = (p: { nombre: string; skus_maestros?: unknown }) => {
+    const sku = (Array.isArray(p.skus_maestros) ? p.skus_maestros[0] : p.skus_maestros) as { foto_url: string | null } | null | undefined;
+    return sku?.foto_url ?? fotoFiltro.get(p.nombre.toLowerCase().trim()) ?? null;
+  };
 
   return (data ?? []).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     skuMaestroId: (p as { sku_maestro_id?: string | null }).sku_maestro_id ?? null,
+    fotoUrl: fotoDe(p),
     fechaCreacion: p.fecha_creacion,
     fuente: p.fuente,
     paginaProductoUrl: p.pagina_producto_url,

@@ -7,6 +7,7 @@ import { formatearFecha } from "@/lib/formato";
 import { BuscarIcon } from "@/lib/nav-icons";
 import { normalizar } from "@/lib/tabla/motor";
 import { AgregarProductoTest } from "./agregar-producto-test";
+import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { DEF_PRODUCTOS_TEST, ESTADOS, etiquetaEstado, etiquetaTestNumero, TEST_NUMEROS, type FilaProductoTest } from "./def-productos-test";
 import { FichaLateralTest } from "./ficha-lateral-test";
@@ -227,6 +228,10 @@ export function ListaProductosTest({
                     className={`cursor-pointer hover:bg-muted aria-[current=true]:bg-accent ${anilloFoco}`}
                   >
                     <td className={claseTd}>
+                      {/* La foto al inicio (al pasar el cursor se ve grande), como en Producto. */}
+                      <div className="flex items-center gap-3">
+                      <MiniaturaFoto url={p.fotoUrl} nombre={p.nombre} />
+                      <div className="min-w-0">
                       <span className="block max-w-[26rem] truncate font-medium" title={p.nombre}>{p.nombre}</span>
                       <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                         {limpiarCategoria(p.categoria)}
@@ -243,6 +248,8 @@ export function ListaProductosTest({
                           </span>
                         )}
                       </span>
+                      </div>
+                      </div>
                     </td>
                     <td className={claseTd}>{p.testNumero ? etiquetaTestNumero(p.testNumero) : "—"}</td>
                     <td className={claseTd}><Pastilla tono={tonoEstado(p.estado)}>{etiquetaEstado(p.estado)}</Pastilla></td>
