@@ -55,6 +55,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   renombrar_tienda: "Cambió el nombre de una tienda",
   anular_compra: "Anuló una compra",
   restaurar_compra: "Restauró una compra",
+  eliminar_comentario_compra: "Eliminó un comentario de una compra",
   crear_ruta_envio: "Creó una ruta de envío",
   editar_ruta_envio: "Editó una ruta de envío",
   activar_ruta_envio: "Activó una ruta de envío",

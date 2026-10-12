@@ -200,6 +200,37 @@ export function TiraPendientes({ pendientes, alQuitar }: { pendientes: Pendiente
   );
 }
 
+/** Los archivos que ya tiene un comentario, al editarlo: como las miniaturas por enviar, cada una con su ✕ para quitarla al guardar. */
+export function TiraExistentes({ adjuntos, alQuitar }: { adjuntos: AdjuntoCompra[]; alQuitar: (id: string) => void }) {
+  if (adjuntos.length === 0) return null;
+  return (
+    <ul aria-label="Archivos del comentario" className="m-0 flex list-none flex-wrap gap-2 p-0">
+      {adjuntos.map((a) => (
+        <li key={a.id} title={a.nombre} className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-muted-foreground">
+          {a.clase === "foto" && a.url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={a.url} alt={a.nombre} className="h-full w-full object-cover" />
+          ) : (
+            <span aria-hidden="true" className="text-lg leading-none">
+              {iconoArchivo(a.nombre)}
+            </span>
+          )}
+          <Tooltip texto="Quitar archivo">
+            <button
+              type="button"
+              aria-label={`Quitar ${a.nombre}`}
+              onClick={() => alQuitar(a.id)}
+              className={`absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-bl-md bg-foreground/80 text-background hover:bg-foreground ${anilloFoco}`}
+            >
+              <CerrarIcon className="h-2.5 w-2.5" />
+            </button>
+          </Tooltip>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Los archivos de un comentario ya enviado, debajo de su texto: las imágenes como miniaturas de 40 × 40 (se amplían al pulsarlas) y los documentos (PDF, Excel, Word…) como enlace con su ícono. */
 export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoCompra[] }) {
   const [ampliada, setAmpliada] = useState<AdjuntoCompra | null>(null);
