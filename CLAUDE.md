@@ -632,7 +632,9 @@ convenciones técnicas del código.
   y envuelve su celda con `ed(c, "<id>", …)` en `tabla-compras.tsx`.
   **Cambiar varias compras a la vez** (como las acciones en lote de ClickUp, para armar un envío: etiqueta, fecha límite,
   planificación…): con permiso de escritura la tabla trae una casilla por fila y una en el encabezado (marca las que se ven;
-  `seleccion` de `TablaDatos`, genérico: cuenta solo lo que está en pantalla, como Retiros). Al marcar alguna sale fija abajo
+  `seleccion` de `TablaDatos`, genérico: cuenta solo lo que está en pantalla, como Retiros; **al agrupar, cada grupo trae su
+  propia casilla en el encabezado** —`casilla` de `EncabezadoGrupo`, también en Retiros— que marca o desmarca todas las filas
+  del grupo, se ve a medias si solo hay algunas y, si el grupo estaba contraído, lo abre al marcarlo). Al marcar alguna sale fija abajo
   `BarraLoteCompras` (`barra-lote-compras.tsx`): «N compras seleccionadas», un botón por dato (Etiquetas, Fecha límite,
   Fecha de Envío, Etapa, Estado, Vía de envío, Proveedor, Tienda y «Más» con el resto de `CAMPOS_EDITABLES`), descargar lo
   marcado y quitar la selección. Cada botón abre **el mismo panel de las celdas** (los editores de `celda-editable.tsx`, ahora
