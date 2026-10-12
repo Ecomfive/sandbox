@@ -74,7 +74,7 @@ export const CURSOS: Curso[] = [
         titulo: "Un catálogo para todos los países",
         parrafos: [
           "Cada producto vive una sola vez en el sistema y vale para todos los países: el mismo SKU, el mismo código de barras y la misma foto. El SKU es la llave con la que una venta de Dropi o Shopify encuentra el producto para descontar inventario, así que debe ser igual en todas las plataformas.",
-          "Un producto nuevo arranca en Test (se está probando). Cuando se aprueba y pasa a Activo desde su ficha, el sistema crea sola su orden de compra en «02 - Cotizar» en el país de la barra de arriba.",
+          "Un producto nuevo arranca en Test (se está probando). Cuando se aprueba y pasa a Activo desde su ficha, el sistema crea sola su orden de compra en «01 - Cotizar» en el país de la barra de arriba.",
           "Un producto puede ser simple (se compra y se guarda tal cual) o compuesto (una combinación de simples con su cantidad: no guarda stock y al venderlo se descuenta cada componente).",
           "Al crear un compuesto, cada componente se busca como en una orden de compra (foto, SKU, nombre y N.º) y se ve el mapa de cómo se arma. En la lista, al pasar el cursor por el nombre, un compuesto muestra su mapa y un simple su foto grande y sus compras.",
         ],
@@ -120,7 +120,7 @@ export const CURSOS: Curso[] = [
       {
         titulo: "Etapa y Estado",
         parrafos: [
-          "La Etapa dice en qué paso va la compra: Backlog, 01 Solicitud Internacional, 02 Cotizar, 03 Cotizado… hasta 11 Completado o Descartado. De los cambios de etapa salen los tiempos y las alertas de atraso.",
+          "La Etapa dice en qué paso va la compra: Backlog, 01 Cotizar, 02 Cotizado… hasta 06 Completado o Descartado. De los cambios de etapa salen los tiempos y las alertas de atraso.",
           "El Estado es el semáforo de gestión (Pendiente, En Gestión, En Revisión, Completado…). Una compra se archiva —pasa a «Cerrados»— cuando su Estado es Completado, aunque la mercancía ya haya llegado antes.",
         ],
       },

@@ -1,4 +1,4 @@
-@AGENTS.md
+﻿@AGENTS.md
 
 # Sistema Gestión de Plataformas Ecomfive
 
@@ -263,7 +263,7 @@ convenciones técnicas del código.
   producto vive en `skus_maestros` (el nombre de la tabla se conserva) y se crea desde «Agregar»: **simple o compuesto** (un compuesto
   es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **Activo o Test** (se ve como «Estado» y se elige en la ficha; en la base es la columna `clase`, y Activo se guarda como `'fisico'`:
   un test se está probando, todavía no se compra, **aparece en Inventario pero no tiene stock** —`wms_aplicar_cambios` rechaza cualquier
-  movimiento— y se pasa a Activo desde el selector «Estado» de su ficha; volver a Test solo si nunca tuvo movimientos). **Un producto aprobado pasa solo a Compras** (12 oct 2026): al pasar de Test a Activo desde su ficha (`cambiarClaseProducto` → `aplicarEstado`, no desde Compras ni en compuestos), `crearCompraDesdeProducto` (`src/lib/compras/compra-desde-producto.ts`) crea su orden en «02 - Cotizar» en el país de la barra de arriba (`getPaisActual`), con su nombre, su foto copiada y un comentario; sin línea de producto (la cantidad se pone al cotizar). El producto nuevo arranca en Test y su foto se sube al crearlo (`productos/nuevos/…` → su carpeta en `crearProducto`). **Compras: un producto en Test no se compra.** Al agregar un producto a una compra se usa `useConfirmarProductoActivo` (`compras/confirmar-producto-activo.tsx`): si está en Test advierte que debe pasar a Activo; Cancelar vuelve atrás y Aceptar lo pasa a Activo en su ficha (`activarProductoParaCompra`, basta poder modificar Compras; queda en su actividad «desde Compras»). Compras enlaza productos con el bloque «Productos» (`wms_compra_items`); el campo de texto «Producto relacionado» se quitó (migración 0090). Ya no hay flujo
+  movimiento— y se pasa a Activo desde el selector «Estado» de su ficha; volver a Test solo si nunca tuvo movimientos). **Un producto aprobado pasa solo a Compras** (12 oct 2026): al pasar de Test a Activo desde su ficha (`cambiarClaseProducto` → `aplicarEstado`, no desde Compras ni en compuestos), `crearCompraDesdeProducto` (`src/lib/compras/compra-desde-producto.ts`) crea su orden en «01 - Cotizar» en el país de la barra de arriba (`getPaisActual`), con su nombre, su foto copiada y un comentario; sin línea de producto (la cantidad se pone al cotizar). El producto nuevo arranca en Test y su foto se sube al crearlo (`productos/nuevos/…` → su carpeta en `crearProducto`). **Compras: un producto en Test no se compra.** Al agregar un producto a una compra se usa `useConfirmarProductoActivo` (`compras/confirmar-producto-activo.tsx`): si está en Test advierte que debe pasar a Activo; Cancelar vuelve atrás y Aceptar lo pasa a Activo en su ficha (`activarProductoParaCompra`, basta poder modificar Compras; queda en su actividad «desde Compras»). Compras enlaza productos con el bloque «Productos» (`wms_compra_items`); el campo de texto «Producto relacionado» se quitó (migración 0090). Ya no hay flujo
   propuesto → en revisión → aprobado (todo queda `aprobado`). **El SKU (`codigo`) es la llave del descuento automático**: es
   obligatorio y único sin importar mayúsculas ni espacios, y una venta de cualquier plataforma (Dropi, las tiendas de Shopify) encuentra
   su producto por ese código, que debe ser el mismo en las dos. `wms_aplicar_venta(codigo, cantidad, bodega, fase)` ya lo implementa
@@ -632,7 +632,9 @@ convenciones técnicas del código.
   y envuelve su celda con `ed(c, "<id>", …)` en `tabla-compras.tsx`.
   **Cambiar varias compras a la vez** (como las acciones en lote de ClickUp, para armar un envío: etiqueta, fecha límite,
   planificación…): con permiso de escritura la tabla trae una casilla por fila y una en el encabezado (marca las que se ven;
-  `seleccion` de `TablaDatos`, genérico: cuenta solo lo que está en pantalla, como Retiros). Al marcar alguna sale fija abajo
+  `seleccion` de `TablaDatos`, genérico: cuenta solo lo que está en pantalla, como Retiros; **al agrupar, cada grupo trae su
+  propia casilla en el encabezado** —`casilla` de `EncabezadoGrupo`, también en Retiros— que marca o desmarca todas las filas
+  del grupo, se ve a medias si solo hay algunas y, si el grupo estaba contraído, lo abre al marcarlo). Al marcar alguna sale fija abajo
   `BarraLoteCompras` (`barra-lote-compras.tsx`): «N compras seleccionadas», un botón por dato (Etiquetas, Fecha límite,
   Fecha de Envío, Etapa, Estado, Vía de envío, Proveedor, Tienda y «Más» con el resto de `CAMPOS_EDITABLES`), descargar lo
   marcado y quitar la selección. Cada botón abre **el mismo panel de las celdas** (los editores de `celda-editable.tsx`, ahora
@@ -735,7 +737,7 @@ convenciones técnicas del código.
   página pide a su servidor, con la hora en ms), quedó en la conversación como bloques `@@ACT@@`;
   `scripts/extraer-etapas-transcripcion.mjs <conversación.jsonl>` arma `datos-privados/clickup-etapas.json` y
   `scripts/importar-etapas-actividad.ts --aplicar` lo carga (`origen` «clickup_actividad», rehace los suyos). Lo anterior al
-  traspaso del 14 jul 2025 (todo a «12 - Completado», hoy «11 - Completado»: «Solicitud Local» se quitó el 6 oct 2026 y las etapas se renumeraron, mismas claves) es del campo «Etapa» viejo, con otra numeración (06 compra y pago,
+  traspaso del 14 jul 2025 (todo a «12 - Completado», hoy «06 - Completado»: «Solicitud Local» se quitó el 6 oct 2026 y, el 10 oct 2026, Solicitud Internacional, Evaluación de Proveedor, Solicitud a Proveedor, Compra y Pago y Aviso Logística; las etapas se renumeraron, mismas claves, y la migración 0098 mueve las compras que siguieran en una quitada: ficha y Actividad las siguen leyendo como «… (ya no se usa)») es del campo «Etapa» viejo, con otra numeración (06 compra y pago,
   07 En China, 08 tracking, 10 completado); el traspaso no cuenta como cambio. Cargado el 7 oct 2026: 5.259 cambios de
   1.196 compras. **Países:** se agregan desde Configuración (sección Países) o, como en ClickUp, con «Agregar país» al final de «Elige el
   país» de la compra nueva (`SelectorPais`: se busca por nombre entre los países del mundo de `src/lib/paises-mundo.ts`, que

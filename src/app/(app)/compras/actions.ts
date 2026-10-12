@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -270,7 +270,7 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string;
   await requireModuloEscritura("compras");
   // El nombre es opcional (venía de ClickUp; una compra con productos se titula por su N.º OC). Sin nombre, toma su código.
   const nombreEscrito = String(formData.get("nombre") ?? "").trim();
-  const etapa = (formData.get("etapa") as string) || "solicitud_internacional";
+  const etapa = (formData.get("etapa") as string) || "cotizar";
   const estado = (formData.get("estado") as string) || "backlog";
 
   if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
@@ -359,7 +359,6 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   const sinAcceso = await sinAccesoACompras([id]);
   if (sinAcceso) return { error: sinAcceso };
 
-  if (!ETAPAS_VALIDAS.has(etapa)) return { error: "Elige una etapa válida." };
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   const tipoYPais = await leerTipoYPais(formData);
@@ -368,6 +367,8 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   const supabase = createServiceClient();
   const { data: actualCompleta } = await supabase.from("wms_compras").select("*").eq("id", id).single();
   const actual = actualCompleta as Record<string, unknown> & { foto_url: string | null; etapa: string; estado: string } | null;
+  // Una compra que sigue en una etapa que ya no se elige (la migración 0098 las mueve) puede guardarse sin cambiarla.
+  if (!ETAPAS_VALIDAS.has(etapa) && etapa !== actual?.etapa) return { error: "Elige una etapa válida." };
   // Sin nombre se conserva el que tenía (el nombre es opcional: el título sale del N.º OC o del código).
   const nombre = nombreEscrito || String(actual?.nombre ?? "") || String(actual?.codigo ?? "") || "Orden de compra";
   const { qty_total, monto_total, ...resto } = leerCambios(formData);

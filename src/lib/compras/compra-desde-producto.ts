@@ -5,7 +5,7 @@ const PREFIJO = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/publi
 
 /**
  * La orden de compra que nace sola cuando un producto aprobado pasa de Test a Activo (pedido de Hernán, 12 oct 2026): en el país
- * de la barra de arriba, en la etapa «02 - Cotizar», con el nombre del producto, su foto (copiada: si se cambia la de la compra no
+ * de la barra de arriba, en la etapa «01 - Cotizar», con el nombre del producto, su foto (copiada: si se cambia la de la compra no
  * toca la del producto) y su SKU en la descripción. La cantidad y el costo se ponen al cotizar (una línea necesita cantidad).
  * Deja su evento de etapa y un comentario que explica de dónde salió. Devuelve lo creado o el motivo por el que no se pudo.
  */

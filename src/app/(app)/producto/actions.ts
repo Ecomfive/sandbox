@@ -181,7 +181,7 @@ async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: strin
   revalidatePath("/producto");
   revalidatePath("/inventario");
 
-  // Un producto aprobado (de Test a Activo desde su ficha) pasa solo a Compras: su orden nace en «02 - Cotizar», en el país de
+  // Un producto aprobado (de Test a Activo desde su ficha) pasa solo a Compras: su orden nace en «01 - Cotizar», en el país de
   // la barra de arriba (decisión de Hernán, 12 oct 2026). Desde Compras («desde»), ya se está comprando: no se crea otra.
   // Un compuesto no se compra (se compran sus componentes): no lleva orden.
   if (actual.clase === "test" && clase === "fisico" && !desde && actual.tipo !== "combo") {
