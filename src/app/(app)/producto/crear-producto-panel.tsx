@@ -7,11 +7,12 @@ import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CalendarioIcon, CatalogoIcon, ProductoIcon } from "@/lib/nav-icons";
 import { svgCodigoBarras } from "@/lib/wms/codigo-barras";
-import { crearProducto, reservarCodigoBarrasInterno, revisarSku, sugerirSkuLibre } from "./actions";
+import { crearProducto, prepararSubidaFotoNuevoProducto, reservarCodigoBarrasInterno, revisarSku, sugerirSkuLibre, subirFotoNuevoProductoDesdeUrl } from "./actions";
 import { imprimirEtiqueta } from "./codigo-barras-producto";
 import { ComboBuilder } from "./combo-builder";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
+import { CampoFoto } from "@/components/ui/campo-foto";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
@@ -60,6 +61,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
     if (espera.current) clearTimeout(espera.current);
     espera.current = setTimeout(() => void sugerir(valor), 450);
   }
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [conVariantes, setConVariantes] = useState(false);
   const [armadas, setArmadas] = useState<VariantesArmadas>({ opciones: [], variantes: [] });
   // Un compuesto sin productos simples no se puede armar: el botón lleva a ese aviso.
@@ -82,7 +84,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
         void pedirInterno();
       }}
       alGuardar={() => setInterno(null)}
-      puedeExtra={!sinComponentes}
+      puedeExtra={!sinComponentes && !subiendoFoto}
       alPulsarSinCompletar={() => document.getElementById("campo-componentes")?.scrollIntoView({ block: "center" })}
     >
       {({ faltante, invalido }) => (
@@ -92,7 +94,7 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
               <Opciones
                 titulo="Estado"
                 nombre="clase"
-                inicial="fisico"
+                inicial="test"
                 opciones={[
                   { valor: "fisico", etiqueta: "Activo", detalle: "se compra" },
                   { valor: "test", etiqueta: "Test", detalle: "se está probando" },
@@ -109,6 +111,16 @@ export function CrearProductoPanel({ opcionesSimples }: { opcionesSimples: Opcio
                 ]}
               />
             </div>
+            {/* La foto, como en la ficha: subirla, arrastrarla (del escritorio o de internet) o pegarla con Ctrl+V. */}
+            <CampoFoto
+              nombreCampo="foto_url"
+              etiqueta="Foto del producto"
+              valorInicial={null}
+              alCambiarSubiendo={setSubiendoFoto}
+              prepararSubida={prepararSubidaFotoNuevoProducto}
+              subirDesdeUrl={subirFotoNuevoProductoDesdeUrl}
+              soltarEnTodo
+            />
             <Campo etiqueta="Nombre" id="campo-nombre-producto" obligatorio faltante={faltante}>
               <input
                 id="campo-nombre-producto"

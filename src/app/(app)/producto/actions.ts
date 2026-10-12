@@ -10,6 +10,9 @@ import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
 import { ETIQUETA_CLASE } from "./def-producto";
+import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
+import { getPaisActual } from "@/lib/pais";
+import { getUsuarioActual } from "@/lib/auth";
 
 const MODULO = "producto";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -123,6 +126,23 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   // Si se pidió un código interno y no se pudo generar, el producto queda creado: se genera después desde su ficha.
   if (generarBarras && !internoVisto) await supabase.rpc("wms_asignar_codigo_barras_interno", { p_sku: data.id });
 
+  // La foto que se subió en la ficha de crear (en `productos/nuevos/…`): se revisa que sea de verdad una imagen y pasa a la
+  // carpeta del producto. Si algo falla, el producto queda creado sin foto (se pone después desde su ficha).
+  const fotoSubida = texto(formData, "foto_url");
+  const prefijoNuevos = `${PREFIJO_FOTOS}productos/nuevos/`;
+  if (fotoSubida && fotoSubida.startsWith(prefijoNuevos) && !fotoSubida.includes("..")) {
+    const origen = fotoSubida.slice(PREFIJO_FOTOS.length);
+    const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(origen);
+    const imagen = archivo ? detectarImagen(new Uint8Array(await archivo.slice(0, 64).arrayBuffer())) : null;
+    if (imagen) {
+      const destino = `productos/${data.id}/${origen.split("/").pop()}`;
+      const { error: errorMover } = await supabase.storage.from(BUCKET_FOTOS).move(origen, destino);
+      if (!errorMover) await supabase.from("skus_maestros").update({ foto_url: PREFIJO_FOTOS + destino }).eq("id", data.id);
+    } else {
+      await supabase.storage.from(BUCKET_FOTOS).remove([origen]);
+    }
+  }
+
   await registrarAuditoria({
     accion: "crear_producto",
     entidad: "skus_maestros",
@@ -138,9 +158,9 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
  * Cambia el estado de un producto: de Test a Activo (se decidió comprarlo) o de Activo a Test. Vuelve a Test solo si nunca
  * tuvo movimientos de inventario: con historia ya no es una prueba. `desde` queda en la actividad («desde Compras»).
  */
-async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: string): Promise<{ error?: string }> {
+async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: string): Promise<{ error?: string; compra?: { numero: number; codigo: string | null; pais: string } }> {
   const supabase = createServiceClient();
-  const { data: actual } = await supabase.from("skus_maestros").select("codigo, clase").eq("id", id).maybeSingle();
+  const { data: actual } = await supabase.from("skus_maestros").select("codigo, clase, tipo").eq("id", id).maybeSingle();
   if (!actual) return { error: "El producto ya no existe." };
   if (actual.clase === clase) return {};
 
@@ -160,11 +180,24 @@ async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: strin
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");
+
+  // Un producto aprobado (de Test a Activo desde su ficha) pasa solo a Compras: su orden nace en «02 - Cotizar», en el país de
+  // la barra de arriba (decisión de Hernán, 12 oct 2026). Desde Compras («desde»), ya se está comprando: no se crea otra.
+  // Un compuesto no se compra (se compran sus componentes): no lleva orden.
+  if (actual.clase === "test" && clase === "fisico" && !desde && actual.tipo !== "combo") {
+    const usuario = await getUsuarioActual();
+    const pais = await getPaisActual(supabase);
+    const r = await crearCompraDesdeProducto({ skuId: id, pais, autor: usuario?.nombre || usuario?.email || "Sistema" });
+    if ("error" in r) return { error: `El producto quedó Activo, pero no se pudo crear su orden de compra: ${r.error}` };
+    await registrarAuditoria({ accion: "crear_compra", entidad: "skus_maestros", entidadId: id, detalle: `OC-${String(r.numero).padStart(4, "0")} · ${r.codigo ?? ""} · ${pais.nombre} (al pasar a Activo)` });
+    revalidatePath("/compras", "layout");
+    return { compra: { ...r, pais: pais.nombre } };
+  }
   return {};
 }
 
 /** El estado de un producto desde su ficha: Activo ('fisico') o Test. Devuelve el error como valor. */
-export async function cambiarClaseProducto(id: string, clase: string): Promise<{ error?: string }> {
+export async function cambiarClaseProducto(id: string, clase: string): Promise<{ error?: string; compra?: { numero: number; codigo: string | null; pais: string } }> {
   await requireModuloEscritura(MODULO);
   if (!ES_ID(id)) return { error: "Producto no válido." };
   if (clase !== "fisico" && clase !== "test") return { error: "Estado no válido." };
@@ -179,7 +212,8 @@ export async function cambiarClaseProducto(id: string, clase: string): Promise<{
 export async function activarProductoParaCompra(id: string): Promise<{ error?: string }> {
   await requireModuloEscritura("compras");
   if (!ES_ID(id)) return { error: "Producto no válido." };
-  return aplicarEstado(id, "fisico", "desde Compras");
+  const r = await aplicarEstado(id, "fisico", "desde Compras");
+  return r.error ? { error: r.error } : {};
 }
 
 /** La actividad de un producto (creación, cambios de clase) para su ficha. Basta poder abrir Producto. */
@@ -529,6 +563,32 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
 // dirección firmada (sin pasar el archivo por la acción) y después se guarda su ruta.
 const BUCKET_FOTOS = "wms-productos";
 const PREFIJO_FOTOS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
+
+/**
+ * Da permiso para subir la foto de un producto que todavía se está creando: va a `productos/nuevos/…` y, al crear el producto,
+ * pasa a su carpeta (`crearProducto`). Devuelve el error como valor.
+ */
+export async function prepararSubidaFotoNuevoProducto(nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
+  await requireModuloEscritura(MODULO);
+  const nombre = String(nombreArchivo ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "foto";
+  const ruta = `productos/nuevos/${crypto.randomUUID()}/${Date.now()}-${nombre}`;
+  const { data, error } = await createServiceClient().storage.from(BUCKET_FOTOS).createSignedUploadUrl(ruta);
+  if (error || !data) return { error: "No se pudo preparar la subida." };
+  return { ruta, token: data.token };
+}
+
+/** La foto de un producto que se está creando, desde una imagen de internet (arrastrada a la ficha). Devuelve su ruta. */
+export async function subirFotoNuevoProductoDesdeUrl(direccion: string): Promise<{ ruta: string } | { error: string }> {
+  await requireModuloEscritura(MODULO);
+  const descarga = await descargarPublico(String(direccion ?? "").trim(), 5 * 1024 * 1024);
+  if ("error" in descarga) return descarga;
+  const imagen = detectarImagen(descarga.bytes.slice(0, 64));
+  if (!imagen) return { error: "Eso no es una imagen JPG, PNG, WebP o GIF." };
+  const ruta = `productos/nuevos/${crypto.randomUUID()}/${Date.now()}-web.${imagen.extension}`;
+  const { error } = await createServiceClient().storage.from(BUCKET_FOTOS).upload(ruta, descarga.bytes, { contentType: imagen.tipo });
+  if (error) return { error: "No se pudo guardar la imagen." };
+  return { ruta };
+}
 
 /** Da permiso para subir la foto de un producto. Devuelve el error como valor. */
 export async function prepararSubidaFotoProducto(id: string, nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {

@@ -98,7 +98,11 @@ export function FichaProducto({
       const r = await cambiarClaseProducto(producto.id, nueva);
       if (r.error) setError(r.error);
       else {
-        mostrarToast(`Estado: ${ETIQUETA_CLASE[nueva]}`);
+        mostrarToast(
+          r.compra
+            ? `Estado: Activo. Se creó su orden de compra OC-${String(r.compra.numero).padStart(4, "0")}${r.compra.codigo ? ` · ${r.compra.codigo}` : ""} (${r.compra.pais}) en Cotizar`
+            : `Estado: ${ETIQUETA_CLASE[nueva]}`,
+        );
         setVersion((v) => v + 1);
       }
     });
