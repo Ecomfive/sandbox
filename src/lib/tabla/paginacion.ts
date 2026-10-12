@@ -1,4 +1,4 @@
-// Paginación de una tabla: qué filas tocan en cada página y qué botones de página se dibujan. Sin React, para poder probarlo.
+﻿// Paginación de una tabla: qué filas tocan en cada página y qué botones de página se dibujan. Sin React, para poder probarlo.
 
 export interface PaginaCalculada {
   /** Página actual (1 a `totalPaginas`), ya corregida si la pedida no existe. */
@@ -11,6 +11,8 @@ export interface PaginaCalculada {
   desde: number;
   hasta: number;
   total: number;
+  /** Filas por página que se usaron para calcularla. */
+  tamano: number;
 }
 
 /** La página `pedida` de una lista de `total` filas con `porPagina` por página; una página que no existe se corrige a la más cercana. */
@@ -20,7 +22,7 @@ export function calcularPagina(total: number, porPagina: number, pedida: number)
   const pagina = Math.min(Math.max(1, Math.floor(Number.isFinite(pedida) ? pedida : 1)), totalPaginas);
   const inicio = (pagina - 1) * tamano;
   const fin = Math.min(inicio + tamano, total);
-  return { pagina, totalPaginas, inicio, fin, desde: total === 0 ? 0 : inicio + 1, hasta: fin, total };
+  return { pagina, totalPaginas, inicio, fin, desde: total === 0 ? 0 : inicio + 1, hasta: fin, total, tamano };
 }
 
 export type BotonPagina = number | "…";

@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { filtroActivo, normalizar, type DefTabla } from "@/lib/tabla/motor";
+import { tamanoDePagina } from "@/lib/tabla/filas-por-pagina";
 import { calcularPagina } from "@/lib/tabla/paginacion";
 import { agruparFilas, aplicarVista } from "@/lib/tabla/vista";
 import { useFiltros, useVista } from "./ganchos";
+import { useFilasPorPagina } from "./usar-filas-por-pagina";
 
 /**
  * Todo lo que necesita una tabla con la barra de herramientas: los filtros y la vista guardados, las filas
@@ -39,10 +41,13 @@ export function useTablaInteractiva<F>(
     const coincide = (fila: F) => textos.some((c) => c.tipo === "texto" && normalizar(c.valor(fila)).includes(q));
     return { ...r, filas: r.filas.filter(coincide) };
   }, [def, filas, filtros, vista.mostrarCerrados, q]);
-  const { limiteSinFiltros, porPagina, paginarSiempre = false } = opciones;
+  const { limiteSinFiltros, paginarSiempre = false } = opciones;
+  // Las filas por página las puede elegir cada persona (50, 100, 500 o todas); sin elección, las de la tabla.
+  const [filasElegidas] = useFilasPorPagina();
+  const porPagina = opciones.porPagina === undefined ? undefined : tamanoDePagina(filasElegidas, opciones.porPagina);
 
-  // Página pedida: vale solo mientras no cambien los filtros, los cerrados ni los grupos; si cambian, se vuelve a la 1.
-  const firmaPagina = JSON.stringify([filtros, vista.mostrarCerrados, vista.agrupar, q]);
+  // Página pedida: vale solo mientras no cambien los filtros, los cerrados, los grupos ni las filas por página; si cambian, se vuelve a la 1.
+  const firmaPagina = JSON.stringify([filtros, vista.mostrarCerrados, vista.agrupar, q, porPagina]);
   const [paginaPedida, setPaginaPedida] = useState<{ firma: string; pagina: number }>({ firma: "", pagina: 1 });
   const paginado = porPagina !== undefined && (paginarSiempre || (!hayFiltros && !agrupado));
   // Agrupada, las páginas siguen el orden de los grupos (una fila con varios valores cuenta una vez, en el primero).
