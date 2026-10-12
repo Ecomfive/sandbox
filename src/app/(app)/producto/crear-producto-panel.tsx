@@ -28,6 +28,9 @@ export function CrearProductoPanel({
   mensajeExito = "Producto creado",
   ocultos,
   boton,
+  incrustada,
+  alGuardar,
+  alCambiarEnviando,
 }: {
   opcionesSimples: OpcionSkuMaestro[];
   /** Otra acción que crea el producto y hace algo más (Test productos lo agrega además a su lista). */
@@ -36,6 +39,11 @@ export function CrearProductoPanel({
   ocultos?: Record<string, string>;
   /** Otro botón que abre la ficha en vez de «Agregar». */
   boton?: (abrir: () => void) => ReactNode;
+  /** Solo el formulario, dentro de otra ventana (la pestaña «Nuevo producto» de Agregar en Test productos). */
+  incrustada?: boolean;
+  /** Además de lo propio, al crearse sin error (cerrar la ventana que la contiene). */
+  alGuardar?: () => void;
+  alCambiarEnviando?: (enviando: boolean) => void;
 }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
@@ -104,7 +112,12 @@ export function CrearProductoPanel({
         // El interno se separa al abrir (y se conserva hasta crear el producto: abrir y cerrar no gasta otro número).
         void pedirInterno();
       }}
-      alGuardar={() => setInterno(null)}
+      alGuardar={() => {
+        setInterno(null);
+        alGuardar?.();
+      }}
+      incrustada={incrustada}
+      alCambiarEnviando={alCambiarEnviando}
       puedeExtra={!sinComponentes && !subiendoFoto}
       alPulsarSinCompletar={() => document.getElementById("campo-componentes")?.scrollIntoView({ block: "center" })}
     >

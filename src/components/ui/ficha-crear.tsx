@@ -41,6 +41,8 @@ export function FichaCrear({
   alPulsarSinCompletar,
   boton,
   alGuardar,
+  incrustada = false,
+  alCambiarEnviando,
   children,
 }: {
   /** Título de la cabecera: «Nuevo gasto». */
@@ -64,6 +66,10 @@ export function FichaCrear({
   boton?: (abrir: () => void) => ReactNode;
   /** Se llama cuando se guardó sin error (para que la ficha que la contiene vuelva a pedir lo que muestra). */
   alGuardar?: () => void;
+  /** Solo el formulario, sin botón ni panel propio: va dentro de otra ventana (p. ej. una pestaña de «Agregar»). */
+  incrustada?: boolean;
+  /** Avisa cuando empieza y termina de guardar (para que la ventana que la contiene no se cierre a medias). */
+  alCambiarEnviando?: (enviando: boolean) => void;
   children: (ayuda: AyudaFaltantes) => ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -100,6 +106,14 @@ export function FichaCrear({
     setAbierto(true);
   }, [abrirConNuevo, parametros, pathname, router]);
 
+  // Incrustada: se «abre» al montarse (deja en blanco su estado) y avisa si está guardando.
+  useEffect(() => {
+    if (incrustada) alAbrirRef.current?.();
+  }, [incrustada]);
+  useEffect(() => {
+    alCambiarEnviando?.(pending);
+  }, [pending, alCambiarEnviando]);
+
   function cerrar() {
     if (pending) return;
     setAbierto(false);
@@ -128,17 +142,7 @@ export function FichaCrear({
     if (!señalarFaltante()) alPulsarSinCompletar?.();
   }
 
-  return (
-    <>
-      {boton ? boton(abrir) : <BotonAgregar ref={botonAbrirRef} etiqueta={etiquetaBoton} onClick={abrir} />}
-
-      <Ventana
-        abierto={abierto}
-        alCerrar={cerrar}
-        lado="derecha"
-        ancho="lg"
-        titulo={<span className="text-lg font-semibold">{titulo}</span>}
-      >
+  const formulario = (
         <form
           ref={formRef}
           onSubmit={alEnviar}
@@ -174,6 +178,22 @@ export function FichaCrear({
             />
           </div>
         </form>
+  );
+
+  if (incrustada) return formulario;
+
+  return (
+    <>
+      {boton ? boton(abrir) : <BotonAgregar ref={botonAbrirRef} etiqueta={etiquetaBoton} onClick={abrir} />}
+
+      <Ventana
+        abierto={abierto}
+        alCerrar={cerrar}
+        lado="derecha"
+        ancho="lg"
+        titulo={<span className="text-lg font-semibold">{titulo}</span>}
+      >
+        {formulario}
       </Ventana>
     </>
   );
