@@ -849,25 +849,83 @@ function esAutor(c: { autor: string | null; autor_id?: string | null }, yo: stri
 
 /**
  * Edita el texto de un comentario: solo quien lo escribió. Queda marcado «(editado)» con la hora. A las personas que se
- * mencionan por primera vez al editar les llega el aviso. Los archivos del comentario no cambian. Devuelve el error como valor.
+ * mencionan por primera vez al editar les llega el aviso. También se pueden quitar sus archivos y agregar otros (un comentario
+ * no puede quedar sin texto ni archivos). Devuelve el error como valor.
  */
-export async function editarComentarioCompra(comentarioId: string, texto: string, menciones: string[] = []): Promise<{ error?: string }> {
+export async function editarComentarioCompra(
+  comentarioId: string,
+  texto: string,
+  menciones: string[] = [],
+  /** Los archivos del comentario: `quitar` son ids de archivos suyos que se borran y `agregar` los que se subieron al editar. */
+  archivos: { quitar?: string[]; agregar?: AdjuntoSubido[] } = {},
+): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
   const supabase = createServiceClient();
+  const quitar = Array.isArray(archivos.quitar) ? archivos.quitar.filter((x) => ES_ID(String(x))) : [];
+  const agregar = Array.isArray(archivos.agregar) ? archivos.agregar : [];
   const { data: c, error: errorLeer } = await supabase.from("wms_compra_comentarios").select("id, compra_id, autor, autor_id, texto").eq("id", comentarioId).maybeSingle();
-  if (errorLeer || !c) return { error: "El comentario ya no existe." };
-  const sinAcceso = await sinAccesoACompras([c.compra_id as string]);
-  if (sinAcceso) return { error: sinAcceso };
-  if (!esAutor(c, usuario.id, usuario.nombre || usuario.email)) return { error: "Solo quien escribió el comentario lo puede editar." };
-  const limpio = String(texto ?? "").trim().slice(0, 5000);
-  if (limpio === c.texto) return {};
-  if (!limpio) {
-    const { count } = await supabase.from("wms_compra_adjuntos").select("id", { count: "exact", head: true }).eq("comentario_id", comentarioId);
-    if (!count) return { error: "El comentario no puede quedar vacío." };
+  if (errorLeer || !c) {
+    await borrarSubidos(agregar.map((a) => a?.ruta));
+    return { error: "El comentario ya no existe." };
   }
+  const sinAcceso = await sinAccesoACompras([c.compra_id as string]);
+  if (sinAcceso) {
+    await borrarSubidos(agregar.map((a) => a?.ruta));
+    return { error: sinAcceso };
+  }
+  if (!esAutor(c, usuario.id, usuario.nombre || usuario.email)) {
+    await borrarSubidos(agregar.map((a) => a?.ruta));
+    return { error: "Solo quien escribió el comentario lo puede editar." };
+  }
+  const limpio = String(texto ?? "").trim().slice(0, 5000);
+
+  // Los archivos que tiene ahora; solo se quitan los que de verdad son de este comentario.
+  const { data: actuales } = await supabase.from("wms_compra_adjuntos").select("id, ruta").eq("comentario_id", comentarioId);
+  const filasActuales = (actuales ?? []) as { id: string; ruta: string | null }[];
+  const aQuitar = filasActuales.filter((a) => quitar.includes(a.id));
+  const quedan = filasActuales.length - aQuitar.length;
+  if (limpio === c.texto && aQuitar.length === 0 && agregar.length === 0) return {};
+  if (!limpio && quedan + agregar.length === 0) {
+    await borrarSubidos(agregar.map((a) => a?.ruta));
+    return { error: "El comentario no puede quedar vacío: escribe algo, deja un archivo o elimina el comentario." };
+  }
+  if (quedan + agregar.length > MAX_ADJUNTOS_COMENTARIO) {
+    await borrarSubidos(agregar.map((a) => a?.ruta));
+    return { error: `Un comentario lleva hasta ${MAX_ADJUNTOS_COMENTARIO} archivos.` };
+  }
+  // Los archivos nuevos se revisan por su contenido antes de guardar nada (si alguno falla, se borran todos).
+  const revisados = agregar.length ? await revisarAdjuntosSubidos(c.compra_id as string, agregar) : [];
+  if ("error" in revisados) return revisados;
+
   const { error } = await supabase.from("wms_compra_comentarios").update({ texto: limpio, editado_en: new Date().toISOString() }).eq("id", comentarioId);
-  if (error) return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0097 para editar comentarios." : "No se pudo guardar el cambio." };
+  if (error) {
+    await borrarSubidos(revisados.map((a) => a.ruta));
+    return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0097 para editar comentarios." : "No se pudo guardar el cambio." };
+  }
+  if (revisados.length) {
+    const { error: errorNuevos } = await supabase.from("wms_compra_adjuntos").insert(
+      revisados.map((a) => ({
+        compra_id: c.compra_id,
+        comentario_id: comentarioId,
+        nombre: a.nombre,
+        extension: a.extension,
+        tamano: a.tamano,
+        clase: a.clase,
+        origen: "sistema",
+        ruta: a.ruta,
+        subido_por: usuario.nombre || usuario.email,
+      })),
+    );
+    if (errorNuevos) {
+      await borrarSubidos(revisados.map((a) => a.ruta));
+      return { error: "No se pudieron guardar los archivos nuevos." };
+    }
+  }
+  if (aQuitar.length) {
+    await supabase.from("wms_compra_adjuntos").delete().in("id", aQuitar.map((a) => a.id));
+    await borrarSubidos(aQuitar.map((a) => a.ruta).filter((r): r is string => !!r));
+  }
 
   // Solo se avisa a quien se menciona ahora y no estaba mencionado antes.
   const nuevos = (await mencionadosValidos(menciones, limpio, usuario.id)).filter((m) => !String(c.texto ?? "").includes(`@${m.nombre}`));
@@ -884,6 +942,46 @@ export async function editarComentarioCompra(comentarioId: string, texto: string
       href: `/compras/lista?ver=${encodeURIComponent(pais?.codigo ?? "todos")}&abrir=${c.compra_id}&comentario=${comentarioId}`,
     });
   }
+  return {};
+}
+
+/**
+ * Elimina un comentario: solo quien lo escribió. Se van con él sus reacciones y sus archivos (también del almacenamiento).
+ * Si tiene respuestas de otras personas no se puede eliminar (se borraría lo que ellas escribieron); las respuestas propias
+ * se van con él. Queda en la auditoría con su texto. Devuelve el error como valor.
+ */
+export async function eliminarComentarioCompra(comentarioId: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
+  if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
+  const supabase = createServiceClient();
+  const { data: c } = await supabase.from("wms_compra_comentarios").select("id, compra_id, autor, autor_id, texto").eq("id", comentarioId).maybeSingle();
+  if (!c) return { error: "El comentario ya no existe." };
+  const sinAcceso = await sinAccesoACompras([c.compra_id as string]);
+  if (sinAcceso) return { error: sinAcceso };
+  const miNombre = usuario.nombre || usuario.email;
+  if (!esAutor(c, usuario.id, miNombre)) return { error: "Solo quien escribió el comentario lo puede eliminar." };
+
+  // Sin la migración 0095 no hay respuestas: la consulta falla y se sigue como si no las hubiera.
+  const { data: respuestas } = await supabase.from("wms_compra_comentarios").select("id, autor, autor_id").eq("respuesta_a", comentarioId);
+  const filasRespuestas = (respuestas ?? []) as { id: string; autor: string | null; autor_id: string | null }[];
+  if (filasRespuestas.some((r) => !esAutor(r, usuario.id, miNombre))) {
+    return { error: "Tiene respuestas de otras personas, así que no se puede eliminar." };
+  }
+
+  // Los archivos de este comentario y de sus respuestas: las filas se van solas con el comentario, el almacenamiento no.
+  const ids = [comentarioId, ...filasRespuestas.map((r) => r.id)];
+  const { data: archivos } = await supabase.from("wms_compra_adjuntos").select("ruta").in("comentario_id", ids);
+  const rutas = ((archivos ?? []) as { ruta: string | null }[]).map((a) => a.ruta).filter((r): r is string => !!r);
+
+  const { error } = await supabase.from("wms_compra_comentarios").delete().eq("id", comentarioId);
+  if (error) return { error: "No se pudo eliminar el comentario." };
+  if (rutas.length) await borrarSubidos(rutas);
+  await registrarAuditoria({
+    accion: "eliminar_comentario_compra",
+    entidad: "wms_compras",
+    entidadId: c.compra_id as string,
+    detalle: `${String(c.texto ?? "").slice(0, 200) || "(solo archivos)"}${rutas.length ? ` · ${rutas.length} archivo${rutas.length === 1 ? "" : "s"}` : ""}`,
+  });
   return {};
 }
 
