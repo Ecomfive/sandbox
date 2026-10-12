@@ -6,6 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { ESTADOS, NIVELES_EXPLOTACION, TEST_NUMEROS } from "./def-productos-test";
 import { crearProducto } from "../producto/actions";
+import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
 const TEST_NUMEROS_VALIDOS: Set<string> = new Set(TEST_NUMEROS.map((t) => t.valor));
@@ -79,6 +80,8 @@ export async function crearProductoTest(formData: FormData): Promise<{ error?: s
   if (error) return { error: error.message };
 
   await registrarAuditoria({ accion: "crear_producto_test", entidad: "wms_productos_test", entidadId: data.id, detalle: nombre });
+  // Vinculado a un producto Activo: pasa a Filtro de productos.
+  if (await pasarTestsAFiltro(supabase, { testIds: [data.id] })) revalidatePath("/filtro-productos");
   revalidatePath("/productos-test");
   return {};
 }
@@ -100,6 +103,8 @@ export async function actualizarProductoTest(formData: FormData): Promise<{ erro
     .eq("id", id);
   if (error) return { error: error.message };
 
+  // Vinculado a un producto Activo: pasa a Filtro de productos.
+  if (await pasarTestsAFiltro(supabase, { testIds: [id] })) revalidatePath("/filtro-productos");
   revalidatePath("/productos-test");
   return {};
 }
@@ -139,6 +144,8 @@ export async function crearProductoNuevoEnTest(formData: FormData): Promise<{ er
   if (error) return { error: "El producto se creó en Producto, pero no se pudo agregar a Test productos: agrégalo con «Agregar»." };
 
   await registrarAuditoria({ accion: "crear_producto_test", entidad: "wms_productos_test", entidadId: data.id, detalle: `${nombre} (nuevo en Producto)` });
+  // Si se creó ya Activo, pasa a Filtro de productos.
+  if (await pasarTestsAFiltro(supabase, { testIds: [data.id] })) revalidatePath("/filtro-productos");
   revalidatePath("/productos-test");
   return {};
 }

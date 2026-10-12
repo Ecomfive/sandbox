@@ -11,6 +11,7 @@ import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
 import { ETIQUETA_CLASE } from "./def-producto";
 import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
+import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 import { getPaisActual } from "@/lib/pais";
 import { getUsuarioActual } from "@/lib/auth";
 
@@ -193,6 +194,8 @@ async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: strin
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");
+  // Activo y con su test vinculado en Test productos: pasa a Filtro de productos.
+  if (clase === "fisico" && (await pasarTestsAFiltro(supabase, { skuId: id }))) revalidatePath("/filtro-productos");
 
   // Un producto aprobado (de Test a Activo desde su ficha) pasa solo a Compras: su orden nace en «01 - Cotizar», en el país de
   // la barra de arriba (decisión de Hernán, 12 oct 2026). Desde Compras («desde»), ya se está comprando: no se crea otra.
