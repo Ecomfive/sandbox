@@ -57,6 +57,8 @@ export function ListaProductosTest({
 }) {
   const [busqueda, setBusqueda] = useState(buscarInicial);
   const [chip, setChip] = useState<Resultado | null>(null);
+  // Solo los que todavía no están vinculados a su producto de Producto.
+  const [sinVincular, setSinVincular] = useState(false);
   const [estado, setEstado] = useState("");
   const [categoria, setCategoria] = useState("");
   const [test, setTest] = useState("");
@@ -75,6 +77,7 @@ export function ListaProductosTest({
         (p) =>
           (!q || normalizar(p.nombre).includes(q)) &&
           (!chip || resultadoDe(p.estado) === chip) &&
+          (!sinVincular || !p.skuMaestroId) &&
           (!estado || p.estado === estado) &&
           (!categoria || limpiarCategoria(p.categoria) === categoria) &&
           (!test || p.testNumero === test),
@@ -88,7 +91,11 @@ export function ListaProductosTest({
         if (y === null) return -1;
         return x === y ? a.nombre.localeCompare(b.nombre) : (x < y ? -1 : 1) * orden.sentido;
       });
-  }, [productos, busqueda, chip, estado, categoria, test, orden]);
+  }, [productos, busqueda, chip, sinVincular, estado, categoria, test, orden]);
+  // Los números de la fila de arriba (como en Compras): cuántos hay de cada resultado y cuántos falta vincular a Producto.
+  const cuantos = useMemo(() => Object.fromEntries(CHIPS.map((c) => [c.resultado, productos.filter((p) => resultadoDe(p.estado) === c.resultado).length])), [productos]);
+  const vinculados = productos.filter((p) => p.skuMaestroId).length;
+  const faltan = productos.length - vinculados;
 
   const visibles = filas.slice(0, POR_PAGINA);
   const idsVisibles = visibles.map((p) => p.id);
@@ -102,6 +109,33 @@ export function ListaProductosTest({
   return (
     <div className={claseConFicha}>
       <div className="min-w-0">
+        <div className="mb-1.5 flex flex-wrap gap-1.5" role="group" aria-label="Filtros rápidos">
+          <BotonBarra
+            activo={!chip && !sinVincular}
+            onClick={() => {
+              setChip(null);
+              setSinVincular(false);
+            }}
+          >
+            Total en test <span className="text-muted-foreground tabular-nums">{productos.length}</span>
+          </BotonBarra>
+          {CHIPS.map((c) => (
+            <BotonBarra key={c.resultado} activo={chip === c.resultado} onClick={() => setChip((v) => (v === c.resultado ? null : c.resultado))}>
+              {c.etiqueta} <span className="text-muted-foreground tabular-nums">{cuantos[c.resultado]}</span>
+            </BotonBarra>
+          ))}
+          <BotonBarra activo={sinVincular} onClick={() => setSinVincular((v) => !v)}>
+            {faltan > 0 && <Punto tono="aviso" />}
+            Sin vincular <span className="text-muted-foreground tabular-nums">{faltan}</span>
+          </BotonBarra>
+        </div>
+        <p className="m-0 mb-3 text-xs text-muted-foreground" role="status">
+          {productos.length === 0
+            ? "Todavía no hay productos en test."
+            : faltan === 0
+              ? `Todos los productos en test están vinculados a Producto (${productos.length}).`
+              : `Productos vinculados a Producto: ${vinculados} de ${productos.length}. Faltan ${faltan}.`}
+        </p>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <label className="flex h-[34px] max-w-xs min-w-[12.5rem] flex-[1_1_12.5rem] items-center gap-1.5 rounded-lg border border-border-control bg-card px-2.5 focus-within:ring-2 focus-within:ring-foreground">
             <BuscarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -114,11 +148,6 @@ export function ListaProductosTest({
               className="w-full bg-transparent text-[13px] outline-none"
             />
           </label>
-          {CHIPS.map((c) => (
-            <BotonBarra key={c.resultado} activo={chip === c.resultado} onClick={() => setChip((v) => (v === c.resultado ? null : c.resultado))}>
-              {c.etiqueta}
-            </BotonBarra>
-          ))}
           <select aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value)} className={claseSelect}>
             <option value="">Todos los estados</option>
             {ESTADOS.map((e) => (

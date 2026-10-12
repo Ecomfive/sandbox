@@ -182,7 +182,7 @@ export const GUIAS: GuiaModulo[] = [
     titulo: "Productos Test",
     ruta: "/productos-test",
     resumen: "Los productos que se prueban en marketing y cuáles resultaron winners.",
-    secciones: [{ titulo: "Uso", pasos: ["Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto."] }],
+    secciones: [{ titulo: "Uso", pasos: ["Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Arriba de la lista: Total en test, Winners, En consulta, Fallidos, Otros estados y Sin vincular, cada uno con su número (púlsalos para filtrar), y cuántos faltan por vincular a Producto.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto."] }],
   },
   {
     modulo: "filtro-productos",
@@ -244,6 +244,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-12", titulo: "Resumen en Productos Test", texto: "La lista de Productos Test muestra arriba el total en test, los winners y los que faltan por vincular a Producto, con su número y como filtro de un toque.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Productos Test vinculados a Producto", texto: "Al agregar un producto en prueba lo eliges de los que ya existen en Producto, con el mismo buscador de la orden de compra; el nombre se llena solo.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Eliminar comentarios y quitar sus archivos", texto: "En tus propios comentarios de una compra puedes pulsar Eliminar (con confirmación) o, al Editar, quitar un archivo con su ✕ y adjuntar otro. Un comentario con respuestas de otras personas no se puede eliminar.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-12", titulo: "Envío al crear un producto", texto: "La ficha «Nuevo producto» trae el bloque Envío (producto físico, embalaje, tamaño empacado, peso, país de origen y código SA).", modulo: "producto", href: "/producto" },
