@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { KpiGroup } from "@/components/ui/kpi-card";
-import type { Asociacion, FilaProducto } from "./def-producto";
+import type { Asociacion, FilaProducto, TestProducto } from "./def-producto";
 import { TablaProducto } from "./tabla-producto";
 import { TarjetasClase } from "./tarjetas-clase";
 
@@ -61,7 +61,7 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests] = await Promise.all([
     supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)"),
     supabase
       .from("wms_producto_variantes")
@@ -76,7 +76,39 @@ export default async function ProductoPage() {
     traerTodasLasFilas<{ sku_maestro_id: string; compra_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
       supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, anulada_en, paises(codigo))").order("id").range(desde, hasta),
     ),
+    // Los tests de Test productos vinculados a cada producto (migración 0099), solo para quien puede abrir Test productos.
+    usuario.modulos.includes("productos-test")
+      ? supabase
+          .from("wms_productos_test")
+          .select("id, nombre, sku_maestro_id, estado, test_numero, fecha_test, metrica_gasto, metrica_compras, metrica_cpa, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)")
+          .not("sku_maestro_id", "is", null)
+          .order("fecha_test", { ascending: false, nullsFirst: false })
+      : Promise.resolve({ data: [] as never[] }),
   ]);
+  const numero = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  const testsPorId = new Map<string, TestProducto[]>();
+  for (const t of (tests.data ?? []) as Record<string, unknown>[]) {
+    const pais = unoDe(t.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? null;
+    if (!puedeVerPais(usuario.paisesPermitidos, pais)) continue;
+    const id = t.sku_maestro_id as string;
+    testsPorId.set(id, [
+      ...(testsPorId.get(id) ?? []),
+      {
+        id: t.id as string,
+        nombre: t.nombre as string,
+        pais,
+        estado: t.estado as string,
+        testNumero: (t.test_numero as string | null) ?? null,
+        fechaTest: (t.fecha_test as string | null) ?? null,
+        gasto: numero(t.metrica_gasto),
+        compras: numero(t.metrica_compras),
+        cpa: numero(t.metrica_cpa),
+        ctr: numero(t.metrica_ctr),
+        hook: numero(t.metrica_hook_rate),
+        cvr: numero(t.metrica_cvr),
+      },
+    ]);
+  }
   const numeroPorId = new Map(numeros.error ? [] : ((numeros.data ?? []) as { id: string; numero: number }[]).map((n) => [n.id, Number(n.numero)]));
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
   // Unidades compradas por producto (las líneas vinculadas en Compras); un producto con variantes suma las de sus variantes.
@@ -191,6 +223,7 @@ export default async function ProductoPage() {
     compras: comprasDe(p.id),
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],
+    tests: testsPorId.get(p.id) ?? [],
     padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre } : null,
     opciones: (p.opciones ?? null) as Record<string, string> | null,
     opcionesVariantes: (p.opciones_variantes ?? []) as { nombre: string; valores: string[] }[],

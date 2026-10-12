@@ -77,12 +77,30 @@ export interface FilaProducto {
   /** Día en que se creó (AAAA-MM-DD). */
   creado: string;
   asociaciones: Asociacion[];
+  /** Sus tests en Test productos (los vinculados a este producto), el más reciente primero. */
+  tests: TestProducto[];
   /** Si es una variante: su producto padre y sus valores ({ Color: "Beige", Talla: "S" }). */
   padre: { id: string; codigo: string; nombre: string } | null;
   opciones: Record<string, string> | null;
   /** Si tiene variantes: sus opciones con los valores, y las variantes. */
   opcionesVariantes: { nombre: string; valores: string[] }[];
   variantes: { id: string; codigo: string; nombre: string; opciones: Record<string, string> }[];
+}
+
+/** Un test del producto en Test productos, con sus métricas (null = sin dato). */
+export interface TestProducto {
+  id: string;
+  nombre: string;
+  pais: string | null;
+  estado: string;
+  testNumero: string | null;
+  fechaTest: string | null;
+  gasto: number | null;
+  compras: number | null;
+  cpa: number | null;
+  ctr: number | null;
+  hook: number | null;
+  cvr: number | null;
 }
 
 /** Cómo se filtra y agrupa la lista de productos. */
@@ -108,6 +126,17 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
       agrupable: true,
     },
     { id: "comprado", etiqueta: "Unidades compradas", tipo: "numero", valor: (p) => p.unidadesCompradas },
+    {
+      id: "test",
+      etiqueta: "Test",
+      tipo: "seleccion",
+      valores: (p) => [p.tests.length ? "con" : "sin"],
+      opciones: () => [
+        { valor: "con", etiqueta: "Tuvo test" },
+        { valor: "sin", etiqueta: "Sin test" },
+      ],
+      agrupable: true,
+    },
   ],
   csvAntes: [
     { etiqueta: "N.º", valor: (p) => (p.numero === null ? "" : String(p.numero)) },
