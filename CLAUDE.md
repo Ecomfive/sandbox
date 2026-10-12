@@ -896,7 +896,14 @@ convenciones técnicas del código.
   y solo dibuja 50, que es lo que pesa (el DOM y la hidratación); los filtros, las
   vistas guardadas y la descarga siguen trabajando sobre todas. Paginar en el
   servidor exigiría mover ahí filtros, agrupación y vistas: no se ha hecho. Lo
-  que esté marcado (acciones en lote) cuenta solo en la página que se ve.
+  que esté marcado (acciones en lote) cuenta solo en la página que se ve. **Filas por página a elección** (12 oct 2026):
+  el pie de toda tabla paginada (`Paginacion`) trae el selector «Filas por página» con 50, 100, 500 o Todas
+  (`src/lib/tabla/filas-por-pagina.ts`, con prueba). Lo elige cada persona, se guarda en su navegador
+  (`tabla-filas-por-pagina-v1`, `useFilasPorPagina`) y vale para todas las tablas; sin elección, cada tabla usa su
+  `porPagina`. `useTablaInteractiva` lo aplica solo (las tablas no cambian) y vuelve a la página 1 al cambiarlo. Con
+  «Todas» o 500 y pocas filas queda una sola página y el selector sigue visible; con 50 filas o menos no se dibuja.
+  «Todas» en una tabla grande como Compras (más de 1 000 filas con celdas editables) puede ir lento: por eso no es lo
+  predeterminado.
 - **Densidad y encabezado fijo de las tablas.** La caja de cada tabla de datos es
   `<ContenedorTabla ariaLabel="...">` (`src/components/tabla/contenedor-tabla.tsx`)
   y la `<table>` lleva la clase `tabla-datos`; los estilos están en

@@ -1,8 +1,10 @@
-"use client";
+﻿"use client";
 
-import { anilloFoco } from "@/components/ui/field";
+import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { ChevronRightIcon } from "@/lib/nav-icons";
+import { etiquetaFilasPorPagina, leerFilasPorPagina, MINIMO_FILAS_POR_PAGINA, OPCIONES_FILAS_POR_PAGINA, opcionMarcada } from "@/lib/tabla/filas-por-pagina";
 import { botonesDePagina, type PaginaCalculada } from "@/lib/tabla/paginacion";
+import { useFilasPorPagina } from "./usar-filas-por-pagina";
 import type { NombreFilas } from "@/lib/tabla/pie";
 
 const BASE = `flex min-h-9 min-w-9 items-center justify-center !rounded-md px-2 text-sm font-medium tabular-nums transition-colors ${anilloFoco}`;
@@ -22,10 +24,14 @@ export function Paginacion({
   nombre: NombreFilas;
   alIrA: (pagina: number) => void;
 }) {
-  if (pagina.totalPaginas <= 1) return null;
+  const [, cambiarFilas] = useFilasPorPagina();
+  // Con pocas filas no hay nada que elegir; pero con «todas» o 500 elegidas queda una sola página y el selector sigue ahí
+  // para poder volver a un número menor.
+  if (pagina.totalPaginas <= 1 && pagina.total <= MINIMO_FILAS_POR_PAGINA) return null;
   const botones = botonesDePagina(pagina.pagina, pagina.totalPaginas);
   const primera = pagina.pagina === 1;
   const ultima = pagina.pagina === pagina.totalPaginas;
+  const marcada = opcionMarcada(pagina.tamano);
 
   return (
     <nav
@@ -36,7 +42,29 @@ export function Paginacion({
       <p className="text-xs text-muted-foreground tabular-nums">
         Mostrando {pagina.desde}–{pagina.hasta} de {pagina.total} {nombre.plural}
       </p>
-      <ul className="flex flex-wrap items-center gap-1">
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        Filas por página
+        <select
+          value={marcada === null ? "" : String(marcada)}
+          onChange={(e) => {
+            const elegida = leerFilasPorPagina(e.target.value);
+            if (elegida !== null) cambiarFilas(elegida);
+          }}
+          className={`${fieldClassSm} w-auto py-1`}
+        >
+          {marcada === null && (
+            <option value="" disabled>
+              {pagina.tamano}
+            </option>
+          )}
+          {OPCIONES_FILAS_POR_PAGINA.map((o) => (
+            <option key={o} value={String(o)}>
+              {etiquetaFilasPorPagina(o)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {pagina.totalPaginas > 1 && <ul className="flex flex-wrap items-center gap-1">
         <li>
           <button
             type="button"
@@ -80,7 +108,7 @@ export function Paginacion({
             <ChevronRightIcon className="h-4 w-4" />
           </button>
         </li>
-      </ul>
+      </ul>}
     </nav>
   );
 }
