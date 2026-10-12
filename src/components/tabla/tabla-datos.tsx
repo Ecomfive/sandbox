@@ -186,6 +186,21 @@ export function TablaDatos<F, C = undefined>({
     });
   }
 
+  // La casilla del encabezado de un grupo marca (o desmarca) todas sus filas. Con el grupo contraído lo abre antes: una acción
+  // nunca toca filas que la persona no tiene delante.
+  function alternarGrupoFilas(grupo: Grupo<F>, contraido: boolean) {
+    const todas = grupo.filas.length > 0 && grupo.filas.every((f) => marcados.has(claveFila(f)));
+    if (contraido && !todas) tabla.alternarGrupo(grupo.clave);
+    setMarcados((actuales) => {
+      const nuevos = new Set(actuales);
+      for (const f of grupo.filas) {
+        if (todas) nuevos.delete(claveFila(f));
+        else nuevos.add(claveFila(f));
+      }
+      return nuevos;
+    });
+  }
+
   const fila = (f: F) => (
     <tr
       key={claveFila(f)}
@@ -396,6 +411,14 @@ export function TablaDatos<F, C = undefined>({
                     cantidad={grupo.filas.length}
                     nombre={nombre}
                     total={formatearTotal ? formatearTotal(grupo.total) : undefined}
+                    casilla={
+                      seleccion
+                        ? {
+                            marcadas: grupo.filas.filter((f) => marcados.has(claveFila(f))).length,
+                            alAlternar: () => alternarGrupoFilas(grupo, contraido),
+                          }
+                        : undefined
+                    }
                   />
                   {!contraido && grupo.filas.map((f) => fila(f))}
                   {hayTotales && grupo.filas.length > 0 && filaSubtotal(grupo)}

@@ -236,6 +236,21 @@ export function TablaRetiros({
     });
   }
 
+  // La casilla del encabezado de un grupo marca todos sus retiros; con el grupo contraído lo abre antes (una acción nunca
+  // toca un retiro que la persona no tiene delante).
+  function alternarGrupoFilas(grupo: Grupo<FilaRetiro>, contraido: boolean) {
+    const todas = grupo.filas.length > 0 && grupo.filas.every((f) => marcados.has(f.id));
+    if (contraido && !todas) tabla.alternarGrupo(grupo.clave);
+    setMarcados((actuales) => {
+      const nuevos = new Set(actuales);
+      for (const f of grupo.filas) {
+        if (todas) nuevos.delete(f.id);
+        else nuevos.add(f.id);
+      }
+      return nuevos;
+    });
+  }
+
   const columnasVisibles = columnasGuardadas.orden
     .filter((id) => !columnasGuardadas.ocultas.has(id))
     .map((id) => COLUMNAS_POR_ID.get(id as ColumnaId)!);
@@ -348,6 +363,14 @@ export function TablaRetiros({
                     cantidad={grupo.filas.length}
                     nombre={NOMBRE_FILAS}
                     total={formatearMoneda(grupo.total, codigoPais)}
+                    casilla={
+                      puedeEscribir
+                        ? {
+                            marcadas: grupo.filas.filter((f) => marcados.has(f.id)).length,
+                            alAlternar: () => alternarGrupoFilas(grupo, contraido),
+                          }
+                        : undefined
+                    }
                   />
                   {!contraido && grupo.filas.map((fila) => filaRetiro(fila))}
                 </tbody>
