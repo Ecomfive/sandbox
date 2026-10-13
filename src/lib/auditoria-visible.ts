@@ -33,14 +33,27 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
 const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);
 
 /**
+ * Acciones de un producto (`skus_maestros`, que no tiene país) que sí son de un país: la orden de compra creada al pasarlo a
+ * Activo y un movimiento de inventario. Su país va al final del detalle («… · Panamá») y se lee con `paisEnDetalle`.
+ */
+export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_inventario"]);
+
+/** El código del país nombrado en el detalle como « · <Nombre>», o undefined si no nombra ninguno. */
+export function paisEnDetalle(detalle: string | null | undefined, paises: { codigo: string; nombre: string }[]): string | undefined {
+  if (!detalle) return undefined;
+  return paises.find((p) => detalle.includes(` · ${p.nombre}`))?.codigo;
+}
+
+/**
  * Si un evento de la auditoría se puede mostrar a esta persona: necesita el módulo de su entidad; las acciones del CRM
  * Comercial piden además «crm-comercial»; y una compra (o ruta de envío) de un país que la persona no puede ver queda fuera
  * (`paisDe` da el código de país de la compra o ruta, o `null` si es de Importadora; `undefined` si no se sabe).
  */
 export function eventoVisible(
-  evento: { accion: string; entidad: string; entidad_id: string | null },
+  evento: { accion: string; entidad: string; entidad_id: string | null; detalle?: string | null },
   usuario: { modulos: string[]; paisesPermitidos: string[] | null },
   paisDe: (entidad: string, id: string | null) => string | null | undefined,
+  paises: { codigo: string; nombre: string }[] = [],
 ): boolean {
   const modulo = MODULO_DE_ENTIDAD[evento.entidad] ?? "usuarios";
   if (!usuario.modulos.includes(modulo)) return false;
@@ -48,6 +61,10 @@ export function eventoVisible(
   if (usuario.paisesPermitidos !== null && (evento.entidad === "wms_compras" || evento.entidad === "wms_rutas_envio")) {
     const pais = paisDe(evento.entidad, evento.entidad_id);
     // Sin saber el país (la compra se borró, por ejemplo) no se arriesga: se oculta.
+    if (pais === undefined || !puedeVerPais(usuario.paisesPermitidos, pais)) return false;
+  }
+  if (usuario.paisesPermitidos !== null && evento.entidad === "skus_maestros" && ACCIONES_PRODUCTO_CON_PAIS.has(evento.accion)) {
+    const pais = paisEnDetalle(evento.detalle, paises);
     if (pais === undefined || !puedeVerPais(usuario.paisesPermitidos, pais)) return false;
   }
   return true;

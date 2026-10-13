@@ -83,6 +83,16 @@ const PENDIENTES: {
  * La cola de trabajo: lo que tiene algo por atender va primero (en el orden de arriba) y lo que está al día queda
  * abajo, como una lista de comprobación. Solo salen los pendientes de módulos que la persona puede abrir.
  */
+/**
+ * Los pendientes con los conteos de módulos que la persona no abre puestos en cero (Centro de notificaciones): así esos
+ * números no salen del servidor (auditoría de seguridad, 13 oct 2026).
+ */
+export function pendientesVisibles(pendientes: PendientesHoy, modulos: string[]): PendientesHoy {
+  const visibles = { ...pendientes };
+  for (const p of PENDIENTES) if (!modulos.includes(p.modulo)) visibles[p.campo] = 0;
+  return visibles;
+}
+
 export function armarCola(pendientes: PendientesHoy, modulos: string[]): FilaCola[] {
   const filas = PENDIENTES.filter((p) => modulos.includes(p.modulo)).map<FilaCola>((p) => ({
     clave: p.clave,

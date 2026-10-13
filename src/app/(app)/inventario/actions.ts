@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { parseExtracto } from "@/lib/extractos/parse";
 import { mapearMovimientosInventario, type MapeoColumnasInventario } from "@/lib/inventario/parse";
 import { requireModuloEscritura } from "@/lib/auth";
+import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 
 export interface ImportarInventarioState {
   status: "idle" | "success" | "error";
@@ -16,8 +17,9 @@ export async function importarInventario(
   _prevState: ImportarInventarioState,
   formData: FormData
 ): Promise<ImportarInventarioState> {
+  let usuario;
   try {
-    await requireModuloEscritura("inventario");
+    usuario = await requireModuloEscritura("inventario");
   } catch (error) {
     return { status: "error", mensaje: error instanceof Error ? error.message : "Sin permiso." };
   }
@@ -30,7 +32,12 @@ export async function importarInventario(
   if (!paisId) return { status: "error", mensaje: "Selecciona un país." };
   if (!mapeoRaw) return { status: "error", mensaje: "Falta el mapeo de columnas." };
 
-  const mapeo = JSON.parse(mapeoRaw) as MapeoColumnasInventario;
+  let mapeo: MapeoColumnasInventario;
+  try {
+    mapeo = JSON.parse(mapeoRaw) as MapeoColumnasInventario;
+  } catch {
+    return { status: "error", mensaje: "El mapeo de columnas no es válido." };
+  }
   const fechaCarga = new Date().toISOString().slice(0, 10);
 
   let movimientos;
@@ -49,6 +56,7 @@ export async function importarInventario(
   }
 
   const supabase = createServiceClient();
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, paisId))) return { status: "error", mensaje: "No tienes acceso a ese país." };
 
   const skusUnicos = Array.from(new Set(movimientos.map((m) => m.sku)));
   const { data: existentes } = await supabase

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { ParaTi, type AvisoParaTi } from "./para-ti";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
+import { pendientesVisibles } from "@/lib/hoy";
 import { CentroNotificaciones } from "./centro-notificaciones";
 import { eventoVisible } from "@/lib/auditoria-visible";
 
@@ -54,11 +55,14 @@ export default async function NotificacionesPage() {
   // El país de cada compra y ruta de envío que aparece, para no mostrar la de un país no permitido.
   const ids = (entidad: string) => [...new Set((todos ?? []).filter((e) => e.entidad === entidad && e.entidad_id).map((e) => e.entidad_id as string))];
   const paisPor = new Map<string, string | null>();
+  let listaPaises: { codigo: string; nombre: string }[] = [];
   if (usuario.paisesPermitidos !== null) {
-    const [compras, rutas] = await Promise.all([
+    const [compras, rutas, todosPaises] = await Promise.all([
       ids("wms_compras").length ? supabase.from("wms_compras").select("id, tipo, paises(codigo)").in("id", ids("wms_compras")) : Promise.resolve({ data: [] }),
       ids("wms_rutas_envio").length ? supabase.from("wms_rutas_envio").select("id, pais_codigo").in("id", ids("wms_rutas_envio")) : Promise.resolve({ data: [] }),
+      supabase.from("paises").select("codigo, nombre"),
     ]);
+    listaPaises = (todosPaises.data ?? []) as { codigo: string; nombre: string }[];
     for (const c of (compras.data ?? []) as { id: string; tipo: string; paises: { codigo: string } | { codigo: string }[] | null }[]) {
       const p = Array.isArray(c.paises) ? c.paises[0] : c.paises;
       paisPor.set(`wms_compras:${c.id}`, c.tipo === "importacion" ? null : (p?.codigo ?? null));
@@ -66,7 +70,7 @@ export default async function NotificacionesPage() {
     for (const r of (rutas.data ?? []) as { id: string; pais_codigo: string }[]) paisPor.set(`wms_rutas_envio:${r.id}`, r.pais_codigo);
   }
   const eventos = (todos ?? [])
-    .filter((e) => eventoVisible(e, usuario, (entidad, id) => paisPor.get(`${entidad}:${id}`)))
+    .filter((e) => eventoVisible(e, usuario, (entidad, id) => paisPor.get(`${entidad}:${id}`), listaPaises))
     .slice(0, 200);
 
   return (
@@ -79,7 +83,7 @@ export default async function NotificacionesPage() {
       <ParaTi avisos={avisos} />
 
       <CentroNotificaciones
-        pendientes={pendientes}
+        pendientes={pendientesVisibles(pendientes, usuario.modulos)}
         eventos={eventos}
         sesionesDropi={sesionesDropi ?? []}
         codigoPais={pais.codigo}

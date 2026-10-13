@@ -32,3 +32,15 @@ test("una compra de un país no permitido no se ve (ni una de país desconocido)
   assert.equal(eventoVisible(ev, u, () => null), false);
   assert.equal(eventoVisible(ev, { modulos: ["compras"], paisesPermitidos: ["importacion"] }, () => null), true);
 });
+
+test("la orden de compra o el movimiento de un producto se filtran por el país de su detalle", () => {
+  const paises = [{ codigo: "PA", nombre: "Panamá" }, { codigo: "CR", nombre: "Costa Rica" }];
+  const u = { modulos: ["producto"], paisesPermitidos: ["CR"] };
+  const mov = (detalle: string) => ({ accion: "movimiento_inventario", entidad: "skus_maestros", entidad_id: "1", detalle });
+  assert.equal(eventoVisible(mov("entrada 5 de X · Costa Rica"), u, sinPais, paises), true);
+  assert.equal(eventoVisible(mov("entrada 5 de X · Panamá"), u, sinPais, paises), false);
+  assert.equal(eventoVisible(mov("entrada 5 de X"), u, sinPais, paises), false);
+  assert.equal(eventoVisible({ accion: "crear_compra", entidad: "skus_maestros", entidad_id: "1", detalle: "OC-0001 · X · Panamá (al pasar a Activo)" }, u, sinPais, paises), false);
+  assert.equal(eventoVisible({ accion: "cambiar_clase", entidad: "skus_maestros", entidad_id: "1", detalle: "x" }, u, sinPais, paises), true);
+  assert.equal(eventoVisible(mov("entrada 5 de X"), { modulos: ["producto"], paisesPermitidos: null }, sinPais, paises), true);
+});

@@ -43,7 +43,12 @@ async function borrarFotoSiEsNuestra(url: string | null) {
   // Solo una foto de la carpeta de este módulo (filtros/<uuid>/…): nunca la de un producto u otra ficha del mismo bucket.
   const ruta = rutaPropia(url, PREFIJO_URL_PUBLICA, "filtros");
   if (!ruta) return;
-  await createServiceClient().storage.from(BUCKET_FOTOS).remove([ruta]);
+  // Se llama después de guardar o borrar la fila: si otra fila todavía usa la foto (alguien copió su dirección en otra
+  // ficha), no se borra. Si la consulta falla, tampoco.
+  const supabase = createServiceClient();
+  const { count, error } = await supabase.from("wms_filtro_productos").select("id", { count: "exact", head: true }).eq("foto_url", url);
+  if (error || (count ?? 0) > 0) return;
+  await supabase.storage.from(BUCKET_FOTOS).remove([ruta]);
 }
 
 const numeroOptativo = (formData: FormData, campo: string): number | null => {

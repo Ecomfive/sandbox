@@ -45,6 +45,13 @@ convenciones técnicas del código.
   - «Hoy» arma cada tarjeta solo con su módulo; una acción que crea algo en el país de la barra comprueba `puedeVerPais`.
   - `getPaisActual` con países limitados solo devuelve uno de ellos (`paisesCandidatos`); si ninguno existe devuelve
     `SIN_PAIS` («Sin país», un id que no es de ningún país), nunca Costa Rica: las páginas quedan vacías en vez de mostrar otro país.
+  - Una acción que recibe un `pais_id` o una bodega del navegador comprueba el país con `puedeVerPaisId` / `puedeVerBodega`
+    (`src/lib/seguridad/pais-acceso.ts`; ya lo hacen la importación de inventario y `registrarMovimientoStock`).
+  - Los eventos de un producto que son de un país (`crear_compra`, `movimiento_inventario`) llevan el país al final del detalle
+    («… · Panamá») y se filtran con `eventoVisible` en la actividad del producto y en Avisos; los conteos de Avisos pasan por
+    `pendientesVisibles` (`src/lib/hoy.ts`).
+  - Compras y Filtro solo borran una foto de Storage si ninguna otra fila la sigue usando. La foto de una persona (Usuarios)
+    se valida por su contenido y con un id UUID. El CSV pone entre comillas también lo que lleva `;` o tabulador.
   - CSV del servidor con el `celdaCsv` compartido (`src/lib/tabla/csv.ts`), HTML de correos con lo escrito por personas
     escapado.
   - `scripts/actualizar-pedidos-servidor.ts` escucha solo en 127.0.0.1, exige Host `localhost:4321` y un código por

@@ -251,6 +251,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-13", titulo: "Cada quien ve sus países también en Inventario", texto: "Con países limitados, Inventario solo deja cargar movimientos en bodegas de tus países, la actividad de un producto ya no muestra órdenes ni movimientos de otros países y los números de «Por corregir» en Avisos son solo de tus módulos.", modulo: "inventario", href: "/inventario" },
   { fecha: "2026-10-13", titulo: "Países limitados: nunca otro país", texto: "Si a una persona se le limitan los países y ninguno de los suyos está disponible, la barra de arriba dice «Sin país» y las páginas quedan vacías, en vez de abrir Costa Rica.", modulo: "usuarios", href: "/usuarios" },
   { fecha: "2026-10-13", titulo: "«Hoy» muestra solo lo de tus módulos", texto: "Las tarjetas de Ventas Dropi, Operaciones, Conciliación del mes, Dropshippers y Proveedores rastreados salen solo si tu rol abre ese módulo. La primera que veas queda abierta.", modulo: "dashboard", href: "/" },
   { fecha: "2026-10-13", titulo: "Avisos muestra solo lo que te toca", texto: "La actividad del Centro de notificaciones ya no trae cambios de módulos que no abres ni compras de países que no tienes asignados.", modulo: "notificaciones", href: "/notificaciones" },

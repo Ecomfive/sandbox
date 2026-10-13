@@ -71,6 +71,8 @@ export function esIpPrivada(ip: string): boolean {
   // IPv4 escondida en los últimos 4 bytes: mapeada (::ffff:0:0/96), compatible (::/96, incluye :: y ::1) y NAT64 (64:ff9b::/96).
   if (ceros(0, 10) && x[10] === 0xff && x[11] === 0xff) return esIpv4Privada(x[12], x[13]);
   if (ceros(0, 12)) return true;
+  // IPv4 «traducida» (::ffff:0:0:0/96, SIIT): también lleva una IPv4 en los últimos 4 bytes.
+  if (ceros(0, 8) && x[8] === 0xff && x[9] === 0xff && ceros(10, 12)) return esIpv4Privada(x[12], x[13]);
   if (x[0] === 0x00 && x[1] === 0x64 && x[2] === 0xff && x[3] === 0x9b) return ceros(4, 12) ? esIpv4Privada(x[12], x[13]) : true;
   // 6to4 (2002::/16): la IPv4 va en los bytes 2 a 5.
   if (x[0] === 0x20 && x[1] === 0x02) return esIpv4Privada(x[2], x[3]);

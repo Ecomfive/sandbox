@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { detectarImagen } from "@/lib/seguridad/imagen";
+import { esUuid } from "@/lib/seguridad/ruta-almacen";
 
 const ALFABETO_CLAVE = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 
@@ -180,19 +182,23 @@ export async function eliminarUsuario(formData: FormData): Promise<{ error?: str
  * avatar propio (`src/lib/perfil-actions.ts`), pero con el id de otra cuenta. */
 export async function subirFotoDeUsuario(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("usuarios");
-  const id = formData.get("id") as string;
+  const id = String(formData.get("id") ?? "");
+  // El id va en la ruta del archivo: solo un UUID (auditoría de seguridad, 13 oct 2026).
+  if (!esUuid(id)) return { error: "Persona no válida." };
   const archivo = formData.get("foto") as File | null;
   if (!archivo || archivo.size === 0) return { error: "Selecciona una imagen." };
-  if (!archivo.type.startsWith("image/")) return { error: "El archivo debe ser una imagen." };
   if (archivo.size > 2 * 1024 * 1024) return { error: "La imagen debe pesar menos de 2MB." };
+  // El tipo y la extensión salen del contenido (su firma), no del nombre ni del tipo que manda el navegador.
+  const contenido = new Uint8Array(await archivo.arrayBuffer());
+  const imagen = detectarImagen(contenido);
+  if (!imagen) return { error: "La imagen debe ser JPG, PNG, WebP o GIF." };
 
   const supabase = createServiceClient();
-  const extension = archivo.name.split(".").pop() || "jpg";
-  const ruta = `${id}/avatar.${extension}`;
+  const ruta = `${id}/avatar.${imagen.extension}`;
 
   const { error: errorSubida } = await supabase.storage
     .from("avatars")
-    .upload(ruta, archivo, { upsert: true, contentType: archivo.type });
+    .upload(ruta, contenido, { upsert: true, contentType: imagen.tipo });
   if (errorSubida) return { error: errorSubida.message };
 
   const { data: publico } = supabase.storage.from("avatars").getPublicUrl(ruta);

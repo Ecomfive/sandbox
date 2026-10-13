@@ -14,6 +14,7 @@ import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { eventoVisible } from "@/lib/auditoria-visible";
 import { getUsuarioActual } from "@/lib/auth";
 
 const MODULO = "producto";
@@ -241,10 +242,11 @@ export async function activarProductoParaCompra(id: string): Promise<{ error?: s
 
 /** La actividad de un producto (creación, cambios de clase) para su ficha. Basta poder abrir Producto. */
 export async function obtenerHistorialProducto(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   if (!ES_ID(id)) return { error: "Producto no válido." };
 
-  const { data, error } = await createServiceClient()
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
     .from("historial_auditoria")
     .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
     .eq("entidad", "skus_maestros")
@@ -252,7 +254,13 @@ export async function obtenerHistorialProducto(id: string): Promise<{ eventos: {
     .order("creado_en", { ascending: false })
     .limit(30);
   if (error) return { error: "No se pudo cargar la actividad." };
-  return { eventos: (data ?? []).map((e) => ({ id: e.id, evento: formatearEventoAuditoria(e), creadoEn: e.creado_en })) };
+  // Con países limitados, las órdenes de compra y los movimientos de inventario de otros países no se muestran.
+  let visibles = data ?? [];
+  if (usuario.paisesPermitidos !== null) {
+    const { data: paises } = await supabase.from("paises").select("codigo, nombre");
+    visibles = visibles.filter((e) => eventoVisible({ ...e, entidad: "skus_maestros", entidad_id: id }, usuario, () => undefined, (paises ?? []) as { codigo: string; nombre: string }[]));
+  }
+  return { eventos: visibles.map((e) => ({ id: e.id, evento: formatearEventoAuditoria(e), creadoEn: e.creado_en })) };
 }
 
 /** Vincula un producto que llega en los pedidos de Dropi (tabla `productos`) con un producto del sistema (o lo desvincula). */

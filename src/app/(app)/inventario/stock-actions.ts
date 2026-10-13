@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
+import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 
 const MODULO = "inventario";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -155,6 +156,11 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   if (vencimiento && !/^\d{4}-\d{2}-\d{2}$/.test(vencimiento)) return { error: "La fecha de vencimiento no es válida." };
 
   const supabase = createServiceClient();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodega))) return { error: "No tienes acceso al país de esa bodega." };
+  // El país de la bodega va al final del detalle de la auditoría («· Panamá»): así su actividad se filtra por país.
+  const { data: bodegaFila } = await supabase.from("wms_bodegas").select("paises(nombre)").eq("id", bodega).maybeSingle();
+  const paisBodega = bodegaFila?.paises as { nombre: string } | { nombre: string }[] | null | undefined;
+  const nombrePais = (Array.isArray(paisBodega) ? paisBodega[0] : paisBodega)?.nombre;
   const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", sku).maybeSingle();
   if (!maestro) return { error: "El SKU no existe." };
   if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
@@ -184,7 +190,7 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
     accion: "movimiento_inventario",
     entidad: "skus_maestros",
     entidadId: sku,
-    detalle: `${tipo} ${cantidad} de ${maestro.codigo}${loteCodigo ? ` lote ${loteCodigo}` : ""}${referencia ? ` (${referencia})` : ""}`,
+    detalle: `${tipo} ${cantidad} de ${maestro.codigo}${loteCodigo ? ` lote ${loteCodigo}` : ""}${referencia ? ` (${referencia})` : ""}${nombrePais ? ` · ${nombrePais}` : ""}`,
   });
   revalidatePath("/inventario");
   return {};

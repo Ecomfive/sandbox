@@ -21,8 +21,10 @@ const HOSTS_PERMITIDOS = new Set([`localhost:${PUERTO}`, `127.0.0.1:${PUERTO}`])
 const TOKEN = randomBytes(24).toString("hex");
 
 function tokenValido(valor: string | null): boolean {
-  if (!valor || valor.length !== TOKEN.length) return false;
-  return timingSafeEqual(Buffer.from(valor), Buffer.from(TOKEN));
+  if (!valor) return false;
+  const recibido = Buffer.from(valor);
+  const esperado = Buffer.from(TOKEN);
+  return recibido.length === esperado.length && timingSafeEqual(recibido, esperado);
 }
 
 function origenPermitido(req: http.IncomingMessage): boolean {
@@ -187,6 +189,9 @@ function paginaConfirmarSaldo(pais: "cr" | "pa"): string {
 }
 
 const servidor = http.createServer(async (req, res) => {
+  // Ninguna otra página puede mostrar esta herramienta dentro de un marco (para engañar a la persona y que pulse un botón).
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
   if (!HOSTS_PERMITIDOS.has(req.headers.host ?? "")) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Abre http://localhost:" + PUERTO);

@@ -15,7 +15,8 @@ export function celdaCsv(valor: CeldaCsv): string {
   if (typeof valor === "number") return Number.isFinite(valor) ? String(valor) : "";
   // Un número escrito como texto («-12.50») no es una fórmula: se deja tal cual para que Excel lo lea como número.
   const texto = /^[=+\-@\t\r]/.test(valor) && !/^-?\d+(\.\d+)?$/.test(valor) ? `'${valor}` : valor;
-  return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  // También `;` y tabulador: un Excel en español separa por `;`, y sin comillas «x;=1+1» abriría una celda con fórmula.
+  return /[",;\t\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }
 
 function valorDeCampo<F>(campo: CampoDef<F>, fila: F, etiquetas: Map<string, string> | undefined): CeldaCsv {
