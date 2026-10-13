@@ -13,7 +13,8 @@ export type CeldaCsv = string | number | null | undefined;
 export function celdaCsv(valor: CeldaCsv): string {
   if (valor === null || valor === undefined) return "";
   if (typeof valor === "number") return Number.isFinite(valor) ? String(valor) : "";
-  const texto = /^[=+\-@\t\r]/.test(valor) ? `'${valor}` : valor;
+  // Un número escrito como texto («-12.50») no es una fórmula: se deja tal cual para que Excel lo lea como número.
+  const texto = /^[=+\-@\t\r]/.test(valor) && !/^-?\d+(\.\d+)?$/.test(valor) ? `'${valor}` : valor;
   return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }
 

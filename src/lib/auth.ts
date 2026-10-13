@@ -5,6 +5,8 @@ import { createSessionClient, createServiceClient } from "@/lib/supabase/server"
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
  * navegador de quien la prende (ver `src/lib/vista-previa-actions.ts`), nunca en la base. */
+const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const VISTA_PREVIA_COOKIE = "vista_previa_rol_id";
 
 export interface UsuarioActual {
@@ -89,10 +91,13 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
 
   // "Ver así": solo quien de verdad administra Usuarios y roles puede probar la app con los
   // permisos de otro rol — así que el cambio se aplica DESPUÉS de calcular los permisos reales,
-  // y solo si esta persona los tenía.
-  if (modulos.includes("usuarios")) {
-    const rolPreviaId = (await cookies()).get(VISTA_PREVIA_COOKIE)?.value || null;
-    if (rolPreviaId) {
+  // y solo si esta persona puede MODIFICAR Usuarios y roles (lo mismo que exige prenderlo; con solo
+  // lectura, poner la cookie a mano daba los permisos de cualquier rol). La cookie lleva además el id
+  // de quien la prendió: una cookie de otra persona, o escrita a mano sin ese id, no vale.
+  if (modulos.includes("usuarios") && !modulosSoloLectura.includes("usuarios")) {
+    const valor = (await cookies()).get(VISTA_PREVIA_COOKIE)?.value || "";
+    const [duenoId, rolPreviaId] = valor.split(":");
+    if (duenoId === perfil.id && rolPreviaId && ES_UUID.test(rolPreviaId)) {
       const { data: rolPrevia } = await supabase
         .from("roles")
         .select("id, nombre, permisos_rol(modulo, solo_lectura)")

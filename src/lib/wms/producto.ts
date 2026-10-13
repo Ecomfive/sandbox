@@ -3,6 +3,9 @@
 
 import { sanitizarHtml } from "@/lib/seguridad/sanitizar-html";
 
+/** La ruta de un medio subido por este módulo: `<uuid>/<fecha>-<nombre>` (la que da `prepararSubidaMedio`). */
+export const RUTA_MEDIO_SHOPIFY = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/\d+-[A-Za-z0-9._-]+$/;
+
 export const ESTADOS_PRODUCTO = ["activo", "borrador", "no_listado"] as const;
 export type EstadoProducto = (typeof ESTADOS_PRODUCTO)[number];
 
@@ -317,7 +320,9 @@ export function validarProducto(crudo: unknown): { datos: ProductoDatos } | { er
     const x = m as Record<string, unknown>;
     return {
       id: typeof x.id === "string" ? x.id : undefined,
-      ruta: typeof x.ruta === "string" ? x.ruta : undefined,
+      // Solo una ruta con la forma que da la subida de este módulo: antes se aceptaba cualquiera y, al quitar el medio, se
+      // borraba ese archivo del bucket compartido (la foto de un producto, de una compra…).
+      ruta: typeof x.ruta === "string" && RUTA_MEDIO_SHOPIFY.test(x.ruta) ? x.ruta : undefined,
       tempId: typeof x.tempId === "string" ? x.tempId : undefined,
       nombre_archivo: texto(x.nombre_archivo, 200),
       tipo: x.tipo === "video" ? "video" : "imagen",

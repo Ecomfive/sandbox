@@ -1,5 +1,6 @@
 "use server";
 
+import { RUTA_MEDIO_DROPI } from "@/lib/wms/producto-dropi";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
@@ -16,7 +17,8 @@ type Cliente = ReturnType<typeof createServiceClient>;
 /** Quita el archivo del bucket solo si ninguna otra fila (un producto duplicado) sigue usándolo. */
 async function quitarArchivosHuerfanos(supabase: Cliente, rutas: string[]) {
   const huerfanas: string[] = [];
-  for (const ruta of [...new Set(rutas)]) {
+  // Solo archivos subidos por este módulo: nunca uno de otro módulo aunque una fila vieja lo nombre.
+  for (const ruta of [...new Set(rutas)].filter((r) => RUTA_MEDIO_DROPI.test(r))) {
     const { count } = await supabase.from("wms_dropi_producto_medios").select("id", { count: "exact", head: true }).eq("ruta", ruta);
     if ((count ?? 0) === 0) huerfanas.push(ruta);
   }

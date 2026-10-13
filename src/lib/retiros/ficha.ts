@@ -2,6 +2,7 @@
 // El PDF y el Excel viven en ficha-pdf.ts y ficha-xlsx.ts y parten de estos mismos datos.
 
 import { formatearFecha, formatearFechaHoraCompleta } from "@/lib/formato";
+import { celdaCsv as celdaCsvSegura } from "@/lib/tabla/csv";
 
 export interface FichaRetiro {
   correlativo: number;
@@ -80,9 +81,9 @@ export function lineasFicha(ficha: FichaRetiro): LineaFicha[] {
   return lineas;
 }
 
+/** Una celda con la protección contra fórmulas de `celdaCsv` (los montos, con dos decimales). */
 function celdaCsv(valor: string | number): string {
-  const texto = typeof valor === "number" ? valor.toFixed(2) : valor;
-  return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  return celdaCsvSegura(typeof valor === "number" ? valor.toFixed(2) : valor);
 }
 
 /** CSV con BOM para que Excel respete los acentos. */

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
@@ -39,8 +40,9 @@ export async function prepararSubidaFotoFiltro(nombreArchivo: string): Promise<{
 
 /** Borra del bucket una foto que ya no queda referenciada (se reemplazó o se quitó). Nunca lanza. */
 async function borrarFotoSiEsNuestra(url: string | null) {
-  if (!url || !url.startsWith(PREFIJO_URL_PUBLICA)) return;
-  const ruta = url.slice(PREFIJO_URL_PUBLICA.length);
+  // Solo una foto de la carpeta de este módulo (filtros/<uuid>/…): nunca la de un producto u otra ficha del mismo bucket.
+  const ruta = rutaPropia(url, PREFIJO_URL_PUBLICA, "filtros");
+  if (!ruta) return;
   await createServiceClient().storage.from(BUCKET_FOTOS).remove([ruta]);
 }
 

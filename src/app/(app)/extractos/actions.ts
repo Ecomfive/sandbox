@@ -1,5 +1,6 @@
 "use server";
 
+import { esUuid, nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { parseExtracto, mapearMovimientos, type MapeoColumnas } from "@/lib/extractos/parse";
@@ -28,14 +29,19 @@ export async function importarExtracto(
   if (!archivo || archivo.size === 0) {
     return { status: "error", mensaje: "Selecciona un archivo." };
   }
-  if (!paisId) {
+  if (!esUuid(paisId)) {
     return { status: "error", mensaje: "Selecciona un país." };
   }
   if (!mapeoRaw) {
     return { status: "error", mensaje: "Falta el mapeo de columnas." };
   }
 
-  const mapeo = JSON.parse(mapeoRaw) as MapeoColumnas;
+  let mapeo: MapeoColumnas;
+  try {
+    mapeo = JSON.parse(mapeoRaw) as MapeoColumnas;
+  } catch {
+    return { status: "error", mensaje: "El mapeo de columnas no es válido." };
+  }
   const buffer = await archivo.arrayBuffer();
 
   let movimientos;
@@ -55,7 +61,8 @@ export async function importarExtracto(
 
   const supabase = createServiceClient();
 
-  const rutaArchivo = `${paisId}/${Date.now()}-${archivo.name}`;
+  // El país es un UUID y el nombre se limpia: nada que mande el navegador puede sacar el archivo de su carpeta.
+  const rutaArchivo = `${paisId}/${Date.now()}-${nombreArchivoSeguro(archivo.name)}`;
   const { error: errorStorage } = await supabase.storage
     .from("extractos-bancarios")
     .upload(rutaArchivo, buffer, {

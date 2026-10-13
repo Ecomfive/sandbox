@@ -1,5 +1,6 @@
 "use server";
 
+import { esUuid, nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -174,7 +175,7 @@ export async function crearRetiro(formData: FormData) {
 export async function cerrarRetiro(formData: FormData) {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
-  const pais_id = formData.get("pais_id") as string;
+  if (!esUuid(id)) throw new Error("Retiro no válido.");
   const soporte_numero = (formData.get("soporte_numero") as string) || null;
   const montoRecibido = Number(formData.get("monto_recibido"));
   const comprobante = formData.get("comprobante") as File | null;
@@ -183,14 +184,15 @@ export async function cerrarRetiro(formData: FormData) {
 
   const { data: retiro, error: errorRetiro } = await supabase
     .from("retiros")
-    .select("estado, a_recibir, monto_neto, comprobante_path")
+    .select("estado, a_recibir, monto_neto, comprobante_path, pais_id")
     .eq("id", id)
     .single();
   if (errorRetiro) throw new Error(errorRetiro.message);
 
   let comprobante_path = retiro.comprobante_path as string | null;
   if (comprobante && comprobante.size > 0) {
-    const ruta = `${pais_id}/${id}/${Date.now()}-${comprobante.name}`;
+    // La carpeta sale del propio retiro (no del formulario) y el nombre se limpia.
+    const ruta = `${retiro.pais_id}/${id}/${Date.now()}-${nombreArchivoSeguro(comprobante.name)}`;
     const { error: errorSubida } = await supabase.storage
       .from("comprobantes-retiro")
       .upload(ruta, comprobante, { contentType: comprobante.type || "application/octet-stream" });
@@ -253,7 +255,7 @@ export async function cerrarRetiro(formData: FormData) {
 export async function conciliarRetiro(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
-  const pais_id = formData.get("pais_id") as string;
+  if (!esUuid(id)) return { error: "Retiro no válido." };
   const soporte_numero = (formData.get("soporte_numero") as string) || null;
   const montoRecibido = Number(formData.get("monto_recibido"));
   const fecha_recibido = (formData.get("fecha_recibido") as string) || null;
@@ -292,7 +294,8 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
 
   let comprobante_path = retiro.comprobante_path as string | null;
   if (comprobante && comprobante.size > 0) {
-    const ruta = `${pais_id}/${id}/${Date.now()}-${comprobante.name}`;
+    // La carpeta sale del propio retiro (no del formulario) y el nombre se limpia.
+    const ruta = `${retiro.pais_id}/${id}/${Date.now()}-${nombreArchivoSeguro(comprobante.name)}`;
     const { error: errorSubida } = await supabase.storage
       .from("comprobantes-retiro")
       .upload(ruta, comprobante, { contentType: comprobante.type || "application/octet-stream" });

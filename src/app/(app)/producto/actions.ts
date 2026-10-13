@@ -13,6 +13,7 @@ import { ETIQUETA_CLASE } from "./def-producto";
 import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 import { getPaisActual } from "@/lib/pais";
+import { puedeVerPais } from "@/lib/paises-permitidos";
 import { getUsuarioActual } from "@/lib/auth";
 
 const MODULO = "producto";
@@ -207,6 +208,8 @@ async function aplicarEstado(id: string, clase: Clase, desde?: string): Promise<
   if (actual.clase === "test" && clase === "fisico" && !desde && actual.tipo !== "combo") {
     const usuario = await getUsuarioActual();
     const pais = await getPaisActual(supabase);
+    // La orden solo se crea en un país que la persona puede ver (con países limitados, la barra podría caer en otro).
+    if (!puedeVerPais(usuario?.paisesPermitidos ?? null, pais.codigo)) return { error: "El producto quedó Activo, pero su orden de compra no se creó: no tienes acceso al país de la barra." };
     const r = await crearCompraDesdeProducto({ skuId: id, pais, autor: usuario?.nombre || usuario?.email || "Sistema" });
     if ("error" in r) return { error: `El producto quedó Activo, pero no se pudo crear su orden de compra: ${r.error}` };
     await registrarAuditoria({ accion: "crear_compra", entidad: "skus_maestros", entidadId: id, detalle: `OC-${String(r.numero).padStart(4, "0")} · ${r.codigo ?? ""} · ${pais.nombre} (al pasar a Activo)` });

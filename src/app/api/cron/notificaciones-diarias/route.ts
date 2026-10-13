@@ -6,6 +6,10 @@ import { enviarCorreo } from "@/lib/notificaciones/correo";
 
 const SITIO = "https://mom-beta-proveduria.vercel.app";
 
+/** El nombre de un país lo escribe una persona (Configuración): en el correo va como texto, nunca como HTML. */
+const escaparHtml = (t: string) =>
+  t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
 export async function GET(request: Request) {
   if (!esPeticionDeCron(request)) {
     return new NextResponse("Unauthorized", { status: 401 });
@@ -54,7 +58,7 @@ export async function GET(request: Request) {
       );
     }
     if (items.length > 0) {
-      secciones.push(`<h2>${pais.nombre}</h2><ul>${items.join("")}</ul>`);
+      secciones.push(`<h2>${escaparHtml(pais.nombre)}</h2><ul>${items.join("")}</ul>`);
     }
   }
 

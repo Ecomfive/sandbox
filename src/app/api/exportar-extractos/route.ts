@@ -4,11 +4,7 @@ import { getPaisActual } from "@/lib/pais";
 import { getUsuarioActual } from "@/lib/auth";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { formatearFecha } from "@/lib/formato";
-
-function celdaCsv(valor: string | number): string {
-  const texto = String(valor);
-  return /[",\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
-}
+import { celdaCsv } from "@/lib/tabla/csv";
 
 export async function GET() {
   const usuario = await getUsuarioActual();

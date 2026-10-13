@@ -29,6 +29,24 @@ convenciones técnicas del código.
 - Las cabeceras de seguridad están en `next.config.ts` y las cookies de sesión son `httpOnly`
   (`src/lib/supabase/cookies.ts`). Los secretos nunca llevan `NEXT_PUBLIC_`.
 - Pruebas: `npm run test:seguridad`. Comprobar la base desde fuera: `node scripts/verificar-seguridad-supabase.mjs`.
+- **Auditoría del 13 oct 2026 (skill security-audit de Cloudflare, 14 hallazgos corregidos).** Reglas que dejó:
+  - Descargar de una URL externa solo con `descargarPublico` (`src/lib/seguridad/url-externa.ts`): IPv6 revisada por bytes
+    (mapeadas, NAT64, 6to4…), puertos 80/443 y la IP se revisa en la misma búsqueda DNS de la conexión (`lookupPublico`).
+  - Borrar un archivo de Storage a partir de una URL guardada: solo con `rutaPropia(url, prefijo, carpeta)`
+    (`src/lib/seguridad/ruta-almacen.ts`), confinado a la carpeta del módulo (`compras/`, `filtros/`). Los adjuntos de un
+    comentario se borran con `borrarSubidos(compraId, rutas)` (solo `comentarios/<compra>/` y nunca uno ya guardado en
+    `wms_compra_adjuntos`); las rutas de medios WMS deben calzar con `RUTA_MEDIO_SHOPIFY` / `RUTA_MEDIO_DROPI`. Un nombre de
+    archivo subido va a la ruta con `nombreArchivoSeguro` y el país/id se leen de la base, no del formulario.
+  - Una foto se **copia** a la carpeta del módulo, no se comparte la URL (Filtro de productos: `copiarFoto`).
+  - «Ver así» (vista previa de rol): la cookie es `<usuario>:<rol>` httpOnly y solo vale para quien puede **modificar**
+    Usuarios y roles.
+  - La bitácora del Centro de notificaciones se filtra por módulo de la entidad y país (`eventoVisible`,
+    `src/lib/auditoria-visible.ts`): una entidad nueva en la auditoría se agrega a `MODULO_DE_ENTIDAD`.
+  - «Hoy» arma cada tarjeta solo con su módulo; una acción que crea algo en el país de la barra comprueba `puedeVerPais`.
+  - CSV del servidor con el `celdaCsv` compartido (`src/lib/tabla/csv.ts`), HTML de correos con lo escrito por personas
+    escapado.
+  - `scripts/actualizar-pedidos-servidor.ts` escucha solo en 127.0.0.1, exige Host `localhost:4321` y un código por
+    arranque en cada POST; el GET `/actualizar-saldo-rapido` solo muestra el botón.
 
 ## Convenciones importantes
 

@@ -1,7 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Un texto para `ilike` que no trate `%`, `_` ni `\` como comodines. */
-const literal = (t: string) => t.replace(/[\%_]/g, (c) => `\${c}`);
+const literal = (t: string) => t.replace(/[\\%_]/g, (c) => "\\" + c);
+const BUCKET = "wms-productos";
+const PREFIJO = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`;
+
+/** Copia la foto del producto a `filtros/<uuid>/` y devuelve su URL pública (o null si no tiene o no se pudo copiar). */
+async function copiarFoto(supabase: SupabaseClient, url: string | null | undefined): Promise<string | null> {
+  if (!url || !url.startsWith(PREFIJO)) return null;
+  const origen = url.slice(PREFIJO.length);
+  if (origen.includes("..")) return null;
+  const destino = `filtros/${crypto.randomUUID()}/${(origen.split("/").pop() ?? "foto").replace(/[^A-Za-z0-9._-]+/g, "-")}`;
+  const { error } = await supabase.storage.from(BUCKET).copy(origen, destino);
+  return error ? null : PREFIJO + destino;
+}
+
 const numero = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
 /**
@@ -39,10 +52,13 @@ export async function pasarTestsAFiltro(supabase: SupabaseClient, por: { testIds
         continue;
       }
 
+      // La foto se COPIA a la carpeta de Filtro (como hace Compras): compartir la del producto hacía que editar o borrar la
+      // fila de Filtro borrara la foto del producto, y al revés.
+      const fotoFiltro = await copiarFoto(supabase, sku.foto_url);
       const { error } = await supabase.from("wms_filtro_productos").insert({
         pais_id: t.pais_id,
         nombre: t.nombre,
-        foto_url: sku.foto_url,
+        foto_url: fotoFiltro,
         estado_registro: "cotizar",
         estado: "pendiente",
         prioridad: "normal",

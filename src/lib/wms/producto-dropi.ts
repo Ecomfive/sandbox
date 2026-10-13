@@ -3,6 +3,9 @@
 
 import { claveCombinacion, combinaciones, sanitizarHtml, type MedioDatos, type OpcionProducto } from "./producto";
 
+/** La ruta de un medio subido por este módulo: `dropi/<uuid>/<fecha>-<nombre>` (la que da `prepararSubidaMedioDropi`). */
+export const RUTA_MEDIO_DROPI = /^dropi\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/\d+-[A-Za-z0-9._-]+$/;
+
 export const PUBLICACIONES = ["publico", "privado"] as const;
 export type Publicacion = (typeof PUBLICACIONES)[number];
 export const ETIQUETA_PUBLICACION: Record<Publicacion, string> = { publico: "Público", privado: "Privado" };
@@ -272,7 +275,9 @@ export function validarProductoDropi(crudo: unknown): { datos: ProductoDropiDato
     const x = m as Record<string, unknown>;
     return {
       id: typeof x.id === "string" ? x.id : undefined,
-      ruta: typeof x.ruta === "string" ? x.ruta : undefined,
+      // Solo una ruta con la forma que da la subida de este módulo: antes se aceptaba cualquiera y, al quitar el medio, se
+      // borraba ese archivo del bucket compartido (la foto de un producto, de una compra…).
+      ruta: typeof x.ruta === "string" && RUTA_MEDIO_DROPI.test(x.ruta) ? x.ruta : undefined,
       tempId: undefined,
       nombre_archivo: texto(x.nombre_archivo, 200),
       tipo: x.tipo === "video" ? "video" : "imagen",

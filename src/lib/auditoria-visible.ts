@@ -1,0 +1,54 @@
+import { ACCIONES_COMERCIALES } from "@/lib/crm/areas";
+import { puedeVerPais } from "@/lib/paises-permitidos";
+
+/**
+ * De qué módulo es cada `entidad` de `historial_auditoria`: un evento solo se muestra en la bitácora del Centro de
+ * notificaciones a quien puede abrir ese módulo (antes la bitácora mostraba los 200 últimos de todos los módulos a
+ * cualquiera con «notificaciones»). Una entidad que no esté aquí solo la ve quien tiene Usuarios y roles, que ya tiene el
+ * historial completo en /usuarios/auditoria.
+ */
+export const MODULO_DE_ENTIDAD: Record<string, string> = {
+  skus_maestros: "producto",
+  dropshippers: "crm-dropshippers",
+  wms_compras: "compras",
+  wms_rutas_envio: "compras",
+  retiros: "retiros",
+  cuentas_retiro: "retiros",
+  saldos_wallet: "retiros",
+  perfiles: "usuarios",
+  manuales_proceso: "usuarios",
+  wms_productos: "wms-productos",
+  wms_dropi_productos: "wms-productos-dropi",
+  wms_ubicaciones: "wms-ubicaciones",
+  wms_bodegas: "wms-bodegas",
+  wms_productos_test: "productos-test",
+  wms_filtro_productos: "filtro-productos",
+  alertas_inventario_no_retornado: "alertas",
+  productos: "productos",
+  paises: "configuracion",
+  plataformas: "configuracion",
+  pais_plataformas: "configuracion",
+};
+
+const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);
+
+/**
+ * Si un evento de la auditoría se puede mostrar a esta persona: necesita el módulo de su entidad; las acciones del CRM
+ * Comercial piden además «crm-comercial»; y una compra (o ruta de envío) de un país que la persona no puede ver queda fuera
+ * (`paisDe` da el código de país de la compra o ruta, o `null` si es de Importadora; `undefined` si no se sabe).
+ */
+export function eventoVisible(
+  evento: { accion: string; entidad: string; entidad_id: string | null },
+  usuario: { modulos: string[]; paisesPermitidos: string[] | null },
+  paisDe: (entidad: string, id: string | null) => string | null | undefined,
+): boolean {
+  const modulo = MODULO_DE_ENTIDAD[evento.entidad] ?? "usuarios";
+  if (!usuario.modulos.includes(modulo)) return false;
+  if (COMERCIALES.has(evento.accion) && !usuario.modulos.includes("crm-comercial")) return false;
+  if (usuario.paisesPermitidos !== null && (evento.entidad === "wms_compras" || evento.entidad === "wms_rutas_envio")) {
+    const pais = paisDe(evento.entidad, evento.entidad_id);
+    // Sin saber el país (la compra se borró, por ejemplo) no se arriesga: se oculta.
+    if (pais === undefined || !puedeVerPais(usuario.paisesPermitidos, pais)) return false;
+  }
+  return true;
+}

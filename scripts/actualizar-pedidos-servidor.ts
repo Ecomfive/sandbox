@@ -10,8 +10,32 @@
 
 import http from "node:http";
 import { spawn } from "node:child_process";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 
 const PUERTO = 4321;
+
+// Seguridad (auditoría del 13 oct 2026): solo escucha en este equipo (127.0.0.1), solo atiende si la dirección es
+// localhost:4321 (una página de internet no puede alcanzarlo con DNS rebinding) y todo lo que ejecuta algo es un POST que
+// lleva un código que cambia cada vez que se abre la herramienta (otra página no puede pulsar los botones por la persona).
+const HOSTS_PERMITIDOS = new Set([`localhost:${PUERTO}`, `127.0.0.1:${PUERTO}`]);
+const TOKEN = randomBytes(24).toString("hex");
+
+function tokenValido(valor: string | null): boolean {
+  if (!valor || valor.length !== TOKEN.length) return false;
+  return timingSafeEqual(Buffer.from(valor), Buffer.from(TOKEN));
+}
+
+function origenPermitido(req: http.IncomingMessage): boolean {
+  const origen = req.headers.origin;
+  if (!origen) return true;
+  try {
+    return HOSTS_PERMITIDOS.has(new URL(origen).host);
+  } catch {
+    return false;
+  }
+}
+
+const campoToken = () => `<input type="hidden" name="token" value="${TOKEN}" />`;
 
 function ejecutar(args: string[]): Promise<{ ok: boolean; salida: string }> {
   return new Promise((resolve) => {
@@ -57,6 +81,7 @@ function paginaPrincipal(): string {
     <legend>1. Iniciar sesión en Dropi</legend>
     <p class="aviso">Solo hace falta la primera vez, o si la sesión ya expiró.</p>
     <form method="POST" action="/sesion">
+      ${campoToken()}
       <label>País</label>
       <select name="pais">
         <option value="pa">Panamá</option>
@@ -69,6 +94,7 @@ function paginaPrincipal(): string {
   <fieldset>
     <legend>2. Actualizar pedidos</legend>
     <form method="POST" action="/actualizar">
+      ${campoToken()}
       <label>País</label>
       <select name="pais">
         <option value="pa">Panamá</option>
@@ -86,6 +112,7 @@ function paginaPrincipal(): string {
     <legend>3. Actualizar saldo de wallet</legend>
     <p class="aviso">Trae el historial de retiros y el saldo actual de wallet directo de Dropi — se ve en Retiros y wallet.</p>
     <form method="POST" action="/actualizar-saldo">
+      ${campoToken()}
       <label>País</label>
       <select name="pais">
         <option value="pa">Panamá</option>
@@ -127,7 +154,45 @@ function fechaValida(valor: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(valor);
 }
 
+/** Lee el formulario de un POST y comprueba su código; si no vale, responde 403 y devuelve null. */
+async function leerFormulario(req: http.IncomingMessage, res: http.ServerResponse): Promise<URLSearchParams | null> {
+  let cuerpo = "";
+  for await (const chunk of req) {
+    cuerpo += chunk;
+    if (cuerpo.length > 10_000) break;
+  }
+  const datos = new URLSearchParams(cuerpo);
+  if (!origenPermitido(req) || !tokenValido(datos.get("token"))) {
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Solicitud no permitida. Vuelve a abrir http://localhost:" + PUERTO + " y usa los botones de la página.");
+    return null;
+  }
+  return datos;
+}
+
+/** El enlace «Actualizar desde Dropi» de Retiros llega aquí: solo muestra el botón, no ejecuta nada al abrirse. */
+function paginaConfirmarSaldo(pais: "cr" | "pa"): string {
+  return `<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8" /><title>Actualizar retiros</title><style>${ESTILOS}</style></head>
+<body>
+  <h1>Actualizar retiros de ${pais === "pa" ? "Panamá" : "Costa Rica"}</h1>
+  <form method="POST" action="/actualizar-saldo">
+    ${campoToken()}
+    <input type="hidden" name="pais" value="${pais}" />
+    <button type="submit">Actualizar ahora</button>
+  </form>
+</body>
+</html>`;
+}
+
 const servidor = http.createServer(async (req, res) => {
+  if (!HOSTS_PERMITIDOS.has(req.headers.host ?? "")) {
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Abre http://localhost:" + PUERTO);
+    return;
+  }
+
   if (req.method === "GET" && req.url === "/") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(paginaPrincipal());
@@ -135,9 +200,8 @@ const servidor = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && req.url === "/sesion") {
-    let cuerpo = "";
-    for await (const chunk of req) cuerpo += chunk;
-    const datos = new URLSearchParams(cuerpo);
+    const datos = await leerFormulario(req, res);
+    if (!datos) return;
     const pais = datos.get("pais") ?? "";
 
     if (!paisValido(pais)) {
@@ -154,9 +218,8 @@ const servidor = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && req.url === "/actualizar") {
-    let cuerpo = "";
-    for await (const chunk of req) cuerpo += chunk;
-    const datos = new URLSearchParams(cuerpo);
+    const datos = await leerFormulario(req, res);
+    if (!datos) return;
     const pais = datos.get("pais") ?? "";
     const desde = datos.get("desde") ?? "";
     const hasta = datos.get("hasta") ?? "";
@@ -195,30 +258,14 @@ const servidor = http.createServer(async (req, res) => {
       return;
     }
 
-    const hoy = new Date().toISOString().slice(0, 10);
-
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.write(paginaProcesando(`Actualizando retiros de ${pais.toUpperCase()}...`));
-
-    const extraccion = await ejecutar(["tsx", "scripts/dropi-extraer-retiros.ts", pais]);
-    let salida = extraccion.salida;
-    let ok = extraccion.ok;
-
-    if (extraccion.ok) {
-      const archivo = `.dropi-downloads/retiros-${pais}-${hoy}.json`;
-      const ingesta = await ejecutar(["tsx", "scripts/dropi-ingerir-retiros.ts", pais, archivo]);
-      salida += "\n\n" + ingesta.salida;
-      ok = ingesta.ok;
-    }
-
-    res.end(cerrarPagina(salida, ok));
+    res.end(paginaConfirmarSaldo(pais));
     return;
   }
 
   if (req.method === "POST" && req.url === "/actualizar-saldo") {
-    let cuerpo = "";
-    for await (const chunk of req) cuerpo += chunk;
-    const datos = new URLSearchParams(cuerpo);
+    const datos = await leerFormulario(req, res);
+    if (!datos) return;
     const pais = datos.get("pais") ?? "";
 
     if (!paisValido(pais)) {
@@ -251,7 +298,7 @@ const servidor = http.createServer(async (req, res) => {
   res.end("No encontrado");
 });
 
-servidor.listen(PUERTO, () => {
+servidor.listen(PUERTO, "127.0.0.1", () => {
   console.log(`Abre http://localhost:${PUERTO} en tu navegador para actualizar pedidos.`);
 });
 

@@ -1,6 +1,7 @@
 ﻿"use server";
 
 import { revalidatePath } from "next/cache";
+import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
@@ -80,8 +81,9 @@ export async function subirFotoCompraDesdeUrl(direccion: string): Promise<{ ruta
 
 /** Borra del bucket una foto que ya no queda referenciada (se reemplazó o se quitó). Nunca lanza. */
 async function borrarFotoSiEsNuestra(url: string | null) {
-  if (!url || !url.startsWith(PREFIJO_URL_PUBLICA)) return;
-  const ruta = url.slice(PREFIJO_URL_PUBLICA.length);
+  // Solo una foto de la carpeta de este módulo (compras/<uuid>/…): nunca la de un producto u otra ficha del mismo bucket.
+  const ruta = rutaPropia(url, PREFIJO_URL_PUBLICA, "compras");
+  if (!ruta) return;
   await createServiceClient().storage.from(BUCKET_FOTOS).remove([ruta]);
 }
 
@@ -865,17 +867,12 @@ export async function editarComentarioCompra(
   const quitar = Array.isArray(archivos.quitar) ? archivos.quitar.filter((x) => ES_ID(String(x))) : [];
   const agregar = Array.isArray(archivos.agregar) ? archivos.agregar : [];
   const { data: c, error: errorLeer } = await supabase.from("wms_compra_comentarios").select("id, compra_id, autor, autor_id, texto").eq("id", comentarioId).maybeSingle();
-  if (errorLeer || !c) {
-    await borrarSubidos(agregar.map((a) => a?.ruta));
-    return { error: "El comentario ya no existe." };
-  }
+  // Sin un comentario válido al que la persona tenga acceso no se borra nada: las rutas recibidas no son de confianza.
+  if (errorLeer || !c) return { error: "El comentario ya no existe." };
   const sinAcceso = await sinAccesoACompras([c.compra_id as string]);
-  if (sinAcceso) {
-    await borrarSubidos(agregar.map((a) => a?.ruta));
-    return { error: sinAcceso };
-  }
+  if (sinAcceso) return { error: sinAcceso };
   if (!esAutor(c, usuario.id, usuario.nombre || usuario.email)) {
-    await borrarSubidos(agregar.map((a) => a?.ruta));
+    await borrarSubidos(c.compra_id as string, agregar.map((a) => a?.ruta));
     return { error: "Solo quien escribió el comentario lo puede editar." };
   }
   const limpio = String(texto ?? "").trim().slice(0, 5000);
@@ -887,11 +884,11 @@ export async function editarComentarioCompra(
   const quedan = filasActuales.length - aQuitar.length;
   if (limpio === c.texto && aQuitar.length === 0 && agregar.length === 0) return {};
   if (!limpio && quedan + agregar.length === 0) {
-    await borrarSubidos(agregar.map((a) => a?.ruta));
+    await borrarSubidos(c.compra_id as string, agregar.map((a) => a?.ruta));
     return { error: "El comentario no puede quedar vacío: escribe algo, deja un archivo o elimina el comentario." };
   }
   if (quedan + agregar.length > MAX_ADJUNTOS_COMENTARIO) {
-    await borrarSubidos(agregar.map((a) => a?.ruta));
+    await borrarSubidos(c.compra_id as string, agregar.map((a) => a?.ruta));
     return { error: `Un comentario lleva hasta ${MAX_ADJUNTOS_COMENTARIO} archivos.` };
   }
   // Los archivos nuevos se revisan por su contenido antes de guardar nada (si alguno falla, se borran todos).
@@ -900,7 +897,7 @@ export async function editarComentarioCompra(
 
   const { error } = await supabase.from("wms_compra_comentarios").update({ texto: limpio, editado_en: new Date().toISOString() }).eq("id", comentarioId);
   if (error) {
-    await borrarSubidos(revisados.map((a) => a.ruta));
+    await borrarSubidos(c.compra_id as string, revisados.map((a) => a.ruta));
     return { error: error.code === "PGRST204" || error.code === "42703" ? "Falta correr la migración 0097 para editar comentarios." : "No se pudo guardar el cambio." };
   }
   if (revisados.length) {
@@ -918,13 +915,13 @@ export async function editarComentarioCompra(
       })),
     );
     if (errorNuevos) {
-      await borrarSubidos(revisados.map((a) => a.ruta));
+      await borrarSubidos(c.compra_id as string, revisados.map((a) => a.ruta));
       return { error: "No se pudieron guardar los archivos nuevos." };
     }
   }
   if (aQuitar.length) {
     await supabase.from("wms_compra_adjuntos").delete().in("id", aQuitar.map((a) => a.id));
-    await borrarSubidos(aQuitar.map((a) => a.ruta).filter((r): r is string => !!r));
+    await borrarArchivosGuardados(aQuitar.map((a) => a.ruta).filter((r): r is string => !!r));
   }
 
   // Solo se avisa a quien se menciona ahora y no estaba mencionado antes.
@@ -975,7 +972,7 @@ export async function eliminarComentarioCompra(comentarioId: string): Promise<{ 
 
   const { error } = await supabase.from("wms_compra_comentarios").delete().eq("id", comentarioId);
   if (error) return { error: "No se pudo eliminar el comentario." };
-  if (rutas.length) await borrarSubidos(rutas);
+  if (rutas.length) await borrarArchivosGuardados(rutas);
   await registrarAuditoria({
     accion: "eliminar_comentario_compra",
     entidad: "wms_compras",
@@ -1009,8 +1006,27 @@ export async function prepararSubidaAdjuntoComentario(compraId: string, nombreAr
 }
 
 /** Borra archivos subidos que ya no se van a usar (se descartaron o no pasaron la revisión). Nunca lanza. */
-async function borrarSubidos(rutas: string[]) {
-  const propias = rutas.filter((r) => typeof r === "string" && r.startsWith("comentarios/"));
+/**
+ * Limpia archivos recién subidos que no llegaron a guardarse (un error, o se quitaron antes de comentar). Las rutas vienen del
+ * navegador, así que solo se borran las de la carpeta de ESA compra, sin `..`, y que no sean ya el archivo de un comentario:
+ * antes bastaba con que empezaran por «comentarios/» y se podían borrar los adjuntos de otras personas (o de compras de otro
+ * país) mandando su ruta, que se ve en los enlaces firmados.
+ */
+async function borrarSubidos(compraId: string, rutas: (string | null | undefined)[]) {
+  const carpeta = `comentarios/${compraId}/`;
+  const candidatas = [...new Set(rutas.filter((r): r is string => typeof r === "string" && r.startsWith(carpeta) && !r.includes("..") && r.length <= 300))];
+  if (!candidatas.length) return;
+  const supabase = createServiceClient();
+  const { data: usadas, error } = await supabase.from("wms_compra_adjuntos").select("ruta").in("ruta", candidatas);
+  if (error) return; // sin poder confirmar que están libres, no se borra nada
+  const ocupadas = new Set(((usadas ?? []) as { ruta: string | null }[]).map((u) => u.ruta));
+  const libres = candidatas.filter((r) => !ocupadas.has(r));
+  if (libres.length) await supabase.storage.from(BUCKET_COMPRAS).remove(libres);
+}
+
+/** Borra del almacenamiento los archivos de un comentario cuyas rutas salieron de la base (no del navegador). */
+async function borrarArchivosGuardados(rutas: string[]) {
+  const propias = rutas.filter((r) => r.startsWith("comentarios/") && !r.includes(".."));
   if (propias.length) await createServiceClient().storage.from(BUCKET_COMPRAS).remove(propias);
 }
 
@@ -1019,7 +1035,7 @@ export async function descartarAdjuntoSubido(compraId: string, ruta: string): Pr
   await requireModuloEscritura("compras");
   if (typeof compraId !== "string" || !ES_ID(compraId) || typeof ruta !== "string" || !ruta.startsWith(`comentarios/${compraId}/`) || ruta.includes("..")) return;
   if (await sinAccesoACompras([compraId])) return;
-  await borrarSubidos([ruta]);
+  await borrarSubidos(compraId, [ruta]);
 }
 
 /**
@@ -1033,12 +1049,17 @@ async function revisarAdjuntosSubidos(
 ): Promise<{ error: string } | { ruta: string; nombre: string; extension: string; tamano: number; clase: string }[]> {
   const rutas = archivos.map((a) => (a && typeof a.ruta === "string" ? a.ruta : ""));
   const falla = async (error: string) => {
-    await borrarSubidos(rutas);
+    await borrarSubidos(compraId, rutas);
     return { error };
   };
   if (archivos.length > MAX_ADJUNTOS_COMENTARIO) return falla(`Un comentario lleva hasta ${MAX_ADJUNTOS_COMENTARIO} archivos.`);
   const carpeta = `comentarios/${compraId}/`;
   if (rutas.some((r) => !r.startsWith(carpeta) || r.includes("..") || r.length > 300)) return falla("Hay un archivo que no es de esta compra.");
+  if (new Set(rutas).size !== rutas.length) return falla("Hay un archivo repetido.");
+  // Un archivo que ya es de otro comentario no se puede volver a adjuntar (luego, al quitarlo, se borraría el ajeno).
+  const { data: yaUsadas, error: errorUsadas } = await createServiceClient().from("wms_compra_adjuntos").select("ruta").in("ruta", rutas);
+  if (errorUsadas) return { error: "No se pudieron revisar los archivos. Inténtalo de nuevo." };
+  if ((yaUsadas ?? []).length) return { error: "Uno de los archivos ya es de otro comentario. Vuelve a adjuntarlo." };
 
   const storage = createServiceClient().storage.from(BUCKET_COMPRAS);
   const resultado: { ruta: string; nombre: string; extension: string; tamano: number; clase: string }[] = [];
@@ -1105,14 +1126,14 @@ export async function comentarCompra(
   // Sin la migración 0095 (columnas `autor_id` y `respuesta_a`): se guarda como antes, sin responder.
   if (insercion.error && (insercion.error.code === "PGRST204" || insercion.error.code === "42703")) {
     if (padre) {
-      await borrarSubidos(archivos.map((a) => a.ruta));
+      await borrarSubidos(id, archivos.map((a) => a.ruta));
       return { error: "Falta correr la migración 0095 para responder comentarios." };
     }
     insercion = await supabase.from("wms_compra_comentarios").insert({ compra_id: id, autor, texto: limpio }).select("id").single();
   }
   const { data, error } = insercion;
   if (error || !data) {
-    await borrarSubidos(archivos.map((a) => a.ruta));
+    await borrarSubidos(id, archivos.map((a) => a.ruta));
     return { error: "No se pudo guardar el comentario." };
   }
   if (revisados && revisados.length) {
@@ -1132,7 +1153,7 @@ export async function comentarCompra(
     if (errorAdjuntos) {
       // Sin la columna `comentario_id` (migración 0085) o por otro error: no queda un comentario a medias.
       await supabase.from("wms_compra_comentarios").delete().eq("id", data.id);
-      await borrarSubidos(archivos.map((a) => a.ruta));
+      await borrarSubidos(id, archivos.map((a) => a.ruta));
       // Al insertar, una columna que no existe llega como PGRST204 («Could not find the … column … in the schema cache»);
       // 42703 es lo que devuelve Postgres directo (al leer). Las dos dicen lo mismo: falta correr la migración 0085.
       const faltaLaColumna = errorAdjuntos.code === "42703" || errorAdjuntos.code === "PGRST204" || /comentario_id/i.test(errorAdjuntos.message ?? "");

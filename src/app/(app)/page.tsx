@@ -52,23 +52,28 @@ export default async function Home({
   const pais = await getPaisActual(supabase);
 
   const verTest = usuario.modulos.includes("productos-test");
+  // Cada tarjeta solo se arma (y se consulta) si la persona puede abrir su módulo: «Hoy» no muestra lo que su rol no ve.
+  const puede = (m: string) => usuario.modulos.includes(m);
+  const ver = {
+    ventas: puede("pedidos-dropi"),
+    operaciones: puede("inventario"),
+    finanzas: puede("conciliaciones"),
+    dropshippers: puede("crm-dropshippers"),
+    inteligencia: puede("inteligencia-competitiva"),
+  };
+  const sinDatos = { data: [] as { estado?: string; id?: string }[] };
   const [inventario, ventas, serieFinanzas, { data: dropshippers }, { data: proveedoresComp }, pendientesHoy, resumenTest] =
     await Promise.all([
-      getSerieInventarioComparada(supabase, pais.id, periodo),
-      getSerieVentasComparada(supabase, pais.id, periodo),
-      getSerieFinanzas(supabase, pais.id),
-      supabase.from("dropshippers").select("estado").eq("pais_id", pais.id),
-      supabase.from("proveedores_competencia").select("id").eq("pais_id", pais.id),
+      ver.operaciones ? getSerieInventarioComparada(supabase, pais.id, periodo) : null,
+      ver.ventas ? getSerieVentasComparada(supabase, pais.id, periodo) : null,
+      ver.finanzas ? getSerieFinanzas(supabase, pais.id) : [],
+      ver.dropshippers ? supabase.from("dropshippers").select("estado").eq("pais_id", pais.id) : sinDatos,
+      ver.inteligencia ? supabase.from("proveedores_competencia").select("id").eq("pais_id", pais.id) : sinDatos,
       obtenerPendientesHoy(supabase, pais.id),
       verTest ? obtenerResumenTest(supabase, pais.id, periodo.desde, periodo.hasta) : Promise.resolve(null),
     ]);
 
   const cola = armarCola(pendientesHoy, usuario.modulos);
-  const hayInventario = inventario.serie.some((p) => p.entradas > 0 || p.salidas > 0);
-  const hayVentas = ventas.serie.some((p) => p.actual > 0);
-
-  const deltaVentas = calcularDelta(ventas.totalActual, ventas.totalComparacion);
-  const deltaSalidas = calcularDelta(inventario.totalSalidas, inventario.totalSalidasComparacion);
 
   const finanzasActual = serieFinanzas[serieFinanzas.length - 1];
   const finanzasOk = finanzasActual ? Math.abs(finanzasActual.diferencia) <= 0.01 : null;
@@ -77,8 +82,11 @@ export default async function Home({
   const activosDropshippers = (dropshippers ?? []).filter((d) => d.estado === "activo").length;
   const totalProveedoresComp = proveedoresComp?.length ?? 0;
 
-  const secciones: SeccionDashboard[] = [
-    {
+  const secciones: SeccionDashboard[] = [];
+  if (ventas) {
+    const hayVentas = ventas.serie.some((p) => p.actual > 0);
+    const deltaVentas = calcularDelta(ventas.totalActual, ventas.totalComparacion);
+    secciones.push({
       clave: "ventas",
       titulo: "Ventas Dropi",
       valor: formatearMoneda(ventas.totalActual, pais.codigo),
@@ -98,8 +106,12 @@ export default async function Home({
           )}
         </>
       ),
-    },
-    {
+    });
+  }
+  if (inventario) {
+    const hayInventario = inventario.serie.some((p) => p.entradas > 0 || p.salidas > 0);
+    const deltaSalidas = calcularDelta(inventario.totalSalidas, inventario.totalSalidasComparacion);
+    secciones.push({
       clave: "operaciones",
       titulo: "Operaciones",
       valor: String(inventario.totalSalidas),
@@ -122,8 +134,10 @@ export default async function Home({
           )}
         </>
       ),
-    },
-    {
+    });
+  }
+  if (ver.finanzas) {
+    secciones.push({
       clave: "finanzas",
       titulo: "Conciliación del mes",
       valor: finanzasActual ? formatearMoneda(finanzasActual.diferencia, pais.codigo) : "—",
@@ -150,8 +164,10 @@ export default async function Home({
           )}
         </>
       ),
-    },
-    {
+    });
+  }
+  if (ver.dropshippers) {
+    secciones.push({
       clave: "dropshippers",
       titulo: "Dropshippers activos",
       valor: `${activosDropshippers} / ${totalDropshippers}`,
@@ -173,8 +189,10 @@ export default async function Home({
           )}
         </>
       ),
-    },
-    {
+    });
+  }
+  if (ver.inteligencia) {
+    secciones.push({
       clave: "inteligencia",
       titulo: "Proveedores rastreados",
       valor: String(totalProveedoresComp),
@@ -194,8 +212,8 @@ export default async function Home({
           )}
         </>
       ),
-    },
-  ];
+    });
+  }
 
   return (
     <Pagina ancho="ancha">
@@ -213,9 +231,11 @@ export default async function Home({
         </div>
       )}
 
-      <div className="mt-6">
-        <DashboardSecciones secciones={secciones} seccionInicial="ventas" />
-      </div>
+      {secciones.length > 0 && (
+        <div className="mt-6">
+          <DashboardSecciones secciones={secciones} seccionInicial={secciones[0].clave} />
+        </div>
+      )}
     </Pagina>
   );
 }
