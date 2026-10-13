@@ -185,6 +185,13 @@ export const GUIAS: GuiaModulo[] = [
     secciones: [{ titulo: "Uso", pasos: ["Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Dashboard: todo el testing a la vez, con filtros que se cruzan (fechas, categoría, Test # y resultado). Pulsa una barra del periodo, una categoría o una fila de «Comparar por» para filtrar y otra vez para quitarlo. Trae la distribución del CPA contra el criterio, el CTR frente al CPA, los promedios de winners frente a fallidos, los mejores winners y lo que conviene revisar.", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Cada fila empieza con la foto del producto (la de Producto o, si no está vinculado, la de Filtro de productos); pasa el cursor encima para verla grande.", "Cada fila dice bajo el nombre si está «Vinculado» (punto verde, con el SKU de su producto) o «Sin vincular» (punto ámbar).", "Arriba de la lista: Total en test, Winners, En consulta, Fallidos, Otros estados y Sin vincular, cada uno con su número (púlsalos para filtrar), y cuántos faltan por vincular a Producto.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto.", "Todo producto vinculado cuyo producto esté Activo en Producto pasa solo a Filtro de productos, en «Cotizar», con su foto y sus métricas (no se repite si ya está).", "«+ Agregar» abre un panel con dos pestañas arriba: arranca en «Nuevo producto» y al lado está «Producto existente» (lo eliges de Producto).", "«Nuevo producto» es la misma ficha de Producto (estado, tipo, foto, SKU, código de barras, envío…): se crea en Producto y queda en esta lista ya vinculado. Hace falta poder modificar Producto."] }],
   },
   {
+    modulo: "fuente-datos",
+    titulo: "Fuente de datos",
+    ruta: "/fuente-datos",
+    resumen: "Las fuentes de donde salen los productos para testear.",
+    secciones: [{ titulo: "Uso", pasos: ["Tiene una pestaña por fuente: Drop Killer, Tu Winner, Scraping de proveedores y Selección de productos.", "Por ahora las pestañas están en preparación («Próximamente»)."] }],
+  },
+  {
     modulo: "filtro-productos",
     titulo: "Filtro de productos",
     ruta: "/filtro-productos",
@@ -244,6 +251,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-13", titulo: "Módulo Fuente de datos", texto: "Nuevo en Marketing: «Fuente de datos», con las pestañas Drop Killer, Tu Winner, Scraping de proveedores y Selección de productos. Por ahora están en preparación.", modulo: "fuente-datos", href: "/fuente-datos" },
   { fecha: "2026-10-12", titulo: "Dashboard de Test productos", texto: "Nueva pestaña «Dashboard» en Test productos: indicadores, tests por periodo, winners por categoría, distribución del CPA, CTR frente a CPA y winners frente a fallidos, con filtros que se cruzan, igual que el Dashboard de Compras.", modulo: "productos-test", href: "/productos-test/dashboard" },
   { fecha: "2026-10-12", titulo: "Test productos sin el bloque Seguimiento", texto: "La ficha y el formulario de un producto en test ya no traen Revisado, Última revisión, Explotación ni Observación: ese seguimiento se lleva en su tarea de ClickUp.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Valor de la marca negra en el resultado del test", texto: "En las barras del resultado de un test (en Test productos y en la ficha de Producto), pasa el cursor por la marca negra para ver su valor: el criterio del CPA o el promedio de los winners de esa métrica.", modulo: "productos-test", href: "/productos-test/productos" },
