@@ -42,9 +42,13 @@ export function distanciaHuella(a: string, b: string): number {
   return d;
 }
 
-/** Desde cuánto se avisa: nombres con al menos el 75 % de palabras en común (y 2 o más) o fotos a 10 bits o menos. */
+/**
+ * Desde cuánto se avisa: nombres con al menos el 75 % de palabras en común (y 2 o más) o fotos a 5 bits o menos. Medido con las
+ * fotos reales (13 oct 2026): la misma foto achicada y recomprimida queda a 2-5 bits; con 10 avisaba de 83 pares entre 288
+ * productos (frascos distintos sobre fondo blanco), con 5 de 11 (copias, combos 2x1 con la foto de su simple, otro color).
+ */
 export const UMBRAL_NOMBRE = 0.75;
-export const UMBRAL_FOTO = 10;
+export const UMBRAL_FOTO = 5;
 
 export interface CandidatoDuplicado {
   id: string;
