@@ -116,11 +116,11 @@ export function ResultadoTestProducto({ producto, referencias }: { producto: Fil
                     : `No cumple: CPA ${usd(t.cpa ?? 0)}, no es menor a ${usd(CPA_OBJETIVO)}.`}
               </span>
             </p>
-            <Medida nombre="CPA" valor={t.cpa} maximo={20} referencia={CPA_OBJETIVO} texto={t.cpa === null ? "—" : usd(t.cpa)} />
-            <Medida nombre="Compras" valor={t.compras} maximo={12} referencia={referencias.compras} texto={t.compras === null ? "—" : String(t.compras)} />
-            <Medida nombre="CTR" valor={t.ctr} maximo={10} referencia={referencias.ctr} texto={t.ctr === null ? "—" : porcentaje(t.ctr)} />
-            <Medida nombre="Hook rate" valor={t.hook} maximo={80} referencia={referencias.hook} texto={t.hook === null ? "—" : porcentaje(t.hook)} />
-            <Medida nombre="CVR" valor={t.cvr} maximo={20} referencia={referencias.cvr} texto={t.cvr === null ? "—" : porcentaje(t.cvr)} />
+            <Medida nombre="CPA" valor={t.cpa} maximo={20} referencia={CPA_OBJETIVO} texto={t.cpa === null ? "—" : usd(t.cpa)} textoReferencia={`Criterio: menos de ${usd(CPA_OBJETIVO)}`} />
+            <Medida nombre="Compras" valor={t.compras} maximo={12} referencia={referencias.compras} texto={t.compras === null ? "—" : String(t.compras)} textoReferencia={referencias.compras === null ? undefined : `Promedio de los winners: ${referencias.compras!.toLocaleString("es-CR", { maximumFractionDigits: 1 })}`} />
+            <Medida nombre="CTR" valor={t.ctr} maximo={10} referencia={referencias.ctr} texto={t.ctr === null ? "—" : porcentaje(t.ctr)} textoReferencia={referencias.ctr === null ? undefined : `Promedio de los winners: ${porcentaje(referencias.ctr!)}`} />
+            <Medida nombre="Hook rate" valor={t.hook} maximo={80} referencia={referencias.hook} texto={t.hook === null ? "—" : porcentaje(t.hook)} textoReferencia={referencias.hook === null ? undefined : `Promedio de los winners: ${porcentaje(referencias.hook!)}`} />
+            <Medida nombre="CVR" valor={t.cvr} maximo={20} referencia={referencias.cvr} texto={t.cvr === null ? "—" : porcentaje(t.cvr)} textoReferencia={referencias.cvr === null ? undefined : `Promedio de los winners: ${porcentaje(referencias.cvr!)}`} />
           </div>
         );
       })}
