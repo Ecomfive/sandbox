@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { actualizarProductoTest, crearProductoTest } from "./actions";
 import {
   ESTADOS,
-  NIVELES_EXPLOTACION,
   TEST_NUMEROS,
   type FilaProductoTest,
 } from "./def-productos-test";
@@ -26,7 +25,7 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
-import { CalendarioIcon, CheckIcon, CerrarIcon, EtiquetaIcon, InteligenciaIcon, TestIcon } from "@/lib/nav-icons";
+import { CheckIcon, CerrarIcon, EtiquetaIcon, InteligenciaIcon, TestIcon } from "@/lib/nav-icons";
 
 /** Un número de métrica que se colorea en vivo mientras se escribe, con el mismo criterio que Filtros. */
 function CampoMetrica({
@@ -318,31 +317,6 @@ export function FormularioProductoTest({
             />
             <CampoMetrica id="campo-metrica-cvr" nombreCampo="metrica_cvr" etiqueta="CVR (%)" defaultValue={producto?.metricaCvr ?? null} nivel={nivelCvr} />
           </div>
-        </Seccion>
-
-        <Seccion icono={CalendarioIcon} titulo="Seguimiento">
-          <label htmlFor="revisado" className="flex cursor-pointer items-center gap-2 text-sm">
-            <input id="revisado" type="checkbox" name="revisado" defaultChecked={producto?.revisado} className="h-4 w-4 accent-[var(--foreground)]" />
-            <span>Revisado</span>
-          </label>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta="Última Revisión" id="campo-ultima-revision">
-              <input id="campo-ultima-revision" type="date" name="ultima_revision" defaultValue={producto?.ultimaRevision ?? ""} className={fieldClass} />
-            </Campo>
-            <Campo etiqueta="Explotación" id="campo-explotacion">
-              <select id="campo-explotacion" name="explotacion" defaultValue={producto?.explotacion ?? ""} className={fieldClass}>
-                <option value="">Sin definir</option>
-                {NIVELES_EXPLOTACION.map((n) => (
-                  <option key={n.valor} value={n.valor}>
-                    {n.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </Campo>
-          </div>
-          <Campo etiqueta="Observación" id="campo-observacion">
-            <textarea id="campo-observacion" name="observacion" defaultValue={producto?.observacion ?? ""} rows={3} className={fieldClass} />
-          </Campo>
         </Seccion>
       </div>
 

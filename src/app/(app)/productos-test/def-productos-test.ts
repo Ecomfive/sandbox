@@ -32,10 +32,6 @@ export interface FilaProductoTest {
   metricaGasto: number | null;
   metricaCompras: number | null;
   metricaCvr: number | null;
-  revisado: boolean;
-  ultimaRevision: string | null;
-  observacion: string | null;
-  explotacion: string | null;
   creadoEn: string;
 }
 
@@ -85,24 +81,6 @@ const TEST_NUMERO_COLOR: Record<string, string> = {
 };
 export const colorTestNumero = (valor: string) => TEST_NUMERO_COLOR[valor] ?? "#8D8D8D";
 
-export const NIVELES_EXPLOTACION = [
-  { valor: "alta", etiqueta: "Alta" },
-  { valor: "media", etiqueta: "Media" },
-  { valor: "baja", etiqueta: "Baja" },
-  { valor: "no_aplica", etiqueta: "No aplica" },
-] as const;
-
-const EXPLOTACION_ETIQUETA: Record<string, string> = Object.fromEntries(NIVELES_EXPLOTACION.map((e) => [e.valor, e.etiqueta]));
-export const etiquetaExplotacion = (valor: string | null) => (valor ? (EXPLOTACION_ETIQUETA[valor] ?? valor) : null);
-
-const EXPLOTACION_COLOR: Record<string, string> = {
-  alta: "#1bbc9c",
-  media: "#f9d900",
-  baja: "#e50000",
-  no_aplica: "#8D8D8D",
-};
-export const colorExplotacion = (valor: string) => EXPLOTACION_COLOR[valor] ?? "#8D8D8D";
-
 /** El ciclo termina en «Enviado a Compras», «Fallido» o «Descartado»: como en Filtros, se ocultan por defecto. */
 const ESTADOS_CERRADOS = ["winner", "enviado_a_compras", "fallido", "descartado"];
 
@@ -128,15 +106,6 @@ export const DEF_PRODUCTOS_TEST: DefTabla<FilaProductoTest> = {
       agrupable: true,
     },
     {
-      id: "explotacion",
-      etiqueta: "Explotación",
-      tipo: "seleccion",
-      valores: (f) => [f.explotacion ?? SIN_VALOR],
-      opciones: () => [...NIVELES_EXPLOTACION.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })), { valor: SIN_VALOR, etiqueta: "Sin definir" }],
-      etiquetaSinValor: "Sin definir",
-      agrupable: true,
-    },
-    {
       id: "categoria",
       etiqueta: "Categoría",
       tipo: "seleccion",
@@ -145,7 +114,6 @@ export const DEF_PRODUCTOS_TEST: DefTabla<FilaProductoTest> = {
       agrupable: true,
     },
     { id: "anguloVenta", etiqueta: "Ángulo de Venta", tipo: "texto", valor: (f) => f.anguloVenta ?? "" },
-    { id: "observacion", etiqueta: "Observación", tipo: "texto", valor: (f) => f.observacion ?? "" },
   ],
   // v2: se agrupa por Categoría (no por Estado) y los cerrados ya no se ocultan por defecto — con la
   // mayoría de los productos en Winner/Fallido, ocultarlos de entrada dejaba la vista casi vacía.

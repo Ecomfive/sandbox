@@ -244,6 +244,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-12", titulo: "Test productos sin el bloque Seguimiento", texto: "La ficha y el formulario de un producto en test ya no traen Revisado, Última revisión, Explotación ni Observación: ese seguimiento se lleva en su tarea de ClickUp.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Valor de la marca negra en el resultado del test", texto: "En las barras del resultado de un test (en Test productos y en la ficha de Producto), pasa el cursor por la marca negra para ver su valor: el criterio del CPA o el promedio de los winners de esa métrica.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Colores del estado de un producto", texto: "El estado de cada producto se reconoce por su color: Activo en verde, Test en azul e Inactivo en rojo, en la lista, en el selector de su ficha, al crearlo y en Inventario.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-12", titulo: "Productos inactivos", texto: "Un producto que ya no se vende bien se marca «Inactivo» en su ficha: vende lo que le queda en inventario, pero no se vuelve a comprar hasta pasarlo a Activo. La lista de Producto tiene la tarjeta «Inactivos» para filtrarlos.", modulo: "producto", href: "/producto" },

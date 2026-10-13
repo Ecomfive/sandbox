@@ -8,7 +8,6 @@ import { formatearFecha } from "@/lib/formato";
 import { EnlaceIcon, FlechaAbajoIcon, FlechaArribaIcon, LapizIcon } from "@/lib/nav-icons";
 import {
   etiquetaEstado,
-  etiquetaExplotacion,
   etiquetaTestNumero,
   type FilaProductoTest,
 } from "./def-productos-test";
@@ -207,9 +206,6 @@ export function FichaLateralTest({
         <Fila etiqueta="Fuente">{p.fuente || vacio}</Fila>
         <Fila etiqueta="Ángulo de venta">{p.anguloVenta || vacio}</Fila>
         <Fila etiqueta="Worldwide">{p.worldwide || vacio}</Fila>
-        <Fila etiqueta="Explotación">{p.explotacion ? etiquetaExplotacion(p.explotacion) : vacio}</Fila>
-        <Fila etiqueta="Revisado">{p.revisado ? `Sí${p.ultimaRevision ? `, ${formatearFecha(p.ultimaRevision)}` : ""}` : "No"}</Fila>
-        <Fila etiqueta="Observación">{p.observacion || vacio}</Fila>
       </Bloque>
 
       {enlaces.length > 0 && (
