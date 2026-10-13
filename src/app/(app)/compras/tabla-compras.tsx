@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { BotonBarra, Punto, claseConFicha, claseFichaMinimizada } from "@/components/panel/piezas-panel";
-import { almacen } from "@/components/tabla/almacen";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { BotonBarra, Punto } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { useToast } from "@/components/ui/toast";
@@ -39,7 +38,6 @@ import {
   type FilaCompra,
 } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
-import { FichaLateralCompra, FichaMinimizada } from "./ficha-lateral-compra";
 import { diasEntre, enGrupo, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
 
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
@@ -92,8 +90,6 @@ const fecha = (v: string | null) => (v ? formatearFecha(v) : "—");
 const siNo = (v: boolean) => (v ? "Sí" : <span className="text-muted-foreground">No</span>);
 const lista = (v: string[], f: (x: string) => string = (x) => x) => (v.length ? v.map(f).join(", ") : "—");
 
-/** Si la ficha de la derecha está minimizada; se guarda en el navegador de cada persona. */
-const CLAVE_FICHA = "compras-ficha-v1";
 /** Filtros de un toque sobre las abiertas (las cerradas se ven con el botón «Cerrados» de la barra). */
 const RAPIDOS: { valor: Grupo; etiqueta: string }[] = [
   { valor: "cotizando", etiqueta: "Cotizando" },
@@ -280,9 +276,9 @@ function columnas(
 /**
  * El tablero de Compras, una sola vista: la tabla con la barra de herramientas común (agrupar —arranca por Etapa—, filtros,
  * columnas, cerrados, descarga y «Agregar»), los filtros de un toque (cotizando, producción, en tránsito, atrasadas) y la
- * ficha de resumen fija a la derecha, que se puede minimizar. Pulsar la descripción de una compra la muestra en la ficha
- * (el resto de la fila no abre nada: sus celdas se editan en su sitio, ver `CeldaEditable`); «Abrir ficha completa» abre la
- * actividad (comentarios, adjuntos, historial). Con la ficha minimizada, la descripción abre la ficha completa.
+ * ficha completa. Pulsar la descripción de una compra abre directo su ficha completa, con la actividad (comentarios, adjuntos,
+ * historial) (13 oct 2026: antes mostraba primero un resumen a la derecha); el resto de la fila no abre nada: sus celdas se
+ * editan en su sitio, ver `CeldaEditable`.
  */
 export function TablaCompras({
   compras: comprasServidor,
@@ -319,10 +315,7 @@ export function TablaCompras({
   const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
   const [soloSinProductos, setSoloSinProductos] = useState(false);
   const [etapa, setEtapa] = useState(etapaInicial);
-  const [elegida, setElegida] = useState<{ id: string; orden: string[] } | null>(null);
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(abrirInicial && comprasServidor.some((c) => c.id === abrirInicial) ? { id: abrirInicial, orden: [abrirInicial] } : null);
-  const guardadoFicha = almacen(CLAVE_FICHA, "local");
-  const fichaMinimizada = useSyncExternalStore(guardadoFicha.suscribir, guardadoFicha.leer, () => "") === "minimizada";
 
   // Lo editado en una celda se ve al instante, sin esperar a rearmar la página: son cambios sobre las filas que llegaron del
   // servidor. Cuando llegan filas nuevas (otra edición, la ficha, recargar) se descarta lo que ya coincide con el servidor.
@@ -510,13 +503,11 @@ export function TablaCompras({
   // El avance de vincular productos a las compras de país (las de ClickUp llegaron sin productos).
   const dePais = compras.filter((c) => c.tipo === "pais" && !c.anulada);
   const sinProductos = dePais.filter((c) => c.productos === 0);
-  const resumen = elegida ? (compras.find((c) => c.id === elegida.id) ?? null) : null;
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
   return (
     <ProveedorTiendas value={gestionTiendas}>
-    {/* El resumen de la derecha aparece al elegir una compra; sin elegir, la tabla usa todo el ancho. */}
-    <div className={!resumen ? "flex flex-col" : fichaMinimizada ? claseFichaMinimizada : claseConFicha}>
+    <div className="flex flex-col">
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtros rápidos">
           {RAPIDOS.map((r) => (
@@ -574,7 +565,7 @@ export function TablaCompras({
           // La ficha se abre solo desde la descripción de la compra: el resto de las celdas se editan en su sitio.
           abrirFila={{
             etiqueta: (c) => `Ver la compra ${c.nombre}`,
-            alAbrir: (c, orden) => (fichaMinimizada ? setAbierta({ id: c.id, orden }) : setElegida({ id: c.id, orden })),
+            alAbrir: (c, orden) => setAbierta({ id: c.id, orden }),
             columna: "nombre",
             soloColumna: true,
             // El botón de etiquetas va junto al nombre, fuera del botón que abre la compra.
@@ -592,7 +583,7 @@ export function TablaCompras({
               </span>
             ),
           }}
-          claseFila={(c) => (!fichaMinimizada && c.id === elegida?.id ? "bg-accent" : "")}
+          claseFila={(c) => (c.id === abierta?.id ? "bg-accent" : "")}
           // Casillas y la barra de abajo para cambiar un dato de varias compras a la vez (solo con permiso de escritura).
           seleccion={
             puedeEscribir
@@ -624,18 +615,6 @@ export function TablaCompras({
         />
       </div>
 
-      {!resumen ? null : fichaMinimizada ? (
-        <FichaMinimizada alAbrir={() => guardadoFicha.guardar("")} />
-      ) : (
-        <FichaLateralCompra
-          alCerrar={() => setElegida(null)}
-          compra={resumen}
-          orden={elegida?.orden ?? []}
-          alIr={(id) => setElegida((e) => (e ? { ...e, id } : e))}
-          alAbrir={() => resumen && setAbierta({ id: resumen.id, orden: elegida?.orden ?? [] })}
-          alMinimizar={() => guardadoFicha.guardar("minimizada")}
-        />
-      )}
       <FichaCompra
         tiendas={todasTiendas}
         etiquetas={todasEtiquetas}
