@@ -1283,13 +1283,14 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   return {};
 }
 
-/** Un producto que se puede comprar (existe, no es compuesto, no está en Test y no tiene variantes), o por qué no. */
+/** Un producto que se puede comprar (existe, no es compuesto, no está en Test ni Inactivo y no tiene variantes), o por qué no. */
 async function productoComprable(skuId: string): Promise<{ codigo: string; nombre: string } | { error: string }> {
   const supabase = createServiceClient();
   const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre, tipo, clase").eq("id", skuId).maybeSingle();
   if (!sku) return { error: "El producto no existe." };
   if (sku.tipo === "combo") return { error: "Un producto compuesto no se compra: se compran sus componentes." };
   if (sku.clase === "test") return { error: `${sku.codigo} está en Test: pásalo a Activo para comprarlo.` };
+  if (sku.clase === "inactivo") return { error: `${sku.codigo} está Inactivo: pásalo a Activo para volver a comprarlo.` };
   const { count: variantes } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("padre_id", skuId);
   if ((variantes ?? 0) > 0) return { error: `${sku.codigo} tiene variantes: se compra por variante.` };
   return { codigo: sku.codigo as string, nombre: sku.nombre as string };
