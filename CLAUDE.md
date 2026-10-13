@@ -43,6 +43,8 @@ convenciones técnicas del código.
   - La bitácora del Centro de notificaciones se filtra por módulo de la entidad y país (`eventoVisible`,
     `src/lib/auditoria-visible.ts`): una entidad nueva en la auditoría se agrega a `MODULO_DE_ENTIDAD`.
   - «Hoy» arma cada tarjeta solo con su módulo; una acción que crea algo en el país de la barra comprueba `puedeVerPais`.
+  - `getPaisActual` con países limitados solo devuelve uno de ellos (`paisesCandidatos`); si ninguno existe devuelve
+    `SIN_PAIS` («Sin país», un id que no es de ningún país), nunca Costa Rica: las páginas quedan vacías en vez de mostrar otro país.
   - CSV del servidor con el `celdaCsv` compartido (`src/lib/tabla/csv.ts`), HTML de correos con lo escrito por personas
     escapado.
   - `scripts/actualizar-pedidos-servidor.ts` escucha solo en 127.0.0.1, exige Host `localhost:4321` y un código por

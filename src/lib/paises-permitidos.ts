@@ -10,6 +10,17 @@ export function puedeVerPais(permitidos: string[] | null, codigo: string | null)
   return permitidos.includes(codigo ?? CLAVE_IMPORTADORA);
 }
 
+/**
+ * En qué orden probar países para la barra de arriba: el elegido si lo puede ver; si no, los de la barra (`nav`, sin los
+ * «pronto») que tenga y luego el resto de los suyos. Con países limitados **nunca** devuelve uno que no tenga: sin ninguno, la
+ * lista queda vacía (y `getPaisActual` usa «Sin país»).
+ */
+export function paisesCandidatos(elegido: string, permitidos: string[] | null, nav: { codigo: string; pronto?: boolean }[]): string[] {
+  if (permitidos === null) return [elegido];
+  const lista = [elegido, ...nav.filter((p) => !p.pronto).map((p) => p.codigo), ...permitidos];
+  return [...new Set(lista)].filter((c) => c !== CLAVE_IMPORTADORA && permitidos.includes(c));
+}
+
 /** Deja solo los países que la persona puede ver. */
 export function filtrarPaises<T extends { codigo: string }>(permitidos: string[] | null, paises: T[]): T[] {
   return permitidos === null ? paises : paises.filter((p) => permitidos.includes(p.codigo));

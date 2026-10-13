@@ -5,12 +5,16 @@ import { PAIS_COOKIE, PAIS_DEFAULT, PAISES_NAV } from "@/lib/nav-data";
 import { conTtl } from "@/lib/cache-ttl";
 import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { paisesCandidatos } from "@/lib/paises-permitidos";
 
 export interface PaisActual {
   id: string;
   codigo: string;
   nombre: string;
 }
+
+/** Lo que devuelve `getPaisActual` a quien tiene países limitados y ninguno existe: no coincide con ningún dato. */
+export const SIN_PAIS: PaisActual = { id: "00000000-0000-0000-0000-000000000000", codigo: "", nombre: "Sin país" };
 
 /** Cada cuánto se vuelve a leer un país de la base: cambian por una decisión de administración, casi nunca. */
 const TTL_PAISES_MS = 10 * 60 * 1000;
@@ -48,16 +52,18 @@ const paisPreferidoDeLaPersona = cache(async (): Promise<string | null> => {
  */
 export async function getPaisActual(supabase: SupabaseClient): Promise<PaisActual> {
   const cookieStore = await cookies();
-  let codigo = cookieStore.get(PAIS_COOKIE)?.value ?? (await paisPreferidoDeLaPersona()) ?? PAIS_DEFAULT;
+  const elegido = cookieStore.get(PAIS_COOKIE)?.value ?? (await paisPreferidoDeLaPersona()) ?? PAIS_DEFAULT;
   // Con países limitados (migración 0087), solo uno de los suyos: si el elegido no lo es, el primero que tenga abierto.
   const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
-  if (permitidos !== null && !permitidos.includes(codigo)) {
-    codigo = PAISES_NAV.find((p) => !p.pronto && permitidos.includes(p.codigo))?.codigo ?? permitidos.find((c) => c !== "importacion") ?? codigo;
+  for (const codigo of paisesCandidatos(elegido, permitidos, PAISES_NAV)) {
+    const pais = await paisPorCodigo(codigo, supabase);
+    if (pais) return pais;
   }
-
-  const pais = await paisPorCodigo(codigo, supabase);
-  if (pais) return pais;
-
-  const porDefecto = await paisPorCodigo(PAIS_DEFAULT, supabase);
-  return porDefecto!;
+  // Sin límite, si el elegido no existe, Costa Rica. Con límite y ninguno de sus países en la base, «Sin país»: un id que no
+  // es de ningún país, así ninguna página muestra datos de un país que no tiene (auditoría de seguridad, 13 oct 2026).
+  if (permitidos === null) {
+    const porDefecto = await paisPorCodigo(PAIS_DEFAULT, supabase);
+    if (porDefecto) return porDefecto;
+  }
+  return SIN_PAIS;
 }
