@@ -37,7 +37,14 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
     id: "clase",
     label: "Estado",
     ocultable: true,
-    render: (f) => (f.clase === "test" ? <Badge tone="warning">{ETIQUETA_CLASE_SKU.test}</Badge> : <span className="text-muted-foreground">{ETIQUETA_CLASE_SKU.fisico}</span>),
+    render: (f) =>
+      f.clase === "test" ? (
+        <Badge tone="warning">{ETIQUETA_CLASE_SKU.test}</Badge>
+      ) : f.clase === "inactivo" ? (
+        <Badge tone="neutral">{ETIQUETA_CLASE_SKU.inactivo}</Badge>
+      ) : (
+        <span className="text-muted-foreground">{ETIQUETA_CLASE_SKU.fisico}</span>
+      ),
   },
   { id: "fisico", label: "Físico", descripcion: DESCRIPCION_CUBETA.fisico, ocultable: false, render: (f) => celda(f.fisico) },
   { id: "reservado", label: "Reservado", descripcion: DESCRIPCION_CUBETA.reservado, ocultable: true, render: (f) => celda(f.reservado) },

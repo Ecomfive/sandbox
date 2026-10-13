@@ -5,7 +5,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { activarProductoParaCompra } from "../producto/actions";
 
-/** Lo mínimo de un producto para decidir si se puede comprar. `clase` es su estado: 'fisico' (Activo) o 'test'. */
+/** Lo mínimo de un producto para decidir si se puede comprar. `clase` es su estado: 'fisico' (Activo), 'test' o 'inactivo'. */
 export interface ProductoParaCompra {
   id: string;
   codigo: string;
@@ -16,10 +16,10 @@ export interface ProductoParaCompra {
 const claseBoton = `rounded-md border px-4 py-2 text-sm font-medium disabled:pointer-events-none disabled:opacity-50 ${anilloFoco}`;
 
 /**
- * Regla de Compras: **un producto en Test no se puede comprar**. Antes de agregar un producto a una compra se llama
+ * Regla de Compras: **un producto en Test o Inactivo no se puede comprar**. Antes de agregar un producto a una compra se llama
  * `await confirmar(producto)`:
  * - si ya está Activo, devuelve `true` sin preguntar;
- * - si está en Test, abre la advertencia «para comprarlo debe pasar a Activo». **Cancelar** devuelve `false` (se vuelve
+ * - si está en Test o Inactivo, abre la advertencia «para comprarlo debe pasar a Activo». **Cancelar** devuelve `false` (se vuelve
  *   atrás y no se agrega); **Aceptar** lo pasa a Activo en su ficha de Producto (`activarProductoParaCompra`, queda en su
  *   actividad «desde Compras») y devuelve `true` para seguir con la compra. Si el cambio falla, el error se ve en la misma
  *   ventana y no se cierra.
@@ -44,7 +44,7 @@ export function useConfirmarProductoActivo() {
   }
 
   function confirmar(p: ProductoParaCompra): Promise<boolean> {
-    if (p.clase !== "test") return Promise.resolve(true);
+    if (p.clase !== "test" && p.clase !== "inactivo") return Promise.resolve(true);
     // Si había otra pregunta abierta, esa se da por cancelada.
     resolver.current?.(false);
     setError(null);
@@ -64,12 +64,13 @@ export function useConfirmarProductoActivo() {
     });
   }
 
+  const estado = producto?.clase === "inactivo" ? "Inactivo" : "Test";
   const dialogo = (
-    <Ventana abierto={!!producto} alCerrar={() => !pendiente && terminar(false)} titulo="Producto en Test" ancho="sm">
+    <Ventana abierto={!!producto} alCerrar={() => !pendiente && terminar(false)} titulo={estado === "Inactivo" ? "Producto inactivo" : "Producto en Test"} ancho="sm">
       {producto && (
         <div className="flex flex-col gap-4 p-5 text-sm">
           <p className="m-0">
-            <strong className="font-semibold">{producto.codigo}</strong> · {producto.nombre} está en <strong className="font-semibold">Test</strong>. Para
+            <strong className="font-semibold">{producto.codigo}</strong> · {producto.nombre} está {estado === "Inactivo" ? "" : "en "}<strong className="font-semibold">{estado}</strong>. Para
             comprarlo debe cambiarse a <strong className="font-semibold">Activo</strong>. ¿Lo cambiamos ahora?
           </p>
           {error && (

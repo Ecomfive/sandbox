@@ -24,7 +24,7 @@ export interface FilaStock {
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
-export const ETIQUETA_CLASE_SKU: Record<string, string> = { fisico: "Activo", test: "Test" };
+export const ETIQUETA_CLASE_SKU: Record<string, string> = { fisico: "Activo", test: "Test", inactivo: "Inactivo" };
 
 export const ETIQUETA_EXISTENCIA: Record<string, string> = {
   negativo: "Saldo negativo",
