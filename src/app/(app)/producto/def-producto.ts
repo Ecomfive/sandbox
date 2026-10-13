@@ -95,6 +95,8 @@ export interface TestProducto {
   estado: string;
   testNumero: string | null;
   fechaTest: string | null;
+  /** El precio de la oferta con que se testeó. */
+  oferta: number | null;
   gasto: number | null;
   compras: number | null;
   cpa: number | null;
@@ -134,6 +136,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
       agrupable: true,
     },
     { id: "comprado", etiqueta: "Unidades compradas", tipo: "numero", valor: (p) => p.unidadesCompradas },
+    { id: "oferta", etiqueta: "Oferta", tipo: "numero", valor: (p) => p.tests[0]?.oferta ?? null },
     {
       id: "test",
       etiqueta: "Test",

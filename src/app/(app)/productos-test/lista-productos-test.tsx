@@ -14,7 +14,7 @@ import { FichaLateralTest } from "./ficha-lateral-test";
 import { FichaProductoTest } from "./ficha-producto-test";
 import { CPA_OBJETIVO, limpiarCategoria, porcentaje, resultadoDe, usd, type Resultado } from "./informe";
 
-type Columna = "fecha" | "gasto" | "compras" | "cpa" | "ctr" | "hook" | "cvr";
+type Columna = "fecha" | "oferta" | "gasto" | "compras" | "cpa" | "ctr" | "hook" | "cvr";
 interface Orden {
   columna: Columna;
   sentido: 1 | -1;
@@ -29,6 +29,8 @@ const CHIPS: { resultado: Resultado; etiqueta: string }[] = [
 ];
 const COLUMNAS: { id: Columna; etiqueta: string; valor: (f: FilaProductoTest) => number | string | null }[] = [
   { id: "fecha", etiqueta: "Fecha test", valor: (f) => f.fechaTest },
+  // El precio de la oferta con que se testeó.
+  { id: "oferta", etiqueta: "Oferta", valor: (f) => f.metricaOferta },
   { id: "gasto", etiqueta: "Gasto", valor: (f) => f.metricaGasto },
   { id: "compras", etiqueta: "Compras", valor: (f) => f.metricaCompras },
   { id: "cpa", etiqueta: "CPA", valor: (f) => f.metricaCpa },
@@ -208,7 +210,7 @@ export function ListaProductosTest({
             <tbody>
               {filas.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="px-3 py-8 text-center text-sm text-muted-foreground">
                     {productos.length === 0 ? "Todavía no hay productos en test. Usa «Agregar» para registrar el primero." : "Ningún producto coincide con lo que buscas."}
                   </td>
                 </tr>
@@ -254,6 +256,7 @@ export function ListaProductosTest({
                     <td className={claseTd}>{p.testNumero ? etiquetaTestNumero(p.testNumero) : "—"}</td>
                     <td className={claseTd}><Pastilla tono={tonoEstado(p.estado)}>{etiquetaEstado(p.estado)}</Pastilla></td>
                     <td className={claseTd}>{p.fechaTest ? formatearFecha(p.fechaTest) : "—"}</td>
+                    <td className={`${claseTd} text-right tabular-nums`}>{p.metricaOferta === null ? "—" : usd(p.metricaOferta)}</td>
                     <td className={`${claseTd} text-right tabular-nums`}>{p.metricaGasto === null ? "—" : usd(p.metricaGasto)}</td>
                     <td className={`${claseTd} text-right tabular-nums`}>{p.metricaCompras ?? "—"}</td>
                     <td className={`${claseTd} text-right tabular-nums`}>

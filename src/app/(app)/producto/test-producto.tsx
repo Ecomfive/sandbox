@@ -55,6 +55,10 @@ function DatosTest({ producto }: { producto: FilaProducto }) {
           </div>
           <dl className="m-0 grid grid-cols-3 gap-x-3 gap-y-1.5 text-xs">
             <div>
+              <dt className="text-muted-foreground">Oferta</dt>
+              <dd className="m-0 font-semibold tabular-nums">{dato(t.oferta, (n) => usd(n))}</dd>
+            </div>
+            <div>
               <dt className="text-muted-foreground">Gasto</dt>
               <dd className="m-0 font-semibold tabular-nums">{dato(t.gasto, (n) => usd(n))}</dd>
             </div>
@@ -103,7 +107,7 @@ export function ResultadoTestProducto({ producto, referencias }: { producto: Fil
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
               <EstadoTest estado={t.estado} />
               <span className="text-muted-foreground">
-                {[t.pais, etiquetaTestNumero(t.testNumero), t.fechaTest ? formatearFecha(t.fechaTest) : null, t.gasto === null ? null : `gasto ${usd(t.gasto)}`].filter(Boolean).join(" · ")}
+                {[t.pais, etiquetaTestNumero(t.testNumero), t.fechaTest ? formatearFecha(t.fechaTest) : null, t.oferta === null ? null : `oferta ${usd(t.oferta)}`, t.gasto === null ? null : `gasto ${usd(t.gasto)}`].filter(Boolean).join(" · ")}
               </span>
             </div>
             <p className="mb-2.5 flex items-start gap-1.5 text-[13px]">

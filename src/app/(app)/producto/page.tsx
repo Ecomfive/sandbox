@@ -80,7 +80,7 @@ export default async function ProductoPage() {
     usuario.modulos.includes("productos-test")
       ? supabase
           .from("wms_productos_test")
-          .select("id, nombre, sku_maestro_id, estado, test_numero, fecha_test, metrica_gasto, metrica_compras, metrica_cpa, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)")
+          .select("id, nombre, sku_maestro_id, estado, test_numero, fecha_test, metrica_oferta, metrica_gasto, metrica_compras, metrica_cpa, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)")
           .not("sku_maestro_id", "is", null)
           .order("fecha_test", { ascending: false, nullsFirst: false })
       : Promise.resolve({ data: [] as never[] }),
@@ -112,6 +112,7 @@ export default async function ProductoPage() {
         estado: t.estado as string,
         testNumero: (t.test_numero as string | null) ?? null,
         fechaTest: (t.fecha_test as string | null) ?? null,
+        oferta: numero(t.metrica_oferta),
         gasto: numero(t.metrica_gasto),
         compras: numero(t.metrica_compras),
         cpa: numero(t.metrica_cpa),

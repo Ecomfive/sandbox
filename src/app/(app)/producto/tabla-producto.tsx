@@ -14,6 +14,7 @@ import { FichaProducto } from "./ficha-producto";
 import { VistaRapidaProducto } from "./vista-rapida-producto";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { CeldaTestProducto } from "./test-producto";
+import { usd } from "../productos-test/informe";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
@@ -28,6 +29,7 @@ const ICONOS: Record<string, IconoComp> = {
   creado: CalendarioIcon,
   comprado: ComprasIcon,
   test: EstadoIcon,
+  oferta: ComprasIcon,
 };
 
 const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
@@ -49,6 +51,14 @@ const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
   { id: "clase", label: "Estado", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },
   // Si pasó por Test productos y cómo le fue; al pasar el cursor, los datos de su test.
   { id: "test", label: "Test", ocultable: true, render: (p) => <CeldaTestProducto producto={p} /> },
+  // En cuánto se testeó (la oferta de su test más reciente); solo los que vienen de Test productos.
+  {
+    id: "oferta",
+    label: "Oferta",
+    ocultable: true,
+    clase: "text-right tabular-nums",
+    render: (p) => (p.tests[0]?.oferta != null ? usd(p.tests[0].oferta) : <span className="text-muted-foreground">—</span>),
+  },
   { id: "barras", label: "Código de barras", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.codigoBarras ?? "—" },
   { id: "vencimiento", label: "Vencimiento", ocultable: true, clase: "text-muted-foreground", render: (p) => (p.manejaVencimiento ? "Por lote" : "—") },
   { id: "componentes", label: "Componentes", ocultable: true, clase: "text-muted-foreground", render: (p) => p.componentes || "—" },
