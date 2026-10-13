@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarFiltro, crearFiltro, prepararSubidaFotoFiltro } from "./actions";
 import { CampoFoto } from "@/components/ui/campo-foto";
+import { CampoSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIENDAS, TIPOS_ENVIO, type FilaFiltro } from "./def-filtros";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
@@ -40,6 +41,9 @@ export function FormularioFiltro({
 }) {
   const [modificado, setModificado] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
+  // El producto de Producto que se eligió (el buscador de la orden de compra) y el nombre, que se llena al elegirlo.
+  const [skuId, setSkuId] = useState<string | null>(filtro?.skuMaestroId ?? null);
+  const [nombre, setNombre] = useState(filtro?.nombre ?? "");
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const invalido = (id: string) => (faltante === id ? true : undefined);
   const [pending, startTransition] = useTransition();
@@ -111,6 +115,21 @@ export function FormularioFiltro({
 
       <div className="flex flex-1 flex-col divide-y divide-border p-5">
         <Seccion icono={FiltroIcon} titulo="Producto">
+          <Campo etiqueta="Producto (de Producto)" id="campo-producto-filtro">
+            <input type="hidden" name="sku_maestro_id" value={skuId ?? ""} />
+            <CampoSkuMaestro
+              valor={skuId}
+              alCambiar={(sku) => {
+                setSkuId(sku?.id ?? null);
+                if (sku) setNombre(sku.nombre);
+                setModificado(true);
+                alModificar?.();
+              }}
+              etiquetaAria="Producto de Producto"
+              placeholder="Busca por SKU, nombre o N.º"
+              claseContenedor="w-full min-w-0"
+            />
+          </Campo>
           <Campo etiqueta="Nombre" id="campo-nombre-filtro" obligatorio faltante={faltante}>
             <input
               id="campo-nombre-filtro"
@@ -119,7 +138,8 @@ export function FormularioFiltro({
               required
               data-enfocar
               aria-invalid={invalido("campo-nombre-filtro")}
-              defaultValue={filtro?.nombre}
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
               placeholder="Ej: Calcitrin Gold para mayores de 40"
               className={fieldClass}
             />

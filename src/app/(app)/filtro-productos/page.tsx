@@ -4,6 +4,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { FiltroIcon } from "@/lib/nav-icons";
+import { ProveedorSkusMaestros } from "@/components/ui/selector-sku-maestro";
+import { obtenerOpcionesProducto } from "../productos-test/datos-test";
 import { TablaFiltros } from "./tabla-filtros";
 import type { FilaFiltro } from "./def-filtros";
 
@@ -18,20 +20,24 @@ export default async function FiltrosComprasPage() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const { data: filtros } = await supabase
+  const [{ data: filtros }, opcionesProducto] = await Promise.all([
+    supabase
     .from("wms_filtro_productos")
     .select(
-      "id, nombre, foto_url, estado_registro, estado, tipo_envio, tienda, qty_producto, precio_total, precio_unitario, prioridad, aprobacion_gestionada, comentarios, creado_en, landing_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, perfiles(nombre, email, avatar_url)"
+      "id, nombre, sku_maestro_id, foto_url, estado_registro, estado, tipo_envio, tienda, qty_producto, precio_total, precio_unitario, prioridad, aprobacion_gestionada, comentarios, creado_en, landing_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, perfiles(nombre, email, avatar_url)"
     )
     .eq("pais_id", pais.id)
     .order("creado_en", { ascending: false })
-    .limit(1000);
+    .limit(1000),
+    obtenerOpcionesProducto(supabase),
+  ]);
 
   const filasFiltro: FilaFiltro[] = (filtros ?? []).map((f) => {
     const asignado = f.perfiles as unknown as { nombre: string | null; email: string; avatar_url: string | null } | null;
     return {
       id: f.id,
       nombre: f.nombre,
+      skuMaestroId: f.sku_maestro_id ?? null,
       fotoUrl: f.foto_url,
       estadoRegistro: f.estado_registro,
       estado: f.estado,
@@ -64,12 +70,15 @@ export default async function FiltrosComprasPage() {
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Filtro de productos" icono={FiltroIcon} oculto />
 
-      <TablaFiltros
-        filtros={filasFiltro}
-        codigoPais={pais.codigo}
-        paisId={pais.id}
-        puedeEscribir={!usuario.modulosSoloLectura.includes("filtro-productos")}
-      />
+      {/* Los productos de Producto, para elegir el de cada producto candidato (el buscador de la orden de compra). */}
+      <ProveedorSkusMaestros opciones={opcionesProducto}>
+        <TablaFiltros
+          filtros={filasFiltro}
+          codigoPais={pais.codigo}
+          paisId={pais.id}
+          puedeEscribir={!usuario.modulosSoloLectura.includes("filtro-productos")}
+        />
+      </ProveedorSkusMaestros>
     </Pagina>
   );
 }

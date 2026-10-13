@@ -58,7 +58,10 @@ const textoOptativo = (formData: FormData, campo: string): string | null => {
 function leerCambios(formData: FormData) {
   const tipoEnvio = (formData.get("tipo_envio") as string | null) || null;
   const tienda = (formData.get("tienda") as string | null) || null;
+  const sku = String(formData.get("sku_maestro_id") ?? "").trim();
   return {
+    // El producto de Producto con que se vincula (vacío = ninguno).
+    sku_maestro_id: /^[0-9a-fA-F-]{36}$/.test(sku) ? sku : null,
     foto_url: textoOptativo(formData, "foto_url"),
     tipo_envio: tipoEnvio && ENVIOS_VALIDOS.has(tipoEnvio) ? tipoEnvio : null,
     tienda: tienda && TIENDAS_VALIDAS.has(tienda) ? tienda : null,
