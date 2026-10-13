@@ -75,7 +75,7 @@ export async function obtenerOpcionesProducto(
       id: p.id as string,
       codigo: p.codigo as string,
       nombre: p.nombre as string,
-      estado: p.clase === "test" || p.clase === "inactivo" ? (p.clase as string) : "aprobado",
+      estado: p.clase === "test" || p.clase === "inactivo" || p.clase === "descontinuado" ? (p.clase as string) : "aprobado",
       numero: (p.numero as number | null) ?? null,
       foto: (p.foto_url as string | null) ?? null,
       compuesto: p.tipo === "combo",

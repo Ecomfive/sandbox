@@ -31,6 +31,7 @@ export function CampoFoto({
   etiqueta = "Foto del producto",
   subirDesdeUrl,
   soltarEnTodo = false,
+  alCambiar,
 }: {
   nombreCampo: string;
   valorInicial: string | null;
@@ -42,6 +43,8 @@ export function CampoFoto({
   subirDesdeUrl?: (url: string) => Promise<{ ruta: string } | { error: string }>;
   /** Soltar o pegar una imagen en cualquier parte de la página (un panel de crear), no solo sobre el cuadro. */
   soltarEnTodo?: boolean;
+  /** Cada vez que cambia la foto (su dirección pública, o null al quitarla). */
+  alCambiar?: (url: string | null) => void;
 }) {
   const [preview, setPreview] = useState<string | null>(valorInicial);
   const [subiendo, setSubiendo] = useState(false);
@@ -52,6 +55,17 @@ export function CampoFoto({
   useEffect(() => {
     alCambiarSubiendo?.(subiendo);
   }, [subiendo, alCambiarSubiendo]);
+
+  const primera = useRef(true);
+  useEffect(() => {
+    if (primera.current) {
+      primera.current = false;
+      return;
+    }
+    alCambiar?.(preview);
+    // Solo cuando cambia la foto, no cuando cambia la función.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview]);
 
   async function subir(archivo: File) {
     if (!archivo.type.startsWith("image/")) {

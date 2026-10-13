@@ -18,6 +18,7 @@ import { EnvioIcon } from "@/lib/nav-icons";
 import { claseTono, type Tone } from "@/components/ui/badge";
 import { TONO_CLASE } from "./def-producto";
 import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
+import { AvisoDuplicados } from "./aviso-duplicados";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
@@ -89,6 +90,8 @@ export function CrearProductoPanel({
     espera.current = setTimeout(() => void sugerir(valor), 450);
   }
   const [subiendoFoto, setSubiendoFoto] = useState(false);
+  // La foto subida, para el aviso de posible duplicado.
+  const [foto, setFoto] = useState<string | null>(null);
   // Se vuelve a armar vacío al abrir la ficha otra vez.
   const [vueltaEnvio, setVueltaEnvio] = useState(0);
   const [conVariantes, setConVariantes] = useState(false);
@@ -107,6 +110,7 @@ export function CrearProductoPanel({
       alAbrir={() => {
         setTipo("simple");
         setNombre("");
+        setFoto(null);
         setCodigo("");
         setSkuTocado(false);
         setConVariantes(false);
@@ -157,6 +161,7 @@ export function CrearProductoPanel({
               prepararSubida={prepararSubidaFotoNuevoProducto}
               subirDesdeUrl={subirFotoNuevoProductoDesdeUrl}
               soltarEnTodo
+              alCambiar={setFoto}
             />
             <Campo etiqueta="Nombre" id="campo-nombre-producto" obligatorio faltante={faltante}>
               <input
@@ -174,6 +179,7 @@ export function CrearProductoPanel({
                 className={`${fieldClass} w-full`}
               />
             </Campo>
+            <AvisoDuplicados nombre={nombre} foto={foto} />
             <Campo etiqueta="SKU" id="campo-codigo-producto" obligatorio faltante={faltante}>
               <input
                 id="campo-codigo-producto"

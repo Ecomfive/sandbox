@@ -13,13 +13,14 @@ const atajoDeClase = (clase: string): AtajoFiltro => ({
   suma: true,
 });
 
-/** Las tarjetas «Activos / Test / Inactivos»: al pulsar una filtran la lista por ese estado (se pulsa otra vez para quitarla). */
-export function TarjetasClase({ conteo }: { conteo: { fisico: number; test: number; inactivo: number } }) {
+/** Las tarjetas «Activos / Test / Inactivos / Descontinuados»: al pulsar una filtran la lista por ese estado (se pulsa otra vez para quitarla). */
+export function TarjetasClase({ conteo }: { conteo: { fisico: number; test: number; inactivo: number; descontinuado: number } }) {
   return (
     <KpiGrid>
       <KpiFiltro def={DEF_PRODUCTO} atajo={atajoDeClase("fisico")} titulo="Activos" valor={conteo.fisico} />
       <KpiFiltro def={DEF_PRODUCTO} atajo={atajoDeClase("test")} titulo="Test" valor={conteo.test} />
       <KpiFiltro def={DEF_PRODUCTO} atajo={atajoDeClase("inactivo")} titulo="Inactivos" valor={conteo.inactivo} />
+      <KpiFiltro def={DEF_PRODUCTO} atajo={atajoDeClase("descontinuado")} titulo="Descontinuados" valor={conteo.descontinuado} />
     </KpiGrid>
   );
 }

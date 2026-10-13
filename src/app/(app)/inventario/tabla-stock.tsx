@@ -42,6 +42,8 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
         <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>
       ) : f.clase === "inactivo" ? (
         <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>
+      ) : f.clase === "descontinuado" ? (
+        <Badge tone="neutral">{ETIQUETA_CLASE_SKU.descontinuado}</Badge>
       ) : (
         <span className="text-muted-foreground">{ETIQUETA_CLASE_SKU.fisico}</span>
       ),

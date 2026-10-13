@@ -167,6 +167,7 @@ export function FichaProducto({
                       <option value="fisico">{ETIQUETA_CLASE.fisico}</option>
                       <option value="test">{ETIQUETA_CLASE.test}</option>
                       <option value="inactivo">{ETIQUETA_CLASE.inactivo}</option>
+                      <option value="descontinuado">{ETIQUETA_CLASE.descontinuado}</option>
                     </select>
                   ) : (
                     (ETIQUETA_CLASE[producto.clase] ?? producto.clase)

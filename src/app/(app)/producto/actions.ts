@@ -15,6 +15,10 @@ import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
+import { huellaFoto } from "@/lib/wms/huella-foto";
+import { posiblesDuplicados, type CandidatoDuplicado, type PosibleDuplicado } from "@/lib/wms/duplicados";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { eventoVisible } from "@/lib/auditoria-visible";
 import { getUsuarioActual } from "@/lib/auth";
 
@@ -154,7 +158,10 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
     if (imagen) {
       const destino = `productos/${data.id}/${origen.split("/").pop()}`;
       const { error: errorMover } = await supabase.storage.from(BUCKET_FOTOS).move(origen, destino);
-      if (!errorMover) await supabase.from("skus_maestros").update({ foto_url: PREFIJO_FOTOS + destino }).eq("id", data.id);
+      if (!errorMover) {
+        await supabase.from("skus_maestros").update({ foto_url: PREFIJO_FOTOS + destino }).eq("id", data.id);
+        if (archivo) await guardarHuella(supabase, data.id, archivo);
+      }
     } else {
       await supabase.storage.from(BUCKET_FOTOS).remove([origen]);
     }
@@ -171,12 +178,13 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   return { id: data.id as string };
 }
 
-type Clase = "fisico" | "test" | "inactivo";
-const esClase = (c: string): c is Clase => c === "fisico" || c === "test" || c === "inactivo";
+type Clase = "fisico" | "test" | "inactivo" | "descontinuado";
+const esClase = (c: string): c is Clase => c === "fisico" || c === "test" || c === "inactivo" || c === "descontinuado";
 
 /**
  * Cambia el estado de un producto: de Test a Activo (se decidió comprarlo), de Activo a Test, o a Inactivo (ya no se vende
- * bien: vende lo que le queda pero no se vuelve a comprar) y de vuelta. Vuelve a Test solo si nunca tuvo movimientos de
+ * bien: vende lo que le queda pero no se vuelve a comprar), a Descontinuado (ya no se va a traer más; igual que Inactivo, migración
+ * 0103) y de vuelta. Vuelve a Test solo si nunca tuvo movimientos de
  * inventario: con historia ya no es una prueba. `desde` queda en la actividad («desde Compras»).
  */
 async function aplicarEstado(id: string, clase: Clase, desde?: string): Promise<{ error?: string; compra?: { numero: number; codigo: string | null; pais: string } }> {
@@ -641,6 +649,45 @@ export async function prepararSubidaFotoProducto(id: string, nombreArchivo: stri
   return { ruta, token: data.token };
 }
 
+/** Calcula y guarda la huella de la foto de un producto (aviso de duplicados). Nunca lanza; sin la migración 0103 no hace nada. */
+async function guardarHuella(supabase: SupabaseClient, id: string, archivo: Blob) {
+  const huella = await huellaFoto(new Uint8Array(await archivo.arrayBuffer()));
+  if (huella) await supabase.from("skus_maestros").update({ foto_huella: huella }).eq("id", id);
+}
+
+/**
+ * Los productos que podrían ser el mismo que se está creando (13 oct 2026): por el nombre (palabras en común) y por la foto
+ * (huella parecida). Solo es un aviso en la ficha «Nuevo producto»; la persona decide. No cuenta las variantes (comparten el
+ * nombre de su producto). Devuelve el error como valor.
+ */
+export async function buscarPosiblesDuplicados(nombre: string, foto: string | null): Promise<{ duplicados: PosibleDuplicado[] } | { error: string }> {
+  await requireModulo(MODULO);
+  const texto = String(nombre ?? "").trim().slice(0, 200);
+  const supabase = createServiceClient();
+
+  // La huella de la foto recién subida (solo una de la carpeta de fotos nuevas).
+  let huella: string | null = null;
+  const prefijoNuevos = `${PREFIJO_FOTOS}productos/nuevos/`;
+  if (typeof foto === "string" && foto.startsWith(prefijoNuevos) && !foto.includes("..") && !foto.includes("?")) {
+    const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(foto.slice(PREFIJO_FOTOS.length));
+    if (archivo) huella = await huellaFoto(new Uint8Array(await archivo.arrayBuffer()));
+  }
+  if (!texto && !huella) return { duplicados: [] };
+
+  type Fila = { id: string; codigo: string; nombre: string; foto_url: string | null; foto_huella?: string | null };
+  let filas: Fila[];
+  try {
+    filas = await traerTodasLasFilas<Fila>((desde, hasta) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, foto_url, foto_huella").is("padre_id", null).order("id").range(desde, hasta),
+    );
+  } catch {
+    // Sin la migración 0103 no hay huellas: se compara solo el nombre.
+    filas = await traerTodasLasFilas<Fila>((desde, hasta) => supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").is("padre_id", null).order("id").range(desde, hasta));
+  }
+  const candidatos: CandidatoDuplicado[] = filas.map((f) => ({ id: f.id, codigo: f.codigo, nombre: f.nombre, foto: f.foto_url, huella: f.foto_huella ?? null }));
+  return { duplicados: posiblesDuplicados(texto, huella, candidatos) };
+}
+
 /**
  * Guarda (o quita, con `ruta` null) la foto de un producto. La foto debe estar en la carpeta de ese producto y ser de verdad
  * una imagen (se revisa su contenido, no el nombre). La anterior, si era nuestra, se borra. Devuelve el error como valor.
@@ -653,6 +700,7 @@ export async function guardarFotoProducto(id: string, ruta: string | null): Prom
   if (errorActual || !actual) return { error: "No se encontró el producto." };
 
   let url: string | null = null;
+  let huella: string | null = null;
   if (ruta !== null) {
     if (typeof ruta !== "string" || !ruta.startsWith(`productos/${id}/`) || ruta.includes("..")) return { error: "Foto no válida." };
     const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(ruta);
@@ -662,10 +710,13 @@ export async function guardarFotoProducto(id: string, ruta: string | null): Prom
       return { error: "El archivo no es una imagen (JPG, PNG, WebP o GIF)." };
     }
     url = PREFIJO_FOTOS + ruta;
+    huella = await huellaFoto(new Uint8Array(await archivo!.arrayBuffer()));
   }
 
   const { error } = await supabase.from("skus_maestros").update({ foto_url: url }).eq("id", id);
   if (error) return { error: "No se pudo guardar la foto." };
+  // La huella va aparte: sin la migración 0103 la foto se guarda igual.
+  await supabase.from("skus_maestros").update({ foto_huella: huella }).eq("id", id);
   const anterior = actual.foto_url as string | null;
   if (anterior && anterior !== url && anterior.startsWith(PREFIJO_FOTOS)) await supabase.storage.from(BUCKET_FOTOS).remove([anterior.slice(PREFIJO_FOTOS.length)]);
   await registrarAuditoria({

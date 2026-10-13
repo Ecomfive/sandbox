@@ -5,7 +5,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { activarProductoParaCompra } from "../producto/actions";
 
-/** Lo mínimo de un producto para decidir si se puede comprar. `clase` es su estado: 'fisico' (Activo), 'test' o 'inactivo'. */
+/** Lo mínimo de un producto para decidir si se puede comprar. `clase` es su estado: 'fisico' (Activo), 'test', 'inactivo' o 'descontinuado'. */
 export interface ProductoParaCompra {
   id: string;
   codigo: string;
@@ -44,7 +44,7 @@ export function useConfirmarProductoActivo() {
   }
 
   function confirmar(p: ProductoParaCompra): Promise<boolean> {
-    if (p.clase !== "test" && p.clase !== "inactivo") return Promise.resolve(true);
+    if (p.clase !== "test" && p.clase !== "inactivo" && p.clase !== "descontinuado") return Promise.resolve(true);
     // Si había otra pregunta abierta, esa se da por cancelada.
     resolver.current?.(false);
     setError(null);
@@ -64,13 +64,13 @@ export function useConfirmarProductoActivo() {
     });
   }
 
-  const estado = producto?.clase === "inactivo" ? "Inactivo" : "Test";
+  const estado = producto?.clase === "inactivo" ? "Inactivo" : producto?.clase === "descontinuado" ? "Descontinuado" : "Test";
   const dialogo = (
-    <Ventana abierto={!!producto} alCerrar={() => !pendiente && terminar(false)} titulo={estado === "Inactivo" ? "Producto inactivo" : "Producto en Test"} ancho="sm">
+    <Ventana abierto={!!producto} alCerrar={() => !pendiente && terminar(false)} titulo={estado === "Test" ? "Producto en Test" : `Producto ${estado.toLowerCase()}`} ancho="sm">
       {producto && (
         <div className="flex flex-col gap-4 p-5 text-sm">
           <p className="m-0">
-            <strong className="font-semibold">{producto.codigo}</strong> · {producto.nombre} está {estado === "Inactivo" ? "" : "en "}<strong className="font-semibold">{estado}</strong>. Para
+            <strong className="font-semibold">{producto.codigo}</strong> · {producto.nombre} está {estado === "Test" ? "en " : ""}<strong className="font-semibold">{estado}</strong>. Para
             comprarlo debe cambiarse a <strong className="font-semibold">Activo</strong>. ¿Lo cambiamos ahora?
           </p>
           {error && (
