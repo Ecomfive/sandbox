@@ -8,7 +8,8 @@ export const ETIQUETA_TIPO: Record<string, string> = { simple: "Simple", combo: 
  * En la base es la columna `clase` y «activo» se guarda como 'fisico' (el nombre de antes): solo cambia lo que se ve.
  */
 export const ETIQUETA_CLASE: Record<string, string> = { fisico: "Activo", test: "Test", inactivo: "Inactivo" };
-export const TONO_CLASE: Record<string, "success" | "warning" | "neutral"> = { fisico: "success", test: "warning", inactivo: "neutral" };
+// Activo verde claro, Test azul e Inactivo rojo claro: los mismos en la columna, la ficha y la ficha de crear.
+export const TONO_CLASE: Record<string, "success" | "azul" | "destructive"> = { fisico: "success", test: "azul", inactivo: "destructive" };
 
 /** Lo enlazado a un producto: fichas de Shopify y de Dropi, y el producto tal como llega en los pedidos de Dropi. */
 export interface Asociacion {
