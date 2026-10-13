@@ -201,7 +201,7 @@ export function CampoSkuMaestro({
                     <span className="truncate text-xs text-muted-foreground">
                       <span className="font-medium text-foreground-soft">{o.codigo}</span>
                       {o.numero !== undefined && o.numero !== null ? ` · ${numeroTexto(o.numero)}` : ""}
-                      {o.estado === "test" ? " · Test" : ""}
+                      {o.estado === "test" ? " · Test" : o.estado === "inactivo" ? " · Inactivo" : ""}
                     </span>
                   </span>
                 </li>

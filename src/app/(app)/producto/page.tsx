@@ -243,8 +243,8 @@ export default async function ProductoPage() {
     variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })),
   }));
 
-  const conteo = { fisico: 0, test: 0 };
-  for (const p of lista) conteo[p.clase === "test" ? "test" : "fisico"]++;
+  const conteo = { fisico: 0, test: 0, inactivo: 0 };
+  for (const p of lista) conteo[p.clase === "test" || p.clase === "inactivo" ? p.clase : "fisico"]++;
   // Un compuesto se arma con productos simples y variantes, nunca con un producto que tiene variantes (no lleva stock:
   // al vender el compuesto se descuenta la variante elegida).
   const opcionesSimples = lista

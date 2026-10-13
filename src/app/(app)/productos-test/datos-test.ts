@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FilaProductoTest } from "./def-productos-test";
 
 const COLUMNAS =
-  "id, nombre, sku_maestro_id, skus_maestros(foto_url), fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, revisado, ultima_revision, observacion, explotacion, creado_en";
+  "id, nombre, sku_maestro_id, skus_maestros(foto_url), fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, creado_en";
 
 const numero = (v: string | number | null) => (v === null ? null : Number(v));
 
@@ -50,10 +50,6 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
     metricaGasto: numero(p.metrica_gasto),
     metricaCompras: numero(p.metrica_compras),
     metricaCvr: numero(p.metrica_cvr),
-    revisado: p.revisado,
-    ultimaRevision: p.ultima_revision,
-    observacion: p.observacion,
-    explotacion: p.explotacion,
     creadoEn: p.creado_en,
   }));
 }
@@ -72,7 +68,7 @@ export async function obtenerOpcionesProducto(supabase: SupabaseClient): Promise
       id: p.id as string,
       codigo: p.codigo as string,
       nombre: p.nombre as string,
-      estado: p.clase === "test" ? "test" : "aprobado",
+      estado: p.clase === "test" || p.clase === "inactivo" ? (p.clase as string) : "aprobado",
       numero: (p.numero as number | null) ?? null,
       foto: (p.foto_url as string | null) ?? null,
     }));

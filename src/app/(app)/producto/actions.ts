@@ -168,11 +168,15 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   return { id: data.id as string };
 }
 
+type Clase = "fisico" | "test" | "inactivo";
+const esClase = (c: string): c is Clase => c === "fisico" || c === "test" || c === "inactivo";
+
 /**
- * Cambia el estado de un producto: de Test a Activo (se decidió comprarlo) o de Activo a Test. Vuelve a Test solo si nunca
- * tuvo movimientos de inventario: con historia ya no es una prueba. `desde` queda en la actividad («desde Compras»).
+ * Cambia el estado de un producto: de Test a Activo (se decidió comprarlo), de Activo a Test, o a Inactivo (ya no se vende
+ * bien: vende lo que le queda pero no se vuelve a comprar) y de vuelta. Vuelve a Test solo si nunca tuvo movimientos de
+ * inventario: con historia ya no es una prueba. `desde` queda en la actividad («desde Compras»).
  */
-async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: string): Promise<{ error?: string; compra?: { numero: number; codigo: string | null; pais: string } }> {
+async function aplicarEstado(id: string, clase: Clase, desde?: string): Promise<{ error?: string; compra?: { numero: number; codigo: string | null; pais: string } }> {
   const supabase = createServiceClient();
   const { data: actual } = await supabase.from("skus_maestros").select("codigo, clase, tipo").eq("id", id).maybeSingle();
   if (!actual) return { error: "El producto ya no existe." };
@@ -212,11 +216,11 @@ async function aplicarEstado(id: string, clase: "fisico" | "test", desde?: strin
   return {};
 }
 
-/** El estado de un producto desde su ficha: Activo ('fisico') o Test. Devuelve el error como valor. */
+/** El estado de un producto desde su ficha: Activo ('fisico'), Test o Inactivo. Devuelve el error como valor. */
 export async function cambiarClaseProducto(id: string, clase: string): Promise<{ error?: string; compra?: { numero: number; codigo: string | null; pais: string } }> {
   await requireModuloEscritura(MODULO);
   if (!ES_ID(id)) return { error: "Producto no válido." };
-  if (clase !== "fisico" && clase !== "test") return { error: "Estado no válido." };
+  if (!esClase(clase)) return { error: "Estado no válido." };
   return aplicarEstado(id, clase);
 }
 

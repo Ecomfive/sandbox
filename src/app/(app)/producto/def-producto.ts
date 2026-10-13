@@ -7,8 +7,9 @@ export const ETIQUETA_TIPO: Record<string, string> = { simple: "Simple", combo: 
  * El estado de un producto. Activo: se compra y tiene stock. Test: se está probando; todavía no se compra y no tiene stock.
  * En la base es la columna `clase` y «activo» se guarda como 'fisico' (el nombre de antes): solo cambia lo que se ve.
  */
-export const ETIQUETA_CLASE: Record<string, string> = { fisico: "Activo", test: "Test" };
-export const TONO_CLASE: Record<string, "success" | "warning"> = { fisico: "success", test: "warning" };
+export const ETIQUETA_CLASE: Record<string, string> = { fisico: "Activo", test: "Test", inactivo: "Inactivo" };
+// Activo verde claro, Test azul e Inactivo rojo claro: los mismos en la columna, la ficha y la ficha de crear.
+export const TONO_CLASE: Record<string, "success" | "azul" | "destructive"> = { fisico: "success", test: "azul", inactivo: "destructive" };
 
 /** Lo enlazado a un producto: fichas de Shopify y de Dropi, y el producto tal como llega en los pedidos de Dropi. */
 export interface Asociacion {
@@ -125,7 +126,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
       valores: (p) => [p.clase],
       opciones: () => Object.entries(ETIQUETA_CLASE).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
-      ordenGrupos: ["fisico", "test"],
+      ordenGrupos: ["fisico", "test", "inactivo"],
     },
     {
       id: "tipo",

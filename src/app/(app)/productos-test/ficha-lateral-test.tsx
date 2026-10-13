@@ -8,7 +8,6 @@ import { formatearFecha } from "@/lib/formato";
 import { EnlaceIcon, FlechaAbajoIcon, FlechaArribaIcon, LapizIcon } from "@/lib/nav-icons";
 import {
   etiquetaEstado,
-  etiquetaExplotacion,
   etiquetaTestNumero,
   type FilaProductoTest,
 } from "./def-productos-test";
@@ -45,13 +44,51 @@ function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
 }
 
 /** Una métrica sobre una pista: la barra es el valor y la marca negra es la referencia (criterio o promedio de winners). */
-export function Medida({ nombre, valor, maximo, referencia, texto }: { nombre: string; valor: number | null; maximo: number; referencia: number | null; texto: string }) {
+/**
+ * Una métrica en barra con su marca negra de referencia (el criterio o el promedio de los winners). Con `textoReferencia`,
+ * pasar el cursor por la marca (o llegar a ella con Tab) muestra su valor: la marca tiene una zona invisible más ancha que
+ * la línea para que sea fácil de apuntar.
+ */
+export function Medida({
+  nombre,
+  valor,
+  maximo,
+  referencia,
+  texto,
+  textoReferencia,
+}: {
+  nombre: string;
+  valor: number | null;
+  maximo: number;
+  referencia: number | null;
+  texto: string;
+  /** Lo que dice la marca al pasar el cursor, p. ej. «Promedio de los winners: 5,2 %». */
+  textoReferencia?: string;
+}) {
+  const izquierda = referencia === null ? null : `${Math.min(100, (referencia / maximo) * 100)}%`;
   return (
     <div className="mb-2.5 grid grid-cols-[5.5rem_minmax(0,1fr)_4.75rem] items-center gap-2 text-[13px]">
       <span className="text-muted-foreground">{nombre}</span>
-      <span className="relative h-1.5 rounded-full bg-muted" role="img" aria-label={`${nombre}: ${texto}`}>
-        {valor !== null && <i className="barra-neon absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, (valor / maximo) * 100)}%` }} />}
-        {referencia !== null && <u aria-hidden="true" className="absolute -top-[3px] -bottom-[3px] w-0.5 bg-foreground no-underline" style={{ left: `${Math.min(100, (referencia / maximo) * 100)}%` }} />}
+      <span className="relative h-1.5">
+        <span className="absolute inset-0 rounded-full bg-muted" role="img" aria-label={textoReferencia ? `${nombre}: ${texto}. ${textoReferencia}` : `${nombre}: ${texto}`}>
+          {valor !== null && <i className="barra-neon absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, (valor / maximo) * 100)}%` }} />}
+        </span>
+        {izquierda !== null &&
+          (textoReferencia ? (
+            <Tooltip texto={textoReferencia}>
+              <span
+                tabIndex={0}
+                role="img"
+                aria-label={textoReferencia}
+                className={`absolute -top-2 -bottom-2 flex w-3 -translate-x-1/2 cursor-help justify-center rounded-sm ${anilloFoco}`}
+                style={{ left: izquierda }}
+              >
+                <u aria-hidden="true" className="my-[5px] w-0.5 bg-foreground no-underline" />
+              </span>
+            </Tooltip>
+          ) : (
+            <u aria-hidden="true" className="absolute -top-[3px] -bottom-[3px] w-0.5 -translate-x-1/2 bg-foreground no-underline" style={{ left: izquierda }} />
+          ))}
       </span>
       <span className="text-right font-medium tabular-nums">{texto}</span>
     </div>
@@ -104,6 +141,7 @@ export function FichaLateralTest({
   const refCtr = promedio(ganadores, (f) => f.metricaCtr);
   const refHook = promedio(ganadores, (f) => f.metricaHookRate);
   const refCvr = promedio(ganadores, (f) => f.metricaCvr);
+  const refCompras = promedio(ganadores, (f) => f.metricaCompras);
   const enlaces = [
     ["Página del producto", p.paginaProductoUrl],
     ["Video", p.videoUrl],
@@ -148,11 +186,11 @@ export function FichaLateralTest({
                 : `No cumple: CPA ${usd(p.metricaCpa ?? 0)}, no es menor a ${usd(CPA_OBJETIVO)}.`}
           </span>
         </p>
-        <Medida nombre="CPA" valor={p.metricaCpa} maximo={20} referencia={CPA_OBJETIVO} texto={p.metricaCpa === null ? "—" : usd(p.metricaCpa)} />
-        <Medida nombre="Compras" valor={p.metricaCompras} maximo={12} referencia={promedio(ganadores, (f) => f.metricaCompras)} texto={p.metricaCompras === null ? "—" : String(p.metricaCompras)} />
-        <Medida nombre="CTR" valor={p.metricaCtr} maximo={10} referencia={refCtr} texto={p.metricaCtr === null ? "—" : porcentaje(p.metricaCtr)} />
-        <Medida nombre="Hook rate" valor={p.metricaHookRate} maximo={80} referencia={refHook} texto={p.metricaHookRate === null ? "—" : porcentaje(p.metricaHookRate)} />
-        <Medida nombre="CVR" valor={p.metricaCvr} maximo={20} referencia={refCvr} texto={p.metricaCvr === null ? "—" : porcentaje(p.metricaCvr)} />
+        <Medida nombre="CPA" valor={p.metricaCpa} maximo={20} referencia={CPA_OBJETIVO} texto={p.metricaCpa === null ? "—" : usd(p.metricaCpa)} textoReferencia={`Criterio: menos de ${usd(CPA_OBJETIVO)}`} />
+        <Medida nombre="Compras" valor={p.metricaCompras} maximo={12} referencia={refCompras} texto={p.metricaCompras === null ? "—" : String(p.metricaCompras)} textoReferencia={refCompras === null ? undefined : `Promedio de los winners: ${refCompras!.toLocaleString("es-CR", { maximumFractionDigits: 1 })}`} />
+        <Medida nombre="CTR" valor={p.metricaCtr} maximo={10} referencia={refCtr} texto={p.metricaCtr === null ? "—" : porcentaje(p.metricaCtr)} textoReferencia={refCtr === null ? undefined : `Promedio de los winners: ${porcentaje(refCtr!)}`} />
+        <Medida nombre="Hook rate" valor={p.metricaHookRate} maximo={80} referencia={refHook} texto={p.metricaHookRate === null ? "—" : porcentaje(p.metricaHookRate)} textoReferencia={refHook === null ? undefined : `Promedio de los winners: ${porcentaje(refHook!)}`} />
+        <Medida nombre="CVR" valor={p.metricaCvr} maximo={20} referencia={refCvr} texto={p.metricaCvr === null ? "—" : porcentaje(p.metricaCvr)} textoReferencia={refCvr === null ? undefined : `Promedio de los winners: ${porcentaje(refCvr!)}`} />
         <p className="m-0 text-xs text-muted-foreground">La marca negra es el criterio (CPA) o el promedio de los winners (compras, CTR, Hook y CVR).</p>
       </Bloque>
 
@@ -168,9 +206,6 @@ export function FichaLateralTest({
         <Fila etiqueta="Fuente">{p.fuente || vacio}</Fila>
         <Fila etiqueta="Ángulo de venta">{p.anguloVenta || vacio}</Fila>
         <Fila etiqueta="Worldwide">{p.worldwide || vacio}</Fila>
-        <Fila etiqueta="Explotación">{p.explotacion ? etiquetaExplotacion(p.explotacion) : vacio}</Fila>
-        <Fila etiqueta="Revisado">{p.revisado ? `Sí${p.ultimaRevision ? `, ${formatearFecha(p.ultimaRevision)}` : ""}` : "No"}</Fila>
-        <Fila etiqueta="Observación">{p.observacion || vacio}</Fila>
       </Bloque>
 
       {enlaces.length > 0 && (

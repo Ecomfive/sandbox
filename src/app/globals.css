@@ -26,6 +26,9 @@
      message never read as the same signal. */
   --destructive: #be123c;
   --destructive-soft: #ffe4e6;
+  /* Azul para el estado «Test» de un producto (texto 6,7:1 sobre su fondo). --accent es morado y queda para lo seleccionado. */
+  --azul: #1d4ed8;
+  --azul-soft: #dbeafe;
   /* El riel del menú (las áreas) es negro en los dos temas; sus textos y la pastilla de avisos van sobre ese negro. */
   --riel: #000000;
   --riel-texto: #c4c4c8;
@@ -58,6 +61,8 @@
   --color-warning-soft: var(--warning-soft);
   --color-destructive: var(--destructive);
   --color-destructive-soft: var(--destructive-soft);
+  --color-azul: var(--azul);
+  --color-azul-soft: var(--azul-soft);
   --color-riel: var(--riel);
   --color-riel-texto: var(--riel-texto);
   --color-riel-hover: var(--riel-hover);
@@ -94,6 +99,8 @@
   --warning-soft: #452a04;
   --destructive: #fb7185;
   --destructive-soft: #4c0519;
+  --azul: #93c5fd;
+  --azul-soft: #172554;
 }
 
 body {

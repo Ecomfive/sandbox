@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { Badge } from "@/components/ui/badge";
+import { Badge, claseTono } from "@/components/ui/badge";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
@@ -162,10 +162,11 @@ export function FichaProducto({
                       value={producto.clase}
                       disabled={pending}
                       onChange={(e) => cambiarClase(e.target.value)}
-                      className={`${fieldClassSm} w-40`}
+                      className={`${fieldClassSm} w-40 font-medium ${TONO_CLASE[producto.clase] ? claseTono(TONO_CLASE[producto.clase]) : ""}`}
                     >
                       <option value="fisico">{ETIQUETA_CLASE.fisico}</option>
                       <option value="test">{ETIQUETA_CLASE.test}</option>
+                      <option value="inactivo">{ETIQUETA_CLASE.inactivo}</option>
                     </select>
                   ) : (
                     (ETIQUETA_CLASE[producto.clase] ?? producto.clase)
