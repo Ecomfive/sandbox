@@ -1185,6 +1185,24 @@ export interface ProductoComprable {
   foto: string | null;
 }
 
+type FilaProductoComprable = { id: string; codigo: string; nombre: string; estado: string; clase: string; padre_id: string | null; opciones: Record<string, string> | null; numero: number | null; foto_url: string | null };
+
+/**
+ * Todos los productos que se pueden elegir en una compra, paginando: el catálogo ya pasa de 1 000 filas (el tope de cada consulta)
+ * y sin paginar el buscador no encontraba los últimos por nombre. `null` si la consulta falla.
+ */
+async function cargarProductosComprables(supabase: ReturnType<typeof createServiceClient>): Promise<FilaProductoComprable[] | null> {
+  try {
+    return await traerTodasLasFilas<FilaProductoComprable>((desde, hasta) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones, numero, foto_url").neq("tipo", "combo").order("nombre").order("id").range(desde, hasta),
+    );
+  } catch {
+    return null;
+  }
+}
+
+const aProductoComprable = (p: FilaProductoComprable) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones, numero: p.numero ?? null, foto: p.foto_url ?? null });
+
 /** Los productos de una compra y los que se le pueden agregar. Basta poder abrir Compras. */
 export async function obtenerProductosCompra(compraId: string): Promise<{ items: ItemCompra[]; productos: ProductoComprable[] } | { error: string }> {
   await requireModulo("compras");
@@ -1198,9 +1216,9 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
       .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre)")
       .eq("compra_id", compraId)
       .order("creado_en"),
-    supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones, numero, foto_url").neq("tipo", "combo").order("nombre"),
+    cargarProductosComprables(supabase),
   ]);
-  if (items.error || productos.error) return { error: "No se pudieron cargar los productos." };
+  if (items.error || !productos) return { error: "No se pudieron cargar los productos." };
   return {
     items: (items.data ?? []).map((i) => {
       const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string } | null;
@@ -1217,7 +1235,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
         origen: i.origen,
       };
     }),
-    productos: (productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones, numero: p.numero ?? null, foto: p.foto_url ?? null })),
+    productos: productos.map(aProductoComprable),
   };
 }
 
@@ -1299,9 +1317,9 @@ async function productoComprable(skuId: string): Promise<{ codigo: string; nombr
 /** Los productos que se pueden agregar a una compra nueva (la que todavía no se crea). Basta poder abrir Compras. */
 export async function productosComprables(): Promise<{ productos: ProductoComprable[] } | { error: string }> {
   await requireModulo("compras");
-  const { data, error } = await createServiceClient().from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones, numero, foto_url").neq("tipo", "combo").order("nombre");
-  if (error) return { error: "No se pudieron cargar los productos." };
-  return { productos: (data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones, numero: p.numero ?? null, foto: p.foto_url ?? null })) };
+  const productos = await cargarProductosComprables(createServiceClient());
+  if (!productos) return { error: "No se pudieron cargar los productos." };
+  return { productos: productos.map(aProductoComprable) };
 }
 
 /** Cambia lo pedido o el costo unitario de un producto de una compra. */

@@ -15,3 +15,17 @@ export async function traerTodasLasFilas<T>(
   }
   return filas;
 }
+
+/**
+ * Lo mismo que `traerTodasLasFilas`, pero con la forma `{ data, error }` de una consulta de Supabase: no lanza, así que sirve donde
+ * el código ya mira `error` (por ejemplo, una columna que puede no existir todavía).
+ */
+export async function traerTodasConError<T>(
+  construirConsulta: (rangoDesde: number, rangoHasta: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<{ data: T[] | null; error: unknown }> {
+  try {
+    return { data: await traerTodasLasFilas<T>(construirConsulta), error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}

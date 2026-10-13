@@ -3,6 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
+import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaStock } from "./def-stock";
 import { TablaStock } from "./tabla-stock";
 
@@ -42,7 +43,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
       ? supabase.from("wms_ubicaciones").select("id, bodega_id, codigo, propiedad").in("bodega_id", idsPropias).eq("activa", true).order("codigo")
       : Promise.resolve({ data: [] as { id: string; bodega_id: string; codigo: string; propiedad: string }[] }),
     // Sin la migración 0086 no hay columna de foto: el inventario se carga igual, sin fotos.
-    supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
+    traerTodasConError<{ id: string; foto_url: string }>((desde, hasta) => supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null).order("id").range(desde, hasta)),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
 
