@@ -24,6 +24,7 @@ export const MODULOS: Modulo[] = [
   { clave: "compras", etiqueta: "Compras (WMS)" },
   { clave: "filtro-productos", etiqueta: "Filtro de productos" },
   { clave: "productos-test", etiqueta: "Test productos (WMS)" },
+  { clave: "fuente-datos", etiqueta: "Fuente de datos" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
   { clave: "configuracion", etiqueta: "Configuración del sistema" },
   { clave: "notificaciones", etiqueta: "Centro de notificaciones" },

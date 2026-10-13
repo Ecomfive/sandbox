@@ -52,6 +52,7 @@ const AREAS: NavSection[] = [
     items: [
       { label: "Test productos", href: "/productos-test", frente: "proveeduria" },
       { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria" },
+      { label: "Fuente de datos", href: "/fuente-datos", frente: "proveeduria" },
     ],
   },
   {
