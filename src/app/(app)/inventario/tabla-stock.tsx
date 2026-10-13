@@ -39,9 +39,9 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
     ocultable: true,
     render: (f) =>
       f.clase === "test" ? (
-        <Badge tone="warning">{ETIQUETA_CLASE_SKU.test}</Badge>
+        <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>
       ) : f.clase === "inactivo" ? (
-        <Badge tone="neutral">{ETIQUETA_CLASE_SKU.inactivo}</Badge>
+        <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>
       ) : (
         <span className="text-muted-foreground">{ETIQUETA_CLASE_SKU.fisico}</span>
       ),

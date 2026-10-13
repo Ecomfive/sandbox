@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-type Tone = "neutral" | "success" | "warning" | "destructive" | "info";
+export type Tone = "neutral" | "success" | "warning" | "destructive" | "info" | "azul";
 
 const tones: Record<Tone, string> = {
   neutral: "bg-muted text-muted-foreground",
@@ -8,7 +8,11 @@ const tones: Record<Tone, string> = {
   warning: "bg-warning-soft text-warning",
   destructive: "bg-destructive-soft text-destructive",
   info: "bg-accent text-accent-foreground",
+  azul: "bg-azul-soft text-azul",
 };
+
+/** Las clases de fondo y texto de un tono, para pintar con el mismo color algo que no es una insignia (un selector de estado). */
+export const claseTono = (tone: Tone): string => tones[tone];
 
 /** Texto blanco o casi negro según qué tanto contraste da cada uno sobre `fondo`, para que un color exacto
  * (traído de ClickUp, por ejemplo) siempre quede legible sin tener que fijarlo a mano caso por caso. */

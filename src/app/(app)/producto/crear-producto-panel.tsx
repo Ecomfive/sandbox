@@ -15,6 +15,8 @@ import { CamposVariantes, type VariantesArmadas } from "./variantes-producto";
 import { CampoFoto } from "@/components/ui/campo-foto";
 import { ENVIO_VACIO, EnvioProductoBloque } from "./envio-producto";
 import { EnvioIcon } from "@/lib/nav-icons";
+import { claseTono, type Tone } from "@/components/ui/badge";
+import { TONO_CLASE } from "./def-producto";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
@@ -130,8 +132,8 @@ export function CrearProductoPanel({
                 nombre="clase"
                 inicial="test"
                 opciones={[
-                  { valor: "fisico", etiqueta: "Activo", detalle: "se compra" },
-                  { valor: "test", etiqueta: "Test", detalle: "se está probando" },
+                  { valor: "fisico", etiqueta: "Activo", detalle: "se compra", tono: TONO_CLASE.fisico },
+                  { valor: "test", etiqueta: "Test", detalle: "se está probando", tono: TONO_CLASE.test },
                 ]}
               />
               <Opciones
@@ -333,7 +335,8 @@ function Opciones({
 }: {
   titulo: string;
   nombre: string;
-  opciones: { valor: string; etiqueta: string; detalle: string }[];
+  /** Con `tono`, la etiqueta se pinta como la insignia de ese estado (Activo verde, Test azul). */
+  opciones: { valor: string; etiqueta: string; detalle: string; tono?: Tone }[];
   inicial?: string;
   valor?: string;
   alCambiar?: (v: string) => void;
@@ -359,7 +362,8 @@ function Opciones({
               className="h-4 w-4 accent-[var(--foreground)]"
             />
             <span>
-              {o.etiqueta} <span className="text-xs text-muted-foreground">({o.detalle})</span>
+              {o.tono ? <span className={`rounded-[5px] px-2 py-0.5 text-xs font-medium ${claseTono(o.tono)}`}>{o.etiqueta}</span> : o.etiqueta}{" "}
+              <span className="text-xs text-muted-foreground">({o.detalle})</span>
             </span>
           </label>
         ))}
