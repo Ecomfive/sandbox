@@ -189,7 +189,7 @@ export const GUIAS: GuiaModulo[] = [
     titulo: "Filtro de productos",
     ruta: "/filtro-productos",
     resumen: "Ideas de productos evaluadas antes de pasarlas a test.",
-    secciones: [{ titulo: "Uso", pasos: ["«Agregar» crea la ficha con su foto y datos.", "Filtra y agrupa para decidir qué pasa a test."] }],
+    secciones: [{ titulo: "Uso", pasos: ["«Agregar» crea la ficha con su foto y datos.", "Filtra y agrupa para decidir qué pasa a test.", "En «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto."] }],
   },
   {
     modulo: "crm-dropshippers",
@@ -244,6 +244,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-12", titulo: "Filtro de productos vinculado a Producto", texto: "En la ficha de un producto del Filtro eliges su producto de Producto, con el mismo buscador de la orden de compra; el nombre se llena solo.", modulo: "filtro-productos", href: "/filtro-productos" },
   { fecha: "2026-10-12", titulo: "Test productos: nombre nuevo y «Nuevo producto»", texto: "Productos Test ahora se llama Test productos. Su lista trae «Nuevo producto», con la misma ficha de Producto: el producto se crea en Producto y queda en Test productos ya vinculado.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Resumen en Productos Test", texto: "La lista de Productos Test muestra arriba el total en test, los winners y los que faltan por vincular a Producto, con su número y como filtro de un toque.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Productos Test vinculados a Producto", texto: "Al agregar un producto en prueba lo eliges de los que ya existen en Producto, con el mismo buscador de la orden de compra; el nombre se llena solo.", modulo: "productos-test", href: "/productos-test/productos" },

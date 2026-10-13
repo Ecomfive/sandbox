@@ -6,6 +6,8 @@ export { claseMetrica, nivelCpa, nivelCpm, nivelCtr, nivelCvr, nivelEfectividad,
 export interface FilaFiltro {
   id: string;
   nombre: string;
+  /** El producto de Producto con que se vinculó (migración 0100); null si todavía no se eligió. */
+  skuMaestroId: string | null;
   fotoUrl: string | null;
   estadoRegistro: string;
   estado: string;
