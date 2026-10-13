@@ -19,13 +19,11 @@ import {
   nivelHookRate,
   porcentaje,
 } from "@/lib/metricas-meta-ads";
-import { CalendarioIcon, EtiquetaIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, TestIcon } from "@/lib/nav-icons";
+import { EtiquetaIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, TestIcon } from "@/lib/nav-icons";
 import {
   colorEstado,
-  colorExplotacion,
   colorTestNumero,
   etiquetaEstado,
-  etiquetaExplotacion,
   etiquetaTestNumero,
   type FilaProductoTest,
 } from "./def-productos-test";
@@ -136,16 +134,6 @@ function DatosDelProductoTest({ producto }: { producto: FilaProductoTest }) {
             {producto.metricaCvr !== null ? <ValorMetrica texto={porcentaje(producto.metricaCvr)} clase={claseMetrica(nivelCvr(producto.metricaCvr))} /> : SIN_DATO}
           </Dato>
         </dl>
-      </Seccion>
-      <Seccion icono={CalendarioIcon} titulo="Seguimiento">
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Dato etiqueta="Revisado">{producto.revisado ? "Sí" : "No"}</Dato>
-          <Dato etiqueta="Última Revisión">{producto.ultimaRevision ?? SIN_DATO}</Dato>
-          <Dato etiqueta="Explotación">
-            {producto.explotacion ? <Badge color={colorExplotacion(producto.explotacion)}>{etiquetaExplotacion(producto.explotacion)}</Badge> : SIN_DATO}
-          </Dato>
-        </dl>
-        <Dato etiqueta="Observación">{producto.observacion || SIN_DATO}</Dato>
       </Seccion>
     </div>
   );

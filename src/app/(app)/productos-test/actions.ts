@@ -4,13 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
-import { ESTADOS, NIVELES_EXPLOTACION, TEST_NUMEROS } from "./def-productos-test";
+import { ESTADOS, TEST_NUMEROS } from "./def-productos-test";
 import { crearProducto } from "../producto/actions";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
 const TEST_NUMEROS_VALIDOS: Set<string> = new Set(TEST_NUMEROS.map((t) => t.valor));
-const EXPLOTACION_VALIDA: Set<string> = new Set(NIVELES_EXPLOTACION.map((e) => e.valor));
 
 const numeroOptativo = (formData: FormData, campo: string): number | null => {
   const texto = formData.get(campo) as string | null;
@@ -27,7 +26,6 @@ const fechaOptativa = (formData: FormData, campo: string): string | null => text
 /** Los campos comunes a crear y actualizar (todo lo que no sea el nombre, el país o el estado). */
 function leerCambios(formData: FormData) {
   const testNumero = (formData.get("test_numero") as string | null) || null;
-  const explotacion = (formData.get("explotacion") as string | null) || null;
   const sku = String(formData.get("sku_maestro_id") ?? "").trim();
   return {
     // El producto de Producto con que se vincula (vacío = ninguno).
@@ -54,10 +52,6 @@ function leerCambios(formData: FormData) {
     metrica_gasto: numeroOptativo(formData, "metrica_gasto"),
     metrica_compras: numeroOptativo(formData, "metrica_compras"),
     metrica_cvr: numeroOptativo(formData, "metrica_cvr"),
-    revisado: formData.get("revisado") === "on",
-    ultima_revision: fechaOptativa(formData, "ultima_revision"),
-    observacion: textoOptativo(formData, "observacion"),
-    explotacion: explotacion && EXPLOTACION_VALIDA.has(explotacion) ? explotacion : null,
   };
 }
 
