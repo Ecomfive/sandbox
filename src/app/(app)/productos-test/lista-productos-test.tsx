@@ -54,6 +54,7 @@ export function ListaProductosTest({
   buscarInicial = "",
   puedeCrearProducto = false,
   opcionesSimples = [],
+  opcionesProducto = [],
 }: {
   productos: FilaProductoTest[];
   paisId: string;
@@ -61,6 +62,8 @@ export function ListaProductosTest({
   /** Si puede crear en Producto: «Nuevo producto» abre la misma ficha de Producto y lo deja aquí vinculado. */
   puedeCrearProducto?: boolean;
   opcionesSimples?: OpcionSkuMaestro[];
+  /** Todos los productos que se pueden vincular (también compuestos), para decir con cuál está vinculada cada fila. */
+  opcionesProducto?: OpcionSkuMaestro[];
   /** Texto con el que abre el campo de búsqueda (lo manda el buscador global con `?buscar=`). */
   buscarInicial?: string;
 }) {
@@ -76,7 +79,7 @@ export function ListaProductosTest({
   const [editando, setEditando] = useState<string | null>(null);
 
   // El SKU de cada producto de Producto, para decir con cuál está vinculado cada fila.
-  const skuPorId = useMemo(() => new Map(opcionesSimples.map((o) => [o.id, o.codigo])), [opcionesSimples]);
+  const skuPorId = useMemo(() => new Map(opcionesProducto.map((o) => [o.id, o.codigo])), [opcionesProducto]);
   const categorias = useMemo(() => [...new Set(productos.map((p) => limpiarCategoria(p.categoria)))].sort((a, b) => a.localeCompare(b)), [productos]);
   const ganadores = useMemo(() => productos.filter((p) => resultadoDe(p.estado) === "ganador"), [productos]);
 

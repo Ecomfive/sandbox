@@ -56,10 +56,14 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
 
 /**
  * Los productos de Producto para elegir el de un producto en prueba (el mismo buscador de la orden de compra: foto, SKU, nombre y
- * N.º). Sin los compuestos ni los productos padre con variantes.
+ * N.º), sin los productos padre con variantes. Incluye los **compuestos** (un test de un 2x1 se vincula a su compuesto: sin él
+ * en la lista, la ficha lo mostraba vacío y al guardar se perdía el vínculo); `compuesto` los marca para quien solo quiere
+ * simples (los componentes de «Nuevo producto»).
  */
-export async function obtenerOpcionesProducto(supabase: SupabaseClient): Promise<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto: string | null }[]> {
-  const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre, clase, tipo, padre_id, numero, foto_url").neq("tipo", "combo").order("nombre");
+export async function obtenerOpcionesProducto(
+  supabase: SupabaseClient,
+): Promise<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto: string | null; compuesto: boolean }[]> {
+  const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre, clase, tipo, padre_id, numero, foto_url").order("nombre");
   const filas = data ?? [];
   const padres = new Set(filas.filter((p) => p.padre_id).map((p) => p.padre_id as string));
   return filas
@@ -71,5 +75,6 @@ export async function obtenerOpcionesProducto(supabase: SupabaseClient): Promise
       estado: p.clase === "test" || p.clase === "inactivo" ? (p.clase as string) : "aprobado",
       numero: (p.numero as number | null) ?? null,
       foto: (p.foto_url as string | null) ?? null,
+      compuesto: p.tipo === "combo",
     }));
 }

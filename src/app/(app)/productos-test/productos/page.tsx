@@ -37,7 +37,9 @@ export default async function ProductosEnTestPage({
           puedeEscribir={!usuario.modulosSoloLectura.includes("productos-test")}
           // «Nuevo producto» crea en Producto: hace falta poder modificarlo.
           puedeCrearProducto={usuario.modulos.includes("producto") && !usuario.modulosSoloLectura.includes("producto")}
-          opcionesSimples={opcionesProducto}
+          opcionesProducto={opcionesProducto}
+          // Los componentes de un compuesto nuevo solo pueden ser productos simples.
+          opcionesSimples={opcionesProducto.filter((o) => !o.compuesto)}
         />
       </ProveedorSkusMaestros>
     </Pagina>
