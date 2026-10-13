@@ -53,6 +53,7 @@ function DatosTest({ producto }: { producto: FilaProducto }) {
               {[t.pais, etiquetaTestNumero(t.testNumero), t.fechaTest ? formatearFecha(t.fechaTest) : null].filter(Boolean).join(" · ")}
             </span>
           </div>
+          {t.via && <span className="text-xs text-muted-foreground">Test de su compuesto: {t.via}</span>}
           <dl className="m-0 grid grid-cols-3 gap-x-3 gap-y-1.5 text-xs">
             <div>
               <dt className="text-muted-foreground">Oferta</dt>
@@ -110,6 +111,7 @@ export function ResultadoTestProducto({ producto, referencias }: { producto: Fil
                 {[t.pais, etiquetaTestNumero(t.testNumero), t.fechaTest ? formatearFecha(t.fechaTest) : null, t.oferta === null ? null : `oferta ${usd(t.oferta)}`, t.gasto === null ? null : `gasto ${usd(t.gasto)}`].filter(Boolean).join(" · ")}
               </span>
             </div>
+            {t.via && <p className="mb-2 text-xs text-muted-foreground">Test de su compuesto: {t.via}</p>}
             <p className="mb-2.5 flex items-start gap-1.5 text-[13px]">
               <Punto tono={cumple === null ? "gris" : cumple ? "exito" : "peligro"} className="mt-1.5" />
               <span>

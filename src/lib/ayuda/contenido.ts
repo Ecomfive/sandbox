@@ -251,6 +251,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-13", titulo: "El test de un 2x1 también en su producto simple", texto: "Un test de un 2x1 (o X2) queda vinculado al compuesto. Ahora su producto simple también lo muestra en la columna «Test», la oferta y el «Resultado del test» de la ficha, con la nota «Test de su compuesto». Ejemplo: la lona impermeable transparente muestra el winner de su 2x1.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-13", titulo: "Compras abre la ficha completa de un clic", texto: "Al pulsar la descripción de una compra se abre directo su ficha completa, con la actividad. Ya no sale primero el resumen a la derecha con «Abrir ficha completa».", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-13", titulo: "Aviso de posible duplicado", texto: "Al crear un producto, si el nombre o la foto se parecen a los de uno que ya existe, la ficha muestra «Posible duplicado» con ese producto (foto, SKU y nombre) y si se parece por el nombre o por la foto.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-13", titulo: "Estado «Descontinuado»", texto: "Un producto que ya no vamos a traer más se marca «Descontinuado» en el selector Estado de su ficha (gris). Vende lo que le queda pero no se puede comprar; tiene su tarjeta para filtrarlos en la lista de Producto.", modulo: "producto", href: "/producto" },

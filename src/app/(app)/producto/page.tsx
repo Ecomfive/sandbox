@@ -68,7 +68,9 @@ export default async function ProductoPage() {
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
   const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners] = await Promise.all([
-    supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)"),
+    traerTodasConError<{ combo_id: string; componente_id: string; cantidad: number; componente: unknown }>((desde, hasta) =>
+      supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)").order("combo_id").order("componente_id").range(desde, hasta),
+    ),
     supabase
       .from("wms_producto_variantes")
       .select("sku_maestro_id, opciones, wms_productos(id, titulo, estado, paises(codigo))")
@@ -84,15 +86,21 @@ export default async function ProductoPage() {
     ),
     // Los tests de Test productos vinculados a cada producto (migración 0099), solo para quien puede abrir Test productos.
     usuario.modulos.includes("productos-test")
-      ? supabase
-          .from("wms_productos_test")
-          .select("id, nombre, sku_maestro_id, estado, test_numero, fecha_test, metrica_oferta, metrica_gasto, metrica_compras, metrica_cpa, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)")
-          .not("sku_maestro_id", "is", null)
-          .order("fecha_test", { ascending: false, nullsFirst: false })
+      ? traerTodasConError<Record<string, unknown>>((desde, hasta) =>
+          supabase
+            .from("wms_productos_test")
+            .select("id, nombre, sku_maestro_id, estado, test_numero, fecha_test, metrica_oferta, metrica_gasto, metrica_compras, metrica_cpa, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)")
+            .not("sku_maestro_id", "is", null)
+            .order("fecha_test", { ascending: false, nullsFirst: false })
+            .order("id")
+            .range(desde, hasta),
+        )
       : Promise.resolve({ data: [] as never[] }),
     // Los winners de Test productos: su promedio es la referencia del «Resultado del test» en la ficha.
     usuario.modulos.includes("productos-test")
-      ? supabase.from("wms_productos_test").select("metrica_compras, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)").in("estado", ["winner", "enviado_a_compras"])
+      ? traerTodasConError<Record<string, unknown>>((desde, hasta) =>
+          supabase.from("wms_productos_test").select("metrica_compras, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)").in("estado", ["winner", "enviado_a_compras"]).order("id").range(desde, hasta),
+        )
       : Promise.resolve({ data: [] as never[] }),
   ]);
   const deWinners = ((winners.data ?? []) as Record<string, unknown>[]).filter((w) =>
@@ -125,9 +133,21 @@ export default async function ProductoPage() {
         ctr: numero(t.metrica_ctr),
         hook: numero(t.metrica_hook_rate),
         cvr: numero(t.metrica_cvr),
+        via: null,
       },
     ]);
   }
+  // Un test de un «2x1» queda vinculado al compuesto (así se importó): su producto simple también lo muestra, marcado con el
+  // nombre del compuesto (13 oct 2026: la lona simple no mostraba el winner de su 2x1). Primero van los tests propios.
+  const nombreProducto = new Map(lista.map((p) => [p.id as string, p.nombre as string]));
+  const deCombos = new Map<string, TestProducto[]>();
+  for (const fila of componentesFilas.data ?? []) {
+    const delCombo = (testsPorId.get(fila.combo_id) ?? []).filter((t) => t.via === null);
+    if (!delCombo.length) continue;
+    const via = nombreProducto.get(fila.combo_id) ?? "compuesto";
+    deCombos.set(fila.componente_id, [...(deCombos.get(fila.componente_id) ?? []), ...delCombo.map((t) => ({ ...t, via }))]);
+  }
+  for (const [id, extra] of deCombos) testsPorId.set(id, [...(testsPorId.get(id) ?? []), ...extra]);
   const numeroPorId = new Map(numeros.error ? [] : ((numeros.data ?? []) as { id: string; numero: number }[]).map((n) => [n.id, Number(n.numero)]));
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
   // Unidades compradas por producto (las líneas vinculadas en Compras); un producto con variantes suma las de sus variantes.

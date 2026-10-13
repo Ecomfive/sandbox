@@ -104,6 +104,8 @@ export interface TestProducto {
   ctr: number | null;
   hook: number | null;
   cvr: number | null;
+  /** Si el test es de un compuesto del que este producto forma parte (el «2x1»): su nombre. El test está vinculado al compuesto. */
+  via: string | null;
 }
 
 /** El promedio de los winners de Test productos: la marca negra de «Resultado del test» (compras, CTR, hook y CVR). */

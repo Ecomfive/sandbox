@@ -9,12 +9,11 @@ const numero = (v: string | number | null) => (v === null ? null : Number(v));
 
 /** Los productos en test de un país, con sus métricas ya como números. Lo comparten el informe y la lista. */
 export async function obtenerProductosTest(supabase: SupabaseClient, paisId: string): Promise<FilaProductoTest[]> {
-  const { data } = await supabase
-    .from("wms_productos_test")
-    .select(COLUMNAS)
-    .eq("pais_id", paisId)
-    .order("creado_en", { ascending: false })
-    .limit(1000);
+  // Todos, de 1 000 en 1 000 (antes se cortaba en 1 000 sin avisar).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- sin tipos generados, como el `select` de antes
+  const { data } = await traerTodasConError<Record<string, any> & { nombre: string }>((desde, hasta) =>
+    supabase.from("wms_productos_test").select(COLUMNAS).eq("pais_id", paisId).order("creado_en", { ascending: false }).order("id").range(desde, hasta),
+  );
   // Sin producto vinculado (o sin foto), la foto de Filtro de productos con el mismo nombre en el país.
   const { data: filtros } = await supabase.from("wms_filtro_productos").select("nombre, foto_url").eq("pais_id", paisId).not("foto_url", "is", null);
   const fotoFiltro = new Map((filtros ?? []).map((f) => [String(f.nombre).toLowerCase().trim(), f.foto_url as string]));
