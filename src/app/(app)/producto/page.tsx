@@ -1,4 +1,4 @@
-import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
@@ -53,10 +53,16 @@ export default async function ProductoPage() {
   // El producto es igual para todos los países; el país solo da formato a las fechas de su actividad.
   const pais = await getPaisActual(supabase);
 
-  const { data: productos } = await supabase
-    .from("skus_maestros")
-    .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa, creado_en, padre_id, opciones, opciones_variantes")
-    .order("creado_en", { ascending: false });
+  // Todos los productos, paginando: cada consulta devuelve 1 000 filas como máximo y el catálogo ya pasa de ahí (sin paginar se
+  // perdían los más antiguos).
+  const { data: productos } = await traerTodasConError<ProductoBd>((desde, hasta) =>
+    supabase
+      .from("skus_maestros")
+      .select("id, codigo, nombre, tipo, clase, codigo_barras, codigo_barras_origen, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa, creado_en, padre_id, opciones, opciones_variantes")
+      .order("creado_en", { ascending: false })
+      .order("id")
+      .range(desde, hasta),
+  );
   const lista: ProductoBd[] = productos ?? [];
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
@@ -70,9 +76,9 @@ export default async function ProductoPage() {
     supabase.from("wms_dropi_productos").select("sku_maestro_id, nombre, publicacion, archivado, paises(codigo)").not("sku_maestro_id", "is", null),
     supabase.from("productos").select("sku_maestro_id, nombre, paises(codigo)").not("sku_maestro_id", "is", null),
     // La foto va aparte: sin la migración 0086 la columna no existe y la lista se carga igual, sin fotos.
-    supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null),
+    traerTodasConError<{ id: string; foto_url: string }>((desde, hasta) => supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null).order("id").range(desde, hasta)),
     // El N.º correlativo va aparte: sin la migración 0089 la columna no existe y la lista se carga igual.
-    supabase.from("skus_maestros").select("id, numero"),
+    traerTodasConError<{ id: string; numero: number }>((desde, hasta) => supabase.from("skus_maestros").select("id, numero").order("id").range(desde, hasta)),
     traerTodasLasFilas<{ sku_maestro_id: string; compra_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
       supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, anulada_en, paises(codigo))").order("id").range(desde, hasta),
     ),

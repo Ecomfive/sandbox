@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaProductoTest } from "./def-productos-test";
 
 const COLUMNAS =
@@ -63,7 +64,9 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
 export async function obtenerOpcionesProducto(
   supabase: SupabaseClient,
 ): Promise<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto: string | null; compuesto: boolean }[]> {
-  const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre, clase, tipo, padre_id, numero, foto_url").order("nombre");
+  const { data } = await traerTodasConError<Record<string, unknown>>((desde, hasta) =>
+    supabase.from("skus_maestros").select("id, codigo, nombre, clase, tipo, padre_id, numero, foto_url").order("nombre").order("id").range(desde, hasta),
+  );
   const filas = data ?? [];
   const padres = new Set(filas.filter((p) => p.padre_id).map((p) => p.padre_id as string));
   return filas

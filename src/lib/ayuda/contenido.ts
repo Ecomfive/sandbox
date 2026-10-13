@@ -251,6 +251,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-13", titulo: "Todos los productos a la vista", texto: "La lista de Producto y el buscador de productos de una compra mostraban solo los primeros 1 000 productos y dejaban fuera los más antiguos o los del final del abecedario. Ahora cargan todos.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-13", titulo: "Módulo Fuente de datos", texto: "Nuevo en Marketing: «Fuente de datos», con las pestañas Drop Killer, Tu Winner, Scraping de proveedores y Selección de productos. Por ahora están en preparación.", modulo: "fuente-datos", href: "/fuente-datos" },
   { fecha: "2026-10-12", titulo: "Dashboard de Test productos", texto: "Nueva pestaña «Dashboard» en Test productos: indicadores, tests por periodo, winners por categoría, distribución del CPA, CTR frente a CPA y winners frente a fallidos, con filtros que se cruzan, igual que el Dashboard de Compras.", modulo: "productos-test", href: "/productos-test/dashboard" },
   { fecha: "2026-10-12", titulo: "Test productos sin el bloque Seguimiento", texto: "La ficha y el formulario de un producto en test ya no traen Revisado, Última revisión, Explotación ni Observación: ese seguimiento se lleva en su tarea de ClickUp.", modulo: "productos-test", href: "/productos-test/productos" },
