@@ -14,7 +14,9 @@ export function celdaCsv(valor: CeldaCsv): string {
   if (valor === null || valor === undefined) return "";
   if (typeof valor === "number") return Number.isFinite(valor) ? String(valor) : "";
   // Un número escrito como texto («-12.50») no es una fórmula: se deja tal cual para que Excel lo lea como número.
-  const texto = /^[=+\-@\t\r]/.test(valor) && !/^-?\d+(\.\d+)?$/.test(valor) ? `'${valor}` : valor;
+  // Se mira tras los espacios del inicio (algunos programas los recortan al abrir) y con los signos de ancho completo.
+  const inicio = valor.replace(/^[\s​\u0000]+/, "");
+  const texto = (/^[=+\-@＝＋－＠]/.test(inicio) || /^[\t\r\n]/.test(valor)) && !/^-?\d+(\.\d+)?$/.test(valor) ? `'${valor}` : valor;
   // También `;` y tabulador: un Excel en español separa por `;`, y sin comillas «x;=1+1» abriría una celda con fórmula.
   return /[",;\t\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }

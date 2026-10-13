@@ -21,7 +21,7 @@ export function TarjetaProductoTest({ resumen, periodo }: { resumen: ResumenTest
   return (
     <section aria-labelledby="titulo-test-hoy" className="min-w-0 rounded-[10px] border border-border bg-card">
       <CabeceraTarjeta id="titulo-test-hoy" titulo="Producto en test">
-        <Link href="/productos-test" className={`rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground ${anilloFoco}`}>
+        <Link href="/productos-test/informe" className={`rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground ${anilloFoco}`}>
           Ver informe
         </Link>
       </CabeceraTarjeta>

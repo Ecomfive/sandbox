@@ -23,6 +23,9 @@ export function ProveedorSkusMaestros({ opciones, children }: { opciones: Opcion
   return <SkusMaestrosContext.Provider value={opciones}>{children}</SkusMaestrosContext.Provider>;
 }
 
+/** Los productos que ofrece el `ProveedorSkusMaestros` de arriba (para sumarle uno recién creado). */
+export const useOpcionesSkuMaestro = () => useContext(SkusMaestrosContext);
+
 const etiqueta = (s: OpcionSkuMaestro) => `${s.codigo} · ${s.nombre}`;
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const numeroTexto = (n?: number | null) => (n === null || n === undefined ? "" : `#${String(n).padStart(4, "0")}`);

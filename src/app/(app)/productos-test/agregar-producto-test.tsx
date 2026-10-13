@@ -3,26 +3,30 @@
 import { useRef, useState } from "react";
 import { BotonAgregar } from "@/components/ui/boton-agregar";
 import { anilloFoco } from "@/components/ui/field";
-import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { ProveedorSkusMaestros, useOpcionesSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { Ventana } from "@/components/ui/ventana";
+import { FlechaIzquierdaIcon } from "@/lib/nav-icons";
 import { CrearProductoPanel } from "../producto/crear-producto-panel";
-import { crearProductoNuevoEnTest } from "./actions";
+import { crearProductoParaTest } from "./actions";
 import { FormularioProductoTest } from "./formulario-producto-test";
 
-type Pestana = "nuevo" | "existente";
-
 /**
- * «+ Agregar» de Test productos: un solo panel con dos pestañas arriba (como las de Compras). Arranca en **Nuevo producto**,
- * la ficha completa de Producto (lo crea allá y lo deja aquí vinculado; solo para quien puede modificar Producto); al lado,
- * **Producto existente** abre la ficha de siempre, donde se elige de Producto. Las dos quedan montadas mientras el panel está
- * abierto, así que pasar de una a otra no pierde lo escrito.
+ * «+ Agregar» de Test productos (13 oct 2026): abre el formulario del producto en test. Junto al campo «Producto» está
+ * **«Nuevo producto»** (solo para quien puede modificar Producto), que cambia el panel a la ficha completa de Producto; al
+ * crearlo se vuelve al formulario con ese producto ya elegido y el nombre lleno, para completar el test y guardarlo. Las dos
+ * vistas quedan montadas mientras el panel está abierto, así que ir y volver no pierde lo escrito.
  */
 export function AgregarProductoTest({ paisId, puedeCrearProducto, opcionesSimples }: { paisId: string; puedeCrearProducto: boolean; opcionesSimples: OpcionSkuMaestro[] }) {
   const [abierto, setAbierto] = useState(false);
-  const [pestana, setPestana] = useState<Pestana>("nuevo");
+  const [vista, setVista] = useState<"test" | "nuevo">("test");
   const [guardando, setGuardando] = useState(false);
+  const [nuevos, setNuevos] = useState<OpcionSkuMaestro[]>([]);
+  const [productoNuevo, setProductoNuevo] = useState<OpcionSkuMaestro | null>(null);
+  // Cambia cada vez que se abre el panel: el formulario y la ficha arrancan vacíos.
+  const [vez, setVez] = useState(0);
+  const creado = useRef<OpcionSkuMaestro | null>(null);
   const botonRef = useRef<HTMLButtonElement>(null);
-  const actual: Pestana = puedeCrearProducto ? pestana : "existente";
+  const opciones = useOpcionesSkuMaestro();
 
   function cerrar() {
     setAbierto(false);
@@ -30,17 +34,20 @@ export function AgregarProductoTest({ paisId, puedeCrearProducto, opcionesSimple
     requestAnimationFrame(() => botonRef.current?.focus());
   }
 
-  const pestanas: { id: Pestana; etiqueta: string }[] = [
-    { id: "nuevo", etiqueta: "Nuevo producto" },
-    { id: "existente", etiqueta: "Producto existente" },
-  ];
+  async function crear(formData: FormData) {
+    const r = await crearProductoParaTest(formData);
+    if (r.producto) creado.current = r.producto;
+    return r;
+  }
 
   return (
     <>
       <BotonAgregar
         ref={botonRef}
         onClick={() => {
-          setPestana("nuevo");
+          setVista("test");
+          setProductoNuevo(null);
+          setVez((v) => v + 1);
           setAbierto(true);
         }}
       />
@@ -51,49 +58,52 @@ export function AgregarProductoTest({ paisId, puedeCrearProducto, opcionesSimple
         }}
         lado="derecha"
         ancho="lg"
-        titulo={<span className="text-lg font-semibold">Agregar producto en test</span>}
+        titulo={<span className="text-lg font-semibold">{vista === "nuevo" ? "Nuevo producto" : "Agregar producto en test"}</span>}
       >
         {puedeCrearProducto && (
-          <div role="tablist" aria-label="Cómo agregarlo" className="flex gap-5 border-b border-border px-5">
-            {pestanas.map((p) => (
+          <div hidden={vista !== "nuevo"} className="flex-1 flex-col [&:not([hidden])]:flex">
+            <div className="border-b border-border px-5 py-2">
               <button
-                key={p.id}
                 type="button"
-                role="tab"
-                id={`pestana-agregar-${p.id}`}
-                aria-selected={actual === p.id}
-                aria-controls={`panel-agregar-${p.id}`}
-                onClick={() => setPestana(p.id)}
-                className={`relative -mb-px border-b-2 py-2.5 text-sm transition-colors ${
-                  actual === p.id ? "border-[#8a35c9] font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-                } ${anilloFoco}`}
+                onClick={() => setVista("test")}
+                disabled={guardando}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40 ${anilloFoco}`}
               >
-                {p.etiqueta}
+                <FlechaIzquierdaIcon className="h-4 w-4" />
+                Volver al test
               </button>
-            ))}
-          </div>
-        )}
-        {puedeCrearProducto && (
-          <div role="tabpanel" id="panel-agregar-nuevo" aria-labelledby="pestana-agregar-nuevo" hidden={actual !== "nuevo"} className="flex-1 flex-col [&:not([hidden])]:flex">
+            </div>
             <CrearProductoPanel
+              key={`nuevo-${vez}-${nuevos.length}`}
               incrustada
               opcionesSimples={opcionesSimples}
-              action={crearProductoNuevoEnTest}
-              mensajeExito="Producto creado y agregado a Test productos"
-              ocultos={{ pais_id: paisId }}
-              alGuardar={cerrar}
+              action={crear}
+              mensajeExito="Producto creado: completa el test y guárdalo"
+              alGuardar={() => {
+                const p = creado.current;
+                creado.current = null;
+                if (p) {
+                  setNuevos((n) => [p, ...n]);
+                  setProductoNuevo(p);
+                }
+                setVista("test");
+              }}
               alCambiarEnviando={setGuardando}
             />
           </div>
         )}
-        <div
-          role={puedeCrearProducto ? "tabpanel" : undefined}
-          id="panel-agregar-existente"
-          aria-labelledby={puedeCrearProducto ? "pestana-agregar-existente" : undefined}
-          hidden={actual !== "existente"}
-          className="flex-1 flex-col [&:not([hidden])]:flex"
-        >
-          <FormularioProductoTest paisId={paisId} alGuardar={cerrar} alCambiarGuardando={setGuardando} />
+        <div hidden={vista !== "test"} className="flex-1 flex-col [&:not([hidden])]:flex">
+          {/* El producto recién creado todavía no está en la lista de la página: se suma aquí para poder mostrarlo elegido. */}
+          <ProveedorSkusMaestros opciones={nuevos.length ? [...nuevos, ...opciones] : opciones}>
+            <FormularioProductoTest
+              key={`test-${vez}`}
+              paisId={paisId}
+              alGuardar={cerrar}
+              alCambiarGuardando={setGuardando}
+              alNuevoProducto={puedeCrearProducto ? () => setVista("nuevo") : undefined}
+              productoNuevo={productoNuevo}
+            />
+          </ProveedorSkusMaestros>
         </div>
       </Ventana>
     </>

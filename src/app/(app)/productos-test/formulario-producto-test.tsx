@@ -1,6 +1,6 @@
 "use client";
 
-import { CampoSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { actualizarProductoTest, crearProductoTest } from "./actions";
 import {
@@ -22,10 +22,10 @@ import {
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { Campo } from "@/components/ui/campo-ficha";
-import { fieldClass } from "@/components/ui/field";
+import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
-import { CheckIcon, CerrarIcon, EtiquetaIcon, InteligenciaIcon, TestIcon } from "@/lib/nav-icons";
+import { CheckIcon, CerrarIcon, EtiquetaIcon, InteligenciaIcon, MasIcon, TestIcon } from "@/lib/nav-icons";
 
 /** Un número de métrica que se colorea en vivo mientras se escribe, con el mismo criterio que Filtros. */
 function CampoMetrica({
@@ -91,6 +91,8 @@ export function FormularioProductoTest({
   botonesArriba,
   encabezado,
   acciones,
+  alNuevoProducto,
+  productoNuevo,
 }: {
   paisId: string;
   producto?: FilaProductoTest;
@@ -101,6 +103,10 @@ export function FormularioProductoTest({
   botonesArriba?: boolean;
   encabezado?: ReactNode;
   acciones?: ReactNode;
+  /** Muestra «Nuevo producto» junto al campo «Producto» (abre la ficha de Producto). */
+  alNuevoProducto?: () => void;
+  /** El producto recién creado con esa ficha: queda elegido y llena el nombre. */
+  productoNuevo?: OpcionSkuMaestro | null;
 }) {
   const [modificado, setModificado] = useState(false);
   // El producto de Producto que se eligió (el buscador de la orden de compra) y el nombre, que se llena al elegirlo.
@@ -114,6 +120,13 @@ export function FormularioProductoTest({
   }, [pending, alCambiarGuardando]);
   const [error, setError] = useState<string | null>(null);
   const editando = !!producto;
+
+  useEffect(() => {
+    if (!productoNuevo) return;
+    setSkuId(productoNuevo.id);
+    setNombre(productoNuevo.nombre);
+    setModificado(true);
+  }, [productoNuevo]);
 
   function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -179,18 +192,30 @@ export function FormularioProductoTest({
         <Seccion icono={EtiquetaIcon} titulo="Producto">
           <Campo etiqueta="Producto (de Producto)" id="campo-producto-test">
             <input type="hidden" name="sku_maestro_id" value={skuId ?? ""} />
-            <CampoSkuMaestro
-              valor={skuId}
-              alCambiar={(sku) => {
-                setSkuId(sku?.id ?? null);
-                if (sku) setNombre(sku.nombre);
-                setModificado(true);
-                alModificar?.();
-              }}
-              etiquetaAria="Producto de Producto"
-              placeholder="Busca por SKU, nombre o N.º"
-              claseContenedor="w-full min-w-0"
-            />
+            <span className="flex items-center gap-2">
+              <CampoSkuMaestro
+                valor={skuId}
+                alCambiar={(sku) => {
+                  setSkuId(sku?.id ?? null);
+                  if (sku) setNombre(sku.nombre);
+                  setModificado(true);
+                  alModificar?.();
+                }}
+                etiquetaAria="Producto de Producto"
+                placeholder="Busca por SKU, nombre o N.º"
+                claseContenedor="min-w-0 flex-1"
+              />
+              {alNuevoProducto && (
+                <button
+                  type="button"
+                  onClick={alNuevoProducto}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-accent ${anilloFoco}`}
+                >
+                  <MasIcon className="h-4 w-4" />
+                  Nuevo producto
+                </button>
+              )}
+            </span>
           </Campo>
           <Campo etiqueta="Nombre" id="campo-nombre-test" obligatorio faltante={faltante}>
             <input

@@ -17,6 +17,7 @@ import { ENVIO_VACIO, EnvioProductoBloque } from "./envio-producto";
 import { EnvioIcon } from "@/lib/nav-icons";
 import { claseTono, type Tone } from "@/components/ui/badge";
 import { TONO_CLASE } from "./def-producto";
+import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
@@ -284,8 +285,8 @@ export function CrearProductoPanel({
                 <input type="checkbox" name="maneja_vencimiento" value="1" className="h-4 w-4" />
                 Tiene fecha de vencimiento (se controla por lote)
               </label>
-              <Campo etiqueta="Avisar con cuántos días de anticipación (opcional, 60 por defecto)" id="campo-aviso-producto">
-                <input id="campo-aviso-producto" type="number" name="dias_aviso_vencimiento" min="1" max="3650" step="1" inputMode="numeric" placeholder="Ej: 90" className={`${fieldClass} w-full`} />
+              <Campo etiqueta={`Avisar con cuántos días de anticipación (opcional, ${DIAS_AVISO_PREDETERMINADO} por defecto)`} id="campo-aviso-producto">
+                <input id="campo-aviso-producto" type="number" name="dias_aviso_vencimiento" min="1" max="3650" step="1" inputMode="numeric" placeholder="Ej: 120" className={`${fieldClass} w-full`} />
               </Campo>
             </Seccion>
           )}

@@ -40,6 +40,10 @@ test("la orden de compra o el movimiento de un producto se filtran por el país 
   assert.equal(eventoVisible(mov("entrada 5 de X · Costa Rica"), u, sinPais, paises), true);
   assert.equal(eventoVisible(mov("entrada 5 de X · Panamá"), u, sinPais, paises), false);
   assert.equal(eventoVisible(mov("entrada 5 de X"), u, sinPais, paises), false);
+  // Texto libre con otro país antes del marcador real: manda el último.
+  assert.equal(eventoVisible(mov("entrada 5 de X (traslado · Costa Rica) · Panamá"), u, sinPais, paises), false);
+  assert.equal(eventoVisible(mov("entrada 5 de X (devolución · Panamá) · Costa Rica"), u, sinPais, paises), true);
+  assert.equal(eventoVisible(mov("entrada 5 de X (a · Costa Rica)"), u, sinPais, paises), false);
   assert.equal(eventoVisible({ accion: "crear_compra", entidad: "skus_maestros", entidad_id: "1", detalle: "OC-0001 · X · Panamá (al pasar a Activo)" }, u, sinPais, paises), false);
   assert.equal(eventoVisible({ accion: "cambiar_clase", entidad: "skus_maestros", entidad_id: "1", detalle: "x" }, u, sinPais, paises), true);
   assert.equal(eventoVisible(mov("entrada 5 de X"), { modulos: ["producto"], paisesPermitidos: null }, sinPais, paises), true);

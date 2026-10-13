@@ -14,6 +14,7 @@ import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
 import { eventoVisible } from "@/lib/auditoria-visible";
 import { getUsuarioActual } from "@/lib/auth";
 
@@ -103,7 +104,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
       estado: "aprobado",
       creado_por: usuario.id,
       ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : internoVisto ? { codigo_barras: internoVisto, codigo_barras_origen: "interno" } : {}),
-      ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso } : {}),
+      ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso ?? DIAS_AVISO_PREDETERMINADO } : {}),
       ...(envio ?? {}),
     })
     .select("id")
@@ -343,7 +344,7 @@ export async function generarCodigoBarrasInterno(id: string): Promise<{ codigo?:
 
 /**
  * Activa o desactiva el control de vencimiento de un producto (se lleva por lote y fecha de caducidad) y fija con cuántos días
- * de anticipación se avisa de un lote por vencer (sin dato, 60). La base lo rechaza si el producto ya tiene stock sin lote (al
+ * de anticipación se avisa de un lote por vencer (sin dato, 90: `DIAS_AVISO_PREDETERMINADO`). La base lo rechaza si el producto ya tiene stock sin lote (al
  * activarlo) o lotes con unidades (al desactivarlo). Devuelve el error como valor.
  */
 export async function configurarVencimiento(id: string, maneja: boolean, diasAviso: number | null): Promise<{ error?: string }> {
@@ -356,7 +357,7 @@ export async function configurarVencimiento(id: string, maneja: boolean, diasAvi
   if (!actual) return { error: "El producto ya no existe." };
   if (maneja && actual.tipo === "combo") return { error: "Un producto compuesto no maneja vencimiento: sale de sus componentes." };
 
-  const { error } = await supabase.from("skus_maestros").update({ maneja_vencimiento: maneja, dias_aviso_vencimiento: maneja ? diasAviso : null }).eq("id", id);
+  const { error } = await supabase.from("skus_maestros").update({ maneja_vencimiento: maneja, dias_aviso_vencimiento: maneja ? (diasAviso ?? DIAS_AVISO_PREDETERMINADO) : null }).eq("id", id);
   if (error) return { error: error.message.length < 200 ? error.message : "No se pudo cambiar el control de vencimiento." };
 
   await registrarAuditoria({
@@ -364,7 +365,7 @@ export async function configurarVencimiento(id: string, maneja: boolean, diasAvi
     entidad: "skus_maestros",
     entidadId: id,
     antes: { Vencimiento: actual.maneja_vencimiento ? `Sí (aviso ${actual.dias_aviso_vencimiento ?? 60} días)` : "No" },
-    despues: { Vencimiento: maneja ? `Sí (aviso ${diasAviso ?? 60} días)` : "No" },
+    despues: { Vencimiento: maneja ? `Sí (aviso ${diasAviso ?? DIAS_AVISO_PREDETERMINADO} días)` : "No" },
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");

@@ -6,6 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { ESTADOS, TEST_NUMEROS } from "./def-productos-test";
 import { crearProducto } from "../producto/actions";
+import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
@@ -76,7 +77,7 @@ export async function crearProductoTest(formData: FormData): Promise<{ error?: s
   await registrarAuditoria({ accion: "crear_producto_test", entidad: "wms_productos_test", entidadId: data.id, detalle: nombre });
   // Vinculado a un producto Activo: pasa a Filtro de productos.
   if (await pasarTestsAFiltro(supabase, { testIds: [data.id] })) revalidatePath("/filtro-productos");
-  revalidatePath("/productos-test");
+  revalidatePath("/productos-test", "layout");
   return {};
 }
 
@@ -99,7 +100,7 @@ export async function actualizarProductoTest(formData: FormData): Promise<{ erro
 
   // Vinculado a un producto Activo: pasa a Filtro de productos.
   if (await pasarTestsAFiltro(supabase, { testIds: [id] })) revalidatePath("/filtro-productos");
-  revalidatePath("/productos-test");
+  revalidatePath("/productos-test", "layout");
   return {};
 }
 
@@ -113,33 +114,20 @@ export async function eliminarProductoTest(formData: FormData) {
   if (error) throw new Error(error.message);
 
   await registrarAuditoria({ accion: "eliminar_producto_test", entidad: "wms_productos_test", entidadId: id, detalle: nombre });
-  revalidatePath("/productos-test");
+  revalidatePath("/productos-test", "layout");
 }
 
 /**
- * «Nuevo producto» de Test productos: crea el producto en Producto con la misma ficha (y las mismas reglas: `crearProducto`
- * pide poder modificar Producto) y lo agrega a la lista de Test productos del país, ya vinculado y con fecha de hoy.
+ * «Nuevo producto» junto al campo «Producto» del formulario de Test productos: crea el producto en Producto con la misma ficha
+ * (y las mismas reglas: `crearProducto` pide poder modificar Producto) y lo devuelve para dejarlo elegido en el formulario,
+ * donde se completan las métricas del test y se guarda como siempre.
  */
-export async function crearProductoNuevoEnTest(formData: FormData): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("productos-test");
-  const pais_id = String(formData.get("pais_id") ?? "");
-  if (!/^[0-9a-fA-F-]{36}$/.test(pais_id)) return { error: "País no válido." };
+export async function crearProductoParaTest(formData: FormData): Promise<{ error?: string; producto?: OpcionSkuMaestro }> {
+  await requireModuloEscritura("productos-test");
   const creado = await crearProducto(formData);
   if (creado.error || !creado.id) return { error: creado.error ?? "No se pudo crear el producto." };
-
-  const nombre = String(formData.get("nombre") ?? "").trim();
-  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("wms_productos_test")
-    .insert({ pais_id, nombre, estado: "pendiente", creado_por: usuario.id, sku_maestro_id: creado.id, fecha_creacion: hoy })
-    .select("id")
-    .single();
-  if (error) return { error: "El producto se creó en Producto, pero no se pudo agregar a Test productos: agrégalo con «Agregar»." };
-
-  await registrarAuditoria({ accion: "crear_producto_test", entidad: "wms_productos_test", entidadId: data.id, detalle: `${nombre} (nuevo en Producto)` });
-  // Si se creó ya Activo, pasa a Filtro de productos.
-  if (await pasarTestsAFiltro(supabase, { testIds: [data.id] })) revalidatePath("/filtro-productos");
-  revalidatePath("/productos-test");
-  return {};
+  const { data } = await createServiceClient().from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url").eq("id", creado.id).maybeSingle();
+  if (!data) return { error: "El producto se creó, pero no se pudo leer: búscalo en «Producto»." };
+  revalidatePath("/producto");
+  return { producto: { id: data.id, codigo: data.codigo, nombre: data.nombre, estado: data.estado, numero: data.numero ?? null, foto: data.foto_url ?? null } };
 }

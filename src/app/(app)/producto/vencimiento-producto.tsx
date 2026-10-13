@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { configurarVencimiento } from "./actions";
+import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
 
 const claseBoton = `rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`;
 
 /**
  * El control de vencimiento de un producto: si caduca se lleva por lote y fecha de vencimiento (cada entrada pide su lote y las
  * salidas sacan primero lo que vence antes, FEFO), y se elige con cuántos días de anticipación se avisa de un lote por vencer
- * (60 si no se dice). Activarlo exige que el producto no tenga stock sin lote; desactivarlo, que ningún lote tenga unidades.
+ * (`DIAS_AVISO_PREDETERMINADO`, 90, si no se dice). Activarlo exige que el producto no tenga stock sin lote; desactivarlo, que ningún lote tenga unidades.
  */
 export function VencimientoProducto({
   id,
@@ -45,7 +46,7 @@ export function VencimientoProducto({
 
   return (
     <div className="flex flex-col gap-3 text-sm">
-      <p className="m-0">{maneja ? `Se controla por lote. Avisa ${diasAviso ?? 60} días antes de que venza un lote.` : "No se controla el vencimiento."}</p>
+      <p className="m-0">{maneja ? `Se controla por lote. Avisa ${diasAviso ?? DIAS_AVISO_PREDETERMINADO} días antes de que venza un lote.` : "No se controla el vencimiento."}</p>
       {puedeEscribir && (
         <div className="flex flex-col gap-2">
           {maneja && (
@@ -60,7 +61,7 @@ export function VencimientoProducto({
                   inputMode="numeric"
                   value={valorDias}
                   disabled={pendiente}
-                  placeholder="60"
+                  placeholder={String(DIAS_AVISO_PREDETERMINADO)}
                   onChange={(e) => setDias(e.target.value)}
                   className={`${fieldClassSm} w-28`}
                 />

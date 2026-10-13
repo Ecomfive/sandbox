@@ -41,7 +41,12 @@ export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_i
 /** El código del país nombrado en el detalle como « · <Nombre>», o undefined si no nombra ninguno. */
 export function paisEnDetalle(detalle: string | null | undefined, paises: { codigo: string; nombre: string }[]): string | undefined {
   if (!detalle) return undefined;
-  return paises.find((p) => detalle.includes(` · ${p.nombre}`))?.codigo;
+  // Solo cuenta el último « · »: antes puede haber texto libre (referencia, lote) que nombre otro país a propósito.
+  const i = detalle.lastIndexOf(" · ");
+  if (i < 0) return undefined;
+  const final = detalle.slice(i + 3);
+  // «Panamá» (movimiento) o «Panamá (al pasar a Activo)» (orden de compra), nada más.
+  return paises.find((p) => final === p.nombre || final === `${p.nombre} (al pasar a Activo)`)?.codigo;
 }
 
 /**
