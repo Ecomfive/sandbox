@@ -6,7 +6,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearFecha, formatearFechaHora } from "@/lib/formato";
 import { CalendarioIcon, CheckIcon, EnlaceIcon, EstadoIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import {
@@ -33,6 +33,7 @@ const ICONOS: Record<string, IconoComp> = {
   comentarios: EstadoIcon,
   vistas: EstadoIcon,
   compartidos: EstadoIcon,
+  publicado: CalendarioIcon,
   notas: EstadoIcon,
 };
 const cifra = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-CR"));
@@ -95,6 +96,7 @@ const COLUMNAS: ColumnaTabla<FilaInstagram, undefined>[] = [
   { id: "megusta", label: "Me gusta", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.megusta) },
   { id: "comentarios", label: "Comentarios", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.comentarios) },
   { id: "vistas", label: "Vistas", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.vistas) },
+  { id: "publicado", label: "Publicado", ocultable: true, oculta: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => (f.fechaPublicacion ? formatearFecha(f.fechaPublicacion) : "—") },
   { id: "compartidos", label: "Compartidos", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.compartidos) },
   { id: "notas", label: "Notas", ocultable: true, oculta: true, clase: "text-muted-foreground", render: (f) => <span className="block max-w-[18rem] truncate">{f.notas ?? "—"}</span> },
 ];

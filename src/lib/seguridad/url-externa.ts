@@ -130,12 +130,12 @@ interface Respuesta {
 }
 
 /** Un GET con la búsqueda DNS revisada (`lookupPublico`), sin seguir redirecciones. */
-function pedir(url: URL, senal: AbortSignal): Promise<Respuesta> {
+function pedir(url: URL, senal: AbortSignal, encabezados?: Record<string, string>): Promise<Respuesta> {
   const cliente = url.protocol === "https:" ? https : http;
   return new Promise((resolver, rechazar) => {
     const solicitud = cliente.get(
       url,
-      { lookup: lookupPublico, signal: senal, headers: { "user-agent": "Mozilla/5.0 (Ecomfive)", accept: "image/*" } },
+      { lookup: lookupPublico, signal: senal, headers: { "user-agent": "Mozilla/5.0 (Ecomfive)", accept: "image/*", ...encabezados } },
       (r) =>
         resolver({
           estado: r.statusCode ?? 0,
@@ -148,8 +148,11 @@ function pedir(url: URL, senal: AbortSignal): Promise<Respuesta> {
   });
 }
 
-/** Descarga hasta `maxBytes` de una dirección pública, revisando cada redirección. */
-export async function descargarPublico(texto: string, maxBytes: number): Promise<{ bytes: Uint8Array } | { error: string }> {
+/**
+ * Descarga hasta `maxBytes` de una dirección pública, revisando cada redirección. Por defecto pide una imagen; `encabezados`
+ * cambia lo que se pide (otro `accept`, otro agente) sin tocar ninguna de las revisiones de seguridad.
+ */
+export async function descargarPublico(texto: string, maxBytes: number, encabezados?: Record<string, string>): Promise<{ bytes: Uint8Array } | { error: string }> {
   const senal = AbortSignal.timeout(10_000);
   let actual = texto;
   for (let salto = 0; salto < 4; salto++) {
@@ -157,7 +160,7 @@ export async function descargarPublico(texto: string, maxBytes: number): Promise
     if ("error" in revisada) return revisada;
     let r: Respuesta;
     try {
-      r = await pedir(revisada.url, senal);
+      r = await pedir(revisada.url, senal, encabezados);
     } catch (error) {
       if ((error as { code?: string })?.code === "EPRIVADA") return { error: "Esa dirección no es pública." };
       return { error: "No se pudo descargar la imagen." };

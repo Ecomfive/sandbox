@@ -254,12 +254,17 @@ export function FichaInstagram({
                   <Campo etiqueta="Cuenta del video" id="campo-autor-instagram" className="col-span-2 sm:col-span-3">
                     <input id="campo-autor-instagram" type="text" name="autor_usuario" maxLength={100} defaultValue={fila.autorUsuario ?? ""} placeholder="Ej: tienda.ejemplo" className={fieldClass} />
                   </Campo>
+                  <Campo etiqueta="Fecha de publicación" id="campo-fecha-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-fecha-instagram" type="date" name="fecha_publicacion" defaultValue={fila.fechaPublicacion ?? ""} className={fieldClass} />
+                  </Campo>
                   {CIFRAS.map(([nombre, etiqueta, valor]) => (
                     <Campo key={nombre} etiqueta={etiqueta} id={`campo-${nombre}-instagram`}>
                       <input id={`campo-${nombre}-instagram`} type="number" inputMode="numeric" min="0" step="1" name={nombre} defaultValue={fila[valor] ?? ""} placeholder="Ej: 1200" className={`${fieldClass} tabular-nums`} />
                     </Campo>
                   ))}
                 </fieldset>
+                {fila.fuenteCifras === "vista_previa" && <p className="m-0 text-xs text-muted-foreground">Leído de la vista pública de Instagram{fila.leidoEn ? ` el ${formatearFechaHora(fila.leidoEn)}` : ""} · dato no oficial</p>}
+                {fila.fuenteCifras === "manual" && <p className="m-0 text-xs text-muted-foreground">Corregido a mano</p>}
               </Seccion>
 
               {fila.datosMeta && (
