@@ -2,6 +2,8 @@ import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatoDeVideo, type CapturaInstagram, type NotaInstagram } from "./extraer";
+import { interpretarEmbed, urlDeEmbed, type DatosEmbed } from "./embed";
+import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
 import { datosQueFaltan } from "./repetidas";
 import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
@@ -72,6 +74,26 @@ async function leerVistaPublica(enlace: string): Promise<{ ok: true; datos: Vist
   return datos ? { ok: true, datos } : { ok: false, error: "La vista previa no trae cifras." };
 }
 
+const ENCABEZADOS_VISTA_PREVIA = {
+  "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+  accept: "text/html",
+  "accept-language": "en-US,en;q=0.9",
+};
+
+/**
+ * Lee la página pública de «insertar» del reel o la publicación: ahí está la dirección del archivo de video (o de la imagen), las
+ * vistas, los me gusta y los comentarios. Es lo que permite completar una captura que llegó solo con el enlace. Mismas reglas que la
+ * vista previa: un pedido, descargador seguro, nunca lanza y el motivo de un fallo queda anotado.
+ */
+async function leerEmbedPublico(enlace: string): Promise<{ ok: true; datos: DatosEmbed } | { ok: false; error: string } | null> {
+  const url = urlDeEmbed(enlace);
+  if (!lecturaPublicaActiva() || !url) return null;
+  const pagina = await descargarPublico(url, 3_000_000, ENCABEZADOS_VISTA_PREVIA);
+  if ("error" in pagina) return { ok: false, error: pagina.error };
+  const datos = interpretarEmbed(new TextDecoder("utf-8").decode(pagina.bytes));
+  return datos ? { ok: true, datos } : { ok: false, error: "La página de insertar no trae datos." };
+}
+
 /**
  * Copia el archivo a nuestro almacenamiento: el enlace del aviso de Meta caduca, el archivo guardado no. Una publicación puede ser
  * un video o una imagen (una foto o un carrusel llega como imagen): los dos se guardan, por su firma y no por lo que diga el servidor.
@@ -122,31 +144,24 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       const media = consulta?.ok ? interpretarMedia(consulta.datos) : null;
       const urlVideo = c.urlVideo ?? media?.urlVideo ?? null;
       const enlaceFinal = c.enlace ?? media?.enlace ?? null;
-      const [video, vista] = await Promise.all([urlVideo ? copiarVideo(data.id, urlVideo) : null, enlaceFinal ? leerVistaPublica(enlaceFinal) : null]);
+      // Con el enlace se lee la página pública (vista previa y «insertar»): de ahí salen las cifras y, si la captura no trajo archivo, el video.
+      const [vista, embed] = await Promise.all([enlaceFinal ? leerVistaPublica(enlaceFinal) : null, enlaceFinal ? leerEmbedPublico(enlaceFinal) : null]);
+      const urlArchivo = urlVideo ?? archivoDeLectura(embed);
+      const video = urlArchivo ? await copiarVideo(data.id, urlArchivo) : null;
 
       const cambios: Record<string, unknown> = {};
       if (remitente) {
         cambios.remitente_usuario = remitente.usuario;
         cambios.remitente_nombre = remitente.nombre;
       }
-      // Las cifras: lo que entrega la API de Meta manda; si no, lo de la vista previa pública (dato no oficial, marcado como tal).
-      const metricas: Record<string, unknown> = {};
+      // Las cifras: lo que entrega la API de Meta manda; si no, lo de la página pública (dato no oficial, marcado como tal).
+      const lectura = cifrasDeLectura(vista, embed);
+      const metricas: Record<string, unknown> = { ...lectura.metricas };
       if (consulta) metricas.consulta = consulta.ok ? consulta.datos : { error: consulta.error };
-      if (vista?.ok) {
-        const v = vista.datos;
-        if (v.megusta !== null) metricas.like_count = v.megusta;
-        if (v.comentarios !== null) metricas.comments_count = v.comentarios;
-        if (v.fecha) metricas.fecha_publicacion = v.fecha;
-        if (v.nombre) metricas.nombre_pagina = v.nombre;
-        metricas.fuente = "vista_previa";
-        metricas.leido_en = new Date().toISOString();
-      } else if (vista) {
-        metricas.vista_previa_error = vista.error;
-      }
       if (media?.megusta != null) metricas.like_count = media.megusta;
       if (media?.comentarios != null) metricas.comments_count = media.comentarios;
       if (Object.keys(metricas).length > 0) cambios.metricas = metricas;
-      const autor = media?.usuario ?? (vista?.ok ? vista.datos.usuario : null);
+      const autor = media?.usuario ?? lectura.autor;
       if (autor) cambios.autor_usuario = autor;
       if (media?.enlace && !c.enlace) cambios.enlace = media.enlace;
       if (video) {
@@ -228,4 +243,39 @@ export async function guardarNotas(notas: NotaInstagram[]): Promise<{ unidas: nu
     }
   }
   return { unidas };
+}
+
+/**
+ * Vuelve a leer la página pública del enlace de una captura que ya existe y la completa: el archivo (si no lo tiene), las cifras, la
+ * cuenta y el nombre de la página. Sirve para las que llegaron solo con enlace antes de que se leyera la página de «insertar», o cuando
+ * Instagram no respondió la primera vez. Lo que una persona corrigió a mano no se pisa. Devuelve un mensaje de error si no hay nada que leer.
+ */
+export async function completarCaptura(id: string): Promise<{ ok: true; archivo: boolean } | { ok: false; error: string }> {
+  const supabase = createServiceClient();
+  const { data } = await supabase.from("instagram_capturas").select("id, enlace, video_ruta, autor_usuario, metricas").eq("id", id).maybeSingle();
+  if (!data) return { ok: false, error: "La captura ya no existe." };
+  if (!data.enlace) return { ok: false, error: "Esta captura no tiene enlace de Instagram para leer." };
+  if (!lecturaPublicaActiva()) return { ok: false, error: "La lectura de la página pública está apagada." };
+
+  const [vista, embed] = await Promise.all([leerVistaPublica(data.enlace), leerEmbedPublico(data.enlace)]);
+  const lectura = cifrasDeLectura(vista, embed);
+  if (Object.keys(lectura.metricas).length === 0 && !lectura.autor) return { ok: false, error: "Instagram no devolvió datos de este enlace." };
+
+  const cambios: Record<string, unknown> = { metricas: mezclarLectura((data.metricas ?? null) as Record<string, unknown> | null, lectura.metricas), actualizado_en: new Date().toISOString() };
+  if (lectura.autor && !data.autor_usuario) cambios.autor_usuario = lectura.autor;
+  let archivo = false;
+  const urlArchivo = data.video_ruta ? null : archivoDeLectura(embed);
+  if (urlArchivo) {
+    const copia = await copiarVideo(data.id, urlArchivo);
+    if ("error" in copia) cambios.video_error = copia.error;
+    else {
+      cambios.video_ruta = copia.ruta;
+      cambios.video_bytes = copia.bytes;
+      cambios.video_error = null;
+      archivo = true;
+    }
+  }
+  const { error } = await supabase.from("instagram_capturas").update(cambios).eq("id", id);
+  if (error) return { ok: false, error: "No se pudieron guardar los datos leídos." };
+  return { ok: true, archivo };
 }

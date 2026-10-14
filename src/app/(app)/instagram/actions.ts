@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { BUCKET_INSTAGRAM } from "@/lib/instagram/guardar";
+import { BUCKET_INSTAGRAM, completarCaptura } from "@/lib/instagram/guardar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ESTADOS_INSTAGRAM, etiquetaEstadoInstagram } from "./def-instagram";
 
@@ -153,6 +153,20 @@ export async function cambiarEstadoCaptura(id: string, estado: string): Promise<
   });
   revalidatePath(RUTA);
   return {};
+}
+
+/**
+ * Vuelve a leer la página pública del enlace de una captura y la completa (archivo, me gusta, comentarios, vistas, cuenta y nombre de
+ * la página). Deja una línea en la actividad. Devuelve el error como valor.
+ */
+export async function leerEnlaceDeCaptura(id: string): Promise<{ error?: string; archivo?: boolean }> {
+  await requireModuloEscritura(MODULO);
+  if (typeof id !== "string" || !UUID.test(id)) return { error: "Captura no válida." };
+  const r = await completarCaptura(id);
+  if (!r.ok) return { error: r.error };
+  await registrarAuditoria({ accion: "leer_enlace_captura_instagram", entidad: ENTIDAD, entidadId: id, detalle: r.archivo ? "Se guardó el archivo y se leyeron las cifras" : "Se leyeron las cifras" });
+  revalidatePath(RUTA);
+  return { archivo: r.archivo };
 }
 
 /** El enlace firmado (una hora) del video de una captura, para verlo en su ficha. El bucket es privado. */

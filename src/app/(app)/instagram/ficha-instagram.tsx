@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
@@ -13,7 +14,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
 import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
-import { actualizarCaptura, obtenerHistorialCaptura, urlVideoCaptura } from "./actions";
+import { actualizarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, urlVideoCaptura } from "./actions";
 import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
@@ -116,6 +117,8 @@ export function FichaInstagram({
   alCerrar: () => void;
 }) {
   const { mostrarToast } = useToast();
+  const router = useRouter();
+  const [leyendo, setLeyendo] = useState(false);
   const [modificadoId, setModificadoId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [versionHistorial, setVersionHistorial] = useState(0);
@@ -136,6 +139,21 @@ export function FichaInstagram({
     setModificadoId(null);
     setError(null);
     alIr(id);
+  }
+
+  /** Vuelve a leer la página pública del enlace y completa el archivo, las cifras, la cuenta y el nombre de la página. */
+  async function leerEnlace() {
+    if (!fila || leyendo) return;
+    setLeyendo(true);
+    const r: { error?: string; archivo?: boolean } = await leerEnlaceDeCaptura(fila.id).catch(() => ({ error: "No se pudo leer el enlace." }));
+    setLeyendo(false);
+    if (r.error) mostrarToast(r.error, "destructive");
+    else {
+      mostrarToast(r.archivo ? "Archivo y datos completados" : "Datos completados");
+      setVersion((v) => v + 1);
+      setVersionHistorial((v) => v + 1);
+      router.refresh();
+    }
   }
 
   function guardar(e: React.FormEvent<HTMLFormElement>) {
@@ -227,6 +245,11 @@ export function FichaInstagram({
             <div className="flex flex-1 flex-col divide-y divide-border p-5">
               <Seccion icono={InstagramIcon} titulo={fila.archivoTipo === "imagen" ? "Imagen" : "Video"}>
                 <VideoCaptura fila={fila} />
+                {puedeEscribir && fila.enlace && (
+                  <button type="button" onClick={() => void leerEnlace()} disabled={leyendo || guardando} className={`self-start text-sm text-primario hover:underline disabled:opacity-60 ${anilloFoco}`}>
+                    {leyendo ? "Leyendo el enlace..." : fila.tieneArchivo ? "Volver a leer el enlace" : "Completar desde el enlace"}
+                  </button>
+                )}
                 {fila.tieneArchivo && fila.videoBytes !== null && <p className="m-0 text-xs text-muted-foreground">{megas(fila.videoBytes).slice(3)}</p>}
               </Seccion>
 
