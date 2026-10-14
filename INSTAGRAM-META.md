@@ -75,6 +75,25 @@ Consecuencias en el sistema:
   solo como archivo no los tiene, salvo que la misma publicación llegue después con enlace.
 - La lista se **refresca sola cada 30 segundos** mientras la pestaña se ve (`router.refresh()`).
 
+## Con el enlace se completa todo: la página de «insertar» (embed)
+
+Lo que el aviso de Meta no trae (el **archivo de video**, las **vistas**) sale del enlace de la captura: la página pública de insertar
+`instagram.com/p/<código>/embed/captioned/` (se pide con el agente de las vistas previas de Facebook, como la vista previa) trae un
+bloque `contextJSON` con la dirección del video en la red de archivos de Instagram, `video_view_count`, me gusta, comentarios, la cuenta,
+la duración y `product_type` (`clips` = reel). Probado el 14 oct con el reel de `nuvotienda.ve`: video MP4 válido de 2,2 MB, 43 me gusta,
+5 comentarios y 974 vistas. `embed.ts` lo lee (solo acepta archivos de `cdninstagram.com` y `fbcdn.net`) y `lectura.ts` junta lo leído
+con la vista previa (que manda en me gusta y comentarios: la vista previa dio 12 comentarios y la de insertar 5, que parece no contar
+respuestas; la de insertar aporta vistas y, si la otra falla, el resto). **Resultado: una captura que llega con enlace termina con el
+archivo, las vistas, los me gusta, los comentarios, la cuenta, el nombre de la página y la fecha**, sin importar cómo se compartió. La
+ficha trae «Completar desde el enlace» / «Volver a leer el enlace» (`completarCaptura`) para las que llegaron antes o cuando Instagram
+no respondió; lo corregido a mano no se pisa. Es la misma zona gris que la vista previa (acceso automatizado) y se apaga con
+`INSTAGRAM_LECTURA_PUBLICA=0`. **Límite probado:** Instagram puede tener la página de insertar **desactivada** para una publicación (IG-0005/0009, el anuncio de
+Perfectx de `mundodigital4955`, e IG-0012, de `vohanh459`: la respuesta es una página genérica que dice «disabled», sin `shortcode_media`).
+Parecen ser anuncios o cuentas con restricciones; en esos casos la vista previa sí da me gusta, comentarios, cuenta, nombre y fecha, pero
+**no hay archivo ni vistas** por esta vía (queda `metricas.embed_error`). En las publicaciones orgánicas probadas (`nuvotienda.ve`) funcionó
+siempre. **Lo único que sigue sin resolverse es lo contrario**: una captura que llega solo como archivo no
+trae enlace, y de un archivo no se puede sacar su enlace (el identificador `ig_post_media_id` no es el código del enlace).
+
 ## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
 
 La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin iniciar sesión) muestra de cada anuncio su anunciante, su
