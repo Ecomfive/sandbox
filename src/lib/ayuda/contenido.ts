@@ -185,6 +185,28 @@ export const GUIAS: GuiaModulo[] = [
     secciones: [{ titulo: "Uso", pasos: ["Al entrar a Test productos se abre la pestaña «Productos» (la lista); al lado están «Informe» y «Dashboard».", "Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Dashboard: todo el testing a la vez, con filtros que se cruzan (fechas, categoría, Test # y resultado). Pulsa una barra del periodo, una categoría o una fila de «Comparar por» para filtrar y otra vez para quitarlo. Trae la distribución del CPA contra el criterio, el CTR frente al CPA, los promedios de winners frente a fallidos, los mejores winners y lo que conviene revisar.", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Cada fila empieza con la foto del producto (la de Producto o, si no está vinculado, la de Filtro de productos); pasa el cursor encima para verla grande.", "Cada fila dice bajo el nombre si está «Vinculado» (punto verde, con el SKU de su producto) o «Sin vincular» (punto ámbar).", "Arriba de la lista: Total en test, Winners, En consulta, Fallidos, Otros estados y Sin vincular, cada uno con su número (púlsalos para filtrar), y cuántos faltan por vincular a Producto.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto.", "Todo producto vinculado cuyo producto esté Activo en Producto pasa solo a Filtro de productos, en «Cotizar», con su foto y sus métricas (no se repite si ya está).", "«+ Agregar» abre el formulario del producto en test. Si el producto aún no existe, pulsa «Nuevo producto», junto al campo «Producto (de Producto)»: abre la misma ficha de Producto (estado, tipo, foto, SKU, código de barras, envío…). Al crearlo vuelves al formulario con ese producto ya elegido y el nombre lleno; completa el test y guárdalo. «Volver al test» regresa sin crear. Hace falta poder modificar Producto."] }],
   },
   {
+    modulo: "scraping-proveedores",
+    titulo: "Scraping de proveedores",
+    ruta: "/scraping-proveedores",
+    resumen: "Los productos de proveedores de Dropi con su precio y stock en el tiempo.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Sigue a proveedores de Dropi: arriba, una tarjeta por proveedor con sus órdenes, productos y dropshippers y si subieron (▲ verde) o bajaron (▼ rojo) desde el registro anterior. Pulsa una tarjeta para ver ese proveedor.",
+          "«Agregar proveedor»: su nombre, el enlace de su página en Dropi (https://app.dropi.mx/dashboard/provider/…) y sus órdenes, productos y dropshippers de hoy. Queda pedida su primera búsqueda completa.",
+          "«Actualizar datos» guarda las cifras de hoy escritas a mano. Cada búsqueda además las lee sola de Dropi («Leído de Dropi» en «Datos del proveedor»).",
+          "«Buscar ahora» pide una búsqueda nueva. La corre el equipo con la sesión de Dropi: una búsqueda de un proveedor de unos 800 productos dura menos de un minuto.",
+          "Las tarjetas Subieron de stock, Bajaron de stock, Cambiaron de precio, Nuevos, Privados y Desaparecieron comparan con la búsqueda anterior y filtran la tabla al pulsarlas.",
+          "La tabla trae cada producto con foto, nombre, precio, stock, cómo se movió el stock en 4 semanas y la fecha de su última revisión; va de los más recientes en Dropi a los más viejos. Pulsa una fila para ver su historial: cada cambio de precio y de stock, cuándo desapareció o volvió.",
+          "Dropi solo muestra a un dropshipper los productos publicados con stock: por eso la tabla trae menos productos que la cifra «Productos» del proveedor, que cuenta también los sin stock y los privados de otros dropshippers.",
+          "Un producto que deja de aparecer queda «Desapareció»: «se agotó» si le quedaban 10 unidades o menos, «lo hizo privado» si apareció un privado con el mismo nombre, o «dejó de aparecer».",
+          "Los privados («Privado …», con el logo del proveedor en vez de foto) se vinculan solos al producto con foto del mismo nombre cuando tienen 2 palabras en común o más y 85 % de parecido; con menos, salen como «posible pareja» para que lo revises.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "seleccion-productos",
     titulo: "Selección de productos",
     ruta: "/seleccion-productos",
@@ -262,6 +284,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-14", titulo: "Scraping de proveedores", texto: "Testing Lab › Scraping de proveedores ya funciona: agrega un proveedor de Dropi y el sistema guarda todos sus productos con foto, precio y stock, y en cada búsqueda anota qué subió o bajó de stock, qué cambió de precio, qué es nuevo y qué desapareció (agotado o privado). Los privados se vinculan por nombre con su producto con foto. Ya está cargado HYPER MODA (779 productos).", modulo: "scraping-proveedores", href: "/scraping-proveedores" },
   { fecha: "2026-10-14", titulo: "Compras sin nombre", texto: "Una compra se identifica por sus códigos (N.º OC y código del país): se quitó el campo «Nombre» que venía de ClickUp, de la ficha, la columna, la búsqueda y la descarga.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-13", titulo: "Selección de productos", texto: "Testing Lab › Selección ya tiene su tablero: los candidatos de las fuentes o creados a mano, con su código de fuente, enlaces, precios de referencia y los estados Por evaluar, Seleccionado y Descartado.", modulo: "seleccion-productos", href: "/seleccion-productos" },
   { fecha: "2026-10-13", titulo: "Íconos en el menú", texto: "Cada página del menú lateral lleva su ícono a la izquierda del nombre, también en Favoritos, para encontrarla de un vistazo.", modulo: "dashboard", href: "/" },
