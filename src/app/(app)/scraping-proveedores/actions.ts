@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
+import { aDolares, monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
+import { motivoYaVisto, yaVisto } from "@/lib/scraping/cruces";
+import { cargarReferencias } from "@/lib/scraping/referencias";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const RUTA = "/scraping-proveedores";
@@ -115,4 +118,73 @@ export async function obtenerHistorialProducto(productoId: string): Promise<{ ev
       detalle: e.detalle,
     })),
   };
+}
+
+/**
+ * «Enviar a Selección»: crea una fila de Selección de productos por cada producto (fuente Scraping de proveedores, su
+ * correlativo SP-0001, en el país del proveedor y con sus precios pasados a dólares). Llega **Seleccionado**; si ya se testeó
+ * o ya está en Producto llega **Descartado** con la nota del motivo. Un producto ya enviado no se vuelve a crear. Hasta 100.
+ */
+export async function enviarASeleccion(ids: string[]): Promise<{ error?: string; enviados?: number; descartados?: number; yaEstaban?: number }> {
+  const usuario = await requireModuloEscritura("scraping-proveedores");
+  if (!usuario.modulos.includes("seleccion-productos") || usuario.modulosSoloLectura.includes("seleccion-productos"))
+    return { error: "Tu rol no puede agregar a Selección de productos." };
+  if (!Array.isArray(ids) || !ids.length || ids.length > 100 || !ids.every((i) => typeof i === "string" && UUID.test(i))) return { error: "Selección no válida." };
+
+  const supabase = createServiceClient();
+  const { data: prods, error } = await supabase
+    .from("scraping_productos")
+    .select("id, dropi_producto_id, nombre, foto_url, foto_huella, precio, precio_sugerido, categoria, scraping_proveedores(nombre, pais, dropi_url)")
+    .in("id", ids);
+  if (error) return { error: "No se pudieron leer los productos. ¿Ya se corrió la migración 0106?" };
+  const { data: ya, error: errorYa } = await supabase.from("wms_seleccion_productos").select("scraping_producto_id").in("scraping_producto_id", ids);
+  if (errorYa) return { error: "Falta correr las migraciones 0104 y 0106 (Selección de productos)." };
+  const enviados = new Set((ya ?? []).map((y) => y.scraping_producto_id));
+  const nuevos = (prods ?? []).filter((p) => !enviados.has(p.id));
+  if (!nuevos.length) return { enviados: 0, descartados: 0, yaEstaban: enviados.size };
+
+  const [{ porUsd }, indice, { data: paises }] = await Promise.all([tasasUsd(supabase), cargarReferencias(supabase), supabase.from("paises").select("id, codigo")]);
+  const paisId = new Map((paises ?? []).map((p) => [String(p.codigo).toLowerCase(), p.id]));
+  const filas = [];
+  for (const p of nuevos) {
+    const prov = (Array.isArray(p.scraping_proveedores) ? p.scraping_proveedores[0] : p.scraping_proveedores) as { nombre: string; pais: string; dropi_url: string } | null;
+    if (!prov) continue;
+    const pais = paisId.get(prov.pais);
+    if (!pais) return { error: `El país del proveedor (${prov.pais.toUpperCase()}) no está en Configuración › Países.` };
+    const { data: codigo, error: errorCodigo } = await supabase.rpc("wms_siguiente_codigo_fuente", { p_fuente: "scraping_proveedores" });
+    if (errorCodigo || !codigo) return { error: "No se pudo dar el código SP. ¿Ya se corrió la migración 0104?" };
+    const moneda = monedaDePais(prov.pais);
+    const visto = yaVisto(p.nombre, p.foto_huella, indice);
+    filas.push({
+      pais_id: pais,
+      nombre: p.nombre,
+      estado: visto ? "descartado" : "seleccionado",
+      motivo_descarte: visto ? motivoYaVisto(visto) : null,
+      fuente: "scraping_proveedores",
+      codigo_fuente: codigo as string,
+      foto_url: p.foto_url,
+      url_pagina: prov.dropi_url,
+      costo_proveedor: aDolares(p.precio === null ? null : Number(p.precio), moneda, porUsd),
+      precio_venta: aDolares(p.precio_sugerido === null ? null : Number(p.precio_sugerido), moneda, porUsd),
+      precio_original: p.precio,
+      moneda_original: moneda,
+      categoria: p.categoria?.split(", ")[0]?.slice(0, 80) ?? null,
+      notas: `Proveedor ${prov.nombre} · ID Dropi ${p.dropi_producto_id}`,
+      scraping_producto_id: p.id,
+      creado_por: usuario.id,
+    });
+  }
+  const { data: creadas, error: errorCrear } = await supabase.from("wms_seleccion_productos").insert(filas).select("id, codigo_fuente, nombre, estado");
+  if (errorCrear) return { error: "No se pudieron crear las filas en Selección." };
+  await registrarAuditoriaLote(
+    (creadas ?? []).map((c) => ({
+      accion: "crear_seleccion",
+      entidad: "wms_seleccion_productos",
+      entidadId: c.id,
+      detalle: `${c.codigo_fuente} · ${c.nombre} (desde Scraping de proveedores${c.estado === "descartado" ? ", descartado: ya visto" : ""})`,
+    })),
+  );
+  revalidatePath(RUTA);
+  revalidatePath("/seleccion-productos");
+  return { enviados: creadas?.length ?? 0, descartados: (creadas ?? []).filter((c) => c.estado === "descartado").length, yaEstaban: enviados.size };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
@@ -9,18 +10,20 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Campo } from "@/components/ui/campo-ficha";
-import { fieldClass } from "@/components/ui/field";
+import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { KpiFiltro } from "@/components/ui/kpi-filtro";
 import { Seccion } from "@/components/ui/seccion-ficha";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { useToast } from "@/components/ui/toast";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha, formatearFechaHora } from "@/lib/formato";
-import { BuscarIcon, CalendarioIcon, CatalogoIcon, EnlaceIcon, HistorialIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
+import { BuscarIcon, CalendarioIcon, CatalogoIcon, CerrarIcon, EnlaceIcon, HistorialIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
-import { agregarProveedor, obtenerHistorialProducto, pedirBusqueda, registrarDatosProveedor, type EventoProducto } from "./actions";
-import { DEF_SCRAPING, MOTIVO, formatoNumero, formatoPrecio, type FilaScraping } from "./def-scraping";
+import { agregarProveedor, enviarASeleccion, obtenerHistorialProducto, pedirBusqueda, registrarDatosProveedor, type EventoProducto } from "./actions";
+import { DEF_SCRAPING, MOTIVO, formatoNumero, formatoPrecio, formatoUsd, type FilaScraping } from "./def-scraping";
 
 export interface ProveedorResumen {
   id: string;
@@ -96,7 +99,48 @@ function Foto({ fila, grande = false }: { fila: FilaScraping; grande?: boolean }
       </span>
     );
   // eslint-disable-next-line @next/next/no-img-element -- fotos de Dropi (CloudFront), sin optimizar
-  return <img src={fila.foto} alt="" loading="lazy" className={`${tam} shrink-0 rounded-md border border-border object-cover`} />;
+  const img = <img src={fila.foto} alt="" loading="lazy" className={`${tam} shrink-0 rounded-md border border-border object-cover`} />;
+  if (grande) return img;
+  // Al pasar el cursor (o con el foco) se ve grande, como en Selección y Test productos.
+  return (
+    <TarjetaEmergente
+      clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+      contenido={
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={fila.foto} alt="" className="max-h-80 max-w-80 rounded-md object-contain" />
+      }
+    >
+      {img}
+    </TarjetaEmergente>
+  );
+}
+
+/** Las marcas de cruce de un producto: prioridad, ya testeado o en Producto, y su fila en Selección. */
+function Marcas({ fila }: { fila: FilaScraping }) {
+  if (!fila.repetidoEn.length && !fila.yaVisto && !fila.seleccion) return null;
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {fila.repetidoEn.length > 0 && (
+        <Tooltip texto={`También en: ${fila.repetidoEn.join(", ")}`}>
+          <span tabIndex={0} className="rounded-[5px] bg-destructive-soft px-1.5 py-0.5 text-[11px] font-semibold text-destructive">
+            Prioridad · {fila.repetidoEn.length + 1} fuentes
+          </span>
+        </Tooltip>
+      )}
+      {fila.yaVisto && (
+        <Tooltip texto={fila.yaVisto.motivo}>
+          <span tabIndex={0} className="rounded-[5px] bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {fila.yaVisto.tipo === "test" ? "Ya testeado" : "Ya en Producto"}
+          </span>
+        </Tooltip>
+      )}
+      {fila.seleccion && (
+        <span className="rounded-[5px] bg-azul-soft px-1.5 py-0.5 text-[11px] font-medium text-azul">
+          En Selección · SEL-{String(fila.seleccion.numero).padStart(4, "0")}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function EstadoProducto({ fila }: { fila: FilaScraping }) {
@@ -110,6 +154,8 @@ function EstadoProducto({ fila }: { fila: FilaScraping }) {
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
   estado: InventarioIcon,
+  cruce: BuscarIcon,
+  precioUsd: CatalogoIcon,
   movimiento: HistorialIcon,
   nombre: ProductoIcon,
   categoria: CatalogoIcon,
@@ -131,7 +177,9 @@ const COLUMNAS: ColumnaTabla<FilaScraping, string>[] = [
           <span className="font-medium">{f.nombre}</span>
           <span className="text-xs text-muted-foreground">
             {f.vinculo ? `${f.vinculo.seguro ? "Igual a" : "¿Igual a"} «${f.vinculo.nombre}» (${f.vinculo.parecido} %)${f.vinculo.seguro ? "" : "?"}` : `ID ${f.dropiId}${f.categoria ? ` · ${f.categoria}` : ""}`}
+            {f.privados.length > 0 && ` · ${f.privados.length} privado${f.privados.length === 1 ? "" : "s"}`}
           </span>
+          <Marcas fila={f} />
         </span>
       </span>
     ),
@@ -144,6 +192,7 @@ const COLUMNAS: ColumnaTabla<FilaScraping, string>[] = [
     render: (f, pais) => (
       <span className="flex flex-col items-end">
         {formatoPrecio(f.precio, pais)}
+        {f.precioUsd !== null && pais !== "pa" && <span className="text-xs text-muted-foreground">{formatoUsd(f.precioUsd)}</span>}
         <Delta ahora={f.precio} antes={f.precioAntes} formato={(n) => formatoPrecio(n, pais)} />
       </span>
     ),
@@ -174,7 +223,19 @@ const COLUMNAS: ColumnaTabla<FilaScraping, string>[] = [
       </span>
     ),
   },
-  { id: "sugerido", label: "Precio sugerido", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f, pais) => formatoPrecio(f.precioSugerido, pais) },
+  {
+    id: "sugerido",
+    label: "Precio sugerido",
+    ocultable: true,
+    oculta: true,
+    clase: "text-right tabular-nums",
+    render: (f, pais) => (
+      <span className="flex flex-col items-end">
+        {formatoPrecio(f.precioSugerido, pais)}
+        {f.precioSugeridoUsd !== null && pais !== "pa" && <span className="text-xs text-muted-foreground">{formatoUsd(f.precioSugeridoUsd)}</span>}
+      </span>
+    ),
+  },
   { id: "creado", label: "Creado en Dropi", ocultable: true, oculta: true, render: (f) => (f.creadoEnDropi ? formatearFecha(f.creadoEnDropi) : "—") },
 ];
 
@@ -189,7 +250,34 @@ const ETIQUETA_EVENTO: Record<string, string> = {
   vinculado: "Vinculado a un producto con foto",
 };
 
-function FichaProducto({ fila, pais, alCerrar }: { fila: FilaScraping | null; pais: string; alCerrar: () => void }) {
+/** Una celda de cambio: «antes → ahora» y la diferencia en color (verde si sube, rojo si baja). */
+function CeldaCambio({ antes, ahora, formato }: { antes: number | null; ahora: number | null; formato: (n: number | null) => string }) {
+  if (ahora === null && antes === null) return <span className="text-muted-foreground">—</span>;
+  if (antes === null) return <span>{formato(ahora)}</span>;
+  return (
+    <span className="flex flex-col">
+      <span className="whitespace-nowrap">
+        <span className="text-muted-foreground">{formato(antes)} → </span>
+        {formato(ahora)}
+      </span>
+      {ahora !== null && <Delta ahora={ahora} antes={antes} formato={(n) => formato(n)} />}
+    </span>
+  );
+}
+
+function FichaProducto({
+  fila,
+  pais,
+  puedeEnviar,
+  alCerrar,
+  alEnviar,
+}: {
+  fila: FilaScraping | null;
+  pais: string;
+  puedeEnviar: boolean;
+  alCerrar: () => void;
+  alEnviar: (ids: string[]) => void;
+}) {
   const [eventos, setEventos] = useState<EventoProducto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -207,16 +295,20 @@ function FichaProducto({ fila, pais, alCerrar }: { fila: FilaScraping | null; pa
     };
   }, [fila]);
 
-  const texto = (e: EventoProducto) => {
-    if (e.evento === "precio") return `${formatoPrecio(e.precioAntes, pais)} → ${formatoPrecio(e.precio, pais)}`;
-    if (e.evento === "stock") return `${formatoNumero(e.stockAntes)} → ${formatoNumero(e.stock)}`;
-    if (e.evento === "primera_vez") return `${formatoPrecio(e.precio, pais)} · ${formatoNumero(e.stock)} en stock${e.detalle ? ` · ${e.detalle}` : ""}`;
-    if (e.evento === "desaparecio") return `${e.detalle ?? ""}${e.stockAntes !== null ? ` · tenía ${formatoNumero(e.stockAntes)} en stock` : ""}`;
-    return e.detalle ?? "";
-  };
+  const precio = (n: number | null) => formatoPrecio(n, pais);
+  const titulo = (e: EventoProducto) =>
+    e.evento === "stock" && e.stock !== null && e.stockAntes !== null
+      ? e.stock > e.stockAntes
+        ? "Subió el stock"
+        : "Bajó el stock"
+      : e.evento === "precio" && e.precio !== null && e.precioAntes !== null
+        ? e.precio > e.precioAntes
+          ? "Subió el precio"
+          : "Bajó el precio"
+        : (ETIQUETA_EVENTO[e.evento] ?? e.evento);
 
   return (
-    <Ventana abierto={!!fila} alCerrar={alCerrar} titulo={fila?.nombre ?? ""} lado="derecha" ancho="md">
+    <Ventana abierto={!!fila} alCerrar={alCerrar} titulo={fila?.nombre ?? ""} lado="derecha" ancho="lg">
       {fila && (
         <div className="flex flex-col divide-y divide-border p-5">
           <Seccion icono={ProductoIcon} titulo="Producto">
@@ -234,16 +326,21 @@ function FichaProducto({ fila, pais, alCerrar }: { fila: FilaScraping | null; pa
                     {fila.vinculo.seguro ? "Vinculado a" : "Posible pareja:"} «{fila.vinculo.nombre}» ({fila.vinculo.parecido} % por nombre)
                   </span>
                 )}
+                <Marcas fila={fila} />
+                {fila.yaVisto && <span className="text-xs text-muted-foreground">{fila.yaVisto.motivo}</span>}
+                {fila.repetidoEn.length > 0 && <span className="text-xs text-muted-foreground">También se vende en: {fila.repetidoEn.join(", ")}.</span>}
               </div>
             </div>
             <dl className="grid grid-cols-3 gap-3 text-sm">
               <div>
                 <dt className="text-xs text-muted-foreground">Precio</dt>
-                <dd className="font-semibold tabular-nums">{formatoPrecio(fila.precio, pais)}</dd>
+                <dd className="font-semibold tabular-nums">{precio(fila.precio)}</dd>
+                {pais !== "pa" && <dd className="text-xs text-muted-foreground tabular-nums">{formatoUsd(fila.precioUsd)}</dd>}
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Sugerido</dt>
-                <dd className="font-semibold tabular-nums">{formatoPrecio(fila.precioSugerido, pais)}</dd>
+                <dd className="font-semibold tabular-nums">{precio(fila.precioSugerido)}</dd>
+                {pais !== "pa" && <dd className="text-xs text-muted-foreground tabular-nums">{formatoUsd(fila.precioSugeridoUsd)}</dd>}
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Stock</dt>
@@ -254,25 +351,84 @@ function FichaProducto({ fila, pais, alCerrar }: { fila: FilaScraping | null; pa
               <p className="mb-1 text-xs text-muted-foreground">Stock en cada búsqueda (4 semanas)</p>
               <Linea valores={fila.serie} ancho={360} alto={64} />
             </div>
+            {puedeEnviar && !fila.seleccion && fila.estado !== "desaparecido" && (
+              <div>
+                <Button type="button" onClick={() => alEnviar([fila.id])}>
+                  Enviar a Selección
+                </Button>
+              </div>
+            )}
           </Seccion>
+
+          {fila.privados.length > 0 && (
+            <Seccion icono={CatalogoIcon} titulo={`Privados de este producto (${fila.privados.length})`}>
+              <ul className="flex flex-col divide-y divide-border rounded-md border border-border text-sm">
+                {fila.privados.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="flex min-w-0 flex-col">
+                      <span className="font-medium">{p.nombre}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {p.seguro ? "Vinculado" : "Posible pareja"} · {p.parecido} % del nombre
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end tabular-nums">
+                      {precio(p.precio)}
+                      <span className="text-xs text-muted-foreground">{formatoNumero(p.stock)} en stock</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Seccion>
+          )}
+
           <Seccion icono={HistorialIcon} titulo="Historial">
             {error && <p className="text-sm text-destructive">{error}</p>}
             {!eventos && !error && <p className="text-sm text-muted-foreground">Cargando…</p>}
             {eventos && (
-              <ol className="flex flex-col gap-3">
-                {eventos.map((e, i) => (
-                  <li key={i} className="flex gap-3 text-sm">
-                    <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-border-control" />
-                    <span className="flex flex-col">
-                      <span className="font-medium">
-                        {e.evento === "stock" && e.stock !== null && e.stockAntes !== null ? (e.stock > e.stockAntes ? "Subió el stock" : "Bajó el stock") : e.evento === "precio" && e.precio !== null && e.precioAntes !== null ? (e.precio > e.precioAntes ? "Subió el precio" : "Bajó el precio") : ETIQUETA_EVENTO[e.evento] ?? e.evento}
-                      </span>
-                      <span className="text-muted-foreground tabular-nums">{texto(e)}</span>
-                      <span className="text-xs text-muted-foreground">{formatearFechaHora(e.fecha)}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <ContenedorTabla ariaLabel={`Historial de ${fila.nombre}`}>
+                <table className="tabla-datos w-full text-sm">
+                  <thead>
+                    <tr className={claseFilaEncabezado}>
+                      <th className={claseEncabezadoColumna}>Fecha</th>
+                      <th className={claseEncabezadoColumna}>Evento</th>
+                      <th className={claseEncabezadoColumna}>Precio</th>
+                      <th className={claseEncabezadoColumna}>Stock</th>
+                      <th className={claseEncabezadoColumna}>Detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eventos.map((e, i) => (
+                      <tr key={i} className="border-b border-border align-top last:border-0">
+                        <td className={`${claseCeldaColumna} whitespace-nowrap`}>{formatearFechaHora(e.fecha)}</td>
+                        <td className={`${claseCeldaColumna} font-medium`}>{titulo(e)}</td>
+                        <td className={`${claseCeldaColumna} tabular-nums`}>
+                          {e.evento === "precio" ? (
+                            <CeldaCambio antes={e.precioAntes} ahora={e.precio} formato={precio} />
+                          ) : e.precio !== null ? (
+                            precio(e.precio)
+                          ) : e.precioAntes !== null ? (
+                            <span className="text-muted-foreground">{precio(e.precioAntes)}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className={`${claseCeldaColumna} tabular-nums`}>
+                          {e.evento === "stock" ? (
+                            <CeldaCambio antes={e.stockAntes} ahora={e.stock} formato={formatoNumero} />
+                          ) : e.stock !== null ? (
+                            formatoNumero(e.stock)
+                          ) : e.stockAntes !== null ? (
+                            <span className="text-muted-foreground">tenía {formatoNumero(e.stockAntes)}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className={`${claseCeldaColumna} text-muted-foreground`}>{e.detalle ?? ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ContenedorTabla>
             )}
           </Seccion>
         </div>
@@ -378,6 +534,8 @@ export function VistaScraping({
   busquedas,
   filas,
   puedeEscribir,
+  puedeEnviar,
+  tasa,
 }: {
   proveedores: ProveedorResumen[];
   elegidoId: string | null;
@@ -385,8 +543,27 @@ export function VistaScraping({
   busquedas: BusquedaResumen[];
   filas: FilaScraping[];
   puedeEscribir: boolean;
+  /** Puede crear filas en Selección de productos (y modificar Scraping). */
+  puedeEnviar: boolean;
+  /** Unidades de la moneda del proveedor por 1 dólar, y de qué día. */
+  tasa: { valor: number | null; fecha: string | null; moneda: string };
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
+  const [enviando, iniciarEnvio] = useTransition();
+  const { mostrarToast } = useToast();
+  const router = useRouter();
+  const enviar = (ids: string[], quitar?: () => void) =>
+    iniciarEnvio(async () => {
+      const r = await enviarASeleccion(ids);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      const partes = [`${r.enviados} enviado${r.enviados === 1 ? "" : "s"} a Selección`];
+      if (r.descartados) partes.push(`${r.descartados} llegaron descartados (ya vistos)`);
+      if (r.yaEstaban) partes.push(`${r.yaEstaban} ya estaban`);
+      mostrarToast(partes.join(" · "), "success");
+      quitar?.();
+      router.refresh();
+    });
+  const enviarPuede = puedeEscribir && puedeEnviar;
   const elegido = proveedores.find((p) => p.id === elegidoId) ?? null;
   const delProveedor = (id: string) => registros.filter((r) => r.proveedorId === id);
   const ultimaBusqueda = (id: string) => busquedas.find((b) => b.proveedorId === id);
@@ -481,6 +658,8 @@ export function VistaScraping({
             <KpiFiltro compacta def={DEF_SCRAPING} tono="warning" titulo="Cambiaron de precio" valor={cuenta((f) => f.movimientos.includes("precio"))} subtexto="desde la búsqueda anterior" atajo={{ id: "precio", etiqueta: "Cambió precio", ayuda: "Filtrar: cambiaron de precio", filtro: { campo: "movimiento", valor: { tipo: "seleccion", valores: ["precio"] } }, suma: true }} />
             <KpiFiltro compacta def={DEF_SCRAPING} tono="info" titulo="Nuevos" valor={cuenta((f) => f.movimientos.includes("nuevo"))} subtexto="en la última búsqueda" atajo={{ id: "nuevo", etiqueta: "Nuevos", ayuda: "Filtrar: nuevos", filtro: { campo: "movimiento", valor: { tipo: "seleccion", valores: ["nuevo"] } }, suma: true }} />
             <KpiFiltro compacta def={DEF_SCRAPING} tono="warning" titulo="Privados" valor={cuenta((f) => f.estado === "privado")} subtexto={`${cuenta((f) => f.estado === "privado" && !!f.vinculo?.seguro)} vinculados por nombre`} atajo={{ id: "privado", etiqueta: "Privados", ayuda: "Filtrar: privados", filtro: { campo: "estado", valor: { tipo: "seleccion", valores: ["privado"] } }, suma: true }} />
+            <KpiFiltro compacta def={DEF_SCRAPING} tono="destructive" titulo="Prioridad" valor={cuenta((f) => f.repetidoEn.length > 0)} subtexto="también en otros proveedores o fuentes" atajo={{ id: "prioridad", etiqueta: "Prioridad", ayuda: "Filtrar: prioridad", filtro: { campo: "cruce", valor: { tipo: "seleccion", valores: ["prioridad"] } }, suma: true }} />
+            <KpiFiltro compacta def={DEF_SCRAPING} titulo="Ya vistos" valor={cuenta((f) => !!f.yaVisto)} subtexto={`${cuenta((f) => f.yaVisto?.tipo === "test")} testeados · ${cuenta((f) => f.yaVisto?.tipo === "producto")} en Producto`} atajo={{ id: "ya-visto", etiqueta: "Ya vistos", ayuda: "Filtrar: ya testeados o en Producto", filtro: { campo: "cruce", valor: { tipo: "seleccion", valores: ["ya_testeado", "en_producto"] } } }} />
             <KpiFiltro compacta def={DEF_SCRAPING} tono="destructive" titulo="Desaparecieron" valor={cuenta((f) => f.estado === "desaparecido")} subtexto={`${cuenta((f) => f.motivo === "agotado")} agotados · ${cuenta((f) => f.motivo === "privatizado")} privatizados`} atajo={{ id: "desaparecido", etiqueta: "Desaparecidos", ayuda: "Filtrar: desaparecidos", filtro: { campo: "estado", valor: { tipo: "seleccion", valores: ["desaparecido"] } }, suma: true }} />
           </KpiGrid>
 
@@ -537,6 +716,12 @@ export function VistaScraping({
             <h3 id="titulo-productos" className="flex items-center gap-2 text-sm font-semibold">
               <BuscarIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               Productos
+              {tasa.valor !== null && tasa.moneda !== "USD" && (
+                <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
+                  US$1 = {tasa.valor.toLocaleString("es-PA", { maximumFractionDigits: 4 })} {tasa.moneda}
+                  {tasa.fecha ? ` · ${formatearFecha(tasa.fecha)}` : ""}
+                </span>
+              )}
             </h3>
             <TablaDatos
               def={DEF_SCRAPING}
@@ -547,6 +732,34 @@ export function VistaScraping({
               nombre={NOMBRE}
               claveFila={(f) => f.id}
               abrirFila={{ etiqueta: (f) => `Ver historial de ${f.nombre}`, alAbrir: (f) => setAbierto(f.id) }}
+              seleccion={
+                enviarPuede
+                  ? {
+                      etiqueta: (f) => `Seleccionar ${f.nombre}`,
+                      barra: (marcadas, quitar) => {
+                        const cantidad = `${marcadas.length} ${marcadas.length === 1 ? "producto seleccionado" : "productos seleccionados"}`;
+                        const enviables = marcadas.filter((m) => !m.seleccion && m.estado !== "desaparecido");
+                        return (
+                          <div
+                            role="region"
+                            aria-label="Productos seleccionados"
+                            aria-busy={enviando}
+                            className="sticky bottom-4 z-30 mx-auto my-3 flex w-fit max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-xl border border-border-control bg-card px-3 py-2 text-sm shadow-lg"
+                          >
+                            <span className="font-medium tabular-nums">{cantidad}</span>
+                            <Button type="button" disabled={enviando || !enviables.length || enviables.length > 100} onClick={() => enviar(enviables.map((m) => m.id), quitar)}>
+                              {enviando ? "Enviando…" : `Enviar a Selección (${enviables.length})`}
+                            </Button>
+                            <button type="button" onClick={quitar} className={`flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:bg-muted ${anilloFoco}`}>
+                              <CerrarIcon className="h-4 w-4" />
+                              Quitar selección
+                            </button>
+                          </div>
+                        );
+                      },
+                    }
+                  : undefined
+              }
               ariaLabel={`Productos de ${elegido.nombre}`}
               vacio={busqueda && busqueda.estado !== "lista" ? "La primera búsqueda todavía no ha corrido." : "Sin productos."}
             />
@@ -554,7 +767,7 @@ export function VistaScraping({
         </section>
       )}
 
-      <FichaProducto fila={filaAbierta} pais={pais} alCerrar={() => setAbierto(null)} />
+      <FichaProducto fila={filaAbierta} pais={pais} puedeEnviar={enviarPuede} alCerrar={() => setAbierto(null)} alEnviar={(ids) => enviar(ids)} />
     </>
   );
 }

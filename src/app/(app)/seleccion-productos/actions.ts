@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { motivoYaVisto, yaVisto } from "@/lib/scraping/cruces";
+import { cargarReferencias } from "@/lib/scraping/referencias";
 import { getPaisActual } from "@/lib/pais";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -116,7 +118,7 @@ async function leerDatos(formData: FormData) {
 /**
  * Crea una fila a mano: siempre «Manual», con el siguiente MAN-0001. Lo que sale de una fuente (Drop Killer, Tu Winner,
  * Scraping) se crea en su módulo y se envía desde ahí, para que quede en la base de esa fuente y no se duplique. Arranca
- * «Por evaluar», en el país de la barra de arriba. Devuelve el error como valor: en producción Next.js oculta el mensaje de
+ * «Seleccionado», en el país de la barra de arriba; si ya se testeó o ya está en Producto arranca «Descartado» con el motivo. Devuelve el error como valor: en producción Next.js oculta el mensaje de
  * una excepción.
  */
 export async function crearSeleccion(formData: FormData): Promise<{ error?: string }> {
@@ -130,14 +132,28 @@ export async function crearSeleccion(formData: FormData): Promise<{ error?: stri
   const { data: codigo, error: errorCodigo } = await supabase.rpc("wms_siguiente_codigo_fuente", { p_fuente: fuente });
   if (errorCodigo || !codigo) return { error: "No se pudo dar el código de la fuente. ¿Ya se corrió la migración 0104?" };
 
+  const visto = yaVisto(leido.datos.nombre, null, await cargarReferencias(supabase));
   const { data, error } = await supabase
     .from(ENTIDAD)
-    .insert({ ...leido.datos, pais_id: pais.id, fuente, codigo_fuente: codigo, estado: "por_evaluar", creado_por: usuario.id })
+    .insert({
+      ...leido.datos,
+      pais_id: pais.id,
+      fuente,
+      codigo_fuente: codigo,
+      estado: visto ? "descartado" : "seleccionado",
+      motivo_descarte: visto ? motivoYaVisto(visto) : null,
+      creado_por: usuario.id,
+    })
     .select("id, numero")
     .single();
   if (error) return { error: "No se pudo crear la fila." };
 
-  await registrarAuditoria({ accion: "crear_seleccion", entidad: ENTIDAD, entidadId: data.id, detalle: `${codigo} · ${leido.datos.nombre}` });
+  await registrarAuditoria({
+    accion: "crear_seleccion",
+    entidad: ENTIDAD,
+    entidadId: data.id,
+    detalle: `${codigo} · ${leido.datos.nombre}${visto ? ` (descartado: ${motivoYaVisto(visto)})` : ""}`,
+  });
   revalidatePath(RUTA);
   return {};
 }
@@ -185,7 +201,7 @@ export async function cambiarEstadoSeleccion(ids: string[], estado: string): Pro
 
   const { error } = await supabase
     .from(ENTIDAD)
-    .update({ estado, actualizado_en: new Date().toISOString() })
+    .update({ estado, actualizado_en: new Date().toISOString(), ...(estado !== "descartado" ? { motivo_descarte: null } : {}) })
     .in(
       "id",
       cambian.map((f) => f.id),

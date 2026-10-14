@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
+import { cargarRepetidos } from "@/lib/scraping/referencias";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { FilaSeleccion } from "./def-seleccion";
 import { TablaSeleccion } from "./tabla-seleccion";
@@ -20,24 +21,28 @@ export default async function SeleccionProductosPage() {
   const usuario = await requireModulo("seleccion-productos");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const [filasR, perfilesR, categoriasR] = await Promise.all([
+  const [filasR, perfilesR, categoriasR, ofertasR, repetidosEn] = await Promise.all([
     supabase
       .from("wms_seleccion_productos")
-      .select("id, numero, nombre, estado, fuente, codigo_fuente, fecha_captacion, foto_url, url_pagina, url_ad_library, costo_proveedor, precio_venta, categoria, responsable_id, notas, creado_en, perfiles!wms_seleccion_productos_responsable_id_fkey(nombre, email)")
+      .select("id, numero, nombre, estado, fuente, codigo_fuente, fecha_captacion, foto_url, url_pagina, url_ad_library, costo_proveedor, precio_venta, categoria, responsable_id, notas, creado_en, motivo_descarte, precio_original, moneda_original, perfiles!wms_seleccion_productos_responsable_id_fkey(nombre, email)")
       .eq("pais_id", pais.id)
       .order("numero", { ascending: false })
       .limit(1000),
     supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre"),
     // Las categorías que ya usan Test productos y la propia Selección, para sugerirlas al escribir.
     supabase.from("wms_productos_test").select("categoria").not("categoria", "is", null).limit(1000),
+    supabase.from("wms_seleccion_ofertas").select("seleccion_id"),
+    cargarRepetidos(supabase),
   ]);
+  const ofertasDe = new Map<string, number>();
+  for (const o of ofertasR.data ?? []) ofertasDe.set(o.seleccion_id, (ofertasDe.get(o.seleccion_id) ?? 0) + 1);
 
   if (filasR.error) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Selección de productos" oculto />
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          No se pudo cargar la selección. Si es la primera vez, falta correr la migración 0104 en Supabase.
+          No se pudo cargar la selección. Falta correr en Supabase las migraciones 0104 y 0106.
         </p>
       </Pagina>
     );
@@ -63,6 +68,11 @@ export default async function SeleccionProductosPage() {
       responsableNombre: r ? r.nombre || r.email : null,
       notas: f.notas,
       creadoEn: f.creado_en,
+      motivoDescarte: f.motivo_descarte,
+      prioridad: [...(repetidosEn.get(f.id) ?? [])],
+      ofertas: ofertasDe.get(f.id) ?? 0,
+      precioOriginal: num(f.precio_original),
+      monedaOriginal: f.moneda_original,
     };
   });
   const responsables = (perfilesR.data ?? []).map((p) => ({ id: p.id as string, nombre: (p.nombre as string | null) || (p.email as string) }));

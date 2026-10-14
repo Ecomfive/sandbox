@@ -24,6 +24,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   wms_productos_test: "productos-test",
   wms_filtro_productos: "filtro-productos",
   scraping_proveedores: "scraping-proveedores",
+  wms_seleccion_productos: "seleccion-productos",
   alertas_inventario_no_retornado: "alertas",
   productos: "productos",
   paises: "configuracion",

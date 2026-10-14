@@ -74,10 +74,35 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
       ocultable: false,
       clase: "font-medium",
       render: (f) => (
-        <span className="block max-w-[22rem] truncate" title={f.nombre}>
-          {f.nombre}
+        <span className="flex max-w-[24rem] flex-col">
+          <span className="block truncate" title={f.nombre}>
+            {f.nombre}
+          </span>
+          {(f.prioridad.length > 0 || (f.estado === "descartado" && f.motivoDescarte)) && (
+            <span className="flex flex-wrap items-center gap-1 text-xs font-normal">
+              {f.prioridad.length > 0 && (
+                <Tooltip texto={`También en: ${f.prioridad.join(", ")}`}>
+                  <span tabIndex={0} className="rounded-[5px] bg-destructive-soft px-1.5 py-0.5 text-[11px] font-semibold text-destructive">
+                    Prioridad · {f.prioridad.length + 1} fuentes
+                  </span>
+                </Tooltip>
+              )}
+              {f.estado === "descartado" && f.motivoDescarte && (
+                <span className="truncate text-muted-foreground" title={f.motivoDescarte}>
+                  {f.motivoDescarte}
+                </span>
+              )}
+            </span>
+          )}
         </span>
       ),
+    },
+    {
+      id: "ofertas",
+      label: "Ofertas",
+      ocultable: true,
+      clase: "tabular-nums whitespace-nowrap text-muted-foreground",
+      render: (f) => (f.ofertas ? `${f.ofertas} de 3` : f.estado === "crear_oferta" ? "Sin ofertas" : "—"),
     },
     {
       id: "estado",

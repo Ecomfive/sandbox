@@ -352,6 +352,21 @@ convenciones técnicas del código.
   navega al «puente» del receptor con la lectura comprimida en el fragmento `#` (el navegador no deja que una página de internet
   llame a 127.0.0.1 ni abra otra pestaña sin un clic). La sesión de Dropi nunca sale de la página. «Buscar ahora» solo deja una
   búsqueda `pendiente` (`scripts/scraping-proveedores.ts pendientes` las lista). Una búsqueda de ~800 productos: ~30 s leyendo + ~16 s guardando.
+- **Testing Lab: Selección, ofertas y cruces** (migración 0106, 14 oct 2026; necesita la 0104 de Alcides y la 0105).
+  Selección de productos (`wms_seleccion_productos`) tiene los estados **Seleccionado → Crear oferta → Descartado** («Por
+  evaluar» se quitó); lo que entra ya viene Seleccionado. **Ya visto:** al entrar (a mano o desde Scraping) se cruza con todos
+  los tests de Test productos (todos los países) y los productos de Producto (`yaVisto`, `src/lib/scraping/cruces.ts`, con
+  prueba: 85 % del nombre y 2 palabras en común, o la misma huella de foto); si ya se vio entra Descartado con
+  `motivo_descarte` («Ya testeado: …»). **Prioridad:** lo que aparece en más de un proveedor de Scraping o en otra fuente
+  (`repetidos`, 85 % y 2 palabras o la misma foto; `cargarRepetidos` en `src/lib/scraping/referencias.ts`); se calcula al
+  cargar, no se guarda. **Creación de ofertas** (`/creacion-ofertas`, módulo `creacion-ofertas`): los productos en «Crear
+  oferta» del país de la barra, con 1 a 3 ofertas (`wms_seleccion_ofertas`: nombre, unidades, precio en dólares, notas) y el
+  margen = precio − costo × unidades. **Dólares:** `tasasUsd` (`src/lib/moneda/tipo-cambio.ts`) lee una vez al día
+  open.er-api.com y guarda `tipos_cambio` (unidades por 1 US$); `MONEDA_POR_PAIS` da la moneda de cada país de Dropi. Scraping
+  muestra cada precio en su moneda y en dólares, marca Prioridad / Ya testeado / En Producto / En Selección, lista los privados
+  vinculados en la ficha del publicado, tiene el historial en tabla y envía a Selección (`enviarASeleccion`, fuente SP, en el
+  país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
+  las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
 - **Pantalla «Hoy»** (`/`, antes «Dashboard operativo»; el módulo de permisos sigue siendo `dashboard`). Arriba, en dos
   tarjetas lado a lado (apiladas en pantallas angostas): **«Necesita tu atención»** (`ColaAtencion`), la cola de trabajo
   con lo que cuenta `obtenerPendientesHoy` (pedidos de Dropi en Novedad, plataformas sin saldo de wallet, retiros de

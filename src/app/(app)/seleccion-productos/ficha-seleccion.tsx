@@ -52,6 +52,35 @@ function Enlace({ url }: { url: string | null }) {
   );
 }
 
+/** Lo que la fila trae de los cruces: el motivo del descarte, la prioridad, el precio original y sus ofertas. */
+function AvisosFila({ fila }: { fila: FilaSeleccion }) {
+  const lineas = [
+    fila.estado === "descartado" && fila.motivoDescarte ? { punto: "bg-destructive", texto: fila.motivoDescarte } : null,
+    fila.prioridad.length ? { punto: "bg-destructive", texto: `Prioridad: también está en ${fila.prioridad.join(", ")}. Se está vendiendo fuerte.` } : null,
+    fila.precioOriginal !== null && fila.monedaOriginal && fila.monedaOriginal !== "USD"
+      ? { punto: "bg-border-control", texto: `Costo en el proveedor: ${fila.precioOriginal.toLocaleString("es-PA", { minimumFractionDigits: 2 })} ${fila.monedaOriginal} (pasado a dólares con el tipo de cambio del día en que llegó).` }
+      : null,
+    fila.ofertas || fila.estado === "crear_oferta" ? { punto: "bg-border-control", texto: `${fila.ofertas} de 3 ofertas en Creación de ofertas.`, href: "/creacion-ofertas" } : null,
+  ].filter(Boolean) as { punto: string; texto: string; href?: string }[];
+  if (!lineas.length) return null;
+  return (
+    <ul className="flex flex-col gap-1.5 border-b border-border px-5 py-3 text-sm">
+      {lineas.map((l) => (
+        <li key={l.texto} className="flex items-start gap-2">
+          <span aria-hidden="true" className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${l.punto}`} />
+          {l.href ? (
+            <a href={l.href} className="underline underline-offset-2">
+              {l.texto}
+            </a>
+          ) : (
+            <span>{l.texto}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Lo que se ve de una fila sin permiso de escritura. */
 function DatosDeLaFila({ fila }: { fila: FilaSeleccion }) {
   return (
@@ -171,6 +200,7 @@ export function FichaSeleccion({
     >
       {fila && (
         <div ref={raiz} className="flex flex-1 flex-col">
+          <AvisosFila fila={fila} />
           {puedeEscribir ? (
             <FormularioSeleccion
               key={`${fila.id}-${version}`}

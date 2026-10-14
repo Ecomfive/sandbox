@@ -22,14 +22,27 @@ export interface FilaSeleccion {
   responsableNombre: string | null;
   notas: string | null;
   creadoEn: string;
+  /** Por qué se descartó (p. ej. «Ya testeado: …» cuando llegó de una fuente y ya se había visto). */
+  motivoDescarte: string | null;
+  /** Otros proveedores o fuentes donde aparece el mismo producto: si hay alguno, es prioridad. */
+  prioridad: string[];
+  /** Cuántas ofertas tiene en Creación de ofertas (0 a 3). */
+  ofertas: number;
+  /** El costo en la moneda del proveedor, si vino de Scraping (el de arriba ya está en dólares). */
+  precioOriginal: number | null;
+  monedaOriginal: string | null;
 }
 
 export const numeroSeleccion = (n: number) => `SEL-${String(n).padStart(4, "0")}`;
 
-/** El recorrido de una fila: cae «Por evaluar» y se decide si se testea (Seleccionado) o no (Descartado). */
+/**
+ * El recorrido de una fila (14 oct 2026, migración 0106): llega **Seleccionado** (lo que viene de una fuente ya se eligió allá),
+ * pasa a **Crear oferta** cuando se le arman sus ofertas (Creación de ofertas, de 1 a 3) o se **Descarta** con su motivo. Lo
+ * que ya se testeó o ya está en Producto llega Descartado solo, con la nota de por qué.
+ */
 export const ESTADOS_SELECCION = [
-  { valor: "por_evaluar", etiqueta: "Por evaluar", color: "#8D8D8D" },
   { valor: "seleccionado", etiqueta: "Seleccionado", color: "#1bbc9c" },
+  { valor: "crear_oferta", etiqueta: "Crear oferta", color: "#5f43d1" },
   { valor: "descartado", etiqueta: "Descartado", color: "#e50000" },
 ] as const;
 
@@ -77,6 +90,19 @@ export const DEF_SELECCION: DefTabla<FilaSeleccion> = {
     { id: "costoProveedor", etiqueta: "Costo proveedor", tipo: "numero", valor: (f) => f.costoProveedor },
     { id: "precioVenta", etiqueta: "Precio de venta", tipo: "numero", valor: (f) => f.precioVenta },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },
+    {
+      id: "prioridad",
+      etiqueta: "Prioridad",
+      tipo: "seleccion",
+      valores: (f) => [f.prioridad.length ? "si" : "no"],
+      opciones: () => [
+        { valor: "si", etiqueta: "Prioridad (en varias fuentes)" },
+        { valor: "no", etiqueta: "Sin prioridad" },
+      ],
+      agrupable: true,
+      ordenGrupos: ["si", "no"],
+    },
+    { id: "motivoDescarte", etiqueta: "Motivo del descarte", tipo: "texto", valor: (f) => f.motivoDescarte ?? "" },
   ],
   csvAntes: [{ etiqueta: "N.º", valor: (f) => numeroSeleccion(f.numero) }],
   // Lo descartado se oculta por defecto, como los cerrados de Compras; el botón lo muestra aparte.

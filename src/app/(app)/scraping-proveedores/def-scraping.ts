@@ -1,7 +1,25 @@
+import { monedaDePais } from "@/lib/moneda/tipo-cambio";
 import type { DefTabla } from "@/lib/tabla/motor";
 
 export type EstadoScraping = "activo" | "privado" | "desaparecido";
 export type Movimiento = "subio" | "bajo" | "precio" | "nuevo";
+export type Cruce = "prioridad" | "ya_testeado" | "en_producto" | "en_seleccion";
+
+export const CRUCES: { valor: Cruce; etiqueta: string }[] = [
+  { valor: "prioridad", etiqueta: "Prioridad (en varios proveedores)" },
+  { valor: "ya_testeado", etiqueta: "Ya testeado" },
+  { valor: "en_producto", etiqueta: "Ya en Producto" },
+  { valor: "en_seleccion", etiqueta: "Enviado a Selección" },
+];
+
+export function crucesDe(f: FilaScraping): Cruce[] {
+  const c: Cruce[] = [];
+  if (f.repetidoEn.length) c.push("prioridad");
+  if (f.yaVisto?.tipo === "test") c.push("ya_testeado");
+  if (f.yaVisto?.tipo === "producto") c.push("en_producto");
+  if (f.seleccion) c.push("en_seleccion");
+  return c;
+}
 
 /** Un producto del proveedor elegido, listo para la tabla (lo arma la página). */
 export interface FilaScraping {
@@ -27,6 +45,17 @@ export interface FilaScraping {
   creadoEnDropi: string | null;
   /** Stock en cada búsqueda de las últimas 4 semanas (de la más vieja a la más nueva). */
   serie: number[];
+  /** Precio y sugerido pasados a dólares con el tipo de cambio del día (`null` si no hay tasa). */
+  precioUsd: number | null;
+  precioSugeridoUsd: number | null;
+  /** Ya se testeó (Test productos) o ya está en Producto: con qué y el motivo para la nota. */
+  yaVisto: { tipo: "test" | "producto"; nombre: string; motivo: string } | null;
+  /** Otros proveedores o fuentes donde aparece el mismo producto (prioridad si hay alguno). */
+  repetidoEn: string[];
+  /** Los privados vinculados a este producto (solo en uno publicado). */
+  privados: { id: string; nombre: string; precio: number | null; stock: number | null; parecido: number; seguro: boolean }[];
+  /** Su fila en Selección de productos, si ya se envió. */
+  seleccion: { numero: number; estado: string } | null;
 }
 
 export const ESTADOS: { valor: EstadoScraping; etiqueta: string }[] = [
@@ -48,13 +77,15 @@ export const MOTIVO: Record<string, string> = {
   desconocido: "dejó de aparecer",
 };
 
-/** Precios en la moneda del país de Dropi del proveedor. */
-const MONEDA: Record<string, string> = { mx: "MXN", co: "COP", cr: "CRC", pa: "USD", cl: "CLP", ec: "USD", pe: "PEN", gt: "GTQ" };
-
+/** Un precio en la moneda del país de Dropi del proveedor («MX$160.00»). */
 export function formatoPrecio(valor: number | null, pais: string): string {
   if (valor === null) return "—";
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency: MONEDA[pais] ?? "USD", maximumFractionDigits: 2 }).format(valor);
+  return new Intl.NumberFormat("es-PA", { style: "currency", currency: monedaDePais(pais), currencyDisplay: "symbol", maximumFractionDigits: 2 }).format(valor);
 }
+
+/** Un precio en dólares («US$8.70»). */
+export const formatoUsd = (valor: number | null) =>
+  valor === null ? "—" : `US$${valor.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const formatoNumero = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-MX"));
 
@@ -77,9 +108,17 @@ export const DEF_SCRAPING: DefTabla<FilaScraping> = {
       valores: (f) => f.movimientos,
       opciones: () => MOVIMIENTOS,
     },
+    {
+      id: "cruce",
+      etiqueta: "Cruces",
+      tipo: "seleccion",
+      valores: (f) => crucesDe(f),
+      opciones: () => CRUCES,
+    },
     { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${f.nombre} ${f.dropiId} ${f.sku ?? ""}` },
     { id: "categoria", etiqueta: "Categoría", tipo: "seleccion", valores: (f) => (f.categoria ? f.categoria.split(", ") : []), agrupable: true },
     { id: "precio", etiqueta: "Precio", tipo: "numero", valor: (f) => f.precio },
+    { id: "precioUsd", etiqueta: "Precio (US$)", tipo: "numero", valor: (f) => f.precioUsd },
     { id: "stock", etiqueta: "Stock", tipo: "numero", valor: (f) => f.stock },
     { id: "ultima", etiqueta: "Revisado", tipo: "fecha", valor: (f) => f.ultimaVez.slice(0, 10) },
     { id: "creado", etiqueta: "Creado en Dropi", tipo: "fecha", valor: (f) => f.creadoEnDropi?.slice(0, 10) ?? null },
@@ -88,5 +127,7 @@ export const DEF_SCRAPING: DefTabla<FilaScraping> = {
     { etiqueta: "ID Dropi", valor: (f) => f.dropiId },
     { etiqueta: "SKU", valor: (f) => f.sku },
     { etiqueta: "Vinculado a", valor: (f) => f.vinculo?.nombre ?? null },
+    { etiqueta: "Ya visto", valor: (f) => f.yaVisto?.motivo ?? null },
+    { etiqueta: "También en", valor: (f) => f.repetidoEn.join(", ") || null },
   ],
 };

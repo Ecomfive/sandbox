@@ -6,6 +6,8 @@
 //   npx tsx scripts/scraping-proveedores.ts recibir           escucha en 127.0.0.1:4322 e imprime la dirección para el navegador
 //   npx tsx scripts/scraping-proveedores.ts archivo <json>     guarda una lectura ya bajada (la misma forma que manda el navegador)
 //   npx tsx scripts/scraping-proveedores.ts pendientes         lista los proveedores con una búsqueda pedida desde el sistema
+//   npx tsx scripts/scraping-proveedores.ts lista              los proveedores activos (la búsqueda diaria de las 5:00 los recorre)
+//   npx tsx scripts/scraping-proveedores.ts huellas            calcula las huellas de foto que falten (también lo hace cada búsqueda)
 //
 // Cada lectura recibida queda también en datos-privados/scraping/ (ignorada por git).
 
@@ -14,6 +16,7 @@ import http from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+import { huellaFoto } from "../src/lib/wms/huella-foto";
 import { comparar, mejorPareja, normalizarDropi, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -164,12 +167,16 @@ async function guardarLectura(l: Lectura) {
       revisar(await supabase.from("scraping_producto_historial").insert(trozo), "Historial");
     });
 
+    // 7b. La huella de las fotos que aún no la tienen (para cruzar con Producto y entre proveedores). Solo las nuevas: la
+    // primera búsqueda de un proveedor tarda más.
+    const huellas = await calcularHuellas(proveedor.id);
+
     // 8. Las cifras del encabezado de Dropi y el cierre de la búsqueda.
     if (l.metricas && [l.metricas.ordenes, l.metricas.productos, l.metricas.dropshippers].every((n) => Number.isInteger(n) && n >= 0)) {
       revisar(await supabase.from("scraping_proveedor_registros").insert({ proveedor_id: proveedor.id, ordenes: l.metricas.ordenes, productos: l.metricas.productos, dropshippers: l.metricas.dropshippers, origen: "dropi" }), "Cifras del proveedor");
     }
     const totalMs = l.duracionMs + (Date.now() - t0);
-    const detalle = `${l.paginas.length} páginas de Dropi (${l.paginas.join(", ")}) en ${Math.round(l.duracionMs / 1000)} s; guardado en ${Math.round((Date.now() - t0) / 1000)} s. ${vinculados} privados vinculados.`;
+    const detalle = `${l.paginas.length} páginas de Dropi (${l.paginas.join(", ")}) en ${Math.round(l.duracionMs / 1000)} s; guardado en ${Math.round((Date.now() - t0) / 1000)} s. ${vinculados} privados vinculados. ${huellas} huellas de foto nuevas.`;
     revisar(
       await supabase
         .from("scraping_busquedas")
@@ -182,6 +189,29 @@ async function guardarLectura(l: Lectura) {
     await supabase.from("scraping_busquedas").update({ estado: "fallida", fin: new Date().toISOString(), detalle: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq("id", busquedaId);
     throw e;
   }
+}
+
+/** Calcula la huella (dHash) de las fotos del proveedor que no la tienen, de 8 en 8. Devuelve cuántas guardó. */
+async function calcularHuellas(proveedorId: string): Promise<number> {
+  const { data, error } = await supabase.from("scraping_productos").select("id, foto_url").eq("proveedor_id", proveedorId).not("foto_url", "is", null).is("foto_huella", null).limit(2000);
+  if (error) return 0; // Sin la migración 0106 no hay columna: se sigue sin huellas.
+  let hechas = 0;
+  const cola = [...(data ?? [])];
+  await Promise.all(
+    Array.from({ length: 8 }, async () => {
+      for (let f = cola.shift(); f; f = cola.shift()) {
+        try {
+          const r = await fetch(f.foto_url!, { signal: AbortSignal.timeout(15_000) });
+          if (!r.ok) continue;
+          const huella = await huellaFoto(new Uint8Array(await r.arrayBuffer()));
+          if (huella && !(await supabase.from("scraping_productos").update({ foto_huella: huella }).eq("id", f.id)).error) hechas++;
+        } catch {
+          // Una foto que no baja se intenta en la próxima búsqueda.
+        }
+      }
+    }),
+  );
+  return hechas;
 }
 
 function guardarCopia(l: Lectura) {
@@ -270,8 +300,19 @@ async function pendientes() {
   console.log(JSON.stringify(data, null, 2));
 }
 
+/** Los proveedores activos, para la búsqueda diaria: una línea por proveedor (id de Dropi, país y enlace). */
+async function lista() {
+  const data = revisar(await supabase.from("scraping_proveedores").select("nombre, dropi_id, pais, dropi_url").eq("activo", true).order("creado_en"), "Proveedores");
+  for (const p of data ?? []) console.log(`${p.dropi_id}\t${p.pais}\t${p.dropi_url}\t${p.nombre}`);
+}
+
 const [modo, arg] = process.argv.slice(2);
 if (modo === "recibir") recibir();
+else if (modo === "lista") lista();
+else if (modo === "huellas") lista().then(async () => {
+  const { data } = await supabase.from("scraping_proveedores").select("id, nombre").eq("activo", true);
+  for (const p of data ?? []) console.log(p.nombre, await calcularHuellas(p.id), "huellas nuevas");
+});
 else if (modo === "archivo" && arg) guardarLectura(JSON.parse(readFileSync(arg, "utf8")) as Lectura).then((r) => console.log(r));
 else if (modo === "pendientes") pendientes();
-else console.log("Uso: npx tsx scripts/scraping-proveedores.ts recibir | archivo <json> | pendientes");
+else console.log("Uso: npx tsx scripts/scraping-proveedores.ts recibir | archivo <json> | pendientes | lista");

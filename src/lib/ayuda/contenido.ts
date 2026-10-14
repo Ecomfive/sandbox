@@ -201,7 +201,27 @@ export const GUIAS: GuiaModulo[] = [
           "La tabla trae cada producto con foto, nombre, precio, stock, cómo se movió el stock en 4 semanas y la fecha de su última revisión; va de los más recientes en Dropi a los más viejos. Pulsa una fila para ver su historial: cada cambio de precio y de stock, cuándo desapareció o volvió.",
           "Dropi solo muestra a un dropshipper los productos publicados con stock: por eso la tabla trae menos productos que la cifra «Productos» del proveedor, que cuenta también los sin stock y los privados de otros dropshippers.",
           "Un producto que deja de aparecer queda «Desapareció»: «se agotó» si le quedaban 10 unidades o menos, «lo hizo privado» si apareció un privado con el mismo nombre, o «dejó de aparecer».",
-          "Los privados («Privado …», con el logo del proveedor en vez de foto) se vinculan solos al producto con foto del mismo nombre cuando tienen 2 palabras en común o más y 85 % de parecido; con menos, salen como «posible pareja» para que lo revises.",
+          "Los privados («Privado …», con el logo del proveedor en vez de foto) se vinculan solos al producto con foto del mismo nombre cuando tienen 2 palabras en común o más y 85 % de parecido; con menos, salen como «posible pareja» para que lo revises. La ficha del producto publicado lista sus privados con su precio y stock.",
+          "Cada precio sale en la moneda del proveedor y debajo en dólares, con el tipo de cambio del día (se lee solo cada día; arriba de la tabla dice cuál se usó).",
+          "Marcas bajo el nombre: «Prioridad» (en rojo) si el mismo producto está en otro proveedor o fuente; «Ya testeado» o «Ya en Producto» si ya lo vimos (pasa el cursor para ver con cuál); «En Selección» si ya se envió. Las tarjetas Prioridad y Ya vistos los filtran.",
+          "Pasa el cursor por una foto para verla grande. La ficha trae el historial en una tabla: fecha, qué pasó, precio y stock de antes y después con su diferencia.",
+          "«Enviar a Selección» (en la ficha, o marcando varios en la tabla y usando la barra de abajo) los pasa a Selección de productos como «Seleccionado», con sus precios en dólares; los que ya se testearon o ya están en Producto llegan «Descartado» con la nota del motivo.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "creacion-ofertas",
+    titulo: "Creación de ofertas",
+    ruta: "/creacion-ofertas",
+    resumen: "Las ofertas (de 1 a 3) de cada producto seleccionado, con su margen.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Aquí salen los productos de Selección de productos en estado «Crear oferta», del país de la barra de arriba.",
+          "Cada producto puede tener de 1 a 3 ofertas: nombre (p. ej. «2x1»), unidades, precio en dólares y notas. Llena la fila vacía y pulsa «Agregar»; cambia una oferta y pulsa «Guardar»; «Quitar» la borra.",
+          "El margen es el precio menos el costo del proveedor por las unidades de la oferta (en verde si gana, en rojo si pierde), con su porcentaje sobre el precio.",
         ],
       },
     ],
@@ -217,7 +237,10 @@ export const GUIAS: GuiaModulo[] = [
         pasos: [
           "Cada fila es un candidato, no un producto de Producto: no lleva SKU. Trae su N.º (SEL-0001), la fuente de donde salió y el código de esa fuente (DK-0001 Drop Killer, TW-0001 Tu Winner, SP-0001 Scraping de proveedores, MAN-0001 a mano).",
           "«Agregar» crea una fila a mano, siempre «Manual» (código MAN-): lo que sale de Drop Killer, Tu Winner o Scraping de proveedores se crea en su módulo y se envía desde ahí, para que quede en la base de la fuente y no se duplique. Lleva nombre, foto, fecha de captación, categoría, responsable, enlaces (página y Ad Library), precios de referencia en dólares y notas.",
-          "Los estados son Por evaluar, Seleccionado y Descartado. Cambia el estado pulsando la insignia de su celda o en la ficha; para varias filas, márcalas y usa «Estado» en la barra de abajo.",
+          "Los estados son Seleccionado, Crear oferta y Descartado. Lo que llega de una fuente o se crea a mano entra Seleccionado; pásalo a «Crear oferta» para armarle sus ofertas en Creación de ofertas. Cambia el estado pulsando la insignia de su celda o en la ficha; para varias filas, márcalas y usa «Estado» en la barra de abajo.",
+          "Si el producto ya se testeó (Test productos, de cualquier país) o ya está en Producto, entra Descartado solo, con la nota de por qué bajo su nombre («Ya testeado: … » o «Ya está en Producto: …»).",
+          "«Prioridad» (en rojo bajo el nombre) marca lo que aparece en más de un proveedor de Scraping o en otra fuente: se está vendiendo fuerte. Pasa el cursor para ver dónde más está; se puede filtrar y agrupar por Prioridad.",
+          "La columna «Ofertas» dice cuántas tiene (de 3). Los precios de Scraping llegan pasados a dólares; la ficha muestra también el costo en la moneda del proveedor.",
           "Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
           "Pulsa el nombre para abrir su ficha: ahí se edita todo y, al final, está su actividad.",
         ],
@@ -284,6 +307,9 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-14", titulo: "Creación de ofertas", texto: "Testing Lab › Creación de ofertas ya funciona: los productos de Selección en «Crear oferta» tienen de 1 a 3 ofertas (nombre, unidades y precio en dólares) con su margen frente al costo del proveedor.", modulo: "creacion-ofertas", href: "/creacion-ofertas" },
+  { fecha: "2026-10-14", titulo: "Selección: Crear oferta, ya testeados y prioridad", texto: "Selección de productos ya no tiene «Por evaluar»: lo nuevo entra Seleccionado y pasa a «Crear oferta». Lo que ya se testeó o ya está en Producto entra Descartado solo, con la nota de por qué, y lo que aparece en varios proveedores o fuentes sale marcado «Prioridad».", modulo: "seleccion-productos", href: "/seleccion-productos" },
+  { fecha: "2026-10-14", titulo: "Scraping: dólares, cruces y enviar a Selección", texto: "Scraping de proveedores muestra cada precio también en dólares (tipo de cambio del día), marca lo ya testeado o ya en Producto y lo que se repite en otros proveedores (Prioridad), agranda la foto al pasar el cursor, trae el historial en tabla y los privados dentro de la ficha del producto publicado, y envía productos a Selección.", modulo: "scraping-proveedores", href: "/scraping-proveedores" },
   { fecha: "2026-10-14", titulo: "Scraping de proveedores", texto: "Testing Lab › Scraping de proveedores ya funciona: agrega un proveedor de Dropi y el sistema guarda todos sus productos con foto, precio y stock, y en cada búsqueda anota qué subió o bajó de stock, qué cambió de precio, qué es nuevo y qué desapareció (agotado o privado). Los privados se vinculan por nombre con su producto con foto. Ya está cargado HYPER MODA (779 productos).", modulo: "scraping-proveedores", href: "/scraping-proveedores" },
   { fecha: "2026-10-13", titulo: "Selección de productos", texto: "Testing Lab › Selección ya tiene su tablero: los candidatos de las fuentes o creados a mano, con su código de fuente, enlaces, precios de referencia y los estados Por evaluar, Seleccionado y Descartado.", modulo: "seleccion-productos", href: "/seleccion-productos" },
   { fecha: "2026-10-13", titulo: "Íconos en el menú", texto: "Cada página del menú lateral lleva su ícono a la izquierda del nombre, también en Favoritos, para encontrarla de un vistazo.", modulo: "dashboard", href: "/" },

@@ -3,6 +3,9 @@ import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { aDolares, monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
+import { motivoYaVisto, yaVisto } from "@/lib/scraping/cruces";
+import { cargarReferencias, cargarRepetidos } from "@/lib/scraping/referencias";
 import type { FilaScraping, Movimiento } from "./def-scraping";
 import { VistaScraping, type BusquedaResumen, type ProveedorResumen, type Registro } from "./vista-scraping";
 
@@ -31,6 +34,7 @@ interface FilaProducto {
   primera_vez: string;
   ultima_vez: string;
   creado_en_dropi: string | null;
+  foto_huella?: string | null;
 }
 
 interface FilaHistorial {
@@ -85,13 +89,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
   const elegido = proveedores.find((x) => x.id === p) ?? proveedores[0] ?? null;
 
   let filas: FilaScraping[] = [];
+  let tasa: { valor: number | null; fecha: string | null; moneda: string } = { valor: null, fecha: null, moneda: "USD" };
   if (elegido) {
     const desde = new Date(Date.now() - DIAS_SERIE * 86_400_000).toISOString();
-    const [prods, hist] = await Promise.all([
+    const [prods, hist, tasas, indice, repetidosEn, enviados] = await Promise.all([
       traerTodasConError<FilaProducto>((a, b) =>
         supabase
           .from("scraping_productos")
-          .select("id, dropi_producto_id, sku, nombre, foto_url, privado, precio, precio_sugerido, stock, categoria, estado, motivo_desaparicion, vinculado_a, vinculo_parecido, vinculo_seguro, primera_vez, ultima_vez, creado_en_dropi")
+          // Con «*» trae también `foto_huella` (migración 0106) sin fallar si todavía no existe.
+          .select("*")
           .eq("proveedor_id", elegido.id)
           .order("creado_en_dropi", { ascending: false, nullsFirst: false })
           .order("id")
@@ -108,7 +114,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
           .order("id")
           .range(a, b),
       ),
+      tasasUsd(supabase),
+      cargarReferencias(supabase),
+      cargarRepetidos(supabase),
+      traerTodasConError<{ scraping_producto_id: string; numero: number; estado: string }>((a, b) =>
+        supabase.from("wms_seleccion_productos").select("scraping_producto_id, numero, estado").not("scraping_producto_id", "is", null).order("id").range(a, b),
+      ),
     ]);
+    const moneda = monedaDePais(elegido.pais);
+    tasa = { valor: tasas.porUsd[moneda] ?? null, fecha: tasas.fecha, moneda };
+    const enSeleccion = new Map((enviados.data ?? []).map((e) => [e.scraping_producto_id, { numero: e.numero, estado: e.estado }]));
 
     // La última búsqueda terminada: sus eventos dicen qué subió, bajó o cambió de precio «desde la búsqueda anterior».
     const ultima = busquedas.find((b) => b.proveedorId === elegido.id && b.estado === "lista")?.id ?? null;
@@ -126,6 +141,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
     }
     const datos = prods.data ?? [];
     const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre]));
+    // Los privados de cada producto publicado (los vinculados por nombre y las sugerencias).
+    const privadosDe = new Map<string, FilaScraping["privados"]>();
+    for (const d of datos) {
+      if (!d.privado || !d.vinculado_a || d.estado !== "activo") continue;
+      privadosDe.set(d.vinculado_a, [
+        ...(privadosDe.get(d.vinculado_a) ?? []),
+        { id: d.id, nombre: d.nombre, precio: n(d.precio), stock: d.stock, parecido: Number(d.vinculo_parecido ?? 0), seguro: d.vinculo_seguro },
+      ]);
+    }
     filas = datos.map((d) => {
       const evs = ultimos.get(d.id) ?? [];
       const st = evs.find((e) => e.evento === "stock");
@@ -156,6 +180,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
         primeraVez: d.primera_vez,
         creadoEnDropi: d.creado_en_dropi,
         serie: serie.get(d.id) ?? (d.stock !== null ? [d.stock] : []),
+        precioUsd: aDolares(n(d.precio), moneda, tasas.porUsd),
+        precioSugeridoUsd: aDolares(n(d.precio_sugerido), moneda, tasas.porUsd),
+        yaVisto: (() => {
+          const v = yaVisto(d.nombre, d.foto_huella ?? null, indice);
+          return v ? { tipo: v.tipo, nombre: v.nombre, motivo: motivoYaVisto(v) } : null;
+        })(),
+        repetidoEn: [...(repetidosEn.get(d.id) ?? [])],
+        privados: privadosDe.get(d.id) ?? [],
+        seleccion: enSeleccion.get(d.id) ?? null,
       };
     });
   }
@@ -163,7 +196,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Scraping de proveedores" oculto />
-      <VistaScraping proveedores={proveedores} elegidoId={elegido?.id ?? null} registros={registros} busquedas={busquedas} filas={filas} puedeEscribir={puedeEscribir} />
+      <VistaScraping proveedores={proveedores} elegidoId={elegido?.id ?? null} registros={registros} busquedas={busquedas} filas={filas} puedeEscribir={puedeEscribir} tasa={tasa} puedeEnviar={usuario.modulos.includes("seleccion-productos") && !usuario.modulosSoloLectura.includes("seleccion-productos")} />
     </Pagina>
   );
 }
