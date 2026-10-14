@@ -14,6 +14,9 @@ export interface NavItem {
   dropi?: boolean;
   /** El frente al que pertenece. Sin frente la página va «afuera» de los tres (es de toda la empresa). */
   frente?: FrenteId;
+  /** Una sección dentro del frente, con su título (Testing Lab: Fuentes, Selección, Producción, Resultados). Las
+   * secciones salen en el orden en que aparecen sus páginas. */
+  grupo?: string;
 }
 
 /** Un área del menú (un botón del riel) con las páginas que se abren desde ella. */
@@ -23,6 +26,10 @@ export interface NavSection {
   panel?: string;
   /** El panel muestra los tres frentes (Proveeduría, Gestión de tienda y Fulfillment); el que no tiene páginas dice «Próximamente». */
   frentes?: boolean;
+  /** Solo estos frentes, en vez de los tres (Testing Lab es solo de Proveeduría). */
+  soloFrentes?: FrenteId[];
+  /** Se queda en el riel aunque todavía no tenga páginas (Marketing): sus frentes dicen «Próximamente». */
+  mostrarVacia?: boolean;
   /** No sale en el riel ni en el panel (tiene su propio acceso, como «Avisos»), pero cuenta para migas, buscador y favoritos. */
   oculta?: boolean;
   items: NavItem[];
@@ -45,16 +52,29 @@ const AREAS: NavSection[] = [
     frentes: true,
     items: [{ label: "Hoy", href: "/", frente: "proveeduria" }],
   },
+  // El recorrido de un producto antes de comprarse, en orden: de dónde sale (Fuentes), qué se elige (Selección), cómo se
+  // prepara su oferta (Producción) y cómo le fue (Resultados). Solo es de Proveeduría.
+  {
+    title: "Testing Lab",
+    frentes: true,
+    soloFrentes: ["proveeduria"],
+    items: [
+      { label: "Drop Killer", href: "/drop-killer", frente: "proveeduria", grupo: "Fuentes" },
+      { label: "Tu Winner", href: "/tu-winner", frente: "proveeduria", grupo: "Fuentes" },
+      { label: "Scraping de proveedores", href: "/scraping-proveedores", frente: "proveeduria", grupo: "Fuentes" },
+      { label: "Selección de productos", href: "/seleccion-productos", frente: "proveeduria", grupo: "Selección" },
+      { label: "Creación de ofertas", href: "/creacion-ofertas", frente: "proveeduria", grupo: "Producción" },
+      { label: "Test productos", href: "/productos-test", frente: "proveeduria", grupo: "Resultados" },
+      { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria", grupo: "Resultados" },
+    ],
+  },
+  // Marketing se queda para lo que sea de marketing; por ahora sin páginas.
   {
     title: "Marketing",
     panel: "Marketing y ventas",
     frentes: true,
-    items: [
-      // En el orden del recorrido de un producto: de dónde sale, se testea y pasa al filtro antes de comprarse.
-      { label: "Fuente de datos", href: "/fuente-datos", frente: "proveeduria" },
-      { label: "Test productos", href: "/productos-test", frente: "proveeduria" },
-      { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria" },
-    ],
+    mostrarVacia: true,
+    items: [],
   },
   {
     title: "Clientes",
@@ -122,7 +142,7 @@ export const PRONTO_NAV: string[] = ["Contrataciones"];
 export function construirAreas(plataformasPais: { nombre: string; tieneDatos: boolean }[]): NavSection[] {
   const hayDropi = plataformasPais.some((p) => p.nombre === "Dropi" && p.tieneDatos);
   return AREAS.map((area) => ({ ...area, items: area.items.filter((item) => !item.dropi || hayDropi) })).filter(
-    (area) => area.items.length > 0
+    (area) => area.items.length > 0 || area.mostrarVacia
   );
 }
 
