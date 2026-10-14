@@ -24,6 +24,8 @@ export interface FilaInstagram {
   paginaDestino: string | null;
   notas: string | null;
   estado: string;
+  /** El aviso de Meta y lo que respondió Instagram al consultar la publicación, en texto, para revisarlos. */
+  datosMeta: string | null;
 }
 
 export const numeroInstagram = (n: number) => `IG-${String(n).padStart(4, "0")}`;

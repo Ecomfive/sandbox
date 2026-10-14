@@ -387,8 +387,14 @@ convenciones técnicas del código.
   viene del DM: se propone a partir de un enlace que la persona escriba en el mismo mensaje y se completa a mano en la ficha. La
   lista es una `TablaDatos` (sin «Agregar»: las crea el webhook), la ficha lateral muestra el video, lo que trajo Meta y, editable,
   Estado (Nuevo / Por testear / Descartado), Página de destino y Notas. Se abre desde `/instagram` y el código es IG-0001.
-  **Falta:** registrar la app en Meta con el webhook y la suscripción al campo `messages`, y probar con un reel y un anuncio
-  patrocinado reales para confirmar qué campos llegan; enviar una captura «Por testear» a Selección (hoy no hay puente).
+  **Cómo se montó la app de Meta y qué hizo falta de verdad** (publicar la app era lo único que destrabó los mensajes; roles de
+  quien comparte, el paso 2 «completo» y la verificación del negocio no hicieron falta): ver [INSTAGRAM-META.md](INSTAGRAM-META.md).
+  **Lo observado** (14 oct 2026, dos muestras): un reel llega con copy y enlace pero **sin archivo de video**; una publicación de
+  video llega con copy y el archivo (se copia a Storage) pero sin enlace. Me gusta, comentarios y vistas no vienen en el aviso:
+  `consultarMedia` pide a Instagram, con el id del reel o la publicación, lo que deja leer de una publicación ajena y guarda la
+  respuesta (o el error) en `metricas.consulta`, visible en la ficha, «Datos de Meta».
+  **Falta:** probar un anuncio patrocinado real; decidir qué hacer con los reels sin video; enviar una captura «Por testear» a
+  Selección (hoy no hay puente).
 - **Investigación › Análisis de competencia** (`/analisis-competencia`, módulo `analisis-competencia`, migración 0108, 14 oct
   2026). Todo el catálogo de Dropi del país de la barra (hoy Panamá) leído con una cuenta de **dropshipper** (la de proveedor
   de ECOMFIVE recibe 401 en el catálogo) y comparado con nuestro proveedor ECOMFIVE (`NUESTRO_PROVEEDOR`,
