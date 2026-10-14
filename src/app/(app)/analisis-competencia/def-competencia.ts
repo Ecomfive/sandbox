@@ -147,3 +147,33 @@ export const DEF_BITACORA: DefTabla<BitacoraC> = {
     { id: "fecha", etiqueta: "Fecha", tipo: "fecha", valor: (f) => f.fecha.slice(0, 10) },
   ],
 };
+
+export interface AlertaC {
+  id: string;
+  fecha: string;
+  tipo: string;
+  titulo: string;
+  detalle: string | null;
+  vista: boolean;
+  productoId: string | null;
+  nuestroId: string | null;
+}
+
+/** Una bajada de stock de un producto (lo que se cuenta como vendido), para las gráficas por día. */
+export interface VentaC {
+  fecha: string;
+  productoId: string;
+  unidades: number;
+}
+
+export interface DatosCompetencia {
+  pais: string;
+  productos: ProductoC[];
+  nuevos: ProductoC[];
+  competidores: CompetidorC[];
+  alertas: AlertaC[];
+  bitacora: BitacoraC[];
+  ultima: { inicio: string; estado: string; duracionMs: number | null; productos: number | null; proveedores: number | null } | null;
+  busquedas: number;
+  ventas: VentaC[];
+}

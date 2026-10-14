@@ -7,7 +7,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { anilloFoco } from "@/components/ui/field";
-import { claseKpi, ContenidoKpi, KpiGrid } from "@/components/ui/kpi-card";
+import { BotonBarra, Indicador } from "@/components/panel/piezas-panel";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { useToast } from "@/components/ui/toast";
@@ -24,33 +24,11 @@ import {
   EVENTOS,
   type BitacoraC,
   type CompetidorC,
+  type DatosCompetencia,
   type FilaNuestro,
   type ProductoC,
 } from "./def-competencia";
 
-export interface AlertaC {
-  id: string;
-  fecha: string;
-  tipo: string;
-  titulo: string;
-  detalle: string | null;
-  vista: boolean;
-  productoId: string | null;
-  nuestroId: string | null;
-}
-
-export interface DatosCompetencia {
-  pais: string;
-  productos: ProductoC[];
-  nuevos: ProductoC[];
-  competidores: CompetidorC[];
-  alertas: AlertaC[];
-  bitacora: BitacoraC[];
-  ultima: { inicio: string; estado: string; duracionMs: number | null; productos: number | null; proveedores: number | null } | null;
-  busquedas: number;
-}
-
-type Pestana = "alertas" | "nuestros" | "nuevos" | "competidores" | "bitacora";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const num = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-PA"));
@@ -363,39 +341,90 @@ function Comparacion({ fila, alCerrar }: { fila: FilaNuestro | null; alCerrar: (
   );
 }
 
-// ---------- Vista ----------
+// ---------- Filas de «Nuestros productos vs competencia» ----------
 
-export function VistaCompetencia({ datos, puedeEscribir }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
-  const [pestana, setPestana] = useState<Pestana>("alertas");
-  const [abierta, setAbierta] = useState<string | null>(null);
+/** Cada producto nuestro con los iguales de la competencia (más baratos primero) y la diferencia con el más bajo. */
+export function filasNuestras(productos: ProductoC[]): FilaNuestro[] {
+  const iguales = new Map<string, ProductoC[]>();
+  for (const p of productos) if (p.igualA && p.estado === "activo") iguales.set(p.igualA, [...(iguales.get(p.igualA) ?? []), p]);
+  return productos
+    .filter((p) => p.esNuestro && p.estado === "activo")
+    .map((n) => {
+      const lista = (iguales.get(n.id) ?? []).sort((a, b) => (a.precio ?? 1e9) - (b.precio ?? 1e9));
+      const precios = lista.map((l) => l.precio).filter((x): x is number => x !== null);
+      const minimo = precios.length ? Math.min(...precios) : null;
+      return {
+        nuestro: n,
+        iguales: lista,
+        minimo,
+        diferencia: minimo !== null && n.precio !== null ? Math.round((minimo - n.precio) * 100) / 100 : null,
+        bajo7: lista.reduce((t, l) => t + l.bajo7, 0),
+      };
+    })
+    .sort((a, b) => b.iguales.length - a.iguales.length || a.nuestro.nombre.localeCompare(b.nuestro.nombre));
+}
+
+// ---------- Barra de indicadores (todas las pestañas) ----------
+
+/** Los indicadores de arriba, con el borde neón de los dashboards del sistema; cada uno lleva a la pestaña que lo lista. */
+export function ResumenCompetencia({ datos }: { datos: DatosCompetencia }) {
+  const filas = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
+  const conCompetencia = filas.filter((f) => f.iguales.length).length;
+  const masBaratos = filas.filter((f) => f.diferencia !== null && f.diferencia < 0).length;
+  const sinVer = datos.alertas.filter((a) => !a.vista).length;
+  const nuevos = datos.nuevos.filter((n) => !n.yaLoTenemos).length;
+  const vendido7 = datos.competidores.reduce((t, c) => t + c.bajo7, 0);
+  const competencia = datos.productos.filter((p) => !p.esNuestro && p.estado === "activo").length;
+  return (
+    <section aria-label="Indicadores de la competencia" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
+      <div className="flex flex-wrap">
+        <Indicador
+          titulo="Catálogo de Dropi"
+          valor={num(datos.ultima?.productos ?? null)}
+          detalle={`${num(datos.competidores.length)} competidores · ${num(competencia)} productos suyos`}
+          href="/analisis-competencia/competidores"
+        />
+        <Indicador titulo="Nuestros productos (ECOMFIVE)" valor={num(filas.length)} detalle={`${conCompetencia} con competencia`} href="/analisis-competencia/productos" />
+        <Indicador
+          titulo="Competencia más barata"
+          punto={masBaratos ? "peligro" : undefined}
+          valor={num(masBaratos)}
+          detalle="productos nuestros con un competidor más barato"
+          href="/analisis-competencia/productos"
+        />
+        <Indicador titulo="Stock vendido (7 días)" valor={num(vendido7)} detalle="unidades que bajó el stock de la competencia" href="/analisis-competencia/competidores" />
+        <Indicador
+          titulo="Nuevos que no tenemos"
+          punto={nuevos ? "aviso" : undefined}
+          valor={num(nuevos)}
+          detalle={datos.busquedas > 1 ? "desde la primera búsqueda" : "desde la segunda búsqueda"}
+          href="/analisis-competencia/nuevos"
+        />
+        <Indicador
+          titulo="Alertas sin ver"
+          punto={sinVer ? "peligro" : undefined}
+          valor={num(sinVer)}
+          detalle={datos.ultima ? `última búsqueda ${formatearFechaHora(datos.ultima.inicio)} · ${segundos(datos.ultima.duracionMs)}` : "sin búsquedas"}
+          href="/analisis-competencia/alertas"
+        />
+      </div>
+    </section>
+  );
+}
+
+// ---------- Pestañas ----------
+
+export function VistaAlertas({ datos, puedeEscribir }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
   const [verVistas, setVerVistas] = useState(false);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [tipo, setTipo] = useState<string>("");
   const [pendiente, iniciar] = useTransition();
   const { mostrarToast } = useToast();
   const router = useRouter();
-
-  const filasNuestras = useMemo<FilaNuestro[]>(() => {
-    const iguales = new Map<string, ProductoC[]>();
-    for (const p of datos.productos) if (p.igualA && p.estado === "activo") iguales.set(p.igualA, [...(iguales.get(p.igualA) ?? []), p]);
-    return datos.productos
-      .filter((p) => p.esNuestro && p.estado === "activo")
-      .map((n) => {
-        const lista = (iguales.get(n.id) ?? []).sort((a, b) => (a.precio ?? 1e9) - (b.precio ?? 1e9));
-        const minimo = lista.length ? Math.min(...lista.map((l) => l.precio ?? Infinity)) : null;
-        const min = minimo === null || !Number.isFinite(minimo) ? null : minimo;
-        return { nuestro: n, iguales: lista, minimo: min, diferencia: min !== null && n.precio !== null ? Math.round((min - n.precio) * 100) / 100 : null, bajo7: lista.reduce((t, l) => t + l.bajo7, 0) };
-      })
-      .sort((a, b) => b.iguales.length - a.iguales.length || a.nuestro.nombre.localeCompare(b.nuestro.nombre));
-  }, [datos.productos]);
-
-  const nuestros = filasNuestras.length;
-  const conCompetencia = filasNuestras.filter((f) => f.iguales.length).length;
-  const masBaratos = filasNuestras.filter((f) => f.diferencia !== null && f.diferencia < 0).length;
+  const filas = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
   const sinVer = datos.alertas.filter((a) => !a.vista);
-  const alertas = verVistas ? datos.alertas : sinVer;
-  const nuevosSinTener = datos.nuevos.filter((n) => !n.yaLoTenemos);
-  const filaAbierta = filasNuestras.find((f) => f.nuestro.id === abierta) ?? null;
-  const vendido7 = datos.competidores.reduce((t, c) => t + c.bajo7, 0);
-
+  const alertas = (verVistas ? datos.alertas : sinVer).filter((a) => !tipo || a.tipo === tipo);
+  const cuenta = (t: string) => (verVistas ? datos.alertas : sinVer).filter((a) => a.tipo === t).length;
   const marcar = (ids?: string[]) =>
     iniciar(async () => {
       const r = await marcarAlertasVistas(ids);
@@ -403,167 +432,130 @@ export function VistaCompetencia({ datos, puedeEscribir }: { datos: DatosCompete
       router.refresh();
     });
 
-  if (!datos.productos.length)
-    return (
-      <p className="rounded-[10px] border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
-        Todavía no hay búsquedas del catálogo de Dropi de {datos.pais}. La primera se corre con la sesión de dropshipper de ese país.
-      </p>
-    );
-
-  const tarjeta = (p: Pestana, titulo: string, valor: string | number, sub: string, tono: "neutral" | "info" | "success" | "warning" | "destructive" = "neutral") => (
-    <button type="button" aria-pressed={pestana === p} onClick={() => setPestana(p)} className={claseKpi(tono, true, pestana === p, true)}>
-      <ContenidoKpi titulo={titulo} valor={valor} subtexto={sub} tono={tono} />
-    </button>
+  return (
+    <section className="flex flex-col gap-3" aria-label="Alertas">
+      <div className="flex flex-wrap items-center gap-2">
+        {Object.entries(TIPO).map(([valor, t]) => (
+          <BotonBarra key={valor} activo={tipo === valor} onClick={() => setTipo(tipo === valor ? "" : valor)}>
+            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${t.punto}`} />
+            {t.etiqueta} <span className="tabular-nums text-muted-foreground">{cuenta(valor)}</span>
+          </BotonBarra>
+        ))}
+        <span className="ml-auto flex items-center gap-2">
+          <BotonBarra activo={verVistas} onClick={() => setVerVistas(!verVistas)}>
+            Ver también las vistas
+          </BotonBarra>
+          {puedeEscribir && sinVer.length > 0 && (
+            <BotonBarra principal disabled={pendiente} onClick={() => marcar()}>
+              Marcar todas como vistas
+            </BotonBarra>
+          )}
+        </span>
+      </div>
+      {!alertas.length && (
+        <p className="rounded-[10px] border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+          {datos.busquedas > 1 ? "Sin alertas con este filtro." : "Las alertas empiezan en la segunda búsqueda: la primera solo guarda cómo está todo hoy."}
+        </p>
+      )}
+      <ul className="flex flex-col overflow-hidden rounded-[10px] border border-border bg-card">
+        {alertas.map((a) => {
+          const t = TIPO[a.tipo] ?? TIPO.competidor_nuevo;
+          const producto = datos.productos.find((p) => p.id === a.productoId);
+          const abre = a.nuestroId ? () => setAbierta(a.nuestroId) : null;
+          return (
+            <li key={a.id} className={`flex flex-wrap items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-0 ${a.vista ? "opacity-70" : ""}`}>
+              <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${t.punto}`} />
+              {producto && <Foto url={producto.foto} />}
+              <span className="flex min-w-0 flex-1 flex-col">
+                {abre ? (
+                  <button type="button" onClick={abre} className={`text-left text-sm font-medium hover:underline ${anilloFoco}`}>
+                    {a.titulo}
+                  </button>
+                ) : (
+                  <span className="text-sm font-medium">{a.titulo}</span>
+                )}
+                {a.detalle && <span className="text-xs text-muted-foreground">{a.detalle}</span>}
+              </span>
+              <span className="flex items-center gap-2">
+                <Badge tone={t.tono}>{t.etiqueta}</Badge>
+                <span className="text-xs whitespace-nowrap text-muted-foreground">{formatearFechaHora(a.fecha)}</span>
+                {puedeEscribir && !a.vista && (
+                  <Button type="button" variant="ghost" className="text-xs" disabled={pendiente} onClick={() => marcar([a.id])}>
+                    Vista
+                  </Button>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <Comparacion fila={filas.find((f) => f.nuestro.id === abierta) ?? null} alCerrar={() => setAbierta(null)} />
+    </section>
   );
-  const pestanas: [Pestana, string, number][] = [
-    ["alertas", "Alertas", sinVer.length],
-    ["nuestros", "Nuestros productos vs competencia", nuestros],
-    ["nuevos", "Nuevos que no tenemos", nuevosSinTener.length],
-    ["competidores", "Competidores", datos.competidores.length],
-    ["bitacora", "Bitácora de cambios", datos.bitacora.length],
-  ];
+}
 
+export function VistaNuestros({ datos }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const filas = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Análisis de competencia · {datos.pais}</h2>
-          <p className="text-sm text-muted-foreground">
-            {num(datos.ultima?.productos ?? null)} productos de {num(datos.ultima?.proveedores ?? null)} proveedores en Dropi · {nuestros} nuestros (ECOMFIVE)
-            {datos.ultima ? ` · última búsqueda ${formatearFechaHora(datos.ultima.inicio)}, duró ${segundos(datos.ultima.duracionMs)}` : ""}
-          </p>
-        </div>
-      </div>
-
-      <KpiGrid compacta>
-        {tarjeta("alertas", "Alertas sin ver", sinVer.length, datos.busquedas > 1 ? "desde la última vez que las marcaste" : "empiezan en la segunda búsqueda", sinVer.length ? "destructive" : "neutral")}
-        {tarjeta("nuestros", "Nuestros productos con competencia", `${conCompetencia} de ${nuestros}`, `${masBaratos} con un competidor más barato`, masBaratos ? "warning" : "neutral")}
-        {tarjeta("nuevos", "Nuevos que no tenemos", nuevosSinTener.length, datos.busquedas > 1 ? "aparecieron desde la primera búsqueda" : "desde la segunda búsqueda", "info")}
-        {tarjeta("competidores", "Stock vendido por la competencia", vendido7.toLocaleString("es-PA"), "unidades en 7 días (bajadas de stock)")}
-        {tarjeta("bitacora", "Cambios anotados", datos.bitacora.length, "los últimos 500")}
-      </KpiGrid>
-
-      <div role="tablist" aria-label="Vistas del análisis" className="flex gap-5 overflow-x-auto border-b border-border">
-        {pestanas.map(([id, texto, cuenta]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={pestana === id}
-            onClick={() => setPestana(id)}
-            className={`-mb-px flex items-center gap-1.5 border-b-2 py-2.5 text-sm whitespace-nowrap ${pestana === id ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"} ${anilloFoco}`}
-          >
-            {texto}
-            <span className="rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground">{cuenta}</span>
-          </button>
-        ))}
-      </div>
-
-      {pestana === "alertas" && (
-        <section className="flex flex-col gap-3" aria-label="Alertas">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={verVistas} onChange={(e) => setVerVistas(e.target.checked)} />
-              Ver también las ya vistas
-            </label>
-            {puedeEscribir && sinVer.length > 0 && (
-              <Button type="button" variant="secondary" disabled={pendiente} onClick={() => marcar()}>
-                Marcar todas como vistas
-              </Button>
-            )}
-          </div>
-          {!alertas.length && (
-            <p className="rounded-[10px] border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-              {datos.busquedas > 1 ? "Sin alertas nuevas." : "Las alertas empiezan en la segunda búsqueda: la primera solo guarda cómo está todo hoy."}
-            </p>
-          )}
-          <ul className="flex flex-col gap-2">
-            {alertas.map((a) => {
-              const t = TIPO[a.tipo] ?? TIPO.competidor_nuevo;
-              const abre = a.nuestroId ? () => setAbierta(a.nuestroId) : a.tipo === "nuevo" ? () => setPestana("nuevos") : null;
-              return (
-                <li key={a.id} className={`flex flex-wrap items-center gap-3 rounded-[10px] border border-border bg-card px-3 py-2.5 ${a.vista ? "opacity-70" : ""}`}>
-                  <span aria-hidden="true" className={`h-2 w-2 shrink-0 self-start rounded-full mt-2 ${t.punto}`} />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    {abre ? (
-                      <button type="button" onClick={abre} className={`text-left font-medium hover:underline ${anilloFoco}`}>
-                        {a.titulo}
-                      </button>
-                    ) : (
-                      <span className="font-medium">{a.titulo}</span>
-                    )}
-                    {a.detalle && <span className="text-xs text-muted-foreground">{a.detalle}</span>}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Badge tone={t.tono}>{t.etiqueta}</Badge>
-                    <span className="text-xs whitespace-nowrap text-muted-foreground">{formatearFechaHora(a.fecha)}</span>
-                    {puedeEscribir && !a.vista && (
-                      <Button type="button" variant="ghost" className="text-xs" disabled={pendiente} onClick={() => marcar([a.id])}>
-                        Vista
-                      </Button>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
-      {pestana === "nuestros" && (
-        <TablaDatos
-          def={DEF_NUESTROS}
-          filas={filasNuestras}
-          columnas={COL_NUESTROS}
-          iconos={ICONOS}
-          nombre={{ singular: "producto", plural: "productos" } satisfies NombreFilas}
-          claveFila={(f) => f.nuestro.id}
-          abrirFila={{ etiqueta: (f) => `Comparar ${f.nuestro.nombre} con la competencia`, alAbrir: (f) => setAbierta(f.nuestro.id) }}
-          ariaLabel="Nuestros productos frente a la competencia"
-          vacio="No hay productos nuestros en esta búsqueda."
-        />
-      )}
-
-      {pestana === "nuevos" && (
-        <TablaDatos
-          def={DEF_NUEVOS}
-          filas={datos.nuevos}
-          columnas={COL_NUEVOS}
-          iconos={ICONOS}
-          nombre={{ singular: "producto", plural: "productos" }}
-          claveFila={(p) => p.id}
-          ariaLabel="Productos nuevos de la competencia"
-          vacio={datos.busquedas > 1 ? "Ningún producto nuevo en la competencia." : "Los nuevos se ven desde la segunda búsqueda: la primera guarda todo el catálogo de hoy."}
-        />
-      )}
-
-      {pestana === "competidores" && (
-        <TablaDatos
-          def={DEF_COMPETIDORES}
-          filas={datos.competidores}
-          columnas={COL_COMPETIDORES}
-          iconos={ICONOS}
-          nombre={{ singular: "competidor", plural: "competidores" }}
-          claveFila={(c) => String(c.id)}
-          ariaLabel="Competidores"
-          vacio="Sin competidores."
-        />
-      )}
-
-      {pestana === "bitacora" && (
-        <TablaDatos
-          def={DEF_BITACORA}
-          filas={datos.bitacora}
-          columnas={COL_BITACORA}
-          iconos={ICONOS}
-          nombre={{ singular: "cambio", plural: "cambios" }}
-          claveFila={(b) => `${b.fecha}-${b.producto}-${b.evento}-${b.proveedor}`}
-          ariaLabel="Bitácora de cambios"
-          vacio="Todavía no hay cambios: se anotan desde la segunda búsqueda."
-        />
-      )}
-
-      <Comparacion fila={filaAbierta} alCerrar={() => setAbierta(null)} />
+      <TablaDatos
+        def={DEF_NUESTROS}
+        filas={filas}
+        columnas={COL_NUESTROS}
+        iconos={ICONOS}
+        nombre={{ singular: "producto", plural: "productos" } satisfies NombreFilas}
+        claveFila={(f) => f.nuestro.id}
+        abrirFila={{ etiqueta: (f) => `Comparar ${f.nuestro.nombre} con la competencia`, alAbrir: (f) => setAbierta(f.nuestro.id) }}
+        ariaLabel="Nuestros productos frente a la competencia"
+        vacio="No hay productos nuestros en esta búsqueda."
+      />
+      <Comparacion fila={filas.find((f) => f.nuestro.id === abierta) ?? null} alCerrar={() => setAbierta(null)} />
     </>
+  );
+}
+
+export function VistaNuevos({ datos }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
+  return (
+    <TablaDatos
+      def={DEF_NUEVOS}
+      filas={datos.nuevos}
+      columnas={COL_NUEVOS}
+      iconos={ICONOS}
+      nombre={{ singular: "producto", plural: "productos" }}
+      claveFila={(p) => p.id}
+      ariaLabel="Productos nuevos de la competencia"
+      vacio={datos.busquedas > 1 ? "Ningún producto nuevo en la competencia." : "Los nuevos se ven desde la segunda búsqueda: la primera guarda todo el catálogo de hoy."}
+    />
+  );
+}
+
+export function VistaCompetidores({ datos }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
+  return (
+    <TablaDatos
+      def={DEF_COMPETIDORES}
+      filas={datos.competidores}
+      columnas={COL_COMPETIDORES}
+      iconos={ICONOS}
+      nombre={{ singular: "competidor", plural: "competidores" }}
+      claveFila={(c) => String(c.id)}
+      ariaLabel="Competidores"
+      vacio="Sin competidores."
+    />
+  );
+}
+
+export function VistaBitacora({ datos }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
+  return (
+    <TablaDatos
+      def={DEF_BITACORA}
+      filas={datos.bitacora}
+      columnas={COL_BITACORA}
+      iconos={ICONOS}
+      nombre={{ singular: "cambio", plural: "cambios" }}
+      claveFila={(b) => `${b.fecha}-${b.producto}-${b.evento}-${b.proveedor}`}
+      ariaLabel="Bitácora de cambios"
+      vacio="Todavía no hay cambios: se anotan desde la segunda búsqueda."
+    />
   );
 }

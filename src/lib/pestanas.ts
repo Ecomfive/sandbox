@@ -43,6 +43,14 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Universidad", href: "/ayuda/universidad" },
     { etiqueta: "Manuales de proceso", href: "/ayuda/manuales" },
   ],
+  "/analisis-competencia": [
+    { etiqueta: "Dashboard", href: "/analisis-competencia" },
+    { etiqueta: "Alertas", href: "/analisis-competencia/alertas" },
+    { etiqueta: "Productos", href: "/analisis-competencia/productos" },
+    { etiqueta: "Nuevos", href: "/analisis-competencia/nuevos" },
+    { etiqueta: "Competidores", href: "/analisis-competencia/competidores" },
+    { etiqueta: "Bitácora", href: "/analisis-competencia/bitacora" },
+  ],
   "/compras": [
     { etiqueta: "Dashboard", href: "/compras/dashboard" },
     { etiqueta: "Informe", href: "/compras/informe" },
