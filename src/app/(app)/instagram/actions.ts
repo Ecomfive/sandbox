@@ -120,6 +120,33 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   return {};
 }
 
+/**
+ * Cambia solo el estado de una captura (desde su celda en la lista, sin abrir la ficha). Deja la misma línea de actividad que
+ * al cambiarlo desde la ficha. Devuelve el error como valor.
+ */
+export async function cambiarEstadoCaptura(id: string, estado: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (typeof id !== "string" || !UUID.test(id)) return { error: "Captura no válida." };
+  if (!ESTADOS.has(estado)) return { error: "Estado no válido." };
+
+  const supabase = createServiceClient();
+  const { data: antes } = await supabase.from(ENTIDAD).select("estado").eq("id", id).maybeSingle();
+  if (!antes) return { error: "La captura ya no existe." };
+  if (antes.estado === estado) return {};
+  const { error } = await supabase.from(ENTIDAD).update({ estado, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudo cambiar el estado." };
+
+  await registrarAuditoria({
+    accion: "actualizar_captura_instagram",
+    entidad: ENTIDAD,
+    entidadId: id,
+    antes: { Estado: etiquetaEstadoInstagram(antes.estado) },
+    despues: { Estado: etiquetaEstadoInstagram(estado) },
+  });
+  revalidatePath(RUTA);
+  return {};
+}
+
 /** El enlace firmado (una hora) del video de una captura, para verlo en su ficha. El bucket es privado. */
 export async function urlVideoCaptura(id: string): Promise<{ url: string } | { error: string }> {
   await requireModulo(MODULO);

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
@@ -13,13 +14,14 @@ import {
   colorEstadoInstagram,
   colorTipoInstagram,
   DEF_INSTAGRAM,
-  etiquetaEstadoInstagram,
   etiquetaTipoInstagram,
   numeroInstagram,
   quienEnvio,
   type FilaInstagram,
 } from "./def-instagram";
+import { cambiarEstadoCaptura } from "./actions";
 import { FichaInstagram } from "./ficha-instagram";
+import { SelectorEstadoInstagram } from "./selector-estado-instagram";
 
 const NOMBRE: NombreFilas = { singular: "captura", plural: "capturas" };
 const ICONOS: Record<string, IconoComp> = {
@@ -51,7 +53,8 @@ function Vinculo({ url, texto }: { url: string | null; texto: string }) {
 
 const resumen = (f: FilaInstagram) => f.titulo || f.textoMensaje || "Sin copy";
 
-const COLUMNAS: ColumnaTabla<FilaInstagram, undefined>[] = [
+function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) => void): ColumnaTabla<FilaInstagram, undefined>[] {
+  return [
   { id: "numero", label: "N.º", ocultable: false, clase: "tabular-nums text-muted-foreground whitespace-nowrap", render: (f) => numeroInstagram(f.numero) },
   {
     id: "captura",
@@ -67,7 +70,12 @@ const COLUMNAS: ColumnaTabla<FilaInstagram, undefined>[] = [
       </span>
     ),
   },
-  { id: "estado", label: "Estado", ocultable: true, render: (f) => <Badge color={colorEstadoInstagram(f.estado)}>{etiquetaEstadoInstagram(f.estado)}</Badge> },
+  {
+    id: "estado",
+    label: "Estado",
+    ocultable: true,
+    render: (f) => <SelectorEstadoInstagram estado={f.estado} aria={`Estado de ${numeroInstagram(f.numero)}`} puedeEscribir={puedeEscribir} alCambiar={(e) => cambiar(f.id, e)} />,
+  },
   { id: "enviadoPor", label: "Enviado por", ocultable: true, clase: "whitespace-nowrap", render: (f) => quienEnvio(f) },
   { id: "recibido", label: "Recibido", ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => formatearFechaHora(f.recibidoEn) },
   {
@@ -99,7 +107,8 @@ const COLUMNAS: ColumnaTabla<FilaInstagram, undefined>[] = [
   { id: "publicado", label: "Publicado", ocultable: true, oculta: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => (f.fechaPublicacion ? formatearFecha(f.fechaPublicacion) : "—") },
   { id: "compartidos", label: "Compartidos", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.compartidos) },
   { id: "notas", label: "Notas", ocultable: true, oculta: true, clase: "text-muted-foreground", render: (f) => <span className="block max-w-[18rem] truncate">{f.notas ?? "—"}</span> },
-];
+  ];
+}
 
 /**
  * La lista de capturas de Instagram (Testing Lab › Fuentes), con la barra de herramientas común: arranca agrupada por
@@ -107,15 +116,35 @@ const COLUMNAS: ColumnaTabla<FilaInstagram, undefined>[] = [
  * mensaje directo con la cuenta de fuentes. Pulsar la captura abre su ficha.
  */
 export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: FilaInstagram[]; codigoPais: string; puedeEscribir: boolean }) {
+  const { mostrarToast } = useToast();
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
-  const fila = abierta ? filas.find((f) => f.id === abierta.id) : undefined;
-  const cols = useMemo(() => COLUMNAS, []);
+  // Los estados cambiados que el servidor todavía no devolvió: se ven al instante y vuelven atrás si se rechazan. Cada uno guarda
+  // el estado que tenía el servidor (`base`) y solo vale mientras siga siendo ese: cuando el servidor trae otro (el elegido, o uno
+  // cambiado después desde la ficha), manda el del servidor.
+  const [cambios, setCambios] = useState<Record<string, { estado: string; base: string }>>({});
+  const vistas = useMemo(() => filas.map((f) => (cambios[f.id] && cambios[f.id].base === f.estado ? { ...f, estado: cambios[f.id].estado } : f)), [filas, cambios]);
+  const fila = abierta ? vistas.find((f) => f.id === abierta.id) : undefined;
+
+  const cambiar = useCallback(
+    async (id: string, estado: string) => {
+      const base = filas.find((f) => f.id === id)?.estado;
+      if (base === undefined) return;
+      setCambios((c) => ({ ...c, [id]: { estado, base } }));
+      const r = await cambiarEstadoCaptura(id, estado).catch(() => ({ error: "No se pudo cambiar el estado." }));
+      if (r.error) {
+        setCambios((c) => Object.fromEntries(Object.entries(c).filter(([k]) => k !== id)));
+        mostrarToast(r.error, "destructive");
+      }
+    },
+    [filas, mostrarToast],
+  );
+  const cols = useMemo(() => columnas(puedeEscribir, (id, estado) => void cambiar(id, estado)), [puedeEscribir, cambiar]);
 
   return (
     <>
       <TablaDatos
         def={DEF_INSTAGRAM}
-        filas={filas}
+        filas={vistas}
         columnas={cols}
         iconos={ICONOS}
         nombre={NOMBRE}
