@@ -1,8 +1,10 @@
+import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatoDeVideo, type CapturaInstagram, type NotaInstagram } from "./extraer";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
-import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, type VistaPublica } from "./vista-previa";
+import { datosQueFaltan } from "./repetidas";
+import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
 
 export const BUCKET_INSTAGRAM = "instagram-fuentes";
 /** Un reel pesa unos MB; el bucket acepta hasta 100 MB. */
@@ -65,19 +67,25 @@ async function leerVistaPublica(enlace: string): Promise<{ ok: true; datos: Vist
     "accept-language": "en-US,en;q=0.9",
   });
   if ("error" in pagina) return { ok: false, error: pagina.error };
-  const datos = interpretarVistaPrevia(descripcionDeLaPagina(new TextDecoder("utf-8").decode(pagina.bytes)));
+  const html = new TextDecoder("utf-8").decode(pagina.bytes);
+  const datos = interpretarVistaPrevia(descripcionDeLaPagina(html), tituloDeLaPagina(html));
   return datos ? { ok: true, datos } : { ok: false, error: "La vista previa no trae cifras." };
 }
 
-/** Copia el video a nuestro almacenamiento: el enlace del aviso de Meta caduca, el archivo guardado no. */
+/**
+ * Copia el archivo a nuestro almacenamiento: el enlace del aviso de Meta caduca, el archivo guardado no. Una publicación puede ser
+ * un video o una imagen (una foto o un carrusel llega como imagen): los dos se guardan, por su firma y no por lo que diga el servidor.
+ */
 async function copiarVideo(id: string, url: string): Promise<{ ruta: string; bytes: number } | { error: string }> {
   const descarga = await descargarPublico(url, MAX_VIDEO);
   if ("error" in descarga) return { error: descarga.error };
-  const formato = formatoDeVideo(descarga.bytes);
-  if (!formato) return { error: "Lo que mandó Meta no es un video." };
-  const ruta = `${id}/video.${formato.extension}`;
-  const { error } = await createServiceClient().storage.from(BUCKET_INSTAGRAM).upload(ruta, descarga.bytes, { contentType: formato.tipo, upsert: true });
-  if (error) return { error: "No se pudo guardar el video." };
+  const video = formatoDeVideo(descarga.bytes);
+  const imagen = video ? null : detectarImagen(descarga.bytes);
+  if (!video && !imagen) return { error: "Lo que mandó Meta no es un video ni una imagen." };
+  const ruta = video ? `${id}/video.${video.extension}` : `${id}/imagen.${imagen?.extension}`;
+  const tipo = video ? video.tipo : (imagen?.tipo as string);
+  const { error } = await createServiceClient().storage.from(BUCKET_INSTAGRAM).upload(ruta, descarga.bytes, { contentType: tipo, upsert: true });
+  if (error) return { error: "No se pudo guardar el archivo." };
   return { ruta, bytes: descarga.bytes.length };
 }
 
@@ -129,6 +137,7 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
         if (v.megusta !== null) metricas.like_count = v.megusta;
         if (v.comentarios !== null) metricas.comments_count = v.comentarios;
         if (v.fecha) metricas.fecha_publicacion = v.fecha;
+        if (v.nombre) metricas.nombre_pagina = v.nombre;
         metricas.fuente = "vista_previa";
         metricas.leido_en = new Date().toISOString();
       } else if (vista) {
@@ -148,11 +157,36 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
         }
       }
       if (Object.keys(cambios).length > 0) await supabase.from("instagram_capturas").update(cambios).eq("id", data.id);
+      if (c.mediaId) await compartirConRepetidas(data.id, c.mediaId);
     } catch {
       // Una captura que falla no debe impedir guardar las demás del mismo aviso.
     }
   }
   return { nuevas };
+}
+
+/**
+ * El mismo contenido compartido dos veces (por ejemplo, una vez como archivo y otra como enlace) trae el mismo identificador de Meta:
+ * cada captura completa a la otra con lo que a la otra le falta (enlace, cuenta, nombre de la página, cifras y fecha), sin pisar
+ * nada. Nunca lanza.
+ */
+async function compartirConRepetidas(id: string, mediaId: string): Promise<void> {
+  try {
+    const supabase = createServiceClient();
+    const { data } = await supabase.from("instagram_capturas").select("id, enlace, autor_usuario, metricas").eq("media_id", mediaId).limit(20);
+    const filas = data ?? [];
+    const esta = filas.find((f) => f.id === id);
+    if (!esta) return;
+    for (const otra of filas) {
+      if (otra.id === id) continue;
+      const aEsta = datosQueFaltan(esta, otra);
+      if (aEsta) await supabase.from("instagram_capturas").update({ ...aEsta, actualizado_en: new Date().toISOString() }).eq("id", id);
+      const aOtra = datosQueFaltan(otra, esta);
+      if (aOtra) await supabase.from("instagram_capturas").update({ ...aOtra, actualizado_en: new Date().toISOString() }).eq("id", otra.id);
+    }
+  } catch {
+    // Completar de más no es motivo para fallar.
+  }
 }
 
 /** Cuánto después de una captura se une todavía un mensaje de texto de la misma persona. */

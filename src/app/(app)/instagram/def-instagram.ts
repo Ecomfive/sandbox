@@ -14,7 +14,13 @@ export interface FilaInstagram {
   titulo: string | null;
   textoMensaje: string | null;
   /** ¿El video ya está copiado en nuestro almacenamiento? */
-  tieneVideo: boolean;
+  /** ¿Hay un archivo (video o imagen) copiado a nuestro almacenamiento? */
+  tieneArchivo: boolean;
+  archivoTipo: "video" | "imagen" | null;
+  /** El nombre con que se muestra la cuenta que publicó («Mundo Digital»): sirve para buscar el anuncio. */
+  nombrePagina: string | null;
+  /** El N.º de la primera captura del mismo contenido, si esta lo repite. */
+  repetidaDe: number | null;
   videoBytes: number | null;
   videoError: string | null;
   autorUsuario: string | null;
@@ -52,18 +58,20 @@ export const colorEstadoInstagram = (v: string) => ESTADOS_INSTAGRAM.find((e) =>
 
 /**
  * Qué trae la captura. No se usa el tipo que declara Meta (`ig_reel` o `ig_post`): no dice lo que el contenido es en Instagram (el
- * mismo video llegó como «reel» o como «publicación» según quién lo compartió), sino qué entregó: un enlace, el archivo de video o
- * las dos cosas.
+ * mismo video llegó una vez como «reel» y otra como «publicación», compartido por la misma persona), sino qué entregó: un enlace,
+ * un archivo (video o imagen) o las dos cosas.
  */
 export const FORMATOS_INSTAGRAM = [
   { valor: "enlace_video", etiqueta: "Enlace y video", color: "#5f43d1" },
+  { valor: "enlace_imagen", etiqueta: "Enlace e imagen", color: "#7a5bd6" },
   { valor: "video", etiqueta: "Con video", color: "#0880EA" },
+  { valor: "imagen", etiqueta: "Con imagen", color: "#2f9e8f" },
   { valor: "enlace", etiqueta: "Con enlace", color: "#d74c81" },
-  { valor: "ninguno", etiqueta: "Sin enlace ni video", color: "#8D8D8D" },
+  { valor: "ninguno", etiqueta: "Sin enlace ni archivo", color: "#8D8D8D" },
 ] as const;
 
-export const formatoDeCaptura = (f: Pick<FilaInstagram, "enlace" | "tieneVideo">): string =>
-  f.enlace && f.tieneVideo ? "enlace_video" : f.tieneVideo ? "video" : f.enlace ? "enlace" : "ninguno";
+export const formatoDeCaptura = (f: Pick<FilaInstagram, "enlace" | "archivoTipo">): string =>
+  f.enlace ? (f.archivoTipo === "video" ? "enlace_video" : f.archivoTipo === "imagen" ? "enlace_imagen" : "enlace") : f.archivoTipo ?? "ninguno";
 export const etiquetaFormatoInstagram = (v: string) => FORMATOS_INSTAGRAM.find((t) => t.valor === v)?.etiqueta ?? v;
 export const colorFormatoInstagram = (v: string) => FORMATOS_INSTAGRAM.find((t) => t.valor === v)?.color ?? "#8D8D8D";
 
@@ -97,7 +105,9 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
     { id: "enviadoPor", etiqueta: "Enviado por", tipo: "seleccion", valores: (f) => [quienEnvio(f)], agrupable: true },
     { id: "autor", etiqueta: "Cuenta del video", tipo: "seleccion", valores: (f) => [f.autorUsuario ? `@${f.autorUsuario}` : SIN_VALOR], etiquetaSinValor: "Sin consultar", agrupable: true },
     { id: "recibido", etiqueta: "Recibido", tipo: "fecha", valor: (f) => aFecha(f.recibidoEn) },
-    { id: "video", etiqueta: "Video guardado", tipo: "seleccion", valores: (f) => [f.tieneVideo ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Con video" }, { valor: "no", etiqueta: "Sin video" }], agrupable: true },
+    { id: "repetida", etiqueta: "Repetida", tipo: "seleccion", valores: (f) => [f.repetidaDe ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Repetida" }, { valor: "no", etiqueta: "Única" }], agrupable: true },
+    { id: "nombrePagina", etiqueta: "Nombre de la página", tipo: "seleccion", valores: (f) => [f.nombrePagina ?? SIN_VALOR], etiquetaSinValor: "Sin nombre", agrupable: true },
+    { id: "video", etiqueta: "Archivo guardado", tipo: "seleccion", valores: (f) => [f.tieneArchivo ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Con archivo" }, { valor: "no", etiqueta: "Sin archivo" }], agrupable: true },
     { id: "conEnlace", etiqueta: "Enlace de Instagram", tipo: "seleccion", valores: (f) => [f.enlace ? "con" : "sin"], opciones: () => [{ valor: "con", etiqueta: "Con enlace" }, { valor: "sin", etiqueta: "Sin enlace" }], agrupable: true },
     { id: "conDestino", etiqueta: "Página de destino", tipo: "seleccion", valores: (f) => [f.paginaDestino ? "con" : "sin"], opciones: () => [{ valor: "con", etiqueta: "Con página" }, { valor: "sin", etiqueta: "Sin página" }], agrupable: true },
     { id: "megusta", etiqueta: "Me gusta", tipo: "numero", valor: (f) => f.megusta },

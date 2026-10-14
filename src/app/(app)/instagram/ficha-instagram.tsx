@@ -54,7 +54,7 @@ const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1
 function VideoCaptura({ fila }: { fila: FilaInstagram }) {
   const [estado, setEstado] = useState<{ id: string; url?: string; error?: string } | null>(null);
   useEffect(() => {
-    if (!fila.tieneVideo) return;
+    if (!fila.tieneArchivo) return;
     let vigente = true;
     urlVideoCaptura(fila.id)
       .then((r) => vigente && setEstado({ id: fila.id, ...("url" in r ? { url: r.url } : { error: r.error }) }))
@@ -62,13 +62,13 @@ function VideoCaptura({ fila }: { fila: FilaInstagram }) {
     return () => {
       vigente = false;
     };
-  }, [fila.id, fila.tieneVideo]);
+  }, [fila.id, fila.tieneArchivo]);
 
   const actual = estado?.id === fila.id ? estado : null;
-  if (!fila.tieneVideo) {
+  if (!fila.tieneArchivo) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
-        <p className="m-0">{fila.videoError ? `Sin video: ${fila.videoError}` : "Esta captura no trae el archivo de video."}</p>
+        <p className="m-0">{fila.videoError ? `Sin archivo: ${fila.videoError}` : "Esta captura no trae ni video ni imagen."}</p>
         {fila.enlace && (
           <a href={fila.enlace} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted ${anilloFoco}`}>
             <EnlaceIcon className="h-4 w-4" />
@@ -85,7 +85,11 @@ function VideoCaptura({ fila }: { fila: FilaInstagram }) {
       </p>
     );
   }
-  if (!actual?.url) return <p className="m-0 rounded-lg border border-border bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Cargando el video…</p>;
+  if (!actual?.url) return <p className="m-0 rounded-lg border border-border bg-muted px-3 py-6 text-center text-sm text-muted-foreground">{fila.archivoTipo === "imagen" ? "Cargando la imagen…" : "Cargando el video…"}</p>;
+  if (fila.archivoTipo === "imagen") {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={actual.url} alt={`Imagen de ${numeroInstagram(fila.numero)}`} className="max-h-[30rem] w-full rounded-lg border border-border bg-muted object-contain" />;
+  }
   return (
     <video key={actual.url} src={actual.url} controls playsInline preload="metadata" aria-label={`Video de ${numeroInstagram(fila.numero)}`} className="max-h-[30rem] w-full rounded-lg bg-black" />
   );
@@ -170,6 +174,7 @@ export function FichaInstagram({
             <span className="text-lg font-semibold">Captura de Instagram</span>
             <Badge color={colorFormatoInstagram(formatoDeCaptura(fila))}>{etiquetaFormatoInstagram(formatoDeCaptura(fila))}</Badge>
             <Badge color={colorEstadoInstagram(fila.estado)}>{etiquetaEstadoInstagram(fila.estado)}</Badge>
+            {fila.repetidaDe !== null && <Badge tone="warning">{`Repetida de ${numeroInstagram(fila.repetidaDe)}`}</Badge>}
           </>
         )
       }
@@ -220,9 +225,9 @@ export function FichaInstagram({
             )}
 
             <div className="flex flex-1 flex-col divide-y divide-border p-5">
-              <Seccion icono={InstagramIcon} titulo="Video">
+              <Seccion icono={InstagramIcon} titulo={fila.archivoTipo === "imagen" ? "Imagen" : "Video"}>
                 <VideoCaptura fila={fila} />
-                {fila.tieneVideo && fila.videoBytes !== null && <p className="m-0 text-xs text-muted-foreground">{megas(fila.videoBytes).slice(3)}</p>}
+                {fila.tieneArchivo && fila.videoBytes !== null && <p className="m-0 text-xs text-muted-foreground">{megas(fila.videoBytes).slice(3)}</p>}
               </Seccion>
 
               <Seccion icono={PersonaIcon} titulo="Quién lo compartió">
@@ -252,6 +257,9 @@ export function FichaInstagram({
 
               <Seccion icono={EstadoIcon} titulo="Cifras de la publicación">
                 <fieldset disabled={!puedeEscribir || guardando} className="m-0 grid min-w-0 grid-cols-2 gap-3 border-0 p-0 sm:grid-cols-3">
+                  <Campo etiqueta="Nombre de la página" id="campo-nombre-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-nombre-instagram" type="text" name="nombre_pagina" maxLength={120} defaultValue={fila.nombrePagina ?? ""} placeholder="Ej: Mundo Digital" className={fieldClass} />
+                  </Campo>
                   <Campo etiqueta="Cuenta del video" id="campo-autor-instagram" className="col-span-2 sm:col-span-3">
                     <input id="campo-autor-instagram" type="text" name="autor_usuario" maxLength={100} defaultValue={fila.autorUsuario ?? ""} placeholder="Ej: tienda.ejemplo" className={fieldClass} />
                   </Campo>
@@ -290,8 +298,8 @@ export function FichaInstagram({
                   </Campo>
                   <Campo etiqueta="Página de destino" id="campo-pagina-instagram">
                     <input id="campo-pagina-instagram" type="url" name="pagina_destino" defaultValue={fila.paginaDestino ?? ""} placeholder="Ej: https://tienda.com/producto" className={fieldClass} />
-                    {urlBibliotecaAnuncios(fila.titulo) && (
-                      <a href={urlBibliotecaAnuncios(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
+                    {urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) && (
+                      <a href={urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
                         <InstagramIcon className="h-4 w-4" />
                         Buscar el anuncio en la Biblioteca de anuncios
                       </a>

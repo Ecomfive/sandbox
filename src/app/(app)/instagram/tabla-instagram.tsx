@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -37,6 +38,8 @@ const ICONOS: Record<string, IconoComp> = {
   vistas: EstadoIcon,
   compartidos: EstadoIcon,
   publicado: CalendarioIcon,
+  nombrePagina: PersonaIcon,
+  repetida: EstadoIcon,
   notas: EstadoIcon,
 };
 const cifra = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-CR"));
@@ -65,6 +68,7 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
     render: (f) => (
       <span className="flex items-center gap-2">
         <Badge color={colorFormatoInstagram(formatoDeCaptura(f))}>{etiquetaFormatoInstagram(formatoDeCaptura(f))}</Badge>
+        {f.repetidaDe !== null && <Badge tone="warning">{`Repetida de ${numeroInstagram(f.repetidaDe)}`}</Badge>}
         <span className="block max-w-[26rem] truncate" title={resumen(f)}>
           {resumen(f)}
         </span>
@@ -78,20 +82,21 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
     render: (f) => <SelectorEstadoInstagram estado={f.estado} aria={`Estado de ${numeroInstagram(f.numero)}`} puedeEscribir={puedeEscribir} alCambiar={(e) => cambiar(f.id, e)} />,
   },
   { id: "enviadoPor", label: "Enviado por", ocultable: true, clase: "whitespace-nowrap", render: (f) => quienEnvio(f) },
+  { id: "nombrePagina", label: "Página", ocultable: true, clase: "whitespace-nowrap", render: (f) => f.nombrePagina ?? "—" },
   { id: "recibido", label: "Recibido", ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => formatearFechaHora(f.recibidoEn) },
   {
     id: "video",
-    label: "Video",
+    label: "Archivo",
     ocultable: true,
     render: (f) =>
-      f.tieneVideo ? (
+      f.tieneArchivo ? (
         <span className="inline-flex items-center gap-1 text-success">
           <CheckIcon className="h-4 w-4" aria-hidden="true" />
           <span className="sr-only">Guardado</span>
         </span>
       ) : f.videoError ? (
         <Tooltip texto={f.videoError}>
-          <span tabIndex={0} role="img" aria-label={`Sin video: ${f.videoError}`} className={`text-warning ${anilloFoco}`}>
+          <span tabIndex={0} role="img" aria-label={`Sin archivo: ${f.videoError}`} className={`text-warning ${anilloFoco}`}>
             ⚠
           </span>
         </Tooltip>
@@ -102,8 +107,8 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
   { id: "instagram", label: "Instagram", ocultable: true, render: (f) => <Vinculo url={f.enlace} texto={`Abrir la captura ${numeroInstagram(f.numero)} en Instagram`} /> },
   { id: "paginaDestino", label: "Página de destino", ocultable: true, render: (f) => <Vinculo url={f.paginaDestino} texto={`Abrir la página de destino de ${numeroInstagram(f.numero)}`} /> },
   { id: "autor", label: "Cuenta del video", ocultable: true, oculta: true, clase: "text-muted-foreground", render: (f) => (f.autorUsuario ? `@${f.autorUsuario}` : "—") },
-  { id: "megusta", label: "Me gusta", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.megusta) },
-  { id: "comentarios", label: "Comentarios", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.comentarios) },
+  { id: "megusta", label: "Me gusta", ocultable: true, clase: "text-right tabular-nums", render: (f) => cifra(f.megusta) },
+  { id: "comentarios", label: "Comentarios", ocultable: true, clase: "text-right tabular-nums", render: (f) => cifra(f.comentarios) },
   { id: "vistas", label: "Vistas", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.vistas) },
   { id: "publicado", label: "Publicado", ocultable: true, oculta: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => (f.fechaPublicacion ? formatearFecha(f.fechaPublicacion) : "—") },
   { id: "compartidos", label: "Compartidos", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.compartidos) },
@@ -118,6 +123,15 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
  */
 export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: FilaInstagram[]; codigoPais: string; puedeEscribir: boolean }) {
   const { mostrarToast } = useToast();
+  const router = useRouter();
+  // Las capturas las crea el webhook: la lista se vuelve a pedir sola cada 30 segundos mientras la pestaña se ve, para que lo que
+  // llega aparezca sin recargar. Lo que está abierto (la ficha, un campo a medias) no se pierde: solo se traen los datos nuevos.
+  useEffect(() => {
+    const cada = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 30_000);
+    return () => clearInterval(cada);
+  }, [router]);
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
   // Los estados cambiados que el servidor todavía no devolvió: se ven al instante y vuelven atrás si se rechazan. Cada uno guarda
   // el estado que tenía el servidor (`base`) y solo vale mientras siga siendo ese: cuando el servidor trae otro (el elegido, o uno

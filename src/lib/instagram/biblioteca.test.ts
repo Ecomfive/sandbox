@@ -28,3 +28,13 @@ test("biblioteca: la dirección busca la frase exacta en todos los países y est
   assert.equal(url.searchParams.get("country"), "ALL");
   assert.equal(url.searchParams.get("active_status"), "all");
 });
+
+test("biblioteca: con el nombre de la página busca sus palabras junto con las del copy", () => {
+  const u = urlBibliotecaAnuncios("⚡ Apoya tu bienestar corporal con Perfectx Joint & Bone Therapy Cream", "Mundo Digital");
+  assert.ok(u);
+  const url = new URL(u);
+  assert.equal(url.searchParams.get("q"), "Mundo Digital Apoya tu bienestar corporal con Perfectx Joint");
+  assert.equal(url.searchParams.get("search_type"), "keyword_unordered");
+  // Un nombre vacío o solo de símbolos vuelve a la frase exacta.
+  for (const n of [null, undefined, "", "  ", "🔥🔥"]) assert.equal(new URL(urlBibliotecaAnuncios("Apoya tu bienestar corporal con Perfectx", n) as string).searchParams.get("search_type"), "keyword_exact_phrase");
+});

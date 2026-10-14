@@ -52,6 +52,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   const autorTexto = String(formData.get("autor_usuario") ?? "").trim().replace(/^@/, "");
   if (autorTexto && !/^[\w.]{1,100}$/.test(autorTexto)) return { error: "Cuenta del video: solo letras, números, puntos y guiones bajos." };
   const autor = autorTexto || null;
+  const nombrePagina = String(formData.get("nombre_pagina") ?? "").trim().slice(0, 120) || null;
   const fechaTexto = String(formData.get("fecha_publicacion") ?? "").trim();
   if (fechaTexto && (!/^\d{4}-\d{2}-\d{2}$/.test(fechaTexto) || Number.isNaN(Date.parse(fechaTexto)))) return { error: "Fecha de publicación no válida." };
   const fechaPublicacion = fechaTexto || null;
@@ -81,9 +82,12 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   const fechaAntes = typeof metricasAntes.fecha_publicacion === "string" ? metricasAntes.fecha_publicacion : null;
   if (fechaPublicacion === null) delete metricas.fecha_publicacion;
   else metricas.fecha_publicacion = fechaPublicacion;
+  const nombreAntes = typeof metricasAntes.nombre_pagina === "string" ? metricasAntes.nombre_pagina : null;
+  if (nombrePagina === null) delete metricas.nombre_pagina;
+  else metricas.nombre_pagina = nombrePagina;
   // Si una persona cambia alguna cifra, la cuenta o la fecha, el dato ya no es el que se leyó solo.
   const cifrasCambiaron = CIFRAS.some(([campo]) => (typeof metricasAntes[campo] === "number" ? metricasAntes[campo] : null) !== cifras[campo]);
-  if (cifrasCambiaron || (antes.autor_usuario ?? null) !== autor || fechaAntes !== fechaPublicacion) metricas.fuente = "manual";
+  if (cifrasCambiaron || (antes.autor_usuario ?? null) !== autor || fechaAntes !== fechaPublicacion || nombreAntes !== nombrePagina) metricas.fuente = "manual";
   const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, autor_usuario: autor, metricas, actualizado_en: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "No se pudieron guardar los cambios." };
 
@@ -103,6 +107,10 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if ((antes.autor_usuario ?? null) !== autor) {
     cambio.antes["Cuenta del video"] = antes.autor_usuario ? `@${antes.autor_usuario}` : "—";
     cambio.despues["Cuenta del video"] = autor ? `@${autor}` : "—";
+  }
+  if (nombreAntes !== nombrePagina) {
+    cambio.antes["Nombre de la página"] = nombreAntes ?? "—";
+    cambio.despues["Nombre de la página"] = nombrePagina ?? "—";
   }
   if (fechaAntes !== fechaPublicacion) {
     cambio.antes["Fecha de publicación"] = fechaAntes ?? "—";

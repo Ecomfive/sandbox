@@ -55,14 +55,25 @@ conectadas) y si los mensajes que caen en «Solicitudes» llegan igual. Se prob�
    registros de Vercel con el filtro `/api/instagram/webhook` (si no hay ningún `POST`, el problema está en Meta; si hay `POST` con 401,
    es el secreto; con 200 y sin fila, mirar `instagram_capturas`).
 
-## Quién comparte cambia lo que llega (observado, sin explicación de Meta)
+## Por qué el mismo contenido llega de formas distintas (hipótesis anterior descartada)
 
-En las 8 capturas del 14 oct el tipo que declaró Meta coincidió siempre con **quién compartió**, no con el contenido: lo compartido por
-la cuenta con el rol de Evaluador **aceptado** (`jhokserg`) llegó como `ig_reel` con enlace y sin archivo; lo compartido por cuentas con la
-invitación **pendiente** (`hernan.betancourt95`, `soyaandrade`) llegó como `ig_post` con el archivo de video y sin enlace. El mismo
-video de Perfectx llegó de las dos formas. Falta confirmarlo: que una cuenta acepte la invitación y comparta de nuevo el mismo
-video. Por eso la tabla ya no muestra «Reel» o «Publicación» (no dicen lo que el contenido es en Instagram) sino el **formato** de lo que
-llegó: «Con enlace», «Con video», «Enlace y video» o «Sin enlace ni video».
+El 14 oct se pensó que el tipo del aviso dependía de **quién compartía** (cuenta con el rol aceptado → `ig_reel` con enlace; cuentas
+pendientes → `ig_post` con archivo). **Era falso**: IG-0011 y IG-0012 son **el mismo contenido** (mismo identificador de Meta,
+`18102301511361563`), compartido dos veces por la **misma persona** con dos minutos de diferencia: una llegó como `ig_post` (archivo de
+23 MB, sin enlace) y la otra como `ig_reel` (enlace `/p/DdmZSerggFG/`, sin archivo). Lo que cambia es, aparentemente, **desde dónde se
+comparte** (no se ha confirmado cuál es cada camino). Y una publicación de **imagen** (foto o carrusel) llega como `ig_post` con un
+archivo que no es video (IG-0006, IG-0013): se guarda como imagen.
+
+Consecuencias en el sistema:
+- La tabla muestra el **formato** de lo que llegó («Con enlace», «Con video», «Con imagen», «Enlace y video», «Enlace e imagen» o «Sin
+  enlace ni archivo»), no «Reel» o «Publicación».
+- El **identificador de Meta es el mismo** para el mismo contenido: sirve para reconocer **repetidas** (también por el código del
+  enlace; `repetidas.ts`) y para que cada captura **complete a la otra** con lo que le falta (enlace, cuenta, nombre de la página, cifras
+  y fecha) sin pisar nada (`compartirConRepetidas` en `guardar.ts`). Así, si el mismo contenido llega como archivo y luego como enlace,
+  el archivo hereda el enlace y las cifras.
+- **Las cifras y el nombre de la página solo se pueden leer cuando hay enlace** (salen de su vista previa pública): una captura que llega
+  solo como archivo no los tiene, salvo que la misma publicación llegue después con enlace.
+- La lista se **refresca sola cada 30 segundos** mientras la pestaña se ve (`router.refresh()`).
 
 ## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
 
@@ -70,7 +81,10 @@ La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin ini
 texto, el identificador y **la dirección del botón de compra**. Buscando el copy de la captura **como frase exacta** sale el anuncio:
 con el copy de IG-0005 («Apoya tu bienestar corporal con Perfectx…») aparecieron 4 anuncios de «Mundo Digital» con el destino
 `clicksitienda.com/products/producto-2lp-pa001-crema-perfetcx`. La ficha trae el botón **«Buscar el anuncio en la Biblioteca de
-anuncios»** (`src/lib/instagram/biblioteca.ts`), que abre esa búsqueda ya armada (países: todos; estados: todos); la persona copia el
+anuncios»** (`src/lib/instagram/biblioteca.ts`), que abre esa búsqueda ya armada (países: todos; estados: todos). Con el **nombre de la página** (que sale del título de la vista previa:
+«Nuvo Venezuela on Instagram: …») busca sus palabras junto con las del copy: se probó «Mundo Digital» + el copy de Perfectx y dio los mismos
+4 anuncios que la frase exacta, y solo el nombre da 50.000; la combinación es igual de precisa y evita mezclar tiendas cuando el copy se
+copia entre varias (algo habitual). Sin nombre se busca la frase exacta; la persona copia el
 destino al campo «Página de destino». **No se automatiza**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
 prohíbe leerla de forma automática (su API oficial solo cubre anuncios políticos fuera de la UE).
 
