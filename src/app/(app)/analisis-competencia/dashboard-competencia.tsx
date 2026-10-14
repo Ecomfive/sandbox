@@ -276,7 +276,6 @@ export function DashboardCompetencia({ datos }: { datos: DatosCompetencia }) {
               ["mas_barato", "Más baratos que nosotros", "rojo"],
               ["bajo_precio", "Bajaron precio", "neon"],
               ["bajo_stock", "Bajaron stock", "neon"],
-              ["nuevo", "Nuevos que no tenemos", "verde"],
               ["desaparecio", "Desaparecieron", "neon"],
               ["competidor_nuevo", "Competidores nuevos", "neon"],
             ].map(([tipo, nombre, tono]) => (

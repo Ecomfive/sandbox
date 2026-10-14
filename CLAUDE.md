@@ -384,7 +384,7 @@ convenciones técnicas del código.
   el tipo que diga el servidor. El aviso completo queda en `payload` (jsonb) para no perder datos mientras se decide qué sirve; las
   métricas del autor (`metricas`: `like_count`, `comments_count`, `view_count`) y `autor_usuario` quedan listos para llenarse con la
   Business Discovery API (solo cuentas profesionales; **compartidos y guardados no los entrega Meta**) y la página de destino no
-  viene del DM (se toma del enlace que la persona pegue en el mismo mensaje y, si no, del primero que aparezca en el copy; se puede filtrar «Sin página»): se propone a partir de un enlace que la persona escriba en el mismo mensaje y se completa a mano en la ficha. La
+  viene del DM: se toma del enlace que la persona escribe al compartir (Instagram lo manda como **mensaje de texto aparte**, que `extraerNotas`/`guardarNotas` unen a la última captura de esa persona de los últimos 20 minutos) y, si no, del primero que aparezca en el copy; se puede filtrar «Sin página» y se completa a mano en la ficha. La
   lista es una `TablaDatos` (sin «Agregar»: las crea el webhook), el estado se cambia pulsando su insignia en la celda (`SelectorEstadoInstagram`, `cambiarEstadoCaptura`; se ve al instante y vuelve atrás si el servidor lo rechaza), la ficha lateral muestra el video, lo que trajo Meta y, editable,
   Estado (Nuevo / Por testear / Descartado), Página de destino y Notas. Se abre desde `/instagram` y el código es IG-0001.
   **Cómo se montó la app de Meta y qué hizo falta de verdad** (publicar la app era lo único que destrabó los mensajes; roles de
@@ -400,7 +400,7 @@ convenciones técnicas del código.
   de ECOMFIVE recibe 401 en el catálogo) y comparado con nuestro proveedor ECOMFIVE (`NUESTRO_PROVEEDOR`,
   `src/lib/competencia/analisis.ts`, con prueba). Tablas `competencia_busquedas`, `competencia_productos` (proveedor, precio,
   stock, `es_nuestro`, `igual_a` + parecido + método nombre/foto, `foto_huella`), `competencia_historial` y
-  `competencia_alertas` (bajó precio, más barato que nosotros, bajó stock, nuevo que no tenemos, competidor nuevo,
+  `competencia_alertas` (bajó precio, más barato que nosotros, bajó stock, competidor nuevo,
   desapareció; `vista`). Se lee con `scrapingCompetencia` de `scripts/scraping-proveedores-navegador.js` en una pestaña de
   `app.dropi.pa` y la guarda el mismo receptor (`tipo: "competencia"`, `scripts/competencia-guardar.ts`): compara con la
   búsqueda anterior (`comparar`), calcula huellas, empareja con `yaVisto` contra lo nuestro y arma las alertas
@@ -408,7 +408,7 @@ convenciones técnicas del código.
   días (`unidadesBajadas`), porque Dropi no muestra ventas ajenas. Panamá, 14 oct 2026: 1.452 productos de 93 proveedores
   leídos en 10 s; ECOMFIVE tiene 178. **Pestañas** (`PESTANAS_POR_MODULO`): Dashboard (`/analisis-competencia`,
   `dashboard-competencia.tsx`, recharts con los degradados neón de Compras/Test productos, filtros cruzados de competidor,
-  categoría, solo iguales y periodo), Alertas, Productos, Nuevos, Competidores y Bitácora; cada una es su página y usa
+  categoría, solo iguales y periodo), Alertas, Productos, Competidores y Bitácora (la de «Nuevos que no tenemos» se quitó a pedido); cada una es su página y usa
   `PaginaCompetencia` (carga `cargarDatosCompetencia` y pone `ResumenCompetencia`, la barra de `Indicador` con `marco-neon`).
   **Competencia de un producto** (Producto y Compras): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
   basta Producto, Compras o Análisis) busca el producto por nombre y foto con `todasLasCoincidencias` (cruces.ts) entre todo

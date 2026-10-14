@@ -28,12 +28,10 @@ test("arma las alertas de una búsqueda", () => {
   const a = armarAlertas({
     productos,
     cambios: [{ id: "c1", eventos: [ev("precio", 8.99, 6.5), ev("stock", 90, 40)] }],
-    nuevos: ["c2", "c3"],
     desaparecidos: [],
-    yaLoTenemos: (id) => (id === "c3" ? "Ya está en Producto" : null),
     proveedoresNuevos: [{ nombre: "PANAMA GADGETS", productos: 54 }],
   });
-  assert.deepEqual(a.map((x) => x.tipo), ["mas_barato", "bajo_stock", "nuevo", "competidor_nuevo"]);
+  assert.deepEqual(a.map((x) => x.tipo), ["mas_barato", "bajo_stock", "competidor_nuevo"]);
   assert.match(a[0].detalle!, /\$8\.99 → \$6\.50 · el nuestro \(«King Maker»\) está en \$6\.99/);
   assert.match(a[1].detalle!, /90 → 40 \(−50\)/);
 });
