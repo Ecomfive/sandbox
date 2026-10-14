@@ -352,7 +352,7 @@ convenciones técnicas del código.
   navega al «puente» del receptor con la lectura comprimida en el fragmento `#` (el navegador no deja que una página de internet
   llame a 127.0.0.1 ni abra otra pestaña sin un clic). La sesión de Dropi nunca sale de la página. «Buscar ahora» solo deja una
   búsqueda `pendiente` (`scripts/scraping-proveedores.ts pendientes` las lista). Una búsqueda de ~800 productos: ~30 s leyendo + ~16 s guardando.
-- **Testing Lab: Selección, ofertas y cruces** (migración 0106, 14 oct 2026; necesita la 0104 de Alcides y la 0105).
+- **Testing Lab: Selección, ofertas y cruces** (migración 0107, 14 oct 2026; necesita la 0104 de Alcides y la 0105).
   Selección de productos (`wms_seleccion_productos`) tiene los estados **Seleccionado → Crear oferta → Descartado** («Por
   evaluar» se quitó); lo que entra ya viene Seleccionado. **Ya visto:** al entrar (a mano o desde Scraping) se cruza con todos
   los tests de Test productos (todos los países) y los productos de Producto (`yaVisto`, `src/lib/scraping/cruces.ts`, con

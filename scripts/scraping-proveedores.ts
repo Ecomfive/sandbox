@@ -194,7 +194,7 @@ async function guardarLectura(l: Lectura) {
 /** Calcula la huella (dHash) de las fotos del proveedor que no la tienen, de 8 en 8. Devuelve cuántas guardó. */
 async function calcularHuellas(proveedorId: string): Promise<number> {
   const { data, error } = await supabase.from("scraping_productos").select("id, foto_url").eq("proveedor_id", proveedorId).not("foto_url", "is", null).is("foto_huella", null).limit(2000);
-  if (error) return 0; // Sin la migración 0106 no hay columna: se sigue sin huellas.
+  if (error) return 0; // Sin la migración 0107 no hay columna: se sigue sin huellas.
   let hechas = 0;
   const cola = [...(data ?? [])];
   await Promise.all(

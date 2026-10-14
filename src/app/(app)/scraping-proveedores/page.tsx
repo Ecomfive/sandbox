@@ -96,7 +96,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
       traerTodasConError<FilaProducto>((a, b) =>
         supabase
           .from("scraping_productos")
-          // Con «*» trae también `foto_huella` (migración 0106) sin fallar si todavía no existe.
+          // Con «*» trae también `foto_huella` (migración 0107) sin fallar si todavía no existe.
           .select("*")
           .eq("proveedor_id", elegido.id)
           .order("creado_en_dropi", { ascending: false, nullsFirst: false })

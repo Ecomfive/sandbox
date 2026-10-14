@@ -42,7 +42,7 @@ export default async function SeleccionProductosPage() {
       <Pagina ancho="ancha" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Selección de productos" oculto />
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          No se pudo cargar la selección. Falta correr en Supabase las migraciones 0104 y 0106.
+          No se pudo cargar la selección. Falta correr en Supabase las migraciones 0104 y 0107.
         </p>
       </Pagina>
     );

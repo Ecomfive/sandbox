@@ -36,7 +36,7 @@ export interface FilaSeleccion {
 export const numeroSeleccion = (n: number) => `SEL-${String(n).padStart(4, "0")}`;
 
 /**
- * El recorrido de una fila (14 oct 2026, migración 0106): llega **Seleccionado** (lo que viene de una fuente ya se eligió allá),
+ * El recorrido de una fila (14 oct 2026, migración 0107): llega **Seleccionado** (lo que viene de una fuente ya se eligió allá),
  * pasa a **Crear oferta** cuando se le arman sus ofertas (Creación de ofertas, de 1 a 3) o se **Descarta** con su motivo. Lo
  * que ya se testeó o ya está en Producto llega Descartado solo, con la nota de por qué.
  */

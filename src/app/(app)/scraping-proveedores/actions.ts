@@ -136,9 +136,9 @@ export async function enviarASeleccion(ids: string[]): Promise<{ error?: string;
     .from("scraping_productos")
     .select("id, dropi_producto_id, nombre, foto_url, foto_huella, precio, precio_sugerido, categoria, scraping_proveedores(nombre, pais, dropi_url)")
     .in("id", ids);
-  if (error) return { error: "No se pudieron leer los productos. ¿Ya se corrió la migración 0106?" };
+  if (error) return { error: "No se pudieron leer los productos. ¿Ya se corrió la migración 0107?" };
   const { data: ya, error: errorYa } = await supabase.from("wms_seleccion_productos").select("scraping_producto_id").in("scraping_producto_id", ids);
-  if (errorYa) return { error: "Falta correr las migraciones 0104 y 0106 (Selección de productos)." };
+  if (errorYa) return { error: "Falta correr las migraciones 0104 y 0107 (Selección de productos)." };
   const enviados = new Set((ya ?? []).map((y) => y.scraping_producto_id));
   const nuevos = (prods ?? []).filter((p) => !enviados.has(p.id));
   if (!nuevos.length) return { enviados: 0, descartados: 0, yaEstaban: enviados.size };

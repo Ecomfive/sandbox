@@ -1,5 +1,5 @@
 // Tipo de cambio a dólares (14 oct 2026): cuántas unidades de cada moneda vale 1 dólar, una vez al día. Se lee de un servicio
-// público (open.er-api.com, sin clave) la primera vez que se necesita en el día y queda en `tipos_cambio` (migración 0106) con
+// público (open.er-api.com, sin clave) la primera vez que se necesita en el día y queda en `tipos_cambio` (migración 0107) con
 // su fecha; si el servicio no responde se usa el último guardado.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
