@@ -55,6 +55,21 @@ conectadas) y si los mensajes que caen en «Solicitudes» llegan igual. Se prob�
    registros de Vercel con el filtro `/api/instagram/webhook` (si no hay ningún `POST`, el problema está en Meta; si hay `POST` con 401,
    es el secreto; con 200 y sin fila, mirar `instagram_capturas`).
 
+## Cómo compartir para que llegue el enlace (regla para el equipo, probada el 14 oct)
+
+**Abrir primero la publicación (o el anuncio) y compartir con su avión de papel; nunca reenviar el mensaje desde la conversación.**
+
+- **Reenviar desde la conversación** (compartir el mensaje que ya llegó en un chat): llega como `ig_post` con **solo el archivo** (video o imagen) y
+  **sin enlace**. Probado por Hernán con un anuncio: IG-0019 (`Cata-Kor NAD+`), imagen de 0,1 MB, sin enlace. Es lo que explica las capturas «solo
+  archivo» que habían llegado (IG-0002, IG-0007, IG-0011, IG-0013: eran anuncios reenviados desde chats).
+- **Abrir la publicación y pulsar su avión de papel**: llega como `ig_reel` **con enlace**. Probado con un anuncio: IG-0020 (`Ducha de Mano 3 en 1`,
+  cuenta `pty_nuvo`), enlace `/p/DeSh9KxMqNy/`.
+- Por la **web de Instagram** todas las rutas probadas llegaron con enlace (cuadrícula del perfil, `/reel/…`, `/p/…`, feed y pestaña de Reels:
+  IG-0001 fusionada, IG-0016, IG-0017 e IG-0018), también para contenido orgánico. La app del celular puede tener más rutas; la regla anterior se
+  confirmó en el celular con los dos anuncios.
+- Lo anterior **sustituye** a la hipótesis de «quién comparte» y a la de «anuncio frente a orgánico»: lo que decide es **desde dónde se comparte**
+  (el mensaje de una conversación o la publicación abierta). El mismo anuncio puede llegar de las dos formas.
+
 ## Por qué el mismo contenido llega de formas distintas (hipótesis anterior descartada)
 
 El 14 oct se pensó que el tipo del aviso dependía de **quién compartía** (cuenta con el rol aceptado → `ig_reel` con enlace; cuentas
@@ -102,6 +117,14 @@ Parecen ser anuncios o cuentas con restricciones; en esos casos la vista previa 
 **no hay archivo ni vistas** por esta vía (queda `metricas.embed_error`). En las publicaciones orgánicas probadas (`nuvotienda.ve`) funcionó
 siempre. **Lo único que sigue sin resolverse es lo contrario**: una captura que llega solo como archivo no
 trae enlace, y de un archivo no se puede sacar su enlace (el identificador `ig_post_media_id` no es el código del enlace).
+
+## El enlace de la bio de una cuenta (landing de tiendas orgánicas): no se puede leer sin sesión
+
+Con la sesión iniciada, el perfil de `nuvotienda.ve` muestra su enlace de la bio (`www.nuvovenezuela.com`). **Sin sesión no hay ninguna vía**: ni el
+embed del perfil (`/<cuenta>/embed/`, que solo trae nombre, seguidores y 6 publicaciones, sin `external_url` ni biografía), ni la página normal con
+agente de navegador, de Facebook o de Googlebot (se probaron las tres). `web_profile_info` responde 429. Para tiendas orgánicas sirve como página de
+destino sugerida, pero habría que leerla a mano con una sesión (como en esta prueba) y no se puede automatizar desde el servidor. Para anuncios, el
+destino correcto es el del botón del anuncio (Biblioteca de anuncios), no el de la bio.
 
 ## Cuando llega solo el archivo: cómo buscar su enlace (probado el 14 oct)
 
