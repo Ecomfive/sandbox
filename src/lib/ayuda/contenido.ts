@@ -189,7 +189,23 @@ export const GUIAS: GuiaModulo[] = [
     titulo: "Fuente de datos",
     ruta: "/fuente-datos",
     resumen: "Las fuentes de donde salen los productos para testear.",
-    secciones: [{ titulo: "Uso", pasos: ["Tiene una pestaña por fuente: Drop Killer, Tu Winner, Scraping de proveedores y Selección de productos.", "Por ahora las pestañas están en preparación («Próximamente»)."] }],
+    secciones: [
+      { titulo: "Uso", pasos: ["Tiene una pestaña por fuente: Drop Killer, Tu Winner, Scraping de proveedores y Selección de productos.", "Drop Killer, Tu Winner y Selección de productos están en preparación («Próximamente»)."] },
+      {
+        titulo: "Scraping de proveedores",
+        pasos: [
+          "Sigue a proveedores de Dropi: arriba, una tarjeta por proveedor con sus órdenes, productos y dropshippers y si subieron (▲ verde) o bajaron (▼ rojo) desde el registro anterior. Pulsa una tarjeta para ver ese proveedor.",
+          "«Agregar proveedor»: su nombre, el enlace de su página en Dropi (https://app.dropi.mx/dashboard/provider/…) y sus órdenes, productos y dropshippers de hoy. Queda pedida su primera búsqueda completa.",
+          "«Actualizar datos» guarda las cifras de hoy escritas a mano. Cada búsqueda además las lee sola de Dropi («Leído de Dropi» en «Datos del proveedor»).",
+          "«Buscar ahora» pide una búsqueda nueva. La corre el equipo con la sesión de Dropi: una búsqueda de un proveedor de unos 800 productos dura menos de un minuto.",
+          "Las tarjetas Subieron de stock, Bajaron de stock, Cambiaron de precio, Nuevos, Privados y Desaparecieron comparan con la búsqueda anterior y filtran la tabla al pulsarlas.",
+          "La tabla trae cada producto con foto, nombre, precio, stock, cómo se movió el stock en 4 semanas y la fecha de su última revisión; va de los más recientes en Dropi a los más viejos. Pulsa una fila para ver su historial: cada cambio de precio y de stock, cuándo desapareció o volvió.",
+          "Dropi solo muestra a un dropshipper los productos publicados con stock: por eso la tabla trae menos productos que la cifra «Productos» del proveedor, que cuenta también los sin stock y los privados de otros dropshippers.",
+          "Un producto que deja de aparecer queda «Desapareció»: «se agotó» si le quedaban 10 unidades o menos, «lo hizo privado» si apareció un privado con el mismo nombre, o «dejó de aparecer».",
+          "Los privados («Privado …», con el logo del proveedor en vez de foto) se vinculan solos al producto con foto del mismo nombre cuando tienen 2 palabras en común o más y 85 % de parecido; con menos, salen como «posible pareja» para que lo revises.",
+        ],
+      },
+    ],
   },
   {
     modulo: "filtro-productos",
@@ -251,6 +267,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-14", titulo: "Scraping de proveedores", texto: "Fuente de datos › Scraping de proveedores ya funciona: agrega un proveedor de Dropi y el sistema guarda todos sus productos con foto, precio y stock, y en cada búsqueda anota qué subió o bajó de stock, qué cambió de precio, qué es nuevo y qué desapareció (agotado o privado). Los privados se vinculan por nombre con su producto con foto. Ya está cargado HYPER MODA (779 productos).", modulo: "fuente-datos", href: "/fuente-datos/scraping-proveedores" },
   { fecha: "2026-10-13", titulo: "El test de un 2x1 también en su producto simple", texto: "Un test de un 2x1 (o X2) queda vinculado al compuesto. Ahora su producto simple también lo muestra en la columna «Test», la oferta y el «Resultado del test» de la ficha, con la nota «Test de su compuesto». Ejemplo: la lona impermeable transparente muestra el winner de su 2x1.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-13", titulo: "Compras abre la ficha completa de un clic", texto: "Al pulsar la descripción de una compra se abre directo su ficha completa, con la actividad. Ya no sale primero el resumen a la derecha con «Abrir ficha completa».", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-13", titulo: "Aviso de posible duplicado", texto: "Al crear un producto, si el nombre o la foto se parecen a los de uno que ya existe, la ficha muestra «Posible duplicado» con ese producto (foto, SKU y nombre) y si se parece por el nombre o por la foto.", modulo: "producto", href: "/producto" },

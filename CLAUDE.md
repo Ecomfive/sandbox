@@ -337,6 +337,21 @@ convenciones técnicas del código.
   «Ganador» agrupa `winner` y
   `enviado_a_compras`. Las piezas visuales comunes (insignias redondas, indicadores, botones de barra, marco de
   tabla) viven en `src/components/panel/piezas-panel.tsx` y las usa también el CRM.
+- **Fuente de datos › Scraping de proveedores** (`/fuente-datos/scraping-proveedores`, módulo `fuente-datos`, migración 0105, 14 oct 2026).
+  Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`
+  manual o dropi), `scraping_busquedas` (con `duracion_ms`), `scraping_productos` (último precio y stock, `estado` activo o
+  desaparecido con `motivo_desaparicion`, privado con `vinculado_a`/`vinculo_parecido`/`vinculo_seguro`) y
+  `scraping_producto_historial` (un evento por cambio). La comparación es pura en `src/lib/scraping/comparar.ts` (con prueba):
+  agotado si desaparece con 10 o menos, privatizado si aparece un privado con su nombre; un privado («Privado …», foto = logo)
+  se vincula solo con 85 % y 2 palabras en común, si no queda como sugerencia. **Dropi a un dropshipper solo le entrega los
+  productos publicados con stock** (HYPER MODA: 779 de los «1436» del encabezado, que salen de
+  `api-v2.dropi.<país>/indicators/supplier/<id>/metrics`). **Cómo se corre:** `npx tsx scripts/scraping-proveedores.ts recibir`
+  (127.0.0.1:4322, código por arranque) y, en la pestaña del proveedor en Dropi con la sesión iniciada, la función de
+  `scripts/scraping-proveedores-navegador.js`: lee `api/products/v4/index` ordenado por `created_at desc` (sin orden, Dropi
+  devuelve páginas aleatorias que se repiten), de 100 en 100 con 1,3 s de pausa (Dropi permite 50 consultas por minuto), y
+  navega al «puente» del receptor con la lectura comprimida en el fragmento `#` (el navegador no deja que una página de internet
+  llame a 127.0.0.1 ni abra otra pestaña sin un clic). La sesión de Dropi nunca sale de la página. «Buscar ahora» solo deja una
+  búsqueda `pendiente` (`scripts/scraping-proveedores.ts pendientes` las lista). Una búsqueda de ~800 productos: ~30 s leyendo + ~16 s guardando.
 - **Pantalla «Hoy»** (`/`, antes «Dashboard operativo»; el módulo de permisos sigue siendo `dashboard`). Arriba, en dos
   tarjetas lado a lado (apiladas en pantallas angostas): **«Necesita tu atención»** (`ColaAtencion`), la cola de trabajo
   con lo que cuenta `obtenerPendientesHoy` (pedidos de Dropi en Novedad, plataformas sin saldo de wallet, retiros de

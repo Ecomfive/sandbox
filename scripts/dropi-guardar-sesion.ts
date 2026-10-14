@@ -5,10 +5,11 @@ const tipo = process.argv[3] === "dropshipper" ? "dropshipper" : "proveedor";
 const urls: Record<string, string> = {
   cr: "https://app.dropi.cr/auth/login",
   pa: "https://app.dropi.pa/auth/login",
+  mx: "https://app.dropi.mx/auth/login",
 };
 
 if (!urls[pais ?? ""]) {
-  console.error("Uso: npx tsx scripts/dropi-guardar-sesion.ts <cr|pa> [dropshipper]");
+  console.error("Uso: npx tsx scripts/dropi-guardar-sesion.ts <cr|pa|mx> [dropshipper]");
   process.exit(1);
 }
 

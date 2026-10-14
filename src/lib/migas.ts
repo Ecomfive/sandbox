@@ -50,6 +50,9 @@ const SUBPAGINAS: Record<string, string> = {
   "/inventario/vencimientos": "Vencimientos",
   "/crm-dropshippers/vinculos": "Vínculos",
   "/productos-test/productos": "Productos",
+  "/fuente-datos/tu-winner": "Tu Winner",
+  "/fuente-datos/scraping-proveedores": "Scraping de proveedores",
+  "/fuente-datos/seleccion-productos": "Selección de productos",
 };
 
 interface ModuloDeNav {

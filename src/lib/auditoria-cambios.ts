@@ -18,6 +18,7 @@ export function calcularCambios(
 
 export const ETIQUETA_ACCION: Record<string, string> = {
   actualizar_margen: "Actualizó margen",
+  agregar_proveedor_scraping: "Agregó un proveedor a Scraping de proveedores",
   actualizar_margen_masivo: "Actualizó margen (en lote)",
   registrar_saldo: "Registró saldo de wallet",
   crear_retiro: "Creó un retiro",
