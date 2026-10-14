@@ -87,7 +87,8 @@ function capturasDeMensaje(evento: Record<string, unknown>): CapturaInstagram[] 
     const carga = esObjeto(a.payload) ? a.payload : {};
     const url = urlHttp(carga.url);
     const esDeInstagram = !!url && HOSTS_INSTAGRAM.test(url.hostname);
-    const id = carga.reel_video_id ?? carga.id;
+    // Un reel trae `reel_video_id`; una publicación, `ig_post_media_id` (visto en avisos reales; la documentación dice `id`).
+    const id = carga.reel_video_id ?? carga.ig_post_media_id ?? carga.id;
     salida.push({
       mensajeId: `${mid}:${i}`,
       remitenteId: remitente,

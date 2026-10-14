@@ -64,6 +64,16 @@ conectadas) y si los mensajes que caen en «Solicitudes» llegan igual. Se prob�
 | Quién lo envió | Su id (y su `@usuario` con el token) | Igual |
 | Me gusta, comentarios, vistas, cuenta del video | No vienen | No vienen |
 
-Son dos muestras: confirmar con más antes de darlo por regla. La consulta a Instagram con el id del reel o la publicación
-(`consultarMedia`, `src/lib/instagram/guardar.ts`) está para averiguar qué deja leer Meta de una publicación ajena; su respuesta o
-su error queda en la ficha, en «Datos de Meta».
+Cinco muestras (4 reels y 1 publicación de video; ningún anuncio patrocinado todavía). Un reel trae `url` (el enlace `/reel/…` o `/p/…`),
+`title` y `reel_video_id`; una publicación trae `url` (un archivo en `lookaside.fbsbx.com/ig_messaging_cdn`, que se copia a Storage), `title` e
+**`ig_post_media_id`** (no `id`, como dice la documentación).
+
+**La consulta a Instagram con ese id no sirve** (`consultarMedia`, `src/lib/instagram/guardar.ts`): con estos permisos Meta responde
+*«Unsupported get request. Object … does not exist, cannot be loaded due to missing permissions, or does not support this operation»*
+para una publicación de otra cuenta. Me gusta, comentarios, vistas y compartidos **no se pueden leer por la API**: se completan a
+mano en la ficha («Cifras de la publicación», dentro de `metricas`). La respuesta de la consulta queda en «Datos de Meta».
+
+**Lectura de la vista previa pública (no implementada, decisión pendiente):** pedir la página pública del enlace con el agente de las
+vistas previas de Facebook devuelve en `og:description` los me gusta, comentarios, la cuenta y la fecha («43 likes, 12 comments -
+nuvotienda.ve on February 4, 2025: …») y una imagen de portada; no da vistas, compartidos ni el video. Es una zona gris de las
+condiciones de Meta (acceso automatizado) y Instagram puede bloquear los servidores; ejecutarlo desde el servidor no quita ese riesgo.

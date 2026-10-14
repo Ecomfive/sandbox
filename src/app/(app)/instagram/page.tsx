@@ -81,6 +81,7 @@ export default async function InstagramPage() {
     megusta: numero(f.metricas?.like_count),
     comentarios: numero(f.metricas?.comments_count),
     vistas: numero(f.metricas?.view_count),
+    compartidos: numero(f.metricas?.share_count),
     paginaDestino: f.pagina_destino,
     notas: f.notas,
     estado: f.estado,

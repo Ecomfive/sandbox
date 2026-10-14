@@ -40,7 +40,13 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
   );
 }
 
-const cifra = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-CR"));
+// Las cifras que se completan a mano: el nombre del campo en la base (`metricas`), su etiqueta y de dónde se lee.
+const CIFRAS = [
+  ["like_count", "Me gusta", "megusta"],
+  ["comments_count", "Comentarios", "comentarios"],
+  ["view_count", "Vistas", "vistas"],
+  ["share_count", "Compartidos", "compartidos"],
+] as const;
 const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1_048_576).toLocaleString("es-CR", { maximumFractionDigits: 1 })} MB`);
 
 /** El video de la captura, con su enlace firmado (el bucket es privado); sin video dice por qué, si se sabe. */
@@ -240,13 +246,20 @@ export function FichaInstagram({
                       "—"
                     )}
                   </Dato>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Dato etiqueta="Cuenta del video">{fila.autorUsuario ? `@${fila.autorUsuario}` : "—"}</Dato>
-                    <Dato etiqueta="Me gusta">{cifra(fila.megusta)}</Dato>
-                    <Dato etiqueta="Comentarios">{cifra(fila.comentarios)}</Dato>
-                    <Dato etiqueta="Vistas">{cifra(fila.vistas)}</Dato>
-                  </div>
                 </dl>
+              </Seccion>
+
+              <Seccion icono={EstadoIcon} titulo="Cifras de la publicación">
+                <fieldset disabled={!puedeEscribir || guardando} className="m-0 grid min-w-0 grid-cols-2 gap-3 border-0 p-0 sm:grid-cols-3">
+                  <Campo etiqueta="Cuenta del video" id="campo-autor-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-autor-instagram" type="text" name="autor_usuario" maxLength={100} defaultValue={fila.autorUsuario ?? ""} placeholder="Ej: tienda.ejemplo" className={fieldClass} />
+                  </Campo>
+                  {CIFRAS.map(([nombre, etiqueta, valor]) => (
+                    <Campo key={nombre} etiqueta={etiqueta} id={`campo-${nombre}-instagram`}>
+                      <input id={`campo-${nombre}-instagram`} type="number" inputMode="numeric" min="0" step="1" name={nombre} defaultValue={fila[valor] ?? ""} placeholder="Ej: 1200" className={`${fieldClass} tabular-nums`} />
+                    </Campo>
+                  ))}
+                </fieldset>
               </Seccion>
 
               {fila.datosMeta && (

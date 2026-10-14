@@ -32,6 +32,7 @@ const ICONOS: Record<string, IconoComp> = {
   megusta: EstadoIcon,
   comentarios: EstadoIcon,
   vistas: EstadoIcon,
+  compartidos: EstadoIcon,
   notas: EstadoIcon,
 };
 const cifra = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-CR"));
@@ -94,6 +95,7 @@ const COLUMNAS: ColumnaTabla<FilaInstagram, undefined>[] = [
   { id: "megusta", label: "Me gusta", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.megusta) },
   { id: "comentarios", label: "Comentarios", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.comentarios) },
   { id: "vistas", label: "Vistas", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.vistas) },
+  { id: "compartidos", label: "Compartidos", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.compartidos) },
   { id: "notas", label: "Notas", ocultable: true, oculta: true, clase: "text-muted-foreground", render: (f) => <span className="block max-w-[18rem] truncate">{f.notas ?? "—"}</span> },
 ];
 

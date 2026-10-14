@@ -392,7 +392,7 @@ convenciones técnicas del código.
   **Lo observado** (14 oct 2026, dos muestras): un reel llega con copy y enlace pero **sin archivo de video**; una publicación de
   video llega con copy y el archivo (se copia a Storage) pero sin enlace. Me gusta, comentarios y vistas no vienen en el aviso:
   `consultarMedia` pide a Instagram, con el id del reel o la publicación, lo que deja leer de una publicación ajena y guarda la
-  respuesta (o el error) en `metricas.consulta`, visible en la ficha, «Datos de Meta».
+  respuesta (o el error) en `metricas.consulta`, visible en la ficha, «Datos de Meta»; **con estos permisos Meta la niega para publicaciones ajenas**, así que me gusta, comentarios, vistas y compartidos (y la cuenta del video) se **completan a mano** en la ficha («Cifras de la publicación», se guardan en `metricas`: `like_count`, `comments_count`, `view_count`, `share_count`). Una publicación trae su id como `ig_post_media_id`.
   **Falta:** probar un anuncio patrocinado real; decidir qué hacer con los reels sin video; enviar una captura «Por testear» a
   Selección (hoy no hay puente).
 - **Investigación › Análisis de competencia** (`/analisis-competencia`, módulo `analisis-competencia`, migración 0108, 14 oct
