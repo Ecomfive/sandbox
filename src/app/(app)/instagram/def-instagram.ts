@@ -50,15 +50,22 @@ export const ESTADOS_INSTAGRAM = [
 export const etiquetaEstadoInstagram = (v: string) => ESTADOS_INSTAGRAM.find((e) => e.valor === v)?.etiqueta ?? v;
 export const colorEstadoInstagram = (v: string) => ESTADOS_INSTAGRAM.find((e) => e.valor === v)?.color ?? "#8D8D8D";
 
-export const TIPOS_INSTAGRAM = [
-  { valor: "reel", etiqueta: "Reel", color: "#d74c81" },
-  { valor: "post", etiqueta: "Publicación", color: "#5f43d1" },
-  { valor: "video", etiqueta: "Video", color: "#0880EA" },
-  { valor: "otro", etiqueta: "Otro", color: "#8D8D8D" },
+/**
+ * Qué trae la captura. No se usa el tipo que declara Meta (`ig_reel` o `ig_post`): no dice lo que el contenido es en Instagram (el
+ * mismo video llegó como «reel» o como «publicación» según quién lo compartió), sino qué entregó: un enlace, el archivo de video o
+ * las dos cosas.
+ */
+export const FORMATOS_INSTAGRAM = [
+  { valor: "enlace_video", etiqueta: "Enlace y video", color: "#5f43d1" },
+  { valor: "video", etiqueta: "Con video", color: "#0880EA" },
+  { valor: "enlace", etiqueta: "Con enlace", color: "#d74c81" },
+  { valor: "ninguno", etiqueta: "Sin enlace ni video", color: "#8D8D8D" },
 ] as const;
 
-export const etiquetaTipoInstagram = (v: string) => TIPOS_INSTAGRAM.find((t) => t.valor === v)?.etiqueta ?? v;
-export const colorTipoInstagram = (v: string) => TIPOS_INSTAGRAM.find((t) => t.valor === v)?.color ?? "#8D8D8D";
+export const formatoDeCaptura = (f: Pick<FilaInstagram, "enlace" | "tieneVideo">): string =>
+  f.enlace && f.tieneVideo ? "enlace_video" : f.tieneVideo ? "video" : f.enlace ? "enlace" : "ninguno";
+export const etiquetaFormatoInstagram = (v: string) => FORMATOS_INSTAGRAM.find((t) => t.valor === v)?.etiqueta ?? v;
+export const colorFormatoInstagram = (v: string) => FORMATOS_INSTAGRAM.find((t) => t.valor === v)?.color ?? "#8D8D8D";
 
 // La fecha en la hora de Panamá y Costa Rica (UTC-5/-6): de noche, la fecha en UTC ya es la de mañana.
 const aFecha = (iso: string) => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Panama" }).format(new Date(iso));
@@ -78,14 +85,14 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
       colorValor: colorEstadoInstagram,
     },
     {
-      id: "tipo",
-      etiqueta: "Tipo",
+      id: "formato",
+      etiqueta: "Formato",
       tipo: "seleccion",
-      valores: (f) => [f.tipo],
-      opciones: () => TIPOS_INSTAGRAM.map((t) => ({ valor: t.valor, etiqueta: t.etiqueta })),
+      valores: (f) => [formatoDeCaptura(f)],
+      opciones: () => FORMATOS_INSTAGRAM.map((t) => ({ valor: t.valor, etiqueta: t.etiqueta })),
       agrupable: true,
-      ordenGrupos: TIPOS_INSTAGRAM.map((t) => t.valor),
-      colorValor: colorTipoInstagram,
+      ordenGrupos: FORMATOS_INSTAGRAM.map((t) => t.valor),
+      colorValor: colorFormatoInstagram,
     },
     { id: "enviadoPor", etiqueta: "Enviado por", tipo: "seleccion", valores: (f) => [quienEnvio(f)], agrupable: true },
     { id: "autor", etiqueta: "Cuenta del video", tipo: "seleccion", valores: (f) => [f.autorUsuario ? `@${f.autorUsuario}` : SIN_VALOR], etiquetaSinValor: "Sin consultar", agrupable: true },

@@ -18,8 +18,9 @@ Instagram»). Los nombres de los menús de Meta cambian seguido: si algo no se l
    para que Meta envíe notificaciones.
 
 **No hizo falta**
-- Que las personas que comparten **acepten el rol de Evaluador de Instagram** (alguien con la invitación pendiente envió una
-  publicación y llegó igual). Con la app publicada basta con que compartan el mensaje con la cuenta.
+- Que las personas que comparten **acepten el rol de Evaluador de Instagram** para que **llegue** el mensaje (alguien con la
+  invitación pendiente envió una publicación y llegó igual). **Ojo:** puede cambiar **qué manda Meta** (ver «Quién comparte cambia lo
+  que llega»).
 - Que el paso 2 de la pantalla de la API quede con la marca verde (el icono siguió «a medias» y funcionó).
 - Verificar el negocio ni enviar la app a revisión (App Review): con los permisos en acceso estándar («Listo para probar») alcanza.
 - Generar el identificador (token) de acceso para recibir: solo sirve para **consultar** el usuario de quien envía y los datos de la
@@ -53,6 +54,25 @@ conectadas) y si los mensajes que caen en «Solicitudes» llegan igual. Se prob�
 8. **Probar.** Compartir un reel por mensaje directo a la cuenta que recibe; en 10 a 30 segundos cae en `/instagram`. Si no llega:
    registros de Vercel con el filtro `/api/instagram/webhook` (si no hay ningún `POST`, el problema está en Meta; si hay `POST` con 401,
    es el secreto; con 200 y sin fila, mirar `instagram_capturas`).
+
+## Quién comparte cambia lo que llega (observado, sin explicación de Meta)
+
+En las 8 capturas del 14 oct el tipo que declaró Meta coincidió siempre con **quién compartió**, no con el contenido: lo compartido por
+la cuenta con el rol de Evaluador **aceptado** (`jhokserg`) llegó como `ig_reel` con enlace y sin archivo; lo compartido por cuentas con la
+invitación **pendiente** (`hernan.betancourt95`, `soyaandrade`) llegó como `ig_post` con el archivo de video y sin enlace. El mismo
+video de Perfectx llegó de las dos formas. Falta confirmarlo: que una cuenta acepte la invitación y comparta de nuevo el mismo
+video. Por eso la tabla ya no muestra «Reel» o «Publicación» (no dicen lo que el contenido es en Instagram) sino el **formato** de lo que
+llegó: «Con enlace», «Con video», «Enlace y video» o «Sin enlace ni video».
+
+## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
+
+La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin iniciar sesión) muestra de cada anuncio su anunciante, su
+texto, el identificador y **la dirección del botón de compra**. Buscando el copy de la captura **como frase exacta** sale el anuncio:
+con el copy de IG-0005 («Apoya tu bienestar corporal con Perfectx…») aparecieron 4 anuncios de «Mundo Digital» con el destino
+`clicksitienda.com/products/producto-2lp-pa001-crema-perfetcx`. La ficha trae el botón **«Buscar el anuncio en la Biblioteca de
+anuncios»** (`src/lib/instagram/biblioteca.ts`), que abre esa búsqueda ya armada (países: todos; estados: todos); la persona copia el
+destino al campo «Página de destino». **No se automatiza**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
+prohíbe leerla de forma automática (su API oficial solo cubre anuncios políticos fuera de la UE).
 
 ## Los dos enlaces de cada captura: qué se puede asegurar y qué no
 
