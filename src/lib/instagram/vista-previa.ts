@@ -10,6 +10,8 @@ export interface VistaPublica {
   usuario: string | null;
   /** AAAA-MM-DD */
   fecha: string | null;
+  /** El nombre con que se muestra la cuenta («Nuvo Venezuela»), del título de la vista previa. Es el nombre de la página para buscar el anuncio. */
+  nombre: string | null;
 }
 
 const MESES: Record<string, number> = {
@@ -37,9 +39,8 @@ export function cifraDeVistaPrevia(texto: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** El texto de `og:description` (o, si falta, de `description`) de una página, sin interpretar. */
-export function descripcionDeLaPagina(html: string): string | null {
-  for (const propiedad of ["og:description", "description"]) {
+function contenidoDeMeta(html: string, propiedades: string[]): string | null {
+  for (const propiedad of propiedades) {
     const orden1 = new RegExp(`<meta\\s+(?:property|name)="${propiedad}"\\s+content="([^"]*)"`, "i").exec(html);
     const orden2 = new RegExp(`<meta\\s+content="([^"]*)"\\s+(?:property|name)="${propiedad}"`, "i").exec(html);
     const t = (orden1 ?? orden2)?.[1];
@@ -48,8 +49,36 @@ export function descripcionDeLaPagina(html: string): string | null {
   return null;
 }
 
-/** Lee «N likes, M comments - cuenta on Month D, YYYY: …». Devuelve null si el texto no tiene esa forma o no aporta ningún dato. */
-export function interpretarVistaPrevia(descripcion: string | null): VistaPublica | null {
+/** El texto de `og:description` (o, si falta, de `description`) de una página, sin interpretar. */
+export function descripcionDeLaPagina(html: string): string | null {
+  return contenidoDeMeta(html, ["og:description", "description"]);
+}
+
+/** El texto de `og:title` de una página, sin interpretar: «Nuvo Venezuela on Instagram: "copy…"». */
+export function tituloDeLaPagina(html: string): string | null {
+  return contenidoDeMeta(html, ["og:title"]);
+}
+
+/** Las pocas entidades HTML que pueden venir en un nombre: &amp; &quot; y las numéricas (&#039; &#x27;). */
+function decodificar(t: string): string {
+  return t
+    .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&");
+}
+
+/** El nombre de la cuenta en «Nombre on Instagram: …», sin entidades HTML; null si el título no tiene esa forma. */
+export function nombreDeVistaPrevia(titulo: string | null): string | null {
+  if (!titulo) return null;
+  const m = titulo.match(/^(.{1,120}?)\s+on Instagram\s*:/);
+  if (!m) return null;
+  const nombre = decodificar(m[1]).trim();
+  return nombre ? nombre.slice(0, 120) : null;
+}
+
+/** Lee «N likes, M comments - cuenta on Month D, YYYY: …» (y, si se pasa el título, el nombre de la cuenta). Devuelve null si el texto no tiene esa forma o no aporta ningún dato. */
+export function interpretarVistaPrevia(descripcion: string | null, titulo: string | null = null): VistaPublica | null {
   if (!descripcion) return null;
   const m = descripcion.match(/^(.{0,80}?)\s-\s([\w.]{1,100})\s+on\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})\s*:/);
   if (!m) return null;
@@ -64,7 +93,7 @@ export function interpretarVistaPrevia(descripcion: string | null): VistaPublica
     const f = new Date(Date.UTC(anio, mes - 1, dia));
     if (f.getUTCFullYear() === anio && f.getUTCMonth() === mes - 1 && f.getUTCDate() === dia) fecha = f.toISOString().slice(0, 10);
   }
-  return { megusta, comentarios, usuario, fecha };
+  return { megusta, comentarios, usuario, fecha, nombre: nombreDeVistaPrevia(titulo) };
 }
 
 /** El enlace de un reel o una publicación de instagram.com: lo único que se lee (no perfiles, ni otros sitios). */
