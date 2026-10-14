@@ -154,3 +154,13 @@ test("una publicación trae su id como ig_post_media_id (aviso real) y también 
   const doc = extraerCapturas(aviso({ mid: "p2", attachments: [{ type: "ig_post", payload: { url: "https://www.instagram.com/p/AB/", id: 55 } }] }));
   assert.equal(doc[0].mediaId, "55");
 });
+
+test("página de destino: la del mensaje manda; si no hay, la primera del copy de la publicación", () => {
+  const adj = (title: string) => [{ type: "ig_reel", payload: { url: "https://www.instagram.com/reel/AB/", title } }];
+  const delCopy = extraerCapturas(aviso({ mid: "d1", attachments: adj("Compra aquí https://tienda.com/p/crema, envíos a todo el país") }));
+  assert.equal(delCopy[0].paginaDestino, "https://tienda.com/p/crema");
+  const delMensaje = extraerCapturas(aviso({ mid: "d2", text: "mira https://otra.com/x", attachments: adj("Compra aquí https://tienda.com/p/crema") }));
+  assert.equal(delMensaje[0].paginaDestino, "https://otra.com/x");
+  const ninguna = extraerCapturas(aviso({ mid: "d3", attachments: adj("Pídelo por WhatsApp, link en la bio https://instagram.com/tienda") }));
+  assert.equal(ninguna[0].paginaDestino, null);
+});

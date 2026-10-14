@@ -289,6 +289,12 @@ export function FichaInstagram({
                   </Campo>
                   <Campo etiqueta="Página de destino" id="campo-pagina-instagram">
                     <input id="campo-pagina-instagram" type="url" name="pagina_destino" defaultValue={fila.paginaDestino ?? ""} placeholder="Ej: https://tienda.com/producto" className={fieldClass} />
+                    {fila.paginaDestino && (
+                      <a href={fila.paginaDestino} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
+                        <EnlaceIcon className="h-4 w-4" />
+                        Abrir la página de destino
+                      </a>
+                    )}
                   </Campo>
                   <Campo etiqueta="Notas" id="campo-notas-instagram">
                     <textarea id="campo-notas-instagram" name="notas" rows={3} maxLength={4000} defaultValue={fila.notas ?? ""} className={fieldClass} />

@@ -97,7 +97,8 @@ function capturasDeMensaje(evento: Record<string, unknown>): CapturaInstagram[] 
       titulo: texto(carga.title, 4000),
       mediaId: typeof id === "number" || typeof id === "string" ? String(id).slice(0, 100) : null,
       textoMensaje,
-      paginaDestino,
+      // La página de destino: la que la persona pegó en su mensaje manda; si no, la primera que aparezca en el copy de la publicación.
+      paginaDestino: paginaDestino ?? paginaDestinoDeTexto(texto(carga.title, 4000)),
       urlVideo: url && !esDeInstagram ? url.toString() : null,
     });
   });
