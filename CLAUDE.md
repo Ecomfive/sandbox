@@ -385,7 +385,7 @@ convenciones técnicas del código.
   métricas del autor (`metricas`: `like_count`, `comments_count`, `view_count`) y `autor_usuario` quedan listos para llenarse con la
   Business Discovery API (solo cuentas profesionales; **compartidos y guardados no los entrega Meta**) y la página de destino no
   viene del DM: se toma del enlace que la persona escribe al compartir (Instagram lo manda como **mensaje de texto aparte**, que `extraerNotas`/`guardarNotas` unen a la última captura de esa persona de los últimos 20 minutos) y, si no, del primero que aparezca en el copy; se puede filtrar «Sin página» y se completa a mano en la ficha. La
-  lista es una `TablaDatos` (sin «Agregar»: las crea el webhook), la ficha lateral muestra el video, lo que trajo Meta y, editable,
+  lista es una `TablaDatos` (sin «Agregar»: las crea el webhook), el estado se cambia pulsando su insignia en la celda (`SelectorEstadoInstagram`, `cambiarEstadoCaptura`; se ve al instante y vuelve atrás si el servidor lo rechaza), la ficha lateral muestra el video, lo que trajo Meta y, editable,
   Estado (Nuevo / Por testear / Descartado), Página de destino y Notas. Se abre desde `/instagram` y el código es IG-0001.
   **Cómo se montó la app de Meta y qué hizo falta de verdad** (publicar la app era lo único que destrabó los mensajes; roles de
   quien comparte, el paso 2 «completo» y la verificación del negocio no hicieron falta): ver [INSTAGRAM-META.md](INSTAGRAM-META.md).
