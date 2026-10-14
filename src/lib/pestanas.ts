@@ -47,7 +47,6 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Dashboard", href: "/analisis-competencia" },
     { etiqueta: "Alertas", href: "/analisis-competencia/alertas" },
     { etiqueta: "Productos", href: "/analisis-competencia/productos" },
-    { etiqueta: "Nuevos", href: "/analisis-competencia/nuevos" },
     { etiqueta: "Competidores", href: "/analisis-competencia/competidores" },
     { etiqueta: "Bitácora", href: "/analisis-competencia/bitacora" },
   ],

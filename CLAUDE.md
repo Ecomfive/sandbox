@@ -400,7 +400,7 @@ convenciones técnicas del código.
   de ECOMFIVE recibe 401 en el catálogo) y comparado con nuestro proveedor ECOMFIVE (`NUESTRO_PROVEEDOR`,
   `src/lib/competencia/analisis.ts`, con prueba). Tablas `competencia_busquedas`, `competencia_productos` (proveedor, precio,
   stock, `es_nuestro`, `igual_a` + parecido + método nombre/foto, `foto_huella`), `competencia_historial` y
-  `competencia_alertas` (bajó precio, más barato que nosotros, bajó stock, nuevo que no tenemos, competidor nuevo,
+  `competencia_alertas` (bajó precio, más barato que nosotros, bajó stock, competidor nuevo,
   desapareció; `vista`). Se lee con `scrapingCompetencia` de `scripts/scraping-proveedores-navegador.js` en una pestaña de
   `app.dropi.pa` y la guarda el mismo receptor (`tipo: "competencia"`, `scripts/competencia-guardar.ts`): compara con la
   búsqueda anterior (`comparar`), calcula huellas, empareja con `yaVisto` contra lo nuestro y arma las alertas
@@ -408,7 +408,7 @@ convenciones técnicas del código.
   días (`unidadesBajadas`), porque Dropi no muestra ventas ajenas. Panamá, 14 oct 2026: 1.452 productos de 93 proveedores
   leídos en 10 s; ECOMFIVE tiene 178. **Pestañas** (`PESTANAS_POR_MODULO`): Dashboard (`/analisis-competencia`,
   `dashboard-competencia.tsx`, recharts con los degradados neón de Compras/Test productos, filtros cruzados de competidor,
-  categoría, solo iguales y periodo), Alertas, Productos, Nuevos, Competidores y Bitácora; cada una es su página y usa
+  categoría, solo iguales y periodo), Alertas, Productos, Competidores y Bitácora (la de «Nuevos que no tenemos» se quitó a pedido); cada una es su página y usa
   `PaginaCompetencia` (carga `cargarDatosCompetencia` y pone `ResumenCompetencia`, la barra de `Indicador` con `marco-neon`).
   **Competencia de un producto** (Producto y Compras): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
   basta Producto, Compras o Análisis) busca el producto por nombre y foto con `todasLasCoincidencias` (cruces.ts) entre todo

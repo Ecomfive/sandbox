@@ -1,7 +1,7 @@
 // Análisis de competencia (14 oct 2026), sin base ni React para poder probarlo:
 // * `normalizarCompetencia`: un producto del catálogo de Dropi con su proveedor.
 // * `armarAlertas`: de lo que cambió en una búsqueda, lo que pide atención (bajó precio, vende más barato que nosotros, bajó
-//   stock, nuevo que no tenemos, competidor nuevo, desapareció uno igual al nuestro).
+//   stock, competidor nuevo, desapareció uno igual al nuestro).
 // * `unidadesBajadas`: cuántas unidades bajó el stock en los últimos N días (la señal de cuánto vende un competidor).
 // Los productos iguales a los nuestros se emparejan con `yaVisto` (src/lib/scraping/cruces.ts): 85 % del nombre y 2 palabras en
 // común, o la misma foto con alguna palabra en común.
@@ -26,7 +26,7 @@ export function normalizarCompetencia(o: unknown): VistoCompetencia | null {
   return { ...v, proveedorId, proveedorNombre, esNuestro: NUESTRO_PROVEEDOR.test(proveedorNombre) };
 }
 
-export type TipoAlerta = "bajo_precio" | "mas_barato" | "bajo_stock" | "nuevo" | "competidor_nuevo" | "desaparecio";
+export type TipoAlerta = "bajo_precio" | "mas_barato" | "bajo_stock" | "competidor_nuevo" | "desaparecio";
 
 export interface Alerta {
   tipo: TipoAlerta;
@@ -52,15 +52,12 @@ const unidades = (n: number | null) => (n === null ? "—" : n.toLocaleString("e
 
 /**
  * Las alertas de una búsqueda. `cambios` son los eventos de cada producto que siguió (precio, stock, reapareció);
- * `nuevos` y `desaparecidos` los ids; `yaLoTenemos` dice si un nuevo sin pareja ya está en Producto o en Test productos;
- * `proveedoresNuevos` los proveedores que no se habían visto. La primera búsqueda de un país no deja alertas (todo es nuevo).
+ * `desaparecidos` los ids; `proveedoresNuevos` los proveedores que no se habían visto. La primera búsqueda de un país no deja alertas (todo es nuevo).
  */
 export function armarAlertas(datos: {
   productos: Map<string, ProductoAlerta>;
   cambios: { id: string; eventos: Evento[] }[];
-  nuevos: string[];
   desaparecidos: string[];
-  yaLoTenemos: (id: string) => string | null;
   proveedoresNuevos: { nombre: string; productos: number }[];
 }): Alerta[] {
   const { productos } = datos;
@@ -93,20 +90,6 @@ export function armarAlertas(datos: {
         });
       }
     }
-  }
-
-  for (const id of datos.nuevos) {
-    const p = productos.get(id);
-    if (!p || p.esNuestro || p.igualA) continue;
-    const tenemos = datos.yaLoTenemos(id);
-    if (tenemos) continue;
-    alertas.push({
-      tipo: "nuevo",
-      productoId: p.id,
-      nuestroId: null,
-      titulo: `Nuevo en ${p.proveedorNombre}: «${p.nombre}»`,
-      detalle: `${usd(p.precio)} · ${unidades(p.stock)} en stock · no lo tenemos`,
-    });
   }
 
   for (const id of datos.desaparecidos) {

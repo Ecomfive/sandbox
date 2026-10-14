@@ -7,8 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { armarAlertas, normalizarCompetencia, type ProductoAlerta, type VistoCompetencia } from "../src/lib/competencia/analisis";
 import { comparar, type Evento, type ProductoGuardado } from "../src/lib/scraping/comparar";
-import { indexar, motivoYaVisto, yaVisto } from "../src/lib/scraping/cruces";
-import { cargarReferencias } from "../src/lib/scraping/referencias";
+import { indexar, yaVisto } from "../src/lib/scraping/cruces";
 
 interface LecturaCompetencia {
   pais: string;
@@ -133,11 +132,9 @@ export async function guardarCompetencia(
     // 3. Historial: cada cambio (sin los de «privatizado»/«publicado», que en la competencia no aplican).
     const historial: (Evento & { producto_id: string; busqueda_id: string; fecha: string })[] = [];
     const fila = (id: string, e: Evento) => ({ ...e, producto_id: id, busqueda_id: busqueda.id, fecha: ahora });
-    const nuevosIds: string[] = [];
     for (const n of r.nuevos) {
       const id = idPorDropi.get(n.dropiId);
       if (!id) continue;
-      nuevosIds.push(id);
       historial.push(fila(id, { evento: "primera_vez", precio: n.precio, stock: n.stock, precio_antes: null, stock_antes: null, detalle: null }));
     }
     const cambios = r.vistos.map((c) => ({ id: c.id, eventos: c.eventos.filter((e) => e.evento === "precio" || e.evento === "stock" || e.evento === "reaparecio") }));
@@ -188,8 +185,6 @@ export async function guardarCompetencia(
       const productos = new Map<string, ProductoAlerta>(
         actuales.map((p) => [p.id, { id: p.id, nombre: p.nombre, proveedorNombre: p.proveedor_nombre, esNuestro: p.es_nuestro, precio: p.precio === null ? null : Number(p.precio), stock: p.stock, igualA: p.igual_a }]),
       );
-      const refs = await cargarReferencias(supabase);
-      const huellaDe = new Map(actuales.map((p) => [p.id, p.foto_huella]));
       const provAntes = new Set(antes.map((g) => Number(g.proveedor_dropi_id)));
       const provNuevos = new Map<number, { nombre: string; productos: number }>();
       for (const v of unicos.values()) {
@@ -201,13 +196,7 @@ export async function guardarCompetencia(
       const lista = armarAlertas({
         productos,
         cambios,
-        nuevos: nuevosIds,
         desaparecidos,
-        yaLoTenemos: (id) => {
-          const p = productos.get(id);
-          const v = p ? yaVisto(p.nombre, huellaDe.get(id) ?? null, refs) : null;
-          return v ? motivoYaVisto(v) : null;
-        },
         proveedoresNuevos: [...provNuevos.values()],
       });
       await enTrozos(lista, 500, async (trozo) => {

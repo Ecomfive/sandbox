@@ -24,10 +24,6 @@ export interface ProductoC {
   bajo7: number;
   bajo30: number;
   urlProveedor: string;
-  /** Otros competidores que venden lo mismo (prioridad). */
-  repetidoEn: string[];
-  /** Si un nuevo ya está en Producto o en Test productos. */
-  yaLoTenemos: string | null;
 }
 
 /** Una fila de «Nuestros productos vs competencia»: un producto nuestro y los iguales de la competencia. */
@@ -61,29 +57,6 @@ export const DEF_NUESTROS: DefTabla<FilaNuestro> = {
     { id: "precio", etiqueta: "Nuestro precio", tipo: "numero", valor: (f) => f.nuestro.precio },
     { id: "diferencia", etiqueta: "Diferencia", tipo: "numero", valor: (f) => f.diferencia },
     { id: "bajo7", etiqueta: "Stock vendido por la competencia (7 días)", tipo: "numero", valor: (f) => f.bajo7 },
-  ],
-};
-
-export const DEF_NUEVOS: DefTabla<ProductoC> = {
-  clave: "competencia-nuevos",
-  campos: [
-    { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${f.nombre} ${f.proveedor}` },
-    { id: "proveedor", etiqueta: "Competidor", tipo: "seleccion", valores: (f) => [f.proveedor], agrupable: true },
-    {
-      id: "cruce",
-      etiqueta: "Cruce",
-      tipo: "seleccion",
-      valores: (f) => [f.yaLoTenemos ? "tenemos" : f.repetidoEn.length ? "prioridad" : "no"],
-      opciones: () => [
-        { valor: "prioridad", etiqueta: "Prioridad (en varios competidores)" },
-        { valor: "no", etiqueta: "No lo tenemos" },
-        { valor: "tenemos", etiqueta: "Ya testeado o en Producto" },
-      ],
-      agrupable: true,
-    },
-    { id: "precio", etiqueta: "Precio", tipo: "numero", valor: (f) => f.precio },
-    { id: "stock", etiqueta: "Stock", tipo: "numero", valor: (f) => f.stock },
-    { id: "visto", etiqueta: "Visto por primera vez", tipo: "fecha", valor: (f) => f.primeraVez.slice(0, 10) },
   ],
 };
 
@@ -169,7 +142,6 @@ export interface VentaC {
 export interface DatosCompetencia {
   pais: string;
   productos: ProductoC[];
-  nuevos: ProductoC[];
   competidores: CompetidorC[];
   alertas: AlertaC[];
   bitacora: BitacoraC[];

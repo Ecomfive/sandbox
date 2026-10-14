@@ -21,7 +21,6 @@ import {
   DEF_BITACORA,
   DEF_COMPETIDORES,
   DEF_NUESTROS,
-  DEF_NUEVOS,
   EVENTOS,
   type BitacoraC,
   type CompetidorC,
@@ -41,7 +40,6 @@ const TIPO: Record<string, { etiqueta: string; tono: "destructive" | "warning" |
   bajo_precio: { etiqueta: "Bajó precio", tono: "warning", punto: "bg-warning" },
   bajo_stock: { etiqueta: "Bajó stock", tono: "warning", punto: "bg-warning" },
   desaparecio: { etiqueta: "Desapareció", tono: "neutral", punto: "bg-border-control" },
-  nuevo: { etiqueta: "Nuevo que no tenemos", tono: "azul", punto: "bg-azul" },
   competidor_nuevo: { etiqueta: "Competidor nuevo", tono: "neutral", punto: "bg-border-control" },
 };
 
@@ -149,47 +147,6 @@ const COL_NUESTROS: ColumnaTabla<FilaNuestro, undefined>[] = [
       );
     },
   },
-];
-
-const COL_NUEVOS: ColumnaTabla<ProductoC, undefined>[] = [
-  {
-    id: "producto",
-    label: "Producto",
-    ocultable: false,
-    render: (p) => (
-      <span className="flex min-w-[16rem] items-center gap-3">
-        <Foto url={p.foto} />
-        <span className="flex min-w-0 flex-col">
-          <span className="font-medium">{p.nombre}</span>
-          <span className="text-xs text-muted-foreground">{p.categoria ?? `ID ${p.dropiId}`}</span>
-        </span>
-      </span>
-    ),
-  },
-  {
-    id: "proveedor",
-    label: "Competidor",
-    ocultable: true,
-    render: (p) => (
-      <a href={p.urlProveedor} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-        {p.proveedor}
-      </a>
-    ),
-  },
-  { id: "precio", label: "Precio", ocultable: true, clase: "text-right tabular-nums", render: (p) => usd(p.precio) },
-  { id: "stock", label: "Stock", ocultable: true, clase: "text-right tabular-nums", render: (p) => num(p.stock) },
-  {
-    id: "cruce",
-    label: "Cruce",
-    ocultable: true,
-    render: (p) => (
-      <span className="flex flex-wrap gap-1">
-        {p.yaLoTenemos ? <Badge>{p.yaLoTenemos}</Badge> : <Badge tone="success">No lo tenemos</Badge>}
-        {p.repetidoEn.length > 0 && <Badge tone="destructive">Prioridad · {p.repetidoEn.length + 1} competidores</Badge>}
-      </span>
-    ),
-  },
-  { id: "visto", label: "Visto", ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (p) => formatearFechaHora(p.primeraVez) },
 ];
 
 const COL_COMPETIDORES: ColumnaTabla<CompetidorC, undefined>[] = [
@@ -390,7 +347,6 @@ export function ResumenCompetencia({ datos }: { datos: DatosCompetencia }) {
   const conCompetencia = filas.filter((f) => f.iguales.length).length;
   const masBaratos = filas.filter((f) => f.diferencia !== null && f.diferencia < 0).length;
   const sinVer = datos.alertas.filter((a) => !a.vista).length;
-  const nuevos = datos.nuevos.filter((n) => !n.yaLoTenemos).length;
   const vendido7 = datos.competidores.reduce((t, c) => t + c.bajo7, 0);
   const competencia = datos.productos.filter((p) => !p.esNuestro && p.estado === "activo").length;
   return (
@@ -411,13 +367,6 @@ export function ResumenCompetencia({ datos }: { datos: DatosCompetencia }) {
           href="/analisis-competencia/productos"
         />
         <Indicador titulo="Stock vendido (7 días)" valor={num(vendido7)} detalle="unidades que bajó el stock de la competencia" href="/analisis-competencia/competidores" />
-        <Indicador
-          titulo="Nuevos que no tenemos"
-          punto={nuevos ? "aviso" : undefined}
-          valor={num(nuevos)}
-          detalle={datos.busquedas > 1 ? "desde la primera búsqueda" : "desde la segunda búsqueda"}
-          href="/analisis-competencia/nuevos"
-        />
         <Indicador
           titulo="Alertas sin ver"
           punto={sinVer ? "peligro" : undefined}
@@ -530,21 +479,6 @@ export function VistaNuestros({ datos }: { datos: DatosCompetencia; puedeEscribi
       />
       <Comparacion fila={filas.find((f) => f.nuestro.id === abierta) ?? null} alCerrar={() => setAbierta(null)} />
     </>
-  );
-}
-
-export function VistaNuevos({ datos }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
-  return (
-    <TablaDatos
-      def={DEF_NUEVOS}
-      filas={datos.nuevos}
-      columnas={COL_NUEVOS}
-      iconos={ICONOS}
-      nombre={{ singular: "producto", plural: "productos" }}
-      claveFila={(p) => p.id}
-      ariaLabel="Productos nuevos de la competencia"
-      vacio={datos.busquedas > 1 ? "Ningún producto nuevo en la competencia." : "Los nuevos se ven desde la segunda búsqueda: la primera guarda todo el catálogo de hoy."}
-    />
   );
 }
 

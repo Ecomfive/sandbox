@@ -1,7 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
-import { repetidos, yaVisto } from "@/lib/scraping/cruces";
-import { cargarReferencias } from "@/lib/scraping/referencias";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { AlertaC, BitacoraC, CompetidorC, DatosCompetencia, ProductoC, VentaC } from "./def-competencia";
 
@@ -30,7 +28,7 @@ interface FilaProducto {
 
 /**
  * Todo lo que muestran las pestañas de Análisis de competencia para un país: los productos (nuestros y de la competencia) con
- * sus iguales, el stock vendido en 1/7/30 días, los nuevos que no tenemos, los competidores, las alertas, la bitácora y las
+ * sus iguales, el stock vendido en 1/7/30 días, los competidores, las alertas, la bitácora y las
  * ventas por día (bajadas de stock) para el dashboard. `null` si falta la migración 0108.
  */
 export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { id: string; codigo: string; nombre: string }): Promise<DatosCompetencia | null> {
@@ -101,35 +99,13 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
       bajo7: unidadesBajadas(cambios, 7, ahora),
       bajo30: unidadesBajadas(cambios, 30, ahora),
       urlProveedor: `https://app.dropi.${dominio}/dashboard/provider/${p.proveedor_dropi_id}/${encodeURIComponent(p.proveedor_nombre)}`,
-      repetidoEn: [],
-      yaLoTenemos: null,
     };
   };
   const productos = filas.map(aProducto);
-  const porId = new Map(productos.map((p) => [p.id, p]));
 
-  // Nuevos que no tenemos: aparecieron después de la primera búsqueda, no son iguales a uno nuestro ni están en Producto o en
-  // Test productos. La prioridad sale de cuántos competidores lo venden.
+  // La primera búsqueda marca desde cuándo un producto de un competidor cuenta como «nuevo» suyo.
   const listas = (busq.data ?? []).filter((b) => b.estado === "lista");
-  const primera = listas[listas.length - 1];
-  const corte = primera?.fin ?? null;
-  const competencia = filas.filter((p) => !p.es_nuestro && p.estado === "activo");
-  const repes = repetidos(competencia.map((p) => ({ id: p.id, grupo: p.proveedor_nombre, nombre: p.nombre, huella: p.foto_huella })));
-  for (const [id, grupos] of repes) {
-    const p = porId.get(id);
-    if (p) p.repetidoEn = [...grupos];
-  }
-  const refs = corte ? await cargarReferencias(supabase) : null;
-  const nuevos: ProductoC[] = [];
-  if (corte && refs) {
-    for (const f of competencia) {
-      if (f.igual_a || f.primera_vez <= corte) continue;
-      const p = porId.get(f.id)!;
-      const v = yaVisto(f.nombre, f.foto_huella, refs);
-      p.yaLoTenemos = v ? `${v.tipo === "test" ? "Ya testeado" : "Ya en Producto"}: «${v.nombre}»` : null;
-      nuevos.push(p);
-    }
-  }
+  const corte = listas[listas.length - 1]?.fin ?? null;
 
   // Competidores: sus productos, cuántos son iguales a los nuestros, los nuevos de la semana y cuánto bajó su stock.
   const porProveedor = new Map<number, CompetidorC>();
@@ -157,7 +133,6 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   const datos: DatosCompetencia = {
     pais: pais.nombre,
     productos,
-    nuevos,
     competidores: [...porProveedor.values()].sort((a, b) => b.bajo7 - a.bajo7 || b.productos - a.productos),
     alertas,
     bitacora,
