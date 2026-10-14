@@ -67,10 +67,19 @@ archivo que no es video (IG-0006, IG-0013): se guarda como imagen.
 Consecuencias en el sistema:
 - La tabla muestra el **formato** de lo que llegó («Con enlace», «Con video», «Con imagen», «Enlace y video», «Enlace e imagen» o «Sin
   enlace ni archivo»), no «Reel» o «Publicación».
-- El **identificador de Meta es el mismo** para el mismo contenido: sirve para reconocer **repetidas** (también por el código del
-  enlace; `repetidas.ts`) y para que cada captura **complete a la otra** con lo que le falta (enlace, cuenta, nombre de la página, cifras
-  y fecha) sin pisar nada (`compartirConRepetidas` en `guardar.ts`). Así, si el mismo contenido llega como archivo y luego como enlace,
-  el archivo hereda el enlace y las cifras.
+- El **identificador de Meta es el mismo** para el mismo contenido (y también el código del enlace): por eso **cada contenido tiene una sola
+  captura**. Si lo mismo se comparte varias veces, o una vez como archivo y otra como enlace, la nueva llegada se **fusiona en la primera**
+  (`fusion.ts`, `fusionarEnPrimera` en `guardar.ts`): la primera se completa con lo que traiga la otra (enlace, archivo, cuenta, nombre de la
+  página, cifras, fecha, textos y notas; nada de lo que ya tenía se pisa), y cada envío queda registrado en `metricas.envios` (quién y
+  cuándo; la ficha dice «Compartida N veces»). Los reintentos de Meta no duplican: un mensaje ya fusionado se reconoce por esos envíos.
+  El botón «Fusionar N repetidas» de la lista hace lo mismo con las que ya estaban repetidas antes. Si la captura principal sigue «nuevo» y
+  la absorbida ya tenía una decisión (por testear, descartado), se conserva esa decisión.
+- **Un enlace pegado después de compartir un archivo** («Copiar enlace» y mandarlo como mensaje) no crea otra captura: se une a la última
+  captura de esa persona (20 minutos) que no tenga enlace y se lee su página para completarla (`pegarEnlaceALaUltima`). Es la forma segura de
+  tener el enlace cuando lo compartido llega solo como archivo.
+- **Reintento desde lo guardado:** la ficha trae «Reintentar el archivo» (o «Completar desde el enlace»): vuelve a descargar el archivo del
+  aviso de Meta que se guardó en `payload` y, si hay enlace, lee su página. Sirve, por ejemplo, para las imágenes que llegaron antes de
+  saberlas guardar (IG-0006, IG-0013); si Meta ya venció la dirección del archivo, avisa el motivo.
 - **Las cifras y el nombre de la página solo se pueden leer cuando hay enlace** (salen de su vista previa pública): una captura que llega
   solo como archivo no los tiene, salvo que la misma publicación llegue después con enlace.
 - La lista se **refresca sola cada 30 segundos** mientras la pestaña se ve (`router.refresh()`).

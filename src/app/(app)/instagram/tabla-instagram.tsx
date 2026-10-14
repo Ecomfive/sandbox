@@ -21,7 +21,7 @@ import {
   quienEnvio,
   type FilaInstagram,
 } from "./def-instagram";
-import { cambiarEstadoCaptura } from "./actions";
+import { cambiarEstadoCaptura, fusionarCapturasRepetidas } from "./actions";
 import { FichaInstagram } from "./ficha-instagram";
 import { SelectorEstadoInstagram } from "./selector-estado-instagram";
 
@@ -69,6 +69,7 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
       <span className="flex items-center gap-2">
         <Badge color={colorFormatoInstagram(formatoDeCaptura(f))}>{etiquetaFormatoInstagram(formatoDeCaptura(f))}</Badge>
         {f.repetidaDe !== null && <Badge tone="warning">{`Repetida de ${numeroInstagram(f.repetidaDe)}`}</Badge>}
+        {f.envios.length > 0 && <Badge tone="info">{`Compartida ${f.envios.length + 1} veces`}</Badge>}
         <span className="block max-w-[26rem] truncate" title={resumen(f)}>
           {resumen(f)}
         </span>
@@ -155,6 +156,21 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
   );
   const cols = useMemo(() => columnas(puedeEscribir, (id, estado) => void cambiar(id, estado)), [puedeEscribir, cambiar]);
 
+  // Las capturas que ya estaban repetidas antes de que se fusionaran solas: un botón las deja en una sola ficha cada una.
+  const repetidas = filas.filter((f) => f.repetidaDe !== null).length;
+  const [fusionando, setFusionando] = useState(false);
+  async function fusionar() {
+    if (fusionando || !confirm(`Se fusionarán ${repetidas} ${repetidas === 1 ? "captura repetida" : "capturas repetidas"} en la primera de cada una, con todos sus datos. ¿Continuar?`)) return;
+    setFusionando(true);
+    const r: { error?: string; fusionadas?: number } = await fusionarCapturasRepetidas().catch(() => ({ error: "No se pudieron fusionar las capturas." }));
+    setFusionando(false);
+    if (r.error) mostrarToast(r.error, "destructive");
+    else {
+      mostrarToast(`${r.fusionadas ?? 0} ${r.fusionadas === 1 ? "captura fusionada" : "capturas fusionadas"}`);
+      router.refresh();
+    }
+  }
+
   return (
     <>
       <TablaDatos
@@ -175,6 +191,13 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
           columna: "captura",
           soloColumna: true,
         }}
+        accionPrincipal={
+          puedeEscribir && repetidas > 0 ? (
+            <button type="button" onClick={() => void fusionar()} disabled={fusionando} className={`inline-flex items-center justify-center gap-1 boton-neon border border-transparent px-4 py-2 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md`}>
+              {fusionando ? "Fusionando..." : `Fusionar ${repetidas} ${repetidas === 1 ? "repetida" : "repetidas"}`}
+            </button>
+          ) : undefined
+        }
         ariaLabel="Capturas de Instagram"
         vacio="Todavía no hay capturas. Comparte un reel por mensaje directo con la cuenta de fuentes y aparecerá aquí."
       />

@@ -4,6 +4,7 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
+import { enviosDe } from "@/lib/instagram/fusion";
 import { repetidasDe } from "@/lib/instagram/repetidas";
 import type { FilaInstagram } from "./def-instagram";
 import { TablaInstagram } from "./tabla-instagram";
@@ -82,6 +83,7 @@ export default async function InstagramPage() {
     archivoTipo: !f.video_ruta ? null : /\.(jpg|png|webp|gif)$/i.test(f.video_ruta) ? "imagen" : "video",
     nombrePagina: typeof f.metricas?.nombre_pagina === "string" ? f.metricas.nombre_pagina : null,
     repetidaDe: repetidas.get(f.numero) ?? null,
+    envios: enviosDe(f.metricas).map((e) => ({ quien: e.remitente_usuario ? `@${e.remitente_usuario}` : e.remitente_nombre || `ID ${e.remitente_id}`, en: e.recibido_en })),
     videoBytes: f.video_bytes === null ? null : Number(f.video_bytes),
     videoError: f.video_error,
     autorUsuario: f.autor_usuario,

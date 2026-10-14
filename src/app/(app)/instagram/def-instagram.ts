@@ -21,6 +21,8 @@ export interface FilaInstagram {
   nombrePagina: string | null;
   /** El N.º de la primera captura del mismo contenido, si esta lo repite. */
   repetidaDe: number | null;
+  /** Los demás envíos del mismo contenido que se fusionaron en esta captura (quién y cuándo). */
+  envios: { quien: string; en: string }[];
   videoBytes: number | null;
   videoError: string | null;
   autorUsuario: string | null;

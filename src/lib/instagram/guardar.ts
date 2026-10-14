@@ -1,11 +1,12 @@
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
-import { formatoDeVideo, type CapturaInstagram, type NotaInstagram } from "./extraer";
+import { extraerCapturas, formatoDeVideo, type CapturaInstagram, type NotaInstagram } from "./extraer";
 import { interpretarEmbed, urlDeEmbed, type DatosEmbed } from "./embed";
+import { enviosDe, fusionar, unirTextos, type FilaFusionable } from "./fusion";
 import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
-import { datosQueFaltan } from "./repetidas";
+import { codigoDePublicacion, repetidasDe } from "./repetidas";
 import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
 
 export const BUCKET_INSTAGRAM = "instagram-fuentes";
@@ -111,19 +112,116 @@ async function copiarVideo(id: string, url: string): Promise<{ ruta: string; byt
   return { ruta, bytes: descarga.bytes.length };
 }
 
+const TABLA = "instagram_capturas";
+const COLUMNAS_FUSION = "id, mensaje_id, recibido_en, remitente_id, remitente_usuario, remitente_nombre, tipo, enlace, titulo, media_id, texto_mensaje, video_ruta, video_bytes, video_error, autor_usuario, metricas, pagina_destino, notas, estado";
+
+/** Cuánto después de una captura se une todavía un mensaje o un enlace suelto de la misma persona. */
+const MINUTOS_PARA_UNIR = 20;
+
+type Supabase = ReturnType<typeof createServiceClient>;
+type FilaConId = FilaFusionable & { id: string };
+
 /**
- * Guarda las capturas de un aviso de Meta: una fila por cada una (con el aviso completo en `payload`) y, después, el video.
- * Meta reintenta los avisos que no contesta a tiempo, así que el mismo mensaje puede llegar dos veces: la llave única
- * `mensaje_id` hace que la segunda vez no cree nada. Nunca lanza: lo que falle queda anotado en `video_error` o se pierde
- * sin tumbar la respuesta al webhook.
+ * ¿Ya se procesó este mensaje de Meta? Meta reintenta los avisos que no contesta a tiempo. Un mensaje procesado queda en su captura
+ * (`mensaje_id`, la llave única) o, si la captura se fusionó en otra, en los envíos de la que la absorbió (`metricas.envios`) o entre
+ * los textos ya unidos (`metricas.notas_unidas`).
+ */
+async function yaProcesado(supabase: Supabase, mensajeId: string): Promise<boolean> {
+  const [envio, nota] = await Promise.all([
+    supabase.from(TABLA).select("id").contains("metricas", { envios: [{ mensaje_id: mensajeId }] }).limit(1),
+    supabase.from(TABLA).select("id").contains("metricas", { notas_unidas: [mensajeId] }).limit(1),
+  ]);
+  return (envio.data?.length ?? 0) > 0 || (nota.data?.length ?? 0) > 0;
+}
+
+/**
+ * La última captura que tocó esa persona en los últimos minutos (la que recibió de ella o en la que se fusionó un envío suyo), para
+ * unirle lo que escribió o el enlace que pegó.
+ */
+async function ultimaCapturaDe(supabase: Supabase, remitenteId: string, sirve: (f: FilaConId) => boolean = () => true): Promise<FilaConId | null> {
+  const desde = new Date(Date.now() - MINUTOS_PARA_UNIR * 60_000).toISOString();
+  const { data } = await supabase.from(TABLA).select(COLUMNAS_FUSION).gte("actualizado_en", desde).order("actualizado_en", { ascending: false }).limit(20);
+  const filas = (data ?? []) as unknown as FilaConId[];
+  return filas.find((f) => sirve(f) && (f.remitente_id === remitenteId || enviosDe(f.metricas).some((e) => e.remitente_id === remitenteId && e.recibido_en >= desde))) ?? null;
+}
+
+/** Absorbe una captura en otra del mismo contenido (ver `fusionar`): la principal se completa y la absorbida desaparece. */
+async function fusionarPar(supabase: Supabase, principalId: string, absorbidaId: string): Promise<boolean> {
+  const { data } = await supabase.from(TABLA).select(COLUMNAS_FUSION).in("id", [principalId, absorbidaId]);
+  const filas = (data ?? []) as unknown as FilaConId[];
+  const principal = filas.find((f) => f.id === principalId);
+  const absorbida = filas.find((f) => f.id === absorbidaId);
+  if (!principal || !absorbida) return false;
+  const { cambios, archivoSobrante } = fusionar(principal, absorbida);
+  const { error } = await supabase.from(TABLA).update({ ...cambios, actualizado_en: new Date().toISOString() }).eq("id", principalId);
+  if (error) return false;
+  await supabase.from(TABLA).delete().eq("id", absorbidaId);
+  if (archivoSobrante) await supabase.storage.from(BUCKET_INSTAGRAM).remove([archivoSobrante]);
+  return true;
+}
+
+/**
+ * Si el mismo contenido ya estaba en una captura anterior (mismo identificador de Meta o mismo código de enlace), esta se fusiona en
+ * la primera: una sola ficha con todos los datos y un registro de cada envío. Devuelve el id de la captura que queda. Nunca lanza.
+ */
+async function fusionarEnPrimera(supabase: Supabase, id: string): Promise<string> {
+  try {
+    const { data } = await supabase.from(TABLA).select(`${COLUMNAS_FUSION}, numero`).eq("id", id).maybeSingle();
+    const nueva = data as unknown as (FilaConId & { numero: number }) | null;
+    if (!nueva) return id;
+    const filtros: string[] = [];
+    if (nueva.media_id && /^\d{1,30}$/.test(nueva.media_id)) filtros.push(`media_id.eq.${nueva.media_id}`);
+    const codigo = codigoDePublicacion(nueva.enlace);
+    if (codigo && /^[\w-]{1,40}$/.test(codigo)) filtros.push(`enlace.ilike.*${codigo}*`);
+    if (filtros.length === 0) return id;
+    const { data: candidatas } = await supabase.from(TABLA).select(`${COLUMNAS_FUSION}, numero`).neq("id", id).or(filtros.join(",")).order("numero").limit(20);
+    const principal = ((candidatas ?? []) as unknown as (FilaConId & { numero: number })[]).find(
+      (f) => f.numero < nueva.numero && ((nueva.media_id && f.media_id === nueva.media_id) || (codigo && codigoDePublicacion(f.enlace) === codigo)),
+    );
+    if (!principal) return id;
+    return (await fusionarPar(supabase, principal.id, id)) ? principal.id : id;
+  } catch {
+    return id;
+  }
+}
+
+/**
+ * Un enlace de reel o publicación que alguien pega después de compartir el archivo («copiar enlace»): en vez de crear otra captura,
+ * se le pone a la última de esa persona que no tenga enlace y se lee su página para completarla. Devuelve true si lo unió.
+ */
+async function pegarEnlaceALaUltima(supabase: Supabase, c: CapturaInstagram): Promise<boolean> {
+  if (!c.enlace || !c.mensajeId.endsWith(":texto")) return false;
+  const previa = await ultimaCapturaDe(supabase, c.remitenteId, (f) => !f.enlace);
+  if (!previa) return false;
+  const metricas = { ...(previa.metricas ?? {}) } as Record<string, unknown>;
+  const unidas = Array.isArray(metricas.notas_unidas) ? (metricas.notas_unidas as string[]) : [];
+  metricas.notas_unidas = [...unidas, c.mensajeId].slice(-20);
+  const { error } = await supabase
+    .from(TABLA)
+    .update({ enlace: c.enlace, texto_mensaje: unirTextos(previa.texto_mensaje, c.textoMensaje), metricas, actualizado_en: new Date().toISOString() })
+    .eq("id", previa.id);
+  if (error) return false;
+  await completarCaptura(previa.id);
+  await fusionarEnPrimera(supabase, previa.id);
+  return true;
+}
+
+/**
+ * Guarda las capturas de un aviso de Meta. Cada contenido tiene **una sola captura**: si ya había una del mismo contenido (mismo
+ * identificador de Meta o mismo código de enlace), la nueva llegada se fusiona en ella; si lo que llegó es un enlace pegado después
+ * de compartir un archivo, se le une a esa captura. El aviso completo queda en `payload`. Meta reintenta los avisos que no contesta a
+ * tiempo: el mismo mensaje no se procesa dos veces. Nunca lanza: lo que falle queda anotado en `video_error` o se pierde sin tumbar
+ * la respuesta al webhook.
  */
 export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram[]): Promise<{ nuevas: number }> {
   const supabase = createServiceClient();
   let nuevas = 0;
   for (const c of capturas) {
     try {
+      if (await yaProcesado(supabase, c.mensajeId)) continue;
+      if (await pegarEnlaceALaUltima(supabase, c)) continue;
       const { data, error } = await supabase
-        .from("instagram_capturas")
+        .from(TABLA)
         .insert({
           mensaje_id: c.mensajeId,
           remitente_id: c.remitenteId,
@@ -171,41 +269,14 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
           cambios.video_bytes = video.bytes;
         }
       }
-      if (Object.keys(cambios).length > 0) await supabase.from("instagram_capturas").update(cambios).eq("id", data.id);
-      if (c.mediaId) await compartirConRepetidas(data.id, c.mediaId);
+      if (Object.keys(cambios).length > 0) await supabase.from(TABLA).update(cambios).eq("id", data.id);
+      await fusionarEnPrimera(supabase, data.id);
     } catch {
       // Una captura que falla no debe impedir guardar las demás del mismo aviso.
     }
   }
   return { nuevas };
 }
-
-/**
- * El mismo contenido compartido dos veces (por ejemplo, una vez como archivo y otra como enlace) trae el mismo identificador de Meta:
- * cada captura completa a la otra con lo que a la otra le falta (enlace, cuenta, nombre de la página, cifras y fecha), sin pisar
- * nada. Nunca lanza.
- */
-async function compartirConRepetidas(id: string, mediaId: string): Promise<void> {
-  try {
-    const supabase = createServiceClient();
-    const { data } = await supabase.from("instagram_capturas").select("id, enlace, autor_usuario, metricas").eq("media_id", mediaId).limit(20);
-    const filas = data ?? [];
-    const esta = filas.find((f) => f.id === id);
-    if (!esta) return;
-    for (const otra of filas) {
-      if (otra.id === id) continue;
-      const aEsta = datosQueFaltan(esta, otra);
-      if (aEsta) await supabase.from("instagram_capturas").update({ ...aEsta, actualizado_en: new Date().toISOString() }).eq("id", id);
-      const aOtra = datosQueFaltan(otra, esta);
-      if (aOtra) await supabase.from("instagram_capturas").update({ ...aOtra, actualizado_en: new Date().toISOString() }).eq("id", otra.id);
-    }
-  } catch {
-    // Completar de más no es motivo para fallar.
-  }
-}
-
-/** Cuánto después de una captura se une todavía un mensaje de texto de la misma persona. */
-const MINUTOS_PARA_UNIR_NOTA = 20;
 
 /**
  * Une cada mensaje de texto suelto a la **última captura de esa misma persona** de los últimos minutos: lo que escribió al
@@ -218,25 +289,18 @@ export async function guardarNotas(notas: NotaInstagram[]): Promise<{ unidas: nu
   let unidas = 0;
   for (const n of notas) {
     try {
-      const desde = new Date(Date.now() - MINUTOS_PARA_UNIR_NOTA * 60_000).toISOString();
-      const { data: captura } = await supabase
-        .from("instagram_capturas")
-        .select("id, texto_mensaje, pagina_destino, metricas")
-        .eq("remitente_id", n.remitenteId)
-        .gte("recibido_en", desde)
-        .order("recibido_en", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      if (await yaProcesado(supabase, n.mensajeId)) continue;
+      const captura = await ultimaCapturaDe(supabase, n.remitenteId);
       if (!captura) continue;
       const metricas = (captura.metricas ?? {}) as Record<string, unknown>;
       const yaUnidas = Array.isArray(metricas.notas_unidas) ? (metricas.notas_unidas as string[]) : [];
-      if (yaUnidas.includes(n.mensajeId)) continue;
       const cambios: Record<string, unknown> = {
-        texto_mensaje: (captura.texto_mensaje ? `${captura.texto_mensaje}\n${n.texto}` : n.texto).slice(0, 4000),
+        texto_mensaje: unirTextos(captura.texto_mensaje, n.texto),
         metricas: { ...metricas, notas_unidas: [...yaUnidas, n.mensajeId].slice(-20) },
+        actualizado_en: new Date().toISOString(),
       };
       if (!captura.pagina_destino && n.paginaDestino) cambios.pagina_destino = n.paginaDestino;
-      const { error } = await supabase.from("instagram_capturas").update(cambios).eq("id", captura.id);
+      const { error } = await supabase.from(TABLA).update(cambios).eq("id", captura.id);
       if (!error) unidas++;
     } catch {
       // Una nota que falla no debe impedir unir las demás.
@@ -246,36 +310,76 @@ export async function guardarNotas(notas: NotaInstagram[]): Promise<{ unidas: nu
 }
 
 /**
- * Vuelve a leer la página pública del enlace de una captura que ya existe y la completa: el archivo (si no lo tiene), las cifras, la
- * cuenta y el nombre de la página. Sirve para las que llegaron solo con enlace antes de que se leyera la página de «insertar», o cuando
- * Instagram no respondió la primera vez. Lo que una persona corrigió a mano no se pisa. Devuelve un mensaje de error si no hay nada que leer.
+ * Vuelve a completar una captura que ya existe: lee la página pública de su enlace (cifras, cuenta, nombre de la página y el archivo si
+ * no lo tiene) y, si todavía no tiene archivo, **vuelve a descargarlo del aviso de Meta que guardamos** (así se recupera, por
+ * ejemplo, una imagen que antes no se sabía guardar). Lo que una persona corrigió a mano no se pisa. Devuelve un mensaje de error si
+ * no hay nada que leer ni que descargar.
  */
 export async function completarCaptura(id: string): Promise<{ ok: true; archivo: boolean } | { ok: false; error: string }> {
   const supabase = createServiceClient();
-  const { data } = await supabase.from("instagram_capturas").select("id, enlace, video_ruta, autor_usuario, metricas").eq("id", id).maybeSingle();
+  const { data } = await supabase.from(TABLA).select("id, mensaje_id, enlace, video_ruta, autor_usuario, metricas, payload").eq("id", id).maybeSingle();
   if (!data) return { ok: false, error: "La captura ya no existe." };
-  if (!data.enlace) return { ok: false, error: "Esta captura no tiene enlace de Instagram para leer." };
-  if (!lecturaPublicaActiva()) return { ok: false, error: "La lectura de la página pública está apagada." };
+  const delAviso = data.video_ruta ? null : (extraerCapturas(data.payload).find((c) => c.mensajeId === data.mensaje_id)?.urlVideo ?? null);
+  if (!data.enlace && !delAviso) return { ok: false, error: "Esta captura no tiene enlace de Instagram ni un archivo que volver a descargar." };
 
-  const [vista, embed] = await Promise.all([leerVistaPublica(data.enlace), leerEmbedPublico(data.enlace)]);
-  const lectura = cifrasDeLectura(vista, embed);
-  if (Object.keys(lectura.metricas).length === 0 && !lectura.autor) return { ok: false, error: "Instagram no devolvió datos de este enlace." };
-
-  const cambios: Record<string, unknown> = { metricas: mezclarLectura((data.metricas ?? null) as Record<string, unknown> | null, lectura.metricas), actualizado_en: new Date().toISOString() };
-  if (lectura.autor && !data.autor_usuario) cambios.autor_usuario = lectura.autor;
-  let archivo = false;
-  const urlArchivo = data.video_ruta ? null : archivoDeLectura(embed);
-  if (urlArchivo) {
-    const copia = await copiarVideo(data.id, urlArchivo);
-    if ("error" in copia) cambios.video_error = copia.error;
-    else {
-      cambios.video_ruta = copia.ruta;
-      cambios.video_bytes = copia.bytes;
-      cambios.video_error = null;
-      archivo = true;
-    }
+  const cambios: Record<string, unknown> = { actualizado_en: new Date().toISOString() };
+  let embed: Awaited<ReturnType<typeof leerEmbedPublico>> = null;
+  if (data.enlace) {
+    if (!lecturaPublicaActiva()) return { ok: false, error: "La lectura de la página pública está apagada." };
+    const [vista, e] = await Promise.all([leerVistaPublica(data.enlace), leerEmbedPublico(data.enlace)]);
+    embed = e;
+    const lectura = cifrasDeLectura(vista, embed);
+    if (Object.keys(lectura.metricas).length > 0) cambios.metricas = mezclarLectura((data.metricas ?? null) as Record<string, unknown> | null, lectura.metricas);
+    if (lectura.autor && !data.autor_usuario) cambios.autor_usuario = lectura.autor;
   }
-  const { error } = await supabase.from("instagram_capturas").update(cambios).eq("id", id);
+
+  let archivo = false;
+  let errorArchivo: string | null = null;
+  if (!data.video_ruta) {
+    for (const url of [delAviso, archivoDeLectura(embed)]) {
+      if (!url) continue;
+      const copia = await copiarVideo(data.id, url);
+      if ("error" in copia) errorArchivo = copia.error;
+      else {
+        cambios.video_ruta = copia.ruta;
+        cambios.video_bytes = copia.bytes;
+        cambios.video_error = null;
+        archivo = true;
+        break;
+      }
+    }
+    if (!archivo && errorArchivo) cambios.video_error = errorArchivo;
+  }
+  const huboDatos = cambios.metricas !== undefined || cambios.autor_usuario !== undefined || archivo;
+  if (!huboDatos) {
+    if (errorArchivo) await supabase.from(TABLA).update({ video_error: errorArchivo }).eq("id", id);
+    return { ok: false, error: errorArchivo ?? "Instagram no devolvió datos de este enlace." };
+  }
+  const { error } = await supabase.from(TABLA).update(cambios).eq("id", id);
   if (error) return { ok: false, error: "No se pudieron guardar los datos leídos." };
   return { ok: true, archivo };
+}
+
+/**
+ * Fusiona de una vez las capturas que ya estaban repetidas (las anteriores a que se fusionaran solas): cada grupo del mismo contenido
+ * queda en su primera captura. Devuelve cuántas se fusionaron.
+ */
+export async function fusionarRepetidas(): Promise<{ fusionadas: number }> {
+  const supabase = createServiceClient();
+  const filas: { id: string; numero: number; enlace: string | null; media_id: string | null }[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data } = await supabase.from(TABLA).select("id, numero, enlace, media_id").order("numero").range(desde, desde + 999);
+    if (!data || data.length === 0) break;
+    filas.push(...data);
+    if (data.length < 1000) break;
+  }
+  const idPorNumero = new Map(filas.map((f) => [f.numero, f.id]));
+  const grupos = repetidasDe(filas.map((f) => ({ numero: f.numero, enlace: f.enlace, mediaId: f.media_id })));
+  let fusionadas = 0;
+  for (const [absorbida, principal] of [...grupos.entries()].sort((a, b) => a[0] - b[0])) {
+    const p = idPorNumero.get(principal);
+    const a = idPorNumero.get(absorbida);
+    if (p && a && (await fusionarPar(supabase, p, a))) fusionadas++;
+  }
+  return { fusionadas };
 }
