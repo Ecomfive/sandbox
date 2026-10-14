@@ -50,9 +50,10 @@ const AREAS: NavSection[] = [
     panel: "Marketing y ventas",
     frentes: true,
     items: [
+      // En el orden del recorrido de un producto: de dónde sale, se testea y pasa al filtro antes de comprarse.
+      { label: "Fuente de datos", href: "/fuente-datos", frente: "proveeduria" },
       { label: "Test productos", href: "/productos-test", frente: "proveeduria" },
       { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria" },
-      { label: "Fuente de datos", href: "/fuente-datos", frente: "proveeduria" },
     ],
   },
   {
