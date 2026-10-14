@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarAlertas, decisionesDeHoy, normalizarCompetencia, posicionPrecio, precioPorUnidad, unidadesBajadas, unidadesEnNombre, type ProductoAlerta } from "./analisis";
+import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEquivalente, precioPorUnidad, unidadesBajadas, unidadesEnNombre, type ProductoAlerta } from "./analisis";
 
 test("normaliza un producto con su proveedor y reconoce los nuestros", () => {
   const p = normalizarCompetencia({ id: 7, name: "King Maker 120", sale_price: 6.99, user: { id: 2094, name: "ECOMFIVE" }, warehouse_product: [{ stock: 5 }] });
@@ -87,7 +87,7 @@ test("qué hacer hoy", () => {
       ["mantener", "Collagen"],
     ],
   );
-  assert.match(d[0].motivo, /ISTMO lo vende a \$6\.00 \(nosotros \$7\.49\) y vendió 58 en 7 días\. Somos #2 de 2\./);
+  assert.match(d[0].motivo, /ISTMO lo vende a \$6\.00, nosotros \$7\.49, y vendió 58 en 7 días\. Somos #2 de 2\./);
   assert.match(d[1].motivo, /se queda sin stock en ~3 semanas/);
 });
 
@@ -107,7 +107,7 @@ test("unidades que trae una publicación, leídas del nombre", () => {
   assert.equal(precioPorUnidad(15.49, "COMBO Lemme burn y lemme purn"), 7.75);
 });
 
-test("las decisiones comparan precio por unidad", () => {
+test("las decisiones comparan con el precio equivalente", () => {
   const base = { foto: null, estado: "activo" as const, primeraVez: "2026-10-01T00:00:00Z", ultimaVez: "2026-10-14T05:00:00Z", stock: 500 };
   const d = decisionesDeHoy(
     [{ id: "l", nombre: "COMBO Lemme burn y lemme purn", precio: 15.49, foto: null }],
@@ -116,7 +116,22 @@ test("las decisiones comparan precio por unidad", () => {
     null,
     new Date("2026-10-14T12:00:00Z"),
   );
-  // $15.49 entre 2 = $7.75 c/u frente a $8.50: vamos ganando, no hay que bajar.
+  // Su unidad a $8.50 equivale a $17.00 por nuestro COMBO de 2 a $15.49: vamos ganando, no hay que bajar.
   assert.deepEqual(d.map((x) => x.tipo), ["mantener"]);
-  assert.match(d[0].motivo, /\$7\.75 c\/u frente a \$8\.50 c\/u/);
+  assert.match(d[0].motivo, /\$15\.49 frente a \$8\.50 por 1 unidad \(= \$17\.00 por el nuestro\)/);
+});
+
+test("contenido y precio equivalente a nuestro producto", () => {
+  assert.deepEqual(medidaEnNombre("Turmeric Pure Curcumin 120 capsulas"), { tipo: "cápsulas", cantidad: 120 });
+  assert.deepEqual(medidaEnNombre("MAGNESIUM COMPLEX TOPLUX 90 CAP"), { tipo: "cápsulas", cantidad: 90 });
+  assert.deepEqual(medidaEnNombre("JJLBRO SPRAY 30ML"), { tipo: "ml", cantidad: 30 });
+  assert.deepEqual(medidaEnNombre("Neocell Collagen Bio-Peptides 20G"), { tipo: "g", cantidad: 20 });
+  assert.equal(medidaEnNombre("YERBA MAGIC  x 60"), null);
+  // 60 cápsulas a $6.00 equivalen a $12.00 por nuestras 120.
+  assert.deepEqual(precioEquivalente("Turmeric Pure Curcumin 120 capsulas", { precio: 6, nombre: "TURMERIC X 60 CAPSULAS" }), { precio: 12, nota: "$6.00 por 60 cápsulas" });
+  assert.deepEqual(precioEquivalente("Aceite de Oregano 300 capsulas", { precio: 10, nombre: "CAPSULAS OREGANO 150 CAPS" }), { precio: 20, nota: "$10.00 por 150 cápsulas" });
+  // Sin contenido en los dos, por unidades: un PACK-2 nuestro frente a la unidad.
+  assert.deepEqual(precioEquivalente("King Maker Capsulas PACK-2", { precio: 8.99, nombre: "KINGMAKER 120 CAPSULAS" }), { precio: 17.98, nota: "$8.99 por 1 unidad" });
+  // Igual tamaño: sin conversión.
+  assert.deepEqual(precioEquivalente("Parches Kinoki", { precio: 3, nombre: "PARCHES KINOKI" }), { precio: 3, nota: null });
 });

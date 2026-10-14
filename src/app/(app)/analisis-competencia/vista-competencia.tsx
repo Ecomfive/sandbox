@@ -10,7 +10,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatearFechaHora } from "@/lib/formato";
 import { marcarAlertasVistas } from "./actions";
-import { decisionesDeHoy, posicionPrecio, precioPorUnidad, unidadesEnNombre, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
+import { decisionesDeHoy, posicionPrecio, precioEquivalente, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
 import type { AlertaC, CompetidorC, DatosCompetencia, FilaNuestro, ProductoC } from "./def-competencia";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
@@ -37,17 +37,16 @@ export function filasNuestras(productos: ProductoC[]): FilaNuestro[] {
   return productos
     .filter((p) => p.esNuestro && p.estado === "activo")
     .map((n) => {
-      const lista = (iguales.get(n.id) ?? []).sort((a, b) => (precioPorUnidad(a.precio, a.nombre) ?? 1e9) - (precioPorUnidad(b.precio, b.nombre) ?? 1e9));
-      const precios = lista.map((l) => precioPorUnidad(l.precio, l.nombre)).filter((x): x is number => x !== null);
+      const eq = (p: ProductoC) => precioEquivalente(n.nombre, p).precio;
+      const lista = (iguales.get(n.id) ?? []).sort((a, b) => (eq(a) ?? 1e9) - (eq(b) ?? 1e9));
+      const precios = lista.map(eq).filter((x): x is number => x !== null);
       const minimo = precios.length ? Math.min(...precios) : null;
-      const nuestroUnidad = precioPorUnidad(n.precio, n.nombre);
       return {
         nuestro: n,
         iguales: lista,
         minimo,
-        nuestroUnidad,
-        porUnidad: unidadesEnNombre(n.nombre) > 1 || lista.some((l) => unidadesEnNombre(l.nombre) > 1),
-        diferencia: minimo !== null && nuestroUnidad !== null ? Math.round((minimo - nuestroUnidad) * 100) / 100 : null,
+        convertido: lista.some((l) => precioEquivalente(n.nombre, l).nota !== null),
+        diferencia: minimo !== null && n.precio !== null ? Math.round((minimo - n.precio) * 100) / 100 : null,
         bajo7: lista.reduce((t, l) => t + l.bajo7, 0),
       };
     })
@@ -76,7 +75,7 @@ export function InsigniaPosicion({ estado, detalle }: { estado: EstadoPosicion; 
 /** Cada producto nuestro con competencia y su posición en precio (los que van perdiendo primero). */
 export function posicionesNuestras(productos: ProductoC[]) {
   return filasNuestras(productos)
-    .map((f) => ({ ...f, posicion: posicionPrecio(f.nuestroUnidad, f.iguales.map((i) => precioPorUnidad(i.precio, i.nombre))) }))
+    .map((f) => ({ ...f, posicion: posicionPrecio(f.nuestro.precio, f.iguales.map((i) => precioEquivalente(f.nuestro.nombre, i).precio)) }))
     .filter((f): f is typeof f & { posicion: Posicion } => f.posicion !== null)
     .sort((a, b) => ORDEN_POSICION[a.posicion.estado] - ORDEN_POSICION[b.posicion.estado] || (a.diferencia ?? 0) - (b.diferencia ?? 0));
 }
@@ -178,9 +177,9 @@ function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicione
       ) : (
         <ul className="flex flex-col">
           {visibles.map((f) => {
-            const mas = f.iguales.find((i) => precioPorUnidad(i.precio, i.nombre) === f.posicion.minimo) ?? f.iguales[0];
-            const dif = f.nuestroUnidad !== null ? Math.round((f.nuestroUnidad - f.posicion.minimo) * 100) / 100 : null;
-            const cu = f.porUnidad ? " c/u" : "";
+            const mas = f.iguales.find((i) => precioEquivalente(f.nuestro.nombre, i).precio === f.posicion.minimo) ?? f.iguales[0];
+            const dif = f.nuestro.precio !== null ? Math.round((f.nuestro.precio - f.posicion.minimo) * 100) / 100 : null;
+            const nota = precioEquivalente(f.nuestro.nombre, mas).nota;
             return (
               <li key={f.nuestro.id} className="border-b border-border last:border-0">
                 <button
@@ -197,9 +196,8 @@ function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicione
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-medium">{f.nuestro.nombre}</span>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      nosotros {usd(f.nuestroUnidad)}
-                      {cu} · más bajo {usd(f.posicion.minimo)}
-                      {cu}
+                      nosotros {usd(f.nuestro.precio)} · más bajo {usd(f.posicion.minimo)}
+                      {nota ? ` equivalente (${nota})` : ""}
                       {f.posicion.estado === "perdiendo" ? ` (${mas.proveedor})` : ""}
                     </span>
                   </span>
@@ -210,7 +208,7 @@ function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicione
                     ))}
                   </span>
                   <span className="hidden text-right text-xs text-muted-foreground tabular-nums sm:block">
-                    {dif === null || dif === 0 ? "mismo precio" : dif > 0 ? `${usd(dif)}${cu} más caros` : `${usd(-dif)}${cu} más baratos`}
+                    {dif === null || dif === 0 ? "mismo precio" : dif > 0 ? `${usd(dif)} más caros` : `${usd(-dif)} más baratos`}
                   </span>
                 </button>
               </li>
@@ -237,7 +235,7 @@ export function ResumenCompetencia({ datos }: { datos: DatosCompetencia }) {
   const posiciones = useMemo(() => {
     const c = { ganando: 0, empatado: 0, perdiendo: 0 };
     for (const f of filas) {
-      const p = posicionPrecio(f.nuestroUnidad, f.iguales.map((i) => precioPorUnidad(i.precio, i.nombre)));
+      const p = posicionPrecio(f.nuestro.precio, f.iguales.map((i) => precioEquivalente(f.nuestro.nombre, i).precio));
       if (p) c[p.estado]++;
     }
     return c;
@@ -366,10 +364,8 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
           <tbody>
             {visibles.map((p) => {
               const n = p.igualA ? nuestros.get(p.igualA) : undefined;
-              const pu = precioPorUnidad(p.precio, p.nombre);
-              const nu = n ? precioPorUnidad(n.precio, n.nombre) : null;
-              const cu = n && (unidadesEnNombre(n.nombre) > 1 || unidadesEnNombre(p.nombre) > 1) ? " c/u" : "";
-              const dif = nu !== null && pu !== null ? Math.round((pu - nu) * 100) / 100 : null;
+              const eq = n ? precioEquivalente(n.nombre, p) : null;
+              const dif = n && n.precio !== null && eq?.precio != null ? Math.round((eq.precio - n.precio) * 100) / 100 : null;
               const ab = abierto === p.id;
               return (
                 <Fragment key={p.id}>
@@ -390,15 +386,18 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                         </span>
                       </span>
                     </td>
-                    <td className={`${claseCeldaColumna} text-right font-medium tabular-nums ${dif !== null && dif < 0 ? "text-destructive" : ""}`}>{usd(p.precio)}</td>
+                    <td className={`${claseCeldaColumna} text-right font-medium tabular-nums ${dif !== null && dif < 0 ? "text-destructive" : ""}`}>
+                      {usd(p.precio)}
+                      {eq?.nota && <span className="block text-xs font-normal text-muted-foreground">= {usd(eq.precio)} por el nuestro</span>}
+                    </td>
                     <td className={claseCeldaColumna}>
                       {n ? (
                         <span className="flex flex-col items-start gap-0.5">
                           <span className="text-xs">
                             {n.nombre} · <span className="tabular-nums">{usd(n.precio)}</span>
                           </span>
-                          {dif !== null && dif < 0 && <InsigniaPosicion estado="perdiendo" detalle={`él ${usd(-dif)}${cu} más barato`} />}
-                          {dif !== null && dif > 0 && <InsigniaPosicion estado="ganando" detalle={`nosotros ${usd(dif)}${cu} más baratos`} />}
+                          {dif !== null && dif < 0 && <InsigniaPosicion estado="perdiendo" detalle={`él ${usd(-dif)} más barato${eq?.nota ? " (equivalente)" : ""}`} />}
+                          {dif !== null && dif > 0 && <InsigniaPosicion estado="ganando" detalle={`nosotros ${usd(dif)} más baratos${eq?.nota ? " (equivalente)" : ""}`} />}
                           {dif === 0 && <InsigniaPosicion estado="empatado" detalle="mismo precio" />}
                         </span>
                       ) : (
@@ -538,9 +537,8 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
       const iguales = prods.filter((p) => p.igualA);
       const baratos = iguales.filter((p) => {
         const n = nuestros.get(p.igualA!);
-        const nu = n ? precioPorUnidad(n.precio, n.nombre) : null;
-        const pu = precioPorUnidad(p.precio, p.nombre);
-        return nu !== null && pu !== null && pu < nu - 0.004;
+        const pu = n ? precioEquivalente(n.nombre, p).precio : null;
+        return n?.precio != null && pu !== null && pu < n.precio - 0.004;
       }).length;
       return { ...c, igualesN: iguales.length, baratos, cambiosHoy: cambiosHoy.get(c.nombre) ?? 0, nuevo: nuevos.has(c.nombre) };
     });

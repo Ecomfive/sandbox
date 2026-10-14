@@ -7,7 +7,7 @@ import { BotonBarra, CabeceraTarjeta, Segmentado, claseTd, claseTh } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
-import { precioPorUnidad } from "@/lib/competencia/analisis";
+import { precioEquivalente } from "@/lib/competencia/analisis";
 import type { DatosCompetencia, ProductoC } from "./def-competencia";
 import { filasNuestras } from "./vista-competencia";
 
@@ -169,9 +169,9 @@ export function DashboardCompetencia({ datos }: { datos: DatosCompetencia }) {
         .map((f) => ({ ...f, iguales: f.iguales.filter((i) => ids.has(i.id)) }))
         .filter((f) => f.iguales.length)
         .map((f) => {
-          const precios = f.iguales.map((i) => precioPorUnidad(i.precio, i.nombre)).filter((x): x is number => x !== null);
+          const precios = f.iguales.map((i) => precioEquivalente(f.nuestro.nombre, i).precio).filter((x): x is number => x !== null);
           const minimo = precios.length ? Math.min(...precios) : null;
-          return { ...f, minimo, diferencia: minimo !== null && f.nuestroUnidad !== null ? Math.round((minimo - f.nuestroUnidad) * 100) / 100 : null };
+          return { ...f, minimo, diferencia: minimo !== null && f.nuestro.precio !== null ? Math.round((minimo - f.nuestro.precio) * 100) / 100 : null };
         })
         .sort((a, b) => (a.diferencia ?? 0) - (b.diferencia ?? 0)),
     [datos.productos, ids],
@@ -339,7 +339,7 @@ export function DashboardCompetencia({ datos }: { datos: DatosCompetencia }) {
                 key={n.nuestro.id}
                 nombre={
                   <>
-                    {n.nuestro.nombre} <span className="text-muted-foreground">· nosotros {usd(n.nuestroUnidad)}{n.porUnidad ? " c/u" : ""}</span>
+                    {n.nuestro.nombre} <span className="text-muted-foreground">· nosotros {usd(n.nuestro.precio)}{n.convertido ? " · competencia en precio equivalente" : ""}</span>
                   </>
                 }
                 valor={Math.abs(n.diferencia ?? 0)}

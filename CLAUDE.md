@@ -415,9 +415,10 @@ convenciones técnicas del código.
   y `decisionesDeHoy` (`src/lib/competencia/analisis.ts`, con prueba): bajar precio (perdemos y un más barato vendió en 7 d),
   oportunidad de stock (le quedan < `SEMANAS_OPORTUNIDAD` = 6 semanas al ritmo de 7 d, o lo dejó de mostrar), vigilar
   (competidor nuevo o que empezó a vender uno igual, después de `corte` = fin de la primera búsqueda) y mantener (ganamos y
-  la competencia vende). Se calculan al cargar; no se guardan. **Precio por unidad:** `unidadesEnNombre` lee PACK-N,
-  Nx1, xN (no «x 60 cápsulas»), «N pares/unidades» y «COMBO A y B»; posición, decisiones y diferencias usan `precioPorUnidad`
-  y muestran «c/u».
+  la competencia vende). Se calculan al cargar; no se guardan. **Precio equivalente:** `precioEquivalente(nuestroNombre, otro)` lleva el precio del competidor al
+  tamaño del nuestro: por contenido si los dos lo dicen (`medidaEnNombre`: cápsulas/caps/cap/softgels/tabletas/gomitas, ml, g)
+  y si no por unidades (`unidadesEnNombre`: PACK-N, Nx1, xN —no «x 60 cápsulas»—, «N pares/unidades», «COMBO A y B»); devuelve
+  la `nota` de la conversión. Posición, decisiones, diferencias y Resumen comparan nuestro precio real con ese equivalente.
   **Competencia de un producto** (Producto y Compras): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
   basta Producto, Compras o Análisis) busca el producto por nombre y foto con `todasLasCoincidencias` (cruces.ts) entre todo
   el catálogo guardado y suma los iguales a nuestro producto de ECOMFIVE (el «SKU» de Dropi es el nombre, no nuestro código);

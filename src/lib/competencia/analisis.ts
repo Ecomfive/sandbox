@@ -211,11 +211,13 @@ export function decisionesDeHoy(
   for (const n of nuestros) {
     const todos = igualesDe.get(n.id) ?? [];
     const activos = todos.filter((p) => p.estado === "activo");
-    // Se compara el precio por unidad: un PACK-2 o un COMBO nuestro frente a la unidad del competidor.
-    const nuestroU = precioPorUnidad(n.precio, n.nombre);
-    const unidad = (p: ProductoDecision) => precioPorUnidad(p.precio, p.nombre);
-    const porUnidad = unidadesEnNombre(n.nombre) > 1 || activos.some((p) => unidadesEnNombre(p.nombre) > 1);
-    const cu = porUnidad ? " c/u" : "";
+    // El precio del competidor se lleva al tamaño del nuestro (cápsulas, ml, g o unidades de un PACK/COMBO).
+    const nuestroU = n.precio;
+    const unidad = (p: ProductoDecision) => precioEquivalente(n.nombre, p).precio;
+    const suPrecio = (p: ProductoDecision) => {
+      const e = precioEquivalente(n.nombre, p);
+      return e.nota ? `${e.nota} (= ${usdD(e.precio)} por el nuestro)` : usdD(e.precio);
+    };
     const pos = posicionPrecio(nuestroU, activos.map(unidad));
     const vendido = activos.reduce((t, p) => t + p.bajo7, 0);
 
@@ -227,7 +229,7 @@ export function decisionesDeHoy(
         salida.push({
           tipo: "bajar",
           titulo: n.nombre,
-          motivo: `${baratoQueVende.proveedor} lo vende a ${usdD(unidad(baratoQueVende))}${cu} (nosotros ${usdD(nuestroU)}${cu}) y vendió ${unD(baratoQueVende.bajo7)} en 7 días. Somos #${pos.pos} de ${pos.de}.`,
+          motivo: `${baratoQueVende.proveedor} lo vende a ${suPrecio(baratoQueVende)}, nosotros ${usdD(nuestroU)}, y vendió ${unD(baratoQueVende.bajo7)} en 7 días. Somos #${pos.pos} de ${pos.de}.`,
           proveedorId: baratoQueVende.proveedorId,
           foto: n.foto ?? baratoQueVende.foto,
         });
@@ -256,13 +258,13 @@ export function decisionesDeHoy(
     if (corte)
       for (const p of activos)
         if (p.primeraVez > corte && p.primeraVez > hace7)
-          salida.push({ tipo: "vigilar", titulo: n.nombre, motivo: `${p.proveedor} empezó a venderlo a ${usdD(unidad(p))}${cu} (nosotros ${usdD(nuestroU)}${cu}).`, proveedorId: p.proveedorId, foto: n.foto ?? p.foto });
+          salida.push({ tipo: "vigilar", titulo: n.nombre, motivo: `${p.proveedor} empezó a venderlo a ${suPrecio(p)}; nosotros ${usdD(nuestroU)}.`, proveedorId: p.proveedorId, foto: n.foto ?? p.foto });
 
     if (pos?.estado === "ganando" && vendido > 0 && nuestroU !== null)
       salida.push({
         tipo: "mantener",
         titulo: n.nombre,
-        motivo: `Somos los más baratos (${usdD(nuestroU)}${cu} frente a ${usdD(pos.minimo)}${cu}) y la competencia vendió ${unD(vendido)} en 7 días: no hace falta bajar.`,
+        motivo: `Somos los más baratos (${usdD(nuestroU)} frente a ${suPrecio(activos.find((p) => unidad(p) === pos.minimo) ?? activos[0])}) y la competencia vendió ${unD(vendido)} en 7 días: no hace falta bajar.`,
         proveedorId: activos.find((p) => unidad(p) === pos.minimo)?.proveedorId ?? activos[0].proveedorId,
         foto: n.foto,
       });
@@ -310,4 +312,44 @@ export function unidadesEnNombre(nombre: string): number {
 /** El precio de una unidad (el de la publicación entre las unidades que trae). */
 export function precioPorUnidad(precio: number | null, nombre: string): number | null {
   return precio === null ? null : Math.round((precio / unidadesEnNombre(nombre)) * 100) / 100;
+}
+
+// ---------- Contenido (cápsulas, ml, g) y precio equivalente a nuestro producto ----------
+
+export type TipoMedida = "cápsulas" | "ml" | "g";
+
+/** El contenido de una unidad, leído del nombre: «120 capsulas», «90 CAP», «150 CAPS», «30ML», «20G». `null` si no dice. */
+export function medidaEnNombre(nombre: string): { tipo: TipoMedida; cantidad: number } | null {
+  const n = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const caps = /(\d+)\s*(capsulas?|caps?|cps|softgels?|tabletas?|tabs|gomitas?|gummies)\b/.exec(n);
+  if (caps && Number(caps[1]) >= 5) return { tipo: "cápsulas", cantidad: Number(caps[1]) };
+  const ml = /(\d+(?:[.,]\d+)?)\s*ml\b/.exec(n);
+  if (ml) return { tipo: "ml", cantidad: Number(ml[1].replace(",", ".")) };
+  const g = /(\d+(?:[.,]\d+)?)\s*(g|gr|grs|gramos)\b/.exec(n);
+  if (g) return { tipo: "g", cantidad: Number(g[1].replace(",", ".")) };
+  return null;
+}
+
+/**
+ * El precio de otra publicación llevado al tamaño de la nuestra, para comparar peras con peras:
+ * * si las dos dicen su contenido del mismo tipo (cápsulas, ml o g), por contenido: 60 cápsulas a $6.00 equivalen a $12.00
+ *   por nuestras 120;
+ * * si no, por unidades: un PACK-2 nuestro frente a la unidad de otro compara contra el doble de su precio.
+ * `nota` explica la conversión («$6.00 por 60 cápsulas») y es `null` si no hizo falta convertir.
+ */
+export function precioEquivalente(nuestroNombre: string, otro: { precio: number | null; nombre: string }): { precio: number | null; nota: string | null } {
+  if (otro.precio === null) return { precio: null, nota: null };
+  const un = unidadesEnNombre(nuestroNombre);
+  const uo = unidadesEnNombre(otro.nombre);
+  const mn = medidaEnNombre(nuestroNombre);
+  const mo = medidaEnNombre(otro.nombre);
+  const redondo = (x: number) => Math.round(x * 100) / 100;
+  if (mn && mo && mn.tipo === mo.tipo) {
+    const totalN = un * mn.cantidad;
+    const totalO = uo * mo.cantidad;
+    if (totalN === totalO) return { precio: otro.precio, nota: null };
+    return { precio: redondo((otro.precio / totalO) * totalN), nota: `$${otro.precio.toFixed(2)} por ${totalO.toLocaleString("es-PA")} ${mo.tipo}` };
+  }
+  if (un === uo) return { precio: otro.precio, nota: null };
+  return { precio: redondo((otro.precio / uo) * un), nota: `$${otro.precio.toFixed(2)} por ${uo} unidad${uo === 1 ? "" : "es"}` };
 }
