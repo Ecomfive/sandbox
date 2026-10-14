@@ -244,6 +244,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-13", titulo: "Íconos en el menú", texto: "Cada página del menú lateral lleva su ícono a la izquierda del nombre, también en Favoritos, para encontrarla de un vistazo.", modulo: "dashboard", href: "/" },
   { fecha: "2026-10-13", titulo: "Testing Lab", texto: "Nueva área del menú, Testing Lab, con el recorrido de un producto en Proveeduría: Fuentes (Drop Killer, Tu Winner y Scraping de proveedores), Selección (Selección de productos), Producción (Creación de ofertas) y Resultados (Test productos y Filtro de productos, que salen de Marketing). Los módulos nuevos están en preparación.", modulo: "productos-test", href: "/productos-test" },
   { fecha: "2026-10-13", titulo: "El test de un 2x1 también en su producto simple", texto: "Un test de un 2x1 (o X2) queda vinculado al compuesto. Ahora su producto simple también lo muestra en la columna «Test», la oferta y el «Resultado del test» de la ficha, con la nota «Test de su compuesto». Ejemplo: la lona impermeable transparente muestra el winner de su 2x1.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-13", titulo: "Compras abre la ficha completa de un clic", texto: "Al pulsar la descripción de una compra se abre directo su ficha completa, con la actividad. Ya no sale primero el resumen a la derecha con «Abrir ficha completa».", modulo: "compras", href: "/compras/lista" },

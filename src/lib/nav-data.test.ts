@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FRENTES, construirAreas, encontrarSeccionActiva } from "./nav-data";
+import { ICONOS_PAGINA } from "./nav-icons";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del menú)
 const areas = construirAreas([{ nombre: "Dropi", tieneDatos: true }]);
@@ -102,4 +103,9 @@ test("las fichas de Shopify y de Dropi ya no están en el menú, pero siguen reg
   const ocultas = areas.filter((a) => a.oculta).flatMap((a) => a.items.map((i) => i.href));
   assert.ok(ocultas.includes("/wms-productos") && ocultas.includes("/wms-productos-dropi"));
   assert.equal(encontrarSeccionActiva("/wms-productos/nuevo", areas), "Fichas de canal");
+});
+
+test("cada página del menú tiene su ícono", () => {
+  const sinIcono = areas.flatMap((a) => a.items).filter((i) => i.href && !ICONOS_PAGINA[i.href]).map((i) => i.href);
+  assert.deepEqual(sinIcono, []);
 });
