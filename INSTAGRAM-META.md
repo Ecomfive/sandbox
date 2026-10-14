@@ -54,6 +54,17 @@ conectadas) y si los mensajes que caen en «Solicitudes» llegan igual. Se prob�
    registros de Vercel con el filtro `/api/instagram/webhook` (si no hay ningún `POST`, el problema está en Meta; si hay `POST` con 401,
    es el secreto; con 200 y sin fila, mirar `instagram_capturas`).
 
+## Los dos enlaces de cada captura: qué se puede asegurar y qué no
+
+- **Enlace de Instagram del anuncio o la publicación:** un reel siempre lo trae. Una publicación (`ig_post`) no: solo trae el archivo
+  de video y su id, y de ese id no se puede armar el enlace.
+- **Enlace de la página de destino:** Meta **no lo entrega** en el mensaje directo, el perfil público de la cuenta no muestra su
+  «link en la bio» a una consulta anónima y, en las muestras, el copy tampoco trae ninguna dirección de tienda. Lo que sí se aprovecha,
+  en este orden: (1) el enlace que la persona **escribe en el mismo mensaje** al compartir, (2) el primer enlace que no sea de
+  Instagram ni de Facebook dentro del **copy**, (3) lo que se escribe a mano en la ficha. La forma fiable de tenerlo siempre es la
+  primera: pedir al equipo que pegue la dirección de la tienda en el mensaje al compartir.
+- La tabla permite filtrar y agrupar por «Con enlace / Sin enlace» y «Con página / Sin página» para completar lo que falte.
+
 ## Qué llega en cada aviso (observado con dos muestras reales)
 
 | | Reel (`ig_reel`) | Publicación (`ig_post`, un video) |

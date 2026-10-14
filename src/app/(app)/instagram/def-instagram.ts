@@ -91,6 +91,8 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
     { id: "autor", etiqueta: "Cuenta del video", tipo: "seleccion", valores: (f) => [f.autorUsuario ? `@${f.autorUsuario}` : SIN_VALOR], etiquetaSinValor: "Sin consultar", agrupable: true },
     { id: "recibido", etiqueta: "Recibido", tipo: "fecha", valor: (f) => aFecha(f.recibidoEn) },
     { id: "video", etiqueta: "Video guardado", tipo: "seleccion", valores: (f) => [f.tieneVideo ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Con video" }, { valor: "no", etiqueta: "Sin video" }], agrupable: true },
+    { id: "conEnlace", etiqueta: "Enlace de Instagram", tipo: "seleccion", valores: (f) => [f.enlace ? "con" : "sin"], opciones: () => [{ valor: "con", etiqueta: "Con enlace" }, { valor: "sin", etiqueta: "Sin enlace" }], agrupable: true },
+    { id: "conDestino", etiqueta: "Página de destino", tipo: "seleccion", valores: (f) => [f.paginaDestino ? "con" : "sin"], opciones: () => [{ valor: "con", etiqueta: "Con página" }, { valor: "sin", etiqueta: "Sin página" }], agrupable: true },
     { id: "megusta", etiqueta: "Me gusta", tipo: "numero", valor: (f) => f.megusta },
     { id: "comentarios", etiqueta: "Comentarios", tipo: "numero", valor: (f) => f.comentarios },
     { id: "vistas", etiqueta: "Vistas", tipo: "numero", valor: (f) => f.vistas },
