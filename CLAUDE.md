@@ -389,6 +389,18 @@ convenciones técnicas del código.
   Estado (Nuevo / Por testear / Descartado), Página de destino y Notas. Se abre desde `/instagram` y el código es IG-0001.
   **Falta:** registrar la app en Meta con el webhook y la suscripción al campo `messages`, y probar con un reel y un anuncio
   patrocinado reales para confirmar qué campos llegan; enviar una captura «Por testear» a Selección (hoy no hay puente).
+- **Investigación › Análisis de competencia** (`/analisis-competencia`, módulo `analisis-competencia`, migración 0108, 14 oct
+  2026). Todo el catálogo de Dropi del país de la barra (hoy Panamá) leído con una cuenta de **dropshipper** (la de proveedor
+  de ECOMFIVE recibe 401 en el catálogo) y comparado con nuestro proveedor ECOMFIVE (`NUESTRO_PROVEEDOR`,
+  `src/lib/competencia/analisis.ts`, con prueba). Tablas `competencia_busquedas`, `competencia_productos` (proveedor, precio,
+  stock, `es_nuestro`, `igual_a` + parecido + método nombre/foto, `foto_huella`), `competencia_historial` y
+  `competencia_alertas` (bajó precio, más barato que nosotros, bajó stock, nuevo que no tenemos, competidor nuevo,
+  desapareció; `vista`). Se lee con `scrapingCompetencia` de `scripts/scraping-proveedores-navegador.js` en una pestaña de
+  `app.dropi.pa` y la guarda el mismo receptor (`tipo: "competencia"`, `scripts/competencia-guardar.ts`): compara con la
+  búsqueda anterior (`comparar`), calcula huellas, empareja con `yaVisto` contra lo nuestro y arma las alertas
+  (`armarAlertas`; la primera búsqueda de un país no deja alertas). «Stock vendido» = suma de las bajadas de stock en 1/7/30
+  días (`unidadesBajadas`), porque Dropi no muestra ventas ajenas. Panamá, 14 oct 2026: 1.452 productos de 93 proveedores
+  leídos en 10 s; ECOMFIVE tiene 178.
 - **Pantalla «Hoy»** (`/`, antes «Dashboard operativo»; el módulo de permisos sigue siendo `dashboard`). Arriba, en dos
   tarjetas lado a lado (apiladas en pantallas angostas): **«Necesita tu atención»** (`ColaAtencion`), la cola de trabajo
   con lo que cuenta `obtenerPendientesHoy` (pedidos de Dropi en Novedad, plataformas sin saldo de wallet, retiros de

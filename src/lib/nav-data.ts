@@ -85,7 +85,10 @@ const AREAS: NavSection[] = [
   {
     title: "Investigación",
     frentes: true,
-    items: [{ label: "Inteligencia competitiva", href: "/inteligencia-competitiva", dropi: true, frente: "proveeduria" }],
+    items: [
+      { label: "Inteligencia competitiva", href: "/inteligencia-competitiva", dropi: true, frente: "proveeduria" },
+      { label: "Análisis de competencia", href: "/analisis-competencia", frente: "proveeduria" },
+    ],
   },
   {
     title: "Operación",

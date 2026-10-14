@@ -85,3 +85,61 @@ async function scrapingProveedor(dropiId, puente) {
   setTimeout(() => location.assign(`${puente}#${datos}`), 50);
   return { enviados: cuerpo.productos.length, paginas, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
 }
+
+// Análisis de competencia: TODO el catálogo de Dropi del país de la sesión (sin proveedor), con el proveedor de cada
+// producto. Se corre en cualquier página de app.dropi.<país> con la sesión de un DROPSHIPPER (una cuenta de proveedor no ve
+// el catálogo: Dropi responde 401). Igual que arriba, la pestaña navega al puente del receptor con la lectura comprimida.
+//   await scrapingCompetencia("http://127.0.0.1:4322/puente/<código>")
+// Panamá, 14 oct 2026: 1.452 productos de 93 proveedores en unos 10 s.
+async function scrapingCompetencia(puente) {
+  const inicio = new Date();
+  const t0 = performance.now();
+  const token = JSON.parse(localStorage.getItem("DROPI_token") || "null");
+  const login = JSON.parse(localStorage.getItem("DROPI_LoginResult") || "{}");
+  if (!token) throw new Error("No hay sesión de Dropi en esta página.");
+  const pais = login?.countries?.[0]?.name || "PANAMA";
+  const api = location.hostname.replace(/^app\./, "api.");
+  const productos = new Map();
+  const paginas = [];
+  for (let desde = 0; desde < 100000; desde += 100) {
+    let r;
+    for (let intento = 0; intento < 5; intento++) {
+      r = await fetch(`https://${api}/api/products/v4/index`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, "x-authorization": "Bearer " + token },
+        body: JSON.stringify({
+          pageSize: 100, startData: desde, privated_product: false, userVerified: false, favorite: false, with_collection: true,
+          get_stock: false, no_count: true, search_type: "simple", country: pais, order_by: "created_at", order_type: "desc",
+        }),
+      });
+      if (r.status !== 429) break;
+      await new Promise((ok) => setTimeout(ok, 30000));
+    }
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.isSuccess) throw new Error(`Dropi respondió ${r.status} en la página ${desde / 100 + 1}`);
+    const objetos = j.objects || [];
+    paginas.push(objetos.length);
+    for (const o of objetos) {
+      productos.set(o.id, {
+        id: o.id, sku: o.sku, name: o.name, type: o.type, sale_price: o.sale_price, suggested_price: o.suggested_price,
+        privated_product: o.privated_product, created_at: o.created_at, user: { id: o.user?.id, name: o.user?.name },
+        gallery: (o.gallery || []).map((g) => ({ urlS3: g.urlS3, url: g.url, main: g.main })),
+        categories: (o.categories || []).map((c) => ({ name: c.name })),
+        warehouse_product: (o.warehouse_product || []).map((w) => ({ stock: w.stock })),
+        variations: (o.variations || []).map((v) => ({ warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ stock: w.stock })) })),
+      });
+    }
+    if (!objetos.length) break;
+  }
+  const cuerpo = {
+    tipo: "competencia", dropiId: 0, pais: location.hostname.split(".").pop(), url: location.href, nombre: null,
+    inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), paginas, metricas: null, productos: [...productos.values()],
+  };
+  const gz = new Blob([JSON.stringify(cuerpo)]).stream().pipeThrough(new CompressionStream("gzip"));
+  const bytes = new Uint8Array(await new Response(gz).arrayBuffer());
+  let binario = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const datos = btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  setTimeout(() => location.assign(`${puente}#${datos}`), 50);
+  return { enviados: cuerpo.productos.length, paginas: paginas.length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
+}

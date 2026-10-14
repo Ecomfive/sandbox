@@ -283,6 +283,26 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "analisis-competencia",
+    titulo: "Análisis de competencia",
+    ruta: "/analisis-competencia",
+    resumen: "Todo el catálogo de Dropi del país comparado con lo que vende ECOMFIVE: precios, stock, nuevos y alertas.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cada día se lee todo el catálogo de Dropi del país (Panamá: unos 1.450 productos de 93 proveedores, en segundos) con una cuenta de dropshipper, y se compara con lo que vende ECOMFIVE.",
+          "Un producto de la competencia es «igual» a uno nuestro si el nombre coincide en 85 % (2 palabras o más) o si la foto es la misma y comparten alguna palabra.",
+          "Alertas: lo que pide atención desde la búsqueda anterior. Un competidor bajó el precio de un producto igual al nuestro (en rojo si ya vende más barato que nosotros), bajó su stock, dejó de mostrarlo, hay un producto nuevo que no tenemos o un competidor nuevo. «Vista» la marca leída; «Marcar todas como vistas» las limpia. Empiezan en la segunda búsqueda.",
+          "Nuestros productos vs competencia: cada producto nuestro con los competidores que lo venden, el precio más bajo frente al nuestro y cuánto stock vendieron ellos en 1, 7 y 30 días. Pulsa una fila para verlos lado a lado (fotos, precio, stock, enlace a su página en Dropi e historial).",
+          "Stock vendido: Dropi no muestra las ventas de otro proveedor; se cuenta lo que bajó su stock entre búsquedas (solo las bajadas: una reposición no resta lo vendido).",
+          "Nuevos que no tenemos: lo que apareció en la competencia después de la primera búsqueda y no es igual a uno nuestro. Marca si ya está en Producto o en Test productos, y «Prioridad» si lo venden varios competidores.",
+          "Competidores: cada proveedor con el enlace a su página, sus productos, cuántos son iguales a los nuestros, los nuevos de la semana y su stock vendido. Bitácora: cada cambio anotado (precio, stock, desapareció, volvió).",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "inteligencia-competitiva",
     titulo: "Inteligencia competitiva",
     ruta: "/inteligencia-competitiva",
@@ -326,6 +346,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-14", titulo: "Análisis de competencia", texto: "Nuevo en Investigación: todo el catálogo de Dropi Panamá comparado con lo que vende ECOMFIVE, por nombre y por foto. Alertas cuando un competidor baja el precio o el stock de un producto igual al nuestro, cuánto stock venden ellos por día, semana y mes, los productos nuevos que no tenemos y la bitácora de cada cambio.", modulo: "analisis-competencia", href: "/analisis-competencia" },
   { fecha: "2026-10-14", titulo: "Creación de ofertas", texto: "Testing Lab › Creación de ofertas ya funciona: los productos de Selección en «Crear oferta» tienen de 1 a 3 ofertas (nombre, unidades y precio en dólares) con su margen frente al costo del proveedor.", modulo: "creacion-ofertas", href: "/creacion-ofertas" },
   { fecha: "2026-10-14", titulo: "Selección: Crear oferta, ya testeados y prioridad", texto: "Selección de productos ya no tiene «Por evaluar»: lo nuevo entra Seleccionado y pasa a «Crear oferta». Lo que ya se testeó o ya está en Producto entra Descartado solo, con la nota de por qué, y lo que aparece en varios proveedores o fuentes sale marcado «Prioridad».", modulo: "seleccion-productos", href: "/seleccion-productos" },
   { fecha: "2026-10-14", titulo: "Scraping: dólares, cruces y enviar a Selección", texto: "Scraping de proveedores muestra cada precio también en dólares (tipo de cambio del día), marca lo ya testeado o ya en Producto y lo que se repite en otros proveedores (Prioridad), agranda la foto al pasar el cursor, trae el historial en tabla y los privados dentro de la ficha del producto publicado, y envía productos a Selección.", modulo: "scraping-proveedores", href: "/scraping-proveedores" },

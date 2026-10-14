@@ -1,0 +1,192 @@
+import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
+import { Pagina } from "@/components/ui/pagina";
+import { requireModulo } from "@/lib/auth";
+import { unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
+import { getPaisActual } from "@/lib/pais";
+import { repetidos, yaVisto } from "@/lib/scraping/cruces";
+import { cargarReferencias } from "@/lib/scraping/referencias";
+import { traerTodasConError } from "@/lib/supabase/paginar";
+import { createServiceClient } from "@/lib/supabase/server";
+import type { BitacoraC, CompetidorC, ProductoC } from "./def-competencia";
+import { VistaCompetencia, type AlertaC, type DatosCompetencia } from "./vista-competencia";
+
+export const metadata = { title: "Análisis de competencia" };
+
+export const dynamic = "force-dynamic";
+
+const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+const DOMINIO: Record<string, string> = { PA: "pa", CR: "cr", MX: "mx", CO: "co" };
+
+interface FilaProducto {
+  id: string;
+  dropi_producto_id: number;
+  proveedor_dropi_id: number;
+  proveedor_nombre: string;
+  nombre: string;
+  foto_url: string | null;
+  foto_huella: string | null;
+  precio: string | null;
+  stock: number | null;
+  categoria: string | null;
+  es_nuestro: boolean;
+  estado: "activo" | "desaparecido";
+  igual_a: string | null;
+  igual_parecido: string | null;
+  igual_metodo: string | null;
+  primera_vez: string;
+  ultima_vez: string;
+}
+
+/**
+ * Investigación › Análisis de competencia: todo el catálogo de Dropi del país de la barra comparado con ECOMFIVE (nuestro
+ * proveedor ahí), con alertas, coincidencias, nuevos que no tenemos, competidores y la bitácora de cambios.
+ */
+export default async function AnalisisCompetenciaPage() {
+  const usuario = await requireModulo("analisis-competencia");
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const desde31 = new Date(Date.now() - 31 * 86_400_000).toISOString();
+
+  const [prods, busq, alertasR, stockR, bitacoraR] = await Promise.all([
+    traerTodasConError<FilaProducto>((a, b) =>
+      supabase
+        .from("competencia_productos")
+        .select("id, dropi_producto_id, proveedor_dropi_id, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, categoria, es_nuestro, estado, igual_a, igual_parecido, igual_metodo, primera_vez, ultima_vez")
+        .eq("pais_id", pais.id)
+        .order("id")
+        .range(a, b),
+    ),
+    supabase.from("competencia_busquedas").select("inicio, fin, estado, productos, proveedores, duracion_ms, cambios").eq("pais_id", pais.id).order("inicio", { ascending: false }).limit(60),
+    supabase.from("competencia_alertas").select("id, fecha, tipo, titulo, detalle, vista, producto_id, nuestro_id").eq("pais_id", pais.id).order("fecha", { ascending: false }).limit(400),
+    traerTodasConError<{ producto_id: string; fecha: string; stock: number; stock_antes: number }>((a, b) =>
+      supabase
+        .from("competencia_historial")
+        .select("producto_id, fecha, stock, stock_antes, competencia_productos!inner(pais_id)")
+        .eq("competencia_productos.pais_id", pais.id)
+        .eq("evento", "stock")
+        .gte("fecha", desde31)
+        .order("id")
+        .range(a, b),
+    ),
+    supabase
+      .from("competencia_historial")
+      .select("fecha, evento, precio, stock, precio_antes, stock_antes, competencia_productos!inner(pais_id, nombre, proveedor_nombre, es_nuestro)")
+      .eq("competencia_productos.pais_id", pais.id)
+      .neq("evento", "primera_vez")
+      .order("fecha", { ascending: false })
+      .limit(500),
+  ]);
+
+  if (prods.error || busq.error) {
+    return (
+      <Pagina ancho="ancha" className="flex flex-col gap-6">
+        <EncabezadoPagina titulo="Análisis de competencia" oculto />
+        <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
+          No se pudo cargar el análisis. Falta correr en Supabase la migración 0108.
+        </p>
+      </Pagina>
+    );
+  }
+
+  const ahora = new Date();
+  const cambiosDe = new Map<string, CambioStock[]>();
+  for (const c of stockR.data ?? []) {
+    if (c.stock === null || c.stock_antes === null) continue;
+    cambiosDe.set(c.producto_id, [...(cambiosDe.get(c.producto_id) ?? []), { fecha: c.fecha, stock: c.stock, stockAntes: c.stock_antes }]);
+  }
+  const dominio = DOMINIO[pais.codigo] ?? pais.codigo.toLowerCase();
+  const filas = prods.data ?? [];
+  const aProducto = (p: FilaProducto): ProductoC => {
+    const cambios = cambiosDe.get(p.id) ?? [];
+    return {
+      id: p.id,
+      dropiId: Number(p.dropi_producto_id),
+      proveedorId: Number(p.proveedor_dropi_id),
+      proveedor: p.proveedor_nombre,
+      nombre: p.nombre,
+      foto: p.foto_url,
+      precio: n(p.precio),
+      stock: p.stock,
+      categoria: p.categoria,
+      estado: p.estado,
+      esNuestro: p.es_nuestro,
+      igualA: p.igual_a,
+      parecido: n(p.igual_parecido),
+      metodo: p.igual_metodo,
+      primeraVez: p.primera_vez,
+      ultimaVez: p.ultima_vez,
+      bajo1: unidadesBajadas(cambios, 1, ahora),
+      bajo7: unidadesBajadas(cambios, 7, ahora),
+      bajo30: unidadesBajadas(cambios, 30, ahora),
+      urlProveedor: `https://app.dropi.${dominio}/dashboard/provider/${p.proveedor_dropi_id}/${encodeURIComponent(p.proveedor_nombre)}`,
+      repetidoEn: [],
+      yaLoTenemos: null,
+    };
+  };
+  const productos = filas.map(aProducto);
+  const porId = new Map(productos.map((p) => [p.id, p]));
+
+  // Nuevos que no tenemos: aparecieron después de la primera búsqueda, no son iguales a uno nuestro ni están en Producto o en
+  // Test productos. La prioridad sale de cuántos competidores lo venden.
+  const listas = (busq.data ?? []).filter((b) => b.estado === "lista");
+  const primera = listas[listas.length - 1];
+  const corte = primera?.fin ?? null;
+  const competencia = filas.filter((p) => !p.es_nuestro && p.estado === "activo");
+  const repes = repetidos(competencia.map((p) => ({ id: p.id, grupo: p.proveedor_nombre, nombre: p.nombre, huella: p.foto_huella })));
+  for (const [id, grupos] of repes) {
+    const p = porId.get(id);
+    if (p) p.repetidoEn = [...grupos];
+  }
+  const refs = corte ? await cargarReferencias(supabase) : null;
+  const nuevos: ProductoC[] = [];
+  if (corte && refs) {
+    for (const f of competencia) {
+      if (f.igual_a || f.primera_vez <= corte) continue;
+      const p = porId.get(f.id)!;
+      const v = yaVisto(f.nombre, f.foto_huella, refs);
+      p.yaLoTenemos = v ? `${v.tipo === "test" ? "Ya testeado" : "Ya en Producto"}: «${v.nombre}»` : null;
+      nuevos.push(p);
+    }
+  }
+
+  // Competidores: sus productos, cuántos son iguales a los nuestros, los nuevos de la semana y cuánto bajó su stock.
+  const porProveedor = new Map<number, CompetidorC>();
+  const hace7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  for (const p of productos) {
+    if (p.esNuestro || p.estado !== "activo") continue;
+    const c = porProveedor.get(p.proveedorId) ?? { id: p.proveedorId, nombre: p.proveedor, url: p.urlProveedor, productos: 0, iguales: 0, nuevos7: 0, bajo1: 0, bajo7: 0, bajo30: 0, primeraVez: p.primeraVez };
+    c.productos++;
+    if (p.igualA) c.iguales++;
+    if (corte && p.primeraVez > corte && p.primeraVez > hace7) c.nuevos7++;
+    c.bajo1 += p.bajo1;
+    c.bajo7 += p.bajo7;
+    c.bajo30 += p.bajo30;
+    if (p.primeraVez < c.primeraVez) c.primeraVez = p.primeraVez;
+    porProveedor.set(p.proveedorId, c);
+  }
+
+  const alertas: AlertaC[] = (alertasR.error ? [] : (alertasR.data ?? [])).map((a) => ({ id: a.id, fecha: a.fecha, tipo: a.tipo, titulo: a.titulo, detalle: a.detalle, vista: a.vista, productoId: a.producto_id, nuestroId: a.nuestro_id }));
+  const bitacora: BitacoraC[] = (bitacoraR.error ? [] : (bitacoraR.data ?? [])).map((h) => {
+    const p = (Array.isArray(h.competencia_productos) ? h.competencia_productos[0] : h.competencia_productos) as { nombre: string; proveedor_nombre: string; es_nuestro: boolean };
+    return { fecha: h.fecha, evento: h.evento, producto: p.nombre, proveedor: p.proveedor_nombre, esNuestro: p.es_nuestro, precio: n(h.precio), stock: h.stock, precioAntes: n(h.precio_antes), stockAntes: h.stock_antes };
+  });
+
+  const ultima = (busq.data ?? [])[0] ?? null;
+  const datos: DatosCompetencia = {
+    pais: pais.nombre,
+    productos,
+    nuevos,
+    competidores: [...porProveedor.values()].sort((a, b) => b.bajo7 - a.bajo7 || b.productos - a.productos),
+    alertas,
+    bitacora,
+    ultima: ultima ? { inicio: ultima.inicio, estado: ultima.estado, duracionMs: ultima.duracion_ms, productos: ultima.productos, proveedores: ultima.proveedores } : null,
+    busquedas: listas.length,
+  };
+
+  return (
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
+      <EncabezadoPagina titulo="Análisis de competencia" oculto />
+      <VistaCompetencia datos={datos} puedeEscribir={!usuario.modulosSoloLectura.includes("analisis-competencia")} />
+    </Pagina>
+  );
+}

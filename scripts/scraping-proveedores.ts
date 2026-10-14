@@ -5,6 +5,7 @@
 // Uso:
 //   npx tsx scripts/scraping-proveedores.ts recibir           escucha en 127.0.0.1:4322 e imprime la dirección para el navegador
 //   npx tsx scripts/scraping-proveedores.ts archivo <json>     guarda una lectura ya bajada (la misma forma que manda el navegador)
+//   (Una lectura con `tipo: "competencia"` es todo el catálogo de un país para Análisis de competencia: competencia-guardar.ts.)
 //   npx tsx scripts/scraping-proveedores.ts pendientes         lista los proveedores con una búsqueda pedida desde el sistema
 //   npx tsx scripts/scraping-proveedores.ts lista              los proveedores activos (la búsqueda diaria de las 5:00 los recorre)
 //   npx tsx scripts/scraping-proveedores.ts huellas            calcula las huellas de foto que falten (también lo hace cada búsqueda)
@@ -17,6 +18,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { huellaFoto } from "../src/lib/wms/huella-foto";
+import { guardarCompetencia } from "./competencia-guardar";
 import { comparar, mejorPareja, normalizarDropi, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -26,6 +28,8 @@ const TOKEN = randomBytes(24).toString("hex");
 const ORIGENES = /^https:\/\/app\.dropi\.(mx|co|cr|pa|cl|ec|pe|gt|py|ar)$/;
 
 interface Lectura {
+  /** «competencia»: todo el catálogo de un país para Análisis de competencia; sin él, un proveedor de Scraping. */
+  tipo?: "competencia";
   dropiId: number;
   pais: string;
   url: string;
@@ -191,9 +195,12 @@ async function guardarLectura(l: Lectura) {
   }
 }
 
-/** Calcula la huella (dHash) de las fotos del proveedor que no la tienen, de 8 en 8. Devuelve cuántas guardó. */
-async function calcularHuellas(proveedorId: string): Promise<number> {
-  const { data, error } = await supabase.from("scraping_productos").select("id, foto_url").eq("proveedor_id", proveedorId).not("foto_url", "is", null).is("foto_huella", null).limit(2000);
+/**
+ * Calcula la huella (dHash) de las fotos que no la tienen, de 8 en 8: las de un proveedor de Scraping o, con
+ * `tabla = "competencia_productos"`, las de un país del Análisis de competencia. Devuelve cuántas guardó.
+ */
+export async function calcularHuellas(filtro: string, tabla = "scraping_productos", columna = "proveedor_id"): Promise<number> {
+  const { data, error } = await supabase.from(tabla).select("id, foto_url").eq(columna, filtro).not("foto_url", "is", null).is("foto_huella", null).limit(5000);
   if (error) return 0; // Sin la migración 0107 no hay columna: se sigue sin huellas.
   let hechas = 0;
   const cola = [...(data ?? [])];
@@ -204,7 +211,7 @@ async function calcularHuellas(proveedorId: string): Promise<number> {
           const r = await fetch(f.foto_url!, { signal: AbortSignal.timeout(15_000) });
           if (!r.ok) continue;
           const huella = await huellaFoto(new Uint8Array(await r.arrayBuffer()));
-          if (huella && !(await supabase.from("scraping_productos").update({ foto_huella: huella }).eq("id", f.id)).error) hechas++;
+          if (huella && !(await supabase.from(tabla).update({ foto_huella: huella }).eq("id", f.id)).error) hechas++;
         } catch {
           // Una foto que no baja se intenta en la próxima búsqueda.
         }
@@ -216,7 +223,7 @@ async function calcularHuellas(proveedorId: string): Promise<number> {
 
 function guardarCopia(l: Lectura) {
   mkdirSync("datos-privados/scraping", { recursive: true });
-  const ruta = `datos-privados/scraping/${l.pais}-${l.dropiId}-${l.inicio.slice(0, 19).replace(/:/g, "")}.json`;
+  const ruta = `datos-privados/scraping/${l.pais}-${l.tipo === "competencia" ? "competencia" : l.dropiId}-${l.inicio.slice(0, 19).replace(/:/g, "")}.json`;
   writeFileSync(ruta, JSON.stringify(l));
   return ruta;
 }
@@ -278,7 +285,7 @@ function recibir() {
         const l = JSON.parse(cuerpo) as Lectura;
         const copia = guardarCopia(l);
         console.log(`Recibidos ${l.productos.length} productos del proveedor ${l.dropiId} (${copia}). Guardando…`);
-        const resultado = await guardarLectura(l);
+        const resultado = l.tipo === "competencia" ? await guardarCompetencia(supabase, l, calcularHuellas) : await guardarLectura(l);
         console.log(resultado);
         res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(resultado));
       } catch (e) {
@@ -313,6 +320,9 @@ else if (modo === "huellas") lista().then(async () => {
   const { data } = await supabase.from("scraping_proveedores").select("id, nombre").eq("activo", true);
   for (const p of data ?? []) console.log(p.nombre, await calcularHuellas(p.id), "huellas nuevas");
 });
-else if (modo === "archivo" && arg) guardarLectura(JSON.parse(readFileSync(arg, "utf8")) as Lectura).then((r) => console.log(r));
+else if (modo === "archivo" && arg) {
+  const l = JSON.parse(readFileSync(arg, "utf8")) as Lectura;
+  (l.tipo === "competencia" ? guardarCompetencia(supabase, l, calcularHuellas) : guardarLectura(l)).then((r) => console.log(r));
+}
 else if (modo === "pendientes") pendientes();
 else console.log("Uso: npx tsx scripts/scraping-proveedores.ts recibir | archivo <json> | pendientes | lista");

@@ -21,6 +21,7 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/filtro-productos": "filtro-productos",
   "/crm-dropshippers": "crm-dropshippers",
   "/inteligencia-competitiva": "inteligencia-competitiva",
+  "/analisis-competencia": "analisis-competencia",
   "/usuarios": "usuarios",
   "/notificaciones": "notificaciones",
 };

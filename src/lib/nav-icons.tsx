@@ -776,6 +776,17 @@ export function InstagramIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Dos productos frente a frente: Análisis de competencia. */
+export function AnalisisCompetenciaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="7" height="14" rx="1.5" />
+      <rect x="14" y="5" width="7" height="14" rx="1.5" />
+      <path d="M10 12h4" />
+    </Icon>
+  );
+}
+
 export function ScrapingIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconoLucide {...props}>
@@ -882,6 +893,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,
   "/inteligencia-competitiva": InteligenciaIcon,
+  "/analisis-competencia": AnalisisCompetenciaIcon,
   "/pedidos-dropi": PedidoIcon,
   "/alertas": AlertaIcon,
   "/inventario": InventarioIcon,
