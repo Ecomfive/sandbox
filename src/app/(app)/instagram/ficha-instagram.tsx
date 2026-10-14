@@ -245,9 +245,9 @@ export function FichaInstagram({
             <div className="flex flex-1 flex-col divide-y divide-border p-5">
               <Seccion icono={InstagramIcon} titulo={fila.archivoTipo === "imagen" ? "Imagen" : "Video"}>
                 <VideoCaptura fila={fila} />
-                {puedeEscribir && (
+                {puedeEscribir && (fila.enlace || !fila.tieneArchivo) && (
                   <button type="button" onClick={() => void leerEnlace()} disabled={leyendo || guardando} className={`self-start text-sm text-primario hover:underline disabled:opacity-60 ${anilloFoco}`}>
-                    {leyendo ? "Leyendo..." : fila.enlace ? (fila.tieneArchivo ? "Volver a leer el enlace" : "Completar desde el enlace") : fila.tieneArchivo ? "Buscar el enlace con Meta" : "Reintentar el archivo"}
+                    {leyendo ? "Leyendo..." : fila.enlace ? (fila.tieneArchivo ? "Volver a leer el enlace" : "Completar desde el enlace") : "Reintentar el archivo"}
                   </button>
                 )}
                 {fila.tieneArchivo && fila.videoBytes !== null && <p className="m-0 text-xs text-muted-foreground">{megas(fila.videoBytes).slice(3)}</p>}

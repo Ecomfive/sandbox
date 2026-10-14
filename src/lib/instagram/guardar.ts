@@ -6,7 +6,6 @@ import { interpretarEmbed, urlDeEmbed, type DatosEmbed } from "./embed";
 import { enviosDe, fusionar, unirTextos, type FilaFusionable } from "./fusion";
 import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
-import { CAMPOS_MENSAJE, enlaceEnRespuesta, midDeMensaje, respuestaParaGuardar } from "./mensaje";
 import { codigoDePublicacion, repetidasDe } from "./repetidas";
 import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
 
@@ -94,27 +93,6 @@ async function leerEmbedPublico(enlace: string): Promise<{ ok: true; datos: Dato
   if ("error" in pagina) return { ok: false, error: pagina.error };
   const datos = interpretarEmbed(new TextDecoder("utf-8").decode(pagina.bytes));
   return datos ? { ok: true, datos } : { ok: false, error: "La página de insertar no trae datos." };
-}
-
-/**
- * Pide a Meta el mensaje por su id (API de conversaciones) para ver si trae el enlace de lo compartido: es la prueba de una vía no
- * documentada, y la respuesta (o el error) se guarda tal cual para revisarla. Nunca lanza.
- */
-async function consultarMensaje(mid: string): Promise<{ ok: true; datos: unknown } | { ok: false; error: string } | null> {
-  const token = process.env.INSTAGRAM_ACCESS_TOKEN;
-  if (!token) return null;
-  let ultimoError = "Instagram no respondió.";
-  for (const campos of CAMPOS_MENSAJE) {
-    try {
-      const r = await fetch(`https://graph.instagram.com/v23.0/${encodeURIComponent(mid)}?fields=${campos}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8_000) });
-      const d = (await r.json().catch(() => null)) as { error?: { message?: unknown } } | null;
-      if (r.ok && d) return { ok: true, datos: d };
-      ultimoError = typeof d?.error?.message === "string" ? d.error.message.slice(0, 400) : `HTTP ${r.status}`;
-    } catch {
-      ultimoError = "Instagram no respondió.";
-    }
-  }
-  return { ok: false, error: ultimoError };
 }
 
 /**
@@ -263,12 +241,7 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       const [remitente, consulta] = await Promise.all([consultarRemitente(c.remitenteId), c.mediaId ? consultarMedia(c.mediaId) : Promise.resolve(null)]);
       const media = consulta?.ok ? interpretarMedia(consulta.datos) : null;
       const urlVideo = c.urlVideo ?? media?.urlVideo ?? null;
-      let enlaceFinal = c.enlace ?? media?.enlace ?? null;
-      // Sin enlace: se prueba a pedirle a Meta el mensaje por su id, por si lo trae (vía no documentada: la respuesta queda guardada).
-      const mid = midDeMensaje(c.mensajeId);
-      const mensaje = !enlaceFinal && mid ? await consultarMensaje(mid) : null;
-      const enlaceDelMensaje = mensaje?.ok ? enlaceEnRespuesta(mensaje.datos) : null;
-      if (enlaceDelMensaje) enlaceFinal = enlaceDelMensaje;
+      const enlaceFinal = c.enlace ?? media?.enlace ?? null;
       // Con el enlace se lee la página pública (vista previa y «insertar»): de ahí salen las cifras y, si la captura no trajo archivo, el video.
       const [vista, embed] = await Promise.all([enlaceFinal ? leerVistaPublica(enlaceFinal) : null, enlaceFinal ? leerEmbedPublico(enlaceFinal) : null]);
       const urlArchivo = urlVideo ?? archivoDeLectura(embed);
@@ -283,14 +256,12 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       const lectura = cifrasDeLectura(vista, embed);
       const metricas: Record<string, unknown> = { ...lectura.metricas };
       if (consulta) metricas.consulta = consulta.ok ? consulta.datos : { error: consulta.error };
-      if (mensaje) metricas.mensaje_meta = mensaje.ok ? respuestaParaGuardar(mensaje.datos) : { error: mensaje.error };
       if (media?.megusta != null) metricas.like_count = media.megusta;
       if (media?.comentarios != null) metricas.comments_count = media.comentarios;
       if (Object.keys(metricas).length > 0) cambios.metricas = metricas;
       const autor = media?.usuario ?? lectura.autor;
       if (autor) cambios.autor_usuario = autor;
       if (media?.enlace && !c.enlace) cambios.enlace = media.enlace;
-      else if (enlaceDelMensaje && !c.enlace) cambios.enlace = enlaceDelMensaje;
       if (video) {
         if ("error" in video) cambios.video_error = video.error;
         else {
@@ -352,27 +323,8 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
 
   const cambios: Record<string, unknown> = { actualizado_en: new Date().toISOString() };
   const metricasActuales = (data.metricas ?? null) as Record<string, unknown> | null;
-  const extraMetricas: Record<string, unknown> = {};
-  let enlace: string | null = data.enlace;
-  let buscoEnMensaje = false;
-  // Sin enlace: se le pide a Meta el mensaje por su id, por si lo trae (vía no documentada; la respuesta queda guardada).
-  if (!enlace) {
-    const mid = midDeMensaje(data.mensaje_id);
-    const mensaje = mid ? await consultarMensaje(mid) : null;
-    if (mensaje) {
-      buscoEnMensaje = true;
-      extraMetricas.mensaje_meta = mensaje.ok ? respuestaParaGuardar(mensaje.datos) : { error: mensaje.error };
-      const encontrado = mensaje.ok ? enlaceEnRespuesta(mensaje.datos) : null;
-      if (encontrado) {
-        enlace = encontrado;
-        cambios.enlace = encontrado;
-      }
-    }
-  }
-  if (!enlace && !delAviso) {
-    if (buscoEnMensaje) await supabase.from(TABLA).update({ metricas: { ...(metricasActuales ?? {}), ...extraMetricas } }).eq("id", id);
-    return { ok: false, error: buscoEnMensaje ? "Meta no devolvió el enlace de este mensaje (la respuesta queda en «Datos de Meta»)." : "Esta captura no tiene enlace de Instagram ni un archivo que volver a descargar." };
-  }
+  const enlace: string | null = data.enlace;
+  if (!enlace && !delAviso) return { ok: false, error: "Esta captura no tiene enlace de Instagram ni un archivo que volver a descargar." };
 
   let embed: Awaited<ReturnType<typeof leerEmbedPublico>> = null;
   let leyoPagina = false;
@@ -383,11 +335,10 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
     const lectura = cifrasDeLectura(vista, embed);
     if (Object.keys(lectura.metricas).length > 0) {
       leyoPagina = true;
-      cambios.metricas = mezclarLectura(metricasActuales, { ...lectura.metricas, ...extraMetricas });
+      cambios.metricas = mezclarLectura(metricasActuales, lectura.metricas);
     }
     if (lectura.autor && !data.autor_usuario) cambios.autor_usuario = lectura.autor;
   }
-  if (cambios.metricas === undefined && Object.keys(extraMetricas).length > 0) cambios.metricas = { ...(metricasActuales ?? {}), ...extraMetricas };
 
   let archivo = false;
   let errorArchivo: string | null = null;
