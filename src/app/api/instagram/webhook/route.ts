@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
-import { extraerCapturas } from "@/lib/instagram/extraer";
+import { extraerCapturas, extraerNotas } from "@/lib/instagram/extraer";
 import { firmaValida, tokenDeVerificacionValido } from "@/lib/instagram/firma";
-import { guardarCapturas } from "@/lib/instagram/guardar";
+import { guardarCapturas, guardarNotas } from "@/lib/instagram/guardar";
 
 export const dynamic = "force-dynamic";
 // Copiar un video de varios MB puede tardar: el trabajo sigue después de contestarle a Meta.
@@ -41,6 +41,13 @@ export async function POST(request: Request) {
   }
 
   const capturas = extraerCapturas(aviso);
-  if (capturas.length > 0) after(() => guardarCapturas(aviso, capturas));
-  return NextResponse.json({ recibidas: capturas.length });
+  const notas = extraerNotas(aviso);
+  if (capturas.length > 0 || notas.length > 0) {
+    // Primero las capturas y después las notas: un texto que llega en el mismo aviso se une a la captura recién guardada.
+    after(async () => {
+      if (capturas.length > 0) await guardarCapturas(aviso, capturas);
+      if (notas.length > 0) await guardarNotas(notas);
+    });
+  }
+  return NextResponse.json({ recibidas: capturas.length, notas: notas.length });
 }
