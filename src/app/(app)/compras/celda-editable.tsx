@@ -53,7 +53,7 @@ export function CeldaEditable({
 
   if (!puedeEscribir || !def || (def.soloSinProductos && compra.productos > 0)) return <>{children}</>;
 
-  const nombre = compra.productos > 0 ? numeroOC(compra.numero) : compra.nombre;
+  const nombre = numeroOC(compra.numero);
   const aria = `${def.etiqueta} de ${nombre}`;
   const inicial = valorInicial(def, compra);
 
