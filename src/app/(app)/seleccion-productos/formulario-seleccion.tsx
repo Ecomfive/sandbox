@@ -10,7 +10,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { CerrarIcon, CheckIcon, EnlaceIcon, EstadoIcon, GastoIcon, SeleccionIcon } from "@/lib/nav-icons";
 import { actualizarSeleccion, crearSeleccion, prepararSubidaFotoSeleccion } from "./actions";
-import { etiquetaFuente, FUENTES, type FilaSeleccion } from "./def-seleccion";
+import { etiquetaFuente, type FilaSeleccion } from "./def-seleccion";
 
 export interface Responsable {
   id: string;
@@ -24,8 +24,8 @@ const hoy = () => {
 };
 
 /**
- * El formulario de una fila de Selección (como `FormularioFiltro`). Sin `fila` crea una a mano (se elige de qué fuente
- * salió; por defecto «Manual»); con `fila` modifica. Al crear, los botones van abajo; al editar desde la ficha, arriba y
+ * El formulario de una fila de Selección (como `FormularioFiltro`). Sin `fila` crea una a mano, siempre «Manual» (lo de una
+ * fuente se crea en su módulo y se envía desde ahí); con `fila` modifica. Al crear, los botones van abajo; al editar desde la ficha, arriba y
  * solo con cambios. El estado no se cambia aquí: se mueve desde la celda, la ficha o la barra de varias filas.
  */
 export function FormularioSeleccion({
@@ -143,14 +143,12 @@ export function FormularioSeleccion({
                 </p>
               </Campo>
             ) : (
-              <Campo etiqueta="Fuente" id="campo-fuente-seleccion" obligatorio faltante={faltante}>
-                <select id="campo-fuente-seleccion" name="fuente" required defaultValue="manual" aria-invalid={invalido("campo-fuente-seleccion")} className={fieldClass}>
-                  {FUENTES.map((f) => (
-                    <option key={f.valor} value={f.valor}>
-                      {f.etiqueta} ({f.prefijo}-0001)
-                    </option>
-                  ))}
-                </select>
+              // Lo que sale de una fuente se crea en su módulo y se envía desde ahí (así queda en la base de la fuente y no se
+              // duplica): aquí solo se crean filas «Manual».
+              <Campo etiqueta="Fuente" id="campo-fuente-seleccion">
+                <p id="campo-fuente-seleccion" className="m-0 py-2 text-sm">
+                  Manual <span className="text-muted-foreground">· el código MAN- se pone solo</span>
+                </p>
               </Campo>
             )}
             <Campo etiqueta="Fecha de captación" id="campo-fecha-seleccion" obligatorio faltante={faltante}>

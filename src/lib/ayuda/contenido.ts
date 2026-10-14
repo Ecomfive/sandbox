@@ -194,7 +194,7 @@ export const GUIAS: GuiaModulo[] = [
         titulo: "Uso",
         pasos: [
           "Cada fila es un candidato, no un producto de Producto: no lleva SKU. Trae su N.º (SEL-0001), la fuente de donde salió y el código de esa fuente (DK-0001 Drop Killer, TW-0001 Tu Winner, SP-0001 Scraping de proveedores, MAN-0001 a mano).",
-          "«Agregar» crea una fila a mano: nombre, foto, fuente, fecha de captación, categoría, responsable, enlaces (página y Ad Library), precios de referencia en dólares y notas.",
+          "«Agregar» crea una fila a mano, siempre «Manual» (código MAN-): lo que sale de Drop Killer, Tu Winner o Scraping de proveedores se crea en su módulo y se envía desde ahí, para que quede en la base de la fuente y no se duplique. Lleva nombre, foto, fecha de captación, categoría, responsable, enlaces (página y Ad Library), precios de referencia en dólares y notas.",
           "Los estados son Por evaluar, Seleccionado y Descartado. Cambia el estado pulsando la insignia de su celda o en la ficha; para varias filas, márcalas y usa «Estado» en la barra de abajo.",
           "Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
           "Pulsa el nombre para abrir su ficha: ahí se edita todo y, al final, está su actividad.",

@@ -7,14 +7,13 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
-import { ESTADOS_SELECCION, etiquetaEstadoSeleccion, FUENTES } from "./def-seleccion";
+import { ESTADOS_SELECCION, etiquetaEstadoSeleccion } from "./def-seleccion";
 
 const MODULO = "seleccion-productos";
 const ENTIDAD = "wms_seleccion_productos";
 const RUTA = "/seleccion-productos";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ESTADOS: Set<string> = new Set(ESTADOS_SELECCION.map((e) => e.valor));
-const FUENTES_VALIDAS: Set<string> = new Set(FUENTES.map((f) => f.valor));
 
 // La foto vive en el mismo bucket público que las de Filtro de productos y las fichas, en su propia carpeta.
 const BUCKET_FOTOS = "wms-productos";
@@ -115,14 +114,14 @@ async function leerDatos(formData: FormData) {
 }
 
 /**
- * Crea una fila a mano. Si dice de qué fuente salió (se encontró en Drop Killer sin pasar por su módulo, por ejemplo), toma el
- * siguiente correlativo de esa fuente; si no, es «Manual» (MAN-0001). Arranca «Por evaluar», en el país de la barra de arriba.
- * Devuelve el error como valor: en producción Next.js oculta el mensaje de una excepción.
+ * Crea una fila a mano: siempre «Manual», con el siguiente MAN-0001. Lo que sale de una fuente (Drop Killer, Tu Winner,
+ * Scraping) se crea en su módulo y se envía desde ahí, para que quede en la base de esa fuente y no se duplique. Arranca
+ * «Por evaluar», en el país de la barra de arriba. Devuelve el error como valor: en producción Next.js oculta el mensaje de
+ * una excepción.
  */
 export async function crearSeleccion(formData: FormData): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
-  const fuente = String(formData.get("fuente") ?? "manual");
-  if (!FUENTES_VALIDAS.has(fuente)) return { error: "Elige una fuente válida." };
+  const fuente = "manual";
   const leido = await leerDatos(formData);
   if ("error" in leido) return { error: leido.error };
 
