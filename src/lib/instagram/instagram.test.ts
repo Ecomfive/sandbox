@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { test } from "node:test";
 import { extraerCapturas, formatoDeVideo, paginaDestinoDeTexto } from "./extraer";
 import { firmaValida, tokenDeVerificacionValido } from "./firma";
+import { interpretarMedia } from "./media";
 
 const aviso = (mensaje: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
   object: "instagram",
@@ -112,4 +113,36 @@ test("video: se reconoce por su firma, no por lo que diga el servidor", () => {
   assert.deepEqual(formatoDeVideo(webm), { extension: "webm", tipo: "video/webm" });
   assert.equal(formatoDeVideo(html), null);
   assert.equal(formatoDeVideo(new Uint8Array()), null);
+});
+
+test("media: aprovecha usuario, cifras, enlace de Instagram y el video solo si es un video", () => {
+  const m = interpretarMedia({
+    id: "1",
+    username: "tienda.ejemplo",
+    like_count: 120,
+    comments_count: 7,
+    media_type: "VIDEO",
+    media_url: "https://scontent.cdninstagram.com/v/a.mp4",
+    permalink: "https://www.instagram.com/reel/ABC/",
+  });
+  assert.deepEqual(m, {
+    usuario: "tienda.ejemplo",
+    megusta: 120,
+    comentarios: 7,
+    enlace: "https://www.instagram.com/reel/ABC/",
+    urlVideo: "https://scontent.cdninstagram.com/v/a.mp4",
+  });
+  // Una imagen no se descarga como video; un enlace que no es de Instagram no se toma.
+  const img = interpretarMedia({ username: "x", media_type: "IMAGE", media_url: "https://x.cdninstagram.com/a.jpg", permalink: "https://evil.example/p/1" });
+  assert.equal(img?.urlVideo, null);
+  assert.equal(img?.enlace, null);
+});
+
+test("media: un error de Meta, un valor raro o una respuesta vacía no dan nada", () => {
+  assert.equal(interpretarMedia({ error: { message: "Unsupported get request" } }), null);
+  assert.equal(interpretarMedia({ id: "1" }), null);
+  assert.equal(interpretarMedia(null), null);
+  assert.equal(interpretarMedia("x"), null);
+  assert.equal(interpretarMedia({ username: "con espacios y <script>", like_count: -3, comments_count: "5" }), null);
+  assert.equal(interpretarMedia({ media_type: "VIDEO", media_url: "http://inseguro.example/a.mp4", like_count: 2 })?.urlVideo, null);
 });

@@ -30,6 +30,7 @@ interface FilaBase {
   pagina_destino: string | null;
   notas: string | null;
   estado: string;
+  payload: unknown;
 }
 
 const numero = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -46,7 +47,7 @@ export default async function InstagramPage() {
   const r = await traerTodasConError<FilaBase>((a, b) =>
     supabase
       .from("instagram_capturas")
-      .select("id, numero, recibido_en, remitente_id, remitente_usuario, remitente_nombre, tipo, enlace, titulo, texto_mensaje, video_ruta, video_bytes, video_error, autor_usuario, metricas, pagina_destino, notas, estado")
+      .select("id, numero, recibido_en, remitente_id, remitente_usuario, remitente_nombre, tipo, enlace, titulo, texto_mensaje, video_ruta, video_bytes, video_error, autor_usuario, metricas, pagina_destino, notas, estado, payload")
       .order("numero", { ascending: false })
       .range(a, b),
   );
@@ -83,6 +84,7 @@ export default async function InstagramPage() {
     paginaDestino: f.pagina_destino,
     notas: f.notas,
     estado: f.estado,
+    datosMeta: JSON.stringify({ aviso: f.payload, consulta: f.metricas?.consulta ?? null }, null, 2).slice(0, 20000),
   }));
 
   return (

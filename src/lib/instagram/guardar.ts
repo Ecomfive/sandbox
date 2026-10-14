@@ -1,6 +1,7 @@
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatoDeVideo, type CapturaInstagram } from "./extraer";
+import { CAMPOS_MEDIA, interpretarMedia } from "./media";
 
 export const BUCKET_INSTAGRAM = "instagram-fuentes";
 /** Un reel pesa unos MB; el bucket acepta hasta 100 MB. */
@@ -26,6 +27,26 @@ async function consultarRemitente(id: string): Promise<{ usuario: string | null;
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Pide a Instagram lo que deja leer del reel o la publicación compartida (autor, me gusta, comentarios, enlace, video). Para una
+ * publicación de otra cuenta Meta puede negarlo: la respuesta o el error se guardan tal cual para revisarlos. Nunca lanza.
+ */
+async function consultarMedia(id: string): Promise<{ ok: true; datos: unknown } | { ok: false; error: string } | null> {
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN;
+  if (!token || !/^\d{5,25}$/.test(id)) return null;
+  try {
+    const r = await fetch(`https://graph.instagram.com/v23.0/${id}?fields=${CAMPOS_MEDIA}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    const d = (await r.json().catch(() => null)) as { error?: { message?: unknown } } | null;
+    if (r.ok && d) return { ok: true, datos: d };
+    return { ok: false, error: typeof d?.error?.message === "string" ? d.error.message.slice(0, 500) : `HTTP ${r.status}` };
+  } catch {
+    return { ok: false, error: "Instagram no respondió." };
   }
 }
 
@@ -70,12 +91,24 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       if (error || !data) continue; // 23505 = ya la teníamos (un reintento de Meta); lo demás tampoco se puede arreglar aquí
       nuevas++;
 
-      const [remitente, video] = await Promise.all([consultarRemitente(c.remitenteId), c.urlVideo ? copiarVideo(data.id, c.urlVideo) : Promise.resolve(null)]);
+      const [remitente, consulta] = await Promise.all([consultarRemitente(c.remitenteId), c.mediaId ? consultarMedia(c.mediaId) : Promise.resolve(null)]);
+      const media = consulta?.ok ? interpretarMedia(consulta.datos) : null;
+      const urlVideo = c.urlVideo ?? media?.urlVideo ?? null;
+      const video = urlVideo ? await copiarVideo(data.id, urlVideo) : null;
+
       const cambios: Record<string, unknown> = {};
       if (remitente) {
         cambios.remitente_usuario = remitente.usuario;
         cambios.remitente_nombre = remitente.nombre;
       }
+      if (consulta) {
+        const metricas: Record<string, unknown> = { consulta: consulta.ok ? consulta.datos : { error: consulta.error } };
+        if (media?.megusta != null) metricas.like_count = media.megusta;
+        if (media?.comentarios != null) metricas.comments_count = media.comentarios;
+        cambios.metricas = metricas;
+      }
+      if (media?.usuario) cambios.autor_usuario = media.usuario;
+      if (media?.enlace && !c.enlace) cambios.enlace = media.enlace;
       if (video) {
         if ("error" in video) cambios.video_error = video.error;
         else {

@@ -59,7 +59,17 @@ function VideoCaptura({ fila }: { fila: FilaInstagram }) {
 
   const actual = estado?.id === fila.id ? estado : null;
   if (!fila.tieneVideo) {
-    return <p className="m-0 rounded-lg border border-border bg-muted px-3 py-6 text-center text-sm text-muted-foreground">{fila.videoError ? `Sin video: ${fila.videoError}` : "Esta captura no trae el archivo de video."}</p>;
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
+        <p className="m-0">{fila.videoError ? `Sin video: ${fila.videoError}` : "Esta captura no trae el archivo de video."}</p>
+        {fila.enlace && (
+          <a href={fila.enlace} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted ${anilloFoco}`}>
+            <EnlaceIcon className="h-4 w-4" />
+            Ver en Instagram
+          </a>
+        )}
+      </div>
+    );
   }
   if (actual?.error) {
     return (
@@ -238,6 +248,15 @@ export function FichaInstagram({
                   </div>
                 </dl>
               </Seccion>
+
+              {fila.datosMeta && (
+                <Seccion icono={InstagramIcon} titulo="Datos de Meta">
+                  <details className="group">
+                    <summary className={`cursor-pointer text-sm text-primario hover:underline ${anilloFoco}`}>Ver el aviso y la consulta a Instagram</summary>
+                    <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-border bg-muted p-3 text-xs">{fila.datosMeta}</pre>
+                  </details>
+                </Seccion>
+              )}
 
               <Seccion icono={EstadoIcon} titulo="Para decidir">
                 <fieldset disabled={!puedeEscribir || guardando} className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">

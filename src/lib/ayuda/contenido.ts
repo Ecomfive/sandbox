@@ -240,7 +240,7 @@ export const GUIAS: GuiaModulo[] = [
           "Cada fila es una captura con su N.º (IG-0001), su tipo (reel, publicación o video), quién la envió, cuándo llegó y su estado. Cae «Nuevo»; pásala a «Por testear» o «Descartado» desde su ficha. Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
           "Pulsa una captura para abrir su ficha: el video guardado en nuestro almacenamiento (no depende de que el reel siga publicado), el copy y el enlace de Instagram, quién lo compartió y el mensaje que escribió, las métricas (me gusta, comentarios, vistas) si se pudieron consultar, y al final su actividad.",
           "Si al compartir escribes en el mismo mensaje el enlace de la tienda del producto, el sistema lo propone como «Página de destino»; también se completa a mano en la ficha, junto con las notas.",
-          "No hay botón «Agregar»: las capturas las crea Instagram. Si una captura no tiene video, la ficha lo dice; los videos de anuncios patrocinados pueden no llegar.",
+          "No hay botón «Agregar»: las capturas las crea Instagram. Un reel llega con su copy y su enlace, pero sin el archivo de video: la ficha lo dice y trae el botón «Ver en Instagram». Una publicación de video llega con el archivo guardado. Los anuncios patrocinados pueden no llegar.",
         ],
       },
     ],
