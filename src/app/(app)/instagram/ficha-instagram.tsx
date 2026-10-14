@@ -40,7 +40,13 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
   );
 }
 
-const cifra = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-CR"));
+// Las cifras que se completan a mano: el nombre del campo en la base (`metricas`), su etiqueta y de dónde se lee.
+const CIFRAS = [
+  ["like_count", "Me gusta", "megusta"],
+  ["comments_count", "Comentarios", "comentarios"],
+  ["view_count", "Vistas", "vistas"],
+  ["share_count", "Compartidos", "compartidos"],
+] as const;
 const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1_048_576).toLocaleString("es-CR", { maximumFractionDigits: 1 })} MB`);
 
 /** El video de la captura, con su enlace firmado (el bucket es privado); sin video dice por qué, si se sabe. */
@@ -240,13 +246,25 @@ export function FichaInstagram({
                       "—"
                     )}
                   </Dato>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Dato etiqueta="Cuenta del video">{fila.autorUsuario ? `@${fila.autorUsuario}` : "—"}</Dato>
-                    <Dato etiqueta="Me gusta">{cifra(fila.megusta)}</Dato>
-                    <Dato etiqueta="Comentarios">{cifra(fila.comentarios)}</Dato>
-                    <Dato etiqueta="Vistas">{cifra(fila.vistas)}</Dato>
-                  </div>
                 </dl>
+              </Seccion>
+
+              <Seccion icono={EstadoIcon} titulo="Cifras de la publicación">
+                <fieldset disabled={!puedeEscribir || guardando} className="m-0 grid min-w-0 grid-cols-2 gap-3 border-0 p-0 sm:grid-cols-3">
+                  <Campo etiqueta="Cuenta del video" id="campo-autor-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-autor-instagram" type="text" name="autor_usuario" maxLength={100} defaultValue={fila.autorUsuario ?? ""} placeholder="Ej: tienda.ejemplo" className={fieldClass} />
+                  </Campo>
+                  <Campo etiqueta="Fecha de publicación" id="campo-fecha-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-fecha-instagram" type="date" name="fecha_publicacion" defaultValue={fila.fechaPublicacion ?? ""} className={fieldClass} />
+                  </Campo>
+                  {CIFRAS.map(([nombre, etiqueta, valor]) => (
+                    <Campo key={nombre} etiqueta={etiqueta} id={`campo-${nombre}-instagram`}>
+                      <input id={`campo-${nombre}-instagram`} type="number" inputMode="numeric" min="0" step="1" name={nombre} defaultValue={fila[valor] ?? ""} placeholder="Ej: 1200" className={`${fieldClass} tabular-nums`} />
+                    </Campo>
+                  ))}
+                </fieldset>
+                {fila.fuenteCifras === "vista_previa" && <p className="m-0 text-xs text-muted-foreground">Leído de la vista pública de Instagram{fila.leidoEn ? ` el ${formatearFechaHora(fila.leidoEn)}` : ""} · dato no oficial</p>}
+                {fila.fuenteCifras === "manual" && <p className="m-0 text-xs text-muted-foreground">Corregido a mano</p>}
               </Seccion>
 
               {fila.datosMeta && (
@@ -271,6 +289,12 @@ export function FichaInstagram({
                   </Campo>
                   <Campo etiqueta="Página de destino" id="campo-pagina-instagram">
                     <input id="campo-pagina-instagram" type="url" name="pagina_destino" defaultValue={fila.paginaDestino ?? ""} placeholder="Ej: https://tienda.com/producto" className={fieldClass} />
+                    {fila.paginaDestino && (
+                      <a href={fila.paginaDestino} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
+                        <EnlaceIcon className="h-4 w-4" />
+                        Abrir la página de destino
+                      </a>
+                    )}
                   </Campo>
                   <Campo etiqueta="Notas" id="campo-notas-instagram">
                     <textarea id="campo-notas-instagram" name="notas" rows={3} maxLength={4000} defaultValue={fila.notas ?? ""} className={fieldClass} />

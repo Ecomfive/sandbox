@@ -12,6 +12,13 @@ const MODULO = "instagram";
 const ENTIDAD = "instagram_capturas";
 const RUTA = "/instagram";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Las cifras de la publicación que se completan a mano: el campo en `metricas` y su etiqueta. */
+const CIFRAS = [
+  ["like_count", "Me gusta"],
+  ["comments_count", "Comentarios"],
+  ["view_count", "Vistas"],
+  ["share_count", "Compartidos"],
+] as const;
 const ESTADOS: Set<string> = new Set(ESTADOS_INSTAGRAM.map((e) => e.valor));
 
 /** Un enlace: solo http(s), para que un `javascript:` no termine en un `href`. */
@@ -41,11 +48,43 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   const pagina = enlace(formData, "pagina_destino", "Página de destino");
   if (pagina !== null && typeof pagina === "object") return pagina;
   const notas = String(formData.get("notas") ?? "").trim().slice(0, 4000) || null;
+  // La cuenta del video, sin la arroba; vacía = sin dato.
+  const autorTexto = String(formData.get("autor_usuario") ?? "").trim().replace(/^@/, "");
+  if (autorTexto && !/^[\w.]{1,100}$/.test(autorTexto)) return { error: "Cuenta del video: solo letras, números, puntos y guiones bajos." };
+  const autor = autorTexto || null;
+  const fechaTexto = String(formData.get("fecha_publicacion") ?? "").trim();
+  if (fechaTexto && (!/^\d{4}-\d{2}-\d{2}$/.test(fechaTexto) || Number.isNaN(Date.parse(fechaTexto)))) return { error: "Fecha de publicación no válida." };
+  const fechaPublicacion = fechaTexto || null;
+  // Las cifras de la publicación: enteros desde 0; vacío = sin dato.
+  const cifras: Record<string, number | null> = {};
+  for (const [campo, nombre] of CIFRAS) {
+    const t = String(formData.get(campo) ?? "").trim();
+    if (!t) {
+      cifras[campo] = null;
+      continue;
+    }
+    const n = Number(t);
+    if (!Number.isInteger(n) || n < 0 || n > 2_000_000_000) return { error: `${nombre}: escribe un número entero desde 0.` };
+    cifras[campo] = n;
+  }
 
   const supabase = createServiceClient();
-  const { data: antes } = await supabase.from(ENTIDAD).select("estado, pagina_destino, notas").eq("id", id).maybeSingle();
+  const { data: antes } = await supabase.from(ENTIDAD).select("estado, pagina_destino, notas, autor_usuario, metricas").eq("id", id).maybeSingle();
   if (!antes) return { error: "La captura ya no existe." };
-  const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, actualizado_en: new Date().toISOString() }).eq("id", id);
+  // Las cifras se mezclan con lo que ya hay en `metricas` (la consulta a Instagram, por ejemplo): no se pierde nada.
+  const metricasAntes = (antes.metricas ?? {}) as Record<string, unknown>;
+  const metricas: Record<string, unknown> = { ...metricasAntes };
+  for (const [campo] of CIFRAS) {
+    if (cifras[campo] === null) delete metricas[campo];
+    else metricas[campo] = cifras[campo];
+  }
+  const fechaAntes = typeof metricasAntes.fecha_publicacion === "string" ? metricasAntes.fecha_publicacion : null;
+  if (fechaPublicacion === null) delete metricas.fecha_publicacion;
+  else metricas.fecha_publicacion = fechaPublicacion;
+  // Si una persona cambia alguna cifra, la cuenta o la fecha, el dato ya no es el que se leyó solo.
+  const cifrasCambiaron = CIFRAS.some(([campo]) => (typeof metricasAntes[campo] === "number" ? metricasAntes[campo] : null) !== cifras[campo]);
+  if (cifrasCambiaron || (antes.autor_usuario ?? null) !== autor || fechaAntes !== fechaPublicacion) metricas.fuente = "manual";
+  const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, autor_usuario: autor, metricas, actualizado_en: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "No se pudieron guardar los cambios." };
 
   const cambio: { antes: Record<string, string>; despues: Record<string, string> } = { antes: {}, despues: {} };
@@ -60,6 +99,21 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if ((antes.notas ?? null) !== notas) {
     cambio.antes.Notas = antes.notas ? "(texto)" : "—";
     cambio.despues.Notas = notas ? "(texto)" : "—";
+  }
+  if ((antes.autor_usuario ?? null) !== autor) {
+    cambio.antes["Cuenta del video"] = antes.autor_usuario ? `@${antes.autor_usuario}` : "—";
+    cambio.despues["Cuenta del video"] = autor ? `@${autor}` : "—";
+  }
+  if (fechaAntes !== fechaPublicacion) {
+    cambio.antes["Fecha de publicación"] = fechaAntes ?? "—";
+    cambio.despues["Fecha de publicación"] = fechaPublicacion ?? "—";
+  }
+  for (const [campo, nombre] of CIFRAS) {
+    const previo = typeof metricasAntes[campo] === "number" ? (metricasAntes[campo] as number) : null;
+    if (previo !== cifras[campo]) {
+      cambio.antes[nombre] = previo === null ? "—" : String(previo);
+      cambio.despues[nombre] = cifras[campo] === null ? "—" : String(cifras[campo]);
+    }
   }
   if (Object.keys(cambio.despues).length > 0) await registrarAuditoria({ accion: "actualizar_captura_instagram", entidad: ENTIDAD, entidadId: id, ...cambio });
   revalidatePath(RUTA);

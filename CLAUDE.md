@@ -384,7 +384,7 @@ convenciones técnicas del código.
   el tipo que diga el servidor. El aviso completo queda en `payload` (jsonb) para no perder datos mientras se decide qué sirve; las
   métricas del autor (`metricas`: `like_count`, `comments_count`, `view_count`) y `autor_usuario` quedan listos para llenarse con la
   Business Discovery API (solo cuentas profesionales; **compartidos y guardados no los entrega Meta**) y la página de destino no
-  viene del DM: se propone a partir de un enlace que la persona escriba en el mismo mensaje y se completa a mano en la ficha. La
+  viene del DM (se toma del enlace que la persona pegue en el mismo mensaje y, si no, del primero que aparezca en el copy; se puede filtrar «Sin página»): se propone a partir de un enlace que la persona escriba en el mismo mensaje y se completa a mano en la ficha. La
   lista es una `TablaDatos` (sin «Agregar»: las crea el webhook), la ficha lateral muestra el video, lo que trajo Meta y, editable,
   Estado (Nuevo / Por testear / Descartado), Página de destino y Notas. Se abre desde `/instagram` y el código es IG-0001.
   **Cómo se montó la app de Meta y qué hizo falta de verdad** (publicar la app era lo único que destrabó los mensajes; roles de
@@ -392,7 +392,7 @@ convenciones técnicas del código.
   **Lo observado** (14 oct 2026, dos muestras): un reel llega con copy y enlace pero **sin archivo de video**; una publicación de
   video llega con copy y el archivo (se copia a Storage) pero sin enlace. Me gusta, comentarios y vistas no vienen en el aviso:
   `consultarMedia` pide a Instagram, con el id del reel o la publicación, lo que deja leer de una publicación ajena y guarda la
-  respuesta (o el error) en `metricas.consulta`, visible en la ficha, «Datos de Meta».
+  respuesta (o el error) en `metricas.consulta`, visible en la ficha, «Datos de Meta»; **con estos permisos Meta la niega para publicaciones ajenas**. Por eso, al guardar una captura con enlace, el sistema **lee solo la vista previa pública** del reel o la publicación (`vista-previa.ts`, un pedido, `og:description`) y llena me gusta, comentarios, cuenta del video y fecha de publicación, marcados como dato no oficial (`metricas.fuente = "vista_previa"`); vistas y compartidos no salen ahí. Todo se puede corregir a mano en la ficha («Cifras de la publicación», en `metricas`: `like_count`, `comments_count`, `view_count`, `share_count`, `fecha_publicacion`), y entonces pasa a `fuente = "manual"`. Se apaga con `INSTAGRAM_LECTURA_PUBLICA=0` (Vercel); si Instagram no responde, el motivo queda en `metricas.vista_previa_error`. Una publicación trae su id como `ig_post_media_id`.
   **Falta:** probar un anuncio patrocinado real; decidir qué hacer con los reels sin video; enviar una captura «Por testear» a
   Selección (hoy no hay puente).
 - **Investigación › Análisis de competencia** (`/analisis-competencia`, módulo `analisis-competencia`, migración 0108, 14 oct

@@ -2,6 +2,7 @@ import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatoDeVideo, type CapturaInstagram } from "./extraer";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
+import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, type VistaPublica } from "./vista-previa";
 
 export const BUCKET_INSTAGRAM = "instagram-fuentes";
 /** Un reel pesa unos MB; el bucket acepta hasta 100 MB. */
@@ -50,6 +51,24 @@ async function consultarMedia(id: string): Promise<{ ok: true; datos: unknown } 
   }
 }
 
+/**
+ * Lee la vista previa pública del reel o la publicación (me gusta, comentarios, cuenta y fecha): lo mismo que ven WhatsApp o
+ * Facebook al pegar el enlace. Un solo pedido por captura, solo al enlace de un reel o una publicación de instagram.com, con el
+ * descargador seguro y pidiendo la página como lo hace Facebook para sus vistas previas. Nunca lanza: si Instagram no responde o
+ * cambia el formato, el motivo queda anotado y la captura se guarda igual.
+ */
+async function leerVistaPublica(enlace: string): Promise<{ ok: true; datos: VistaPublica } | { ok: false; error: string } | null> {
+  if (!lecturaPublicaActiva() || !enlaceLegible(enlace)) return null;
+  const pagina = await descargarPublico(enlace, 3_000_000, {
+    "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+    accept: "text/html",
+    "accept-language": "en-US,en;q=0.9",
+  });
+  if ("error" in pagina) return { ok: false, error: pagina.error };
+  const datos = interpretarVistaPrevia(descripcionDeLaPagina(new TextDecoder("utf-8").decode(pagina.bytes)));
+  return datos ? { ok: true, datos } : { ok: false, error: "La vista previa no trae cifras." };
+}
+
 /** Copia el video a nuestro almacenamiento: el enlace del aviso de Meta caduca, el archivo guardado no. */
 async function copiarVideo(id: string, url: string): Promise<{ ruta: string; bytes: number } | { error: string }> {
   const descarga = await descargarPublico(url, MAX_VIDEO);
@@ -94,20 +113,32 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       const [remitente, consulta] = await Promise.all([consultarRemitente(c.remitenteId), c.mediaId ? consultarMedia(c.mediaId) : Promise.resolve(null)]);
       const media = consulta?.ok ? interpretarMedia(consulta.datos) : null;
       const urlVideo = c.urlVideo ?? media?.urlVideo ?? null;
-      const video = urlVideo ? await copiarVideo(data.id, urlVideo) : null;
+      const enlaceFinal = c.enlace ?? media?.enlace ?? null;
+      const [video, vista] = await Promise.all([urlVideo ? copiarVideo(data.id, urlVideo) : null, enlaceFinal ? leerVistaPublica(enlaceFinal) : null]);
 
       const cambios: Record<string, unknown> = {};
       if (remitente) {
         cambios.remitente_usuario = remitente.usuario;
         cambios.remitente_nombre = remitente.nombre;
       }
-      if (consulta) {
-        const metricas: Record<string, unknown> = { consulta: consulta.ok ? consulta.datos : { error: consulta.error } };
-        if (media?.megusta != null) metricas.like_count = media.megusta;
-        if (media?.comentarios != null) metricas.comments_count = media.comentarios;
-        cambios.metricas = metricas;
+      // Las cifras: lo que entrega la API de Meta manda; si no, lo de la vista previa pública (dato no oficial, marcado como tal).
+      const metricas: Record<string, unknown> = {};
+      if (consulta) metricas.consulta = consulta.ok ? consulta.datos : { error: consulta.error };
+      if (vista?.ok) {
+        const v = vista.datos;
+        if (v.megusta !== null) metricas.like_count = v.megusta;
+        if (v.comentarios !== null) metricas.comments_count = v.comentarios;
+        if (v.fecha) metricas.fecha_publicacion = v.fecha;
+        metricas.fuente = "vista_previa";
+        metricas.leido_en = new Date().toISOString();
+      } else if (vista) {
+        metricas.vista_previa_error = vista.error;
       }
-      if (media?.usuario) cambios.autor_usuario = media.usuario;
+      if (media?.megusta != null) metricas.like_count = media.megusta;
+      if (media?.comentarios != null) metricas.comments_count = media.comentarios;
+      if (Object.keys(metricas).length > 0) cambios.metricas = metricas;
+      const autor = media?.usuario ?? (vista?.ok ? vista.datos.usuario : null);
+      if (autor) cambios.autor_usuario = autor;
       if (media?.enlace && !c.enlace) cambios.enlace = media.enlace;
       if (video) {
         if ("error" in video) cambios.video_error = video.error;

@@ -54,6 +54,17 @@ conectadas) y si los mensajes que caen en «Solicitudes» llegan igual. Se prob�
    registros de Vercel con el filtro `/api/instagram/webhook` (si no hay ningún `POST`, el problema está en Meta; si hay `POST` con 401,
    es el secreto; con 200 y sin fila, mirar `instagram_capturas`).
 
+## Los dos enlaces de cada captura: qué se puede asegurar y qué no
+
+- **Enlace de Instagram del anuncio o la publicación:** un reel siempre lo trae. Una publicación (`ig_post`) no: solo trae el archivo
+  de video y su id, y de ese id no se puede armar el enlace.
+- **Enlace de la página de destino:** Meta **no lo entrega** en el mensaje directo, el perfil público de la cuenta no muestra su
+  «link en la bio» a una consulta anónima y, en las muestras, el copy tampoco trae ninguna dirección de tienda. Lo que sí se aprovecha,
+  en este orden: (1) el enlace que la persona **escribe en el mismo mensaje** al compartir, (2) el primer enlace que no sea de
+  Instagram ni de Facebook dentro del **copy**, (3) lo que se escribe a mano en la ficha. La forma fiable de tenerlo siempre es la
+  primera: pedir al equipo que pegue la dirección de la tienda en el mensaje al compartir.
+- La tabla permite filtrar y agrupar por «Con enlace / Sin enlace» y «Con página / Sin página» para completar lo que falte.
+
 ## Qué llega en cada aviso (observado con dos muestras reales)
 
 | | Reel (`ig_reel`) | Publicación (`ig_post`, un video) |
@@ -64,6 +75,21 @@ conectadas) y si los mensajes que caen en «Solicitudes» llegan igual. Se prob�
 | Quién lo envió | Su id (y su `@usuario` con el token) | Igual |
 | Me gusta, comentarios, vistas, cuenta del video | No vienen | No vienen |
 
-Son dos muestras: confirmar con más antes de darlo por regla. La consulta a Instagram con el id del reel o la publicación
-(`consultarMedia`, `src/lib/instagram/guardar.ts`) está para averiguar qué deja leer Meta de una publicación ajena; su respuesta o
-su error queda en la ficha, en «Datos de Meta».
+Cinco muestras (4 reels y 1 publicación de video; ningún anuncio patrocinado todavía). Un reel trae `url` (el enlace `/reel/…` o `/p/…`),
+`title` y `reel_video_id`; una publicación trae `url` (un archivo en `lookaside.fbsbx.com/ig_messaging_cdn`, que se copia a Storage), `title` e
+**`ig_post_media_id`** (no `id`, como dice la documentación).
+
+**La consulta a Instagram con ese id no sirve** (`consultarMedia`, `src/lib/instagram/guardar.ts`): con estos permisos Meta responde
+*«Unsupported get request. Object … does not exist, cannot be loaded due to missing permissions, or does not support this operation»*
+para una publicación de otra cuenta. Me gusta, comentarios, vistas y compartidos **no se pueden leer por la API**: se completan a
+mano en la ficha («Cifras de la publicación», dentro de `metricas`). La respuesta de la consulta queda en «Datos de Meta».
+
+**Lectura de la vista previa pública (implementada, decisión de Hernán, 14 oct 2026):** al recibir una captura con enlace de reel o
+publicación, el servidor pide **una vez** esa página pública (`src/lib/instagram/vista-previa.ts`, `leerVistaPublica` en `guardar.ts`) con el
+descargador seguro y el agente de las vistas previas de Facebook, y lee `og:description`: «43 likes, 12 comments - nuvotienda.ve on
+February 4, 2025: …». Se guardan **me gusta, comentarios, cuenta y fecha de publicación** (en `metricas` y `autor_usuario`), marcados
+`fuente: "vista_previa"` («dato no oficial» en la ficha); las **vistas y los compartidos no salen** ahí y se escriben a mano. Si una
+persona corrige algo en la ficha, pasa a `fuente: "manual"`. Probado con tres enlaces reales (43/12, 102/95 y 2/0). Riesgos que se
+aceptaron: las condiciones de Meta limitan el acceso automatizado, y Instagram puede dejar de responder o pedir inicio de sesión a las
+direcciones de Vercel (el motivo queda en `metricas.vista_previa_error`, y la captura se guarda igual). Una publicación (`ig_post`) no
+trae enlace, así que no tiene lectura. **Se apaga sin tocar el código** poniendo `INSTAGRAM_LECTURA_PUBLICA=0` en Vercel.

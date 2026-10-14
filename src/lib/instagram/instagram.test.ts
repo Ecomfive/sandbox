@@ -146,3 +146,21 @@ test("media: un error de Meta, un valor raro o una respuesta vacía no dan nada"
   assert.equal(interpretarMedia({ username: "con espacios y <script>", like_count: -3, comments_count: "5" }), null);
   assert.equal(interpretarMedia({ media_type: "VIDEO", media_url: "http://inseguro.example/a.mp4", like_count: 2 })?.urlVideo, null);
 });
+
+test("una publicación trae su id como ig_post_media_id (aviso real) y también se acepta id", () => {
+  const real = extraerCapturas(aviso({ mid: "p1", attachments: [{ type: "ig_post", payload: { url: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1", title: "Crema", ig_post_media_id: "18019022309933089" } }] }));
+  assert.equal(real[0].mediaId, "18019022309933089");
+  assert.equal(real[0].urlVideo, "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1");
+  const doc = extraerCapturas(aviso({ mid: "p2", attachments: [{ type: "ig_post", payload: { url: "https://www.instagram.com/p/AB/", id: 55 } }] }));
+  assert.equal(doc[0].mediaId, "55");
+});
+
+test("página de destino: la del mensaje manda; si no hay, la primera del copy de la publicación", () => {
+  const adj = (title: string) => [{ type: "ig_reel", payload: { url: "https://www.instagram.com/reel/AB/", title } }];
+  const delCopy = extraerCapturas(aviso({ mid: "d1", attachments: adj("Compra aquí https://tienda.com/p/crema, envíos a todo el país") }));
+  assert.equal(delCopy[0].paginaDestino, "https://tienda.com/p/crema");
+  const delMensaje = extraerCapturas(aviso({ mid: "d2", text: "mira https://otra.com/x", attachments: adj("Compra aquí https://tienda.com/p/crema") }));
+  assert.equal(delMensaje[0].paginaDestino, "https://otra.com/x");
+  const ninguna = extraerCapturas(aviso({ mid: "d3", attachments: adj("Pídelo por WhatsApp, link en la bio https://instagram.com/tienda") }));
+  assert.equal(ninguna[0].paginaDestino, null);
+});
