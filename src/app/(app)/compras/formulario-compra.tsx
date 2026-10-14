@@ -189,17 +189,6 @@ export function FormularioCompra({
 
       <div className="flex flex-1 flex-col divide-y divide-border p-5">
         <Seccion icono={ComprasIcon} titulo="Compra">
-          <Campo etiqueta="Nombre" id="campo-nombre-compra">
-            <input
-              id="campo-nombre-compra"
-              type="text"
-              name="nombre"
-              data-enfocar
-              defaultValue={compra?.nombre}
-              placeholder='Ej: Gotas Líquidas Clean "Lote #1, 1000"'
-              className={fieldClass}
-            />
-          </Campo>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Campo etiqueta={conEmoji("codigo", "Código")} id="campo-codigo-compra">
               {/* El código lo pone el sistema al crear la compra (el siguiente de su país): no se escribe a mano. */}

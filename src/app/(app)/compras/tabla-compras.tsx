@@ -157,7 +157,7 @@ function columnas(
             <span className="flex items-center gap-1.5">
               {atrasada && <Punto tono="peligro" />}
               {atrasada && <span className="sr-only">Atrasada. </span>}
-              <span className="block max-w-[24rem] truncate font-medium" title={c.nombre}>
+              <span className="block max-w-[24rem] truncate font-medium" title={`${tituloCompra(c)}${c.codigo ? ` · ${c.codigo}` : ""}`}>
                 {c.codigo && <span className="mr-1.5 font-normal text-muted-foreground">{c.codigo}</span>}
                 {tituloCompra(c)}
               </span>

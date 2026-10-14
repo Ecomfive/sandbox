@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { BotonBarra, CabeceraTarjeta, Delta, Indicador, Pastilla, Punto, Segmentado } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { etiquetaEtapa, etiquetaVia, type FilaCompra } from "./def-compras";
+import { etiquetaEtapa, etiquetaVia, numeroOC, type FilaCompra } from "./def-compras";
 import {
   abiertasPorEtapa,
   diasEntre,
@@ -266,8 +266,8 @@ export function InformeCompras({
               <li key={c.id} className="flex items-center gap-2 border-b border-border px-3.5 py-2">
                 <Punto tono="peligro" />
                 <span className="min-w-0 flex-1 truncate">
-                  {c.codigo ? `${c.codigo} · ` : ""}
-                  {c.nombre}
+                  {numeroOC(c.numero)}
+                  {c.codigo ? ` · ${c.codigo}` : ""}
                 </span>
                 <span className="text-xs whitespace-nowrap text-muted-foreground">{diasEntre(c.fechaEnvio, dia)} días en tránsito</span>
               </li>
