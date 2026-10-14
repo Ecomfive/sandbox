@@ -185,6 +185,24 @@ export const GUIAS: GuiaModulo[] = [
     secciones: [{ titulo: "Uso", pasos: ["Al entrar a Test productos se abre la pestaña «Productos» (la lista); al lado están «Informe» y «Dashboard».", "Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Dashboard: todo el testing a la vez, con filtros que se cruzan (fechas, categoría, Test # y resultado). Pulsa una barra del periodo, una categoría o una fila de «Comparar por» para filtrar y otra vez para quitarlo. Trae la distribución del CPA contra el criterio, el CTR frente al CPA, los promedios de winners frente a fallidos, los mejores winners y lo que conviene revisar.", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Cada fila empieza con la foto del producto (la de Producto o, si no está vinculado, la de Filtro de productos); pasa el cursor encima para verla grande.", "Cada fila dice bajo el nombre si está «Vinculado» (punto verde, con el SKU de su producto) o «Sin vincular» (punto ámbar).", "Arriba de la lista: Total en test, Winners, En consulta, Fallidos, Otros estados y Sin vincular, cada uno con su número (púlsalos para filtrar), y cuántos faltan por vincular a Producto.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto.", "Todo producto vinculado cuyo producto esté Activo en Producto pasa solo a Filtro de productos, en «Cotizar», con su foto y sus métricas (no se repite si ya está).", "«+ Agregar» abre el formulario del producto en test. Si el producto aún no existe, pulsa «Nuevo producto», junto al campo «Producto (de Producto)»: abre la misma ficha de Producto (estado, tipo, foto, SKU, código de barras, envío…). Al crearlo vuelves al formulario con ese producto ya elegido y el nombre lleno; completa el test y guárdalo. «Volver al test» regresa sin crear. Hace falta poder modificar Producto."] }],
   },
   {
+    modulo: "seleccion-productos",
+    titulo: "Selección de productos",
+    ruta: "/seleccion-productos",
+    resumen: "El tablero donde caen los productos candidatos de las fuentes y se decide cuáles se testean.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cada fila es un candidato, no un producto de Producto: no lleva SKU. Trae su N.º (SEL-0001), la fuente de donde salió y el código de esa fuente (DK-0001 Drop Killer, TW-0001 Tu Winner, SP-0001 Scraping de proveedores, MAN-0001 a mano).",
+          "«Agregar» crea una fila a mano: nombre, foto, fuente, fecha de captación, categoría, responsable, enlaces (página y Ad Library), precios de referencia en dólares y notas.",
+          "Los estados son Por evaluar, Seleccionado y Descartado. Cambia el estado pulsando la insignia de su celda o en la ficha; para varias filas, márcalas y usa «Estado» en la barra de abajo.",
+          "Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
+          "Pulsa el nombre para abrir su ficha: ahí se edita todo y, al final, está su actividad.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "filtro-productos",
     titulo: "Filtro de productos",
     ruta: "/filtro-productos",
@@ -244,6 +262,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-13", titulo: "Selección de productos", texto: "Testing Lab › Selección ya tiene su tablero: los candidatos de las fuentes o creados a mano, con su código de fuente, enlaces, precios de referencia y los estados Por evaluar, Seleccionado y Descartado.", modulo: "seleccion-productos", href: "/seleccion-productos" },
   { fecha: "2026-10-13", titulo: "Íconos en el menú", texto: "Cada página del menú lateral lleva su ícono a la izquierda del nombre, también en Favoritos, para encontrarla de un vistazo.", modulo: "dashboard", href: "/" },
   { fecha: "2026-10-13", titulo: "Testing Lab", texto: "Nueva área del menú, Testing Lab, con el recorrido de un producto en Proveeduría: Fuentes (Drop Killer, Tu Winner y Scraping de proveedores), Selección (Selección de productos), Producción (Creación de ofertas) y Resultados (Test productos y Filtro de productos, que salen de Marketing). Los módulos nuevos están en preparación.", modulo: "productos-test", href: "/productos-test" },
   { fecha: "2026-10-13", titulo: "El test de un 2x1 también en su producto simple", texto: "Un test de un 2x1 (o X2) queda vinculado al compuesto. Ahora su producto simple también lo muestra en la columna «Test», la oferta y el «Resultado del test» de la ficha, con la nota «Test de su compuesto». Ejemplo: la lona impermeable transparente muestra el winner de su 2x1.", modulo: "producto", href: "/producto" },
