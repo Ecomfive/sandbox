@@ -5,6 +5,7 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/compras": "compras",
   "/producto": "producto",
   "/scraping-proveedores": "scraping-proveedores",
+  "/instagram": "instagram",
   "/seleccion-productos": "seleccion-productos",
   "/inventario": "inventario",
   "/wms-bodegas": "wms-bodegas",
