@@ -32,6 +32,8 @@ test("CRM en Clientes, Inteligencia competitiva en Investigación y Filtro de pr
   assert.deepEqual(hrefs("Investigación"), ["/inteligencia-competitiva"]);
   assert.ok(hrefs("Marketing").includes("/filtro-productos"));
   assert.ok(hrefs("Marketing").includes("/fuente-datos"), "Fuente de datos en Marketing");
+  // El orden del recorrido de un producto.
+  assert.deepEqual(hrefs("Marketing"), ["/fuente-datos", "/productos-test", "/filtro-productos"]);
   for (const ruta of ["/crm-dropshippers", "/inteligencia-competitiva"]) assert.ok(!hrefs("Marketing").includes(ruta), ruta);
   assert.ok(!hrefs("Operación").includes("/filtro-productos"));
 });
