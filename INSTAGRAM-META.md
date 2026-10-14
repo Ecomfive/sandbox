@@ -120,10 +120,9 @@ Lo que sí se probó o se dejó en marcha:
   **Pero** hace falta saber la cuenta (de un archivo no se sabe) y, en las cuentas de **anuncios** de las capturas que llegaron solo como archivo
   (`vohanh459`, `mundodigital4955`) esa página de insertar está **desactivada** («disabled»): no habría lista. Con las 4 capturas de archivo reales no
   habría servido de nada, por eso no se construyó.
-- **Pedirle a Meta el mensaje** (`consultarMensaje`, API de conversaciones: `GET /{mid}?fields=…shares,attachments`): vía **no documentada**, se
-  prueba sola con cada captura sin enlace y su respuesta (o error) queda en `metricas.mensaje_meta`, visible en «Datos de Meta». Si trae un
-  enlace de reel o publicación (`mensaje.ts`, busca en toda la respuesta) se usa y se lee su página. «Reintentar el archivo» la repite en las
-  capturas viejas. **Pendiente de ver qué devuelve Meta.**
+- **Pedirle a Meta el mensaje** (API de conversaciones, `GET /{mid}?fields=id,created_time,from,to,message,attachments,shares`): **no sirve, se
+  quitó.** Probado el 14 oct con IG-0007: Meta contesta bien pero solo con `id`, `from` (quién lo envió), `to` (a quién), `created_time` y
+  `message` vacío; **ni `attachments` ni `shares`**, aunque se pidieron. Lo compartido no se puede leer por aquí.
 - **Pegar el enlace a mano**: la ficha tiene el campo «Enlace de Instagram»; al guardar uno nuevo se lee su página enseguida (archivo, vistas,
   cifras, cuenta, nombre).
 - **El mismo contenido por otra ruta**: si alguien lo comparte de forma que llega con enlace, se fusiona y el archivo hereda el enlace (por el id
