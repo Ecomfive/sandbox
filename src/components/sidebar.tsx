@@ -11,7 +11,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
-import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -69,6 +69,7 @@ function ItemPagina({
 }) {
   if (!item.href) return null;
   const activo = esActiva(pathname, item.href);
+  const Icono = ICONOS_PAGINA[item.href];
   return (
     <div className="flex items-center gap-0.5">
       <Link
@@ -79,7 +80,10 @@ function ItemPagina({
           activo ? "bg-accent font-medium text-accent-foreground" : "text-foreground transition-colors hover:bg-muted"
         }`}
       >
-        {item.label}
+        <span className="flex min-w-0 items-center gap-2">
+          {Icono && <Icono className={`h-4 w-4 shrink-0 ${activo ? "" : "text-muted-foreground"}`} />}
+          <span className="truncate">{item.label}</span>
+        </span>
         <ContadorMenu cantidad={cantidadDe(item, pendientes)} />
       </Link>
       <FavoritoToggle href={item.href} activo={favoritos.includes(item.href)} />
