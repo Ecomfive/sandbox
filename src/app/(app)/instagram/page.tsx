@@ -97,7 +97,7 @@ export default async function InstagramPage() {
     paginaDestino: f.pagina_destino,
     notas: f.notas,
     estado: f.estado,
-    datosMeta: JSON.stringify({ aviso: f.payload, consulta: f.metricas?.consulta ?? null }, null, 2).slice(0, 20000),
+    datosMeta: JSON.stringify({ aviso: f.payload, consulta: f.metricas?.consulta ?? null, mensaje: f.metricas?.mensaje_meta ?? null }, null, 2).slice(0, 20000),
   }));
 
   return (

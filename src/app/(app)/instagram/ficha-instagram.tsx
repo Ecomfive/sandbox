@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
-import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
+import { urlBibliotecaAnuncios, urlGoogleDeInstagram } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, urlVideoCaptura } from "./actions";
 import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
@@ -284,7 +284,15 @@ export function FichaInstagram({
                         {fila.enlace}
                       </a>
                     ) : (
-                      "—"
+                      <span className="flex flex-col gap-1">
+                        <span>—</span>
+                        {urlGoogleDeInstagram(fila.titulo) && (
+                          <a href={urlGoogleDeInstagram(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-primario hover:underline ${anilloFoco}`}>
+                            <EnlaceIcon className="h-4 w-4" />
+                            Buscar el enlace en Google
+                          </a>
+                        )}
+                      </span>
                     )}
                   </Dato>
                 </dl>
@@ -292,6 +300,9 @@ export function FichaInstagram({
 
               <Seccion icono={EstadoIcon} titulo="Cifras de la publicación">
                 <fieldset disabled={!puedeEscribir || guardando} className="m-0 grid min-w-0 grid-cols-2 gap-3 border-0 p-0 sm:grid-cols-3">
+                  <Campo etiqueta="Enlace de Instagram" id="campo-enlace-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-enlace-instagram" type="url" name="enlace" maxLength={2000} defaultValue={fila.enlace ?? ""} placeholder="Ej: https://www.instagram.com/reel/ABC123/" className={fieldClass} />
+                  </Campo>
                   <Campo etiqueta="Nombre de la página" id="campo-nombre-instagram" className="col-span-2 sm:col-span-3">
                     <input id="campo-nombre-instagram" type="text" name="nombre_pagina" maxLength={120} defaultValue={fila.nombrePagina ?? ""} placeholder="Ej: Mundo Digital" className={fieldClass} />
                   </Campo>

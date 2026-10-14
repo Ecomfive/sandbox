@@ -7,7 +7,7 @@
 const MAX_PALABRAS = 8;
 
 /** El arranque del copy que sirve para buscarlo: sin emojis ni símbolos al inicio y hasta el primer signo o las 8 palabras. */
-export function frasePorBuscar(copy: string | null | undefined): string | null {
+export function frasePorBuscar(copy: string | null | undefined, maxPalabras = MAX_PALABRAS): string | null {
   if (!copy) return null;
   const linea = copy
     .split(/\r?\n/)
@@ -16,13 +16,25 @@ export function frasePorBuscar(copy: string | null | undefined): string | null {
   if (!linea) return null;
   const sinSimbolos = linea.replace(/^[^\p{L}\p{N}]+/u, "");
   const hastaElSigno = sinSimbolos.split(/[,.:;!?&()\[\]{}"“”¡¿|/\\]/)[0];
-  const palabras = hastaElSigno.split(/\s+/).filter(Boolean).slice(0, MAX_PALABRAS);
+  const palabras = hastaElSigno.split(/\s+/).filter(Boolean).slice(0, maxPalabras);
   // Una frase de una o dos palabras trae demasiados anuncios ajenos: se prefiere seguir hasta las 8 palabras, signos aparte.
   if (palabras.length < 3) {
-    const todas = sinSimbolos.replace(/[,.:;!?&()\[\]{}"“”¡¿|/\\]+/g, " ").split(/\s+/).filter(Boolean).slice(0, MAX_PALABRAS);
+    const todas = sinSimbolos.replace(/[,.:;!?&()\[\]{}"“”¡¿|/\\]+/g, " ").split(/\s+/).filter(Boolean).slice(0, maxPalabras);
     return todas.length >= 2 ? todas.join(" ") : null;
   }
   return palabras.join(" ");
+}
+
+/**
+ * La búsqueda en Google de la publicación de Instagram que tiene ese copy (`site:instagram.com "frase"`), para cuando lo compartido llegó
+ * solo como archivo y no se tiene el enlace. Es una ayuda, no una garantía: probado el 14 oct, con el copy de un reel orgánico Google devolvió la
+ * cuenta y otras publicaciones suyas pero no la exacta, y con el de un anuncio no devolvió nada (Instagram casi no se indexa y un anuncio
+ * puede no tener publicación pública). Se usan hasta 10 palabras, algo más que para la Biblioteca.
+ */
+export function urlGoogleDeInstagram(copy: string | null | undefined): string | null {
+  const frase = frasePorBuscar(copy, 10);
+  if (!frase) return null;
+  return `https://www.google.com/search?q=${encodeURIComponent(`site:instagram.com "${frase}"`)}`;
 }
 
 /**

@@ -103,6 +103,25 @@ Parecen ser anuncios o cuentas con restricciones; en esos casos la vista previa 
 siempre. **Lo único que sigue sin resolverse es lo contrario**: una captura que llega solo como archivo no
 trae enlace, y de un archivo no se puede sacar su enlace (el identificador `ig_post_media_id` no es el código del enlace).
 
+## Cuando llega solo el archivo: cómo buscar su enlace (probado el 14 oct)
+
+De un archivo no se puede **calcular** el enlace: el `asset_id` de su dirección es el mismo `ig_post_media_id` (identificador de Graph,
+`18102301511361563`), y el código del enlace (`DdmZSerggFG`) corresponde a otro número (`3991989340766077254`); no hay fórmula entre los dos.
+Lo que sí se probó o se dejó en marcha:
+- **Google** (`site:instagram.com "frase del copy"`, botón «Buscar el enlace en Google» de la ficha): con el copy de un reel orgánico de
+  `nuvotienda.ve` devolvió su perfil y otras publicaciones suyas pero **no la exacta**; con el de un anuncio (Perfectx), nada. Sirve a veces para
+  llegar a la cuenta; no es fiable. Instagram casi no se indexa y un anuncio puede no tener publicación pública.
+- **Pedirle a Meta el mensaje** (`consultarMensaje`, API de conversaciones: `GET /{mid}?fields=…shares,attachments`): vía **no documentada**, se
+  prueba sola con cada captura sin enlace y su respuesta (o error) queda en `metricas.mensaje_meta`, visible en «Datos de Meta». Si trae un
+  enlace de reel o publicación (`mensaje.ts`, busca en toda la respuesta) se usa y se lee su página. «Reintentar el archivo» la repite en las
+  capturas viejas. **Pendiente de ver qué devuelve Meta.**
+- **Pegar el enlace a mano**: la ficha tiene el campo «Enlace de Instagram»; al guardar uno nuevo se lee su página enseguida (archivo, vistas,
+  cifras, cuenta, nombre).
+- **El mismo contenido por otra ruta**: si alguien lo comparte de forma que llega con enlace, se fusiona y el archivo hereda el enlace (por el id
+  de Meta). **Un enlace pegado como mensaje** después de compartir se une a la última captura de esa persona sin enlace.
+- Para un **anuncio**, el «enlace» útil es el de la Biblioteca (`facebook.com/ads/library/?id=<identificador>`), que se encuentra con el botón de la
+  Biblioteca; un anuncio «dark post» no tiene enlace de Instagram.
+
 ## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
 
 La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin iniciar sesión) muestra de cada anuncio su anunciante, su
