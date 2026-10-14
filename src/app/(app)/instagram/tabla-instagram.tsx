@@ -12,9 +12,10 @@ import { CalendarioIcon, CheckIcon, EnlaceIcon, EstadoIcon, InstagramIcon, Perso
 import type { NombreFilas } from "@/lib/tabla/pie";
 import {
   colorEstadoInstagram,
-  colorTipoInstagram,
+  colorFormatoInstagram,
   DEF_INSTAGRAM,
-  etiquetaTipoInstagram,
+  etiquetaFormatoInstagram,
+  formatoDeCaptura,
   numeroInstagram,
   quienEnvio,
   type FilaInstagram,
@@ -26,7 +27,7 @@ import { SelectorEstadoInstagram } from "./selector-estado-instagram";
 const NOMBRE: NombreFilas = { singular: "captura", plural: "capturas" };
 const ICONOS: Record<string, IconoComp> = {
   estado: EstadoIcon,
-  tipo: InstagramIcon,
+  formato: InstagramIcon,
   enviadoPor: PersonaIcon,
   autor: InstagramIcon,
   recibido: CalendarioIcon,
@@ -63,7 +64,7 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
     clase: "font-medium",
     render: (f) => (
       <span className="flex items-center gap-2">
-        <Badge color={colorTipoInstagram(f.tipo)}>{etiquetaTipoInstagram(f.tipo)}</Badge>
+        <Badge color={colorFormatoInstagram(formatoDeCaptura(f))}>{etiquetaFormatoInstagram(formatoDeCaptura(f))}</Badge>
         <span className="block max-w-[26rem] truncate" title={resumen(f)}>
           {resumen(f)}
         </span>
@@ -152,7 +153,7 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
         anchoMinimo="56rem"
         aspecto="lista"
         etiquetaGrupo={(campo, grupo) =>
-          campo === "estado" ? <Badge color={colorEstadoInstagram(grupo.clave)}>{grupo.etiqueta}</Badge> : campo === "tipo" ? <Badge color={colorTipoInstagram(grupo.clave)}>{grupo.etiqueta}</Badge> : <span className="font-semibold">{grupo.etiqueta}</span>
+          campo === "estado" ? <Badge color={colorEstadoInstagram(grupo.clave)}>{grupo.etiqueta}</Badge> : campo === "formato" ? <Badge color={colorFormatoInstagram(grupo.clave)}>{grupo.etiqueta}</Badge> : <span className="font-semibold">{grupo.etiqueta}</span>
         }
         abrirFila={{
           etiqueta: (f) => `Abrir la captura ${numeroInstagram(f.numero)}`,

@@ -11,9 +11,10 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
+import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, obtenerHistorialCaptura, urlVideoCaptura } from "./actions";
-import { colorEstadoInstagram, colorTipoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaTipoInstagram, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
+import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -167,7 +168,7 @@ export function FichaInstagram({
           <>
             <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroInstagram(fila.numero)}</span>
             <span className="text-lg font-semibold">Captura de Instagram</span>
-            <Badge color={colorTipoInstagram(fila.tipo)}>{etiquetaTipoInstagram(fila.tipo)}</Badge>
+            <Badge color={colorFormatoInstagram(formatoDeCaptura(fila))}>{etiquetaFormatoInstagram(formatoDeCaptura(fila))}</Badge>
             <Badge color={colorEstadoInstagram(fila.estado)}>{etiquetaEstadoInstagram(fila.estado)}</Badge>
           </>
         )
@@ -289,6 +290,12 @@ export function FichaInstagram({
                   </Campo>
                   <Campo etiqueta="Página de destino" id="campo-pagina-instagram">
                     <input id="campo-pagina-instagram" type="url" name="pagina_destino" defaultValue={fila.paginaDestino ?? ""} placeholder="Ej: https://tienda.com/producto" className={fieldClass} />
+                    {urlBibliotecaAnuncios(fila.titulo) && (
+                      <a href={urlBibliotecaAnuncios(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
+                        <InstagramIcon className="h-4 w-4" />
+                        Buscar el anuncio en la Biblioteca de anuncios
+                      </a>
+                    )}
                     {fila.paginaDestino && (
                       <a href={fila.paginaDestino} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
                         <EnlaceIcon className="h-4 w-4" />
