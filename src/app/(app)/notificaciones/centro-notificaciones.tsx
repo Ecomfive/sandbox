@@ -8,7 +8,7 @@ import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { calcularCambios, ETIQUETA_ACCION } from "@/lib/auditoria-cambios";
-import { AlertaIcon, PedidoIcon, WalletIcon, ConciliacionIcon, BuscarIcon, CalendarioIcon } from "@/lib/nav-icons";
+import { AlertaIcon, PedidoIcon, WalletIcon, ConciliacionIcon, BuscarIcon, CalendarioIcon, InteligenciaIcon } from "@/lib/nav-icons";
 import type { PendientesHoy } from "@/lib/pendientes-hoy";
 
 interface EventoAuditoria {
@@ -171,6 +171,13 @@ function PorCorregir({ pendientes }: { pendientes: PendientesHoy }) {
       titulo: "Lotes por vencer",
       href: "/inventario/vencimientos",
       Icono: CalendarioIcon,
+    },
+    {
+      clave: "competidores-nuevos",
+      cantidad: pendientes.competidoresNuevos,
+      titulo: "Competidores nuevos en Dropi",
+      href: "/analisis-competencia/alertas",
+      Icono: InteligenciaIcon,
     },
   ].filter((t) => t.cantidad > 0);
 

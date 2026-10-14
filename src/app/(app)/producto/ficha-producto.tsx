@@ -10,7 +10,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge, claseTono } from "@/components/ui/badge";
-import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
+import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
 import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
@@ -185,6 +186,12 @@ export function FichaProducto({
             {producto.tests.length > 0 && (
               <Seccion icono={TestIcon} titulo="Resultado del test">
                 <ResultadoTestProducto producto={producto} referencias={referenciasTest} />
+              </Seccion>
+            )}
+
+            {producto.tipo !== "combo" && (
+              <Seccion icono={InteligenciaIcon} titulo="Competencia en Dropi">
+                <BloqueCompetencia key={producto.id} skuId={producto.id} />
               </Seccion>
             )}
 

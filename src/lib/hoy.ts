@@ -77,6 +77,15 @@ const PENDIENTES: {
     href: "/inventario/vencimientos",
     accion: "Revisar",
   },
+  {
+    clave: "competidores-nuevos",
+    modulo: "analisis-competencia",
+    campo: "competidoresNuevos",
+    titulo: "Competidores nuevos en Dropi",
+    descripcion: "Proveedores que empezaron a vender en Dropi del país (Análisis de competencia)",
+    href: "/analisis-competencia/alertas",
+    accion: "Revisar",
+  },
 ];
 
 /**

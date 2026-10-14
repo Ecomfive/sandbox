@@ -410,6 +410,12 @@ convenciones técnicas del código.
   `dashboard-competencia.tsx`, recharts con los degradados neón de Compras/Test productos, filtros cruzados de competidor,
   categoría, solo iguales y periodo), Alertas, Productos, Nuevos, Competidores y Bitácora; cada una es su página y usa
   `PaginaCompetencia` (carga `cargarDatosCompetencia` y pone `ResumenCompetencia`, la barra de `Indicador` con `marco-neon`).
+  **Competencia de un producto** (Producto y Compras): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
+  basta Producto, Compras o Análisis) busca el producto por nombre y foto con `todasLasCoincidencias` (cruces.ts) entre todo
+  el catálogo guardado y suma los iguales a nuestro producto de ECOMFIVE (el «SKU» de Dropi es el nombre, no nuestro código);
+  `BloqueCompetencia` / `CompetenciaDesplegable` (`src/components/competencia/piezas-competencia.tsx`, con `FotoAmpliable` y
+  `HistorialCompetencia`). **Competidor nuevo** = `PendientesHoy.competidoresNuevos` (alertas `competidor_nuevo` sin ver): sale
+  en la cola de Hoy, en Avisos y como contador de `/analisis-competencia`.
 - **Pantalla «Hoy»** (`/`, antes «Dashboard operativo»; el módulo de permisos sigue siendo `dashboard`). Arriba, en dos
   tarjetas lado a lado (apiladas en pantallas angostas): **«Necesita tu atención»** (`ColaAtencion`), la cola de trabajo
   con lo que cuenta `obtenerPendientesHoy` (pedidos de Dropi en Novedad, plataformas sin saldo de wallet, retiros de

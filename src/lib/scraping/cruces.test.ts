@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { indexar, motivoYaVisto, repetidos, yaVisto } from "./cruces";
+import { indexar, motivoYaVisto, repetidos, todasLasCoincidencias, yaVisto } from "./cruces";
 
 const indice = indexar([
   { tipo: "test", id: "t1", nombre: "Crema ChillFlex Alivia Músculos", huella: null, detalle: "Test #3 · 12 mar 2026 · winner" },
@@ -34,4 +34,13 @@ test("marca como repetido lo que aparece en otro proveedor o fuente, no en el mi
   assert.deepEqual([...(r.get("a") ?? [])], ["TECNO"]);
   assert.deepEqual([...(r.get("b") ?? [])], ["HYPER"]);
   assert.equal(r.has("d"), false);
+});
+
+test("todas las coincidencias de un nombre", () => {
+  const i = indexar([
+    { tipo: "producto", id: "a", nombre: "Turmeric Pure Curcumin 120 capsulas", huella: null, detalle: "" },
+    { tipo: "producto", id: "b", nombre: "TURMERIC CURCUMIN 60 CAPSULAS", huella: null, detalle: "" },
+    { tipo: "producto", id: "c", nombre: "Magnesium Complex", huella: null, detalle: "" },
+  ]);
+  assert.deepEqual(todasLasCoincidencias("Turmeric Curcumin", null, i).map((c) => c.id).sort(), ["a", "b"]);
 });

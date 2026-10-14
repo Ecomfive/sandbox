@@ -121,3 +121,23 @@ export function repetidos(items: ItemRepetible[], ignorar = ""): Map<string, Set
   });
   return salida;
 }
+
+/**
+ * Todas las referencias que son el mismo producto (no solo la mejor), de la más parecida a la menos: con las mismas reglas
+ * que `yaVisto` (85 % del nombre y 2 palabras en común, o la misma foto con alguna palabra en común). La usa la competencia de
+ * un producto de Producto o de una compra.
+ */
+export function todasLasCoincidencias(nombre: string, huella: string | null, indice: IndiceReferencias): Coincidencia[] {
+  const palabras = palabrasClave(nombre);
+  const candidatos = new Set<number>();
+  for (const p of palabras) for (const i of indice.porPalabra.get(p) ?? []) candidatos.add(i);
+  const salida: (Coincidencia & { puntos: number })[] = [];
+  for (const i of candidatos) {
+    const r = indice.refs[i];
+    const parecido = parecidoNombre(palabras, r.palabras);
+    const porNombre = parecido >= UMBRAL_YA_VISTO && comunes(palabras, r.palabras, parecido) >= 2;
+    const porFoto = !!huella && !!r.huella && parecido > 0 && distanciaHuella(huella, r.huella) <= UMBRAL_FOTO;
+    if (porNombre || porFoto) salida.push({ tipo: r.tipo, id: r.id, nombre: r.nombre, detalle: r.detalle, porFoto, parecido, puntos: (porFoto ? 2 : 0) + parecido });
+  }
+  return salida.sort((a, b) => b.puntos - a.puntos).map(({ puntos: _p, ...c }) => (void _p, c));
+}

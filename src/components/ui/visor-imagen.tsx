@@ -17,14 +17,18 @@ export function VisorImagen({ src, alt, onClose }: { src: string | null; alt?: s
   useEffect(() => {
     if (!src) return;
     cerrarRef.current?.focus();
+    // En `window` y en la fase de captura, y sin dejar que siga: así Escape cierra solo la foto y no también la ficha
+    // (`Ventana`) que la abrió, que escucha Escape en `document`.
     function alTeclear(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
     }
-    document.addEventListener("keydown", alTeclear);
+    window.addEventListener("keydown", alTeclear, true);
     const overflowPrevio = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", alTeclear);
+      window.removeEventListener("keydown", alTeclear, true);
       document.body.style.overflow = overflowPrevio;
     };
   }, [src, onClose]);

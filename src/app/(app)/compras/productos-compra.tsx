@@ -2,6 +2,7 @@
 
 import { startTransition, useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { CompetenciaDesplegable } from "@/components/competencia/piezas-competencia";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -124,6 +125,7 @@ function FilaItem({
         </label>
         <CamposCosto costo={costo} deshabilitado={!puedeEscribir || pendiente} alSalir={guardar} />
       </div>
+      <CompetenciaDesplegable skuId={item.skuId} nombre={item.nombre} />
     </li>
   );
 }
@@ -268,7 +270,8 @@ export function ProductosCompra({
         {lineasBorrador.length > 0 && (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {lineasBorrador.map((l) => (
-              <li key={l.skuId} className="flex items-start justify-between gap-2 rounded-lg border border-border p-3">
+              <li key={l.skuId} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 text-sm">
                   <p className="m-0 font-medium">
                     <span className="mr-1.5 text-muted-foreground">{l.codigo}</span>
@@ -286,6 +289,8 @@ export function ProductosCompra({
                 >
                   Quitar
                 </button>
+                </div>
+                <CompetenciaDesplegable skuId={l.skuId} nombre={l.nombre} />
               </li>
             ))}
           </ul>

@@ -12,10 +12,11 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
+import { FotoAmpliable, HistorialCompetencia } from "@/components/competencia/piezas-competencia";
 import { formatearFechaHora } from "@/lib/formato";
 import { CalendarioIcon, CatalogoIcon, HistorialIcon, InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
-import { marcarAlertasVistas, obtenerHistorialCompetencia, type EventoCompetencia } from "./actions";
+import { marcarAlertasVistas } from "./actions";
 import {
   DEF_BITACORA,
   DEF_COMPETIDORES,
@@ -263,77 +264,94 @@ const ICONOS: Record<string, IconoComp> = {
   fecha: CalendarioIcon,
 };
 
-// ---------- Comparación lado a lado ----------
+// ---------- Comparación (ficha de un producto nuestro frente a la competencia) ----------
 
-function HistorialProducto({ id }: { id: string }) {
-  const [eventos, setEventos] = useState<EventoCompetencia[] | null>(null);
-  useEffect(() => {
-    let vigente = true;
-    obtenerHistorialCompetencia(id).then((r) => vigente && setEventos(r.eventos ?? []));
-    return () => {
-      vigente = false;
-    };
-  }, [id]);
-  if (!eventos) return <p className="text-xs text-muted-foreground">Cargando historial…</p>;
-  if (!eventos.length) return null;
-  return (
-    <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground tabular-nums">
-      {eventos.slice(0, 8).map((e, i) => (
-        <li key={i}>
-          {formatearFechaHora(e.fecha)} ·{" "}
-          {e.evento === "precio"
-            ? `precio ${usd(e.precioAntes)} → ${usd(e.precio)}`
-            : e.evento === "stock"
-              ? `stock ${num(e.stockAntes)} → ${num(e.stock)}`
-              : e.evento === "primera_vez"
-                ? `apareció a ${usd(e.precio)} con ${num(e.stock)}`
-                : (EVENTOS[e.evento] ?? e.evento).toLowerCase()}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
+/**
+ * La ficha de un producto nuestro frente a la competencia: arriba nuestro producto (foto pequeña que se agranda con un clic,
+ * precio y stock); luego cada competidor en una fila con su foto, precio frente al nuestro, stock y lo que vendió en 1, 7 y 30
+ * días; al desplegarlo, su historial en tabla (cada vez que bajó o subió el stock y cada cambio de precio). Al final, el
+ * historial de nuestro producto.
+ */
 function Comparacion({ fila, alCerrar }: { fila: FilaNuestro | null; alCerrar: () => void }) {
+  const [abierto, setAbierto] = useState<string | null>(null);
+  useEffect(() => setAbierto(fila?.iguales[0]?.id ?? null), [fila]);
   return (
     <Ventana abierto={!!fila} alCerrar={alCerrar} titulo={fila?.nuestro.nombre ?? ""} lado="derecha" ancho="lg">
       {fila && (
         <div className="flex flex-col divide-y divide-border p-5">
-          <Seccion icono={ProductoIcon} titulo={fila.iguales.length ? `Frente a ${fila.iguales.length} competidor${fila.iguales.length === 1 ? "" : "es"}` : "Sin competencia"}>
-            {!fila.iguales.length && <p className="text-sm text-muted-foreground">Ningún competidor vende este producto en Dropi.</p>}
-            {fila.iguales.map((c) => (
-              <div key={c.id} className="flex flex-col gap-2 border-b border-border pb-4 last:border-0 last:pb-0">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1 rounded-lg border border-foreground/30 bg-accent p-2 text-sm">
-                    <span className="text-xs font-medium text-muted-foreground">Nosotros</span>
-                    <Foto url={fila.nuestro.foto} grande />
-                    <span className="font-semibold tabular-nums">{usd(fila.nuestro.precio)}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{num(fila.nuestro.stock)} en stock</span>
-                  </div>
-                  <div className="flex flex-col gap-1 rounded-lg border border-border p-2 text-sm">
-                    <a href={c.urlProveedor} target="_blank" rel="noopener noreferrer" className="text-xs font-medium underline underline-offset-2">
-                      {c.proveedor}
-                    </a>
-                    <Foto url={c.foto} grande />
-                    <span className={`font-semibold tabular-nums ${c.precio !== null && fila.nuestro.precio !== null && c.precio < fila.nuestro.precio ? "text-destructive" : ""}`}>{usd(c.precio)}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{num(c.stock)} en stock</span>
-                    <span className="text-xs">«{c.nombre}»</span>
-                  </div>
+          <Seccion icono={ProductoIcon} titulo="Nuestro producto (ECOMFIVE)">
+            <div className="flex items-center gap-3">
+              <FotoAmpliable url={fila.nuestro.foto} nombre={fila.nuestro.nombre} tam="h-14 w-14" />
+              <dl className="grid flex-1 grid-cols-3 gap-3 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Precio</dt>
+                  <dd className="font-semibold tabular-nums">{usd(fila.nuestro.precio)}</dd>
                 </div>
-                <span className="flex flex-wrap gap-1">
-                  {c.metodo === "foto" ? <Badge tone="azul">Misma foto</Badge> : null}
-                  {c.parecido !== null && <Badge>{c.parecido} % del nombre</Badge>}
-                  {c.precio !== null && fila.nuestro.precio !== null && c.precio < fila.nuestro.precio && <Badge tone="destructive">Vende más barato que nosotros</Badge>}
-                  <Badge>
-                    Vendió 1 d −{num(c.bajo1)} · 7 d −{num(c.bajo7)} · 30 d −{num(c.bajo30)}
-                  </Badge>
-                </span>
-                <HistorialProducto id={c.id} />
-              </div>
-            ))}
+                <div>
+                  <dt className="text-xs text-muted-foreground">Stock</dt>
+                  <dd className="font-semibold tabular-nums">{num(fila.nuestro.stock)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Precio más bajo de la competencia</dt>
+                  <dd className={`font-semibold tabular-nums ${fila.diferencia !== null && fila.diferencia < 0 ? "text-destructive" : ""}`}>
+                    {usd(fila.minimo)}
+                    {fila.diferencia !== null && fila.diferencia !== 0 && (
+                      <span className="ml-1 text-xs font-normal">
+                        ({fila.diferencia < 0 ? "−" : "+"}
+                        {usd(Math.abs(fila.diferencia))})
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </Seccion>
+
+          <Seccion icono={CatalogoIcon} titulo={fila.iguales.length ? `Competidores que lo venden (${fila.iguales.length})` : "Sin competencia"}>
+            {!fila.iguales.length && <p className="text-sm text-muted-foreground">Ningún competidor vende este producto en Dropi.</p>}
+            <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+              {fila.iguales.map((c) => {
+                const masBarato = c.precio !== null && fila.nuestro.precio !== null && c.precio < fila.nuestro.precio;
+                return (
+                  <li key={c.id} className="flex flex-col gap-2 px-3 py-2.5">
+                    <div className="flex items-start gap-3">
+                      <FotoAmpliable url={c.foto} nombre={c.nombre} tam="h-10 w-10" />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <a href={c.urlProveedor} target="_blank" rel="noopener noreferrer" className="text-sm font-medium break-words underline-offset-2 hover:underline">
+                          {c.proveedor}
+                        </a>
+                        <span className="text-xs break-words text-muted-foreground">
+                          «{c.nombre}» · {c.metodo === "foto" ? "misma foto" : `${c.parecido ?? 0} % del nombre`}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 flex-col items-end text-sm tabular-nums">
+                        <span className={`font-semibold ${masBarato ? "text-destructive" : ""}`}>{usd(c.precio)}</span>
+                        <span className="text-xs text-muted-foreground">{num(c.stock)} en stock</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:pl-[52px]">
+                      {masBarato && <Badge tone="destructive">Más barato que nosotros</Badge>}
+                      <Badge>Vendió 1 d: {num(c.bajo1)}</Badge>
+                      <Badge>7 d: {num(c.bajo7)}</Badge>
+                      <Badge>30 d: {num(c.bajo30)}</Badge>
+                      <button
+                        type="button"
+                        aria-expanded={abierto === c.id}
+                        onClick={() => setAbierto(abierto === c.id ? null : c.id)}
+                        className={`ml-auto rounded-md px-2 py-1 text-xs text-primario hover:bg-muted ${anilloFoco}`}
+                      >
+                        {abierto === c.id ? "Ocultar historial" : "Ver historial"}
+                      </button>
+                    </div>
+                    {abierto === c.id && <HistorialCompetencia productoId={c.id} />}
+                  </li>
+                );
+              })}
+            </ul>
+          </Seccion>
+
           <Seccion icono={HistorialIcon} titulo="Historial de nuestro producto">
-            <HistorialProducto id={fila.nuestro.id} />
+            <HistorialCompetencia productoId={fila.nuestro.id} />
           </Seccion>
         </div>
       )}

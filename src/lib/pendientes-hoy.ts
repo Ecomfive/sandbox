@@ -10,6 +10,8 @@ export interface PendientesHoy {
   lotesVencidos: number;
   /** Lotes con unidades que vencen dentro de los días de aviso de su producto. */
   lotesPorVencer: number;
+  /** Competidores que entraron a Dropi del país (alertas de Análisis de competencia sin marcar como vistas). */
+  competidoresNuevos: number;
 }
 
 async function contarNovedades(supabase: SupabaseClient, paisId: string): Promise<{ count: number | null }> {
@@ -36,7 +38,7 @@ async function contarLotes(supabase: SupabaseClient, paisId: string): Promise<{ 
  * Cruza en un solo lugar los pendientes que hoy viven cada uno en su propio
  * módulo: alertas de inventario abiertas, plataformas sin saldo de wallet
  * registrado, pedidos de Dropi con estado "Novedad" y retiros de Dropi que
- * no se pudieron vincular a ningún retiro local, y los lotes vencidos o por vencer.
+ * no se pudieron vincular a ningún retiro local, los lotes vencidos o por vencer y los competidores nuevos en Dropi.
  */
 export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: string): Promise<PendientesHoy> {
   const [
@@ -46,6 +48,7 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     { count: pedidosConNovedad },
     { count: retirosDropiSinVincular },
     lotes,
+    { count: competidoresNuevos },
   ] = await Promise.all([
     supabase
       .from("alertas_inventario_no_retornado")
@@ -58,6 +61,8 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     contarNovedades(supabase, paisId),
     supabase.from("dropi_retiros_sin_vincular").select("*", { count: "exact", head: true }).eq("pais_id", paisId),
     contarLotes(supabase, paisId),
+    // Sin la migración 0108 la consulta falla y cuenta cero: el aviso no rompe la página.
+    supabase.from("competencia_alertas").select("*", { count: "exact", head: true }).eq("pais_id", paisId).eq("tipo", "competidor_nuevo").eq("vista", false),
   ]);
 
   const plataformasConSaldo = new Set((saldos ?? []).map((s) => s.plataforma_id));
@@ -72,5 +77,6 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     retirosDropiSinVincular: retirosDropiSinVincular ?? 0,
     lotesVencidos: lotes.vencidos,
     lotesPorVencer: lotes.porVencer,
+    competidoresNuevos: competidoresNuevos ?? 0,
   };
 }

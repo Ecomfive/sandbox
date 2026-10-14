@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -21,28 +21,4 @@ export async function marcarAlertasVistas(ids?: string[]): Promise<{ error?: str
   if (error) return { error: "No se pudieron marcar las alertas." };
   revalidatePath("/analisis-competencia");
   return {};
-}
-
-export interface EventoCompetencia {
-  fecha: string;
-  evento: string;
-  precio: number | null;
-  stock: number | null;
-  precioAntes: number | null;
-  stockAntes: number | null;
-}
-
-/** El historial de un producto (para la comparación lado a lado), del más nuevo al más viejo. */
-export async function obtenerHistorialCompetencia(productoId: string): Promise<{ eventos?: EventoCompetencia[]; error?: string }> {
-  await requireModulo("analisis-competencia");
-  if (!UUID.test(productoId)) return { error: "Producto no válido." };
-  const { data, error } = await createServiceClient()
-    .from("competencia_historial")
-    .select("fecha, evento, precio, stock, precio_antes, stock_antes")
-    .eq("producto_id", productoId)
-    .order("fecha", { ascending: false })
-    .limit(200);
-  if (error) return { error: error.message };
-  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-  return { eventos: (data ?? []).map((e) => ({ fecha: e.fecha, evento: e.evento, precio: n(e.precio), stock: e.stock, precioAntes: n(e.precio_antes), stockAntes: e.stock_antes })) };
 }
