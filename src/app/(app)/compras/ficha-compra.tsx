@@ -196,7 +196,6 @@ export function FichaCompra({
         compra && (
           <>
             <span className="text-lg font-semibold tabular-nums">{numeroOC(compra.numero)}</span>
-            {compra.productos === 0 && <span className="text-lg font-semibold">{compra.nombre}</span>}
             <Badge color={colorEtapa(compra.etapa)}>{etiquetaEtapa(compra.etapa)}</Badge>
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
             {compra.anulada && <Badge tone="destructive">Anulada</Badge>}
@@ -223,7 +222,7 @@ export function FichaCompra({
               etiquetas={etiquetas}
               colores={colores}
               botonesArriba
-              acciones={compra.anulada ? undefined : <AnularCompraBoton id={compra.id} nombre={compra.nombre} alAnular={alCerrar} />}
+              acciones={compra.anulada ? undefined : <AnularCompraBoton id={compra.id} nombre={numeroOC(compra.numero)} alAnular={alCerrar} />}
               alGuardar={alGuardar}
               alCancelar={alCancelar}
               alCambiarGuardando={setGuardando}

@@ -367,6 +367,28 @@ convenciones técnicas del código.
   vinculados en la ficha del publicado, tiene el historial en tabla y envía a Selección (`enviarASeleccion`, fuente SP, en el
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
+- **Testing Lab › Instagram** (`/instagram`, módulo `instagram`, migración 0106, 14 oct 2026). Una fuente más de Fuentes: lo que el
+  equipo ve en Instagram y comparte **por mensaje directo con la cuenta de fuentes** (`@ecomfive.fuentes`, cuenta profesional ligada
+  al Business Manager) cae solo en `instagram_capturas`. Meta llama al webhook **`/api/instagram/webhook`**
+  (`src/app/api/instagram/webhook/route.ts`): `GET` para registrarlo (devuelve `hub.challenge` si `hub.verify_token` coincide con
+  `INSTAGRAM_VERIFY_TOKEN`) y `POST` por cada mensaje, que **solo se acepta con la firma `X-Hub-Signature-256`** (HMAC-SHA256 del
+  cuerpo crudo con `INSTAGRAM_APP_SECRET`, en tiempo constante; sin secreto configurado todo se rechaza). Contesta de inmediato y el
+  trabajo sigue en `after()`. Variables de entorno (nunca `NEXT_PUBLIC_`): `INSTAGRAM_APP_SECRET`, `INSTAGRAM_VERIFY_TOKEN` y,
+  opcional, `INSTAGRAM_ACCESS_TOKEN` (con él se consulta el usuario y el nombre de quien envió; sin él solo se guarda su id).
+  La lógica pura vive en `src/lib/instagram/` (con prueba): `firma.ts`, `extraer.ts` (entiende `entry[].messaging[]` y
+  `changes[].value`; captura adjuntos `ig_reel`/`reel`, `ig_post`/`post`, `video`, `share`/`fallback` y también un enlace de reel o
+  publicación pegado en el texto; ignora ecos, imágenes, audios y menciones; si la `url` del adjunto es de instagram.com es el
+  enlace, si no es el archivo de video) y `guardar.ts`. **Una fila por mensaje+adjunto**: `mensaje_id` es único, así que un
+  reintento de Meta no duplica. El video se copia a Storage (bucket **privado** `instagram-fuentes`, se ve con enlace firmado de una
+  hora) con el descargador seguro `descargarPublico` (sin red interna, hasta 100 MB) y **se valida por su firma** (MP4/WebM), no por
+  el tipo que diga el servidor. El aviso completo queda en `payload` (jsonb) para no perder datos mientras se decide qué sirve; las
+  métricas del autor (`metricas`: `like_count`, `comments_count`, `view_count`) y `autor_usuario` quedan listos para llenarse con la
+  Business Discovery API (solo cuentas profesionales; **compartidos y guardados no los entrega Meta**) y la página de destino no
+  viene del DM: se propone a partir de un enlace que la persona escriba en el mismo mensaje y se completa a mano en la ficha. La
+  lista es una `TablaDatos` (sin «Agregar»: las crea el webhook), la ficha lateral muestra el video, lo que trajo Meta y, editable,
+  Estado (Nuevo / Por testear / Descartado), Página de destino y Notas. Se abre desde `/instagram` y el código es IG-0001.
+  **Falta:** registrar la app en Meta con el webhook y la suscripción al campo `messages`, y probar con un reel y un anuncio
+  patrocinado reales para confirmar qué campos llegan; enviar una captura «Por testear» a Selección (hoy no hay puente).
 - **Pantalla «Hoy»** (`/`, antes «Dashboard operativo»; el módulo de permisos sigue siendo `dashboard`). Arriba, en dos
   tarjetas lado a lado (apiladas en pantallas angostas): **«Necesita tu atención»** (`ColaAtencion`), la cola de trabajo
   con lo que cuenta `obtenerPendientesHoy` (pedidos de Dropi en Novedad, plataformas sin saldo de wallet, retiros de

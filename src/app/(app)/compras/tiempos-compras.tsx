@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CabeceraTarjeta, MarcoTabla, Punto, Segmentado, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { formatearFecha } from "@/lib/formato";
-import { etiquetaEstado, etiquetaEtapa, etiquetaVia, type FilaCompra } from "./def-compras";
+import { etiquetaEstado, etiquetaEtapa, etiquetaVia, numeroOC, type FilaCompra } from "./def-compras";
 import { diasEntre, entero, estaAbierta, hoy, paraRevisar, porDimension, tiempoEnEstados, tiemposPorTramo, umbralesTransito, usd } from "./calculos-compras";
 import { SelectorVista } from "./selector-vista";
 
@@ -174,8 +174,8 @@ export function TiemposCompras({
               <li key={c.id} className="flex items-center gap-2 border-b border-border px-3.5 py-2 last:border-b-0">
                 <Punto tono="peligro" />
                 <span className="min-w-0 flex-1 truncate">
-                  {c.codigo ? `${c.codigo} · ` : ""}
-                  {c.nombre}
+                  {numeroOC(c.numero)}
+                  {c.codigo ? ` · ${c.codigo}` : ""}
                 </span>
                 <span className="text-xs whitespace-nowrap text-muted-foreground">
                   {c.viaEnvio.map(etiquetaVia).join(", ") || "—"} · {diasEntre(c.fechaEnvio, dia)} d
@@ -193,8 +193,8 @@ export function TiemposCompras({
                 <span className="flex items-center gap-2">
                   <Punto tono={c.etapa === "descartado" ? "gris" : "aviso"} />
                   <span className="min-w-0 flex-1 truncate font-medium">
-                    {c.codigo ? `${c.codigo} · ` : ""}
-                    {c.nombre}
+                    {numeroOC(c.numero)}
+                    {c.codigo ? ` · ${c.codigo}` : ""}
                   </span>
                   <span className="text-xs text-muted-foreground">{formatearFecha(c.creadoEn)}</span>
                 </span>

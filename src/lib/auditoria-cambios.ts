@@ -22,6 +22,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   cambiar_estado_seleccion: "Cambió el estado",
   crear_oferta_seleccion: "Creó una oferta",
   eliminar_oferta_seleccion: "Quitó una oferta",
+  actualizar_captura_instagram: "Modificó la captura de Instagram",
   actualizar_margen: "Actualizó margen",
   agregar_proveedor_scraping: "Agregó un proveedor a Scraping de proveedores",
   actualizar_margen_masivo: "Actualizó margen (en lote)",

@@ -236,10 +236,10 @@ export function compararPorCodigo(a: Pick<FilaCompra, "codigo" | "numero">, b: P
 }
 
 /**
- * El título de una compra: con productos vinculados, su número de orden (los productos se ven debajo); sin ellos, el nombre
- * que traía de ClickUp (que decía el producto).
+ * El título de una compra: su N.º OC. El nombre que traía de ClickUp ya no se usa (14 oct 2026): una compra se identifica
+ * por sus códigos (N.º OC y código del país) y lo que lleva se ve en sus productos. La columna `nombre` sigue en la base.
  */
-export const tituloCompra = (c: Pick<FilaCompra, "numero" | "nombre" | "productos">) => (c.productos > 0 ? numeroOC(c.numero) : c.nombre);
+export const tituloCompra = (c: Pick<FilaCompra, "numero">) => numeroOC(c.numero);
 
 /** «1.000 × Faja · Beige / S, 500 × Truly…» (hasta `max`, y «y N más»). */
 export function resumenLineas(lineas: FilaCompra["lineas"], max = 3): string {
@@ -353,7 +353,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       ],
       agrupable: true,
     },
-    { id: "nombreCompra", etiqueta: "Nombre", tipo: "texto", valor: (c) => `${numeroOC(c.numero)} ${c.nombre} ${c.proveedor ?? ""} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}` },
+    { id: "nombreCompra", etiqueta: "Orden de compra", tipo: "texto", valor: (c) => `${numeroOC(c.numero)} ${c.codigo ?? ""} ${c.proveedor ?? ""} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}` },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
     { id: "qtyTotal", etiqueta: "Cantidad total", tipo: "numero", valor: (c) => c.qtyTotal },
     { id: "montoTotal", etiqueta: "Monto Total", tipo: "numero", valor: (c) => c.montoTotal },
@@ -385,7 +385,6 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
   csvAntes: [
     { etiqueta: "N.º OC", valor: (c) => numeroOC(c.numero) },
     { etiqueta: "Código", valor: (c) => c.codigo ?? "" },
-    { etiqueta: "Nombre", valor: (c) => c.nombre },
     { etiqueta: "Tipo", valor: (c) => (c.tipo === "importacion" ? "Importadora" : "País") },
   ],
   cerrados: {
