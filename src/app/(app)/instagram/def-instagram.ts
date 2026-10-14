@@ -22,6 +22,11 @@ export interface FilaInstagram {
   comentarios: number | null;
   vistas: number | null;
   compartidos: number | null;
+  /** AAAA-MM-DD: cuándo se publicó en Instagram. */
+  fechaPublicacion: string | null;
+  /** De dónde salieron las cifras: «vista_previa» (leídas solas de la página pública, dato no oficial) o «manual» (escritas o corregidas por una persona). */
+  fuenteCifras: string | null;
+  leidoEn: string | null;
   paginaDestino: string | null;
   notas: string | null;
   estado: string;
@@ -90,6 +95,7 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
     { id: "comentarios", etiqueta: "Comentarios", tipo: "numero", valor: (f) => f.comentarios },
     { id: "vistas", etiqueta: "Vistas", tipo: "numero", valor: (f) => f.vistas },
     { id: "compartidos", etiqueta: "Compartidos", tipo: "numero", valor: (f) => f.compartidos },
+    { id: "publicado", etiqueta: "Publicado", tipo: "fecha", valor: (f) => f.fechaPublicacion },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },
   ],
   csvAntes: [{ etiqueta: "N.º", valor: (f) => numeroInstagram(f.numero) }],

@@ -73,7 +73,12 @@ Cinco muestras (4 reels y 1 publicación de video; ningún anuncio patrocinado t
 para una publicación de otra cuenta. Me gusta, comentarios, vistas y compartidos **no se pueden leer por la API**: se completan a
 mano en la ficha («Cifras de la publicación», dentro de `metricas`). La respuesta de la consulta queda en «Datos de Meta».
 
-**Lectura de la vista previa pública (no implementada, decisión pendiente):** pedir la página pública del enlace con el agente de las
-vistas previas de Facebook devuelve en `og:description` los me gusta, comentarios, la cuenta y la fecha («43 likes, 12 comments -
-nuvotienda.ve on February 4, 2025: …») y una imagen de portada; no da vistas, compartidos ni el video. Es una zona gris de las
-condiciones de Meta (acceso automatizado) y Instagram puede bloquear los servidores; ejecutarlo desde el servidor no quita ese riesgo.
+**Lectura de la vista previa pública (implementada, decisión de Hernán, 14 oct 2026):** al recibir una captura con enlace de reel o
+publicación, el servidor pide **una vez** esa página pública (`src/lib/instagram/vista-previa.ts`, `leerVistaPublica` en `guardar.ts`) con el
+descargador seguro y el agente de las vistas previas de Facebook, y lee `og:description`: «43 likes, 12 comments - nuvotienda.ve on
+February 4, 2025: …». Se guardan **me gusta, comentarios, cuenta y fecha de publicación** (en `metricas` y `autor_usuario`), marcados
+`fuente: "vista_previa"` («dato no oficial» en la ficha); las **vistas y los compartidos no salen** ahí y se escriben a mano. Si una
+persona corrige algo en la ficha, pasa a `fuente: "manual"`. Probado con tres enlaces reales (43/12, 102/95 y 2/0). Riesgos que se
+aceptaron: las condiciones de Meta limitan el acceso automatizado, y Instagram puede dejar de responder o pedir inicio de sesión a las
+direcciones de Vercel (el motivo queda en `metricas.vista_previa_error`, y la captura se guarda igual). Una publicación (`ig_post`) no
+trae enlace, así que no tiene lectura. **Se apaga sin tocar el código** poniendo `INSTAGRAM_LECTURA_PUBLICA=0` en Vercel.

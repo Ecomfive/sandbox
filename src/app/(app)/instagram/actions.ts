@@ -52,6 +52,9 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   const autorTexto = String(formData.get("autor_usuario") ?? "").trim().replace(/^@/, "");
   if (autorTexto && !/^[\w.]{1,100}$/.test(autorTexto)) return { error: "Cuenta del video: solo letras, números, puntos y guiones bajos." };
   const autor = autorTexto || null;
+  const fechaTexto = String(formData.get("fecha_publicacion") ?? "").trim();
+  if (fechaTexto && (!/^\d{4}-\d{2}-\d{2}$/.test(fechaTexto) || Number.isNaN(Date.parse(fechaTexto)))) return { error: "Fecha de publicación no válida." };
+  const fechaPublicacion = fechaTexto || null;
   // Las cifras de la publicación: enteros desde 0; vacío = sin dato.
   const cifras: Record<string, number | null> = {};
   for (const [campo, nombre] of CIFRAS) {
@@ -75,6 +78,12 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
     if (cifras[campo] === null) delete metricas[campo];
     else metricas[campo] = cifras[campo];
   }
+  const fechaAntes = typeof metricasAntes.fecha_publicacion === "string" ? metricasAntes.fecha_publicacion : null;
+  if (fechaPublicacion === null) delete metricas.fecha_publicacion;
+  else metricas.fecha_publicacion = fechaPublicacion;
+  // Si una persona cambia alguna cifra, la cuenta o la fecha, el dato ya no es el que se leyó solo.
+  const cifrasCambiaron = CIFRAS.some(([campo]) => (typeof metricasAntes[campo] === "number" ? metricasAntes[campo] : null) !== cifras[campo]);
+  if (cifrasCambiaron || (antes.autor_usuario ?? null) !== autor || fechaAntes !== fechaPublicacion) metricas.fuente = "manual";
   const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, autor_usuario: autor, metricas, actualizado_en: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "No se pudieron guardar los cambios." };
 
@@ -94,6 +103,10 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if ((antes.autor_usuario ?? null) !== autor) {
     cambio.antes["Cuenta del video"] = antes.autor_usuario ? `@${antes.autor_usuario}` : "—";
     cambio.despues["Cuenta del video"] = autor ? `@${autor}` : "—";
+  }
+  if (fechaAntes !== fechaPublicacion) {
+    cambio.antes["Fecha de publicación"] = fechaAntes ?? "—";
+    cambio.despues["Fecha de publicación"] = fechaPublicacion ?? "—";
   }
   for (const [campo, nombre] of CIFRAS) {
     const previo = typeof metricasAntes[campo] === "number" ? (metricasAntes[campo] as number) : null;
