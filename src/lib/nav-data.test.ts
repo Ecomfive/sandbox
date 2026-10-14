@@ -10,7 +10,7 @@ const hrefs = (titulo: string) => (area(titulo)?.items ?? []).map((i) => i.href)
 test("el riel tiene las áreas acordadas y Avisos va oculto", () => {
   assert.deepEqual(
     areas.filter((a) => !a.oculta).map((a) => a.title),
-    ["Desempeño", "Marketing", "Clientes", "Investigación", "Operación", "Finanzas", "Equipo"],
+    ["Desempeño", "Testing Lab", "Marketing", "Clientes", "Investigación", "Operación", "Finanzas", "Equipo"],
   );
   assert.equal(area("Avisos")?.oculta, true);
 });
@@ -24,17 +24,34 @@ test("Compras y Producto están en Operación, no en Marketing", () => {
     assert.ok(hrefs("Operación").includes(ruta), `${ruta} en Operación`);
     assert.ok(!hrefs("Marketing").includes(ruta), `${ruta} no en Marketing`);
   }
-  assert.ok(hrefs("Marketing").includes("/productos-test"), "Productos Test sigue en Marketing");
 });
 
-test("CRM en Clientes, Inteligencia competitiva en Investigación y Filtro de productos en Marketing", () => {
+test("Testing Lab: solo Proveeduría, con el recorrido del producto en secciones y en orden", () => {
+  const lab = area("Testing Lab");
+  assert.deepEqual(lab?.soloFrentes, ["proveeduria"]);
+  assert.deepEqual(
+    lab?.items.map((i) => `${i.grupo} › ${i.href}`),
+    [
+      "Fuentes › /drop-killer",
+      "Fuentes › /tu-winner",
+      "Fuentes › /scraping-proveedores",
+      "Selección › /seleccion-productos",
+      "Producción › /creacion-ofertas",
+      "Resultados › /productos-test",
+      "Resultados › /filtro-productos",
+    ],
+  );
+  assert.ok(lab?.items.every((i) => i.frente === "proveeduria"));
+});
+
+test("Marketing sigue en el riel aunque todavía no tenga páginas", () => {
+  assert.deepEqual(hrefs("Marketing"), []);
+  assert.equal(area("Marketing")?.mostrarVacia, true);
+});
+
+test("CRM en Clientes e Inteligencia competitiva en Investigación", () => {
   assert.deepEqual(hrefs("Clientes"), ["/crm-dropshippers"]);
   assert.deepEqual(hrefs("Investigación"), ["/inteligencia-competitiva"]);
-  assert.ok(hrefs("Marketing").includes("/filtro-productos"));
-  assert.ok(hrefs("Marketing").includes("/fuente-datos"), "Fuente de datos en Marketing");
-  // El orden del recorrido de un producto.
-  assert.deepEqual(hrefs("Marketing"), ["/fuente-datos", "/productos-test", "/filtro-productos"]);
-  for (const ruta of ["/crm-dropshippers", "/inteligencia-competitiva"]) assert.ok(!hrefs("Marketing").includes(ruta), ruta);
   assert.ok(!hrefs("Operación").includes("/filtro-productos"));
 });
 

@@ -563,6 +563,17 @@ export function FavoritosIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Matraz: Testing Lab (de dónde salen los productos hasta el resultado de su test). */
+export function TestingLabIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" />
+      <path d="M6.453 15h11.094" />
+      <path d="M8.5 2h7" />
+    </IconoLucide>
+  );
+}
+
 /** Megáfono: Marketing y ventas. */
 export function MarketingIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -701,6 +712,7 @@ export function BabyYodaIcon(props: SVGProps<SVGSVGElement>) {
 export const SECTION_ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   Desempeño: DesempenoIcon,
   Favoritos: FavoritosIcon,
+  "Testing Lab": TestingLabIcon,
   Marketing: MarketingIcon,
   Clientes: ClientesIcon,
   Investigación: InvestigacionIcon,

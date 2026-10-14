@@ -40,7 +40,7 @@ interface AreaVisible {
 function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined): AreaVisible[] {
   return areas
     .map((area) => ({ area, items: area.items.filter((item) => puedeVer(modulos, item.href)) }))
-    .filter((a) => a.items.length > 0);
+    .filter((a) => a.items.length > 0 || a.area.mostrarVacia);
 }
 
 /** Pendientes de una página: el Centro de notificaciones muestra el total; las demás, lo suyo. */
@@ -130,15 +130,23 @@ function PaginasDeArea({
           ))}
         </div>
       )}
-      {FRENTES.map((f) => {
+      {FRENTES.filter((f) => !area.soloFrentes || area.soloFrentes.includes(f.id)).map((f) => {
         const delFrente = items.filter((i) => i.frente === f.id);
+        const grupos = [...new Set(delFrente.map((i) => i.grupo))];
         return (
           <div key={f.id} role="group" aria-label={f.titulo}>
             <SubTitulo>{f.titulo}</SubTitulo>
             {delFrente.length > 0 ? (
-              <div className="flex flex-col gap-0.5">
-                {delFrente.map((item) => (
-                  <ItemPagina key={item.href} item={item} {...resto} />
+              <div className="flex flex-col gap-2">
+                {grupos.map((g) => (
+                  <div key={g ?? "-"} role={g ? "group" : undefined} aria-label={g} className="flex flex-col gap-0.5">
+                    {g && <p className="m-0 px-3 pt-0.5 text-[0.65rem] font-medium tracking-wide text-muted-foreground/80 uppercase">{g}</p>}
+                    {delFrente
+                      .filter((i) => i.grupo === g)
+                      .map((item) => (
+                        <ItemPagina key={item.href} item={item} {...resto} />
+                      ))}
+                  </div>
                 ))}
               </div>
             ) : (

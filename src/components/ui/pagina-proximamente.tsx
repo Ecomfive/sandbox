@@ -3,11 +3,11 @@ import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 
 /**
- * Una pestaña de Fuente de datos (Marketing) que todavía no tiene contenido: la estructura del módulo existe (menú,
- * permiso `fuente-datos` y pestañas en `PESTANAS_POR_MODULO`) y cada fuente se irá llenando de a una.
+ * La página de un módulo que ya existe en el menú y en los permisos pero todavía no tiene contenido (los de Testing Lab
+ * mientras se construyen): comprueba el acceso y dice «Próximamente».
  */
-export async function PestanaProximamente({ titulo }: { titulo: string }) {
-  await requireModulo("fuente-datos");
+export async function PaginaProximamente({ modulo, titulo }: { modulo: string; titulo: string }) {
+  await requireModulo(modulo);
   return (
     <Pagina ancho="media" className="flex flex-col gap-6">
       <EncabezadoPagina titulo={titulo} oculto />
