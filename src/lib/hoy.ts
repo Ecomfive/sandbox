@@ -83,7 +83,7 @@ const PENDIENTES: {
     campo: "competidoresNuevos",
     titulo: "Competidores nuevos en Dropi",
     descripcion: "Proveedores que empezaron a vender en Dropi del país (Análisis de competencia)",
-    href: "/analisis-competencia/alertas",
+    href: "/analisis-competencia",
     accion: "Revisar",
   },
 ];

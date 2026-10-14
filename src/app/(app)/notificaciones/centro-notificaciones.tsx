@@ -176,7 +176,7 @@ function PorCorregir({ pendientes }: { pendientes: PendientesHoy }) {
       clave: "competidores-nuevos",
       cantidad: pendientes.competidoresNuevos,
       titulo: "Competidores nuevos en Dropi",
-      href: "/analisis-competencia/alertas",
+      href: "/analisis-competencia",
       Icono: InteligenciaIcon,
     },
   ].filter((t) => t.cantidad > 0);

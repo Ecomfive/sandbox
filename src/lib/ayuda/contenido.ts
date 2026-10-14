@@ -286,21 +286,18 @@ export const GUIAS: GuiaModulo[] = [
     modulo: "analisis-competencia",
     titulo: "Análisis de competencia",
     ruta: "/analisis-competencia",
-    resumen: "Todo el catálogo de Dropi del país comparado con lo que vende ECOMFIVE: precios, stock, nuevos y alertas.",
+    resumen: "Todo el catálogo de Dropi del país comparado con lo que vende ECOMFIVE: competidores, sus productos, precios y stock.",
     secciones: [
       {
         titulo: "Uso",
         pasos: [
-          "Cada día se lee todo el catálogo de Dropi del país (Panamá: unos 1.450 productos de 93 proveedores, en segundos) con una cuenta de dropshipper, y se compara con lo que vende ECOMFIVE.",
-          "Tiene cinco pestañas: Dashboard, Alertas, Productos, Competidores y Bitácora. Arriba de todas está la barra de indicadores (catálogo, nuestros productos, competencia más barata, stock vendido en 7 días y alertas sin ver); cada indicador lleva a su pestaña.",
-          "Dashboard: el stock vendido por la competencia por día (iguales a los nuestros y resto), las alertas de los últimos 30 días, los competidores y las categorías que más venden, nuestro precio frente al más bajo de la competencia (en rojo si ellos venden más barato) y los productos de la competencia que más venden. Los filtros (competidor, categoría, solo iguales a los nuestros y Día / Semana / Mes) se cruzan; pulsar un competidor o una categoría también filtra.",
-          "Un producto de la competencia es «igual» a uno nuestro si el nombre coincide en 85 % (2 palabras o más) o si la foto es la misma y comparten alguna palabra.",
-          "Alertas: lo que pide atención desde la búsqueda anterior. Un competidor bajó el precio de un producto igual al nuestro (en rojo si ya vende más barato que nosotros), bajó su stock, dejó de mostrarlo o hay un competidor nuevo. «Vista» la marca leída; «Marcar todas como vistas» las limpia. Empiezan en la segunda búsqueda.",
-          "Productos: cada producto nuestro con los competidores que lo venden, el precio más bajo frente al nuestro y cuánto stock vendieron ellos en 1, 7 y 30 días. Pulsa una fila para abrir su ficha: nuestro producto arriba y cada competidor en una fila (foto pequeña que se agranda con un clic, precio, stock, lo vendido y enlace a su página en Dropi); «Ver historial» despliega una tabla con cada vez que bajó o subió el stock y cada cambio de precio.",
-          "Competidor nuevo: cuando un proveedor empieza a vender en Dropi del país, además de la alerta, sale en «Hoy» (Necesita tu atención), en Avisos y como contador en el menú, hasta marcar la alerta como vista.",
-          "Desde Producto y Compras: la ficha de un producto trae «Competencia en Dropi» (buscado por nombre y por foto) y cada producto de una compra tiene «Ver competencia en Dropi».",
+          "Cada día se lee todo el catálogo de Dropi del país (Panamá: unos 1.450 productos de 93 proveedores, en segundos) con una cuenta de dropshipper, y se compara con lo que vende ECOMFIVE por nombre y por foto.",
+          "Dos pestañas: Competidores (la pantalla principal) y Resumen (las gráficas). Arriba de las dos está la barra de indicadores: competidores, nuestros productos con competencia, cuántos venden más barato que nosotros, el stock que vendió la competencia en 7 días y las novedades sin ver.",
+          "Novedades: lo que cambió desde la búsqueda anterior en los productos iguales a los nuestros (bajó el precio, en rojo si ya vende más barato que nosotros; bajó el stock; dejó de mostrarlo) y los competidores nuevos. Toca una para abrir su competidor; «Vista» la marca leída.",
+          "Competidores: busca un competidor o un producto, usa los filtros de un toque (venden productos nuestros, más baratos que nosotros, con cambios) y ordena por lo vendido, por iguales a los nuestros o por productos. Toca un competidor para abrirlo ahí mismo: sus productos, primero los iguales a los nuestros con su precio frente al nuestro, su stock y lo vendido en 7 y 30 días. «Ver historial» despliega cada vez que bajó o subió el stock y cada cambio de precio. La foto se agranda con un clic.",
           "Stock vendido: Dropi no muestra las ventas de otro proveedor; se cuenta lo que bajó su stock entre búsquedas (solo las bajadas: una reposición no resta lo vendido).",
-          "Competidores: cada proveedor con el enlace a su página, sus productos, cuántos son iguales a los nuestros, los nuevos de la semana y su stock vendido. Bitácora: cada cambio anotado (precio, stock, desapareció, volvió).",
+          "Resumen: el stock vendido por día, las alertas de 30 días, los competidores y las categorías que más venden, nuestro precio frente al más bajo y los productos que más venden, con filtros que se cruzan.",
+          "Un competidor nuevo sale también en «Hoy», en Avisos y como contador en el menú. Desde Producto y Compras: la ficha de un producto trae «Competencia en Dropi» y cada producto de una compra tiene «Ver competencia en Dropi».",
         ],
       },
     ],
@@ -349,6 +346,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-14", titulo: "Análisis de competencia en una pantalla", texto: "Análisis de competencia ahora tiene solo dos pestañas: Competidores y Resumen. En Competidores, las novedades van arriba y cada competidor se abre en su sitio con sus productos (los iguales a los nuestros primero, con el precio frente al nuestro); cada producto despliega su historial.", modulo: "analisis-competencia", href: "/analisis-competencia" },
   { fecha: "2026-10-14", titulo: "Sin «Nuevos que no tenemos»", texto: "Análisis de competencia ya no tiene la pestaña ni las alertas de «Nuevos que no tenemos»: quedan Dashboard, Alertas, Productos, Competidores y Bitácora.", modulo: "analisis-competencia", href: "/analisis-competencia" },
   { fecha: "2026-10-14", titulo: "La competencia de cada producto", texto: "La ficha de un producto (Producto) trae el bloque «Competencia en Dropi»: quién más lo vende en Panamá, a qué precio frente al nuestro, su stock y cuánto vendió en 7 y 30 días, con el historial de cada uno. En una compra, cada producto tiene «Ver competencia en Dropi».", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-14", titulo: "Aviso de competidor nuevo", texto: "Cuando un proveedor nuevo empieza a vender en Dropi Panamá sale en «Hoy» (Necesita tu atención), en Avisos y con un contador en Análisis de competencia, hasta marcar su alerta como vista. La ficha de un producto en Análisis de competencia muestra fotos pequeñas que se agrandan con un clic y el historial de cada competidor en una tabla.", modulo: "analisis-competencia", href: "/analisis-competencia/alertas" },

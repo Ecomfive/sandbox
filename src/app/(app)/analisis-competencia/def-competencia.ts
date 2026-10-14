@@ -1,5 +1,3 @@
-import type { DefTabla } from "@/lib/tabla/motor";
-
 /** Un producto del catálogo de Dropi del país (nuestro o de la competencia). */
 export interface ProductoC {
   id: string;
@@ -36,30 +34,6 @@ export interface FilaNuestro {
   bajo7: number;
 }
 
-export const DEF_NUESTROS: DefTabla<FilaNuestro> = {
-  clave: "competencia-nuestros",
-  campos: [
-    { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${f.nuestro.nombre} ${f.iguales.map((i) => `${i.proveedor} ${i.nombre}`).join(" ")}` },
-    {
-      id: "competencia",
-      etiqueta: "Competencia",
-      tipo: "seleccion",
-      valores: (f) => [f.iguales.length ? (f.diferencia !== null && f.diferencia < 0 ? "mas_barata" : "con") : "sin"],
-      opciones: () => [
-        { valor: "mas_barata", etiqueta: "La competencia vende más barato" },
-        { valor: "con", etiqueta: "Con competencia" },
-        { valor: "sin", etiqueta: "Solo nosotros" },
-      ],
-      agrupable: true,
-      ordenGrupos: ["mas_barata", "con", "sin"],
-    },
-    { id: "competidores", etiqueta: "Competidores", tipo: "numero", valor: (f) => f.iguales.length },
-    { id: "precio", etiqueta: "Nuestro precio", tipo: "numero", valor: (f) => f.nuestro.precio },
-    { id: "diferencia", etiqueta: "Diferencia", tipo: "numero", valor: (f) => f.diferencia },
-    { id: "bajo7", etiqueta: "Stock vendido por la competencia (7 días)", tipo: "numero", valor: (f) => f.bajo7 },
-  ],
-};
-
 export interface CompetidorC {
   id: number;
   nombre: string;
@@ -73,17 +47,6 @@ export interface CompetidorC {
   primeraVez: string;
 }
 
-export const DEF_COMPETIDORES: DefTabla<CompetidorC> = {
-  clave: "competencia-competidores",
-  campos: [
-    { id: "nombre", etiqueta: "Competidor", tipo: "texto", valor: (f) => f.nombre },
-    { id: "productos", etiqueta: "Productos", tipo: "numero", valor: (f) => f.productos },
-    { id: "iguales", etiqueta: "Iguales a los nuestros", tipo: "numero", valor: (f) => f.iguales },
-    { id: "bajo7", etiqueta: "Stock vendido (7 días)", tipo: "numero", valor: (f) => f.bajo7 },
-    { id: "bajo30", etiqueta: "Stock vendido (30 días)", tipo: "numero", valor: (f) => f.bajo30 },
-  ],
-};
-
 export interface BitacoraC {
   fecha: string;
   evento: string;
@@ -95,31 +58,6 @@ export interface BitacoraC {
   precioAntes: number | null;
   stockAntes: number | null;
 }
-
-export const EVENTOS: Record<string, string> = {
-  precio: "Precio",
-  stock: "Stock",
-  desaparecio: "Desapareció",
-  reaparecio: "Volvió",
-  primera_vez: "Apareció",
-};
-
-export const DEF_BITACORA: DefTabla<BitacoraC> = {
-  clave: "competencia-bitacora",
-  campos: [
-    {
-      id: "evento",
-      etiqueta: "Tipo",
-      tipo: "seleccion",
-      valores: (f) => [f.evento],
-      opciones: () => Object.entries(EVENTOS).map(([valor, etiqueta]) => ({ valor, etiqueta })),
-      agrupable: true,
-    },
-    { id: "proveedor", etiqueta: "Proveedor", tipo: "seleccion", valores: (f) => [f.proveedor], agrupable: true },
-    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (f) => f.producto },
-    { id: "fecha", etiqueta: "Fecha", tipo: "fecha", valor: (f) => f.fecha.slice(0, 10) },
-  ],
-};
 
 export interface AlertaC {
   id: string;

@@ -406,9 +406,10 @@ convenciones técnicas del código.
   búsqueda anterior (`comparar`), calcula huellas, empareja con `yaVisto` contra lo nuestro y arma las alertas
   (`armarAlertas`; la primera búsqueda de un país no deja alertas). «Stock vendido» = suma de las bajadas de stock en 1/7/30
   días (`unidadesBajadas`), porque Dropi no muestra ventas ajenas. Panamá, 14 oct 2026: 1.452 productos de 93 proveedores
-  leídos en 10 s; ECOMFIVE tiene 178. **Pestañas** (`PESTANAS_POR_MODULO`): Dashboard (`/analisis-competencia`,
-  `dashboard-competencia.tsx`, recharts con los degradados neón de Compras/Test productos, filtros cruzados de competidor,
-  categoría, solo iguales y periodo), Alertas, Productos, Competidores y Bitácora (la de «Nuevos que no tenemos» se quitó a pedido); cada una es su página y usa
+  leídos en 10 s; ECOMFIVE tiene 178. **Pestañas** (`PESTANAS_POR_MODULO`, simplificado a pedido el 14 oct 2026): **Competidores**
+  (`/analisis-competencia`, `VistaCompetidores`: novedades = alertas arriba, buscador, filtros de un toque y la lista de
+  competidores en acordeón; cada uno muestra sus productos, los iguales a los nuestros primero, y cada producto despliega
+  `HistorialCompetencia`) y **Resumen** (`/analisis-competencia/resumen`, `dashboard-competencia.tsx`). Las dos usan
   `PaginaCompetencia` (carga `cargarDatosCompetencia` y pone `ResumenCompetencia`, la barra de `Indicador` con `marco-neon`).
   **Competencia de un producto** (Producto y Compras): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
   basta Producto, Compras o Análisis) busca el producto por nombre y foto con `todasLasCoincidencias` (cruces.ts) entre todo
