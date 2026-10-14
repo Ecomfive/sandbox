@@ -143,6 +143,52 @@ export function extraerCapturas(cuerpo: unknown): CapturaInstagram[] {
   return salida;
 }
 
+/**
+ * Un mensaje de texto sin nada compartido: lo que alguien escribe al compartir un reel («mira esta tienda https://…»). Instagram
+ * lo manda como un mensaje **aparte**, después del reel, así que no llega dentro de la captura: se une a la última de esa persona.
+ */
+export interface NotaInstagram {
+  mensajeId: string;
+  remitenteId: string;
+  texto: string;
+  /** La primera página que no sea de Instagram ni de Facebook dentro del texto. */
+  paginaDestino: string | null;
+}
+
+function notaDeMensaje(evento: Record<string, unknown>): NotaInstagram | null {
+  const mensaje = esObjeto(evento.message) ? evento.message : null;
+  if (!mensaje || mensaje.is_echo === true) return null;
+  const adjuntos = Array.isArray(mensaje.attachments) ? mensaje.attachments : [];
+  if (adjuntos.length > 0 || capturasDeMensaje(evento).length > 0) return null;
+  const mid = texto(mensaje.mid, 300);
+  const remitente = esObjeto(evento.sender) ? texto(evento.sender.id, 100) : null;
+  const t = texto(mensaje.text, 4000);
+  if (!mid || !remitente || !t) return null;
+  return { mensajeId: mid, remitenteId: remitente, texto: t, paginaDestino: paginaDestinoDeTexto(t) };
+}
+
+/** Los mensajes de texto sueltos de un aviso de Meta (lo que se escribió al compartir), para unirlos a la última captura de quien los escribió. */
+export function extraerNotas(cuerpo: unknown): NotaInstagram[] {
+  if (!esObjeto(cuerpo) || !Array.isArray(cuerpo.entry)) return [];
+  const salida: NotaInstagram[] = [];
+  for (const entrada of cuerpo.entry) {
+    if (!esObjeto(entrada)) continue;
+    if (Array.isArray(entrada.messaging)) {
+      for (const e of entrada.messaging) {
+        const n = esObjeto(e) ? notaDeMensaje(e) : null;
+        if (n) salida.push(n);
+      }
+    }
+    if (Array.isArray(entrada.changes)) {
+      for (const c of entrada.changes) {
+        const n = esObjeto(c) && c.field === "messages" && esObjeto(c.value) ? notaDeMensaje(c.value) : null;
+        if (n) salida.push(n);
+      }
+    }
+  }
+  return salida;
+}
+
 /** Un archivo MP4 o MOV por su firma (`ftyp` a partir del 5.º byte): el tipo que declare el servidor no se toma en cuenta. */
 export function esVideoMp4(bytes: Uint8Array): boolean {
   return bytes.length > 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70;

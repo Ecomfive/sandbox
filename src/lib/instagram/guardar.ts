@@ -1,6 +1,6 @@
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
-import { formatoDeVideo, type CapturaInstagram } from "./extraer";
+import { formatoDeVideo, type CapturaInstagram, type NotaInstagram } from "./extraer";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
 import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, type VistaPublica } from "./vista-previa";
 
@@ -153,4 +153,45 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
     }
   }
   return { nuevas };
+}
+
+/** Cuánto después de una captura se une todavía un mensaje de texto de la misma persona. */
+const MINUTOS_PARA_UNIR_NOTA = 20;
+
+/**
+ * Une cada mensaje de texto suelto a la **última captura de esa misma persona** de los últimos minutos: lo que escribió al
+ * compartir pasa a «Mensaje que escribió» y, si trae una página que no sea de Instagram ni de Facebook y la captura aún no tiene
+ * página de destino, esa queda como su destino. Meta reintenta los avisos: el id de cada mensaje ya unido queda en
+ * `metricas.notas_unidas` para no repetirlo. Un texto sin captura reciente se ignora. Nunca lanza.
+ */
+export async function guardarNotas(notas: NotaInstagram[]): Promise<{ unidas: number }> {
+  const supabase = createServiceClient();
+  let unidas = 0;
+  for (const n of notas) {
+    try {
+      const desde = new Date(Date.now() - MINUTOS_PARA_UNIR_NOTA * 60_000).toISOString();
+      const { data: captura } = await supabase
+        .from("instagram_capturas")
+        .select("id, texto_mensaje, pagina_destino, metricas")
+        .eq("remitente_id", n.remitenteId)
+        .gte("recibido_en", desde)
+        .order("recibido_en", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!captura) continue;
+      const metricas = (captura.metricas ?? {}) as Record<string, unknown>;
+      const yaUnidas = Array.isArray(metricas.notas_unidas) ? (metricas.notas_unidas as string[]) : [];
+      if (yaUnidas.includes(n.mensajeId)) continue;
+      const cambios: Record<string, unknown> = {
+        texto_mensaje: (captura.texto_mensaje ? `${captura.texto_mensaje}\n${n.texto}` : n.texto).slice(0, 4000),
+        metricas: { ...metricas, notas_unidas: [...yaUnidas, n.mensajeId].slice(-20) },
+      };
+      if (!captura.pagina_destino && n.paginaDestino) cambios.pagina_destino = n.paginaDestino;
+      const { error } = await supabase.from("instagram_capturas").update(cambios).eq("id", captura.id);
+      if (!error) unidas++;
+    } catch {
+      // Una nota que falla no debe impedir unir las demás.
+    }
+  }
+  return { unidas };
 }
