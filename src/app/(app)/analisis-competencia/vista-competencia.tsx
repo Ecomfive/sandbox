@@ -10,6 +10,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatearFechaHora } from "@/lib/formato";
 import { marcarAlertasVistas } from "./actions";
+import { decisionesDeHoy, posicionPrecio, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
 import type { AlertaC, CompetidorC, DatosCompetencia, FilaNuestro, ProductoC } from "./def-competencia";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
@@ -50,6 +51,176 @@ export function filasNuestras(productos: ProductoC[]): FilaNuestro[] {
     .sort((a, b) => b.iguales.length - a.iguales.length || a.nuestro.nombre.localeCompare(b.nuestro.nombre));
 }
 
+// ---------- Posición en precio y «Qué hacer hoy» ----------
+
+const ESTILO_POSICION: Record<EstadoPosicion, { etiqueta: string; clase: string }> = {
+  ganando: { etiqueta: "Ganando", clase: "bg-success-soft text-success" },
+  empatado: { etiqueta: "Empatado", clase: "bg-muted text-muted-foreground" },
+  perdiendo: { etiqueta: "Perdiendo", clase: "bg-destructive-soft text-destructive" },
+};
+
+/** La insignia de posición en precio: «Ganando #1 de 3», «Perdiendo · él $1.49 más barato». */
+export function InsigniaPosicion({ estado, detalle }: { estado: EstadoPosicion; detalle: string }) {
+  const e = ESTILO_POSICION[estado];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${e.clase}`}>
+      {e.etiqueta}
+      <span className="font-medium opacity-85">{detalle}</span>
+    </span>
+  );
+}
+
+/** Cada producto nuestro con competencia y su posición en precio (los que van perdiendo primero). */
+export function posicionesNuestras(productos: ProductoC[]) {
+  return filasNuestras(productos)
+    .map((f) => ({ ...f, posicion: posicionPrecio(f.nuestro.precio, f.iguales.map((i) => i.precio)) }))
+    .filter((f): f is typeof f & { posicion: Posicion } => f.posicion !== null)
+    .sort((a, b) => ORDEN_POSICION[a.posicion.estado] - ORDEN_POSICION[b.posicion.estado] || (a.diferencia ?? 0) - (b.diferencia ?? 0));
+}
+const ORDEN_POSICION: Record<EstadoPosicion, number> = { perdiendo: 0, empatado: 1, ganando: 2 };
+
+const ESTILO_DECISION: Record<TipoDecision, { etiqueta: string; clase: string }> = {
+  bajar: { etiqueta: "Bajar precio", clase: "bg-destructive-soft text-destructive" },
+  oportunidad: { etiqueta: "Oportunidad de stock", clase: "bg-azul-soft text-azul" },
+  vigilar: { etiqueta: "Vigilar", clase: "bg-warning-soft text-warning" },
+  mantener: { etiqueta: "Mantener precio", clase: "bg-success-soft text-success" },
+};
+
+/** «Qué hacer hoy»: las decisiones que salen de los datos, con su motivo; tocar una abre su competidor. */
+function QueHacerHoy({ decisiones, alAbrir }: { decisiones: Decision[]; alAbrir: (proveedorId: number) => void }) {
+  const [tipo, setTipo] = useState<TipoDecision | "">("");
+  const [todas, setTodas] = useState(false);
+  const lista = decisiones.filter((d) => !tipo || d.tipo === tipo);
+  const visibles = todas ? lista : lista.slice(0, 6);
+  const cuenta = (t: TipoDecision) => decisiones.filter((d) => d.tipo === t).length;
+  return (
+    <section aria-labelledby="titulo-hoy" className="rounded-[10px] border border-border bg-card">
+      <CabeceraTarjeta id="titulo-hoy" titulo={`Qué hacer hoy · ${decisiones.length}`}>
+        <span className="flex flex-wrap justify-end gap-1">
+          {(Object.keys(ESTILO_DECISION) as TipoDecision[]).map((t) =>
+            cuenta(t) ? (
+              <button
+                key={t}
+                type="button"
+                aria-pressed={tipo === t}
+                onClick={() => setTipo(tipo === t ? "" : t)}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTILO_DECISION[t].clase} ${tipo === t ? "ring-1 ring-current" : "opacity-80 hover:opacity-100"} ${anilloFoco}`}
+              >
+                {ESTILO_DECISION[t].etiqueta} {cuenta(t)}
+              </button>
+            ) : null,
+          )}
+        </span>
+      </CabeceraTarjeta>
+      {!decisiones.length ? (
+        <p className="px-3.5 py-3 text-sm text-muted-foreground">
+          Nada que decidir por ahora. Las decisiones salen de lo que cambia entre búsquedas: precio, stock vendido y competidores nuevos.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {visibles.map((d, i) => (
+            <li key={`${d.tipo}-${d.titulo}-${i}`} className="border-b border-border md:border-r">
+              <button type="button" onClick={() => alAbrir(d.proveedorId)} className={`flex h-full w-full items-start gap-3 px-3.5 py-3 text-left hover:bg-muted ${anilloFoco}`}>
+                {d.foto ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- fotos de Dropi (CloudFront)
+                  <img src={d.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
+                ) : (
+                  <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border-control" />
+                )}
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className={`self-start rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTILO_DECISION[d.tipo].clase}`}>{ESTILO_DECISION[d.tipo].etiqueta}</span>
+                  <span className="text-sm font-semibold">{d.titulo}</span>
+                  <span className="text-xs text-muted-foreground">{d.motivo}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {lista.length > 6 && (
+        <button type="button" onClick={() => setTodas(!todas)} className={`w-full px-3.5 py-2 text-left text-xs text-primario hover:bg-muted ${anilloFoco}`}>
+          {todas ? "Ver menos" : `Ver las ${lista.length} decisiones`}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** «Nuestros productos frente a la competencia»: la posición en precio de cada uno, con filtros de un toque. */
+function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicionesNuestras>; alAbrir: (proveedorId: number) => void }) {
+  const [estado, setEstado] = useState<EstadoPosicion | "">("");
+  const [todos, setTodos] = useState(false);
+  const cuenta = (e: EstadoPosicion) => filas.filter((f) => f.posicion.estado === e).length;
+  const lista = filas.filter((f) => !estado || f.posicion.estado === estado);
+  const visibles = todos ? lista : lista.slice(0, 8);
+  return (
+    <section aria-labelledby="titulo-frente" className="rounded-[10px] border border-border bg-card">
+      <CabeceraTarjeta id="titulo-frente" titulo={`Nuestros productos frente a la competencia · ${filas.length}`}>
+        <span className="flex flex-wrap justify-end gap-1">
+          {(["perdiendo", "empatado", "ganando"] as EstadoPosicion[]).map((e) => (
+            <button
+              key={e}
+              type="button"
+              aria-pressed={estado === e}
+              onClick={() => setEstado(estado === e ? "" : e)}
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTILO_POSICION[e].clase} ${estado === e ? "ring-1 ring-current" : "opacity-80 hover:opacity-100"} ${anilloFoco}`}
+            >
+              {ESTILO_POSICION[e].etiqueta} {cuenta(e)}
+            </button>
+          ))}
+        </span>
+      </CabeceraTarjeta>
+      {!filas.length ? (
+        <p className="px-3.5 py-3 text-sm text-muted-foreground">Ningún producto nuestro tiene competencia en Dropi.</p>
+      ) : (
+        <ul className="flex flex-col">
+          {visibles.map((f) => {
+            const mas = f.iguales.find((i) => i.precio === f.posicion.minimo) ?? f.iguales[0];
+            const dif = f.nuestro.precio !== null ? Math.round((f.nuestro.precio - f.posicion.minimo) * 100) / 100 : null;
+            return (
+              <li key={f.nuestro.id} className="border-b border-border last:border-0">
+                <button
+                  type="button"
+                  onClick={() => alAbrir(mas.proveedorId)}
+                  className={`grid w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 px-3.5 py-2 text-left hover:bg-muted sm:grid-cols-[36px_minmax(0,1.6fr)_auto_minmax(0,0.8fr)_minmax(0,0.8fr)] ${anilloFoco}`}
+                >
+                  {f.nuestro.foto ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- fotos de Dropi (CloudFront)
+                    <img src={f.nuestro.foto} alt="" loading="lazy" className="h-9 w-9 rounded-md border border-border object-cover" />
+                  ) : (
+                    <span aria-hidden="true" className="h-9 w-9 rounded-md border border-dashed border-border-control" />
+                  )}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium">{f.nuestro.nombre}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      nosotros {usd(f.nuestro.precio)} · más bajo {usd(f.posicion.minimo)}
+                      {f.posicion.estado === "perdiendo" ? ` (${mas.proveedor})` : ""}
+                    </span>
+                  </span>
+                  <InsigniaPosicion estado={f.posicion.estado} detalle={`#${f.posicion.pos} de ${f.posicion.de}`} />
+                  <span aria-hidden="true" className="hidden items-center gap-0.5 sm:flex">
+                    {Array.from({ length: f.posicion.de }, (_, k) => (
+                      <span key={k} className={`h-2 min-w-2.5 flex-1 rounded-sm ${k === f.posicion.pos - 1 ? "bg-primario" : "bg-muted"}`} />
+                    ))}
+                  </span>
+                  <span className="hidden text-right text-xs text-muted-foreground tabular-nums sm:block">
+                    {dif === null || dif === 0 ? "mismo precio" : dif > 0 ? `${usd(dif)} más caros` : `${usd(-dif)} más baratos`}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {lista.length > 8 && (
+        <button type="button" onClick={() => setTodos(!todos)} className={`w-full border-t border-border px-3.5 py-2 text-left text-xs text-primario hover:bg-muted ${anilloFoco}`}>
+          {todos ? "Ver menos" : `Ver los ${lista.length} productos`}
+        </button>
+      )}
+    </section>
+  );
+}
+
 // ---------- Barra de indicadores ----------
 
 /** Los indicadores de arriba, con el borde neón de los dashboards del sistema (en las dos pestañas). */
@@ -57,6 +228,14 @@ export function ResumenCompetencia({ datos }: { datos: DatosCompetencia }) {
   const filas = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
   const conCompetencia = filas.filter((f) => f.iguales.length).length;
   const masBaratos = filas.filter((f) => f.diferencia !== null && f.diferencia < 0).length;
+  const posiciones = useMemo(() => {
+    const c = { ganando: 0, empatado: 0, perdiendo: 0 };
+    for (const f of filas) {
+      const p = posicionPrecio(f.nuestro.precio, f.iguales.map((i) => i.precio));
+      if (p) c[p.estado]++;
+    }
+    return c;
+  }, [filas]);
   const sinVer = datos.alertas.filter((a) => !a.vista).length;
   const vendido7 = datos.competidores.reduce((t, c) => t + c.bajo7, 0);
   const competencia = datos.productos.filter((p) => !p.esNuestro && p.estado === "activo").length;
@@ -65,7 +244,12 @@ export function ResumenCompetencia({ datos }: { datos: DatosCompetencia }) {
       <div className="flex flex-wrap">
         <Indicador titulo={`Competidores en Dropi ${datos.pais}`} valor={num(datos.competidores.length)} detalle={`${num(competencia)} productos suyos`} />
         <Indicador titulo="Nuestros productos con competencia" valor={`${conCompetencia} de ${filas.length}`} detalle="ECOMFIVE" />
-        <Indicador titulo="Venden más barato que nosotros" punto={masBaratos ? "peligro" : undefined} valor={num(masBaratos)} detalle="productos nuestros" />
+        <Indicador
+          titulo="Nuestra posición en precio"
+          punto={masBaratos ? "peligro" : undefined}
+          valor={`${posiciones.ganando} · ${posiciones.empatado} · ${posiciones.perdiendo}`}
+          detalle="ganando · empatado · perdiendo"
+        />
         <Indicador titulo="Stock vendido por la competencia" valor={num(vendido7)} detalle="unidades en 7 días" />
         <Indicador
           titulo="Novedades sin ver"
@@ -204,8 +388,9 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                           <span className="text-xs">
                             {n.nombre} · <span className="tabular-nums">{usd(n.precio)}</span>
                           </span>
-                          {dif !== null && dif < 0 && <Badge tone="destructive">Más barato por {usd(-dif)}</Badge>}
-                          {dif !== null && dif > 0 && <Badge tone="success">Nosotros más baratos</Badge>}
+                          {dif !== null && dif < 0 && <InsigniaPosicion estado="perdiendo" detalle={`él ${usd(-dif)} más barato`} />}
+                          {dif !== null && dif > 0 && <InsigniaPosicion estado="ganando" detalle={`nosotros ${usd(dif)} más baratos`} />}
+                          {dif === 0 && <InsigniaPosicion estado="empatado" detalle="mismo precio" />}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -361,13 +546,20 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
       );
   }, [datos.competidores, porCompetidor, nuestros, cambiosHoy, nuevos, soloIguales, soloBaratos, soloCambios, busqueda, orden]);
 
-  // Una novedad abre su competidor (y lo lleva a la vista).
-  const abrirNovedad = (a: AlertaC) => {
-    const prov =
-      a.tipo === "competidor_nuevo"
-        ? datos.competidores.find((c) => c.nombre === a.titulo.replace(/^Competidor nuevo:\s*/, ""))?.id
-        : datos.productos.find((p) => p.id === a.productoId)?.proveedorId;
-    if (prov === undefined) return;
+  const posiciones = useMemo(() => posicionesNuestras(datos.productos), [datos.productos]);
+  const decisiones = useMemo(() => {
+    const hace7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const nuevosComp = datos.corte
+      ? datos.competidores.filter((c) => c.primeraVez > datos.corte! && c.primeraVez > hace7).map((c) => ({ proveedorId: c.id, nombre: c.nombre, productos: c.productos }))
+      : [];
+    return decisionesDeHoy(
+      datos.productos.filter((p) => p.esNuestro && p.estado === "activo").map((p) => ({ id: p.id, nombre: p.nombre, precio: p.precio, foto: p.foto })),
+      datos.productos.filter((p) => !p.esNuestro),
+      nuevosComp,
+      datos.corte,
+    );
+  }, [datos.productos, datos.competidores, datos.corte]);
+  const abrirCompetidor = (prov: number) => {
     setTexto("");
     setSoloIguales(false);
     setSoloBaratos(false);
@@ -376,8 +568,19 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
     requestAnimationFrame(() => document.getElementById(`competidor-${prov}`)?.scrollIntoView({ block: "start", behavior: "smooth" }));
   };
 
+  // Una novedad abre su competidor (y lo lleva a la vista).
+  const abrirNovedad = (a: AlertaC) => {
+    const prov =
+      a.tipo === "competidor_nuevo"
+        ? datos.competidores.find((c) => c.nombre === a.titulo.replace(/^Competidor nuevo:\s*/, ""))?.id
+        : datos.productos.find((p) => p.id === a.productoId)?.proveedorId;
+    if (prov !== undefined) abrirCompetidor(prov);
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      <QueHacerHoy decisiones={decisiones} alAbrir={abrirCompetidor} />
+      <NuestrosFrente filas={posiciones} alAbrir={abrirCompetidor} />
       <Novedades alertas={datos.alertas} alAbrir={abrirNovedad} puedeEscribir={puedeEscribir} busquedas={datos.busquedas} />
 
       <div className="flex flex-wrap items-center gap-2">

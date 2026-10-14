@@ -138,6 +138,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
     bitacora,
     ultima: ultima ? { inicio: ultima.inicio, estado: ultima.estado, duracionMs: ultima.duracion_ms, productos: ultima.productos, proveedores: ultima.proveedores } : null,
     busquedas: listas.length,
+    corte,
     ventas,
   };
 

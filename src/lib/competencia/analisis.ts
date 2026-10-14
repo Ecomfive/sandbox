@@ -127,3 +127,144 @@ export function unidadesBajadas(cambios: CambioStock[], dias: number, ahora = ne
   const limite = new Date(ahora.getTime() - dias * 86_400_000).toISOString();
   return cambios.reduce((t, c) => (c.fecha > limite && c.stock < c.stockAntes ? t + (c.stockAntes - c.stock) : t), 0);
 }
+
+// ---------- Posición en precio y «Qué hacer hoy» (14 oct 2026, ideas tomadas de SmartFlow) ----------
+
+export type EstadoPosicion = "ganando" | "empatado" | "perdiendo";
+
+export interface Posicion {
+  /** Nuestro puesto por precio (1 = el más barato) entre nosotros y la competencia. */
+  pos: number;
+  de: number;
+  estado: EstadoPosicion;
+  /** El precio más bajo de la competencia. */
+  minimo: number;
+}
+
+/** Dónde quedamos en precio frente a los iguales de la competencia. `null` sin nuestro precio o sin competidores con precio. */
+export function posicionPrecio(nuestro: number | null, competencia: (number | null)[]): Posicion | null {
+  const precios = competencia.filter((p): p is number => p !== null);
+  if (nuestro === null || !precios.length) return null;
+  const minimo = Math.min(...precios);
+  const masBaratos = precios.filter((p) => p < nuestro - 0.004).length;
+  const iguales = precios.filter((p) => Math.abs(p - nuestro) <= 0.004).length;
+  const estado: EstadoPosicion = masBaratos ? "perdiendo" : iguales ? "empatado" : "ganando";
+  return { pos: masBaratos + 1, de: precios.length + 1, estado, minimo };
+}
+
+export type TipoDecision = "bajar" | "oportunidad" | "vigilar" | "mantener";
+
+export interface Decision {
+  tipo: TipoDecision;
+  /** De qué producto o competidor se trata. */
+  titulo: string;
+  /** El motivo, con los números. */
+  motivo: string;
+  /** El competidor que abre al tocarla. */
+  proveedorId: number;
+  foto: string | null;
+}
+
+/** Lo mínimo de un producto de la competencia para decidir. */
+export interface ProductoDecision {
+  id: string;
+  proveedorId: number;
+  proveedor: string;
+  nombre: string;
+  foto: string | null;
+  precio: number | null;
+  stock: number | null;
+  bajo7: number;
+  estado: "activo" | "desaparecido";
+  igualA: string | null;
+  primeraVez: string;
+  ultimaVez: string;
+}
+
+/** Al ritmo de lo vendido en 7 días, con menos de estas semanas de stock es una oportunidad. */
+export const SEMANAS_OPORTUNIDAD = 6;
+
+const usdD = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
+const unD = (n: number) => n.toLocaleString("es-PA");
+
+/**
+ * «Qué hacer hoy»: decisiones por producto nuestro o competidor, en este orden de importancia:
+ * * **Bajar precio:** vamos perdiendo en precio y un competidor más barato vendió algo en 7 días.
+ * * **Oportunidad de stock:** un competidor con un producto igual al nuestro tiene stock para menos de 6 semanas al ritmo de
+ *   los últimos 7 días, o lo dejó de mostrar en la última semana.
+ * * **Vigilar:** un competidor nuevo o uno que empezó a vender un producto igual al nuestro en la última semana (después de la
+ *   primera búsqueda, `corte`).
+ * * **Mantener precio:** vamos ganando y la competencia sigue vendiendo.
+ */
+export function decisionesDeHoy(
+  nuestros: { id: string; nombre: string; precio: number | null; foto: string | null }[],
+  competencia: ProductoDecision[],
+  competidoresNuevos: { proveedorId: number; nombre: string; productos: number }[],
+  corte: string | null,
+  ahora = new Date(),
+): Decision[] {
+  const hace7 = new Date(ahora.getTime() - 7 * 86_400_000).toISOString();
+  const igualesDe = new Map<string, ProductoDecision[]>();
+  for (const p of competencia) if (p.igualA) igualesDe.set(p.igualA, [...(igualesDe.get(p.igualA) ?? []), p]);
+  const salida: Decision[] = [];
+
+  for (const n of nuestros) {
+    const todos = igualesDe.get(n.id) ?? [];
+    const activos = todos.filter((p) => p.estado === "activo");
+    const pos = posicionPrecio(n.precio, activos.map((p) => p.precio));
+    const vendido = activos.reduce((t, p) => t + p.bajo7, 0);
+
+    if (pos?.estado === "perdiendo" && n.precio !== null) {
+      const precio = n.precio;
+      const baratoQueVende = activos.filter((p) => p.precio !== null && p.precio < precio - 0.004 && p.bajo7 > 0).sort((a, b) => (a.precio ?? 0) - (b.precio ?? 0))[0];
+      if (baratoQueVende)
+        salida.push({
+          tipo: "bajar",
+          titulo: n.nombre,
+          motivo: `${baratoQueVende.proveedor} lo vende a ${usdD(baratoQueVende.precio)} (nosotros ${usdD(precio)}) y vendió ${unD(baratoQueVende.bajo7)} en 7 días. Somos #${pos.pos} de ${pos.de}.`,
+          proveedorId: baratoQueVende.proveedorId,
+          foto: n.foto ?? baratoQueVende.foto,
+        });
+    }
+
+    for (const p of todos) {
+      if (p.estado === "desaparecido") {
+        if (p.ultimaVez > hace7)
+          salida.push({ tipo: "oportunidad", titulo: n.nombre, motivo: `${p.proveedor} dejó de mostrar «${p.nombre}» (tenía ${unD(p.stock ?? 0)} en stock): se agotó o lo hizo privado.`, proveedorId: p.proveedorId, foto: n.foto ?? p.foto });
+        continue;
+      }
+      if (p.bajo7 <= 0 || p.stock === null) continue;
+      const semanas = p.stock / p.bajo7;
+      if (semanas < SEMANAS_OPORTUNIDAD) {
+        const s = Math.max(1, Math.round(semanas));
+        salida.push({
+          tipo: "oportunidad",
+          titulo: n.nombre,
+          motivo: `A ${p.proveedor} le quedan ${unD(p.stock)} y vende ${unD(p.bajo7)} por semana: se queda sin stock en ~${s} semana${s === 1 ? "" : "s"}.`,
+          proveedorId: p.proveedorId,
+          foto: n.foto ?? p.foto,
+        });
+      }
+    }
+
+    if (corte)
+      for (const p of activos)
+        if (p.primeraVez > corte && p.primeraVez > hace7)
+          salida.push({ tipo: "vigilar", titulo: n.nombre, motivo: `${p.proveedor} empezó a venderlo a ${usdD(p.precio)} (nosotros ${usdD(n.precio)}).`, proveedorId: p.proveedorId, foto: n.foto ?? p.foto });
+
+    if (pos?.estado === "ganando" && vendido > 0 && n.precio !== null)
+      salida.push({
+        tipo: "mantener",
+        titulo: n.nombre,
+        motivo: `Somos los más baratos (${usdD(n.precio)} frente a ${usdD(pos.minimo)}) y la competencia vendió ${unD(vendido)} en 7 días: no hace falta bajar.`,
+        proveedorId: activos.find((p) => p.precio === pos.minimo)?.proveedorId ?? activos[0].proveedorId,
+        foto: n.foto,
+      });
+  }
+
+  for (const c of competidoresNuevos)
+    salida.push({ tipo: "vigilar", titulo: `${c.nombre} (competidor nuevo)`, motivo: `Entró a Dropi con ${unD(c.productos)} productos.`, proveedorId: c.proveedorId, foto: null });
+
+  const orden: Record<TipoDecision, number> = { bajar: 0, oportunidad: 1, vigilar: 2, mantener: 3 };
+  return salida.sort((a, b) => orden[a.tipo] - orden[b.tipo]);
+}

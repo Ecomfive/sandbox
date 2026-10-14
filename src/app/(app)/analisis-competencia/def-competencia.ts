@@ -85,5 +85,7 @@ export interface DatosCompetencia {
   bitacora: BitacoraC[];
   ultima: { inicio: string; estado: string; duracionMs: number | null; productos: number | null; proveedores: number | null } | null;
   busquedas: number;
+  /** Fin de la primera búsqueda del país: lo que aparece después es nuevo de verdad. */
+  corte: string | null;
   ventas: VentaC[];
 }

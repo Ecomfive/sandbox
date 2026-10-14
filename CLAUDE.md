@@ -411,6 +411,11 @@ convenciones técnicas del código.
   competidores en acordeón; cada uno muestra sus productos, los iguales a los nuestros primero, y cada producto despliega
   `HistorialCompetencia`) y **Resumen** (`/analisis-competencia/resumen`, `dashboard-competencia.tsx`). Las dos usan
   `PaginaCompetencia` (carga `cargarDatosCompetencia` y pone `ResumenCompetencia`, la barra de `Indicador` con `marco-neon`).
+  **Qué hacer hoy y posición en precio** (ideas de SmartFlow): `posicionPrecio` (ganando / empatado / perdiendo, «#2 de 3»)
+  y `decisionesDeHoy` (`src/lib/competencia/analisis.ts`, con prueba): bajar precio (perdemos y un más barato vendió en 7 d),
+  oportunidad de stock (le quedan < `SEMANAS_OPORTUNIDAD` = 6 semanas al ritmo de 7 d, o lo dejó de mostrar), vigilar
+  (competidor nuevo o que empezó a vender uno igual, después de `corte` = fin de la primera búsqueda) y mantener (ganamos y
+  la competencia vende). Se calculan al cargar; no se guardan.
   **Competencia de un producto** (Producto y Compras): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
   basta Producto, Compras o Análisis) busca el producto por nombre y foto con `todasLasCoincidencias` (cruces.ts) entre todo
   el catálogo guardado y suma los iguales a nuestro producto de ECOMFIVE (el «SKU» de Dropi es el nombre, no nuestro código);
