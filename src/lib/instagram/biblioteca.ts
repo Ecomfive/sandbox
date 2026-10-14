@@ -26,18 +26,6 @@ export function frasePorBuscar(copy: string | null | undefined, maxPalabras = MA
 }
 
 /**
- * La búsqueda en Google de la publicación de Instagram que tiene ese copy (`site:instagram.com "frase"`), para cuando lo compartido llegó
- * solo como archivo y no se tiene el enlace. Es una ayuda, no una garantía: probado el 14 oct, con el copy de un reel orgánico Google devolvió la
- * cuenta y otras publicaciones suyas pero no la exacta, y con el de un anuncio no devolvió nada (Instagram casi no se indexa y un anuncio
- * puede no tener publicación pública). Se usan hasta 10 palabras, algo más que para la Biblioteca.
- */
-export function urlGoogleDeInstagram(copy: string | null | undefined): string | null {
-  const frase = frasePorBuscar(copy, 10);
-  if (!frase) return null;
-  return `https://www.google.com/search?q=${encodeURIComponent(`site:instagram.com "${frase}"`)}`;
-}
-
-/**
  * La búsqueda en la Biblioteca de anuncios, en todos los países y todos los estados, o null si no hay copy que buscar.
  * Con el nombre de la página se buscan sus palabras junto con las del copy: es igual de precisa cuando el anuncio es único (probado
  * con «Mundo Digital» + el copy de Perfectx: los mismos 4 anuncios que con la frase exacta) y evita mezclar a otros anunciantes

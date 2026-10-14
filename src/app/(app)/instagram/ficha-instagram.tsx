@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
-import { urlBibliotecaAnuncios, urlGoogleDeInstagram } from "@/lib/instagram/biblioteca";
+import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, urlVideoCaptura } from "./actions";
 import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
@@ -284,15 +284,7 @@ export function FichaInstagram({
                         {fila.enlace}
                       </a>
                     ) : (
-                      <span className="flex flex-col gap-1">
-                        <span>—</span>
-                        {urlGoogleDeInstagram(fila.titulo) && (
-                          <a href={urlGoogleDeInstagram(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-primario hover:underline ${anilloFoco}`}>
-                            <EnlaceIcon className="h-4 w-4" />
-                            Buscar el enlace en Google
-                          </a>
-                        )}
-                      </span>
+                      "—"
                     )}
                   </Dato>
                 </dl>
