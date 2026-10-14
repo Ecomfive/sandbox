@@ -30,6 +30,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Cerrados", definicion: "El botón de la barra de una tabla que muestra lo que ya terminó (compras completadas, retiros conciliados). Por defecto se ocultan." },
   { termino: "Mención (@)", definicion: "Escribir @ y el nombre de alguien en un comentario o nota: le llega un aviso en «Para ti» con el enlace al comentario." },
   { termino: "SKU", definicion: "El código único de un producto: lo identifica en el WMS, Shopify, las tiendas y Dropi, y con él una venta encuentra el producto para descontar inventario. Lo escribes al crear el producto y no puede repetirse: si ya existe, el sistema te avisa. Se puede corregir desde la ficha por uno que no exista (y hay que cambiarlo también en las plataformas).", modulos: ["producto", "inventario", "compras"] },
+  { termino: "Captura de Instagram", definicion: "Un reel, publicación o video que alguien del equipo compartió por mensaje directo con la cuenta de fuentes. Cae solo en Testing Lab › Instagram con su video guardado, su copy y quién lo envió; su código es IG-0001, IG-0002…", modulos: ["instagram"] },
   { termino: "N.º de producto", definicion: "El correlativo que pone el sistema al crear un producto (#0001, #0002…). Ordena la lista de productos; no se repite ni se cambia.", modulos: ["producto"] },
   { termino: "Producto simple", definicion: "Un producto que se compra y se guarda tal cual.", modulos: ["producto", "inventario"] },
   { termino: "Producto compuesto (combo)", definicion: "Una combinación de productos simples con su cantidad. No guarda stock: al venderlo se descuenta cada componente.", modulos: ["producto", "inventario"] },
@@ -207,6 +208,24 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "instagram",
+    titulo: "Instagram",
+    ruta: "/instagram",
+    resumen: "Los productos que el equipo ve en Instagram y comparte con la cuenta de fuentes, listos para decidir si se testean.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cuando alguien del equipo ve en Instagram un producto que puede servir para testear, lo comparte por mensaje directo (el avión de papel) con la cuenta de fuentes del equipo, @ecomfive.fuentes. Cae solo en esta lista, sin escribir nada.",
+          "Cada fila es una captura con su N.º (IG-0001), su tipo (reel, publicación o video), quién la envió, cuándo llegó y su estado. Cae «Nuevo»; pásala a «Por testear» o «Descartado» desde su ficha. Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
+          "Pulsa una captura para abrir su ficha: el video guardado en nuestro almacenamiento (no depende de que el reel siga publicado), el copy y el enlace de Instagram, quién lo compartió y el mensaje que escribió, las métricas (me gusta, comentarios, vistas) si se pudieron consultar, y al final su actividad.",
+          "Si al compartir escribes en el mismo mensaje el enlace de la tienda del producto, el sistema lo propone como «Página de destino»; también se completa a mano en la ficha, junto con las notas.",
+          "No hay botón «Agregar»: las capturas las crea Instagram. Si una captura no tiene video, la ficha lo dice; los videos de anuncios patrocinados pueden no llegar.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "seleccion-productos",
     titulo: "Selección de productos",
     ruta: "/seleccion-productos",
@@ -284,6 +303,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-14", titulo: "Instagram como fuente", texto: "Testing Lab › Instagram: lo que el equipo comparte por mensaje directo con la cuenta de fuentes cae solo en una lista, con el video guardado, el copy, el enlace y quién lo envió, para decidir si se testea.", modulo: "instagram", href: "/instagram" },
   { fecha: "2026-10-14", titulo: "Scraping de proveedores", texto: "Testing Lab › Scraping de proveedores ya funciona: agrega un proveedor de Dropi y el sistema guarda todos sus productos con foto, precio y stock, y en cada búsqueda anota qué subió o bajó de stock, qué cambió de precio, qué es nuevo y qué desapareció (agotado o privado). Los privados se vinculan por nombre con su producto con foto. Ya está cargado HYPER MODA (779 productos).", modulo: "scraping-proveedores", href: "/scraping-proveedores" },
   { fecha: "2026-10-13", titulo: "Selección de productos", texto: "Testing Lab › Selección ya tiene su tablero: los candidatos de las fuentes o creados a mano, con su código de fuente, enlaces, precios de referencia y los estados Por evaluar, Seleccionado y Descartado.", modulo: "seleccion-productos", href: "/seleccion-productos" },
   { fecha: "2026-10-13", titulo: "Íconos en el menú", texto: "Cada página del menú lateral lleva su ícono a la izquierda del nombre, también en Favoritos, para encontrarla de un vistazo.", modulo: "dashboard", href: "/" },

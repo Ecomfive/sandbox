@@ -27,6 +27,7 @@ export const MODULOS: Modulo[] = [
   { clave: "drop-killer", etiqueta: "Drop Killer (Testing Lab)" },
   { clave: "tu-winner", etiqueta: "Tu Winner (Testing Lab)" },
   { clave: "scraping-proveedores", etiqueta: "Scraping de proveedores (Testing Lab)" },
+  { clave: "instagram", etiqueta: "Instagram (Testing Lab)" },
   { clave: "seleccion-productos", etiqueta: "Selección de productos (Testing Lab)" },
   { clave: "creacion-ofertas", etiqueta: "Creación de ofertas (Testing Lab)" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
