@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarAlertas, decisionesDeHoy, normalizarCompetencia, posicionPrecio, unidadesBajadas, type ProductoAlerta } from "./analisis";
+import { armarAlertas, decisionesDeHoy, normalizarCompetencia, posicionPrecio, precioPorUnidad, unidadesBajadas, unidadesEnNombre, type ProductoAlerta } from "./analisis";
 
 test("normaliza un producto con su proveedor y reconoce los nuestros", () => {
   const p = normalizarCompetencia({ id: 7, name: "King Maker 120", sale_price: 6.99, user: { id: 2094, name: "ECOMFIVE" }, warehouse_product: [{ stock: 5 }] });
@@ -89,4 +89,34 @@ test("qué hacer hoy", () => {
   );
   assert.match(d[0].motivo, /ISTMO lo vende a \$6\.00 \(nosotros \$7\.49\) y vendió 58 en 7 días\. Somos #2 de 2\./);
   assert.match(d[1].motivo, /se queda sin stock en ~3 semanas/);
+});
+
+test("unidades que trae una publicación, leídas del nombre", () => {
+  assert.equal(unidadesEnNombre("King Maker Capsulas PACK-2"), 2);
+  assert.equal(unidadesEnNombre("Yerba Magic PACK-2"), 2);
+  assert.equal(unidadesEnNombre("Crema Reafirmante 2x1"), 2);
+  assert.equal(unidadesEnNombre("Filtro De Lavadora X2"), 2);
+  assert.equal(unidadesEnNombre("2 Pares Calcetines De Compresión"), 2);
+  assert.equal(unidadesEnNombre("COMBO Lemme burn y lemme purn"), 2);
+  // El contenido no es cantidad de productos.
+  assert.equal(unidadesEnNombre("YERBA MAGIC  x 60"), 1);
+  assert.equal(unidadesEnNombre("Turmeric Pure Curcumin 120 capsulas"), 1);
+  assert.equal(unidadesEnNombre("TURMERIC X 60 CAPSULAS"), 1);
+  assert.equal(unidadesEnNombre("Limpiador De Oídos Kit 6 Piezas"), 1);
+  assert.equal(unidadesEnNombre("Lemme Burn"), 1);
+  assert.equal(precioPorUnidad(15.49, "COMBO Lemme burn y lemme purn"), 7.75);
+});
+
+test("las decisiones comparan precio por unidad", () => {
+  const base = { foto: null, estado: "activo" as const, primeraVez: "2026-10-01T00:00:00Z", ultimaVez: "2026-10-14T05:00:00Z", stock: 500 };
+  const d = decisionesDeHoy(
+    [{ id: "l", nombre: "COMBO Lemme burn y lemme purn", precio: 15.49, foto: null }],
+    [{ ...base, id: "x", proveedorId: 1, proveedor: "Natural", nombre: "Lemme Burn", precio: 8.5, bajo7: 3, igualA: "l" }],
+    [],
+    null,
+    new Date("2026-10-14T12:00:00Z"),
+  );
+  // $15.49 entre 2 = $7.75 c/u frente a $8.50: vamos ganando, no hay que bajar.
+  assert.deepEqual(d.map((x) => x.tipo), ["mantener"]);
+  assert.match(d[0].motivo, /\$7\.75 c\/u frente a \$8\.50 c\/u/);
 });

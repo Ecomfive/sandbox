@@ -28,9 +28,14 @@ export interface ProductoC {
 export interface FilaNuestro {
   nuestro: ProductoC;
   iguales: ProductoC[];
+  /** El precio por unidad más bajo de la competencia (un PACK-2 o un COMBO se divide entre sus unidades). */
   minimo: number | null;
   /** Precio más bajo de la competencia menos el nuestro (negativo = ellos más baratos). */
   diferencia: number | null;
+  /** Nuestro precio por unidad (el de la publicación si trae una sola). */
+  nuestroUnidad: number | null;
+  /** Si alguno de los dos trae varias unidades: los precios de arriba son por unidad. */
+  porUnidad: boolean;
   bajo7: number;
 }
 

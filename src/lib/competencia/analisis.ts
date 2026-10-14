@@ -211,17 +211,23 @@ export function decisionesDeHoy(
   for (const n of nuestros) {
     const todos = igualesDe.get(n.id) ?? [];
     const activos = todos.filter((p) => p.estado === "activo");
-    const pos = posicionPrecio(n.precio, activos.map((p) => p.precio));
+    // Se compara el precio por unidad: un PACK-2 o un COMBO nuestro frente a la unidad del competidor.
+    const nuestroU = precioPorUnidad(n.precio, n.nombre);
+    const unidad = (p: ProductoDecision) => precioPorUnidad(p.precio, p.nombre);
+    const porUnidad = unidadesEnNombre(n.nombre) > 1 || activos.some((p) => unidadesEnNombre(p.nombre) > 1);
+    const cu = porUnidad ? " c/u" : "";
+    const pos = posicionPrecio(nuestroU, activos.map(unidad));
     const vendido = activos.reduce((t, p) => t + p.bajo7, 0);
 
-    if (pos?.estado === "perdiendo" && n.precio !== null) {
-      const precio = n.precio;
-      const baratoQueVende = activos.filter((p) => p.precio !== null && p.precio < precio - 0.004 && p.bajo7 > 0).sort((a, b) => (a.precio ?? 0) - (b.precio ?? 0))[0];
+    if (pos?.estado === "perdiendo" && nuestroU !== null) {
+      const baratoQueVende = activos
+        .filter((p) => (unidad(p) ?? Infinity) < nuestroU - 0.004 && p.bajo7 > 0)
+        .sort((a, b) => (unidad(a) ?? 0) - (unidad(b) ?? 0))[0];
       if (baratoQueVende)
         salida.push({
           tipo: "bajar",
           titulo: n.nombre,
-          motivo: `${baratoQueVende.proveedor} lo vende a ${usdD(baratoQueVende.precio)} (nosotros ${usdD(precio)}) y vendió ${unD(baratoQueVende.bajo7)} en 7 días. Somos #${pos.pos} de ${pos.de}.`,
+          motivo: `${baratoQueVende.proveedor} lo vende a ${usdD(unidad(baratoQueVende))}${cu} (nosotros ${usdD(nuestroU)}${cu}) y vendió ${unD(baratoQueVende.bajo7)} en 7 días. Somos #${pos.pos} de ${pos.de}.`,
           proveedorId: baratoQueVende.proveedorId,
           foto: n.foto ?? baratoQueVende.foto,
         });
@@ -250,14 +256,14 @@ export function decisionesDeHoy(
     if (corte)
       for (const p of activos)
         if (p.primeraVez > corte && p.primeraVez > hace7)
-          salida.push({ tipo: "vigilar", titulo: n.nombre, motivo: `${p.proveedor} empezó a venderlo a ${usdD(p.precio)} (nosotros ${usdD(n.precio)}).`, proveedorId: p.proveedorId, foto: n.foto ?? p.foto });
+          salida.push({ tipo: "vigilar", titulo: n.nombre, motivo: `${p.proveedor} empezó a venderlo a ${usdD(unidad(p))}${cu} (nosotros ${usdD(nuestroU)}${cu}).`, proveedorId: p.proveedorId, foto: n.foto ?? p.foto });
 
-    if (pos?.estado === "ganando" && vendido > 0 && n.precio !== null)
+    if (pos?.estado === "ganando" && vendido > 0 && nuestroU !== null)
       salida.push({
         tipo: "mantener",
         titulo: n.nombre,
-        motivo: `Somos los más baratos (${usdD(n.precio)} frente a ${usdD(pos.minimo)}) y la competencia vendió ${unD(vendido)} en 7 días: no hace falta bajar.`,
-        proveedorId: activos.find((p) => p.precio === pos.minimo)?.proveedorId ?? activos[0].proveedorId,
+        motivo: `Somos los más baratos (${usdD(nuestroU)}${cu} frente a ${usdD(pos.minimo)}${cu}) y la competencia vendió ${unD(vendido)} en 7 días: no hace falta bajar.`,
+        proveedorId: activos.find((p) => unidad(p) === pos.minimo)?.proveedorId ?? activos[0].proveedorId,
         foto: n.foto,
       });
   }
@@ -267,4 +273,41 @@ export function decisionesDeHoy(
 
   const orden: Record<TipoDecision, number> = { bajar: 0, oportunidad: 1, vigilar: 2, mantener: 3 };
   return salida.sort((a, b) => orden[a.tipo] - orden[b.tipo]);
+}
+
+// ---------- Unidades por nombre: comparar precio por unidad ----------
+
+/** Hasta cuántas unidades se acepta leer del nombre (más que eso suele ser el contenido: «x 60 cápsulas»). */
+const MAX_UNIDADES = 6;
+/** Lo que sigue a un número cuando es contenido y no cantidad de productos. */
+const CONTENIDO = /^\s*(caps?|c[aá]psulas?|ml|g|gr|gramos?|mg|oz|kg|l|lt|litros?|tabletas?|gomitas?|sobres?|piezas?|pzs?|cm|mm)\b/i;
+
+/**
+ * Cuántas unidades del producto trae una publicación, leído del nombre: «PACK-2», «Pack 3», «2x1», «X2», «2 Pares», «3
+ * unidades», o un «COMBO A y B» (cuenta las partes). Sin nada de eso, 1. No confunde el contenido («x 60 cápsulas», «120
+ * capsulas», «Kit 6 piezas») con unidades.
+ */
+export function unidadesEnNombre(nombre: string): number {
+  const n = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const acotar = (x: number) => (Number.isFinite(x) && x >= 2 && x <= MAX_UNIDADES ? x : null);
+  const pack = /\bpack\s*[-x]?\s*(\d+)\b/.exec(n);
+  if (pack && acotar(Number(pack[1]))) return Number(pack[1]);
+  const porUno = /\b(\d+)\s*x\s*1\b/.exec(n);
+  if (porUno && acotar(Number(porUno[1]))) return Number(porUno[1]);
+  const pares = /\b(\d+)\s*(pares|unidades|unid|und|uds)\b/.exec(n);
+  if (pares && acotar(Number(pares[1]))) return Number(pares[1]);
+  for (const m of n.matchAll(/(?:^|[\s(])x\s*(\d+)\b/g)) {
+    const resto = n.slice((m.index ?? 0) + m[0].length);
+    if (!CONTENIDO.test(resto) && acotar(Number(m[1]))) return Number(m[1]);
+  }
+  if (/\bcombo\b/.test(n)) {
+    const partes = n.replace(/^.*\bcombo\b/, "").split(/\s+(?:y|\+|&)\s+|\s*\+\s*/).filter((p) => p.trim().length > 1);
+    if (acotar(partes.length)) return partes.length;
+  }
+  return 1;
+}
+
+/** El precio de una unidad (el de la publicación entre las unidades que trae). */
+export function precioPorUnidad(precio: number | null, nombre: string): number | null {
+  return precio === null ? null : Math.round((precio / unidadesEnNombre(nombre)) * 100) / 100;
 }
