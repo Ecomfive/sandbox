@@ -4,6 +4,7 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
+import { repetidasDe } from "@/lib/instagram/repetidas";
 import type { FilaInstagram } from "./def-instagram";
 import { TablaInstagram } from "./tabla-instagram";
 
@@ -31,6 +32,7 @@ interface FilaBase {
   notas: string | null;
   estado: string;
   payload: unknown;
+  media_id: string | null;
 }
 
 const numero = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -47,7 +49,7 @@ export default async function InstagramPage() {
   const r = await traerTodasConError<FilaBase>((a, b) =>
     supabase
       .from("instagram_capturas")
-      .select("id, numero, recibido_en, remitente_id, remitente_usuario, remitente_nombre, tipo, enlace, titulo, texto_mensaje, video_ruta, video_bytes, video_error, autor_usuario, metricas, pagina_destino, notas, estado, payload")
+      .select("id, numero, recibido_en, remitente_id, remitente_usuario, remitente_nombre, tipo, enlace, titulo, texto_mensaje, video_ruta, video_bytes, video_error, autor_usuario, metricas, pagina_destino, notas, estado, payload, media_id")
       .order("numero", { ascending: false })
       .range(a, b),
   );
@@ -63,7 +65,9 @@ export default async function InstagramPage() {
     );
   }
 
-  const filas: FilaInstagram[] = (r.data ?? []).map((f) => ({
+  const base = r.data ?? [];
+  const repetidas = repetidasDe(base.map((f) => ({ numero: f.numero, enlace: f.enlace, mediaId: f.media_id })));
+  const filas: FilaInstagram[] = base.map((f) => ({
     id: f.id,
     numero: f.numero,
     recibidoEn: f.recibido_en,
@@ -74,7 +78,10 @@ export default async function InstagramPage() {
     enlace: f.enlace,
     titulo: f.titulo,
     textoMensaje: f.texto_mensaje,
-    tieneVideo: !!f.video_ruta,
+    tieneArchivo: !!f.video_ruta,
+    archivoTipo: !f.video_ruta ? null : /\.(jpg|png|webp|gif)$/i.test(f.video_ruta) ? "imagen" : "video",
+    nombrePagina: typeof f.metricas?.nombre_pagina === "string" ? f.metricas.nombre_pagina : null,
+    repetidaDe: repetidas.get(f.numero) ?? null,
     videoBytes: f.video_bytes === null ? null : Number(f.video_bytes),
     videoError: f.video_error,
     autorUsuario: f.autor_usuario,
