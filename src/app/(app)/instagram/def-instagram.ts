@@ -21,6 +21,7 @@ export interface FilaInstagram {
   megusta: number | null;
   comentarios: number | null;
   vistas: number | null;
+  compartidos: number | null;
   paginaDestino: string | null;
   notas: string | null;
   estado: string;
@@ -88,6 +89,7 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
     { id: "megusta", etiqueta: "Me gusta", tipo: "numero", valor: (f) => f.megusta },
     { id: "comentarios", etiqueta: "Comentarios", tipo: "numero", valor: (f) => f.comentarios },
     { id: "vistas", etiqueta: "Vistas", tipo: "numero", valor: (f) => f.vistas },
+    { id: "compartidos", etiqueta: "Compartidos", tipo: "numero", valor: (f) => f.compartidos },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },
   ],
   csvAntes: [{ etiqueta: "N.º", valor: (f) => numeroInstagram(f.numero) }],
