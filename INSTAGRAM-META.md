@@ -103,6 +103,34 @@ Parecen ser anuncios o cuentas con restricciones; en esos casos la vista previa 
 siempre. **Lo único que sigue sin resolverse es lo contrario**: una captura que llega solo como archivo no
 trae enlace, y de un archivo no se puede sacar su enlace (el identificador `ig_post_media_id` no es el código del enlace).
 
+## Cuando llega solo el archivo: cómo buscar su enlace (probado el 14 oct)
+
+De un archivo no se puede **calcular** el enlace: el `asset_id` de su dirección es el mismo `ig_post_media_id` (identificador de Graph,
+`18102301511361563`), y el código del enlace (`DdmZSerggFG`) corresponde a otro número (`3991989340766077254`); no hay fórmula entre los dos.
+Lo que sí se probó o se dejó en marcha:
+- **Google** (`site:instagram.com "frase del copy"`): **no sirve y se quitó el botón.** Con la herramienta de búsqueda, 0 de 3 casos devolvieron
+  una página de Instagram (reel orgánico `nuvotienda.ve`, su reel de guantes y el de `nuvo.tienda`); con un Google real en Chrome devolvió el perfil y
+  publicaciones parecidas de la cuenta, pero no se vio la publicación exacta, y para un anuncio (Perfectx) nada. Instagram casi no se indexa y las
+  direcciones de los resultados vienen ocultas. No ayuda a conseguir el enlace.
+- **Reconocer la publicación dentro de la cuenta** (idea de comparar el video con las publicaciones de la cuenta; probado, no implementado): la página
+  de insertar del **perfil** (`instagram.com/<cuenta>/embed/`, mismo agente de vista previa) trae un bloque con `graphql_media`: **solo las 6 últimas
+  publicaciones**, cada una con código (el enlace), tipo (`GraphVideo`/`GraphImage`/`GraphSidecar`), medidas, descripción, me gusta y portada
+  (`web_profile_info` responde 429). En `nuvo.tienda` (13 publicaciones) y `nuvotienda.ve` (37) la publicación conocida sí estaba entre las 6, y para
+  distinguir publicaciones con la misma descripción servirían el tipo y las medidas (se leen del `tkhd` del MP4; también la duración, del `mvhd`).
+  **Pero** hace falta saber la cuenta (de un archivo no se sabe) y, en las cuentas de **anuncios** de las capturas que llegaron solo como archivo
+  (`vohanh459`, `mundodigital4955`) esa página de insertar está **desactivada** («disabled»): no habría lista. Con las 4 capturas de archivo reales no
+  habría servido de nada, por eso no se construyó.
+- **Pedirle a Meta el mensaje** (`consultarMensaje`, API de conversaciones: `GET /{mid}?fields=…shares,attachments`): vía **no documentada**, se
+  prueba sola con cada captura sin enlace y su respuesta (o error) queda en `metricas.mensaje_meta`, visible en «Datos de Meta». Si trae un
+  enlace de reel o publicación (`mensaje.ts`, busca en toda la respuesta) se usa y se lee su página. «Reintentar el archivo» la repite en las
+  capturas viejas. **Pendiente de ver qué devuelve Meta.**
+- **Pegar el enlace a mano**: la ficha tiene el campo «Enlace de Instagram»; al guardar uno nuevo se lee su página enseguida (archivo, vistas,
+  cifras, cuenta, nombre).
+- **El mismo contenido por otra ruta**: si alguien lo comparte de forma que llega con enlace, se fusiona y el archivo hereda el enlace (por el id
+  de Meta). **Un enlace pegado como mensaje** después de compartir se une a la última captura de esa persona sin enlace.
+- Para un **anuncio**, el «enlace» útil es el de la Biblioteca (`facebook.com/ads/library/?id=<identificador>`), que se encuentra con el botón de la
+  Biblioteca; un anuncio «dark post» no tiene enlace de Instagram.
+
 ## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
 
 La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin iniciar sesión) muestra de cada anuncio su anunciante, su

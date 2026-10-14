@@ -7,7 +7,7 @@
 const MAX_PALABRAS = 8;
 
 /** El arranque del copy que sirve para buscarlo: sin emojis ni símbolos al inicio y hasta el primer signo o las 8 palabras. */
-export function frasePorBuscar(copy: string | null | undefined): string | null {
+export function frasePorBuscar(copy: string | null | undefined, maxPalabras = MAX_PALABRAS): string | null {
   if (!copy) return null;
   const linea = copy
     .split(/\r?\n/)
@@ -16,10 +16,10 @@ export function frasePorBuscar(copy: string | null | undefined): string | null {
   if (!linea) return null;
   const sinSimbolos = linea.replace(/^[^\p{L}\p{N}]+/u, "");
   const hastaElSigno = sinSimbolos.split(/[,.:;!?&()\[\]{}"“”¡¿|/\\]/)[0];
-  const palabras = hastaElSigno.split(/\s+/).filter(Boolean).slice(0, MAX_PALABRAS);
+  const palabras = hastaElSigno.split(/\s+/).filter(Boolean).slice(0, maxPalabras);
   // Una frase de una o dos palabras trae demasiados anuncios ajenos: se prefiere seguir hasta las 8 palabras, signos aparte.
   if (palabras.length < 3) {
-    const todas = sinSimbolos.replace(/[,.:;!?&()\[\]{}"“”¡¿|/\\]+/g, " ").split(/\s+/).filter(Boolean).slice(0, MAX_PALABRAS);
+    const todas = sinSimbolos.replace(/[,.:;!?&()\[\]{}"“”¡¿|/\\]+/g, " ").split(/\s+/).filter(Boolean).slice(0, maxPalabras);
     return todas.length >= 2 ? todas.join(" ") : null;
   }
   return palabras.join(" ");

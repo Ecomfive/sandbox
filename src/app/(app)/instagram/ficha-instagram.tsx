@@ -292,6 +292,9 @@ export function FichaInstagram({
 
               <Seccion icono={EstadoIcon} titulo="Cifras de la publicación">
                 <fieldset disabled={!puedeEscribir || guardando} className="m-0 grid min-w-0 grid-cols-2 gap-3 border-0 p-0 sm:grid-cols-3">
+                  <Campo etiqueta="Enlace de Instagram" id="campo-enlace-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-enlace-instagram" type="url" name="enlace" maxLength={2000} defaultValue={fila.enlace ?? ""} placeholder="Ej: https://www.instagram.com/reel/ABC123/" className={fieldClass} />
+                  </Campo>
                   <Campo etiqueta="Nombre de la página" id="campo-nombre-instagram" className="col-span-2 sm:col-span-3">
                     <input id="campo-nombre-instagram" type="text" name="nombre_pagina" maxLength={120} defaultValue={fila.nombrePagina ?? ""} placeholder="Ej: Mundo Digital" className={fieldClass} />
                   </Campo>

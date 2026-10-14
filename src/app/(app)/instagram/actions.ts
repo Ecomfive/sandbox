@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { enlaceLegible } from "@/lib/instagram/vista-previa";
 import { BUCKET_INSTAGRAM, completarCaptura, fusionarRepetidas as fusionarRepetidasEnBase } from "@/lib/instagram/guardar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ESTADOS_INSTAGRAM, etiquetaEstadoInstagram } from "./def-instagram";
@@ -53,6 +54,14 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if (autorTexto && !/^[\w.]{1,100}$/.test(autorTexto)) return { error: "Cuenta del video: solo letras, números, puntos y guiones bajos." };
   const autor = autorTexto || null;
   const nombrePagina = String(formData.get("nombre_pagina") ?? "").trim().slice(0, 120) || null;
+  // El enlace de Instagram: solo de un reel o una publicación de instagram.com, sin parámetros; vacío = sin enlace.
+  const enlaceTexto = String(formData.get("enlace") ?? "").trim().slice(0, 2000);
+  let enlaceNuevo: string | null = null;
+  if (enlaceTexto) {
+    if (!enlaceLegible(enlaceTexto)) return { error: "Enlace de Instagram: pega el enlace de un reel o una publicación (https://www.instagram.com/reel/…)." };
+    const u = new URL(enlaceTexto);
+    enlaceNuevo = `https://www.instagram.com${u.pathname}`;
+  }
   const fechaTexto = String(formData.get("fecha_publicacion") ?? "").trim();
   if (fechaTexto && (!/^\d{4}-\d{2}-\d{2}$/.test(fechaTexto) || Number.isNaN(Date.parse(fechaTexto)))) return { error: "Fecha de publicación no válida." };
   const fechaPublicacion = fechaTexto || null;
@@ -70,7 +79,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   }
 
   const supabase = createServiceClient();
-  const { data: antes } = await supabase.from(ENTIDAD).select("estado, pagina_destino, notas, autor_usuario, metricas").eq("id", id).maybeSingle();
+  const { data: antes } = await supabase.from(ENTIDAD).select("estado, pagina_destino, notas, autor_usuario, metricas, enlace").eq("id", id).maybeSingle();
   if (!antes) return { error: "La captura ya no existe." };
   // Las cifras se mezclan con lo que ya hay en `metricas` (la consulta a Instagram, por ejemplo): no se pierde nada.
   const metricasAntes = (antes.metricas ?? {}) as Record<string, unknown>;
@@ -88,7 +97,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   // Si una persona cambia alguna cifra, la cuenta o la fecha, el dato ya no es el que se leyó solo.
   const cifrasCambiaron = CIFRAS.some(([campo]) => (typeof metricasAntes[campo] === "number" ? metricasAntes[campo] : null) !== cifras[campo]);
   if (cifrasCambiaron || (antes.autor_usuario ?? null) !== autor || fechaAntes !== fechaPublicacion || nombreAntes !== nombrePagina) metricas.fuente = "manual";
-  const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, autor_usuario: autor, metricas, actualizado_en: new Date().toISOString() }).eq("id", id);
+  const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, autor_usuario: autor, enlace: enlaceNuevo, metricas, actualizado_en: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "No se pudieron guardar los cambios." };
 
   const cambio: { antes: Record<string, string>; despues: Record<string, string> } = { antes: {}, despues: {} };
@@ -108,6 +117,10 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
     cambio.antes["Cuenta del video"] = antes.autor_usuario ? `@${antes.autor_usuario}` : "—";
     cambio.despues["Cuenta del video"] = autor ? `@${autor}` : "—";
   }
+  if ((antes.enlace ?? null) !== enlaceNuevo) {
+    cambio.antes["Enlace de Instagram"] = antes.enlace ?? "—";
+    cambio.despues["Enlace de Instagram"] = enlaceNuevo ?? "—";
+  }
   if (nombreAntes !== nombrePagina) {
     cambio.antes["Nombre de la página"] = nombreAntes ?? "—";
     cambio.despues["Nombre de la página"] = nombrePagina ?? "—";
@@ -124,6 +137,8 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
     }
   }
   if (Object.keys(cambio.despues).length > 0) await registrarAuditoria({ accion: "actualizar_captura_instagram", entidad: ENTIDAD, entidadId: id, ...cambio });
+  // Un enlace nuevo (pegado a mano) se lee enseguida: la página pública completa el archivo, las vistas, las cifras, la cuenta y el nombre.
+  if (enlaceNuevo && enlaceNuevo !== (antes.enlace ?? null)) await completarCaptura(id).catch(() => null);
   revalidatePath(RUTA);
   return {};
 }
