@@ -245,9 +245,9 @@ export function FichaInstagram({
             <div className="flex flex-1 flex-col divide-y divide-border p-5">
               <Seccion icono={InstagramIcon} titulo={fila.archivoTipo === "imagen" ? "Imagen" : "Video"}>
                 <VideoCaptura fila={fila} />
-                {puedeEscribir && fila.enlace && (
+                {puedeEscribir && (fila.enlace || !fila.tieneArchivo) && (
                   <button type="button" onClick={() => void leerEnlace()} disabled={leyendo || guardando} className={`self-start text-sm text-primario hover:underline disabled:opacity-60 ${anilloFoco}`}>
-                    {leyendo ? "Leyendo el enlace..." : fila.tieneArchivo ? "Volver a leer el enlace" : "Completar desde el enlace"}
+                    {leyendo ? "Leyendo..." : fila.tieneArchivo ? "Volver a leer el enlace" : fila.enlace ? "Completar desde el enlace" : "Reintentar el archivo"}
                   </button>
                 )}
                 {fila.tieneArchivo && fila.videoBytes !== null && <p className="m-0 text-xs text-muted-foreground">{megas(fila.videoBytes).slice(3)}</p>}
@@ -255,8 +255,20 @@ export function FichaInstagram({
 
               <Seccion icono={PersonaIcon} titulo="Quién lo compartió">
                 <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Dato etiqueta="Enviado por">{quienEnvio(fila)}</Dato>
-                  <Dato etiqueta="Recibido">{formatearFechaHora(fila.recibidoEn)}</Dato>
+                  <Dato etiqueta={fila.envios.length > 0 ? `Compartida ${fila.envios.length + 1} veces` : "Enviado por"}>
+                    {fila.envios.length === 0 ? (
+                      quienEnvio(fila)
+                    ) : (
+                      <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                        {[{ quien: quienEnvio(fila), en: fila.recibidoEn }, ...fila.envios].map((e, i) => (
+                          <li key={i}>
+                            {e.quien} · <span className="text-muted-foreground">{formatearFechaHora(e.en)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Dato>
+                  {fila.envios.length === 0 && <Dato etiqueta="Recibido">{formatearFechaHora(fila.recibidoEn)}</Dato>}
                   <Dato etiqueta="Mensaje que escribió">{fila.textoMensaje ?? "—"}</Dato>
                 </dl>
               </Seccion>

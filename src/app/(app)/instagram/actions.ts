@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { BUCKET_INSTAGRAM, completarCaptura } from "@/lib/instagram/guardar";
+import { BUCKET_INSTAGRAM, completarCaptura, fusionarRepetidas as fusionarRepetidasEnBase } from "@/lib/instagram/guardar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ESTADOS_INSTAGRAM, etiquetaEstadoInstagram } from "./def-instagram";
 
@@ -167,6 +167,19 @@ export async function leerEnlaceDeCaptura(id: string): Promise<{ error?: string;
   await registrarAuditoria({ accion: "leer_enlace_captura_instagram", entidad: ENTIDAD, entidadId: id, detalle: r.archivo ? "Se guardó el archivo y se leyeron las cifras" : "Se leyeron las cifras" });
   revalidatePath(RUTA);
   return { archivo: r.archivo };
+}
+
+/**
+ * Fusiona de una vez las capturas que ya estaban repetidas: cada grupo del mismo contenido queda en su primera captura, con todos los
+ * datos y el registro de cada envío. Deja una línea en la actividad. Devuelve el error como valor.
+ */
+export async function fusionarCapturasRepetidas(): Promise<{ error?: string; fusionadas?: number }> {
+  await requireModuloEscritura(MODULO);
+  const r = await fusionarRepetidasEnBase().catch(() => null);
+  if (!r) return { error: "No se pudieron fusionar las capturas." };
+  if (r.fusionadas > 0) await registrarAuditoria({ accion: "fusionar_capturas_instagram", entidad: ENTIDAD, detalle: `Fusionó ${r.fusionadas} ${r.fusionadas === 1 ? "captura repetida" : "capturas repetidas"}` });
+  revalidatePath(RUTA);
+  return { fusionadas: r.fusionadas };
 }
 
 /** El enlace firmado (una hora) del video de una captura, para verlo en su ficha. El bucket es privado. */
