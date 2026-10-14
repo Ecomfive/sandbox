@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { enviosDe } from "@/lib/instagram/fusion";
 import { enlaceLegible } from "@/lib/instagram/vista-previa";
 import { BUCKET_INSTAGRAM, completarCaptura, fusionarRepetidas as fusionarRepetidasEnBase } from "@/lib/instagram/guardar";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -195,6 +196,48 @@ export async function fusionarCapturasRepetidas(): Promise<{ error?: string; fus
   if (r.fusionadas > 0) await registrarAuditoria({ accion: "fusionar_capturas_instagram", entidad: ENTIDAD, detalle: `Fusionó ${r.fusionadas} ${r.fusionadas === 1 ? "captura repetida" : "capturas repetidas"}` });
   revalidatePath(RUTA);
   return { fusionadas: r.fusionadas };
+}
+
+/**
+ * Elimina una captura (y su archivo del almacenamiento, si ninguna otra lo usa). No se puede deshacer; deja una línea en la actividad
+ * general. Devuelve el error como valor.
+ */
+export async function eliminarCaptura(id: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (typeof id !== "string" || !UUID.test(id)) return { error: "Captura no válida." };
+  const supabase = createServiceClient();
+  const { data } = await supabase.from(ENTIDAD).select("numero, video_ruta").eq("id", id).maybeSingle();
+  if (!data) return { error: "La captura ya no existe." };
+  const { error } = await supabase.from(ENTIDAD).delete().eq("id", id);
+  if (error) return { error: "No se pudo eliminar la captura." };
+  if (data.video_ruta) {
+    const { count } = await supabase.from(ENTIDAD).select("id", { count: "exact", head: true }).eq("video_ruta", data.video_ruta);
+    if (!count) await supabase.storage.from(BUCKET_INSTAGRAM).remove([data.video_ruta]);
+  }
+  await registrarAuditoria({ accion: "eliminar_captura_instagram", entidad: ENTIDAD, entidadId: id, detalle: `IG-${String(data.numero).padStart(4, "0")}` });
+  revalidatePath(RUTA);
+  return {};
+}
+
+/**
+ * Quita un envío de la lista de los que se fusionaron en una captura («Compartida N veces»), por ejemplo uno que fue una prueba. No
+ * deshace los datos que ese envío haya completado. Devuelve el error como valor.
+ */
+export async function quitarEnvioDeCaptura(id: string, mensajeId: string): Promise<{ error?: string }> {
+  await requireModuloEscritura(MODULO);
+  if (typeof id !== "string" || !UUID.test(id) || typeof mensajeId !== "string" || !mensajeId) return { error: "Datos no válidos." };
+  const supabase = createServiceClient();
+  const { data } = await supabase.from(ENTIDAD).select("numero, metricas").eq("id", id).maybeSingle();
+  if (!data) return { error: "La captura ya no existe." };
+  const metricas = (data.metricas ?? {}) as Record<string, unknown>;
+  const envios = enviosDe(metricas);
+  const quedan = envios.filter((e) => e.mensaje_id !== mensajeId);
+  if (quedan.length === envios.length) return { error: "Ese envío ya no está en la lista." };
+  const { error } = await supabase.from(ENTIDAD).update({ metricas: { ...metricas, envios: quedan }, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudo quitar el envío." };
+  await registrarAuditoria({ accion: "quitar_envio_captura_instagram", entidad: ENTIDAD, entidadId: id, detalle: "Quitó un envío de la lista" });
+  revalidatePath(RUTA);
+  return {};
 }
 
 /** El enlace firmado (una hora) del video de una captura, para verlo en su ficha. El bucket es privado. */

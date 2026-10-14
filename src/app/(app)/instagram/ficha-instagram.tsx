@@ -13,8 +13,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
 import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
-import { CerrarIcon, CheckIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
-import { actualizarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, urlVideoCaptura } from "./actions";
+import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
+import { actualizarCaptura, eliminarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, quitarEnvioDeCaptura, urlVideoCaptura } from "./actions";
 import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
@@ -119,6 +119,7 @@ export function FichaInstagram({
   const { mostrarToast } = useToast();
   const router = useRouter();
   const [leyendo, setLeyendo] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [modificadoId, setModificadoId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [versionHistorial, setVersionHistorial] = useState(0);
@@ -154,6 +155,31 @@ export function FichaInstagram({
       setVersionHistorial((v) => v + 1);
       router.refresh();
     }
+  }
+
+  /** Borra la captura (con su archivo) tras confirmar: no se puede deshacer. */
+  async function eliminar() {
+    if (!fila || eliminando || guardando) return;
+    if (!confirm(`¿Eliminar la captura ${numeroInstagram(fila.numero)}? Se borra con su archivo y no se puede deshacer.`)) return;
+    setEliminando(true);
+    const r: { error?: string } = await eliminarCaptura(fila.id).catch(() => ({ error: "No se pudo eliminar la captura." }));
+    setEliminando(false);
+    if (r.error) return mostrarToast(r.error, "destructive");
+    mostrarToast(`${numeroInstagram(fila.numero)} eliminada`);
+    setModificadoId(null);
+    alCerrar();
+    router.refresh();
+  }
+
+  /** Quita un envío fusionado de la lista de «Compartida N veces». */
+  async function quitarEnvio(mensajeId: string, quien: string) {
+    if (!fila || guardando) return;
+    if (!confirm(`¿Quitar el envío de ${quien} de la lista? Los datos que haya completado se quedan.`)) return;
+    const r: { error?: string } = await quitarEnvioDeCaptura(fila.id, mensajeId).catch(() => ({ error: "No se pudo quitar el envío." }));
+    if (r.error) return mostrarToast(r.error, "destructive");
+    mostrarToast("Envío quitado");
+    setVersionHistorial((v) => v + 1);
+    router.refresh();
   }
 
   function guardar(e: React.FormEvent<HTMLFormElement>) {
@@ -260,9 +286,16 @@ export function FichaInstagram({
                       quienEnvio(fila)
                     ) : (
                       <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-                        {[{ quien: quienEnvio(fila), en: fila.recibidoEn }, ...fila.envios].map((e, i) => (
-                          <li key={i}>
-                            {e.quien} · <span className="text-muted-foreground">{formatearFechaHora(e.en)}</span>
+                        {[{ mensajeId: null as string | null, quien: quienEnvio(fila), en: fila.recibidoEn }, ...fila.envios].map((e, i) => (
+                          <li key={i} className="flex flex-wrap items-center gap-x-2">
+                            <span>
+                              {e.quien} · <span className="text-muted-foreground">{formatearFechaHora(e.en)}</span>
+                            </span>
+                            {puedeEscribir && e.mensajeId && (
+                              <button type="button" onClick={() => void quitarEnvio(e.mensajeId as string, e.quien)} aria-label={`Quitar el envío de ${e.quien}`} className={`text-xs text-muted-foreground hover:text-destructive hover:underline ${anilloFoco}`}>
+                                Quitar
+                              </button>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -356,6 +389,13 @@ export function FichaInstagram({
               </Seccion>
             </div>
           </form>
+          {puedeEscribir && (
+            <div className="border-t border-border p-5">
+              <BotonAccion icono={PapeleraIcon} tono="peligro" onClick={() => void eliminar()} disabled={eliminando || guardando}>
+                {eliminando ? "Eliminando..." : "Eliminar captura"}
+              </BotonAccion>
+            </div>
+          )}
           <div className="border-t border-border p-5">
             <HistorialGenerico id={fila.id} codigoPais={codigoPais} version={versionHistorial} obtener={obtenerHistorialCaptura} />
           </div>
