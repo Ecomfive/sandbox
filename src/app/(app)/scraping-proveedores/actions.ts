@@ -5,7 +5,7 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { createServiceClient } from "@/lib/supabase/server";
 
-const RUTA = "/fuente-datos/scraping-proveedores";
+const RUTA = "/scraping-proveedores";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** El enlace de un proveedor en Dropi: `https://app.dropi.<país>/dashboard/provider/<id>/<nombre>`. */
@@ -30,7 +30,7 @@ function cifras(formData: FormData): { ordenes: number; productos: number; drops
 
 /** «Agregar proveedor»: lo guarda con sus cifras de hoy y deja pedida su primera búsqueda completa. */
 export async function agregarProveedor(formData: FormData): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("fuente-datos");
+  const usuario = await requireModuloEscritura("scraping-proveedores");
   const nombre = String(formData.get("nombre") ?? "").trim().slice(0, 200);
   const enlace = leerEnlace(String(formData.get("url") ?? ""));
   if (!nombre) return { error: "Escribe el nombre del proveedor." };
@@ -56,7 +56,7 @@ export async function agregarProveedor(formData: FormData): Promise<{ error?: st
 
 /** «Actualizar datos del proveedor»: las cifras de hoy, para comparar con las anteriores. */
 export async function registrarDatosProveedor(formData: FormData): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("fuente-datos");
+  const usuario = await requireModuloEscritura("scraping-proveedores");
   const id = String(formData.get("proveedor_id") ?? "");
   if (!UUID.test(id)) return { error: "Proveedor no válido." };
   const c = cifras(formData);
@@ -70,7 +70,7 @@ export async function registrarDatosProveedor(formData: FormData): Promise<{ err
 
 /** «Buscar ahora»: deja pedida una búsqueda completa (la corre el equipo con la sesión de Dropi). */
 export async function pedirBusqueda(proveedorId: string): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("fuente-datos");
+  const usuario = await requireModuloEscritura("scraping-proveedores");
   if (!UUID.test(proveedorId)) return { error: "Proveedor no válido." };
   const supabase = createServiceClient();
   const { data: abierta } = await supabase.from("scraping_busquedas").select("id").eq("proveedor_id", proveedorId).in("estado", ["pendiente", "corriendo"]).limit(1).maybeSingle();
@@ -93,7 +93,7 @@ export interface EventoProducto {
 
 /** Todo el historial de un producto (lo pide su ficha al abrirse), del más nuevo al más viejo. */
 export async function obtenerHistorialProducto(productoId: string): Promise<{ eventos?: EventoProducto[]; error?: string }> {
-  await requireModulo("fuente-datos");
+  await requireModulo("scraping-proveedores");
   if (!UUID.test(productoId)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
   const { data, error } = await supabase

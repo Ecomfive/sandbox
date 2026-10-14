@@ -11,7 +11,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
-import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, SECTION_ICONS } from "@/lib/nav-icons";
+import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -40,7 +40,7 @@ interface AreaVisible {
 function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined): AreaVisible[] {
   return areas
     .map((area) => ({ area, items: area.items.filter((item) => puedeVer(modulos, item.href)) }))
-    .filter((a) => a.items.length > 0);
+    .filter((a) => a.items.length > 0 || a.area.mostrarVacia);
 }
 
 /** Pendientes de una página: el Centro de notificaciones muestra el total; las demás, lo suyo. */
@@ -69,6 +69,7 @@ function ItemPagina({
 }) {
   if (!item.href) return null;
   const activo = esActiva(pathname, item.href);
+  const Icono = ICONOS_PAGINA[item.href];
   return (
     <div className="flex items-center gap-0.5">
       <Link
@@ -79,7 +80,10 @@ function ItemPagina({
           activo ? "bg-accent font-medium text-accent-foreground" : "text-foreground transition-colors hover:bg-muted"
         }`}
       >
-        {item.label}
+        <span className="flex min-w-0 items-center gap-2">
+          {Icono && <Icono className={`h-4 w-4 shrink-0 ${activo ? "" : "text-muted-foreground"}`} />}
+          <span className="truncate">{item.label}</span>
+        </span>
         <ContadorMenu cantidad={cantidadDe(item, pendientes)} />
       </Link>
       <FavoritoToggle href={item.href} activo={favoritos.includes(item.href)} />
@@ -130,15 +134,23 @@ function PaginasDeArea({
           ))}
         </div>
       )}
-      {FRENTES.map((f) => {
+      {FRENTES.filter((f) => !area.soloFrentes || area.soloFrentes.includes(f.id)).map((f) => {
         const delFrente = items.filter((i) => i.frente === f.id);
+        const grupos = [...new Set(delFrente.map((i) => i.grupo))];
         return (
           <div key={f.id} role="group" aria-label={f.titulo}>
             <SubTitulo>{f.titulo}</SubTitulo>
             {delFrente.length > 0 ? (
-              <div className="flex flex-col gap-0.5">
-                {delFrente.map((item) => (
-                  <ItemPagina key={item.href} item={item} {...resto} />
+              <div className="flex flex-col gap-2">
+                {grupos.map((g) => (
+                  <div key={g ?? "-"} role={g ? "group" : undefined} aria-label={g} className="flex flex-col gap-0.5">
+                    {g && <p className="m-0 px-3 pt-0.5 text-[0.65rem] font-medium tracking-wide text-muted-foreground/80 uppercase">{g}</p>}
+                    {delFrente
+                      .filter((i) => i.grupo === g)
+                      .map((item) => (
+                        <ItemPagina key={item.href} item={item} {...resto} />
+                      ))}
+                  </div>
                 ))}
               </div>
             ) : (

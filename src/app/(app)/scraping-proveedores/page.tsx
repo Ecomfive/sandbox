@@ -6,7 +6,7 @@ import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaScraping, Movimiento } from "./def-scraping";
 import { VistaScraping, type BusquedaResumen, type ProveedorResumen, type Registro } from "./vista-scraping";
 
-export const metadata = { title: "Scraping de proveedores · Fuente de datos" };
+export const metadata = { title: "Scraping de proveedores" };
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +47,8 @@ interface FilaHistorial {
 const n = (v: string | null) => (v === null ? null : Number(v));
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
-  const usuario = await requireModulo("fuente-datos");
-  const puedeEscribir = !usuario.modulosSoloLectura.includes("fuente-datos");
+  const usuario = await requireModulo("scraping-proveedores");
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("scraping-proveedores");
   const { p } = await searchParams;
   const supabase = createServiceClient();
 

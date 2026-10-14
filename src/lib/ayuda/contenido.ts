@@ -185,14 +185,13 @@ export const GUIAS: GuiaModulo[] = [
     secciones: [{ titulo: "Uso", pasos: ["Al entrar a Test productos se abre la pestaña «Productos» (la lista); al lado están «Informe» y «Dashboard».", "Informe: tests por día, semana o mes y los winners (CPA menor a $4).", "Dashboard: todo el testing a la vez, con filtros que se cruzan (fechas, categoría, Test # y resultado). Pulsa una barra del periodo, una categoría o una fila de «Comparar por» para filtrar y otra vez para quitarlo. Trae la distribución del CPA contra el criterio, el CTR frente al CPA, los promedios de winners frente a fallidos, los mejores winners y lo que conviene revisar.", "Productos: la lista con su ficha; «Copiar informe» para compartir.", "Cada fila empieza con la foto del producto (la de Producto o, si no está vinculado, la de Filtro de productos); pasa el cursor encima para verla grande.", "Cada fila dice bajo el nombre si está «Vinculado» (punto verde, con el SKU de su producto) o «Sin vincular» (punto ámbar).", "Arriba de la lista: Total en test, Winners, En consulta, Fallidos, Otros estados y Sin vincular, cada uno con su número (púlsalos para filtrar), y cuántos faltan por vincular a Producto.", "Al agregar un producto en prueba, en «Producto (de Producto)» búscalo como en una orden de compra (foto, SKU, nombre y N.º): el nombre se llena solo y queda vinculado a su producto.", "Todo producto vinculado cuyo producto esté Activo en Producto pasa solo a Filtro de productos, en «Cotizar», con su foto y sus métricas (no se repite si ya está).", "«+ Agregar» abre el formulario del producto en test. Si el producto aún no existe, pulsa «Nuevo producto», junto al campo «Producto (de Producto)»: abre la misma ficha de Producto (estado, tipo, foto, SKU, código de barras, envío…). Al crearlo vuelves al formulario con ese producto ya elegido y el nombre lleno; completa el test y guárdalo. «Volver al test» regresa sin crear. Hace falta poder modificar Producto."] }],
   },
   {
-    modulo: "fuente-datos",
-    titulo: "Fuente de datos",
-    ruta: "/fuente-datos",
-    resumen: "Las fuentes de donde salen los productos para testear.",
+    modulo: "scraping-proveedores",
+    titulo: "Scraping de proveedores",
+    ruta: "/scraping-proveedores",
+    resumen: "Los productos de proveedores de Dropi con su precio y stock en el tiempo.",
     secciones: [
-      { titulo: "Uso", pasos: ["Tiene una pestaña por fuente: Drop Killer, Tu Winner, Scraping de proveedores y Selección de productos.", "Drop Killer, Tu Winner y Selección de productos están en preparación («Próximamente»)."] },
       {
-        titulo: "Scraping de proveedores",
+        titulo: "Uso",
         pasos: [
           "Sigue a proveedores de Dropi: arriba, una tarjeta por proveedor con sus órdenes, productos y dropshippers y si subieron (▲ verde) o bajaron (▼ rojo) desde el registro anterior. Pulsa una tarjeta para ver ese proveedor.",
           "«Agregar proveedor»: su nombre, el enlace de su página en Dropi (https://app.dropi.mx/dashboard/provider/…) y sus órdenes, productos y dropshippers de hoy. Queda pedida su primera búsqueda completa.",
@@ -203,6 +202,24 @@ export const GUIAS: GuiaModulo[] = [
           "Dropi solo muestra a un dropshipper los productos publicados con stock: por eso la tabla trae menos productos que la cifra «Productos» del proveedor, que cuenta también los sin stock y los privados de otros dropshippers.",
           "Un producto que deja de aparecer queda «Desapareció»: «se agotó» si le quedaban 10 unidades o menos, «lo hizo privado» si apareció un privado con el mismo nombre, o «dejó de aparecer».",
           "Los privados («Privado …», con el logo del proveedor en vez de foto) se vinculan solos al producto con foto del mismo nombre cuando tienen 2 palabras en común o más y 85 % de parecido; con menos, salen como «posible pareja» para que lo revises.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "seleccion-productos",
+    titulo: "Selección de productos",
+    ruta: "/seleccion-productos",
+    resumen: "El tablero donde caen los productos candidatos de las fuentes y se decide cuáles se testean.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cada fila es un candidato, no un producto de Producto: no lleva SKU. Trae su N.º (SEL-0001), la fuente de donde salió y el código de esa fuente (DK-0001 Drop Killer, TW-0001 Tu Winner, SP-0001 Scraping de proveedores, MAN-0001 a mano).",
+          "«Agregar» crea una fila a mano, siempre «Manual» (código MAN-): lo que sale de Drop Killer, Tu Winner o Scraping de proveedores se crea en su módulo y se envía desde ahí, para que quede en la base de la fuente y no se duplique. Lleva nombre, foto, fecha de captación, categoría, responsable, enlaces (página y Ad Library), precios de referencia en dólares y notas.",
+          "Los estados son Por evaluar, Seleccionado y Descartado. Cambia el estado pulsando la insignia de su celda o en la ficha; para varias filas, márcalas y usa «Estado» en la barra de abajo.",
+          "Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
+          "Pulsa el nombre para abrir su ficha: ahí se edita todo y, al final, está su actividad.",
         ],
       },
     ],
@@ -267,7 +284,10 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
-  { fecha: "2026-10-14", titulo: "Scraping de proveedores", texto: "Fuente de datos › Scraping de proveedores ya funciona: agrega un proveedor de Dropi y el sistema guarda todos sus productos con foto, precio y stock, y en cada búsqueda anota qué subió o bajó de stock, qué cambió de precio, qué es nuevo y qué desapareció (agotado o privado). Los privados se vinculan por nombre con su producto con foto. Ya está cargado HYPER MODA (779 productos).", modulo: "fuente-datos", href: "/fuente-datos/scraping-proveedores" },
+  { fecha: "2026-10-14", titulo: "Scraping de proveedores", texto: "Testing Lab › Scraping de proveedores ya funciona: agrega un proveedor de Dropi y el sistema guarda todos sus productos con foto, precio y stock, y en cada búsqueda anota qué subió o bajó de stock, qué cambió de precio, qué es nuevo y qué desapareció (agotado o privado). Los privados se vinculan por nombre con su producto con foto. Ya está cargado HYPER MODA (779 productos).", modulo: "scraping-proveedores", href: "/scraping-proveedores" },
+  { fecha: "2026-10-13", titulo: "Selección de productos", texto: "Testing Lab › Selección ya tiene su tablero: los candidatos de las fuentes o creados a mano, con su código de fuente, enlaces, precios de referencia y los estados Por evaluar, Seleccionado y Descartado.", modulo: "seleccion-productos", href: "/seleccion-productos" },
+  { fecha: "2026-10-13", titulo: "Íconos en el menú", texto: "Cada página del menú lateral lleva su ícono a la izquierda del nombre, también en Favoritos, para encontrarla de un vistazo.", modulo: "dashboard", href: "/" },
+  { fecha: "2026-10-13", titulo: "Testing Lab", texto: "Nueva área del menú, Testing Lab, con el recorrido de un producto en Proveeduría: Fuentes (Drop Killer, Tu Winner y Scraping de proveedores), Selección (Selección de productos), Producción (Creación de ofertas) y Resultados (Test productos y Filtro de productos, que salen de Marketing). Los módulos nuevos están en preparación.", modulo: "productos-test", href: "/productos-test" },
   { fecha: "2026-10-13", titulo: "El test de un 2x1 también en su producto simple", texto: "Un test de un 2x1 (o X2) queda vinculado al compuesto. Ahora su producto simple también lo muestra en la columna «Test», la oferta y el «Resultado del test» de la ficha, con la nota «Test de su compuesto». Ejemplo: la lona impermeable transparente muestra el winner de su 2x1.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-13", titulo: "Compras abre la ficha completa de un clic", texto: "Al pulsar la descripción de una compra se abre directo su ficha completa, con la actividad. Ya no sale primero el resumen a la derecha con «Abrir ficha completa».", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-13", titulo: "Aviso de posible duplicado", texto: "Al crear un producto, si el nombre o la foto se parecen a los de uno que ya existe, la ficha muestra «Posible duplicado» con ese producto (foto, SKU y nombre) y si se parece por el nombre o por la foto.", modulo: "producto", href: "/producto" },
@@ -282,8 +302,7 @@ export const NOVEDADES: Novedad[] = [
   { fecha: "2026-10-13", titulo: "«Ver así» se vuelve a activar", texto: "Si estabas probando el sistema con los permisos de otro rol, vuelve a pulsar «Ver así»: la vista previa se reinició con un cambio de seguridad. Solo la usa quien puede modificar Usuarios y roles.", modulo: "usuarios", href: "/usuarios" },
   { fecha: "2026-10-13", titulo: "Actualizar retiros desde Dropi pide confirmar", texto: "El botón de actualizar de Retiros abre la herramienta de este equipo con el botón «Actualizar ahora»: ya no arranca sola al abrirse.", modulo: "retiros", href: "/retiros" },
   { fecha: "2026-10-13", titulo: "Todos los productos a la vista", texto: "La lista de Producto y el buscador de productos de una compra mostraban solo los primeros 1 000 productos y dejaban fuera los más antiguos o los del final del abecedario. Ahora cargan todos.", modulo: "producto", href: "/producto" },
-  { fecha: "2026-10-13", titulo: "Módulo Fuente de datos", texto: "Nuevo en Marketing: «Fuente de datos», con las pestañas Drop Killer, Tu Winner, Scraping de proveedores y Selección de productos. Por ahora están en preparación.", modulo: "fuente-datos", href: "/fuente-datos" },
-  { fecha: "2026-10-12", titulo: "Dashboard de Test productos", texto: "Nueva pestaña «Dashboard» en Test productos: indicadores, tests por periodo, winners por categoría, distribución del CPA, CTR frente a CPA y winners frente a fallidos, con filtros que se cruzan, igual que el Dashboard de Compras.", modulo: "productos-test", href: "/productos-test/dashboard" },
+    { fecha: "2026-10-12", titulo: "Dashboard de Test productos", texto: "Nueva pestaña «Dashboard» en Test productos: indicadores, tests por periodo, winners por categoría, distribución del CPA, CTR frente a CPA y winners frente a fallidos, con filtros que se cruzan, igual que el Dashboard de Compras.", modulo: "productos-test", href: "/productos-test/dashboard" },
   { fecha: "2026-10-12", titulo: "Test productos sin el bloque Seguimiento", texto: "La ficha y el formulario de un producto en test ya no traen Revisado, Última revisión, Explotación ni Observación: ese seguimiento se lleva en su tarea de ClickUp.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Valor de la marca negra en el resultado del test", texto: "En las barras del resultado de un test (en Test productos y en la ficha de Producto), pasa el cursor por la marca negra para ver su valor: el criterio del CPA o el promedio de los winners de esa métrica.", modulo: "productos-test", href: "/productos-test/productos" },
   { fecha: "2026-10-12", titulo: "Colores del estado de un producto", texto: "El estado de cada producto se reconoce por su color: Activo en verde, Test en azul e Inactivo en rojo, en la lista, en el selector de su ficha, al crearlo y en Inventario.", modulo: "producto", href: "/producto" },
