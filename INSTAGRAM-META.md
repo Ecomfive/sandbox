@@ -163,7 +163,17 @@ salen las cifras, la cuenta y, si el anuncio lo permite, el video; el destino sa
 siempre, que era lo que fallaba al reenviar desde un chat.
 
 - **Primera prueba real (15 oct 2026, IG-0027, un anuncio de «Metodo Sawaya / nutricionista…»):** llegó el enlace, el nombre de la página, la cuenta, la fecha, 5.668 me gusta y 149 comentarios; **sin video** (la página de «insertar» de esa cuenta no trae datos) y, al principio, **sin copy**: lo compartido desde el celular no lo trae, pero la vista previa pública sí (`og:description` = «N likes, M comments - cuenta on fecha: "copy…"», con todo el texto), y desde entonces se toma de ahí si falta.
-- Solo **Android** (Chrome) registra la app como destino de compartir. En iPhone no aparece; ahí quedan el mensaje directo o un atajo de la app Atajos.
+- Solo **Android** (Chrome) registra la app como destino de compartir. En **iPhone** se usa un **atajo de la app Atajos** que abre la misma página con lo
+  compartido en la dirección (`/instagram/compartir?url=…`): el servidor no cambia (esa página ya lee `title`, `text` y `url` de la dirección, que es lo que probamos en
+  producción). Pasos, una sola vez:
+  1. App **Atajos** › pestaña «Atajos» › **+**.
+  2. Nombre: «Ecomfive Fuentes». Toca **ⓘ** › activa **«Mostrar en hoja de compartir»** › tipos aceptados: **URLs** y **Texto**.
+  3. Acción **«Texto»**: `https://mom-beta-proveduria.vercel.app/instagram/compartir?url=` y, pegada, la variable **«Entrada del atajo»**.
+  4. Acción **«Abrir URLs»**: la variable «Texto» del paso anterior. **Listo**.
+  5. Tener la **sesión de la plataforma iniciada en Safari** (el navegador predeterminado): si no, la página pide iniciar sesión y ese envío se pierde.
+  Uso: en Instagram, avión de papel › «Compartir en…» › «Atajos» › «Ecomfive Fuentes». La primera vez iOS pide permiso para abrir la dirección: «Permitir siempre».
+  **No se probó en un iPhone real** (aquí no hay cómo): la parte de la plataforma sí se probó con la misma dirección desde Chrome. La dirección sin codificar sirve porque el
+  servidor solo busca el enlace del reel o la publicación dentro de lo recibido; un enlace con `&` se corta ahí, pero la ruta del reel queda antes.
 - Hay que instalar la app: Chrome › menú ⋮ › «Instalar aplicación» (o «Agregar a la pantalla de inicio»), con la sesión de la plataforma iniciada en Chrome.
 - No se puede correlacionar este envío con el mensaje directo del mismo anuncio por id: el id del mensaje de Meta (`18020951225874919` en IG-0020) no es el de la
   publicación (el de `/p/DeSh9KxMqNy/` equivale a `4004412357671560050`), son dos ids distintos. Si la misma persona comparte el mismo contenido por las

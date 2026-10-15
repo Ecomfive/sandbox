@@ -12,6 +12,20 @@ type Estado = { tipo: "guardando" } | { tipo: "sin_datos" } | { tipo: "listo"; r
 const caja = "rounded-lg border border-border bg-card px-4 py-3 text-sm";
 const enlaceBoton = `inline-flex items-center self-start rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted ${anilloFoco}`;
 
+/** Después de guardar: volver a la app de Instagram (su dirección `instagram://app` la abre en iPhone y Android) o ver las capturas. */
+function Acciones() {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <a href="instagram://app" className={enlaceBoton}>
+        Volver a Instagram
+      </a>
+      <Link href="/instagram" className={enlaceBoton}>
+        Ver capturas
+      </Link>
+    </div>
+  );
+}
+
 /**
  * Guarda lo que llegó de la hoja de «Compartir en…» de Instagram y dice en qué captura quedó. Los datos compartidos se borran de la
  * dirección en cuanto se leen: recargar la página no vuelve a guardar lo mismo (y la acción tampoco lo duplica en los siguientes minutos).
@@ -40,9 +54,7 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
     return (
       <div className="flex flex-col gap-3">
         <p className={`${caja} m-0 text-muted-foreground`}>{puedeEscribir ? "No llegó nada para guardar. Compártelo desde Instagram con «Ecomfive Fuentes»." : "Tu rol solo puede ver Instagram: no puede guardar lo que compartas."}</p>
-        <Link href="/instagram" className={enlaceBoton}>
-          Ir a Instagram
-        </Link>
+        <Acciones />
       </div>
     );
   }
@@ -54,9 +66,7 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
         <p role="alert" className={`${caja} m-0 text-destructive`}>
           {r.error ?? "No se pudo guardar."}
         </p>
-        <Link href="/instagram" className={enlaceBoton}>
-          Ir a Instagram
-        </Link>
+        <Acciones />
       </div>
     );
   }
@@ -68,9 +78,7 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
         {r.nombrePagina && <span className="text-muted-foreground">{r.nombrePagina}</span>}
         <span className="text-muted-foreground">{r.tieneArchivo ? "Con archivo" : "Sin archivo"}</span>
       </div>
-      <Link href="/instagram" className={enlaceBoton}>
-        Ir a Instagram
-      </Link>
+      <Acciones />
     </div>
   );
 }
