@@ -35,7 +35,11 @@ export interface ResultadoCompartido {
 export async function compartirDesdeCelular(compartido: { title?: string; text?: string; url?: string }): Promise<ResultadoCompartido> {
   const usuario = await requireModuloEscritura("instagram");
   const dato = enlaceDeCompartido({ title: compartido?.title, text: compartido?.text, url: compartido?.url });
-  if (!dato) return { error: "No encontré el enlace de un reel, video o publicación de Instagram, Facebook o TikTok en lo que compartiste. Ábrelo en la app y compártelo desde ahí." };
+  if (!dato) {
+    // Se dice qué llegó para poder ver qué clase de enlace mandó la app (y agregarlo si falta).
+    const llego = [compartido?.url, compartido?.text, compartido?.title].filter((t): t is string => typeof t === "string" && t.trim() !== "").join(" ").replace(/\s+/g, " ").slice(0, 200);
+    return { error: `No reconocí el enlace de un reel, video o publicación de Instagram, Facebook o TikTok en lo que compartiste${llego ? ` (llegó: «${llego}»)` : " (no llegó ningún texto)"}.` };
+  }
   const llave = llaveDeEnvio(usuario.id, dato.enlace);
   if (!llave) return { error: "El enlace compartido no es de un reel, video o publicación." };
 

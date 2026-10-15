@@ -53,7 +53,7 @@ test("Facebook: los enlaces de compartir y fb.watch son cortos", () => {
 });
 
 test("Facebook: lo que no es un contenido se ignora", () => {
-  for (const u of ["https://www.facebook.com/", "https://www.facebook.com/tienda.pa", "https://www.facebook.com/groups/123456789/", "https://www.facebook.com/reel/abc", "https://facebook.com.evil.com/reel/10153231379946729", "http://www.facebook.com/reel/10153231379946729", "no es un enlace", null, undefined, ""]) {
+  for (const u of ["https://www.facebook.com/", "https://www.facebook.com/tienda.pa", "https://www.facebook.com/groups/123456789/", "https://facebook.com.evil.com/reel/10153231379946729", "http://www.facebook.com/reel/10153231379946729", "no es un enlace", null, undefined, ""]) {
     assert.equal(reconocerEnlace(u as string), null, String(u));
   }
 });
@@ -71,4 +71,33 @@ test("plataformaDeMetricas: sin dato es Instagram", () => {
   assert.equal(plataformaDeMetricas("tiktok"), "tiktok");
   assert.equal(plataformaDeMetricas("facebook"), "facebook");
   for (const v of [undefined, null, "", "instagram", "otra", 5]) assert.equal(plataformaDeMetricas(v), "instagram");
+});
+
+test("Facebook: los demás enlaces que manda la app (compartir sin letra, fotos, grupos, videos con título)", () => {
+  const sin = reconocerEnlace("https://www.facebook.com/share/1AbCdEfGhI/?mibextid=x");
+  assert.deepEqual(sin, { plataforma: "facebook", enlace: "https://www.facebook.com/share/1AbCdEfGhI/", codigo: "corto-1AbCdEfGhI", tipo: "otro", corto: true });
+  assert.equal(reconocerEnlace("https://www.facebook.com/photo/?fbid=1234567890123&set=a.99")?.enlace, "https://www.facebook.com/photo/?fbid=1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/photo.php?fbid=1234567890123")?.codigo, "1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/tienda.pa/photos/a.123456/1234567890123/?type=3")?.enlace, "https://www.facebook.com/photo/?fbid=1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/groups/ventaspanama/posts/1234567890123/")?.enlace, "https://www.facebook.com/groups/ventaspanama/posts/1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/groups/ventaspanama/permalink/1234567890123/")?.tipo, "post");
+  assert.equal(reconocerEnlace("https://www.facebook.com/tienda.pa/videos/mi-titulo/1234567890123/")?.enlace, "https://www.facebook.com/tienda.pa/videos/1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/watch/live/?v=1234567890123")?.enlace, "https://www.facebook.com/reel/1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/groups/ventaspanama/"), null);
+});
+
+test("Facebook: una forma de enlace que no se conoce (como las de los anuncios) se acepta como enlace por abrir", () => {
+  const r = reconocerEnlace("https://www.facebook.com/CustomVenezuela/activity/1234567890?mibextid=xyz&__cft__[0]=abc&ref=ad");
+  assert.equal(r?.plataforma, "facebook");
+  assert.equal(r?.corto, true);
+  assert.match(r?.codigo ?? "", /^corto-/);
+  // Sin los parámetros de rastreo; con los que identifican el contenido.
+  assert.equal(r?.enlace, "https://www.facebook.com/CustomVenezuela/activity/1234567890");
+  assert.equal(reconocerEnlace("https://www.facebook.com/CustomVenezuela/other/x?fbid=1234567890123&mibextid=z")?.enlace, "https://www.facebook.com/CustomVenezuela/other/x?fbid=1234567890123");
+  // El mismo enlace da siempre el mismo código (no se duplica) y enlaces distintos, códigos distintos.
+  assert.equal(reconocerEnlace("https://www.facebook.com/CustomVenezuela/activity/1234567890?ref=a")?.codigo, r?.codigo);
+  assert.notEqual(reconocerEnlace("https://www.facebook.com/CustomVenezuela/activity/999999")?.codigo, r?.codigo);
+  assert.equal(reconocerEnlace("https://fb.me/AbCdEfG")?.corto, true);
+  // Lo que claramente no es un contenido sigue sin aceptarse.
+  for (const u of ["https://www.facebook.com/ads/library/?id=123", "https://www.facebook.com/login/?next=x", "https://www.facebook.com/hashtag/oferta", "https://www.facebook.com/marketplace/item/123/", "https://www.facebook.com/people/Ana/100001/", "https://www.facebook.com/profile.php?id=100001"]) assert.equal(reconocerEnlace(u), null, u);
 });
