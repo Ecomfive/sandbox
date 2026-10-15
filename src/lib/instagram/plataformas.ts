@@ -72,6 +72,11 @@ export function reconocerEnlace(texto: string | null | undefined): EnlaceReconoc
     return null;
   }
 
+  if (host.toLowerCase() === "fb.me") {
+    const m = /^\/([\w-]{4,30})\/?$/.exec(ruta);
+    return m ? como("facebook", `https://fb.me/${m[1]}`, `corto-${m[1]}`, "otro", true) : null;
+  }
+
   if (host.toLowerCase() === "fb.watch") {
     const m = /^\/([\w-]{5,24})\/?$/.exec(ruta);
     return m ? como("facebook", `https://fb.watch/${m[1]}/`, `corto-${m[1]}`, "video", true) : null;
@@ -107,8 +112,27 @@ export function reconocerEnlace(texto: string | null | undefined): EnlaceReconoc
       const letra = compartir[1] ? `${compartir[1]}/` : "";
       return como("facebook", `https://www.facebook.com/share/${letra}${compartir[2]}/`, `corto-${compartir[2]}`, compartir[1] === "p" ? "post" : compartir[1] ? "video" : "otro", true);
     }
+    // Respaldo: cualquier otro enlace de contenido de Facebook (una forma que todavía no se conoce, como las de los anuncios). Se guarda
+    // tal cual, sin los parámetros de rastreo, como un enlace «corto»: el servidor lo abre, sigue sus redirecciones y se queda con el canónico.
+    const sirve = /^\/[^/]+\/[^/]+/.test(ruta) || ["fbid", "story_fbid", "v"].some((k) => u.searchParams.has(k));
+    if (sirve && !/^\/(login|help|policies|privacy|settings|marketplace|events|pages|business|ads|gaming|friends|notifications|messages|bookmarks|hashtag|search|l\.php|dialog|plugins|tr|security|recover|people|profile\.php|public)(?:\/|$)/i.test(ruta) && !/^\/groups\/[^/]+\/?$/.test(ruta)) {
+      const limpio = new URL(`https://www.facebook.com${ruta}`);
+      for (const k of ["fbid", "story_fbid", "id", "v", "set"]) {
+        const valor = u.searchParams.get(k);
+        if (valor && /^[A-Za-z0-9._-]{1,80}$/.test(valor)) limpio.searchParams.set(k, valor);
+      }
+      const texto = limpio.toString().slice(0, 600);
+      return como("facebook", texto, `corto-${resumen(texto)}`, "otro", true);
+    }
   }
   return null;
+}
+
+/** Un resumen corto y estable de un texto (para darle un código a un enlace que todavía no se sabe de qué contenido es). */
+function resumen(texto: string): string {
+  let h = 5381;
+  for (let i = 0; i < texto.length; i++) h = ((h * 33) ^ texto.charCodeAt(i)) >>> 0;
+  return h.toString(36);
 }
 
 /** El código del contenido de un enlace de cualquier red (o null): dos capturas con el mismo código son el mismo contenido. */
