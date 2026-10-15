@@ -367,6 +367,11 @@ export function FichaInstagram({
                       Buscar el anuncio en la Biblioteca de anuncios
                     </a>
                   )}
+                  {fila.nombrePagina && urlBibliotecaAnuncios(fila.titulo) && (
+                    <a href={urlBibliotecaAnuncios(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                      Buscar solo el copy
+                    </a>
+                  )}
                   {puedeEscribir && <MarcadorBiblioteca />}
                 </div>
               </Seccion>

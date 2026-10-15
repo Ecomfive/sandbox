@@ -141,11 +141,19 @@ export function mismoCopy(a: string | null | undefined, b: string | null | undef
   return n >= COPY_MINIMO && x.slice(0, n) === y.slice(0, n);
 }
 
-/** ¿Es la misma página? Mismo nombre, o uno dentro del otro («Mundo Digital» y «Mundo Digital PA»). */
+/**
+ * ¿Es la misma página? Mismo nombre, o uno dentro del otro («Mundo Digital» y «Mundo Digital PA»). También sin espacios y con al menos
+ * 5 letras: el usuario de Instagram `nenagosling` está dentro de la página `Nenagoslingshop` de la Biblioteca.
+ */
 export function mismaPagina(a: string | null | undefined, b: string | null | undefined): boolean {
   const x = normalizar(a);
   const y = normalizar(b);
-  return x.length > 0 && y.length > 0 && (x === y || x.includes(y) || y.includes(x));
+  if (x.length === 0 || y.length === 0) return false;
+  if (x === y) return true;
+  if (Math.min(x.length, y.length) >= 4 && (x.includes(y) || y.includes(x))) return true;
+  const cx = x.replace(/ /g, "");
+  const cy = y.replace(/ /g, "");
+  return Math.min(cx.length, cy.length) >= 5 && (cx.includes(cy) || cy.includes(cx));
 }
 
 /**
@@ -155,36 +163,76 @@ export function mismaPagina(a: string | null | undefined, b: string | null | und
  * - Sin nombre, si todos los del mismo copy son de una sola página se toma esa; si hay varias no se adivina y se dice por qué.
  */
 export function coincidencias(
-  captura: { copy: string | null; nombrePagina: string | null },
+  captura: { copy: string | null; nombrePagina: string | null; paginasAlternas?: string[] },
   anuncios: AnuncioBiblioteca[],
 ): { ok: CoincidenciaBiblioteca } | { motivo: string } | null {
   if (!captura.copy) return null;
   const delCopy = anuncios.filter((a) => mismoCopy(captura.copy, a.copy));
   if (delCopy.length === 0) return null;
+  // El nombre con que Instagram muestra la cuenta no siempre es el de la página en la Biblioteca: además del nombre de la captura
+  // sirve el que la Biblioteca tenía cuando alguien vinculó la captura a mano (`paginasAlternas`).
+  const nombres = [captura.nombrePagina, ...(captura.paginasAlternas ?? [])].filter((n): n is string => !!n);
   let elegidos = delCopy;
-  if (captura.nombrePagina) {
-    elegidos = delCopy.filter((a) => mismaPagina(captura.nombrePagina, a.pagina));
+  if (nombres.length > 0) {
+    elegidos = delCopy.filter((a) => nombres.some((n) => mismaPagina(n, a.pagina)));
     if (elegidos.length === 0) return null;
   } else {
     const paginas = new Set(delCopy.map((a) => normalizar(a.pagina)));
     if (paginas.size > 1) return { motivo: `El copy está en ${paginas.size} páginas distintas: escribe el nombre de la página en la ficha y vuelve a leer la Biblioteca.` };
   }
-  const total = elegidos.reduce((s, a) => s + a.cantidad, 0);
-  const activos = elegidos.filter((a) => a.activo).reduce((s, a) => s + a.cantidad, 0);
-  const fechas = elegidos.map((a) => a.desde).filter((d): d is string => !!d).sort();
+  return { ok: resumirAnuncios(elegidos) };
+}
+
+/** Lo que se anota de un conjunto de anuncios: cuántos son (una tarjeta agrupada cuenta por todos los que reúne), activos, desde cuándo y adónde llevan. */
+export function resumirAnuncios(anuncios: AnuncioBiblioteca[]): CoincidenciaBiblioteca {
+  const total = anuncios.reduce((s, a) => s + a.cantidad, 0);
+  const activos = anuncios.filter((a) => a.activo).reduce((s, a) => s + a.cantidad, 0);
+  const fechas = anuncios.map((a) => a.desde).filter((d): d is string => !!d).sort();
   const cuenta = new Map<string, number>();
-  for (const a of elegidos) if (a.destino) cuenta.set(a.destino, (cuenta.get(a.destino) ?? 0) + a.cantidad);
+  for (const a of anuncios) if (a.destino) cuenta.set(a.destino, (cuenta.get(a.destino) ?? 0) + a.cantidad);
   return {
-    ok: {
-      pagina: elegidos.find((a) => a.pagina)?.pagina ?? null,
-      total,
-      activos,
-      inactivos: total - activos,
-      desde: fechas[0] ?? null,
-      ids: elegidos.map((a) => a.id).slice(0, 50),
-      destinos: [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([url, n]) => ({ url, n })).slice(0, 5),
-    },
+    pagina: anuncios.find((a) => a.pagina)?.pagina ?? null,
+    total,
+    activos,
+    inactivos: total - activos,
+    desde: fechas[0] ?? null,
+    ids: anuncios.map((a) => a.id).slice(0, 50),
+    destinos: [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([url, n]) => ({ url, n })).slice(0, 5),
   };
+}
+
+/**
+ * Los anuncios que el navegador manda de vuelta para vincularlos a mano a una captura: nunca se confía en su forma (los mandó una
+ * página abierta en el navegador). Se descarta lo que no tenga la forma de un anuncio de la Biblioteca y se recorta lo demás.
+ */
+export function validarAnuncios(valor: unknown): AnuncioBiblioteca[] {
+  if (!Array.isArray(valor)) return [];
+  const salida: AnuncioBiblioteca[] = [];
+  for (const item of valor.slice(0, MAX_TARJETAS)) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    if (typeof o.id !== "string" || !/^\d{6,25}$/.test(o.id) || typeof o.activo !== "boolean") continue;
+    let destino: string | null = null;
+    if (typeof o.destino === "string" && o.destino.length <= 2000) {
+      try {
+        const u = new URL(o.destino);
+        if (u.protocol === "https:" || u.protocol === "http:") destino = u.toString();
+      } catch {
+        destino = null;
+      }
+    }
+    const cantidad = typeof o.cantidad === "number" && Number.isInteger(o.cantidad) ? Math.max(1, Math.min(500, o.cantidad)) : 1;
+    salida.push({
+      id: o.id,
+      activo: o.activo,
+      desde: typeof o.desde === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.desde) ? o.desde : null,
+      pagina: typeof o.pagina === "string" && o.pagina.trim() ? o.pagina.trim().slice(0, 200) : null,
+      copy: typeof o.copy === "string" ? o.copy.slice(0, 300) : "",
+      destino,
+      cantidad,
+    });
+  }
+  return salida;
 }
 
 /** Lo que llega en el fragmento de la dirección (`#d=`): el contenido en base64 seguro para direcciones. */
@@ -234,4 +282,24 @@ export interface ResultadoLecturaBiblioteca {
   parcial?: boolean;
   actualizadas?: { numero: number; pagina: string | null; total: number; activos: number; destinoNuevo: boolean }[];
   omitidas?: { numero: number; motivo: string }[];
+  /** Los anuncios leídos que ninguna captura reconoció, para vincularlos a mano (con el copy recortado). */
+  sinVincular?: AnuncioBiblioteca[];
+  /** Las capturas a las que se puede vincular a mano, de la más nueva a la más vieja. */
+  capturas?: CapturaParaVincular[];
+}
+
+export interface CapturaParaVincular {
+  id: string;
+  numero: number;
+  pagina: string | null;
+  copy: string | null;
+}
+
+/** El resultado de vincular a mano unos anuncios a una captura. */
+export interface ResultadoVinculo {
+  error?: string;
+  numero?: number;
+  total?: number;
+  activos?: number;
+  destinoNuevo?: boolean;
 }
