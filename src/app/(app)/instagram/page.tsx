@@ -7,6 +7,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { enviosDe } from "@/lib/instagram/fusion";
 import { repetidasDe } from "@/lib/instagram/repetidas";
 import type { FilaInstagram } from "./def-instagram";
+import { RegistrarSw } from "./registrar-sw";
 import { TablaInstagram } from "./tabla-instagram";
 
 export const metadata = { title: "Instagram" };
@@ -110,6 +111,7 @@ export default async function InstagramPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Instagram" oculto />
+      <RegistrarSw />
       <TablaInstagram filas={filas} codigoPais={pais.codigo} puedeEscribir={!usuario.modulosSoloLectura.includes("instagram")} />
     </Pagina>
   );

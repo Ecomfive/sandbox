@@ -52,6 +52,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/productos-test/productos": "Productos",
   "/analisis-competencia/resumen": "Resumen",
   "/instagram/biblioteca": "Biblioteca de anuncios",
+  "/instagram/compartir": "Compartido desde el celular",
 };
 
 interface ModuloDeNav {
