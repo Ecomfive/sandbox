@@ -38,6 +38,7 @@ const ICONOS: Record<string, IconoComp> = {
   vistas: EstadoIcon,
   compartidos: EstadoIcon,
   publicado: CalendarioIcon,
+  anuncios: EstadoIcon,
   nombrePagina: PersonaIcon,
   repetida: EstadoIcon,
   notas: EstadoIcon,
@@ -108,6 +109,24 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
   { id: "instagram", label: "Instagram", ocultable: true, render: (f) => <Vinculo url={f.enlace} texto={`Abrir la captura ${numeroInstagram(f.numero)} en Instagram`} /> },
   { id: "paginaDestino", label: "Página de destino", ocultable: true, render: (f) => <Vinculo url={f.paginaDestino} texto={`Abrir la página de destino de ${numeroInstagram(f.numero)}`} /> },
   { id: "autor", label: "Cuenta del video", ocultable: true, oculta: true, clase: "text-muted-foreground", render: (f) => (f.autorUsuario ? `@${f.autorUsuario}` : "—") },
+  {
+    id: "anuncios",
+    label: "Anuncios (mismo copy)",
+    ocultable: true,
+    clase: "text-right tabular-nums",
+    render: (f) =>
+      f.anuncios === null ? (
+        "—"
+      ) : f.bibliotecaActivos !== null ? (
+        <Tooltip texto={`${cifra(f.bibliotecaActivos)} ${f.bibliotecaActivos === 1 ? "activo" : "activos"}`}>
+          <span tabIndex={0} className={anilloFoco}>
+            {cifra(f.anuncios)}
+          </span>
+        </Tooltip>
+      ) : (
+        cifra(f.anuncios)
+      ),
+  },
   { id: "megusta", label: "Me gusta", ocultable: true, clase: "text-right tabular-nums", render: (f) => cifra(f.megusta) },
   { id: "comentarios", label: "Comentarios", ocultable: true, clase: "text-right tabular-nums", render: (f) => cifra(f.comentarios) },
   { id: "vistas", label: "Vistas", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.vistas) },

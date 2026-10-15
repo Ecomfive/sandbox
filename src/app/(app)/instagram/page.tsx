@@ -37,6 +37,8 @@ interface FilaBase {
 }
 
 const numero = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+/** El detalle de la última lectura de la Biblioteca de anuncios (`metricas.biblioteca`), si hubo una. */
+const biblioteca = (m: Record<string, unknown> | null): Record<string, unknown> | null => (m && typeof m.biblioteca === "object" && m.biblioteca !== null ? (m.biblioteca as Record<string, unknown>) : null);
 
 /**
  * Testing Lab › Fuentes › Instagram: lo que el equipo comparte por mensaje directo con la cuenta de fuentes cuando ve en
@@ -95,6 +97,11 @@ export default async function InstagramPage() {
     fuenteCifras: typeof f.metricas?.fuente === "string" ? f.metricas.fuente : null,
     leidoEn: typeof f.metricas?.leido_en === "string" ? f.metricas.leido_en : null,
     paginaDestino: f.pagina_destino,
+    anuncios: numero(f.metricas?.anuncios_mismo_copy),
+    bibliotecaActivos: numero(biblioteca(f.metricas)?.activos),
+    bibliotecaInactivos: numero(biblioteca(f.metricas)?.inactivos),
+    bibliotecaDesde: typeof biblioteca(f.metricas)?.desde === "string" ? (biblioteca(f.metricas)?.desde as string) : null,
+    bibliotecaLeidoEn: typeof biblioteca(f.metricas)?.leido_en === "string" ? (biblioteca(f.metricas)?.leido_en as string) : null,
     notas: f.notas,
     estado: f.estado,
     datosMeta: JSON.stringify({ aviso: f.payload, consulta: f.metricas?.consulta ?? null, mensaje: f.metricas?.mensaje_meta ?? null }, null, 2).slice(0, 20000),

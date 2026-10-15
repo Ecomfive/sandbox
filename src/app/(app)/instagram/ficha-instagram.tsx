@@ -11,10 +11,11 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearFecha, formatearFechaHora } from "@/lib/formato";
 import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, eliminarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, quitarEnvioDeCaptura, urlVideoCaptura } from "./actions";
+import { MarcadorBiblioteca } from "./marcador-biblioteca";
 import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
@@ -347,6 +348,29 @@ export function FichaInstagram({
                 {fila.fuenteCifras === "manual" && <p className="m-0 text-xs text-muted-foreground">Corregido a mano</p>}
               </Seccion>
 
+              <Seccion icono={InstagramIcon} titulo="Biblioteca de anuncios">
+                <fieldset disabled={!puedeEscribir || guardando} className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
+                  <Campo etiqueta="Anuncios con el mismo copy" id="campo-anuncios-instagram">
+                    <input id="campo-anuncios-instagram" type="number" inputMode="numeric" min="0" step="1" name="anuncios_mismo_copy" defaultValue={fila.anuncios ?? ""} placeholder="Ej: 4" className={`${fieldClass} tabular-nums`} />
+                  </Campo>
+                </fieldset>
+                {fila.bibliotecaLeidoEn && (
+                  <p className="m-0 text-xs text-muted-foreground">
+                    Última lectura: {fila.bibliotecaActivos ?? 0} {fila.bibliotecaActivos === 1 ? "activo" : "activos"} · {fila.bibliotecaInactivos ?? 0} {fila.bibliotecaInactivos === 1 ? "inactivo" : "inactivos"}
+                    {fila.bibliotecaDesde ? ` · circula desde el ${formatearFecha(fila.bibliotecaDesde)}` : ""} · {formatearFechaHora(fila.bibliotecaLeidoEn)}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  {urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) && (
+                    <a href={urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                      <InstagramIcon className="h-4 w-4" />
+                      Buscar el anuncio en la Biblioteca de anuncios
+                    </a>
+                  )}
+                  {puedeEscribir && <MarcadorBiblioteca />}
+                </div>
+              </Seccion>
+
               {fila.datosMeta && (
                 <Seccion icono={InstagramIcon} titulo="Datos de Meta">
                   <details className="group">
@@ -369,12 +393,6 @@ export function FichaInstagram({
                   </Campo>
                   <Campo etiqueta="Página de destino" id="campo-pagina-instagram">
                     <input id="campo-pagina-instagram" type="url" name="pagina_destino" defaultValue={fila.paginaDestino ?? ""} placeholder="Ej: https://tienda.com/producto" className={fieldClass} />
-                    {urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) && (
-                      <a href={urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
-                        <InstagramIcon className="h-4 w-4" />
-                        Buscar el anuncio en la Biblioteca de anuncios
-                      </a>
-                    )}
                     {fila.paginaDestino && (
                       <a href={fila.paginaDestino} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 self-start text-sm text-primario hover:underline ${anilloFoco}`}>
                         <EnlaceIcon className="h-4 w-4" />

@@ -36,6 +36,13 @@ export interface FilaInstagram {
   fuenteCifras: string | null;
   leidoEn: string | null;
   paginaDestino: string | null;
+  /** Cuántos anuncios de la misma página llevan el mismo copy (leídos de la Biblioteca de anuncios o escritos a mano). */
+  anuncios: number | null;
+  /** De la última lectura de la Biblioteca: cuántos de esos anuncios están activos, desde cuándo circula el más antiguo y cuándo se leyó. */
+  bibliotecaActivos: number | null;
+  bibliotecaInactivos: number | null;
+  bibliotecaDesde: string | null;
+  bibliotecaLeidoEn: string | null;
   notas: string | null;
   estado: string;
   /** El aviso de Meta y lo que respondió Instagram al consultar la publicación, en texto, para revisarlos. */
@@ -116,6 +123,7 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
     { id: "comentarios", etiqueta: "Comentarios", tipo: "numero", valor: (f) => f.comentarios },
     { id: "vistas", etiqueta: "Vistas", tipo: "numero", valor: (f) => f.vistas },
     { id: "compartidos", etiqueta: "Compartidos", tipo: "numero", valor: (f) => f.compartidos },
+    { id: "anuncios", etiqueta: "Anuncios con el mismo copy", tipo: "numero", valor: (f) => f.anuncios },
     { id: "publicado", etiqueta: "Publicado", tipo: "fecha", valor: (f) => f.fechaPublicacion },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },
   ],
