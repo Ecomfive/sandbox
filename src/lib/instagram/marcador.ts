@@ -21,7 +21,9 @@ const CODIGO = [
   "while(n.parentElement){var p=n.parentElement,c=0;for(var j=0;j<H.length;j++){if(p.contains(H[j]))c++}",
   "if(c>1||p.innerText.length>4000||/Ordenar por|Order by/.test(p.innerText))break;u=p;n=p}",
   "var a=u.querySelector('a[href*=\"l.facebook.com/l.php\"]');",
-  "T.push({x:(u.innerText||'').slice(0,4000),l:a?a.href.slice(0,3000):null})",
+  // El enlace de la página del anunciante (`facebook.com/<usuario>/`): de ahí sale su cuenta.
+  "var q=[].filter.call(u.querySelectorAll('a[href]'),function(z){return /^https:\\/\\/www\\.facebook\\.com\\/[^\\/?#]+\\/?$/.test(z.href)})[0];",
+  "T.push({x:(u.innerText||'').slice(0,4000),l:a?a.href.slice(0,3000):null,p:q?q.href.slice(0,300):null})",
   "}",
   "var r=(document.body.innerText.match(/~?\\s*[\\d][\\d.,\\s]*\\s+(resultados?|results?)/i)||[''])[0];",
   "var d={v:1,u:location.href.slice(0,600),r:r.slice(0,80),t:T};",

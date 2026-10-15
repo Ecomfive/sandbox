@@ -89,8 +89,11 @@ export async function guardarLecturaBiblioteca(fragmento: string): Promise<Resul
     };
     if (!nombre && ok.pagina) metricas.nombre_pagina = ok.pagina;
     const destinoNuevo = !c.pagina_destino && ok.destinos.length > 0;
+    // La cuenta (el usuario de la página del anunciante) solo se completa si estaba vacía.
+    const cuentaNueva = !c.autor_usuario && ok.usuario ? ok.usuario : null;
     const cambios: Record<string, unknown> = { metricas, actualizado_en: leidoEn };
     if (destinoNuevo) cambios.pagina_destino = ok.destinos[0].url;
+    if (cuentaNueva) cambios.autor_usuario = cuentaNueva;
     const { error } = await supabase.from(ENTIDAD).update(cambios).eq("id", c.id);
     if (error) {
       omitidas.push({ numero: c.numero, motivo: "No se pudo guardar." });
@@ -102,8 +105,8 @@ export async function guardarLecturaBiblioteca(fragmento: string): Promise<Resul
       accion: "leer_biblioteca_captura_instagram",
       entidad: ENTIDAD,
       entidadId: c.id,
-      antes: { "Anuncios con el mismo copy": antes, ...(destinoNuevo ? { "Página de destino": "—" } : {}) },
-      despues: { "Anuncios con el mismo copy": `${ok.total} (${ok.activos} activos)`, ...(destinoNuevo ? { "Página de destino": ok.destinos[0].url } : {}) },
+      antes: { "Anuncios con el mismo copy": antes, ...(destinoNuevo ? { "Página de destino": "—" } : {}), ...(cuentaNueva ? { "Cuenta del video": "—" } : {}) },
+      despues: { "Anuncios con el mismo copy": `${ok.total} (${ok.activos} activos)`, ...(destinoNuevo ? { "Página de destino": ok.destinos[0].url } : {}), ...(cuentaNueva ? { "Cuenta del video": `@${cuentaNueva}` } : {}) },
     });
     actualizadas.push({ numero: c.numero, pagina: ok.pagina, total: ok.total, activos: ok.activos, destinoNuevo });
   }
@@ -136,7 +139,7 @@ export async function vincularAnunciosACaptura(capturaId: string, crudos: unknow
   if (anuncios.length === 0) return { error: "Elige al menos un anuncio." };
 
   const supabase = createServiceClient();
-  const { data } = await supabase.from(ENTIDAD).select("numero, metricas, pagina_destino").eq("id", capturaId).maybeSingle();
+  const { data } = await supabase.from(ENTIDAD).select("numero, metricas, pagina_destino, autor_usuario").eq("id", capturaId).maybeSingle();
   if (!data) return { error: "La captura ya no existe." };
   const resumen = resumirAnuncios(anuncios);
   const metricasAntes = (data.metricas ?? {}) as Record<string, unknown>;
@@ -149,6 +152,7 @@ export async function vincularAnunciosACaptura(capturaId: string, crudos: unknow
   const destinoNuevo = !data.pagina_destino && resumen.destinos.length > 0;
   const cambios: Record<string, unknown> = { metricas, actualizado_en: leidoEn };
   if (destinoNuevo) cambios.pagina_destino = resumen.destinos[0].url;
+  if (!data.autor_usuario && resumen.usuario) cambios.autor_usuario = resumen.usuario;
   const { error } = await supabase.from(ENTIDAD).update(cambios).eq("id", capturaId);
   if (error) return { error: "No se pudo vincular." };
 

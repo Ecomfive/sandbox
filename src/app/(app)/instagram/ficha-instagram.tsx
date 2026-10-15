@@ -13,7 +13,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha, formatearFechaHora } from "@/lib/formato";
 import { urlBibliotecaAnuncios, urlBibliotecaPrimeraLinea, urlBusquedaTikTok, urlTopAdsTikTok } from "@/lib/instagram/biblioteca";
-import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
+import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, iconoDeRed, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, eliminarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, quitarEnvioDeCaptura, urlVideoCaptura } from "./actions";
 import { MarcadorBiblioteca } from "./marcador-biblioteca";
 import { UnirCaptura } from "./unir-captura";
@@ -278,7 +278,7 @@ export function FichaInstagram({
             )}
 
             <div className="flex flex-1 flex-col divide-y divide-border p-5">
-              <Seccion icono={InstagramIcon} titulo={fila.archivoTipo === "imagen" ? "Imagen" : "Video"}>
+              <Seccion icono={iconoDeRed(fila.plataforma)} titulo={fila.archivoTipo === "imagen" ? "Imagen" : "Video"}>
                 <VideoCaptura fila={fila} />
                 {puedeEscribir && (fila.enlace || !fila.tieneArchivo) && (
                   <button type="button" onClick={() => void leerEnlace()} disabled={leyendo || guardando} className={`self-start text-sm text-primario hover:underline disabled:opacity-60 ${anilloFoco}`}>
@@ -363,7 +363,7 @@ export function FichaInstagram({
               </Seccion>
 
               {fila.plataforma === "tiktok" ? (
-                <Seccion icono={InstagramIcon} titulo="Anuncio en TikTok">
+                <Seccion icono={iconoDeRed("tiktok")} titulo="Anuncio en TikTok">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     {urlBusquedaTikTok(fila.titulo) && (
                       <a href={urlBusquedaTikTok(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
@@ -381,7 +381,7 @@ export function FichaInstagram({
                   </div>
                 </Seccion>
               ) : (
-              <Seccion icono={InstagramIcon} titulo="Biblioteca de anuncios">
+              <Seccion icono={iconoDeRed(fila.plataforma)} titulo="Biblioteca de anuncios">
                 <fieldset disabled={!puedeEscribir || guardando} className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
                   <Campo etiqueta="Anuncios con el mismo copy" id="campo-anuncios-instagram">
                     <input id="campo-anuncios-instagram" type="number" inputMode="numeric" min="0" step="1" name="anuncios_mismo_copy" defaultValue={fila.anuncios ?? ""} placeholder="Ej: 4" className={`${fieldClass} tabular-nums`} />
@@ -396,7 +396,10 @@ export function FichaInstagram({
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   {urlBibliotecaAnuncios(fila.titulo) && (
                     <a href={urlBibliotecaAnuncios(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                      <InstagramIcon className="h-4 w-4" />
+                      {(() => {
+                        const Icono = iconoDeRed(fila.plataforma);
+                        return <Icono className="h-4 w-4" />;
+                      })()}
                       Buscar el anuncio en la Biblioteca de anuncios
                     </a>
                   )}
@@ -416,7 +419,7 @@ export function FichaInstagram({
               )}
 
               {fila.datosMeta && (
-                <Seccion icono={InstagramIcon} titulo="Datos de Meta">
+                <Seccion icono={iconoDeRed(fila.plataforma)} titulo={fila.plataforma === "instagram" ? "Datos de Meta" : `Datos de ${etiquetaPlataforma(fila.plataforma)}`}>
                   <details className="group">
                     <summary className={`cursor-pointer text-sm text-primario hover:underline ${anilloFoco}`}>Ver el aviso y la consulta</summary>
                     <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-border bg-muted p-3 text-xs">{fila.datosMeta}</pre>

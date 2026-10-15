@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { enlaceDeApp, type Plataforma } from "@/lib/instagram/plataformas";
 import { etiquetaPlataforma, numeroInstagram } from "../def-instagram";
 import { compartirDesdeCelular, type ResultadoCompartido } from "../compartir-actions";
 
@@ -12,13 +13,21 @@ type Estado = { tipo: "guardando" } | { tipo: "sin_datos" } | { tipo: "listo"; r
 const caja = "rounded-lg border border-border bg-card px-4 py-3 text-sm";
 const enlaceBoton = `inline-flex items-center self-start rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted ${anilloFoco}`;
 
-/** Después de guardar: volver a la app de Instagram (su dirección `instagram://app` la abre en iPhone y Android) o ver las capturas. */
-function Acciones() {
+/**
+ * Después de guardar: volver a la app de donde se compartió (o «Cerrar» si no se sabe cuál) y ver las capturas. Volver cierra esta
+ * ventana, que es la que abrió la hoja de compartir sobre la app (en una app instalada se cierra y se queda donde estabas); si no se
+ * puede cerrar (una pestaña del navegador, como en iPhone), abre la app de la red.
+ */
+function Acciones({ plataforma }: { plataforma?: Plataforma }) {
+  function volver() {
+    window.close();
+    if (plataforma) setTimeout(() => (window.closed ? undefined : void (window.location.href = enlaceDeApp(plataforma, navigator.userAgent))), 400);
+  }
   return (
     <div className="flex flex-wrap gap-2">
-      <a href="instagram://app" className={enlaceBoton}>
-        Volver a Instagram
-      </a>
+      <button type="button" onClick={volver} className={enlaceBoton}>
+        {plataforma ? `Volver a ${etiquetaPlataforma(plataforma)}` : "Cerrar"}
+      </button>
       <Link href="/instagram" className={enlaceBoton}>
         Ver capturas
       </Link>
@@ -85,7 +94,7 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
           No se pudo leer la página pública: la captura quedó con el enlace. En su ficha, «Completar desde el enlace» lo intenta de nuevo.
         </p>
       )}
-      <Acciones />
+      <Acciones plataforma={r.plataforma} />
     </div>
   );
 }

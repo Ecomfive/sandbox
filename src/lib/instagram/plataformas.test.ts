@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { codigoDeContenido, plataformaDeEnlace, plataformaDeMetricas, reconocerEnlace } from "./plataformas";
+import { codigoDeContenido, enlaceDeApp, plataformaDeEnlace, plataformaDeMetricas, reconocerEnlace } from "./plataformas";
 
 test("Instagram: se limpia el enlace y se saca el código", () => {
   const r = reconocerEnlace("https://www.instagram.com/reel/DeSh9KxMqNy/?igsh=MWx0dnZ6bTFzY2Z5Zg==");
@@ -100,4 +100,22 @@ test("Facebook: una forma de enlace que no se conoce (como las de los anuncios) 
   assert.equal(reconocerEnlace("https://fb.me/AbCdEfG")?.corto, true);
   // Lo que claramente no es un contenido sigue sin aceptarse.
   for (const u of ["https://www.facebook.com/ads/library/?id=123", "https://www.facebook.com/login/?next=x", "https://www.facebook.com/hashtag/oferta", "https://www.facebook.com/marketplace/item/123/", "https://www.facebook.com/people/Ana/100001/", "https://www.facebook.com/profile.php?id=100001"]) assert.equal(reconocerEnlace(u), null, u);
+});
+
+test("Facebook: la publicación con el título en texto en la ruta (formato nuevo) se reconoce por su id", () => {
+  const r = reconocerEnlace("https://www.facebook.com/customvenezuela/posts/los-detalles-marcan-la-diferencia-sudadera-verde-bosque-con-el-nombre-de-chise-b/122340408620224822/");
+  assert.deepEqual(r, { plataforma: "facebook", enlace: "https://www.facebook.com/customvenezuela/posts/122340408620224822", codigo: "122340408620224822", tipo: "post", corto: false });
+  assert.equal(reconocerEnlace("https://www.facebook.com/tienda.pa/posts/pfbid02AbCdEfGhIjKlMnOp")?.codigo, "pfbid02AbCdEfGhIjKlMnOp");
+});
+
+test("enlaceDeApp: cada aparato abre la app de la red a su manera", () => {
+  const android = "Mozilla/5.0 (Linux; Android 13; Redmi) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36";
+  const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1";
+  const pc = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36";
+  assert.equal(enlaceDeApp("facebook", android), "intent://#Intent;package=com.facebook.katana;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end");
+  assert.ok(enlaceDeApp("tiktok", android).includes("package=com.zhiliaoapp.musically"));
+  assert.ok(enlaceDeApp("instagram", android).includes("package=com.instagram.android"));
+  assert.equal(enlaceDeApp("facebook", iphone), "fb://");
+  assert.equal(enlaceDeApp("instagram", iphone), "instagram://");
+  assert.equal(enlaceDeApp("tiktok", pc), "https://www.tiktok.com/");
 });

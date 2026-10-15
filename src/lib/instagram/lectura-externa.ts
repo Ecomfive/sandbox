@@ -35,6 +35,10 @@ export interface DatosFacebook {
   compartidos: number | null;
   /** La dirección canónica (`og:url`). */
   enlace: string | null;
+  /** La dirección de la imagen de la publicación (`og:image`): la foto de un anuncio o de un post que no es video. Null si no trae o no es de la red de archivos de Facebook. */
+  imagen: string | null;
+  /** El nombre de la página, cuando el título de la vista previa es solo eso (una publicación que no es video: «Custom Venezuela»). */
+  nombrePagina: string | null;
   /** El id de la página (o persona) dueña de la publicación, que está en el código de la página: con él se abre la página y se saca su nombre. */
   paginaId: string | null;
 }
@@ -155,6 +159,8 @@ export function interpretarFacebook(html: string): DatosFacebook | null {
     comentarios: leer("comentarios|comments"),
     compartidos: leer("veces compartido|compartidos|shares"),
     enlace: og.url && /^https:\/\/(www\.|m\.|web\.)?facebook\.com\//.test(og.url) ? og.url.slice(0, 2000) : null,
+    imagen: archivoFacebookPermitido(og.image),
+    nombrePagina: partes.length === 1 && !/\d[ \u00a0]*(reproduc|vistas|views|reacc|reactions|me gusta|likes|comentarios|comments)/i.test(titulo) ? texto(titulo.replace(/ [|·-] Facebook$/, ""), 120) : null,
     paginaId: /"pageID":"(\d{5,25})"/.exec(html)?.[1] ?? /"owner":\{"__typename":"[A-Za-z]+","id":"(\d{5,25})"/.exec(html)?.[1] ?? null,
   };
   return Object.values(salida).some((v) => v !== null) ? salida : null;

@@ -776,6 +776,29 @@ export function InstagramIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** La «f» de Facebook. */
+export function FacebookIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </IconoLucide>
+  );
+}
+
+/** La nota musical de TikTok. */
+export function TikTokIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+    </IconoLucide>
+  );
+}
+
+/** El ícono de la red de una captura (Instagram, Facebook o TikTok): cada una lleva el suyo, no el de Instagram para todas. */
+export function iconoDeRed(plataforma: string): (props: SVGProps<SVGSVGElement>) => React.JSX.Element {
+  return plataforma === "facebook" ? FacebookIcon : plataforma === "tiktok" ? TikTokIcon : InstagramIcon;
+}
+
 /** Dos productos frente a frente: Análisis de competencia. */
 export function AnalisisCompetenciaIcon(props: SVGProps<SVGSVGElement>) {
   return (

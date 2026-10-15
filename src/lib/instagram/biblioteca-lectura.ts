@@ -9,6 +9,8 @@
 export interface TarjetaBruta {
   x: string;
   l: string | null;
+  /** El enlace de la página del anunciante (`https://www.facebook.com/<usuario>/`): de ahí sale su cuenta. */
+  p?: string | null;
 }
 
 /** Un anuncio de la Biblioteca. `cantidad` es 1, o N si la tarjeta dice «N anuncios usan este contenido y texto». */
@@ -18,6 +20,8 @@ export interface AnuncioBiblioteca {
   /** AAAA-MM-DD: desde cuándo está en circulación. */
   desde: string | null;
   pagina: string | null;
+  /** El nombre de usuario de la página del anunciante (`nenagoslingshop`), del enlace de su nombre en la tarjeta. */
+  usuario?: string | null;
   copy: string;
   destino: string | null;
   cantidad: number;
@@ -26,6 +30,8 @@ export interface AnuncioBiblioteca {
 export interface CoincidenciaBiblioteca {
   /** El nombre de la página tal como lo escribe la Biblioteca. */
   pagina: string | null;
+  /** Su nombre de usuario, el más repetido entre los anuncios. */
+  usuario: string | null;
   /** Anuncios con el mismo copy (una tarjeta agrupada cuenta por todos los que reúne). */
   total: number;
   activos: number;
@@ -122,7 +128,15 @@ export function interpretarTarjeta(t: TarjetaBruta): AnuncioBiblioteca | null {
     copy: cuerpo.join("\n").trim().slice(0, 2000),
     destino,
     cantidad,
+    usuario: usuarioDeEnlacePagina(t.p),
   };
+}
+
+/** El nombre de usuario de una página de Facebook en su enlace (`https://www.facebook.com/nenagoslingshop/` → `nenagoslingshop`); null si es solo un número o no es de una página. */
+export function usuarioDeEnlacePagina(enlace: string | null | undefined): string | null {
+  if (!enlace) return null;
+  const m = /^https:\/\/www\.facebook\.com\/([A-Za-z][A-Za-z0-9.-]{1,79})\/?$/.exec(enlace);
+  return m && !/\.php$/i.test(m[1]) ? m[1] : null;
 }
 
 /** Cuántos resultados dice la página («~1.100 resultados»), o null. */
@@ -197,6 +211,11 @@ export function resumirAnuncios(anuncios: AnuncioBiblioteca[]): CoincidenciaBibl
     inactivos: total - activos,
     desde: fechas[0] ?? null,
     ids: anuncios.map((a) => a.id).slice(0, 50),
+    usuario: (() => {
+      const usuarios = new Map<string, number>();
+      for (const a of anuncios) if (a.usuario) usuarios.set(a.usuario, (usuarios.get(a.usuario) ?? 0) + a.cantidad);
+      return [...usuarios.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
+    })(),
     destinos: [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([url, n]) => ({ url, n })).slice(0, 5),
   };
 }
@@ -227,6 +246,7 @@ export function validarAnuncios(valor: unknown): AnuncioBiblioteca[] {
       activo: o.activo,
       desde: typeof o.desde === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.desde) ? o.desde : null,
       pagina: typeof o.pagina === "string" && o.pagina.trim() ? o.pagina.trim().slice(0, 200) : null,
+      usuario: typeof o.usuario === "string" && /^[A-Za-z][A-Za-z0-9.-]{1,79}$/.test(o.usuario) ? o.usuario : null,
       copy: typeof o.copy === "string" ? o.copy.slice(0, 300) : "",
       destino,
       cantidad,
@@ -265,7 +285,7 @@ export function validarLectura(valor: unknown): { lectura: LecturaBruta } | { er
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
     if (typeof o.x !== "string") continue;
-    t.push({ x: o.x.slice(0, 4000), l: typeof o.l === "string" ? o.l.slice(0, 3000) : null });
+    t.push({ x: o.x.slice(0, 4000), l: typeof o.l === "string" ? o.l.slice(0, 3000) : null, p: typeof o.p === "string" ? o.p.slice(0, 300) : null });
   }
   if (t.length === 0) return { error: "No se leyó ningún anuncio." };
   return { lectura: { v: 1, u: v.u.slice(0, 600), r: typeof v.r === "string" ? v.r.slice(0, 80) : "", t } };
