@@ -267,6 +267,8 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       if (Object.keys(metricas).length > 0) cambios.metricas = metricas;
       const autor = media?.usuario ?? lectura.autor;
       if (autor) cambios.autor_usuario = autor;
+      // Sin copy en el aviso (un enlace compartido desde el celular no lo trae), se toma el de la vista previa pública.
+      if (!c.titulo && lectura.copy) cambios.titulo = lectura.copy;
       if (media?.enlace && !c.enlace) cambios.enlace = media.enlace;
       if (video) {
         if ("error" in video) cambios.video_error = video.error;
@@ -323,7 +325,7 @@ export async function guardarNotas(notas: NotaInstagram[]): Promise<{ unidas: nu
  */
 export async function completarCaptura(id: string): Promise<{ ok: true; archivo: boolean } | { ok: false; error: string }> {
   const supabase = createServiceClient();
-  const { data } = await supabase.from(TABLA).select("id, mensaje_id, enlace, video_ruta, autor_usuario, metricas, payload").eq("id", id).maybeSingle();
+  const { data } = await supabase.from(TABLA).select("id, mensaje_id, enlace, titulo, video_ruta, autor_usuario, metricas, payload").eq("id", id).maybeSingle();
   if (!data) return { ok: false, error: "La captura ya no existe." };
   const delAviso = data.video_ruta ? null : (extraerCapturas(data.payload).find((c) => c.mensajeId === data.mensaje_id)?.urlVideo ?? null);
 
@@ -344,6 +346,7 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
       cambios.metricas = mezclarLectura(metricasActuales, lectura.metricas);
     }
     if (lectura.autor && !data.autor_usuario) cambios.autor_usuario = lectura.autor;
+    if (lectura.copy && !data.titulo) cambios.titulo = lectura.copy;
   }
 
   let archivo = false;
@@ -363,7 +366,7 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
     }
     if (!archivo && errorArchivo) cambios.video_error = errorArchivo;
   }
-  const huboDatos = leyoPagina || cambios.enlace !== undefined || cambios.autor_usuario !== undefined || archivo;
+  const huboDatos = leyoPagina || cambios.enlace !== undefined || cambios.autor_usuario !== undefined || cambios.titulo !== undefined || archivo;
   if (!huboDatos) {
     if (errorArchivo || cambios.metricas !== undefined) await supabase.from(TABLA).update({ ...(errorArchivo ? { video_error: errorArchivo } : {}), ...(cambios.metricas !== undefined ? { metricas: cambios.metricas } : {}) }).eq("id", id);
     return { ok: false, error: errorArchivo ?? "Instagram no devolvió datos de este enlace." };
