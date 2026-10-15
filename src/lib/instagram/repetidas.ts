@@ -1,10 +1,12 @@
+import { codigoDeContenido } from "./plataformas";
+
 /**
  * El mismo contenido puede llegar varias veces: dos personas lo comparten, o una misma lo comparte por dos caminos (el 14 oct,
  * IG-0011 llegó como archivo y IG-0012 como enlace, y los dos traían **el mismo identificador de Meta**). Se reconoce por ese
  * identificador (`reel_video_id` / `ig_post_media_id`) o por el código del enlace de Instagram.
  */
 
-/** El código de la publicación en su enlace (`/p/DeR1_WGsSMh/` → `DeR1_WGsSMh`), o null si no es un enlace de reel o publicación. */
+/** El código de la publicación **de Instagram** en su enlace (`/p/DeR1_WGsSMh/` → `DeR1_WGsSMh`), o null si no es un enlace de reel o publicación de Instagram. Para cualquier red, `codigoDeContenido` (`plataformas.ts`). */
 export function codigoDePublicacion(enlace: string | null | undefined): string | null {
   if (!enlace) return null;
   try {
@@ -37,7 +39,7 @@ export function repetidasDe(capturas: CapturaParaRepetidas[]): Map<number, numbe
   for (const c of capturas) padre.set(c.numero, c.numero);
   const vistas = new Map<string, number>();
   for (const c of capturas) {
-    for (const clave of [c.mediaId ? `id:${c.mediaId}` : null, codigoDePublicacion(c.enlace) ? `cod:${codigoDePublicacion(c.enlace)}` : null]) {
+    for (const clave of [c.mediaId ? `id:${c.mediaId}` : null, codigoDeContenido(c.enlace) ? `cod:${codigoDeContenido(c.enlace)}` : null]) {
       if (!clave) continue;
       const otra = vistas.get(clave);
       if (otra === undefined) vistas.set(clave, c.numero);

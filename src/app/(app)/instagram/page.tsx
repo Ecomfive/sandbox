@@ -5,6 +5,7 @@ import { getPaisActual } from "@/lib/pais";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviosDe } from "@/lib/instagram/fusion";
+import { plataformaDeMetricas } from "@/lib/instagram/plataformas";
 import { repetidasDe } from "@/lib/instagram/repetidas";
 import type { FilaInstagram } from "./def-instagram";
 import { RegistrarSw } from "./registrar-sw";
@@ -75,6 +76,7 @@ export default async function InstagramPage() {
     id: f.id,
     numero: f.numero,
     recibidoEn: f.recibido_en,
+    plataforma: plataformaDeMetricas(f.metricas?.plataforma),
     remitenteId: f.remitente_id,
     remitenteUsuario: f.remitente_usuario,
     remitenteNombre: f.remitente_nombre,
@@ -92,6 +94,8 @@ export default async function InstagramPage() {
     autorUsuario: f.autor_usuario,
     megusta: numero(f.metricas?.like_count),
     comentarios: numero(f.metricas?.comments_count),
+    vistas: numero(f.metricas?.view_count),
+    compartidos: numero(f.metricas?.share_count),
     fechaPublicacion: typeof f.metricas?.fecha_publicacion === "string" ? f.metricas.fecha_publicacion : null,
     fuenteCifras: typeof f.metricas?.fuente === "string" ? f.metricas.fuente : null,
     leidoEn: typeof f.metricas?.leido_en === "string" ? f.metricas.leido_en : null,

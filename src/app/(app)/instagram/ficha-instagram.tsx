@@ -12,12 +12,12 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha, formatearFechaHora } from "@/lib/formato";
-import { urlBibliotecaAnuncios, urlBibliotecaPrimeraLinea } from "@/lib/instagram/biblioteca";
+import { urlBibliotecaAnuncios, urlBibliotecaPrimeraLinea, urlBusquedaTikTok, urlTopAdsTikTok } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, eliminarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, quitarEnvioDeCaptura, urlVideoCaptura } from "./actions";
 import { MarcadorBiblioteca } from "./marcador-biblioteca";
 import { UnirCaptura } from "./unir-captura";
-import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
+import { colorEstadoInstagram, colorFormatoInstagram, colorPlataforma, etiquetaPlataforma, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -49,6 +49,11 @@ const CIFRAS = [
   ["like_count", "Me gusta", "megusta"],
   ["comments_count", "Comentarios", "comentarios"],
 ] as const;
+// Vistas y compartidos: solo los dan TikTok y Facebook, así que solo se muestran en sus capturas.
+const CIFRAS_EXTRA = [
+  ["view_count", "Vistas", "vistas"],
+  ["share_count", "Compartidos", "compartidos"],
+] as const;
 const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1_048_576).toLocaleString("es-CR", { maximumFractionDigits: 1 })} MB`);
 
 /** El video de la captura, con su enlace firmado (el bucket es privado); sin video dice por qué, si se sabe. */
@@ -73,7 +78,7 @@ function VideoCaptura({ fila }: { fila: FilaInstagram }) {
         {fila.enlace && (
           <a href={fila.enlace} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted ${anilloFoco}`}>
             <EnlaceIcon className="h-4 w-4" />
-            Ver en Instagram
+            {`Ver en ${etiquetaPlataforma(fila.plataforma)}`}
           </a>
         )}
       </div>
@@ -218,7 +223,8 @@ export function FichaInstagram({
         fila && (
           <>
             <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroInstagram(fila.numero)}</span>
-            <span className="text-lg font-semibold">Captura de Instagram</span>
+            <span className="text-lg font-semibold">{`Captura de ${etiquetaPlataforma(fila.plataforma)}`}</span>
+            {fila.plataforma !== "instagram" && <Badge color={colorPlataforma(fila.plataforma)}>{etiquetaPlataforma(fila.plataforma)}</Badge>}
             <Badge color={colorFormatoInstagram(formatoDeCaptura(fila))}>{etiquetaFormatoInstagram(formatoDeCaptura(fila))}</Badge>
             <Badge color={colorEstadoInstagram(fila.estado)}>{etiquetaEstadoInstagram(fila.estado)}</Badge>
             {fila.repetidaDe !== null && <Badge tone="warning">{`Repetida de ${numeroInstagram(fila.repetidaDe)}`}</Badge>}
@@ -309,12 +315,12 @@ export function FichaInstagram({
                 </dl>
               </Seccion>
 
-              <Seccion icono={EnlaceIcon} titulo="Lo que trajo Instagram">
+              <Seccion icono={EnlaceIcon} titulo={`Lo que trajo ${etiquetaPlataforma(fila.plataforma)}`}>
                 <dl className="flex flex-col gap-3">
                   <Dato etiqueta="Copy">
                     <span className="whitespace-pre-wrap">{fila.titulo ?? "—"}</span>
                   </Dato>
-                  <Dato etiqueta="Enlace de Instagram">
+                  <Dato etiqueta={`Enlace de ${etiquetaPlataforma(fila.plataforma)}`}>
                     {fila.enlace ? (
                       <a href={fila.enlace} target="_blank" rel="noopener noreferrer" className={`break-all text-primario hover:underline ${anilloFoco}`}>
                         {fila.enlace}
@@ -328,8 +334,8 @@ export function FichaInstagram({
 
               <Seccion icono={EstadoIcon} titulo="Cifras de la publicación">
                 <fieldset disabled={!puedeEscribir || guardando} className="m-0 grid min-w-0 grid-cols-2 gap-3 border-0 p-0 sm:grid-cols-3">
-                  <Campo etiqueta="Enlace de Instagram" id="campo-enlace-instagram" className="col-span-2 sm:col-span-3">
-                    <input id="campo-enlace-instagram" type="url" name="enlace" maxLength={2000} defaultValue={fila.enlace ?? ""} placeholder="Ej: https://www.instagram.com/reel/ABC123/" className={fieldClass} />
+                  <Campo etiqueta={`Enlace de ${etiquetaPlataforma(fila.plataforma)}`} id="campo-enlace-instagram" className="col-span-2 sm:col-span-3">
+                    <input id="campo-enlace-instagram" type="url" name="enlace" maxLength={2000} defaultValue={fila.enlace ?? ""} placeholder={fila.plataforma === "tiktok" ? "Ej: https://www.tiktok.com/@cuenta/video/1234567890" : fila.plataforma === "facebook" ? "Ej: https://www.facebook.com/reel/1234567890" : "Ej: https://www.instagram.com/reel/ABC123/"} className={fieldClass} />
                   </Campo>
                   <Campo etiqueta="Nombre de la página" id="campo-nombre-instagram" className="col-span-2 sm:col-span-3">
                     <input id="campo-nombre-instagram" type="text" name="nombre_pagina" maxLength={120} defaultValue={fila.nombrePagina ?? ""} placeholder="Ej: Mundo Digital" className={fieldClass} />
@@ -345,11 +351,36 @@ export function FichaInstagram({
                       <input id={`campo-${nombre}-instagram`} type="number" inputMode="numeric" min="0" step="1" name={nombre} defaultValue={fila[valor] ?? ""} placeholder="Ej: 1200" className={`${fieldClass} tabular-nums`} />
                     </Campo>
                   ))}
+                {fila.plataforma !== "instagram" &&
+                  CIFRAS_EXTRA.map(([nombre, etiqueta, valor]) => (
+                    <Campo key={nombre} etiqueta={etiqueta} id={`campo-${nombre}-instagram`}>
+                      <input id={`campo-${nombre}-instagram`} type="number" inputMode="numeric" min="0" step="1" name={nombre} defaultValue={fila[valor] ?? ""} placeholder="Ej: 1200" className={`${fieldClass} tabular-nums`} />
+                    </Campo>
+                  ))}
                 </fieldset>
-                {fila.fuenteCifras === "vista_previa" && <p className="m-0 text-xs text-muted-foreground">Leído de la vista pública de Instagram{fila.leidoEn ? ` el ${formatearFechaHora(fila.leidoEn)}` : ""} · dato no oficial</p>}
+                {fila.fuenteCifras === "vista_previa" && <p className="m-0 text-xs text-muted-foreground">{`Leído de la vista pública de ${etiquetaPlataforma(fila.plataforma)}`}{fila.leidoEn ? ` el ${formatearFechaHora(fila.leidoEn)}` : ""} · dato no oficial</p>}
                 {fila.fuenteCifras === "manual" && <p className="m-0 text-xs text-muted-foreground">Corregido a mano</p>}
               </Seccion>
 
+              {fila.plataforma === "tiktok" ? (
+                <Seccion icono={InstagramIcon} titulo="Anuncio en TikTok">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    {urlBusquedaTikTok(fila.titulo) && (
+                      <a href={urlBusquedaTikTok(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                        Buscar el copy en TikTok
+                      </a>
+                    )}
+                    {fila.autorUsuario && (
+                      <a href={`https://www.tiktok.com/@${fila.autorUsuario}`} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                        {`Abrir la cuenta @${fila.autorUsuario}`}
+                      </a>
+                    )}
+                    <a href={urlTopAdsTikTok(codigoPais)} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                      Top Ads de TikTok
+                    </a>
+                  </div>
+                </Seccion>
+              ) : (
               <Seccion icono={InstagramIcon} titulo="Biblioteca de anuncios">
                 <fieldset disabled={!puedeEscribir || guardando} className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
                   <Campo etiqueta="Anuncios con el mismo copy" id="campo-anuncios-instagram">
@@ -377,11 +408,12 @@ export function FichaInstagram({
                   {puedeEscribir && <MarcadorBiblioteca />}
                 </div>
               </Seccion>
+              )}
 
               {fila.datosMeta && (
                 <Seccion icono={InstagramIcon} titulo="Datos de Meta">
                   <details className="group">
-                    <summary className={`cursor-pointer text-sm text-primario hover:underline ${anilloFoco}`}>Ver el aviso y la consulta a Instagram</summary>
+                    <summary className={`cursor-pointer text-sm text-primario hover:underline ${anilloFoco}`}>Ver el aviso y la consulta</summary>
                     <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-border bg-muted p-3 text-xs">{fila.datosMeta}</pre>
                   </details>
                 </Seccion>

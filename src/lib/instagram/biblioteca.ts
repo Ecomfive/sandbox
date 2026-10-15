@@ -66,3 +66,21 @@ export function urlBibliotecaPrimeraLinea(copy: string | null | undefined): stri
   if (!corta || corta === copyCompletoPorBuscar(copy)) return null;
   return frase(corta);
 }
+
+/**
+ * La búsqueda del texto de un video en **TikTok** (su propia búsqueda, para encontrar el mismo producto en otras cuentas): las primeras
+ * palabras del copy, sin emojis ni signos. TikTok no tiene una biblioteca pública de anuncios para estos países (la suya, la
+ * «Commercial Content Library», solo cubre Europa), así que esto y el perfil de la cuenta son lo que se puede abrir.
+ */
+export function urlBusquedaTikTok(copy: string | null | undefined): string | null {
+  const texto = copyCompletoPorBuscar(copy);
+  if (!texto) return null;
+  const palabras = texto.split(" ").slice(0, 10).join(" ");
+  return `https://www.tiktok.com/search?q=${encodeURIComponent(palabras)}`;
+}
+
+/** Los «Top Ads» del Creative Center de TikTok para un país (los mejores anuncios que sus anunciantes autorizaron; para ver todos hay que iniciar sesión en TikTok). */
+export function urlTopAdsTikTok(codigoPais: string | null | undefined): string {
+  const region = /^[A-Za-z]{2}$/.test(codigoPais ?? "") ? (codigoPais as string).toUpperCase() : "US";
+  return `https://ads.tiktok.com/business/creativecenter/inspiration/topads/pc/en?period=30&region=${region}`;
+}

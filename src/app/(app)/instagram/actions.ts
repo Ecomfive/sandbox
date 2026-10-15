@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { enviosDe } from "@/lib/instagram/fusion";
-import { enlaceLegible } from "@/lib/instagram/vista-previa";
+import { reconocerEnlace } from "@/lib/instagram/plataformas";
 import { BUCKET_INSTAGRAM, completarCaptura, fusionarRepetidas as fusionarRepetidasEnBase, unirCapturas as unirCapturasEnBase } from "@/lib/instagram/guardar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ESTADOS_INSTAGRAM, etiquetaEstadoInstagram } from "./def-instagram";
@@ -18,6 +18,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CIFRAS = [
   ["like_count", "Me gusta"],
   ["comments_count", "Comentarios"],
+] as const;
+/** Vistas y compartidos solo los dan TikTok y Facebook: la ficha de Instagram no los muestra, así que solo se guardan si vienen en el formulario (si no, no se borran). */
+const CIFRAS_OPCIONALES = [
+  ["view_count", "Vistas"],
+  ["share_count", "Compartidos"],
 ] as const;
 const ESTADOS: Set<string> = new Set(ESTADOS_INSTAGRAM.map((e) => e.valor));
 
@@ -45,6 +50,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if (!UUID.test(id)) return { error: "Captura no válida." };
   const estado = String(formData.get("estado") ?? "");
   if (!ESTADOS.has(estado)) return { error: "Estado no válido." };
+  const cifrasDelFormulario = [...CIFRAS, ...CIFRAS_OPCIONALES.filter(([campo]) => formData.has(campo))];
   const pagina = enlace(formData, "pagina_destino", "Página de destino");
   if (pagina !== null && typeof pagina === "object") return pagina;
   const notas = String(formData.get("notas") ?? "").trim().slice(0, 4000) || null;
@@ -53,20 +59,20 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if (autorTexto && !/^[\w.]{1,100}$/.test(autorTexto)) return { error: "Cuenta del video: solo letras, números, puntos y guiones bajos." };
   const autor = autorTexto || null;
   const nombrePagina = String(formData.get("nombre_pagina") ?? "").trim().slice(0, 120) || null;
-  // El enlace de Instagram: solo de un reel o una publicación de instagram.com, sin parámetros; vacío = sin enlace.
+  // El enlace de la captura: de un reel, video o publicación de Instagram, Facebook o TikTok, sin parámetros; vacío = sin enlace.
   const enlaceTexto = String(formData.get("enlace") ?? "").trim().slice(0, 2000);
   let enlaceNuevo: string | null = null;
   if (enlaceTexto) {
-    if (!enlaceLegible(enlaceTexto)) return { error: "Enlace de Instagram: pega el enlace de un reel o una publicación (https://www.instagram.com/reel/…)." };
-    const u = new URL(enlaceTexto);
-    enlaceNuevo = `https://www.instagram.com${u.pathname}`;
+    const r = reconocerEnlace(enlaceTexto);
+    if (!r) return { error: "Enlace: pega el enlace de un reel, video o publicación de Instagram, Facebook o TikTok (https://www.instagram.com/reel/…)." };
+    enlaceNuevo = r.enlace;
   }
   const fechaTexto = String(formData.get("fecha_publicacion") ?? "").trim();
   if (fechaTexto && (!/^\d{4}-\d{2}-\d{2}$/.test(fechaTexto) || Number.isNaN(Date.parse(fechaTexto)))) return { error: "Fecha de publicación no válida." };
   const fechaPublicacion = fechaTexto || null;
   // Las cifras de la publicación: enteros desde 0; vacío = sin dato.
   const cifras: Record<string, number | null> = {};
-  for (const [campo, nombre] of CIFRAS) {
+  for (const [campo, nombre] of cifrasDelFormulario) {
     const t = String(formData.get(campo) ?? "").trim();
     if (!t) {
       cifras[campo] = null;
@@ -91,7 +97,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   // Las cifras se mezclan con lo que ya hay en `metricas` (la consulta a Instagram, por ejemplo): no se pierde nada.
   const metricasAntes = (antes.metricas ?? {}) as Record<string, unknown>;
   const metricas: Record<string, unknown> = { ...metricasAntes };
-  for (const [campo] of CIFRAS) {
+  for (const [campo] of cifrasDelFormulario) {
     if (cifras[campo] === null) delete metricas[campo];
     else metricas[campo] = cifras[campo];
   }
@@ -105,7 +111,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if (nombrePagina === null) delete metricas.nombre_pagina;
   else metricas.nombre_pagina = nombrePagina;
   // Si una persona cambia alguna cifra, la cuenta o la fecha, el dato ya no es el que se leyó solo.
-  const cifrasCambiaron = CIFRAS.some(([campo]) => (typeof metricasAntes[campo] === "number" ? metricasAntes[campo] : null) !== cifras[campo]);
+  const cifrasCambiaron = cifrasDelFormulario.some(([campo]) => (typeof metricasAntes[campo] === "number" ? metricasAntes[campo] : null) !== cifras[campo]);
   if (cifrasCambiaron || (antes.autor_usuario ?? null) !== autor || fechaAntes !== fechaPublicacion || nombreAntes !== nombrePagina) metricas.fuente = "manual";
   const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, autor_usuario: autor, enlace: enlaceNuevo, metricas, actualizado_en: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "No se pudieron guardar los cambios." };
@@ -143,7 +149,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
     cambio.antes["Anuncios con el mismo copy"] = anunciosAntes === null ? "—" : String(anunciosAntes);
     cambio.despues["Anuncios con el mismo copy"] = anuncios === null ? "—" : String(anuncios);
   }
-  for (const [campo, nombre] of CIFRAS) {
+  for (const [campo, nombre] of cifrasDelFormulario) {
     const previo = typeof metricasAntes[campo] === "number" ? (metricasAntes[campo] as number) : null;
     if (previo !== cifras[campo]) {
       cambio.antes[nombre] = previo === null ? "—" : String(previo);

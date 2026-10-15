@@ -1,3 +1,4 @@
+import { colorPlataforma, etiquetaPlataforma, PLATAFORMAS, type Plataforma } from "@/lib/instagram/plataformas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 /** Una captura de Instagram: lo que alguien del equipo compartió por mensaje directo con la cuenta de fuentes. */
@@ -6,6 +7,8 @@ export interface FilaInstagram {
   /** El N.º de la captura (se muestra IG-0001). */
   numero: number;
   recibidoEn: string;
+  /** La red de donde viene: Instagram, Facebook o TikTok. */
+  plataforma: Plataforma;
   remitenteId: string;
   remitenteUsuario: string | null;
   remitenteNombre: string | null;
@@ -28,6 +31,9 @@ export interface FilaInstagram {
   autorUsuario: string | null;
   megusta: number | null;
   comentarios: number | null;
+  /** Vistas y compartidos: solo los dan TikTok y Facebook (la ficha de Instagram no los muestra). */
+  vistas: number | null;
+  compartidos: number | null;
   /** AAAA-MM-DD: cuándo se publicó en Instagram. */
   fechaPublicacion: string | null;
   /** De dónde salieron las cifras: «vista_previa» (leídas solas de la página pública, dato no oficial) o «manual» (escritas o corregidas por una persona). */
@@ -46,6 +52,8 @@ export interface FilaInstagram {
   /** El aviso de Meta y lo que respondió Instagram al consultar la publicación, en texto, para revisarlos. */
   datosMeta: string | null;
 }
+
+export { colorPlataforma, etiquetaPlataforma };
 
 export const numeroInstagram = (n: number) => `IG-${String(n).padStart(4, "0")}`;
 
@@ -108,6 +116,16 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
       agrupable: true,
       ordenGrupos: FORMATOS_INSTAGRAM.map((t) => t.valor),
       colorValor: colorFormatoInstagram,
+    },
+    {
+      id: "plataforma",
+      etiqueta: "Red",
+      tipo: "seleccion",
+      valores: (f) => [f.plataforma],
+      opciones: () => PLATAFORMAS.map((p) => ({ valor: p.valor, etiqueta: p.etiqueta })),
+      agrupable: true,
+      ordenGrupos: PLATAFORMAS.map((p) => p.valor),
+      colorValor: colorPlataforma,
     },
     { id: "enviadoPor", etiqueta: "Enviado por", tipo: "seleccion", valores: (f) => [quienEnvio(f)], agrupable: true },
     { id: "autor", etiqueta: "Cuenta del video", tipo: "seleccion", valores: (f) => [f.autorUsuario ? `@${f.autorUsuario}` : SIN_VALOR], etiquetaSinValor: "Sin consultar", agrupable: true },

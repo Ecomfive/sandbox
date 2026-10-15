@@ -1,5 +1,5 @@
 import { detectarImagen } from "@/lib/seguridad/imagen";
-import { descargarPublico } from "@/lib/seguridad/url-externa";
+import { descargarConDetalle, descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
 import { extraerCapturas, formatoDeVideo, type CapturaInstagram, type NotaInstagram } from "./extraer";
 import { interpretarEmbed, urlDeEmbed, type DatosEmbed } from "./embed";
@@ -7,8 +7,10 @@ import { enviosDe, fusionar, unirTextos, type FilaFusionable } from "./fusion";
 import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
 import { esEnvioPropio } from "./compartir";
+import { interpretarFacebook, interpretarTikTok } from "./lectura-externa";
+import { codigoDeContenido, reconocerEnlace, type Plataforma } from "./plataformas";
 import { sonDeContenidosDistintos } from "./unir";
-import { codigoDePublicacion, repetidasDe } from "./repetidas";
+import { repetidasDe } from "./repetidas";
 import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
 
 export const BUCKET_INSTAGRAM = "instagram-fuentes";
@@ -101,8 +103,8 @@ async function leerEmbedPublico(enlace: string): Promise<{ ok: true; datos: Dato
  * Copia el archivo a nuestro almacenamiento: el enlace del aviso de Meta caduca, el archivo guardado no. Una publicación puede ser
  * un video o una imagen (una foto o un carrusel llega como imagen): los dos se guardan, por su firma y no por lo que diga el servidor.
  */
-async function copiarVideo(id: string, url: string): Promise<{ ruta: string; bytes: number } | { error: string }> {
-  const descarga = await descargarPublico(url, MAX_VIDEO);
+async function copiarVideo(id: string, url: string, encabezados?: Record<string, string>): Promise<{ ruta: string; bytes: number } | { error: string }> {
+  const descarga = await descargarPublico(url, MAX_VIDEO, encabezados);
   if ("error" in descarga) return { error: descarga.error };
   const video = formatoDeVideo(descarga.bytes);
   const imagen = video ? null : detectarImagen(descarga.bytes);
@@ -112,6 +114,59 @@ async function copiarVideo(id: string, url: string): Promise<{ ruta: string; byt
   const { error } = await createServiceClient().storage.from(BUCKET_INSTAGRAM).upload(ruta, descarga.bytes, { contentType: tipo, upsert: true });
   if (error) return { error: "No se pudo guardar el archivo." };
   return { ruta, bytes: descarga.bytes.length };
+}
+
+const AGENTE_NAVEGADOR = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+/** Lo que se leyó de la página pública de un video de TikTok o una publicación de Facebook, ya en la forma en que se guarda. */
+interface LecturaExterna {
+  copy: string | null;
+  usuario: string | null;
+  /** El enlace canónico (el de un enlace corto, una vez abierto). */
+  enlace: string | null;
+  metricas: Record<string, unknown>;
+  videoUrl: string | null;
+  /** Las cookies de la página: TikTok solo entrega su video a quien las trae. */
+  cookies: string[];
+}
+
+/**
+ * Lee la página pública de un contenido de **TikTok** o **Facebook**: un pedido (que sigue las redirecciones de un enlace corto) con el
+ * descargador seguro. TikTok se pide como un navegador y Facebook como lo hace su propia vista previa. Nunca lanza: si la red no
+ * responde o cambia su formato, devuelve el motivo y la captura se guarda igual.
+ */
+async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plataforma, "instagram">): Promise<{ ok: true; lectura: LecturaExterna } | { ok: false; error: string }> {
+  if (!lecturaPublicaActiva()) return { ok: false, error: "La lectura de la página pública está apagada." };
+  const ahora = new Date().toISOString();
+  try {
+    if (plataforma === "tiktok") {
+      const p = await descargarConDetalle(enlace, 3_000_000, { "user-agent": AGENTE_NAVEGADOR, accept: "text/html", "accept-language": "en-US,en;q=0.9" });
+      if ("error" in p) return { ok: false, error: p.error };
+      const d = interpretarTikTok(new TextDecoder("utf-8").decode(p.bytes));
+      if (!d) return { ok: false, error: "TikTok no entregó los datos del video." };
+      const m: Record<string, unknown> = { plataforma, fuente: "vista_previa", leido_en: ahora };
+      if (d.megusta !== null) m.like_count = d.megusta;
+      if (d.comentarios !== null) m.comments_count = d.comentarios;
+      if (d.vistas !== null) m.view_count = d.vistas;
+      if (d.compartidos !== null) m.share_count = d.compartidos;
+      if (d.fecha) m.fecha_publicacion = d.fecha;
+      if (d.nombre) m.nombre_pagina = d.nombre;
+      if (d.duracion !== null) m.duracion = d.duracion;
+      return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, cookies: p.cookies } };
+    }
+    const p = await descargarConDetalle(enlace, 3_000_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
+    if ("error" in p) return { ok: false, error: p.error };
+    const d = interpretarFacebook(new TextDecoder("utf-8").decode(p.bytes));
+    if (!d) return { ok: false, error: "Facebook no mostró esa publicación sin iniciar sesión (puede ser privada o estar borrada)." };
+    const m: Record<string, unknown> = { plataforma, fuente: "vista_previa", leido_en: ahora };
+    if (d.reacciones !== null) m.like_count = d.reacciones;
+    if (d.comentarios !== null) m.comments_count = d.comentarios;
+    if (d.vistas !== null) m.view_count = d.vistas;
+    if (d.compartidos !== null) m.share_count = d.compartidos;
+    return { ok: true, lectura: { copy: d.copy, usuario: null, enlace: reconocerEnlace(d.enlace)?.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: null, cookies: [] } };
+  } catch {
+    return { ok: false, error: "No se pudo leer la página." };
+  }
 }
 
 const TABLA = "instagram_capturas";
@@ -173,18 +228,56 @@ async function fusionarEnPrimera(supabase: Supabase, id: string): Promise<string
     if (!nueva) return id;
     const filtros: string[] = [];
     if (nueva.media_id && /^\d{1,30}$/.test(nueva.media_id)) filtros.push(`media_id.eq.${nueva.media_id}`);
-    const codigo = codigoDePublicacion(nueva.enlace);
-    if (codigo && /^[\w-]{1,40}$/.test(codigo)) filtros.push(`enlace.ilike.*${codigo}*`);
+    const codigo = codigoDeContenido(nueva.enlace);
+    if (codigo && /^[\w-]{1,90}$/.test(codigo)) filtros.push(`enlace.ilike.*${codigo}*`);
     if (filtros.length === 0) return id;
     const { data: candidatas } = await supabase.from(TABLA).select(`${COLUMNAS_FUSION}, numero`).neq("id", id).or(filtros.join(",")).order("numero").limit(20);
     const principal = ((candidatas ?? []) as unknown as (FilaConId & { numero: number })[]).find(
-      (f) => f.numero < nueva.numero && ((nueva.media_id && f.media_id === nueva.media_id) || (codigo && codigoDePublicacion(f.enlace) === codigo)),
+      (f) => f.numero < nueva.numero && ((nueva.media_id && f.media_id === nueva.media_id) || (codigo && codigoDeContenido(f.enlace) === codigo)),
     );
     if (!principal) return id;
     return (await fusionarPar(supabase, principal.id, id)) ? principal.id : id;
   } catch {
     return id;
   }
+}
+
+/**
+ * Completa una captura de **TikTok** o **Facebook** con lo que dice su página pública: el copy (solo si no tenía), la cuenta, las cifras,
+ * la fecha, el nombre de la página y, en TikTok, el video (copiado a nuestro almacenamiento por su firma, con las cookies de la página).
+ * Si la captura venía de un enlace corto, se queda con el enlace canónico. Lo que una persona corrigió a mano no se pisa.
+ */
+async function aplicarLecturaExterna(
+  supabase: Supabase,
+  fila: { id: string; enlace: string; titulo: string | null; autor_usuario: string | null; metricas: Record<string, unknown> | null; video_ruta: string | null },
+  plataforma: Exclude<Plataforma, "instagram">,
+): Promise<{ ok: true; archivo: boolean } | { ok: false; error: string }> {
+  const leida = await leerPaginaExterna(fila.enlace, plataforma);
+  if (!leida.ok) {
+    // El motivo queda anotado para revisarlo; la captura no pierde lo que ya tenía.
+    await supabase.from(TABLA).update({ metricas: { ...(fila.metricas ?? {}), plataforma, vista_previa_error: leida.error }, actualizado_en: new Date().toISOString() }).eq("id", fila.id);
+    return leida;
+  }
+  const { lectura } = leida;
+  const cambios: Record<string, unknown> = { metricas: mezclarLectura({ ...(fila.metricas ?? {}), vista_previa_error: undefined }, lectura.metricas), actualizado_en: new Date().toISOString() };
+  if (!fila.titulo && lectura.copy) cambios.titulo = lectura.copy;
+  if (!fila.autor_usuario && lectura.usuario) cambios.autor_usuario = lectura.usuario;
+  if (lectura.enlace && lectura.enlace !== fila.enlace) cambios.enlace = lectura.enlace;
+
+  let archivo = false;
+  if (!fila.video_ruta && lectura.videoUrl) {
+    const copia = await copiarVideo(fila.id, lectura.videoUrl, { accept: "*/*", referer: "https://www.tiktok.com/", "user-agent": AGENTE_NAVEGADOR, ...(lectura.cookies.length > 0 ? { cookie: lectura.cookies.join("; ") } : {}) });
+    if ("error" in copia) cambios.video_error = copia.error;
+    else {
+      cambios.video_ruta = copia.ruta;
+      cambios.video_bytes = copia.bytes;
+      cambios.video_error = null;
+      archivo = true;
+    }
+  }
+  const { error } = await supabase.from(TABLA).update(cambios).eq("id", fila.id);
+  if (error) return { ok: false, error: "No se pudieron guardar los datos leídos." };
+  return { ok: true, archivo };
 }
 
 /**
@@ -216,9 +309,10 @@ async function pegarEnlaceALaUltima(supabase: Supabase, c: CapturaInstagram): Pr
  * tiempo: el mismo mensaje no se procesa dos veces. Nunca lanza: lo que falle queda anotado en `video_error` o se pierde sin tumbar
  * la respuesta al webhook.
  */
-export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram[], remitentePropio?: { usuario: string | null; nombre: string | null }): Promise<{ nuevas: number }> {
+export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram[], remitentePropio?: { usuario: string | null; nombre: string | null }): Promise<{ nuevas: number; ids: string[] }> {
   const supabase = createServiceClient();
   let nuevas = 0;
+  const ids: string[] = [];
   for (const c of capturas) {
     try {
       if (await yaProcesado(supabase, c.mensajeId)) continue;
@@ -234,12 +328,23 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
           media_id: c.mediaId,
           texto_mensaje: c.textoMensaje,
           pagina_destino: c.paginaDestino,
+          // La red de lo compartido (sin dato es Instagram): queda desde el primer momento, aunque la lectura de su página falle.
+          ...(c.plataforma && c.plataforma !== "instagram" ? { metricas: { plataforma: c.plataforma } } : {}),
           payload: aviso as object,
         })
         .select("id")
         .single();
       if (error || !data) continue; // 23505 = ya la teníamos (un reintento de Meta); lo demás tampoco se puede arreglar aquí
       nuevas++;
+
+      // Facebook y TikTok: se lee su página pública (copy, cuenta, cifras y, en TikTok, el video) y se une con lo que ya hubiera del mismo contenido.
+      if (c.plataforma && c.plataforma !== "instagram" && c.enlace) {
+        const propio = esEnvioPropio(c.remitenteId) ? remitentePropio : null;
+        if (propio) await supabase.from(TABLA).update({ remitente_usuario: propio.usuario, remitente_nombre: propio.nombre }).eq("id", data.id);
+        await aplicarLecturaExterna(supabase, { id: data.id, enlace: c.enlace, titulo: c.titulo, autor_usuario: null, metricas: { plataforma: c.plataforma }, video_ruta: null }, c.plataforma);
+        ids.push(await fusionarEnPrimera(supabase, data.id));
+        continue;
+      }
 
       // Lo compartido desde la plataforma (celular instalado como app) ya trae quién es: no se le pregunta a Instagram.
       const [remitente, consulta] = await Promise.all([
@@ -279,12 +384,12 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
         }
       }
       if (Object.keys(cambios).length > 0) await supabase.from(TABLA).update(cambios).eq("id", data.id);
-      await fusionarEnPrimera(supabase, data.id);
+      ids.push(await fusionarEnPrimera(supabase, data.id));
     } catch {
       // Una captura que falla no debe impedir guardar las demás del mismo aviso.
     }
   }
-  return { nuevas };
+  return { nuevas, ids };
 }
 
 /**
@@ -328,6 +433,13 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
   const supabase = createServiceClient();
   const { data } = await supabase.from(TABLA).select("id, mensaje_id, enlace, titulo, video_ruta, autor_usuario, metricas, payload").eq("id", id).maybeSingle();
   if (!data) return { ok: false, error: "La captura ya no existe." };
+  const red = reconocerEnlace(data.enlace);
+  if (data.enlace && red && red.plataforma !== "instagram") {
+    if (!lecturaPublicaActiva()) return { ok: false, error: "La lectura de la página pública está apagada." };
+    const r = await aplicarLecturaExterna(supabase, { id: data.id, enlace: data.enlace, titulo: data.titulo, autor_usuario: data.autor_usuario, metricas: (data.metricas ?? null) as Record<string, unknown> | null, video_ruta: data.video_ruta }, red.plataforma);
+    if (r.ok) await fusionarEnPrimera(supabase, data.id);
+    return r;
+  }
   const delAviso = data.video_ruta ? null : (extraerCapturas(data.payload).find((c) => c.mensajeId === data.mensaje_id)?.urlVideo ?? null);
 
   const cambios: Record<string, unknown> = { actualizado_en: new Date().toISOString() };

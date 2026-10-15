@@ -14,7 +14,9 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import {
   colorEstadoInstagram,
   colorFormatoInstagram,
+  colorPlataforma,
   DEF_INSTAGRAM,
+  etiquetaPlataforma,
   etiquetaFormatoInstagram,
   formatoDeCaptura,
   numeroInstagram,
@@ -32,6 +34,7 @@ const NOMBRE: NombreFilas = { singular: "captura", plural: "capturas" };
 const ICONOS: Record<string, IconoComp> = {
   estado: EstadoIcon,
   formato: InstagramIcon,
+  plataforma: InstagramIcon,
   enviadoPor: PersonaIcon,
   autor: InstagramIcon,
   recibido: CalendarioIcon,
@@ -85,6 +88,7 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
     ocultable: true,
     render: (f) => <SelectorEstadoInstagram estado={f.estado} aria={`Estado de ${numeroInstagram(f.numero)}`} puedeEscribir={puedeEscribir} alCambiar={(e) => cambiar(f.id, e)} />,
   },
+  { id: "plataforma", label: "Red", ocultable: true, clase: "whitespace-nowrap", render: (f) => <Badge color={colorPlataforma(f.plataforma)}>{etiquetaPlataforma(f.plataforma)}</Badge> },
   { id: "enviadoPor", label: "Enviado por", ocultable: true, clase: "whitespace-nowrap", render: (f) => quienEnvio(f) },
   { id: "nombrePagina", label: "Página", ocultable: true, clase: "whitespace-nowrap", render: (f) => f.nombrePagina ?? "—" },
   { id: "recibido", label: "Recibido", ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => formatearFechaHora(f.recibidoEn) },

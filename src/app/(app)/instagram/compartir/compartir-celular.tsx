@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
-import { numeroInstagram } from "../def-instagram";
+import { etiquetaPlataforma, numeroInstagram } from "../def-instagram";
 import { compartirDesdeCelular, type ResultadoCompartido } from "../compartir-actions";
 
 type Estado = { tipo: "guardando" } | { tipo: "sin_datos" } | { tipo: "listo"; r: ResultadoCompartido };
@@ -53,7 +53,7 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
   if (estado.tipo === "sin_datos") {
     return (
       <div className="flex flex-col gap-3">
-        <p className={`${caja} m-0 text-muted-foreground`}>{puedeEscribir ? "No llegó nada para guardar. Compártelo desde Instagram con «Ecomfive Fuentes»." : "Tu rol solo puede ver Instagram: no puede guardar lo que compartas."}</p>
+        <p className={`${caja} m-0 text-muted-foreground`}>{puedeEscribir ? "No llegó nada para guardar. Compártelo desde Instagram, Facebook o TikTok con «Ecomfive Fuentes»." : "Tu rol solo puede ver Instagram: no puede guardar lo que compartas."}</p>
         <Acciones />
       </div>
     );
@@ -75,9 +75,16 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
       <div role="status" className={`${caja} flex flex-wrap items-center gap-x-3 gap-y-1`}>
         <span className="font-medium tabular-nums">{numeroInstagram(r.numero)}</span>
         <Badge tone={r.nueva ? "success" : "info"}>{r.nueva ? "Guardada" : `Compartida ${r.veces} ${r.veces === 1 ? "vez" : "veces"}`}</Badge>
+        {r.plataforma && <span className="text-muted-foreground">{etiquetaPlataforma(r.plataforma)}</span>}
         {r.nombrePagina && <span className="text-muted-foreground">{r.nombrePagina}</span>}
         <span className="text-muted-foreground">{r.tieneArchivo ? "Con archivo" : "Sin archivo"}</span>
       </div>
+      {r.leida === false && (
+        <p role="status" className={`${caja} m-0`}>
+          <span aria-hidden="true" className="mr-2 inline-block h-2 w-2 rounded-full bg-warning align-middle" />
+          No se pudo leer la página pública: la captura quedó con el enlace. En su ficha, «Completar desde el enlace» lo intenta de nuevo.
+        </p>
+      )}
       <Acciones />
     </div>
   );

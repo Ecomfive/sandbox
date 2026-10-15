@@ -4,7 +4,7 @@
  * cada camino es distinto y no se pueden reconocer por él. Aquí se sugiere con qué captura unirla (por el tiempo entre una y otra y por
  * lo que cada una aporta) y se decide si dos capturas se pueden unir. La fusión en sí es `fusionar` (`fusion.ts`).
  */
-import { codigoDePublicacion } from "./repetidas";
+import { codigoDeContenido } from "./plataformas";
 
 /** Lo mínimo de una captura para sugerir una unión. */
 export interface CapturaParaUnir {
@@ -32,8 +32,8 @@ export const MINUTOS_MAXIMOS_SUGERENCIA = 120;
 
 /** ¿Las dos capturas son de contenidos distintos? Sí si las dos tienen enlace y su código de publicación no es el mismo. */
 export function sonDeContenidosDistintos(a: { enlace: string | null }, b: { enlace: string | null }): boolean {
-  const x = codigoDePublicacion(a.enlace);
-  const y = codigoDePublicacion(b.enlace);
+  const x = codigoDeContenido(a.enlace);
+  const y = codigoDeContenido(b.enlace);
   return !!x && !!y && x !== y;
 }
 

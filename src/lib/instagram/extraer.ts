@@ -15,6 +15,8 @@ export interface CapturaInstagram {
   paginaDestino: string | null;
   /** La dirección del archivo de video, si el adjunto trae una que no es de la página de Instagram. */
   urlVideo: string | null;
+  /** La red de donde viene lo compartido; sin dato es Instagram (los mensajes de Meta siempre lo son). */
+  plataforma?: "instagram" | "facebook" | "tiktok";
 }
 
 const TIPO_ADJUNTO: Record<string, CapturaInstagram["tipo"]> = {
@@ -28,7 +30,7 @@ const TIPO_ADJUNTO: Record<string, CapturaInstagram["tipo"]> = {
 };
 
 const HOSTS_INSTAGRAM = /(^|\.)(instagram\.com|instagr\.am)$/i;
-const HOSTS_META = /(^|\.)(instagram\.com|instagr\.am|facebook\.com|fb\.com|fb\.me|fb\.watch|l\.facebook\.com|l\.instagram\.com)$/i;
+const HOSTS_META = /(^|\.)(instagram\.com|instagr\.am|facebook\.com|fb\.com|fb\.me|fb\.watch|l\.facebook\.com|l\.instagram\.com|tiktok\.com)$/i;
 const ENLACE_EN_TEXTO = /https?:\/\/[^\s<>"']+/gi;
 const ENLACE_PUBLICACION = /^\/(?:[\w.]+\/)?(?:reels?|p|tv)\/[\w-]+/i;
 
