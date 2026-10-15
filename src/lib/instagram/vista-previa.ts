@@ -12,6 +12,8 @@ export interface VistaPublica {
   fecha: string | null;
   /** El nombre con que se muestra la cuenta («Nuvo Venezuela»), del título de la vista previa. Es el nombre de la página para buscar el anuncio. */
   nombre: string | null;
+  /** El texto de la publicación (su copy), de lo que sigue a la fecha en la vista previa. Null si no hay. */
+  copy: string | null;
 }
 
 const MESES: Record<string, number> = {
@@ -65,6 +67,9 @@ function decodificar(t: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
     .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&");
 }
 
@@ -77,12 +82,24 @@ export function nombreDeVistaPrevia(titulo: string | null): string | null {
   return nombre ? nombre.slice(0, 120) : null;
 }
 
+/** El copy que sigue a la fecha: sin las comillas que lo envuelven ni los caracteres invisibles que Instagram intercala. */
+function copyDeVistaPrevia(resto: string | undefined): string | null {
+  if (!resto) return null;
+  const t = decodificar(resto)
+    .replace(/[​-‏⁠﻿]/g, "")
+    .trim()
+    .replace(/^"/, "")
+    .replace(/"\.?\s*$/, "")
+    .trim();
+  return t ? t.slice(0, 4000) : null;
+}
+
 /** Lee «N likes, M comments - cuenta on Month D, YYYY: …» (y, si se pasa el título, el nombre de la cuenta). Devuelve null si el texto no tiene esa forma o no aporta ningún dato. */
 export function interpretarVistaPrevia(descripcion: string | null, titulo: string | null = null): VistaPublica | null {
   if (!descripcion) return null;
-  const m = descripcion.match(/^(.{0,80}?)\s-\s([\w.]{1,100})\s+on\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})\s*:/);
+  const m = descripcion.match(/^(.{0,80}?)\s-\s([\w.]{1,100})\s+on\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})\s*:([\s\S]*)$/);
   if (!m) return null;
-  const [, cifras, usuario, mesTexto, diaTexto, anioTexto] = m;
+  const [, cifras, usuario, mesTexto, diaTexto, anioTexto, resto] = m;
   const megusta = cifraDeVistaPrevia(/([\d.,]+\s*[KMB]?)\s+likes?\b/i.exec(cifras)?.[1]);
   const comentarios = cifraDeVistaPrevia(/([\d.,]+\s*[KMB]?)\s+comments?\b/i.exec(cifras)?.[1]);
   const mes = MESES[mesTexto.toLowerCase()];
@@ -93,7 +110,7 @@ export function interpretarVistaPrevia(descripcion: string | null, titulo: strin
     const f = new Date(Date.UTC(anio, mes - 1, dia));
     if (f.getUTCFullYear() === anio && f.getUTCMonth() === mes - 1 && f.getUTCDate() === dia) fecha = f.toISOString().slice(0, 10);
   }
-  return { megusta, comentarios, usuario, fecha, nombre: nombreDeVistaPrevia(titulo) };
+  return { megusta, comentarios, usuario, fecha, nombre: nombreDeVistaPrevia(titulo), copy: copyDeVistaPrevia(resto) };
 }
 
 /** El enlace de un reel o una publicación de instagram.com: lo único que se lee (no perfiles, ni otros sitios). */
