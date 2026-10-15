@@ -1,27 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { copyCompletoPorBuscar, frasePorBuscar, urlBibliotecaAnuncios, urlBibliotecaPrimeraLinea } from "./biblioteca";
+import { copyCompletoPorBuscar, urlAnunciosDePagina, urlBibliotecaAnuncios, urlBusquedaTikTok, urlTopAdsTikTok } from "./biblioteca";
 
 // El copy real de IG-0026 (15 oct 2026): con la primera línea la Biblioteca daba 340 resultados; con todo el copy, 1.
 const COPY_IG26 =
   "✨ Hay joyas bonitas... y hay joyas que cuentan tu historia.\nCrea un Cofre de Tesoros único con los dijes que representan a las personas, lugares, profesiones, hobbies y sueños que más amas. 💖\nMás de 500 dijes para diseñar una joya que nadie más tendrá.\n🎁 El regalo más personal es el que habla de quien lo recibe.";
 
-test("biblioteca: la frase es el arranque del copy, sin emojis y hasta el primer signo", () => {
-  assert.equal(frasePorBuscar("⚡ Apoya tu bienestar corporal con Perfectx Joint & Bone Therapy Cream, la crema concentrada"), "Apoya tu bienestar corporal con Perfectx Joint");
-  assert.equal(frasePorBuscar("✨Nuestro Soporte celular para retrovisor brinda mayor concentración al conductor"), "Nuestro Soporte celular para retrovisor brinda mayor concentración");
-  assert.equal(frasePorBuscar("Estos son algunos de los beneficios de Los Guantes de Compresión Cobrevida🤗 ✔ Fácil de usar"), "Estos son algunos de los beneficios de Los");
-});
-
-test("biblioteca: salta las líneas vacías y sin letras, y completa si el primer tramo es demasiado corto", () => {
-  assert.equal(frasePorBuscar("\n\n🔥🔥\nOferta limitada hoy mismo en toda la tienda"), "Oferta limitada hoy mismo en toda la tienda");
-  assert.equal(frasePorBuscar("¡Ya llegó! Crema para articulaciones con colágeno"), "Ya llegó Crema para articulaciones con colágeno");
-});
-
 test("biblioteca: sin copy utilizable no hay búsqueda", () => {
-  for (const x of [null, undefined, "", "   ", "🔥🔥🔥", "Hola"]) assert.equal(frasePorBuscar(x), null);
   for (const x of [null, undefined, "", "   ", "🔥🔥🔥", "Hola"]) assert.equal(copyCompletoPorBuscar(x), null);
   assert.equal(urlBibliotecaAnuncios(null), null);
-  assert.equal(urlBibliotecaPrimeraLinea(null), null);
+  assert.equal(urlBusquedaTikTok(null), null);
 });
 
 test("biblioteca: el copy completo se limpia a letras y números, sin saltos de línea, emojis ni puntuación", () => {
@@ -54,10 +42,22 @@ test("biblioteca: la dirección busca el copy completo como frase exacta en todo
   assert.equal(url.searchParams.get("active_status"), "all");
 });
 
-test("biblioteca: la búsqueda de la primera línea es aparte y solo existe si es distinta del copy completo", () => {
-  const u = urlBibliotecaPrimeraLinea(COPY_IG26);
+test("biblioteca: los anuncios de una página se buscan por su nombre exacto, sin la ciudad que agrega Facebook", () => {
+  const u = urlAnunciosDePagina("Nenagoslingshop");
   assert.ok(u);
-  assert.equal(new URL(u).searchParams.get("q"), '"Hay joyas bonitas"');
-  // Un copy de una sola frase corta: la primera línea es lo mismo que el copy completo.
-  assert.equal(urlBibliotecaPrimeraLinea("Apoya tu bienestar corporal con Perfectx"), null);
+  assert.equal(new URL(u).searchParams.get("q"), '"Nenagoslingshop"');
+  assert.equal(new URL(u).searchParams.get("search_type"), "keyword_exact_phrase");
+  assert.equal(new URL(urlAnunciosDePagina("Oferta VE | Caracas") as string).searchParams.get("q"), '"Oferta VE"');
+  assert.equal(new URL(urlAnunciosDePagina("Tienda & Más · Panamá") as string).searchParams.get("q"), '"Tienda Más"');
+  for (const n of [null, undefined, "", "  ", "🔥", "|"]) assert.equal(urlAnunciosDePagina(n), null, String(n));
+});
+
+test("TikTok: la búsqueda usa las primeras palabras del copy y los Top Ads, el país", () => {
+  const u = urlBusquedaTikTok(COPY_IG26);
+  assert.ok(u);
+  assert.equal(new URL(u).origin + new URL(u).pathname, "https://www.tiktok.com/search");
+  assert.equal(new URL(u).searchParams.get("q"), "Hay joyas bonitas y hay joyas que cuentan tu historia");
+  assert.equal(new URL(urlTopAdsTikTok("pa")).searchParams.get("region"), "PA");
+  assert.equal(new URL(urlTopAdsTikTok(null)).searchParams.get("region"), "US");
+  assert.equal(new URL(urlTopAdsTikTok("<script>")).searchParams.get("region"), "US");
 });

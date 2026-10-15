@@ -47,6 +47,9 @@ export interface FilaInstagram {
   bibliotecaInactivos: number | null;
   bibliotecaDesde: string | null;
   bibliotecaLeidoEn: string | null;
+  /** El nombre con que la Biblioteca muestra la página (puede diferir del de la red) y si «Cuenta del video» salió de ahí (entonces es el usuario de Facebook de la página). */
+  bibliotecaPagina: string | null;
+  cuentaDeBiblioteca: boolean;
   notas: string | null;
   estado: string;
   /** El aviso de Meta y lo que respondió Instagram al consultar la publicación, en texto, para revisarlos. */

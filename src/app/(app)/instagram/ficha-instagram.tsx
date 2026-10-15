@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha, formatearFechaHora } from "@/lib/formato";
-import { urlBibliotecaAnuncios, urlBibliotecaPrimeraLinea, urlBusquedaTikTok, urlTopAdsTikTok } from "@/lib/instagram/biblioteca";
+import { urlAnunciosDePagina, urlBibliotecaAnuncios, urlBusquedaTikTok, urlTopAdsTikTok } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, iconoDeRed, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, eliminarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, quitarEnvioDeCaptura, urlVideoCaptura } from "./actions";
 import { MarcadorBiblioteca } from "./marcador-biblioteca";
@@ -33,6 +33,27 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: str
       </button>
     </Tooltip>
   );
+}
+
+/** Un enlace que sale de la plataforma: pequeño, con el aviso de que abre otra pestaña para quien usa lector de pantalla. */
+function EnlaceExterno({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={`inline-flex min-h-6 items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+      <EnlaceIcon className="h-3.5 w-3.5 shrink-0" />
+      <span>{children}</span>
+      <span className="sr-only"> (se abre en una pestaña nueva)</span>
+    </a>
+  );
+}
+
+/** El perfil de la cuenta en su red; si la cuenta salió de la Biblioteca es el usuario de la página de Facebook, aunque la captura sea de Instagram. */
+function perfilDe(fila: FilaInstagram): { href: string; texto: string } | null {
+  const usuario = fila.autorUsuario?.trim().replace(/^@/, "");
+  if (!usuario) return null;
+  const u = encodeURIComponent(usuario);
+  if (fila.plataforma === "tiktok") return { href: `https://www.tiktok.com/@${u}`, texto: `Abrir la cuenta @${usuario}` };
+  if (fila.plataforma === "facebook" || fila.cuentaDeBiblioteca) return { href: `https://www.facebook.com/${u}`, texto: "Abrir la página de Facebook" };
+  return { href: `https://www.instagram.com/${u}/`, texto: "Abrir el perfil de Instagram" };
 }
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
@@ -212,6 +233,10 @@ export function FichaInstagram({
   const indice = fila ? orden.indexOf(fila.id) : -1;
   const anterior = indice > 0 ? orden[indice - 1] : null;
   const siguiente = indice >= 0 && indice < orden.length - 1 ? orden[indice + 1] : null;
+  // Los anuncios de la página se buscan por su nombre en la Biblioteca; si no se conoce, por el usuario de Facebook de la cuenta.
+  const perfilDeLaCuenta = fila ? perfilDe(fila) : null;
+  const usuarioDeFacebook = fila && (fila.plataforma === "facebook" || fila.cuentaDeBiblioteca) ? fila.autorUsuario : null;
+  const urlPaginaEnBiblioteca = fila ? urlAnunciosDePagina(fila.bibliotecaPagina ?? fila.nombrePagina ?? usuarioDeFacebook) : null;
 
   return (
     <Ventana
@@ -364,21 +389,21 @@ export function FichaInstagram({
 
               {fila.plataforma === "tiktok" ? (
                 <Seccion icono={iconoDeRed("tiktok")} titulo="Anuncio en TikTok">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                     {urlBusquedaTikTok(fila.titulo) && (
-                      <a href={urlBusquedaTikTok(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                        Buscar el copy en TikTok
-                      </a>
+                      <li>
+                        <EnlaceExterno href={urlBusquedaTikTok(fila.titulo) as string}>Buscar el copy en TikTok</EnlaceExterno>
+                      </li>
                     )}
-                    {fila.autorUsuario && (
-                      <a href={`https://www.tiktok.com/@${fila.autorUsuario}`} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                        {`Abrir la cuenta @${fila.autorUsuario}`}
-                      </a>
+                    {perfilDeLaCuenta && (
+                      <li>
+                        <EnlaceExterno href={perfilDeLaCuenta.href}>{perfilDeLaCuenta.texto}</EnlaceExterno>
+                      </li>
                     )}
-                    <a href={urlTopAdsTikTok(codigoPais)} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                      Top Ads de TikTok
-                    </a>
-                  </div>
+                    <li>
+                      <EnlaceExterno href={urlTopAdsTikTok(codigoPais)}>Top Ads de TikTok</EnlaceExterno>
+                    </li>
+                  </ul>
                 </Seccion>
               ) : (
               <Seccion icono={iconoDeRed(fila.plataforma)} titulo="Biblioteca de anuncios">
@@ -393,28 +418,24 @@ export function FichaInstagram({
                     {fila.bibliotecaDesde ? ` · circula desde el ${formatearFecha(fila.bibliotecaDesde)}` : ""} · {formatearFechaHora(fila.bibliotecaLeidoEn)}
                   </p>
                 )}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                   {urlBibliotecaAnuncios(fila.titulo) && (
-                    <a href={urlBibliotecaAnuncios(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                      {(() => {
-                        const Icono = iconoDeRed(fila.plataforma);
-                        return <Icono className="h-4 w-4" />;
-                      })()}
-                      Buscar el anuncio en la Biblioteca de anuncios
-                    </a>
+                    <li>
+                      <EnlaceExterno href={urlBibliotecaAnuncios(fila.titulo) as string}>Buscar el anuncio en la Biblioteca de anuncios</EnlaceExterno>
+                    </li>
                   )}
-                  {urlBibliotecaPrimeraLinea(fila.titulo) && (
-                    <a href={urlBibliotecaPrimeraLinea(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                      Buscar solo la primera línea
-                    </a>
+                  {urlPaginaEnBiblioteca && (
+                    <li>
+                      <EnlaceExterno href={urlPaginaEnBiblioteca}>Ver los anuncios de la página</EnlaceExterno>
+                    </li>
                   )}
-                  {fila.plataforma === "facebook" && fila.autorUsuario && (
-                    <a href={`https://www.facebook.com/${fila.autorUsuario}`} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                      Abrir la página
-                    </a>
+                  {perfilDeLaCuenta && (
+                    <li>
+                      <EnlaceExterno href={perfilDeLaCuenta.href}>{perfilDeLaCuenta.texto}</EnlaceExterno>
+                    </li>
                   )}
-                  {puedeEscribir && <MarcadorBiblioteca />}
-                </div>
+                </ul>
+                {puedeEscribir && <MarcadorBiblioteca />}
               </Seccion>
               )}
 

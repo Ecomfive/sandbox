@@ -89,8 +89,9 @@ export async function guardarLecturaBiblioteca(fragmento: string): Promise<Resul
     };
     if (!nombre && ok.pagina) metricas.nombre_pagina = ok.pagina;
     const destinoNuevo = !c.pagina_destino && ok.destinos.length > 0;
-    // La cuenta (el usuario de la página del anunciante) solo se completa si estaba vacía.
+    // La cuenta (el usuario de la página del anunciante) solo se completa si estaba vacía; se anota de dónde salió para abrir su página de Facebook y no su perfil de Instagram.
     const cuentaNueva = !c.autor_usuario && ok.usuario ? ok.usuario : null;
+    if (cuentaNueva) metricas.cuenta_origen = "biblioteca";
     const cambios: Record<string, unknown> = { metricas, actualizado_en: leidoEn };
     if (destinoNuevo) cambios.pagina_destino = ok.destinos[0].url;
     if (cuentaNueva) cambios.autor_usuario = cuentaNueva;
@@ -152,7 +153,10 @@ export async function vincularAnunciosACaptura(capturaId: string, crudos: unknow
   const destinoNuevo = !data.pagina_destino && resumen.destinos.length > 0;
   const cambios: Record<string, unknown> = { metricas, actualizado_en: leidoEn };
   if (destinoNuevo) cambios.pagina_destino = resumen.destinos[0].url;
-  if (!data.autor_usuario && resumen.usuario) cambios.autor_usuario = resumen.usuario;
+  if (!data.autor_usuario && resumen.usuario) {
+    cambios.autor_usuario = resumen.usuario;
+    metricas.cuenta_origen = "biblioteca";
+  }
   const { error } = await supabase.from(ENTIDAD).update(cambios).eq("id", capturaId);
   if (error) return { error: "No se pudo vincular." };
 

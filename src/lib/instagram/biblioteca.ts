@@ -10,28 +10,8 @@
  * igual con o sin emojis y puntuación, así que el texto se limpia (solo letras y números) para no depender de comillas, puntos
  * suspensivos o emojis que Instagram y la Biblioteca escriban distinto.
  */
-const MAX_PALABRAS = 8;
 /** Hasta cuántos caracteres del copy se buscan: lo que pasa se corta en el límite de una palabra (una frase más corta del mismo copy sigue siendo exacta). */
 const MAX_CARACTERES = 700;
-
-/** El arranque del copy que sirve para buscarlo: sin emojis ni símbolos al inicio y hasta el primer signo o las 8 palabras. */
-export function frasePorBuscar(copy: string | null | undefined, maxPalabras = MAX_PALABRAS): string | null {
-  if (!copy) return null;
-  const linea = copy
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .find((l) => /[\p{L}\p{N}]/u.test(l));
-  if (!linea) return null;
-  const sinSimbolos = linea.replace(/^[^\p{L}\p{N}]+/u, "");
-  const hastaElSigno = sinSimbolos.split(/[,.:;!?&()\[\]{}"“”¡¿|/\\]/)[0];
-  const palabras = hastaElSigno.split(/\s+/).filter(Boolean).slice(0, maxPalabras);
-  // Una frase de una o dos palabras trae demasiados anuncios ajenos: se prefiere seguir hasta las 8 palabras, signos aparte.
-  if (palabras.length < 3) {
-    const todas = sinSimbolos.replace(/[,.:;!?&()\[\]{}"“”¡¿|/\\]+/g, " ").split(/\s+/).filter(Boolean).slice(0, maxPalabras);
-    return todas.length >= 2 ? todas.join(" ") : null;
-  }
-  return palabras.join(" ");
-}
 
 /**
  * El copy completo para buscarlo: solo letras y números, con una sola separación entre palabras (los saltos de línea, los emojis y la
@@ -57,14 +37,14 @@ export function urlBibliotecaAnuncios(copy: string | null | undefined): string |
 }
 
 /**
- * La búsqueda solo de la **primera línea** del copy: para cuando el copy completo no encuentra nada (Instagram puede mostrar el texto
- * recortado o distinto al de la Biblioteca). Trae más resultados, de varios anunciantes si el copy es una plantilla. Null si no hay
- * una primera línea utilizable o si es lo mismo que el copy completo.
+ * La búsqueda del **nombre de la página** como frase exacta en la Biblioteca: muestra los anuncios de esa página (probado el 15 oct 2026 con
+ * «Nenagoslingshop»: ~9 resultados, todos de esa página). Sirve donde no se puede abrir la página por su id (`view_all_page_id`, que sin iniciar
+ * sesión no devuelve anuncios). Del nombre se usa lo anterior a « | » o « · » (Facebook agrega la ciudad: «Oferta VE | Caracas»).
  */
-export function urlBibliotecaPrimeraLinea(copy: string | null | undefined): string | null {
-  const corta = frasePorBuscar(copy);
-  if (!corta || corta === copyCompletoPorBuscar(copy)) return null;
-  return frase(corta);
+export function urlAnunciosDePagina(nombre: string | null | undefined): string | null {
+  const corto = (nombre ?? "").split(/ [|·] /)[0];
+  const limpio = corto.normalize("NFC").replace(/[^\p{L}\p{N}\s]+/gu, " ").replace(/\s+/g, " ").trim();
+  return limpio.length >= 2 ? frase(limpio) : null;
 }
 
 /**
