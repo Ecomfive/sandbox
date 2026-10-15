@@ -167,7 +167,7 @@ function VincularAMano({ anuncios, capturas, sinNingunaCoincidencia }: { anuncio
           {vinculadas.map((v, i) => (
             <li key={i} role="status" className={`${caja} flex flex-wrap items-center gap-x-3 gap-y-1`}>
               <span className="font-medium tabular-nums">{numeroInstagram(v.numero)}</span>
-              <Badge tone="info">{`${plural(v.total ?? 0, "anuncio", "anuncios")} vinculados`}</Badge>
+              <Badge tone="info">{plural(v.total ?? 0, "anuncio vinculado", "anuncios vinculados")}</Badge>
               <span className="text-muted-foreground">{plural(v.activos ?? 0, "activo", "activos")}</span>
               {v.destinoNuevo && <Badge tone="success">Página de destino guardada</Badge>}
             </li>
