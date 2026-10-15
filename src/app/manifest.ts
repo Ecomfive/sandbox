@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
  * Lo que hace que la plataforma se pueda instalar como app en el celular (Chrome › «Instalar aplicación»). Instalada, aparece como
  * «Ecomfive Fuentes» en la hoja de «Compartir en…» de Instagram: lo que se comparte llega a `/instagram/compartir` (el «share
  * target»), que guarda el reel o la publicación como una captura, sin pasar por el mensaje directo. Solo Android (Chrome) registra el
- * destino de compartir; en iPhone la plataforma se instala pero no aparece al compartir.
+ * destino de compartir; en iPhone se usa un atajo de la app Atajos que abre la misma página (ver `INSTAGRAM-META.md`).
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
