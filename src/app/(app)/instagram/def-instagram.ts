@@ -28,8 +28,6 @@ export interface FilaInstagram {
   autorUsuario: string | null;
   megusta: number | null;
   comentarios: number | null;
-  vistas: number | null;
-  compartidos: number | null;
   /** AAAA-MM-DD: cuándo se publicó en Instagram. */
   fechaPublicacion: string | null;
   /** De dónde salieron las cifras: «vista_previa» (leídas solas de la página pública, dato no oficial) o «manual» (escritas o corregidas por una persona). */
@@ -121,8 +119,6 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
     { id: "conDestino", etiqueta: "Página de destino", tipo: "seleccion", valores: (f) => [f.paginaDestino ? "con" : "sin"], opciones: () => [{ valor: "con", etiqueta: "Con página" }, { valor: "sin", etiqueta: "Sin página" }], agrupable: true },
     { id: "megusta", etiqueta: "Me gusta", tipo: "numero", valor: (f) => f.megusta },
     { id: "comentarios", etiqueta: "Comentarios", tipo: "numero", valor: (f) => f.comentarios },
-    { id: "vistas", etiqueta: "Vistas", tipo: "numero", valor: (f) => f.vistas },
-    { id: "compartidos", etiqueta: "Compartidos", tipo: "numero", valor: (f) => f.compartidos },
     { id: "anuncios", etiqueta: "Anuncios con el mismo copy", tipo: "numero", valor: (f) => f.anuncios },
     { id: "publicado", etiqueta: "Publicado", tipo: "fecha", valor: (f) => f.fechaPublicacion },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },

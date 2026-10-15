@@ -21,7 +21,8 @@ import {
   quienEnvio,
   type FilaInstagram,
 } from "./def-instagram";
-import { cambiarEstadoCaptura, fusionarCapturasRepetidas } from "./actions";
+import { cambiarEstadoCaptura, eliminarCapturas, fusionarCapturasRepetidas, unirCapturas } from "./actions";
+import { BarraLoteInstagram } from "./barra-lote-instagram";
 import { unionProbable } from "@/lib/instagram/unir";
 import { FichaInstagram } from "./ficha-instagram";
 import { paraUnir } from "./unir-captura";
@@ -37,8 +38,6 @@ const ICONOS: Record<string, IconoComp> = {
   video: CheckIcon,
   megusta: EstadoIcon,
   comentarios: EstadoIcon,
-  vistas: EstadoIcon,
-  compartidos: EstadoIcon,
   publicado: CalendarioIcon,
   anuncios: EstadoIcon,
   nombrePagina: PersonaIcon,
@@ -132,9 +131,7 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
   },
   { id: "megusta", label: "Me gusta", ocultable: true, clase: "text-right tabular-nums", render: (f) => cifra(f.megusta) },
   { id: "comentarios", label: "Comentarios", ocultable: true, clase: "text-right tabular-nums", render: (f) => cifra(f.comentarios) },
-  { id: "vistas", label: "Vistas", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.vistas) },
   { id: "publicado", label: "Publicado", ocultable: true, oculta: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => (f.fechaPublicacion ? formatearFecha(f.fechaPublicacion) : "—") },
-  { id: "compartidos", label: "Compartidos", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => cifra(f.compartidos) },
   { id: "notas", label: "Notas", ocultable: true, oculta: true, clase: "text-muted-foreground", render: (f) => <span className="block max-w-[18rem] truncate">{f.notas ?? "—"}</span> },
   ];
 }
@@ -203,6 +200,36 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
     }
   }
 
+  // Unir y eliminar desde la lista, sin abrir la ficha: lo hace la barra de las capturas marcadas.
+  const [trabajando, setTrabajando] = useState(false);
+  async function unirMarcadas(marcadas: FilaInstagram[], quitar: () => void) {
+    if (marcadas.length !== 2 || trabajando) return;
+    const [vieja, nueva] = marcadas[0].numero < marcadas[1].numero ? marcadas : [marcadas[1], marcadas[0]];
+    if (!confirm(`Se unirán ${numeroInstagram(vieja.numero)} y ${numeroInstagram(nueva.numero)} en ${numeroInstagram(vieja.numero)}, la más antigua. ${numeroInstagram(nueva.numero)} se elimina y lo que aporte (enlace, copy, cifras, archivo) pasa a la que queda. ¿Continuar?`)) return;
+    setTrabajando(true);
+    const r = await unirCapturas(marcadas[0].id, marcadas[1].id).catch(() => ({ error: "No se pudieron unir las capturas." }) as { error?: string; numero?: number });
+    setTrabajando(false);
+    if (r.error || r.numero === undefined) return mostrarToast(r.error ?? "No se pudieron unir las capturas.", "destructive");
+    mostrarToast(`Unidas en ${numeroInstagram(r.numero)}`);
+    quitar();
+    router.refresh();
+  }
+  async function eliminarMarcadas(marcadas: FilaInstagram[], quitar: () => void) {
+    if (marcadas.length === 0 || trabajando) return;
+    const nombres = marcadas.length <= 3 ? marcadas.map((f) => numeroInstagram(f.numero)).join(", ") : `${marcadas.length} capturas`;
+    if (!confirm(`¿Eliminar ${nombres}? Se borran con sus archivos y no se puede deshacer.`)) return;
+    setTrabajando(true);
+    const r = await eliminarCapturas(marcadas.map((f) => f.id)).catch(() => ({ error: "No se pudieron eliminar las capturas." }) as { error?: string; eliminadas?: number });
+    setTrabajando(false);
+    if (r.error) mostrarToast(r.error, "destructive");
+    else mostrarToast(r.eliminadas === 1 ? "Captura eliminada" : `${r.eliminadas} capturas eliminadas`);
+    if ((r.eliminadas ?? 0) > 0) {
+      quitar();
+      setAbierta((a) => (a && marcadas.some((f) => f.id === a.id) ? null : a));
+      router.refresh();
+    }
+  }
+
   return (
     <>
       <TablaDatos
@@ -223,6 +250,14 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
           columna: "captura",
           soloColumna: true,
         }}
+        seleccion={
+          puedeEscribir
+            ? {
+                etiqueta: (f) => `Seleccionar la captura ${numeroInstagram(f.numero)}`,
+                barra: (marcadas, quitar) => <BarraLoteInstagram filas={marcadas} ocupada={trabajando} alUnir={() => void unirMarcadas(marcadas, quitar)} alEliminar={() => void eliminarMarcadas(marcadas, quitar)} alQuitar={quitar} />,
+              }
+            : undefined
+        }
         accionPrincipal={
           puedeEscribir && repetidas > 0 ? (
             <button type="button" onClick={() => void fusionar()} disabled={fusionando} className={`inline-flex items-center justify-center gap-1 boton-neon border border-transparent px-4 py-2 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md`}>

@@ -195,11 +195,13 @@ La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin ini
 texto, el identificador y **la dirección del botón de compra**. Buscando el copy de la captura **como frase exacta** sale el anuncio:
 con el copy de IG-0005 («Apoya tu bienestar corporal con Perfectx…») aparecieron 4 anuncios de «Mundo Digital» con el destino
 `clicksitienda.com/products/producto-2lp-pa001-crema-perfetcx`. La ficha trae el botón **«Buscar el anuncio en la Biblioteca de
-anuncios»** (`src/lib/instagram/biblioteca.ts`), que abre esa búsqueda ya armada (países: todos; estados: todos). Con el **nombre de la página** (que sale del título de la vista previa:
-«Nuvo Venezuela on Instagram: …») busca sus palabras junto con las del copy: se probó «Mundo Digital» + el copy de Perfectx y dio los mismos
-4 anuncios que la frase exacta, y solo el nombre da 50.000; la combinación es igual de precisa y evita mezclar tiendas cuando el copy se
-copia entre varias (algo habitual). Sin nombre se busca la frase exacta; la persona copia el
-destino al campo «Página de destino». **El servidor no la abre**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
+anuncios»** (`src/lib/instagram/biblioteca.ts`), que abre esa búsqueda ya armada (países: todos; estados: todos). **Busca el copy completo como frase exacta** (desde el 15 oct 2026; antes buscaba su primera
+línea, o el nombre de la página junto con ella). Medido en la Biblioteca: el copy de IG-0026 («Hay joyas bonitas… y hay joyas que cuentan tu historia…», una plantilla que
+usan muchas tiendas) da **340 resultados** con la primera línea y **1** con el copy completo, que es justo su anuncio; el de IG-0027, 11 contra 10. Con el nombre de la
+página más la primera línea daba 0 (el nombre en Instagram no es el de la página en la Biblioteca). La Biblioteca acepta frases de al menos 900 caracteres y busca igual con o
+sin emojis y puntuación, así que el texto se limpia a **letras y números**, con un solo espacio entre palabras y hasta 700 caracteres cortados en una palabra
+(`copyCompletoPorBuscar`): así no depende de comillas, puntos suspensivos o emojis que Instagram y la Biblioteca escriban distinto. Si el copy completo no encuentra nada
+(Instagram puede mostrarlo recortado), **«Buscar solo la primera línea»** (`urlBibliotecaPrimeraLinea`) trae más resultados, de varios anunciantes si es una plantilla. **El servidor no la abre**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
 prohíbe leerla de forma automática (su API oficial solo cubre anuncios políticos fuera de la UE). Lo que sí se hace es leerla **desde el navegador
 de la persona** (ver la sección siguiente).
 

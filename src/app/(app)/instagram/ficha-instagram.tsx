@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha, formatearFechaHora } from "@/lib/formato";
-import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
+import { urlBibliotecaAnuncios, urlBibliotecaPrimeraLinea } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, eliminarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, quitarEnvioDeCaptura, urlVideoCaptura } from "./actions";
 import { MarcadorBiblioteca } from "./marcador-biblioteca";
@@ -48,8 +48,6 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
 const CIFRAS = [
   ["like_count", "Me gusta", "megusta"],
   ["comments_count", "Comentarios", "comentarios"],
-  ["view_count", "Vistas", "vistas"],
-  ["share_count", "Compartidos", "compartidos"],
 ] as const;
 const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1_048_576).toLocaleString("es-CR", { maximumFractionDigits: 1 })} MB`);
 
@@ -365,15 +363,15 @@ export function FichaInstagram({
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  {urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) && (
-                    <a href={urlBibliotecaAnuncios(fila.titulo, fila.nombrePagina) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                  {urlBibliotecaAnuncios(fila.titulo) && (
+                    <a href={urlBibliotecaAnuncios(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
                       <InstagramIcon className="h-4 w-4" />
                       Buscar el anuncio en la Biblioteca de anuncios
                     </a>
                   )}
-                  {fila.nombrePagina && urlBibliotecaAnuncios(fila.titulo) && (
-                    <a href={urlBibliotecaAnuncios(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
-                      Buscar solo el copy
+                  {urlBibliotecaPrimeraLinea(fila.titulo) && (
+                    <a href={urlBibliotecaPrimeraLinea(fila.titulo) ?? undefined} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                      Buscar solo la primera línea
                     </a>
                   )}
                   {puedeEscribir && <MarcadorBiblioteca />}

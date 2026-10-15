@@ -18,8 +18,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CIFRAS = [
   ["like_count", "Me gusta"],
   ["comments_count", "Comentarios"],
-  ["view_count", "Vistas"],
-  ["share_count", "Compartidos"],
 ] as const;
 const ESTADOS: Set<string> = new Set(ESTADOS_INSTAGRAM.map((e) => e.valor));
 
@@ -153,7 +151,7 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
     }
   }
   if (Object.keys(cambio.despues).length > 0) await registrarAuditoria({ accion: "actualizar_captura_instagram", entidad: ENTIDAD, entidadId: id, ...cambio });
-  // Un enlace nuevo (pegado a mano) se lee enseguida: la página pública completa el archivo, las vistas, las cifras, la cuenta y el nombre.
+  // Un enlace nuevo (pegado a mano) se lee enseguida: la página pública completa el archivo, las cifras, la cuenta y el nombre.
   if (enlaceNuevo && enlaceNuevo !== (antes.enlace ?? null)) await completarCaptura(id).catch(() => null);
   revalidatePath(RUTA);
   return {};
@@ -187,7 +185,7 @@ export async function cambiarEstadoCaptura(id: string, estado: string): Promise<
 }
 
 /**
- * Vuelve a leer la página pública del enlace de una captura y la completa (archivo, me gusta, comentarios, vistas, cuenta y nombre de
+ * Vuelve a leer la página pública del enlace de una captura y la completa (archivo, me gusta, comentarios, cuenta y nombre de
  * la página). Deja una línea en la actividad. Devuelve el error como valor.
  */
 export async function leerEnlaceDeCaptura(id: string): Promise<{ error?: string; archivo?: boolean }> {
@@ -220,18 +218,43 @@ export async function fusionarCapturasRepetidas(): Promise<{ error?: string; fus
 export async function eliminarCaptura(id: string): Promise<{ error?: string }> {
   await requireModuloEscritura(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Captura no válida." };
-  const supabase = createServiceClient();
+  const r = await borrarUna(createServiceClient(), id);
+  if (!r.ok) return { error: r.error };
+  revalidatePath(RUTA);
+  return {};
+}
+
+/** Borra una captura, su archivo si ninguna otra lo usa, y deja la línea en la actividad. */
+async function borrarUna(supabase: ReturnType<typeof createServiceClient>, id: string): Promise<{ ok: true; numero: number } | { ok: false; error: string }> {
   const { data } = await supabase.from(ENTIDAD).select("numero, video_ruta").eq("id", id).maybeSingle();
-  if (!data) return { error: "La captura ya no existe." };
+  if (!data) return { ok: false, error: "La captura ya no existe." };
   const { error } = await supabase.from(ENTIDAD).delete().eq("id", id);
-  if (error) return { error: "No se pudo eliminar la captura." };
+  if (error) return { ok: false, error: "No se pudo eliminar la captura." };
   if (data.video_ruta) {
     const { count } = await supabase.from(ENTIDAD).select("id", { count: "exact", head: true }).eq("video_ruta", data.video_ruta);
     if (!count) await supabase.storage.from(BUCKET_INSTAGRAM).remove([data.video_ruta]);
   }
   await registrarAuditoria({ accion: "eliminar_captura_instagram", entidad: ENTIDAD, entidadId: id, detalle: `IG-${String(data.numero).padStart(4, "0")}` });
+  return { ok: true, numero: data.numero as number };
+}
+
+/**
+ * Elimina varias capturas de una vez (las que se marcaron en la lista): hasta 100, cada una con su archivo y su línea en la actividad.
+ * No se puede deshacer. Si alguna falla, las demás se eliminan igual y se dice cuántas quedaron. Devuelve el error como valor.
+ */
+export async function eliminarCapturas(ids: string[]): Promise<{ error?: string; eliminadas?: number }> {
+  await requireModuloEscritura(MODULO);
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || ids.some((i) => typeof i !== "string" || !UUID.test(i))) return { error: "Elige entre 1 y 100 capturas." };
+  const supabase = createServiceClient();
+  let eliminadas = 0;
+  for (const id of new Set(ids)) {
+    const r = await borrarUna(supabase, id);
+    if (r.ok) eliminadas++;
+  }
   revalidatePath(RUTA);
-  return {};
+  const total = new Set(ids).size;
+  if (eliminadas < total) return { eliminadas, error: eliminadas === 0 ? "No se pudo eliminar ninguna captura." : `Se eliminaron ${eliminadas} de ${total}.` };
+  return { eliminadas };
 }
 
 /**
