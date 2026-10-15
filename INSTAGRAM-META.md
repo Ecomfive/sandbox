@@ -163,8 +163,32 @@ anuncios»** (`src/lib/instagram/biblioteca.ts`), que abre esa búsqueda ya arma
 «Nuvo Venezuela on Instagram: …») busca sus palabras junto con las del copy: se probó «Mundo Digital» + el copy de Perfectx y dio los mismos
 4 anuncios que la frase exacta, y solo el nombre da 50.000; la combinación es igual de precisa y evita mezclar tiendas cuando el copy se
 copia entre varias (algo habitual). Sin nombre se busca la frase exacta; la persona copia el
-destino al campo «Página de destino». **No se automatiza**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
-prohíbe leerla de forma automática (su API oficial solo cubre anuncios políticos fuera de la UE).
+destino al campo «Página de destino». **El servidor no la abre**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
+prohíbe leerla de forma automática (su API oficial solo cubre anuncios políticos fuera de la UE). Lo que sí se hace es leerla **desde el navegador
+de la persona** (ver la sección siguiente).
+
+## Contar los anuncios con el mismo copy: el marcador «Leer Biblioteca» (15 oct 2026)
+
+Un mismo anuncio suele estar duplicado muchas veces (Perfectx: 4 anuncios de «Mundo Digital» con el mismo copy y distinto video), y cuántos hay es una
+señal de que el anunciante lo está escalando. La plataforma lo cuenta con un **favorito del navegador** («Leer Biblioteca», `src/lib/instagram/marcador.ts`)
+que se arrastra a la barra de favoritos desde el bloque «Biblioteca de anuncios» de la ficha y se pulsa con la búsqueda de la Biblioteca abierta:
+
+1. Lee cada tarjeta de la página (texto y enlace del botón). La tarjeta es el contenedor más grande que contiene **un solo** «Identificador de la
+   biblioteca», para no depender de las clases de Meta, que cambian.
+2. Abre `/instagram/biblioteca#d=<lectura>`. La lectura va en el **fragmento** de la dirección porque desde `facebook.com` no se puede llamar a otro sitio
+   (su CSP lo impide) pero sí abrir una pestaña, y el fragmento nunca llega al servidor hasta que la propia página lo envía a la acción.
+3. `guardarLecturaBiblioteca` interpreta las tarjetas y cuenta, **para cada captura**, los anuncios de la misma página con el mismo copy.
+
+Lo observado en la Biblioteca (búsqueda de «Mundo Digital» + el copy de Perfectx, y de «colageno» en Panamá): cada tarjeta trae `Activo`/`Inactivo`, «Identificador de
+la biblioteca: N», «En circulación desde el 10 oct 2026», el nombre de la página, «Publicidad», el copy, el dominio en mayúsculas, el titular y el botón. El
+enlace del botón es `l.facebook.com/l.php?u=<destino>&h=…`: **trae la página de destino completa**, no solo el dominio. Meta ya agrupa los anuncios
+idénticos en una sola tarjeta: «Este anuncio tiene varias versiones» + «2 anuncios usan este contenido y texto» (cuenta como 2). El contador de arriba
+(«~4 resultados», «~1.100 resultados») permite saber si faltan tarjetas por cargar (la Biblioteca carga ~30 y sigue al bajar). La URL de la Biblioteca **descarta los
+parámetros que no conoce**: no se puede llevar ahí el id de la captura, por eso la captura se reconoce por su copy y su página, no por la dirección.
+
+Cómo decide que es el mismo copy: las primeras 25 a 120 letras, sin emojis, acentos ni mayúsculas (`mismoCopy`), para que un copy que Instagram recortó siga
+coincidiendo con el completo. Cómo decide que es la misma página: nombre igual o uno dentro del otro (`mismaPagina`: «Mundo Digital» y «Mundo Digital PA»).
+Una captura sin nombre de página solo se cuenta si todos los anuncios con ese copy son de una sola página.
 
 ## Los dos enlaces de cada captura: qué se puede asegurar y qué no
 

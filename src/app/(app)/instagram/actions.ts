@@ -78,6 +78,14 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
     if (!Number.isInteger(n) || n < 0 || n > 2_000_000_000) return { error: `${nombre}: escribe un número entero desde 0.` };
     cifras[campo] = n;
   }
+  // Cuántos anuncios de la misma página llevan este copy: lo llena la lectura de la Biblioteca y se puede corregir; vacío = sin dato.
+  const anunciosTexto = String(formData.get("anuncios_mismo_copy") ?? "").trim();
+  let anuncios: number | null = null;
+  if (anunciosTexto) {
+    const n = Number(anunciosTexto);
+    if (!Number.isInteger(n) || n < 0 || n > 100_000) return { error: "Anuncios con el mismo copy: escribe un número entero desde 0." };
+    anuncios = n;
+  }
 
   const supabase = createServiceClient();
   const { data: antes } = await supabase.from(ENTIDAD).select("estado, pagina_destino, notas, autor_usuario, metricas, enlace").eq("id", id).maybeSingle();
@@ -89,6 +97,9 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
     if (cifras[campo] === null) delete metricas[campo];
     else metricas[campo] = cifras[campo];
   }
+  const anunciosAntes = typeof metricasAntes.anuncios_mismo_copy === "number" ? metricasAntes.anuncios_mismo_copy : null;
+  if (anuncios === null) delete metricas.anuncios_mismo_copy;
+  else metricas.anuncios_mismo_copy = anuncios;
   const fechaAntes = typeof metricasAntes.fecha_publicacion === "string" ? metricasAntes.fecha_publicacion : null;
   if (fechaPublicacion === null) delete metricas.fecha_publicacion;
   else metricas.fecha_publicacion = fechaPublicacion;
@@ -129,6 +140,10 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   if (fechaAntes !== fechaPublicacion) {
     cambio.antes["Fecha de publicación"] = fechaAntes ?? "—";
     cambio.despues["Fecha de publicación"] = fechaPublicacion ?? "—";
+  }
+  if (anunciosAntes !== anuncios) {
+    cambio.antes["Anuncios con el mismo copy"] = anunciosAntes === null ? "—" : String(anunciosAntes);
+    cambio.despues["Anuncios con el mismo copy"] = anuncios === null ? "—" : String(anuncios);
   }
   for (const [campo, nombre] of CIFRAS) {
     const previo = typeof metricasAntes[campo] === "number" ? (metricasAntes[campo] as number) : null;
