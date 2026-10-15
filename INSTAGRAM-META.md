@@ -162,6 +162,7 @@ Eso permite saltarse el mensaje directo: la plataforma se instala como **app web
 salen las cifras, la cuenta y, si el anuncio lo permite, el video; el destino sale de la Biblioteca con el marcador). Para quien comparte, el enlace llega
 siempre, que era lo que fallaba al reenviar desde un chat.
 
+- **Primera prueba real (15 oct 2026, IG-0027, un anuncio de «Metodo Sawaya / nutricionista…»):** llegó el enlace, el nombre de la página, la cuenta, la fecha, 5.668 me gusta y 149 comentarios; **sin video** (la página de «insertar» de esa cuenta no trae datos) y, al principio, **sin copy**: lo compartido desde el celular no lo trae, pero la vista previa pública sí (`og:description` = «N likes, M comments - cuenta on fecha: "copy…"», con todo el texto), y desde entonces se toma de ahí si falta.
 - Solo **Android** (Chrome) registra la app como destino de compartir. En iPhone no aparece; ahí quedan el mensaje directo o un atajo de la app Atajos.
 - Hay que instalar la app: Chrome › menú ⋮ › «Instalar aplicación» (o «Agregar a la pantalla de inicio»), con la sesión de la plataforma iniciada en Chrome.
 - No se puede correlacionar este envío con el mensaje directo del mismo anuncio por id: el id del mensaje de Meta (`18020951225874919` en IG-0020) no es el de la

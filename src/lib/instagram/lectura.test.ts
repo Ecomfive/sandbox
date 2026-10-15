@@ -5,7 +5,7 @@ import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import type { VistaPublica } from "./vista-previa";
 
 const AHORA = new Date("2026-10-14T20:00:00.000Z");
-const vista: VistaPublica = { megusta: 43, comentarios: 12, usuario: "nuvotienda.ve", fecha: "2025-02-04", nombre: "Nuvo Venezuela" };
+const vista: VistaPublica = { megusta: 43, comentarios: 12, usuario: "nuvotienda.ve", fecha: "2025-02-04", nombre: "Nuvo Venezuela", copy: "Nuestro Soporte celular para retrovisor" };
 const embed: DatosEmbed = { esVideo: true, videoUrl: "https://x.cdninstagram.com/v.mp4", imagenUrl: "https://x.cdninstagram.com/p.jpg", vistas: 974, megusta: 40, comentarios: 5, usuario: "otro", duracion: 24.125, producto: "clips" };
 
 test("lectura: la vista previa manda en me gusta, comentarios y cuenta; la página de insertar aporta las vistas", () => {
@@ -36,7 +36,7 @@ test("lectura: si las dos fallan solo quedan los motivos y no se marca como leí
   const r = cifrasDeLectura({ ok: false, error: "a" }, { ok: false, error: "b" }, AHORA);
   assert.deepEqual(r.metricas, { vista_previa_error: "a", embed_error: "b" });
   assert.equal(r.autor, null);
-  assert.deepEqual(cifrasDeLectura(null, null, AHORA), { metricas: {}, autor: null });
+  assert.deepEqual(cifrasDeLectura(null, null, AHORA), { metricas: {}, autor: null, copy: null });
 });
 
 test("lectura: el archivo es el video, o la imagen solo si es una foto (nunca la portada de un video)", () => {
