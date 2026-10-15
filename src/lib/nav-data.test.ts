@@ -37,6 +37,7 @@ test("Testing Lab: solo Proveeduría, con el recorrido del producto en secciones
       "Fuentes › /tu-winner",
       "Fuentes › /scraping-proveedores",
       "Fuentes › /instagram",
+      "Fuentes › /sugerencias-clientes",
       "Selección › /seleccion-productos",
       "Producción › /creacion-ofertas",
       "Resultados › /productos-test",
