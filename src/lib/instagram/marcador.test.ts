@@ -26,7 +26,8 @@ test("el marcador, ejecutado sobre una página falsa de la Biblioteca, arma la l
   const texto = "​\nActivo\nIdentificador de la biblioteca: 1428370656108071\nEn circulación desde el 10 oct 2026\nVer detalles del anuncio\nMundo Digital\nPublicidad\n⚡ Apoya tu bienestar corporal con Perfectx — ñandú\nMás información";
   const hoja = { children: [], textContent: "Identificador de la biblioteca: 1428370656108071" };
   const enlace = { href: "https://l.facebook.com/l.php?u=http%3A%2F%2Fclicksitienda.com%2Fp" };
-  const raiz = { innerText: texto, contains: (x: unknown) => x === hoja, querySelector: () => enlace };
+  const paginaAnunciante = { href: "https://www.facebook.com/nenagoslingshop/" };
+  const raiz = { innerText: texto, contains: (x: unknown) => x === hoja, querySelector: () => enlace, querySelectorAll: () => [enlace, paginaAnunciante] };
   const hijo: Record<string, unknown> = { ...hoja, parentElement: raiz };
   const abiertas: string[] = [];
   const documento = {
@@ -39,12 +40,13 @@ test("el marcador, ejecutado sobre una página falsa de la Biblioteca, arma la l
   f(documento, ubicacion, ventana, (m: string) => assert.fail(m), btoa, unescape, encodeURIComponent);
   assert.equal(abiertas.length, 1);
   assert.ok(abiertas[0].startsWith("https://mom-beta-proveduria.vercel.app/instagram/biblioteca#d="));
-  const lectura = decodificarLectura(abiertas[0].slice(abiertas[0].indexOf("#"))) as { v: number; u: string; r: string; t: { x: string; l: string | null }[] };
+  const lectura = decodificarLectura(abiertas[0].slice(abiertas[0].indexOf("#"))) as { v: number; u: string; r: string; t: { x: string; l: string | null; p: string | null }[] };
   assert.equal(lectura.v, 1);
   assert.equal(lectura.r, "~4 resultados");
   assert.equal(lectura.t.length, 1);
   assert.equal(lectura.t[0].x, texto, "el texto con acentos, emojis y símbolos vuelve intacto");
   assert.equal(lectura.t[0].l, enlace.href);
+  assert.equal(lectura.t[0].p, paginaAnunciante.href, "el enlace de la página del anunciante viaja con la tarjeta");
 });
 
 test("decodificarLectura devuelve null con un fragmento roto", () => {

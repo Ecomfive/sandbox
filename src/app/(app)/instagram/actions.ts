@@ -113,6 +113,8 @@ export async function actualizarCaptura(formData: FormData): Promise<{ error?: s
   // Si una persona cambia alguna cifra, la cuenta o la fecha, el dato ya no es el que se leyó solo.
   const cifrasCambiaron = cifrasDelFormulario.some(([campo]) => (typeof metricasAntes[campo] === "number" ? metricasAntes[campo] : null) !== cifras[campo]);
   if (cifrasCambiaron || (antes.autor_usuario ?? null) !== autor || fechaAntes !== fechaPublicacion || nombreAntes !== nombrePagina) metricas.fuente = "manual";
+  // Una cuenta escrita a mano ya no es la que dio la Biblioteca.
+  if ((antes.autor_usuario ?? null) !== autor) delete metricas.cuenta_origen;
   const { error } = await supabase.from(ENTIDAD).update({ estado, pagina_destino: pagina, notas, autor_usuario: autor, enlace: enlaceNuevo, metricas, actualizado_en: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "No se pudieron guardar los cambios." };
 

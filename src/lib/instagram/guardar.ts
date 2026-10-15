@@ -126,6 +126,8 @@ interface LecturaExterna {
   enlace: string | null;
   metricas: Record<string, unknown>;
   videoUrl: string | null;
+  /** La imagen de la publicación, para las que no son video (la foto de un anuncio o de un post). */
+  imagenUrl: string | null;
   /** Las cookies de la página: TikTok solo entrega su video a quien las trae. */
   cookies: string[];
   /** De qué página se pide el archivo (la red lo pide). */
@@ -154,7 +156,7 @@ export async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plat
       if (d.fecha) m.fecha_publicacion = d.fecha;
       if (d.nombre) m.nombre_pagina = d.nombre;
       if (d.duracion !== null) m.duracion = d.duracion;
-      return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, cookies: p.cookies, referer: "https://www.tiktok.com/" } };
+      return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, imagenUrl: null, cookies: p.cookies, referer: "https://www.tiktok.com/" } };
     }
     const p = await descargarConDetalle(enlace, 3_000_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
     if ("error" in p) return { ok: false, error: p.error };
@@ -174,9 +176,12 @@ export async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plat
       const pagina = await descargarConDetalle(`https://www.facebook.com/${d.paginaId}`, 400_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" }, true);
       const dp = "error" in pagina ? null : interpretarPaginaFacebook(new TextDecoder("utf-8").decode(pagina.bytes));
       if (dp?.nombre) m.nombre_pagina = dp.nombre;
+      else if (d.nombrePagina) m.nombre_pagina = d.nombrePagina;
       usuario = dp?.usuario ?? null;
       m.pagina_id = d.paginaId;
     }
+    // Sin id de página (una publicación que no es video), el título de la vista previa es el nombre de la página.
+    if (!d.paginaId && d.nombrePagina) m.nombre_pagina = d.nombrePagina;
     // El archivo: la página de «insertar» del video (pública, sin iniciar sesión) trae las direcciones del video, la de alta calidad y la normal.
     let videoUrl: string | null = null;
     if (canonico && canonico.tipo === "video" && !canonico.corto) {
@@ -186,7 +191,7 @@ export async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plat
         videoUrl = archivos.hd ?? archivos.sd;
       }
     }
-    return { ok: true, lectura: { copy: d.copy, usuario, enlace: canonico?.enlace ?? null, metricas: m, videoUrl, cookies: [], referer: "https://www.facebook.com/" } };
+    return { ok: true, lectura: { copy: d.copy, usuario, enlace: canonico?.enlace ?? null, metricas: m, videoUrl, imagenUrl: videoUrl ? null : d.imagen, cookies: [], referer: "https://www.facebook.com/" } };
   } catch {
     return { ok: false, error: "No se pudo leer la página." };
   }
@@ -288,8 +293,10 @@ async function aplicarLecturaExterna(
   if (lectura.enlace && lectura.enlace !== fila.enlace) cambios.enlace = lectura.enlace;
 
   let archivo = false;
-  if (!fila.video_ruta && lectura.videoUrl) {
-    const copia = await copiarVideo(fila.id, lectura.videoUrl, { accept: "*/*", referer: lectura.referer, "user-agent": AGENTE_NAVEGADOR, ...(lectura.cookies.length > 0 ? { cookie: lectura.cookies.join("; ") } : {}) });
+  // El video; si la publicación no es un video, su imagen (la foto de un anuncio).
+  const urlArchivo = lectura.videoUrl ?? lectura.imagenUrl;
+  if (!fila.video_ruta && urlArchivo) {
+    const copia = await copiarVideo(fila.id, urlArchivo, { accept: "*/*", referer: lectura.referer, "user-agent": AGENTE_NAVEGADOR, ...(lectura.cookies.length > 0 ? { cookie: lectura.cookies.join("; ") } : {}) });
     if ("error" in copia) cambios.video_error = copia.error;
     else {
       cambios.video_ruta = copia.ruta;

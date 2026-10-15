@@ -105,6 +105,8 @@ export default async function InstagramPage() {
     bibliotecaInactivos: numero(biblioteca(f.metricas)?.inactivos),
     bibliotecaDesde: typeof biblioteca(f.metricas)?.desde === "string" ? (biblioteca(f.metricas)?.desde as string) : null,
     bibliotecaLeidoEn: typeof biblioteca(f.metricas)?.leido_en === "string" ? (biblioteca(f.metricas)?.leido_en as string) : null,
+    bibliotecaPagina: typeof biblioteca(f.metricas)?.pagina === "string" ? (biblioteca(f.metricas)?.pagina as string) : null,
+    cuentaDeBiblioteca: f.metricas?.cuenta_origen === "biblioteca",
     notas: f.notas,
     estado: f.estado,
     datosMeta: JSON.stringify({ aviso: f.payload, consulta: f.metricas?.consulta ?? null, mensaje: f.metricas?.mensaje_meta ?? null }, null, 2).slice(0, 20000),

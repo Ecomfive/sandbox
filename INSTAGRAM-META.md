@@ -227,8 +227,12 @@ línea, o el nombre de la página junto con ella). Medido en la Biblioteca: el c
 usan muchas tiendas) da **340 resultados** con la primera línea y **1** con el copy completo, que es justo su anuncio; el de IG-0027, 11 contra 10. Con el nombre de la
 página más la primera línea daba 0 (el nombre en Instagram no es el de la página en la Biblioteca). La Biblioteca acepta frases de al menos 900 caracteres y busca igual con o
 sin emojis y puntuación, así que el texto se limpia a **letras y números**, con un solo espacio entre palabras y hasta 700 caracteres cortados en una palabra
-(`copyCompletoPorBuscar`): así no depende de comillas, puntos suspensivos o emojis que Instagram y la Biblioteca escriban distinto. Si el copy completo no encuentra nada
-(Instagram puede mostrarlo recortado), **«Buscar solo la primera línea»** (`urlBibliotecaPrimeraLinea`) trae más resultados, de varios anunciantes si es una plantilla. **El servidor no la abre**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
+(`copyCompletoPorBuscar`): así no depende de comillas, puntos suspensivos o emojis que Instagram y la Biblioteca escriban distinto. «Buscar solo la primera línea» se quitó
+(15 oct 2026): el copy completo es siempre más preciso. En su lugar la ficha trae **«Ver los anuncios de la página»** (`urlAnunciosDePagina`), que busca el *nombre* de la página como frase
+exacta para ver todo lo que corre (probado con «Nenagoslingshop»: ~9 resultados, todos de esa página); el nombre sale de la última lectura de la Biblioteca, luego del nombre de la página de la
+captura y, si no, del usuario de Facebook; se le quita lo que Facebook agrega tras « | » o « · » (la ciudad). **Mirar la página por su id** (`view_all_page_id`) no sirve sin iniciar sesión: no muestra anuncios. Junto
+a esos dos enlaces va el de la cuenta: «Abrir el perfil de Instagram», «Abrir la página de Facebook» o «Abrir la cuenta @…» de TikTok; si la cuenta salió de la Biblioteca (`metricas.cuenta_origen = "biblioteca"`)
+es el usuario de la *página de Facebook* aunque la captura sea de Instagram, y el enlace abre Facebook. **El servidor no la abre**: la Biblioteca se arma con JavaScript (haría falta un navegador) y Meta
 prohíbe leerla de forma automática (su API oficial solo cubre anuncios políticos fuera de la UE). Lo que sí se hace es leerla **desde el navegador
 de la persona** (ver la sección siguiente).
 

@@ -43,3 +43,19 @@ test("Facebook: solo se baja un archivo de la red de archivos de Facebook", () =
   // Un archivo de otro sitio dentro del bloque de datos no se acepta.
   assert.deepEqual(archivosDeEmbedFacebook('{"hd_src":"https:\\/\\/evil.com\\/a.mp4","sd_src":"https:\\/\\/video.xx.fbcdn.net\\/b.mp4"}'), { hd: null, sd: "https://video.xx.fbcdn.net/b.mp4" });
 });
+
+test("Facebook: una publicación que no es video trae la foto y el nombre de la página en el título (anuncio de Custom Venezuela, 15 oct 2026)", () => {
+  const html = '<meta property="og:type" content="video.other"/><meta property="og:title" content="Custom Venezuela"/><meta property="og:description" content="Los detalles marcan la diferencia."/><meta property="og:url" content="https://www.facebook.com/customvenezuela/posts/los-detalles-marcan-la-diferencia/122340408620224822/"/><meta property="og:image" content="https://www.facebook.com/ads/image/?d=AQIf6pKGEc"/>';
+  const r = interpretarFacebook(html);
+  assert.ok(r);
+  assert.equal(r.nombrePagina, "Custom Venezuela");
+  assert.equal(r.imagen, "https://www.facebook.com/ads/image/?d=AQIf6pKGEc");
+  assert.equal(r.vistas, null);
+  assert.equal(r.reacciones, null);
+  assert.equal(r.copy, "Los detalles marcan la diferencia.");
+  // Un reel (título con cifras) no toma ese título como nombre de la página.
+  const reel = interpretarFacebook('<meta property="og:title" content="2,8&#xa0;mill. reproducciones &#xb7; 1353 reacciones | How to share with just friends. | Facebook"/><meta property="og:description" content="How to share"/>');
+  assert.equal(reel?.nombrePagina, null);
+  // Una imagen de otro sitio no se acepta.
+  assert.equal(interpretarFacebook('<meta property="og:title" content="Tienda"/><meta property="og:image" content="https://evil.com/a.jpg"/>')?.imagen, null);
+});

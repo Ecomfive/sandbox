@@ -89,7 +89,8 @@ export function reconocerEnlace(texto: string | null | undefined): EnlaceReconoc
     if (/^\/watch(?:\/live)?\/?$/.test(ruta) && v && ID.test(v)) return como("facebook", `https://www.facebook.com/reel/${v}`, v, "video");
     const video = /^\/([\w.-]{1,80})\/videos\/(?:[^/]+\/)*(\d{6,25})\/?$/.exec(ruta);
     if (video) return como("facebook", `https://www.facebook.com/${video[1]}/videos/${video[2]}`, video[2], "video");
-    const post = /^\/([\w.-]{1,80})\/posts\/([\w-]{6,80})\/?$/.exec(ruta);
+    // `posts/pfbid…` o, el formato nuevo, `posts/<título en texto>/<id>/`: el código es el último tramo.
+    const post = /^\/([\w.-]{1,80})\/posts\/(?:[^/]+\/)*([\w-]{6,80})\/?$/.exec(ruta);
     if (post) return como("facebook", `https://www.facebook.com/${post[1]}/posts/${post[2]}`, post[2], "post");
     // Una foto: `photo/?fbid=ID`, `photo.php?fbid=ID` o `<página>/photos/<álbum>/ID/`.
     const foto = u.searchParams.get("fbid");
@@ -140,3 +141,21 @@ export const codigoDeContenido = (enlace: string | null | undefined): string | n
 
 /** De qué red es un enlace, o Instagram si no se reconoce (lo anterior a Facebook y TikTok no guardaba la red). */
 export const plataformaDeEnlace = (enlace: string | null | undefined): Plataforma => reconocerEnlace(enlace)?.plataforma ?? "instagram";
+
+/** Cómo abrir la app de cada red desde el navegador del celular: su paquete en Android y su esquema en iPhone. */
+const APPS: Record<Plataforma, { android: string; ios: string; web: string }> = {
+  instagram: { android: "com.instagram.android", ios: "instagram://", web: "https://www.instagram.com/" },
+  facebook: { android: "com.facebook.katana", ios: "fb://", web: "https://www.facebook.com/" },
+  tiktok: { android: "com.zhiliaoapp.musically", ios: "snssdk1233://", web: "https://www.tiktok.com/" },
+};
+
+/**
+ * La dirección que abre la app de una red según el aparato: en Android una dirección `intent://` (abre la app por su paquete), en iPhone
+ * el esquema de la app y, en una computadora, la web de la red. `agente` es el `navigator.userAgent`.
+ */
+export function enlaceDeApp(plataforma: Plataforma, agente: string): string {
+  const app = APPS[plataforma];
+  if (/android/i.test(agente)) return `intent://#Intent;package=${app.android};action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end`;
+  if (/iphone|ipad|ipod/i.test(agente)) return app.ios;
+  return app.web;
+}
