@@ -153,6 +153,21 @@ Lo que sí se probó o se dejó en marcha:
 - Para un **anuncio**, el «enlace» útil es el de la Biblioteca (`facebook.com/ads/library/?id=<identificador>`), que se encuentra con el botón de la
   Biblioteca; un anuncio «dark post» no tiene enlace de Instagram.
 
+## Compartir desde el celular sin mensaje directo (15 oct 2026)
+
+Los anuncios se ven en la app de Instagram del celular, donde no hay marcadores ni extensiones. Pero al pulsar el avión de papel de un **anuncio
+patrocinado**, Instagram ofrece compartirlo también **fuera de Instagram** (WhatsApp, Facebook, Chrome…) y copiar el enlace (probado por Hernán).
+Eso permite saltarse el mensaje directo: la plataforma se instala como **app web** en Chrome del celular y aparece en esa lista como
+«Ecomfive Fuentes» (`share_target` del manifiesto). Lo compartido llega a `/instagram/compartir` y se guarda como una captura con su enlace (de ahí
+salen las cifras, la cuenta y, si el anuncio lo permite, el video; el destino sale de la Biblioteca con el marcador). Para quien comparte, el enlace llega
+siempre, que era lo que fallaba al reenviar desde un chat.
+
+- Solo **Android** (Chrome) registra la app como destino de compartir. En iPhone no aparece; ahí quedan el mensaje directo o un atajo de la app Atajos.
+- Hay que instalar la app: Chrome › menú ⋮ › «Instalar aplicación» (o «Agregar a la pantalla de inicio»), con la sesión de la plataforma iniciada en Chrome.
+- No se puede correlacionar este envío con el mensaje directo del mismo anuncio por id: el id del mensaje de Meta (`18020951225874919` en IG-0020) no es el de la
+  publicación (el de `/p/DeSh9KxMqNy/` equivale a `4004412357671560050`), son dos ids distintos. Si la misma persona comparte el mismo contenido por las
+  dos vías, se fusionan por el enlace cuando el mensaje también trae enlace.
+
 ## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
 
 La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin iniciar sesión) muestra de cada anuncio su anunciante, su

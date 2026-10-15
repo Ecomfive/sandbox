@@ -6,6 +6,7 @@ import { interpretarEmbed, urlDeEmbed, type DatosEmbed } from "./embed";
 import { enviosDe, fusionar, unirTextos, type FilaFusionable } from "./fusion";
 import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
+import { esEnvioPropio } from "./compartir";
 import { codigoDePublicacion, repetidasDe } from "./repetidas";
 import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
 
@@ -209,11 +210,12 @@ async function pegarEnlaceALaUltima(supabase: Supabase, c: CapturaInstagram): Pr
 /**
  * Guarda las capturas de un aviso de Meta. Cada contenido tiene **una sola captura**: si ya había una del mismo contenido (mismo
  * identificador de Meta o mismo código de enlace), la nueva llegada se fusiona en ella; si lo que llegó es un enlace pegado después
- * de compartir un archivo, se le une a esa captura. El aviso completo queda en `payload`. Meta reintenta los avisos que no contesta a
+ * de compartir un archivo, se le une a esa captura. `remitentePropio` es quien compartió desde la plataforma (no desde un mensaje de
+ * Meta). El aviso completo queda en `payload`. Meta reintenta los avisos que no contesta a
  * tiempo: el mismo mensaje no se procesa dos veces. Nunca lanza: lo que falle queda anotado en `video_error` o se pierde sin tumbar
  * la respuesta al webhook.
  */
-export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram[]): Promise<{ nuevas: number }> {
+export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram[], remitentePropio?: { usuario: string | null; nombre: string | null }): Promise<{ nuevas: number }> {
   const supabase = createServiceClient();
   let nuevas = 0;
   for (const c of capturas) {
@@ -238,7 +240,11 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       if (error || !data) continue; // 23505 = ya la teníamos (un reintento de Meta); lo demás tampoco se puede arreglar aquí
       nuevas++;
 
-      const [remitente, consulta] = await Promise.all([consultarRemitente(c.remitenteId), c.mediaId ? consultarMedia(c.mediaId) : Promise.resolve(null)]);
+      // Lo compartido desde la plataforma (celular instalado como app) ya trae quién es: no se le pregunta a Instagram.
+      const [remitente, consulta] = await Promise.all([
+        esEnvioPropio(c.remitenteId) ? Promise.resolve(remitentePropio ?? null) : consultarRemitente(c.remitenteId),
+        c.mediaId ? consultarMedia(c.mediaId) : Promise.resolve(null),
+      ]);
       const media = consulta?.ok ? interpretarMedia(consulta.datos) : null;
       const urlVideo = c.urlVideo ?? media?.urlVideo ?? null;
       const enlaceFinal = c.enlace ?? media?.enlace ?? null;
