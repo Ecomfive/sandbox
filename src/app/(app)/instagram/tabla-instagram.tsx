@@ -22,7 +22,9 @@ import {
   type FilaInstagram,
 } from "./def-instagram";
 import { cambiarEstadoCaptura, fusionarCapturasRepetidas } from "./actions";
+import { unionProbable } from "@/lib/instagram/unir";
 import { FichaInstagram } from "./ficha-instagram";
+import { paraUnir } from "./unir-captura";
 import { SelectorEstadoInstagram } from "./selector-estado-instagram";
 
 const NOMBRE: NombreFilas = { singular: "captura", plural: "capturas" };
@@ -58,7 +60,7 @@ function Vinculo({ url, texto }: { url: string | null; texto: string }) {
 
 const resumen = (f: FilaInstagram) => f.titulo || f.textoMensaje || "Sin copy";
 
-function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) => void): ColumnaTabla<FilaInstagram, undefined>[] {
+function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) => void, uniones: Map<string, number>): ColumnaTabla<FilaInstagram, undefined>[] {
   return [
   { id: "numero", label: "N.º", ocultable: false, clase: "tabular-nums text-muted-foreground whitespace-nowrap", render: (f) => numeroInstagram(f.numero) },
   {
@@ -71,6 +73,7 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
         <Badge color={colorFormatoInstagram(formatoDeCaptura(f))}>{etiquetaFormatoInstagram(formatoDeCaptura(f))}</Badge>
         {f.repetidaDe !== null && <Badge tone="warning">{`Repetida de ${numeroInstagram(f.repetidaDe)}`}</Badge>}
         {f.envios.length > 0 && <Badge tone="info">{`Compartida ${f.envios.length + 1} veces`}</Badge>}
+        {puedeEscribir && uniones.has(f.id) && <Badge tone="warning">{`Se puede unir con ${numeroInstagram(uniones.get(f.id) as number)}`}</Badge>}
         <span className="block max-w-[26rem] truncate" title={resumen(f)}>
           {resumen(f)}
         </span>
@@ -173,7 +176,17 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
     },
     [filas, mostrarToast],
   );
-  const cols = useMemo(() => columnas(puedeEscribir, (id, estado) => void cambiar(id, estado)), [puedeEscribir, cambiar]);
+  // Un anuncio reenviado desde un chat llega solo como archivo; si hay una captura con enlace de hace pocos minutos, casi seguro es el mismo: se avisa en la lista.
+  const uniones = useMemo(() => {
+    const paraAvisar = new Map<string, number>();
+    const todas = vistas.map(paraUnir);
+    for (const c of todas) {
+      const u = unionProbable(c, todas);
+      if (u) paraAvisar.set(c.id, u.numero);
+    }
+    return paraAvisar;
+  }, [vistas]);
+  const cols = useMemo(() => columnas(puedeEscribir, (id, estado) => void cambiar(id, estado), uniones), [puedeEscribir, cambiar, uniones]);
 
   // Las capturas que ya estaban repetidas antes de que se fusionaran solas: un botón las deja en una sola ficha cada una.
   const repetidas = filas.filter((f) => f.repetidaDe !== null).length;
@@ -222,6 +235,7 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
       />
       <FichaInstagram
         fila={fila}
+        otras={vistas}
         orden={abierta?.orden ?? []}
         codigoPais={codigoPais}
         puedeEscribir={puedeEscribir}
