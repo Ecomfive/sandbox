@@ -92,8 +92,6 @@ export default async function InstagramPage() {
     autorUsuario: f.autor_usuario,
     megusta: numero(f.metricas?.like_count),
     comentarios: numero(f.metricas?.comments_count),
-    vistas: numero(f.metricas?.view_count),
-    compartidos: numero(f.metricas?.share_count),
     fechaPublicacion: typeof f.metricas?.fecha_publicacion === "string" ? f.metricas.fecha_publicacion : null,
     fuenteCifras: typeof f.metricas?.fuente === "string" ? f.metricas.fuente : null,
     leidoEn: typeof f.metricas?.leido_en === "string" ? f.metricas.leido_en : null,
