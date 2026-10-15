@@ -141,11 +141,19 @@ export function mismoCopy(a: string | null | undefined, b: string | null | undef
   return n >= COPY_MINIMO && x.slice(0, n) === y.slice(0, n);
 }
 
-/** ¿Es la misma página? Mismo nombre, o uno dentro del otro («Mundo Digital» y «Mundo Digital PA»). */
+/**
+ * ¿Es la misma página? Mismo nombre, o uno dentro del otro («Mundo Digital» y «Mundo Digital PA»). También sin espacios y con al menos
+ * 5 letras: el usuario de Instagram `nenagosling` está dentro de la página `Nenagoslingshop` de la Biblioteca.
+ */
 export function mismaPagina(a: string | null | undefined, b: string | null | undefined): boolean {
   const x = normalizar(a);
   const y = normalizar(b);
-  return x.length > 0 && y.length > 0 && (x === y || x.includes(y) || y.includes(x));
+  if (x.length === 0 || y.length === 0) return false;
+  if (x === y) return true;
+  if (Math.min(x.length, y.length) >= 4 && (x.includes(y) || y.includes(x))) return true;
+  const cx = x.replace(/ /g, "");
+  const cy = y.replace(/ /g, "");
+  return Math.min(cx.length, cy.length) >= 5 && (cx.includes(cy) || cy.includes(cx));
 }
 
 /**

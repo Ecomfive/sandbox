@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { coincidencias, resumirAnuncios, validarAnuncios, type AnuncioBiblioteca } from "./biblioteca-lectura";
+import { coincidencias, mismaPagina, resumirAnuncios, validarAnuncios, type AnuncioBiblioteca } from "./biblioteca-lectura";
 
 const COPY = "✨ Hay joyas bonitas… y hay joyas que cuentan tu historia. Un collar que habla de lo que más ama.";
 const anuncio = (id: string, extra: Partial<AnuncioBiblioteca> = {}): AnuncioBiblioteca => ({ id, activo: true, desde: "2026-10-10", pagina: "Nena Gosling", copy: COPY, destino: "https://nena.com/producto", cantidad: 1, ...extra });
@@ -30,6 +30,17 @@ test("el nombre de la cuenta en Instagram no es el de la página en la Bibliotec
   const r = coincidencias({ copy: COPY, nombrePagina: "NENA GOSLING regalos personalizados", paginasAlternas: ["Joyería Luna"] }, lectura);
   assert.ok(r && "ok" in r);
   assert.equal(r.ok.total, 1);
+});
+
+test("el usuario de Instagram sin espacios reconoce la página de la Biblioteca (IG-0026: nenagosling → Nenagoslingshop)", () => {
+  assert.equal(mismaPagina("nenagosling", "Nenagoslingshop"), true);
+  assert.equal(mismaPagina("NENA GOSLING regalos personalizados", "Nenagoslingshop"), false);
+  assert.equal(mismaPagina("mundo digital", "MundoDigital PA"), true);
+  // Un nombre muy corto no se busca dentro de otro sin espacios.
+  assert.equal(mismaPagina("tia", "Cristiana Shop"), false);
+  const lectura = [anuncio("100000000000001", { pagina: "Nenagoslingshop" })];
+  const r = coincidencias({ copy: COPY, nombrePagina: "NENA GOSLING regalos personalizados", paginasAlternas: ["nenagosling"] }, lectura);
+  assert.ok(r && "ok" in r);
 });
 
 test("validarAnuncios descarta lo que no es un anuncio y recorta lo demás", () => {

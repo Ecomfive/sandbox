@@ -29,9 +29,13 @@ interface FilaCaptura {
   titulo: string | null;
   metricas: Record<string, unknown> | null;
   pagina_destino: string | null;
+  autor_usuario: string | null;
 }
 
-/** El nombre con que la Biblioteca mostraba la página la última vez que se leyó o se vinculó a mano esta captura. */
+/**
+ * El nombre con que la Biblioteca mostraba la página la última vez que se leyó o se vinculó a mano esta captura. (El usuario de Instagram
+ * de la cuenta también sirve para reconocerla: suele parecerse a la página, `nenagosling` → «Nenagoslingshop».)
+ */
 function paginaDeBiblioteca(metricas: Record<string, unknown>): string | null {
   const b = metricas.biblioteca;
   return b && typeof b === "object" && typeof (b as Record<string, unknown>).pagina === "string" ? ((b as Record<string, unknown>).pagina as string) : null;
@@ -59,7 +63,7 @@ export async function guardarLecturaBiblioteca(fragmento: string): Promise<Resul
 
   const supabase = createServiceClient();
   const r = await traerTodasConError<FilaCaptura>((a, b) =>
-    supabase.from(ENTIDAD).select("id, numero, titulo, metricas, pagina_destino").not("titulo", "is", null).order("numero", { ascending: true }).range(a, b),
+    supabase.from(ENTIDAD).select("id, numero, titulo, metricas, pagina_destino, autor_usuario").not("titulo", "is", null).order("numero", { ascending: true }).range(a, b),
   );
   if (r.error || !r.data) return { error: "No se pudieron leer las capturas." };
 
@@ -71,7 +75,7 @@ export async function guardarLecturaBiblioteca(fragmento: string): Promise<Resul
     const metricasAntes = (c.metricas ?? {}) as Record<string, unknown>;
     const nombre = typeof metricasAntes.nombre_pagina === "string" && metricasAntes.nombre_pagina ? metricasAntes.nombre_pagina : null;
     const alterna = paginaDeBiblioteca(metricasAntes);
-    const res = coincidencias({ copy: c.titulo, nombrePagina: nombre, paginasAlternas: alterna ? [alterna] : [] }, anuncios);
+    const res = coincidencias({ copy: c.titulo, nombrePagina: nombre, paginasAlternas: [alterna, c.autor_usuario].filter((n): n is string => !!n) }, anuncios);
     if (!res) continue;
     if ("motivo" in res) {
       omitidas.push({ numero: c.numero, motivo: res.motivo });

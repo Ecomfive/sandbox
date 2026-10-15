@@ -208,7 +208,7 @@ Una captura sin nombre de página solo se cuenta si todos los anuncios con ese c
 
 **Cuando el nombre no coincide (IG-0026, 15 oct 2026).** El nombre con que Instagram muestra la cuenta («NENA GOSLING regalos personalizados») no era el de la página
 en la Biblioteca, y el copy es una plantilla que usan muchas tiendas («Hay joyas bonitas… y hay joyas que cuentan tu historia»: la frase exacta dio 340 resultados
-de varios anunciantes, la búsqueda con el nombre dio 0). Por eso la lectura puede no reconocer ninguna captura: los anuncios leídos se pueden **vincular a mano** a una
+de varios anunciantes, la búsqueda con el nombre dio 0). En la Biblioteca la página se llama «Nenagoslingshop» y el usuario de la cuenta es `nenagosling`: comparados sin espacios, uno está dentro del otro, así que ahora el usuario de la cuenta también cuenta para reconocerla. Aun así la lectura puede no reconocer ninguna captura: los anuncios leídos se pueden **vincular a mano** a una
 captura, y se guarda el nombre de la página en la Biblioteca para que la siguiente lectura la reconozca sola. La Biblioteca ordena por impresiones y carga ~30: con
 340 resultados el anuncio buscado puede no estar entre los primeros, y hay que bajar hasta que cargue.
 
