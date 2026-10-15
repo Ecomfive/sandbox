@@ -81,20 +81,32 @@ export function reconocerEnlace(texto: string | null | undefined): EnlaceReconoc
     const reel = /^\/reel\/(\d+)\/?$/.exec(ruta);
     if (reel && ID.test(reel[1])) return como("facebook", `https://www.facebook.com/reel/${reel[1]}`, reel[1], "video");
     const v = u.searchParams.get("v");
-    if (/^\/watch\/?$/.test(ruta) && v && ID.test(v)) return como("facebook", `https://www.facebook.com/reel/${v}`, v, "video");
-    const video = /^\/([\w.-]{1,80})\/videos\/(\d+)\/?$/.exec(ruta);
-    if (video && ID.test(video[2])) return como("facebook", `https://www.facebook.com/${video[1]}/videos/${video[2]}`, video[2], "video");
+    if (/^\/watch(?:\/live)?\/?$/.test(ruta) && v && ID.test(v)) return como("facebook", `https://www.facebook.com/reel/${v}`, v, "video");
+    const video = /^\/([\w.-]{1,80})\/videos\/(?:[^/]+\/)*(\d{6,25})\/?$/.exec(ruta);
+    if (video) return como("facebook", `https://www.facebook.com/${video[1]}/videos/${video[2]}`, video[2], "video");
     const post = /^\/([\w.-]{1,80})\/posts\/([\w-]{6,80})\/?$/.exec(ruta);
     if (post) return como("facebook", `https://www.facebook.com/${post[1]}/posts/${post[2]}`, post[2], "post");
+    // Una foto: `photo/?fbid=ID`, `photo.php?fbid=ID` o `<página>/photos/<álbum>/ID/`.
+    const foto = u.searchParams.get("fbid");
+    if (/^\/photo(?:\.php)?\/?$/.test(ruta) && foto && ID.test(foto)) return como("facebook", `https://www.facebook.com/photo/?fbid=${foto}`, foto, "post");
+    const fotos = /^\/([\w.-]{1,80})\/photos\/(?:[^/]+\/)*(\d{6,25})\/?$/.exec(ruta);
+    if (fotos) return como("facebook", `https://www.facebook.com/photo/?fbid=${fotos[2]}`, fotos[2], "post");
+    // Una publicación de un grupo público.
+    const grupo = /^\/groups\/([\w.-]{1,80})\/(?:posts|permalink)\/(\d{6,25})\/?$/.exec(ruta);
+    if (grupo) return como("facebook", `https://www.facebook.com/groups/${grupo[1]}/posts/${grupo[2]}`, grupo[2], "post");
     const story = u.searchParams.get("story_fbid");
     const id = u.searchParams.get("id");
     if (/^\/(permalink|story)\.php$/.test(ruta) && story && /^[\w-]{6,80}$/.test(story)) {
       const base = `https://www.facebook.com${ruta}?story_fbid=${story}`;
       return como("facebook", id && /^\d{4,25}$/.test(id) ? `${base}&id=${id}` : base, story, "post");
     }
-    // Un enlace de «compartir» de Facebook: `facebook.com/share/r/XXXX/` (reel), `/share/v/` (video) o `/share/p/` (publicación).
-    const compartir = /^\/share\/([rvp])\/([\w-]{5,30})\/?$/.exec(ruta);
-    if (compartir) return como("facebook", `https://www.facebook.com/share/${compartir[1]}/${compartir[2]}/`, `corto-${compartir[2]}`, compartir[1] === "p" ? "post" : "video", true);
+    // Un enlace de «compartir» de Facebook: `facebook.com/share/r/XXXX/` (reel), `/share/v/` (video), `/share/p/` (publicación) o, el más
+    // nuevo, `/share/XXXX/` sin letra (Facebook decide al abrirlo qué es).
+    const compartir = /^\/share\/(?:([rvp])\/)?([\w-]{5,30})\/?$/.exec(ruta);
+    if (compartir) {
+      const letra = compartir[1] ? `${compartir[1]}/` : "";
+      return como("facebook", `https://www.facebook.com/share/${letra}${compartir[2]}/`, `corto-${compartir[2]}`, compartir[1] === "p" ? "post" : compartir[1] ? "video" : "otro", true);
+    }
   }
   return null;
 }

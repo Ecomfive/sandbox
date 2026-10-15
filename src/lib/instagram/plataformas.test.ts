@@ -72,3 +72,16 @@ test("plataformaDeMetricas: sin dato es Instagram", () => {
   assert.equal(plataformaDeMetricas("facebook"), "facebook");
   for (const v of [undefined, null, "", "instagram", "otra", 5]) assert.equal(plataformaDeMetricas(v), "instagram");
 });
+
+test("Facebook: los demás enlaces que manda la app (compartir sin letra, fotos, grupos, videos con título)", () => {
+  const sin = reconocerEnlace("https://www.facebook.com/share/1AbCdEfGhI/?mibextid=x");
+  assert.deepEqual(sin, { plataforma: "facebook", enlace: "https://www.facebook.com/share/1AbCdEfGhI/", codigo: "corto-1AbCdEfGhI", tipo: "otro", corto: true });
+  assert.equal(reconocerEnlace("https://www.facebook.com/photo/?fbid=1234567890123&set=a.99")?.enlace, "https://www.facebook.com/photo/?fbid=1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/photo.php?fbid=1234567890123")?.codigo, "1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/tienda.pa/photos/a.123456/1234567890123/?type=3")?.enlace, "https://www.facebook.com/photo/?fbid=1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/groups/ventaspanama/posts/1234567890123/")?.enlace, "https://www.facebook.com/groups/ventaspanama/posts/1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/groups/ventaspanama/permalink/1234567890123/")?.tipo, "post");
+  assert.equal(reconocerEnlace("https://www.facebook.com/tienda.pa/videos/mi-titulo/1234567890123/")?.enlace, "https://www.facebook.com/tienda.pa/videos/1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/watch/live/?v=1234567890123")?.enlace, "https://www.facebook.com/reel/1234567890123");
+  assert.equal(reconocerEnlace("https://www.facebook.com/groups/ventaspanama/"), null);
+});
