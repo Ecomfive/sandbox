@@ -16,6 +16,7 @@ import { urlBibliotecaAnuncios } from "@/lib/instagram/biblioteca";
 import { CerrarIcon, CheckIcon, PapeleraIcon, EnlaceIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarCaptura, eliminarCaptura, leerEnlaceDeCaptura, obtenerHistorialCaptura, quitarEnvioDeCaptura, urlVideoCaptura } from "./actions";
 import { MarcadorBiblioteca } from "./marcador-biblioteca";
+import { UnirCaptura } from "./unir-captura";
 import { colorEstadoInstagram, colorFormatoInstagram, ESTADOS_INSTAGRAM, etiquetaEstadoInstagram, etiquetaFormatoInstagram, formatoDeCaptura, numeroInstagram, quienEnvio, type FilaInstagram } from "./def-instagram";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
@@ -104,6 +105,7 @@ function VideoCaptura({ fila }: { fila: FilaInstagram }) {
  */
 export function FichaInstagram({
   fila,
+  otras,
   orden,
   codigoPais,
   puedeEscribir,
@@ -111,6 +113,8 @@ export function FichaInstagram({
   alCerrar,
 }: {
   fila: FilaInstagram | undefined;
+  /** Todas las capturas de la lista, para elegir con cuál unir esta. */
+  otras: FilaInstagram[];
   orden: string[];
   codigoPais: string;
   puedeEscribir: boolean;
@@ -412,6 +416,11 @@ export function FichaInstagram({
               </Seccion>
             </div>
           </form>
+          {puedeEscribir && otras.length > 1 && (
+            <div className="border-t border-border p-5">
+              <UnirCaptura key={fila.id} fila={fila} otras={otras} alUnir={() => { alCerrar(); router.refresh(); }} />
+            </div>
+          )}
           {puedeEscribir && (
             <div className="border-t border-border p-5">
               <BotonAccion icono={PapeleraIcon} tono="peligro" onClick={() => void eliminar()} disabled={eliminando || guardando}>

@@ -179,6 +179,16 @@ siempre, que era lo que fallaba al reenviar desde un chat.
   publicación (el de `/p/DeSh9KxMqNy/` equivale a `4004412357671560050`), son dos ids distintos. Si la misma persona comparte el mismo contenido por las
   dos vías, se fusionan por el enlace cuando el mensaje también trae enlace.
 
+## Unir un archivo sin enlace con su anuncio compartido (15 oct 2026)
+
+Un anuncio **reenviado desde un chat** llega solo como archivo; el mismo anuncio **compartido después** con «Compartir en…» (Android o atajo de iPhone) llega con
+enlace. Meta no les da el mismo identificador (el del mensaje, `18020951225874919` en IG-0020, no es el de la publicación, `4004412357671560050` en
+`/p/DeSh9KxMqNy/`), así que el sistema no los reconoce como uno y quedan **dos capturas**. La ficha trae **«Unir con otra captura»**: lista primero las que el sistema
+**sugiere** (menos de 2 horas entre una y otra, enlaces no distintos y una aporta el enlace o el archivo que le falta a la otra; la misma persona va primero y,
+si no, la más cercana en el tiempo) y después todas las demás, para decidir a mano. La lista de capturas avisa «Se puede unir con IG-00NN» en las de solo archivo
+cuando hay **una sola** con enlace de menos de 30 minutos. Al unir queda la **más antigua** y absorbe a la otra (enlace, copy, cifras, archivo y envíos); la otra se
+elimina. No se pueden unir dos capturas con enlaces de Instagram distintos.
+
 ## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
 
 La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin iniciar sesión) muestra de cada anuncio su anunciante, su

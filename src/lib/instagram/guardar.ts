@@ -7,6 +7,7 @@ import { enviosDe, fusionar, unirTextos, type FilaFusionable } from "./fusion";
 import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
 import { esEnvioPropio } from "./compartir";
+import { sonDeContenidosDistintos } from "./unir";
 import { codigoDePublicacion, repetidasDe } from "./repetidas";
 import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
 
@@ -398,4 +399,25 @@ export async function fusionarRepetidas(): Promise<{ fusionadas: number }> {
     if (p && a && (await fusionarPar(supabase, p, a))) fusionadas++;
   }
   return { fusionadas };
+}
+
+/**
+ * Une dos capturas que una persona decidió que son el mismo contenido (un anuncio que llegó como archivo y el mismo compartido después
+ * como enlace): la **más antigua** queda y absorbe a la otra con `fusionar` (solo se completa lo que le falta; nada de lo que ya tenía se
+ * pisa) y la otra desaparece, con sus envíos anotados en «Compartida N veces». Se rechaza si las dos tienen enlace y no es el mismo. Nunca
+ * lanza.
+ */
+export async function unirCapturas(idA: string, idB: string): Promise<{ ok: true; principal: { id: string; numero: number }; absorbida: { numero: number } } | { ok: false; error: string }> {
+  try {
+    const supabase = createServiceClient();
+    const { data } = await supabase.from(TABLA).select(`${COLUMNAS_FUSION}, numero`).in("id", [idA, idB]);
+    const filas = ((data ?? []) as unknown as (FilaConId & { numero: number })[]).sort((a, b) => a.numero - b.numero);
+    if (filas.length !== 2) return { ok: false, error: "Una de las capturas ya no existe." };
+    const [principal, absorbida] = filas;
+    if (sonDeContenidosDistintos(principal, absorbida)) return { ok: false, error: "Las dos capturas tienen un enlace de Instagram distinto: no son el mismo contenido." };
+    if (!(await fusionarPar(supabase, principal.id, absorbida.id))) return { ok: false, error: "No se pudieron unir las capturas." };
+    return { ok: true, principal: { id: principal.id, numero: principal.numero }, absorbida: { numero: absorbida.numero } };
+  } catch {
+    return { ok: false, error: "No se pudieron unir las capturas." };
+  }
 }

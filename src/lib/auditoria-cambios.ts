@@ -25,6 +25,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   actualizar_captura_instagram: "Modificó la captura de Instagram",
   leer_enlace_captura_instagram: "Leyó el enlace de la captura de Instagram",
   compartir_captura_instagram: "Compartió un reel o publicación de Instagram desde el celular",
+  unir_capturas_instagram: "Unió dos capturas de Instagram",
   vincular_biblioteca_captura_instagram: "Vinculó a mano anuncios de la Biblioteca a la captura de Instagram",
   leer_biblioteca_captura_instagram: "Leyó la Biblioteca de anuncios de la captura de Instagram",
   fusionar_capturas_instagram: "Fusionó capturas repetidas de Instagram",

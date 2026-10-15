@@ -6,7 +6,7 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { enviosDe } from "@/lib/instagram/fusion";
 import { enlaceLegible } from "@/lib/instagram/vista-previa";
-import { BUCKET_INSTAGRAM, completarCaptura, fusionarRepetidas as fusionarRepetidasEnBase } from "@/lib/instagram/guardar";
+import { BUCKET_INSTAGRAM, completarCaptura, fusionarRepetidas as fusionarRepetidasEnBase, unirCapturas as unirCapturasEnBase } from "@/lib/instagram/guardar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ESTADOS_INSTAGRAM, etiquetaEstadoInstagram } from "./def-instagram";
 
@@ -253,6 +253,25 @@ export async function quitarEnvioDeCaptura(id: string, mensajeId: string): Promi
   await registrarAuditoria({ accion: "quitar_envio_captura_instagram", entidad: ENTIDAD, entidadId: id, detalle: "Quitó un envío de la lista" });
   revalidatePath(RUTA);
   return {};
+}
+
+/**
+ * Une dos capturas que son el mismo contenido (la más antigua queda y absorbe a la otra: enlace, copy, cifras, archivo, envíos). Deja una
+ * línea en la actividad de la que queda. Devuelve el error como valor.
+ */
+export async function unirCapturas(idA: string, idB: string): Promise<{ error?: string; numero?: number; absorbida?: number }> {
+  await requireModuloEscritura(MODULO);
+  if (typeof idA !== "string" || typeof idB !== "string" || !UUID.test(idA) || !UUID.test(idB) || idA === idB) return { error: "Elige dos capturas distintas." };
+  const r = await unirCapturasEnBase(idA, idB);
+  if (!r.ok) return { error: r.error };
+  await registrarAuditoria({
+    accion: "unir_capturas_instagram",
+    entidad: ENTIDAD,
+    entidadId: r.principal.id,
+    detalle: `Unió IG-${String(r.absorbida.numero).padStart(4, "0")} en esta captura`,
+  });
+  revalidatePath(RUTA);
+  return { numero: r.principal.numero, absorbida: r.absorbida.numero };
 }
 
 /** El enlace firmado (una hora) del video de una captura, para verlo en su ficha. El bucket es privado. */
