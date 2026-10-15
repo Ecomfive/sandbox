@@ -169,6 +169,8 @@ export async function descargarConDetalle(
   texto: string,
   maxBytes: number,
   encabezados?: Record<string, string>,
+  /** Con `parcial`, una respuesta más grande que `maxBytes` no es un error: se lee el comienzo y se cierra (sirve para las etiquetas del `<head>` de una página pesada). */
+  parcial = false,
 ): Promise<{ bytes: Uint8Array; urlFinal: string; cookies: string[] } | { error: string }> {
   const senal = AbortSignal.timeout(10_000);
   let actual = texto;
@@ -194,25 +196,34 @@ export async function descargarConDetalle(
       r.cuerpo.resume();
       return { error: "El sitio no entregó la imagen." };
     }
-    if (r.largo > maxBytes) {
+    if (r.largo > maxBytes && !parcial) {
       r.cuerpo.destroy();
       return { error: "La imagen pesa demasiado." };
     }
     const partes: Buffer[] = [];
     let total = 0;
+    let cortada = false;
     try {
       for await (const trozo of r.cuerpo as AsyncIterable<Buffer>) {
         total += trozo.length;
         if (total > maxBytes) {
-          r.cuerpo.destroy();
-          return { error: "La imagen pesa demasiado." };
+          if (!parcial) {
+            r.cuerpo.destroy();
+            return { error: "La imagen pesa demasiado." };
+          }
+          // Lectura parcial: ya se tiene el comienzo; se deja de leer.
+          partes.push(trozo);
+          cortada = true;
+          break;
         }
         partes.push(trozo);
       }
     } catch {
-      return { error: "No se pudo descargar la imagen." };
+      // Al cortar una lectura parcial el cierre de la conexión puede avisar como error: ya se tiene lo que se quería.
+      if (!cortada) return { error: "No se pudo descargar la imagen." };
     }
-    return { bytes: new Uint8Array(Buffer.concat(partes, total)), urlFinal: revisada.url.toString(), cookies };
+    if (cortada) r.cuerpo.destroy();
+    return { bytes: new Uint8Array(Buffer.concat(partes)), urlFinal: revisada.url.toString(), cookies };
   }
   return { error: "Demasiadas redirecciones." };
 }

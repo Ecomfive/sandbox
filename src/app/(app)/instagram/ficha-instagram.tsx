@@ -405,6 +405,11 @@ export function FichaInstagram({
                       Buscar solo la primera línea
                     </a>
                   )}
+                  {fila.plataforma === "facebook" && fila.autorUsuario && (
+                    <a href={`https://www.facebook.com/${fila.autorUsuario}`} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-sm text-primario hover:underline ${anilloFoco}`}>
+                      Abrir la página
+                    </a>
+                  )}
                   {puedeEscribir && <MarcadorBiblioteca />}
                 </div>
               </Seccion>

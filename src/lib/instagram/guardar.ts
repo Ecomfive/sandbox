@@ -7,7 +7,7 @@ import { enviosDe, fusionar, unirTextos, type FilaFusionable } from "./fusion";
 import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
 import { esEnvioPropio } from "./compartir";
-import { interpretarFacebook, interpretarTikTok } from "./lectura-externa";
+import { archivosDeEmbedFacebook, interpretarFacebook, interpretarPaginaFacebook, interpretarTikTok } from "./lectura-externa";
 import { codigoDeContenido, reconocerEnlace, type Plataforma } from "./plataformas";
 import { sonDeContenidosDistintos } from "./unir";
 import { repetidasDe } from "./repetidas";
@@ -128,6 +128,8 @@ interface LecturaExterna {
   videoUrl: string | null;
   /** Las cookies de la página: TikTok solo entrega su video a quien las trae. */
   cookies: string[];
+  /** De qué página se pide el archivo (la red lo pide). */
+  referer: string;
 }
 
 /**
@@ -135,7 +137,7 @@ interface LecturaExterna {
  * descargador seguro. TikTok se pide como un navegador y Facebook como lo hace su propia vista previa. Nunca lanza: si la red no
  * responde o cambia su formato, devuelve el motivo y la captura se guarda igual.
  */
-async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plataforma, "instagram">): Promise<{ ok: true; lectura: LecturaExterna } | { ok: false; error: string }> {
+export async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plataforma, "instagram">): Promise<{ ok: true; lectura: LecturaExterna } | { ok: false; error: string }> {
   if (!lecturaPublicaActiva()) return { ok: false, error: "La lectura de la página pública está apagada." };
   const ahora = new Date().toISOString();
   try {
@@ -152,7 +154,7 @@ async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plataforma,
       if (d.fecha) m.fecha_publicacion = d.fecha;
       if (d.nombre) m.nombre_pagina = d.nombre;
       if (d.duracion !== null) m.duracion = d.duracion;
-      return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, cookies: p.cookies } };
+      return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, cookies: p.cookies, referer: "https://www.tiktok.com/" } };
     }
     const p = await descargarConDetalle(enlace, 3_000_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
     if ("error" in p) return { ok: false, error: p.error };
@@ -163,7 +165,28 @@ async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plataforma,
     if (d.comentarios !== null) m.comments_count = d.comentarios;
     if (d.vistas !== null) m.view_count = d.vistas;
     if (d.compartidos !== null) m.share_count = d.compartidos;
-    return { ok: true, lectura: { copy: d.copy, usuario: null, enlace: reconocerEnlace(d.enlace)?.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: null, cookies: [] } };
+    const canonico = reconocerEnlace(d.enlace) ?? reconocerEnlace(p.urlFinal);
+    // El nombre de la página: la página del reel trae su id, y abrir `facebook.com/<id>` da su nombre y su dirección. Es un pedido más
+    // que puede fallar (se queda sin nombre) sin afectar lo demás.
+    let usuario: string | null = null;
+    if (d.paginaId) {
+      // La página pesa varios MB y su nombre está en las etiquetas del principio: se lee solo el comienzo.
+      const pagina = await descargarConDetalle(`https://www.facebook.com/${d.paginaId}`, 400_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" }, true);
+      const dp = "error" in pagina ? null : interpretarPaginaFacebook(new TextDecoder("utf-8").decode(pagina.bytes));
+      if (dp?.nombre) m.nombre_pagina = dp.nombre;
+      usuario = dp?.usuario ?? null;
+      m.pagina_id = d.paginaId;
+    }
+    // El archivo: la página de «insertar» del video (pública, sin iniciar sesión) trae las direcciones del video, la de alta calidad y la normal.
+    let videoUrl: string | null = null;
+    if (canonico && canonico.tipo === "video" && !canonico.corto) {
+      const embed = await descargarConDetalle(`https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(canonico.enlace)}`, 3_000_000, { "user-agent": AGENTE_NAVEGADOR, accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
+      if (!("error" in embed)) {
+        const archivos = archivosDeEmbedFacebook(new TextDecoder("utf-8").decode(embed.bytes));
+        videoUrl = archivos.hd ?? archivos.sd;
+      }
+    }
+    return { ok: true, lectura: { copy: d.copy, usuario, enlace: canonico?.enlace ?? null, metricas: m, videoUrl, cookies: [], referer: "https://www.facebook.com/" } };
   } catch {
     return { ok: false, error: "No se pudo leer la página." };
   }
@@ -266,7 +289,7 @@ async function aplicarLecturaExterna(
 
   let archivo = false;
   if (!fila.video_ruta && lectura.videoUrl) {
-    const copia = await copiarVideo(fila.id, lectura.videoUrl, { accept: "*/*", referer: "https://www.tiktok.com/", "user-agent": AGENTE_NAVEGADOR, ...(lectura.cookies.length > 0 ? { cookie: lectura.cookies.join("; ") } : {}) });
+    const copia = await copiarVideo(fila.id, lectura.videoUrl, { accept: "*/*", referer: lectura.referer, "user-agent": AGENTE_NAVEGADOR, ...(lectura.cookies.length > 0 ? { cookie: lectura.cookies.join("; ") } : {}) });
     if ("error" in copia) cambios.video_error = copia.error;
     else {
       cambios.video_ruta = copia.ruta;

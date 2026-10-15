@@ -199,8 +199,13 @@ Al compartir desde **Facebook** y **TikTok**, su hoja de compartir también ofre
   cookies que puso la página y `referer: https://www.tiktok.com/`; sin ellas no. También existe `tiktok.com/oembed?url=…` (título y cuenta, sin cifras). Un enlace corto (`vm.tiktok.com/…`,
   `vt.tiktok.com/…`, `tiktok.com/t/…`) redirige al video; uno inventado redirige a la portada.
 - **Facebook:** la vista previa (`facebookexternalhit`) de un reel público trae `og:description` (el texto), `og:url` (el enlace canónico: `watch/?v=ID` redirige a `/reel/ID`) y un `og:title`
-  como «2,8 mill. reproducciones · 1353 reacciones | texto | Facebook» (en español o inglés según `Accept-Language`). No trae el nombre de la página ni archivo. Una publicación privada o un
-  enlace de compartir inventado devuelven «Inicia sesión o regístrate para verlo».
+  como «2,8 mill. reproducciones · 1353 reacciones | texto | Facebook» (en español o inglés según `Accept-Language`). Una publicación privada o un
+  enlace de compartir inventado devuelven «Inicia sesión o regístrate para verlo». **El nombre de la página y el archivo sí se pueden sacar** (probado el mismo día con el reel de
+  la página «Facebook»): (1) el código de la página del reel trae el id de la página (`"pageID":"100064860875397"`); abriendo `facebook.com/<id>` redirige a la dirección con su nombre
+  de usuario (`/facebook/`) y su `og:title` es el nombre de la página («Facebook», con la cantidad de seguidores en la descripción). Esa página pesa ~5 MB: solo se lee el comienzo
+  (`descargarConDetalle` con `parcial`). (2) La página de «insertar» (`facebook.com/plugins/video.php?href=<enlace del reel>`, se pide como un navegador) trae `hd_src` y `sd_src`, direcciones
+  de MP4 en `video-*.xx.fbcdn.net` que se bajan sin cookies: 5,4 MB (HD) y 1,2 MB (normal), los dos con firma de MP4 válida. `oembed.json` de Facebook devuelve 400 sin una clave de la
+  app. Solo vale para videos y reels públicos; una publicación de texto o foto no tiene `hd_src`.
 - **Lo que no se probó:** la lectura **desde Vercel** (IP de centro de datos): TikTok y Facebook pueden bloquearla. Si falla, la captura se guarda con el enlace y el motivo queda en
   `metricas.vista_previa_error`; «Completar desde el enlace» la intenta de nuevo.
 

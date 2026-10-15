@@ -35,6 +35,16 @@ export interface DatosFacebook {
   compartidos: number | null;
   /** La dirección canónica (`og:url`). */
   enlace: string | null;
+  /** El id de la página (o persona) dueña de la publicación, que está en el código de la página: con él se abre la página y se saca su nombre. */
+  paginaId: string | null;
+}
+
+/** Lo que dice la página de Facebook (la del anunciante) en su vista previa. */
+export interface DatosPaginaFacebook {
+  /** El nombre de la página («Nuvo Venezuela»). */
+  nombre: string | null;
+  /** Su nombre en la dirección (`facebook.com/nuvovenezuela/` → `nuvovenezuela`); null si la dirección es solo un número. */
+  usuario: string | null;
 }
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -145,6 +155,45 @@ export function interpretarFacebook(html: string): DatosFacebook | null {
     comentarios: leer("comentarios|comments"),
     compartidos: leer("veces compartido|compartidos|shares"),
     enlace: og.url && /^https:\/\/(www\.|m\.|web\.)?facebook\.com\//.test(og.url) ? og.url.slice(0, 2000) : null,
+    paginaId: /"pageID":"(\d{5,25})"/.exec(html)?.[1] ?? /"owner":\{"__typename":"[A-Za-z]+","id":"(\d{5,25})"/.exec(html)?.[1] ?? null,
   };
   return Object.values(salida).some((v) => v !== null) ? salida : null;
+}
+
+/** La vista previa de la página de un anunciante en Facebook (`facebook.com/<id>`): su nombre y su nombre de usuario. Null si pide iniciar sesión. */
+export function interpretarPaginaFacebook(html: string): DatosPaginaFacebook | null {
+  const og: Record<string, string> = {};
+  for (const m of html.matchAll(META)) if (!(m[1] in og)) og[m[1]] = decodificarHtml(m[2]);
+  const titulo = texto(og.title, 200);
+  if (!titulo || /inicia sesi[oó]n|log in|log into|sign up|reg[ií]strate|facebook - (log|inicia)/i.test(titulo)) return null;
+  const ruta = og.url && /^https:\/\/(www\.|m\.|web\.)?facebook\.com\//.test(og.url) ? new URL(og.url).pathname : "";
+  const candidato = /^\/([A-Za-z][\w.-]{1,79})\/?$/.exec(ruta)?.[1] ?? null;
+  // `profile.php?id=…` y otras rutas de Facebook (`.php`) no son un nombre de usuario.
+  const usuario = candidato && !/\.php$/i.test(candidato) ? candidato : null;
+  return { nombre: titulo, usuario };
+}
+
+/** Solo se descarga un video de la red de archivos de Facebook (https), nunca de otro sitio que ponga el bloque de datos. */
+export function archivoFacebookPermitido(url: unknown): string | null {
+  if (typeof url !== "string" || url.length > 6000) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /(^|\.)(fbcdn\.net|fbsbx\.com|facebook\.com)$/i.test(u.hostname) ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Las direcciones del video que trae la página de «insertar» de Facebook (`plugins/video.php`): la de alta calidad y la normal. */
+export function archivosDeEmbedFacebook(html: string): { hd: string | null; sd: string | null } {
+  // El valor es una cadena JSON (con `\/` y `&`): se lee tal cual y se decodifica con JSON.parse.
+  const leer = (m: RegExpExecArray | null): string | null => {
+    if (!m) return null;
+    try {
+      return archivoFacebookPermitido(JSON.parse(`"${m[1]}"`));
+    } catch {
+      return null;
+    }
+  };
+  return { hd: leer(/"hd_src":"((?:[^"\\]|\\.)*)"/.exec(html)), sd: leer(/"sd_src":"((?:[^"\\]|\\.)*)"/.exec(html)) };
 }
