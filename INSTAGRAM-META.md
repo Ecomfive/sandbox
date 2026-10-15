@@ -189,6 +189,33 @@ si no, la más cercana en el tiempo) y después todas las demás, para decidir a
 cuando hay **una sola** con enlace de menos de 30 minutos. Al unir queda la **más antigua** y absorbe a la otra (enlace, copy, cifras, archivo y envíos); la otra se
 elimina. No se pueden unir dos capturas con enlaces de Instagram distintos.
 
+## Facebook y TikTok (15 oct 2026)
+
+Al compartir desde **Facebook** y **TikTok**, su hoja de compartir también ofrece «Ecomfive Fuentes» (Android) o el atajo (iPhone). Se sumaron como redes de la misma lista
+(`metricas.plataforma`, sin migración). Lo que se midió desde el servidor, sin iniciar sesión:
+
+- **TikTok:** la página del video (`tiktok.com/@cuenta/video/ID`) trae un bloque `__UNIVERSAL_DATA_FOR_REHYDRATION__` con el texto (`desc`), la cuenta (`uniqueId`, `nickname`), la
+  fecha (`createTime`), las cifras (`diggCount`, `commentCount`, `shareCount`, `playCount`) y la dirección del video (`playAddr`). **El video se baja** (2,9 MB, MP4 válido) pidiéndolo con las
+  cookies que puso la página y `referer: https://www.tiktok.com/`; sin ellas no. También existe `tiktok.com/oembed?url=…` (título y cuenta, sin cifras). Un enlace corto (`vm.tiktok.com/…`,
+  `vt.tiktok.com/…`, `tiktok.com/t/…`) redirige al video; uno inventado redirige a la portada.
+- **Facebook:** la vista previa (`facebookexternalhit`) de un reel público trae `og:description` (el texto), `og:url` (el enlace canónico: `watch/?v=ID` redirige a `/reel/ID`) y un `og:title`
+  como «2,8 mill. reproducciones · 1353 reacciones | texto | Facebook» (en español o inglés según `Accept-Language`). Una publicación privada o un
+  enlace de compartir inventado devuelven «Inicia sesión o regístrate para verlo». **El nombre de la página y el archivo sí se pueden sacar** (probado el mismo día con el reel de
+  la página «Facebook»): (1) el código de la página del reel trae el id de la página (`"pageID":"100064860875397"`); abriendo `facebook.com/<id>` redirige a la dirección con su nombre
+  de usuario (`/facebook/`) y su `og:title` es el nombre de la página («Facebook», con la cantidad de seguidores en la descripción). Esa página pesa ~5 MB: solo se lee el comienzo
+  (`descargarConDetalle` con `parcial`). (2) La página de «insertar» (`facebook.com/plugins/video.php?href=<enlace del reel>`, se pide como un navegador) trae `hd_src` y `sd_src`, direcciones
+  de MP4 en `video-*.xx.fbcdn.net` que se bajan sin cookies: 5,4 MB (HD) y 1,2 MB (normal), los dos con firma de MP4 válida. `oembed.json` de Facebook devuelve 400 sin una clave de la
+  app. Solo vale para videos y reels públicos; una publicación de texto o foto no tiene `hd_src`.
+- **Lo que no se probó:** la lectura **desde Vercel** (IP de centro de datos): TikTok y Facebook pueden bloquearla. Si falla, la captura se guarda con el enlace y el motivo queda en
+  `metricas.vista_previa_error`; «Completar desde el enlace» la intenta de nuevo.
+
+**Buscar el anuncio.** Facebook comparte la Biblioteca de Meta (misma búsqueda del copy completo y mismo marcador). **TikTok no tiene un equivalente público para Panamá y Costa Rica:** la
+«Commercial Content Library» solo muestra contenido de Europa; el **Creative Center › Top Ads** (`ads.tiktok.com/business/creativecenter/inspiration/topads`) sí tiene Panamá y Costa Rica
+(`region=PA`, `region=CR`) pero muestra solo «los mejores anuncios que sus anunciantes autorizaron» y pide iniciar sesión para ver más (su parámetro `keyword` de la dirección no llenó el
+buscador), así que no sirve para encontrar un anuncio en concreto; **TikTok Shop** no está confirmado en estos países (Mexico y Brasil sí). Lo que se ofrece en la ficha: buscar el copy en la
+búsqueda de TikTok (para ver el mismo producto en otras cuentas), abrir la cuenta y los Top Ads del país. Herramientas de terceros (Pipiads, Minea, Kalodata, FastMoss) cubren TikTok, pero
+son de pago y no se integraron.
+
 ## Cómo conseguir la página de destino de un anuncio: la Biblioteca de anuncios
 
 La Biblioteca de anuncios de Meta (`facebook.com/ads/library`, pública, sin iniciar sesión) muestra de cada anuncio su anunciante, su
