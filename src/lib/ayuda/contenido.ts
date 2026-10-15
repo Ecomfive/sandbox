@@ -247,6 +247,24 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "sugerencias-clientes",
+    titulo: "Sugerencias de clientes",
+    ruta: "/sugerencias-clientes",
+    resumen: "Los productos que nos recomiendan los dropshippers, para decidir cuáles pasan a Selección.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Las sugerencias llegan desde la ficha del cliente en el CRM (botón «Recomendar») o con «Agregar» aquí mismo, eligiendo el cliente por su código del CRM (DS-0014).",
+          "Cada una lleva su código SUG-, la foto, el nombre, quién la recomendó, el país donde la vio, la categoría y notas.",
+          "Estados: Nuevo, Seleccionado y Descartado. Al marcarla Seleccionado pasa sola a Selección de productos con el mismo código SUG-; si el producto ya se testeó o ya está en Producto, en Selección llega Descartado con el motivo.",
+          "Una sugerencia ya seleccionada no vuelve atrás: su recorrido sigue en Selección.",
+          "Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "seleccion-productos",
     titulo: "Selección de productos",
     ruta: "/seleccion-productos",
@@ -349,6 +367,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-15", titulo: "Sugerencias de clientes", texto: "Nueva fuente en Testing Lab: lo que nos recomiendan los dropshippers. Atención lo registra desde la ficha del cliente en el CRM con «Recomendar» (sin necesitar el módulo), o se agrega a mano asignándolo a un cliente. La ficha del CRM muestra sus productos recomendados y su estado.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
   { fecha: "2026-10-15", titulo: "Fuentes: ver todos los anuncios de una página", texto: "En el bloque «Biblioteca de anuncios» de la ficha, «Buscar solo la primera línea» se quitó (el copy completo es siempre más preciso) y ahora está «Ver los anuncios de la página», que abre la Biblioteca con el nombre de esa página para ver todo lo que está corriendo. Debajo van, en el mismo lugar, «Abrir el perfil de Instagram», «Abrir la página de Facebook» o «Abrir la cuenta» de TikTok, según la red.", modulo: "instagram", href: "/instagram" },
   { fecha: "2026-10-15", titulo: "Fuentes: fotos de Facebook, cuenta desde la Biblioteca y botón de volver", texto: "Un anuncio de Facebook con foto ahora guarda su imagen y el nombre de la página; «Leer Biblioteca» completa también la «Cuenta del video» cuando estaba vacía; cada red lleva su ícono en la ficha; y «Volver a Facebook/TikTok/Instagram», al terminar de compartir desde el celular, cierra la ventana y te deja donde estabas.", modulo: "instagram", href: "/instagram" },
   { fecha: "2026-10-15", titulo: "Fuentes: también Facebook y TikTok", texto: "Lo que compartes desde Facebook y TikTok con «Compartir en…» › «Ecomfive Fuentes» (o el atajo de iPhone) también se guarda: con su enlace, su texto, el nombre de la cuenta o página, las cifras y el video (en Facebook, si es un video público). La lista tiene una columna «Red». En Facebook la búsqueda del anuncio usa la misma Biblioteca de Meta; en TikTok la ficha ofrece buscar el texto en TikTok, abrir la cuenta y los Top Ads del país.", modulo: "instagram", href: "/instagram" },

@@ -55,6 +55,7 @@ export const FUENTES = [
   { valor: "tu_winner", etiqueta: "Tu Winner", prefijo: "TW", color: "#d74c81" },
   { valor: "scraping_proveedores", etiqueta: "Scraping de proveedores", prefijo: "SP", color: "#0880EA" },
   { valor: "manual", etiqueta: "Manual", prefijo: "MAN", color: "#8D8D8D" },
+  { valor: "sugerencia_cliente", etiqueta: "Sugerencia de cliente", prefijo: "SUG", color: "#b12a97" },
 ] as const;
 
 export const etiquetaFuente = (v: string) => FUENTES.find((f) => f.valor === v)?.etiqueta ?? v;
