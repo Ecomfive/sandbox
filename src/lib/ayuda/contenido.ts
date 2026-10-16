@@ -25,6 +25,12 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Módulo", definicion: "Una página del sistema con su permiso propio (Compras, Producto, Inventario…). Tu rol decide qué módulos ves y si puedes modificarlos o solo leerlos." },
   { termino: "Rol", definicion: "El conjunto de permisos que tiene una persona: qué módulos abre y cuáles son solo de lectura. Se configura en Usuarios y roles." },
   { termino: "Países permitidos", definicion: "Los países cuyas compras, histórico y datos puede ver una persona. «Todos los países» no limita nada." },
+  { termino: "Puesto", definicion: "El cargo que ocupa una persona (Media Buyer, Analista de Compras…): su misión, responsabilidades, áreas de resultado, lo que puede decidir, a quién reporta y lo que tiene que aprender. Lo tuyo se ve en «Mi puesto», en el menú de tu cuenta." },
+  { termino: "Misión del puesto (JD)", definicion: "En una o dos frases, para qué existe el puesto. Es el resumen de su descripción de cargo (Job Description)." },
+  { termino: "Áreas de resultado (KRA)", definicion: "Las 3 a 6 cosas de las que responde un puesto (por ejemplo, rentabilidad de campañas y generación de pedidos). Key Result Areas." },
+  { termino: "SOP", definicion: "Procedimiento estándar de operación: el paso a paso de una tarea. En el sistema son los Manuales de proceso del Centro de ayuda, enlazados a cada puesto." },
+  { termino: "Onboarding 30/60/90", definicion: "Lo que una persona nueva aprende en sus primeros 30, 60 y 90 días: los manuales y cursos de su puesto por etapa. Cuenta como hecho un curso aprobado o un manual marcado como leído." },
+  { termino: "Puesto principal", definicion: "Si una persona ocupa varios puestos, el principal es el que decide su jefe en el organigrama y el que sale primero en «Mi puesto»." },
   { termino: "Ficha", definicion: "El panel que se abre a la derecha al pulsar una fila: muestra todo de ese registro y, si tienes permiso, ahí mismo se edita." },
   { termino: "Vista guardada", definicion: "Una combinación de filtros, agrupación y columnas que guardas con nombre en una tabla para volver a ella con un clic." },
   { termino: "Cerrados", definicion: "El botón de la barra de una tabla que muestra lo que ya terminó (compras completadas, retiros conciliados). Por defecto se ocultan." },
@@ -344,6 +350,19 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "puestos",
+    titulo: "Puestos y organigrama",
+    ruta: "/puestos",
+    resumen: "Qué hace cada puesto, de qué responde, a quién reporta, quién lo ocupa y qué manuales y cursos tiene que conocer.",
+    secciones: [
+      { titulo: "Crear un puesto", pasos: ["«Agregar» pide el nombre, el área, a quién reporta, cuántas plazas tiene y su misión.", "En su ficha se completan las responsabilidades, las áreas de resultado (una por línea, hasta 6) y la autoridad (lo que puede decidir o aprobar)."] },
+      { titulo: "Personas", pasos: ["En el bloque «Personas» de la ficha se asigna a alguien al puesto; también desde su ficha en Usuarios y roles.", "Una persona puede tener varios puestos: el primero queda como principal y se cambia con «Hacer principal».", "Un punto ámbar marca los puestos con plazas vacantes."] },
+      { titulo: "SOP y onboarding", pasos: ["«Añadir manual o curso» enlaza un Manual de proceso o un curso de la Universidad y elige en qué etapa va: Día 30, 60, 90 o De consulta.", "El avance de cada persona sale de los cursos que aprobó y los manuales que marcó como leídos. Si un manual cambia, hay que volver a leerlo."] },
+      { titulo: "Organigrama", pasos: ["La pestaña «Organigrama» arma el árbol con «Reporta a» y muestra quién ocupa cada puesto.", "Se filtra por área; pulsar una caja abre la ficha del puesto.", "Un puesto no se borra: se desactiva (antes hay que quitar a sus personas)."] },
+      { titulo: "Mi puesto", pasos: ["Cada persona ve lo suyo en «Mi puesto», en el menú de su cuenta (arriba a la derecha): su jefe, su equipo, su puesto y su onboarding."] },
+    ],
+  },
+  {
     modulo: "notificaciones",
     titulo: "Avisos",
     ruta: "/notificaciones",
@@ -370,6 +389,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-16", titulo: "Puestos y organigrama", texto: "Nuevo módulo en Equipo: la ficha de cada puesto (misión, responsabilidades, áreas de resultado y autoridad), a quién reporta, quién lo ocupa y sus manuales y cursos por etapa del onboarding (Día 30, 60 y 90). La pestaña Organigrama arma el árbol. Cada persona ve lo suyo en «Mi puesto», en el menú de su cuenta, y marca los manuales como leídos.", modulo: "puestos", href: "/puestos" },
   { fecha: "2026-10-16", titulo: "Exclusividad para quien recomienda", texto: "Un producto recomendado por un cliente es exclusivo suyo durante 30 días desde que queda disponible para vender. En «Productos recomendados» de su ficha del CRM se ve hasta cuándo y cuántos días quedan, y se puede pasar a 60 o 90 días. La ficha del producto en Producto también lo indica, y Sugerencias de clientes tiene la columna Exclusividad.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
   { fecha: "2026-10-16", titulo: "Seguimiento de lo que recomienda un cliente", texto: "En la ficha del cliente en el CRM, «Productos recomendados» muestra su % de acierto (cuántos salieron Winner), cuántos se compraron y, por cada producto, en qué etapa va y cuántos días lleva. Al pulsarlo se ve su recorrido: recomendado, seleccionado, oferta, test, resultado y compra hasta que está disponible para vender, con fecha y día de cada etapa, sin cantidades ni costos.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
   { fecha: "2026-10-16", titulo: "Enviar a Test y recorrido enlazado", texto: "En Creación de ofertas, «Enviar a Test» crea el producto (en Test) y su test ya vinculados a su fila de Selección, que pasa a «En test». En el formulario de un test, «Viene de Selección» lo vincula a mano. La compra que nace al pasar un producto a Activo ahora guarda de qué producto viene.", modulo: "creacion-ofertas", href: "/creacion-ofertas" },

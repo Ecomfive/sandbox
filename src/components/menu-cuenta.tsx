@@ -5,7 +5,7 @@ import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { EVENTO_ABRIR_ATAJOS } from "@/components/atajos-teclado";
 import { MenuDesplegable, TituloGrupoMenu, claseOpcionMenu } from "@/components/ui/menu-desplegable";
-import { CheckIcon, ConfiguracionIcon } from "@/lib/nav-icons";
+import { CheckIcon, ConfiguracionIcon, PuestosIcon } from "@/lib/nav-icons";
 import { subirAvatar } from "@/lib/perfil-actions";
 import { CAMBIOS_RECIENTES, VERSION } from "@/lib/version";
 
@@ -127,6 +127,10 @@ export function MenuCuenta({
             Atajos de teclado
             <kbd className="ml-auto rounded border border-border bg-muted px-1.5 text-xs text-muted-foreground">?</kbd>
           </button>
+          <Link href="/mi-puesto" role="menuitem" onClick={() => cerrar()} className={claseOpcionMenu}>
+            <PuestosIcon className="h-4 w-4 text-muted-foreground" />
+            Mi puesto
+          </Link>
           {puedeConfigurar && (
             <Link href="/configuracion" role="menuitem" onClick={() => cerrar()} className={claseOpcionMenu}>
               <ConfiguracionIcon className="h-4 w-4 text-muted-foreground" />

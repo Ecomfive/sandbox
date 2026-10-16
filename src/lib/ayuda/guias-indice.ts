@@ -24,5 +24,6 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/inteligencia-competitiva": "inteligencia-competitiva",
   "/analisis-competencia": "analisis-competencia",
   "/usuarios": "usuarios",
+  "/puestos": "puestos",
   "/notificaciones": "notificaciones",
 };

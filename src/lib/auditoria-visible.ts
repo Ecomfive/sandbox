@@ -8,6 +8,7 @@ import { puedeVerPais } from "@/lib/paises-permitidos";
  * historial completo en /usuarios/auditoria.
  */
 export const MODULO_DE_ENTIDAD: Record<string, string> = {
+  puestos: "puestos",
   skus_maestros: "producto",
   dropshippers: "crm-dropshippers",
   wms_compras: "compras",

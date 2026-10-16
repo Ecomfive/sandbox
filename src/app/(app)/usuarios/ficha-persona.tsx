@@ -20,6 +20,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { CheckIcon } from "@/lib/nav-icons";
 import { formatearFecha, formatearTiempoRelativo } from "@/lib/formato";
 import { PaisesPersona } from "./paises-persona";
+import { PuestosPersona } from "./puestos-persona";
 
 function FilaAlta({ etiqueta, completo, children }: { etiqueta: string; completo: boolean; children?: React.ReactNode }) {
   return (
@@ -264,6 +265,8 @@ export function FichaPersona({
                 </p>
               )}
             </section>
+
+            <PuestosPersona key={`puesto-${persona.id}`} personaId={persona.id} nombre={persona.nombre ?? persona.email} />
 
             {puedeEditarse && <PaisesPersona key={persona.id} id={persona.id} nombre={persona.nombre ?? persona.email} inicial={persona.paisesPermitidos} />}
 
