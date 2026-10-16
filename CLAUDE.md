@@ -238,6 +238,24 @@ convenciones técnicas del código.
   **Regla: todo cambio que se vea en el sistema actualiza el Centro de ayuda en el mismo cambio** (su guía, el glosario y, si
   lo enseña, el curso). Además, una tarea programada diaria (20:00, «Actualizar el Centro de ayuda») revisa lo publicado en
   `main` y corrige solo esos tres archivos de `src/lib/ayuda/`.
+- **Equipo › Puestos y organigrama** (`/puestos` y `/puestos/organigrama`, módulo `puestos`, migración 0112, 16 oct 2026; plan en
+  [EQUIPO-PUESTOS.md](EQUIPO-PUESTOS.md), fase 1). Un **puesto** (`puestos`) es una plantilla: nombre (único), área (lista fija
+  `AREAS_PUESTO`, `src/lib/puestos/puesto.ts`), `reporta_a` (de ahí sale el organigrama; un disparador y `cierraCiclo` impiden ciclos),
+  plazas, misión, responsabilidades y autoridad (formato simple de los manuales, se muestran con `TextoManual`, nunca HTML) y `kra`
+  (hasta 6). Lista con `TablaDatos` (agrupada por área, punto ámbar si hay vacante), «Agregar» con `FichaCrear` y ficha lateral
+  (`ficha-puesto.tsx`) que ya es el formulario; Personas y «Procedimientos (SOP) y onboarding» guardan al momento. Un puesto no se
+  borra: se desactiva sin personas. **Personas:** `puesto_personas` (varios puestos por persona, **uno principal**, índice único
+  parcial; el primero que se asigna lo es y al quitarlo pasa al siguiente). El jefe no se guarda: `jefesDe` sube por `reporta_a`
+  saltando puestos vacantes. Se asigna también desde la ficha de la persona en Usuarios y roles (`usuarios/puestos-persona.tsx`,
+  por contexto; solo con el módulo `puestos`). **SOP y cursos:** `puesto_manuales` (→ `manuales_proceso`) y `puesto_cursos` (id de
+  `CURSOS`, validado en el servidor), cada uno con `etapa` 30/60/90 o null = de consulta. **Avance del onboarding**
+  (`src/lib/puestos/onboarding.ts`, con prueba): curso aprobado (`cursos_progreso.completado_en`) o manual leído
+  (`manuales_lecturas`; si el manual se actualizó después, «Volver a leer»). El manual trae «Marcar como leído» (`BotonLeido`,
+  `marcarManualLeido` en `mi-puesto/actions.ts`) y se puede abrir si está enlazado a un puesto de la persona aunque no sea de sus
+  módulos (`manualesDeMisPuestos`). **«Mi puesto»** (`/mi-puesto`, en `MenuCuenta`) no es un módulo: lo abre cualquiera con sesión y
+  solo muestra lo suyo (jefe, equipo, cada puesto con su onboarding). Lectura de todo en `cargarPuestos` (`src/lib/puestos/datos.ts`);
+  sin la migración las páginas avisan. La migración da `puestos` a los roles que tienen `usuarios`. Fuera de la fase 1: KPI,
+  scorecard, OKR, evaluaciones, PDI e incentivos.
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo

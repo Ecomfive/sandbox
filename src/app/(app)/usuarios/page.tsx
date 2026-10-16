@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { CrearUsuarioPanel } from "./crear-usuario-panel";
 import type { FilaUsuario, Rol } from "./def-usuarios";
+import { ProveedorPuestosPersona, type PuestosDeUsuarios } from "./puestos-persona";
 import { UsuariosYRoles } from "./usuarios-y-roles";
 
 export const metadata = { title: "Usuarios y roles" };
@@ -91,19 +92,45 @@ export default async function UsuariosPage() {
     paisesPermitidos: paisesPorPersona ? (paisesPorPersona.get(p.id) ?? null) : undefined,
   }));
 
+  const puestos = await cargarPuestosDeUsuarios(usuario.modulos, usuario.modulosSoloLectura);
+
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Usuarios y roles" oculto>
         Quién trabaja en la app, qué páginas ve cada rol y si la persona ya está lista para empezar.
       </EncabezadoPagina>
 
-      <UsuariosYRoles
-        personas={personas}
-        roles={rolesTipados}
-        modulosPorRol={modulosPorRol}
-        soloLecturaPorRol={soloLecturaPorRol}
-        miId={usuario.id}
-      />
+      <ProveedorPuestosPersona valor={puestos}>
+        <UsuariosYRoles
+          personas={personas}
+          roles={rolesTipados}
+          modulosPorRol={modulosPorRol}
+          soloLecturaPorRol={soloLecturaPorRol}
+          miId={usuario.id}
+        />
+      </ProveedorPuestosPersona>
     </Pagina>
   );
+}
+
+/** El bloque «Puesto» de cada ficha: solo con el módulo Puestos y con la migración 0112 (si no, `null` y no sale). */
+async function cargarPuestosDeUsuarios(modulos: string[], soloLectura: string[]): Promise<PuestosDeUsuarios | null> {
+  if (!modulos.includes("puestos")) return null;
+  const supabase = createServiceClient();
+  const [puestos, ocupantes] = await Promise.all([
+    supabase.from("puestos").select("id, nombre, activo").order("nombre"),
+    supabase.from("puesto_personas").select("puesto_id, usuario_id, principal"),
+  ]);
+  if (puestos.error || ocupantes.error) return null;
+  const nombre = new Map((puestos.data ?? []).map((p) => [p.id as string, p.nombre as string]));
+  const porPersona: PuestosDeUsuarios["porPersona"] = {};
+  for (const o of ocupantes.data ?? []) {
+    const id = o.usuario_id as string;
+    (porPersona[id] ??= []).push({ id: o.puesto_id as string, nombre: nombre.get(o.puesto_id as string) ?? "—", principal: o.principal === true });
+  }
+  return {
+    puestos: (puestos.data ?? []).filter((p) => p.activo !== false).map((p) => ({ id: p.id as string, nombre: p.nombre as string })),
+    porPersona,
+    puedeAsignar: !soloLectura.includes("puestos"),
+  };
 }

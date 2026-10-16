@@ -119,8 +119,11 @@ const AREAS: NavSection[] = [
     title: "Equipo",
     panel: "Recursos humanos",
     frentes: true,
-    // Usuarios y roles es de toda la empresa: queda afuera de los tres frentes.
-    items: [{ label: "Usuarios y roles", href: "/usuarios" }],
+    // Usuarios y roles y Puestos son de toda la empresa: quedan afuera de los tres frentes.
+    items: [
+      { label: "Usuarios y roles", href: "/usuarios" },
+      { label: "Puestos", href: "/puestos" },
+    ],
   },
   // Las fichas de producto de Shopify y de Dropi ya no están en el menú (se llega a ellas desde Producto); la página y su
   // permiso siguen vivos, y esta área oculta mantiene sus migas, el buscador y los favoritos.

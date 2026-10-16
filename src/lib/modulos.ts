@@ -33,6 +33,7 @@ export const MODULOS: Modulo[] = [
   { clave: "seleccion-productos", etiqueta: "Selección de productos (Testing Lab)" },
   { clave: "creacion-ofertas", etiqueta: "Creación de ofertas (Testing Lab)" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
+  { clave: "puestos", etiqueta: "Puestos y organigrama" },
   { clave: "configuracion", etiqueta: "Configuración del sistema" },
   { clave: "notificaciones", etiqueta: "Centro de notificaciones" },
 ];

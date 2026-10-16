@@ -16,6 +16,10 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Usuarios y roles", href: "/usuarios" },
     { etiqueta: "Historial de auditoría", href: "/usuarios/auditoria" },
   ],
+  "/puestos": [
+    { etiqueta: "Puestos", href: "/puestos" },
+    { etiqueta: "Organigrama", href: "/puestos/organigrama" },
+  ],
   "/extractos": [
     { etiqueta: "Cargar extracto", href: "/extractos" },
     { etiqueta: "Diccionario de patrones bancarios", href: "/extractos/patrones" },

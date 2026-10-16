@@ -17,6 +17,16 @@ export function calcularCambios(
 }
 
 export const ETIQUETA_ACCION: Record<string, string> = {
+  crear_puesto: "Creó el puesto",
+  editar_puesto: "Editó el puesto",
+  cambiar_estado_puesto: "Cambió el estado del puesto",
+  asignar_puesto: "Asignó a una persona",
+  quitar_puesto: "Quitó a una persona",
+  puesto_principal: "Cambió el puesto principal",
+  enlazar_sop_puesto: "Enlazó un procedimiento",
+  quitar_sop_puesto: "Quitó un procedimiento",
+  enlazar_curso_puesto: "Enlazó un curso",
+  quitar_curso_puesto: "Quitó un curso",
   cambiar_exclusividad: "Cambió la exclusividad",
   enviar_a_test: "Envió a Test",
   crear_sugerencia: "Registró la sugerencia",
