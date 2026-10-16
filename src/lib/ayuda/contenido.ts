@@ -256,6 +256,7 @@ export const GUIAS: GuiaModulo[] = [
       {
         titulo: "Uso",
         pasos: [
+          "En la ficha del cliente en el CRM, «Productos recomendados» muestra su % de acierto (Winners sobre recomendados), cuántos se compraron y el recorrido de cada producto con sus días, para contárselo al cliente (sin cantidades ni costos).",
           "Las sugerencias llegan desde la ficha del cliente en el CRM (botón «Recomendar») o con «Agregar» aquí mismo, eligiendo el cliente por su código del CRM (DS-0014).",
           "Cada una lleva su código SUG-, la foto, el nombre, quién la recomendó, el país donde la vio, la categoría y notas.",
           "Estados: Nuevo, Seleccionado y Descartado. Al marcarla Seleccionado pasa sola a Selección de productos con el mismo código SUG-; si el producto ya se testeó o ya está en Producto, en Selección llega Descartado con el motivo.",
@@ -368,6 +369,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-16", titulo: "Seguimiento de lo que recomienda un cliente", texto: "En la ficha del cliente en el CRM, «Productos recomendados» muestra su % de acierto (cuántos salieron Winner), cuántos se compraron y, por cada producto, en qué etapa va y cuántos días lleva. Al pulsarlo se ve su recorrido: recomendado, seleccionado, oferta, test, resultado y compra hasta que está disponible para vender, con fecha y día de cada etapa, sin cantidades ni costos.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
   { fecha: "2026-10-16", titulo: "Enviar a Test y recorrido enlazado", texto: "En Creación de ofertas, «Enviar a Test» crea el producto (en Test) y su test ya vinculados a su fila de Selección, que pasa a «En test». En el formulario de un test, «Viene de Selección» lo vincula a mano. La compra que nace al pasar un producto a Activo ahora guarda de qué producto viene.", modulo: "creacion-ofertas", href: "/creacion-ofertas" },
   { fecha: "2026-10-15", titulo: "Sugerencias de clientes", texto: "Nueva fuente en Testing Lab: lo que nos recomiendan los dropshippers. Atención lo registra desde la ficha del cliente en el CRM con «Recomendar» (sin necesitar el módulo), o se agrega a mano asignándolo a un cliente. La ficha del CRM muestra sus productos recomendados y su estado.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
   { fecha: "2026-10-15", titulo: "Fuentes: ver todos los anuncios de una página", texto: "En el bloque «Biblioteca de anuncios» de la ficha, «Buscar solo la primera línea» se quitó (el copy completo es siempre más preciso) y ahora está «Ver los anuncios de la página», que abre la Biblioteca con el nombre de esa página para ver todo lo que está corriendo. Debajo van, en el mismo lugar, «Abrir el perfil de Instagram», «Abrir la página de Facebook» o «Abrir la cuenta» de TikTok, según la red.", modulo: "instagram", href: "/instagram" },

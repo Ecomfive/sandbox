@@ -10,6 +10,7 @@ import { motivoYaVisto, yaVisto } from "@/lib/scraping/cruces";
 import { cargarReferencias } from "@/lib/scraping/referencias";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { aciertoCliente, armarSeguimiento, type Seguimiento } from "@/lib/sugerencias/seguimiento";
 import { ESTADOS_SUGERENCIA, etiquetaEstadoSugerencia } from "./def-sugerencias";
 
 const MODULO = "sugerencias-clientes";
@@ -216,23 +217,84 @@ export interface RecomendacionCliente {
   fotoUrl: string | null;
   estado: string;
   creadoEn: string;
+  /** Su recorrido para contárselo al cliente: etapas, fechas y días (sin cantidades ni costos). */
+  seguimiento: Seguimiento;
 }
 
+const uno = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+
 /**
- * Las recomendaciones de un dropshipper, para su ficha en el CRM. Basta poder abrir Atención (es lo que el cliente nos
- * mandó; no muestra cantidades ni costos). Devuelve el error como valor.
+ * Las recomendaciones de un dropshipper con el recorrido de cada una (Sugerencia → Selección → oferta → test → compra) y su
+ * % de acierto, para su ficha en el CRM. Basta poder abrir Atención: es lo que el cliente nos mandó y no muestra cantidades
+ * ni costos. Devuelve el error como valor.
  */
-export async function recomendacionesDeDropshipper(dropshipperId: string): Promise<{ recomendaciones: RecomendacionCliente[] } | { error: string }> {
+export async function recomendacionesDeDropshipper(
+  dropshipperId: string,
+): Promise<{ recomendaciones: RecomendacionCliente[]; acierto: ReturnType<typeof aciertoCliente> } | { error: string }> {
   await requireModulo(MODULO_ATENCION);
   if (!UUID.test(dropshipperId)) return { error: "Cliente no válido." };
-  const { data, error } = await createServiceClient()
+  const supabase = createServiceClient();
+  const { data: sugerencias, error } = await supabase
     .from(ENTIDAD)
-    .select("id, codigo, nombre, foto_url, estado, creado_en")
+    .select("id, codigo, nombre, foto_url, estado, creado_en, actualizado_en, seleccion_id")
     .eq("dropshipper_id", dropshipperId)
     .order("creado_en", { ascending: false })
     .limit(100);
   if (error) return { error: "No se pudieron cargar las recomendaciones." };
-  return {
-    recomendaciones: (data ?? []).map((s) => ({ id: s.id, codigo: s.codigo, nombre: s.nombre, fotoUrl: s.foto_url, estado: s.estado, creadoEn: s.creado_en })),
-  };
+  const lista = sugerencias ?? [];
+  const selIds = lista.map((s) => s.seleccion_id).filter((x): x is string => !!x);
+
+  // Selección (y cuándo pasó a «Crear oferta»), test y compra de cada una.
+  const [{ data: sels }, { data: auditoria }, { data: ofertas }, { data: tests }] = await Promise.all([
+    selIds.length ? supabase.from("wms_seleccion_productos").select("id, estado, creado_en").in("id", selIds) : Promise.resolve({ data: [] as never[] }),
+    selIds.length
+      ? supabase.from("historial_auditoria").select("entidad_id, despues, creado_en").eq("entidad", "wms_seleccion_productos").in("entidad_id", selIds).eq("accion", "cambiar_estado_seleccion").order("creado_en")
+      : Promise.resolve({ data: [] as never[] }),
+    selIds.length ? supabase.from("wms_seleccion_ofertas").select("seleccion_id, creado_en").in("seleccion_id", selIds).order("creado_en") : Promise.resolve({ data: [] as never[] }),
+    selIds.length ? supabase.from("wms_productos_test").select("seleccion_id, estado, creado_en, fecha_test, actualizado_en, sku_maestro_id").in("seleccion_id", selIds) : Promise.resolve({ data: [] as never[] }),
+  ]);
+  const skuIds = (tests ?? []).map((t) => t.sku_maestro_id as string | null).filter((x): x is string => !!x);
+  const [{ data: comprasDirectas }, { data: items }] = await Promise.all([
+    skuIds.length ? supabase.from("wms_compras").select("id, sku_maestro_id, etapa, anulada_en, creado_en").in("sku_maestro_id", skuIds) : Promise.resolve({ data: [] as never[] }),
+    skuIds.length ? supabase.from("wms_compra_items").select("sku_maestro_id, wms_compras(id, etapa, anulada_en, creado_en)").in("sku_maestro_id", skuIds) : Promise.resolve({ data: [] as never[] }),
+  ]);
+  // La compra de cada producto: la que nació de él (sku_maestro_id) o, si no, la primera donde aparece como línea.
+  const compraDeSku = new Map<string, { id: string; etapa: string; anulada: boolean; creadoEn: string }>();
+  for (const c of comprasDirectas ?? []) {
+    const ya = compraDeSku.get(c.sku_maestro_id as string);
+    if (!ya || c.creado_en < ya.creadoEn) compraDeSku.set(c.sku_maestro_id as string, { id: c.id, etapa: c.etapa, anulada: !!c.anulada_en, creadoEn: c.creado_en });
+  }
+  for (const it of items ?? []) {
+    const c = uno(it.wms_compras as never) as { id: string; etapa: string; anulada_en: string | null; creado_en: string } | null;
+    if (c && !compraDeSku.has(it.sku_maestro_id as string)) compraDeSku.set(it.sku_maestro_id as string, { id: c.id, etapa: c.etapa, anulada: !!c.anulada_en, creadoEn: c.creado_en });
+  }
+  const compraIds = [...compraDeSku.values()].map((c) => c.id);
+  const { data: eventos } = compraIds.length
+    ? await supabase.from("wms_compra_eventos").select("compra_id, valor_despues, ocurrido_en").eq("campo", "etapa").in("compra_id", compraIds).order("ocurrido_en")
+    : { data: [] as { compra_id: string; valor_despues: string; ocurrido_en: string }[] };
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  const recomendaciones: RecomendacionCliente[] = lista.map((s) => {
+    const sel = (sels ?? []).find((x) => x.id === s.seleccion_id) ?? null;
+    const enOferta =
+      (auditoria ?? []).find((a) => a.entidad_id === s.seleccion_id && (a.despues as { Estado?: string } | null)?.Estado === "Crear oferta")?.creado_en ??
+      (ofertas ?? []).find((o) => o.seleccion_id === s.seleccion_id)?.creado_en ??
+      null;
+    const t = (tests ?? []).find((x) => x.seleccion_id === s.seleccion_id) ?? null;
+    const compra = t?.sku_maestro_id ? compraDeSku.get(t.sku_maestro_id) : undefined;
+    const etapasCompra: Record<string, string> = {};
+    if (compra) for (const e of eventos ?? []) if (e.compra_id === compra.id && !etapasCompra[e.valor_despues]) etapasCompra[e.valor_despues] = e.ocurrido_en;
+    const seguimiento = armarSeguimiento(
+      {
+        recomendado: s.creado_en,
+        sugerencia: { estado: s.estado, actualizadoEn: s.actualizado_en },
+        seleccion: sel ? { estado: sel.estado, creadoEn: sel.creado_en, enOfertaEn: enOferta } : null,
+        test: t ? { estado: t.estado, creadoEn: t.creado_en, resultadoEn: t.fecha_test ?? (t.estado === "winner" || t.estado === "fallido" ? t.actualizado_en : null) } : null,
+        compra: compra ? { etapa: compra.etapa, anulada: compra.anulada, etapas: etapasCompra } : null,
+      },
+      hoy,
+    );
+    return { id: s.id, codigo: s.codigo, nombre: s.nombre, fotoUrl: s.foto_url, estado: s.estado, creadoEn: s.creado_en, seguimiento };
+  });
+  return { recomendaciones, acierto: aciertoCliente(recomendaciones.map((r) => r.seguimiento)) };
 }
