@@ -3,7 +3,7 @@ import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaProductoTest } from "./def-productos-test";
 
 const COLUMNAS =
-  "id, nombre, sku_maestro_id, skus_maestros(foto_url), fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, creado_en";
+  "id, nombre, sku_maestro_id, seleccion_id, skus_maestros(foto_url), fecha_creacion, fuente, pagina_producto_url, video_url, categoria, angulo_venta, worldwide, ad_library, fecha_test, estado, clickup, test_numero, calculadora_url, campana_url, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr, creado_en";
 
 const numero = (v: string | number | null) => (v === null ? null : Number(v));
 
@@ -26,6 +26,7 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
     id: p.id,
     nombre: p.nombre,
     skuMaestroId: (p as { sku_maestro_id?: string | null }).sku_maestro_id ?? null,
+    seleccionId: (p as { seleccion_id?: string | null }).seleccion_id ?? null,
     fotoUrl: fotoDe(p),
     fechaCreacion: p.fecha_creacion,
     fuente: p.fuente,

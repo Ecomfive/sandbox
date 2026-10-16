@@ -43,6 +43,7 @@ export const numeroSeleccion = (n: number) => `SEL-${String(n).padStart(4, "0")}
 export const ESTADOS_SELECCION = [
   { valor: "seleccionado", etiqueta: "Seleccionado", color: "#1bbc9c" },
   { valor: "crear_oferta", etiqueta: "Crear oferta", color: "#5f43d1" },
+  { valor: "en_test", etiqueta: "En test", color: "#0880EA" },
   { valor: "descartado", etiqueta: "Descartado", color: "#e50000" },
 ] as const;
 
