@@ -257,7 +257,7 @@ export function FichaLateral({
       )}
 
       <Bloque icono={SugerenciaIcon} titulo="Productos recomendados">
-        <RecomendacionesDropshipper key={`recomendaciones-${d.id}`} dropshipperId={d.id} version={version} />
+        <RecomendacionesDropshipper key={`recomendaciones-${d.id}`} dropshipperId={d.id} version={version} puedeEscribir={acceso.escribeAtencion} />
       </Bloque>
 
       <Bloque icono={EnlaceIcon} titulo="Cuentas">

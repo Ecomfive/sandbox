@@ -10,7 +10,7 @@ import { motivoYaVisto, yaVisto } from "@/lib/scraping/cruces";
 import { cargarReferencias } from "@/lib/scraping/referencias";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
-import { aciertoCliente, armarSeguimiento, type Seguimiento } from "@/lib/sugerencias/seguimiento";
+import { aciertoCliente, armarSeguimiento, exclusividadDe, PLAZOS_EXCLUSIVIDAD, type Exclusividad, type Seguimiento } from "@/lib/sugerencias/seguimiento";
 import { ESTADOS_SUGERENCIA, etiquetaEstadoSugerencia } from "./def-sugerencias";
 
 const MODULO = "sugerencias-clientes";
@@ -219,6 +219,8 @@ export interface RecomendacionCliente {
   creadoEn: string;
   /** Su recorrido para contárselo al cliente: etapas, fechas y días (sin cantidades ni costos). */
   seguimiento: Seguimiento;
+  /** Su exclusividad sobre el producto: 30, 60 o 90 días desde que quedó disponible para vender. */
+  exclusividad: Exclusividad;
 }
 
 const uno = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
@@ -233,15 +235,30 @@ export async function recomendacionesDeDropshipper(
 ): Promise<{ recomendaciones: RecomendacionCliente[]; acierto: ReturnType<typeof aciertoCliente> } | { error: string }> {
   await requireModulo(MODULO_ATENCION);
   if (!UUID.test(dropshipperId)) return { error: "Cliente no válido." };
+  const recomendaciones = await recomendacionesDeDropshipperSinPermiso(dropshipperId).catch(() => null);
+  if (!recomendaciones) return { error: "No se pudieron cargar las recomendaciones." };
+  return { recomendaciones, acierto: aciertoCliente(recomendaciones.map((r) => r.seguimiento)) };
+}
+
+/** El cálculo de las recomendaciones y su recorrido; quien lo llama ya comprobó el permiso. Lanza si falla la lectura. */
+async function recomendacionesDeDropshipperSinPermiso(dropshipperId: string): Promise<RecomendacionCliente[]> {
   const supabase = createServiceClient();
-  const { data: sugerencias, error } = await supabase
-    .from(ENTIDAD)
-    .select("id, codigo, nombre, foto_url, estado, creado_en, actualizado_en, seleccion_id")
-    .eq("dropshipper_id", dropshipperId)
-    .order("creado_en", { ascending: false })
-    .limit(100);
-  if (error) return { error: "No se pudieron cargar las recomendaciones." };
-  const lista = sugerencias ?? [];
+  const consulta = (columnas: string) => supabase.from(ENTIDAD).select(columnas).eq("dropshipper_id", dropshipperId).order("creado_en", { ascending: false }).limit(100);
+  // Sin la migración 0111 no existe `exclusividad_dias`: se lee sin ella (30 días por defecto).
+  let r = await consulta("id, codigo, nombre, foto_url, estado, creado_en, actualizado_en, seleccion_id, exclusividad_dias");
+  if (r.error) r = await consulta("id, codigo, nombre, foto_url, estado, creado_en, actualizado_en, seleccion_id");
+  if (r.error) throw new Error("No se pudieron cargar las recomendaciones.");
+  const lista = (r.data ?? []) as unknown as {
+    id: string;
+    codigo: string;
+    nombre: string;
+    foto_url: string | null;
+    estado: string;
+    creado_en: string;
+    actualizado_en: string;
+    seleccion_id: string | null;
+    exclusividad_dias?: number;
+  }[];
   const selIds = lista.map((s) => s.seleccion_id).filter((x): x is string => !!x);
 
   // Selección (y cuándo pasó a «Crear oferta»), test y compra de cada una.
@@ -294,7 +311,51 @@ export async function recomendacionesDeDropshipper(
       },
       hoy,
     );
-    return { id: s.id, codigo: s.codigo, nombre: s.nombre, fotoUrl: s.foto_url, estado: s.estado, creadoEn: s.creado_en, seguimiento };
+    const exclusividad = exclusividadDe(seguimiento, s.exclusividad_dias ?? 30, hoy);
+    return { id: s.id, codigo: s.codigo, nombre: s.nombre, fotoUrl: s.foto_url, estado: s.estado, creadoEn: s.creado_en, seguimiento, exclusividad };
   });
-  return { recomendaciones, acierto: aciertoCliente(recomendaciones.map((r) => r.seguimiento)) };
+  return recomendaciones;
+}
+
+/**
+ * Cambia el plazo de exclusividad de una recomendación (30, 60 o 90 días). Puede Atención (desde la ficha del cliente) o quien
+ * trabaja en Sugerencias de clientes. Queda en la actividad de la sugerencia y en la del cliente.
+ */
+export async function cambiarExclusividad(id: string, dias: number): Promise<{ error?: string }> {
+  const usuario = await getUsuarioActual();
+  if (!usuario || !(puedeEscribir(usuario, MODULO_ATENCION) || puedeEscribir(usuario, MODULO))) return { error: "No tienes permiso para cambiar la exclusividad." };
+  if (!UUID.test(id)) return { error: "Recomendación no válida." };
+  if (!(PLAZOS_EXCLUSIVIDAD as readonly number[]).includes(dias)) return { error: "El plazo es de 30, 60 o 90 días." };
+  const supabase = createServiceClient();
+  const { data: actual } = await supabase.from(ENTIDAD).select("codigo, dropshipper_id, exclusividad_dias").eq("id", id).maybeSingle();
+  if (!actual) return { error: "No se encontró la recomendación. ¿Ya se corrió la migración 0111?" };
+  if (actual.exclusividad_dias === dias) return {};
+  const { error } = await supabase.from(ENTIDAD).update({ exclusividad_dias: dias, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudo cambiar el plazo." };
+  await registrarAuditoriaLote([
+    { accion: "cambiar_exclusividad", entidad: ENTIDAD, entidadId: id, antes: { Exclusividad: `${actual.exclusividad_dias} días` }, despues: { Exclusividad: `${dias} días` } },
+    { accion: "cambiar_exclusividad", entidad: "dropshippers", entidadId: actual.dropshipper_id, detalle: `${actual.codigo}: ${dias} días` },
+  ]);
+  revalidatePath(RUTA);
+  return {};
+}
+
+/**
+ * La exclusividad de un producto de Producto, si salió de la recomendación de un cliente (producto → test → Selección →
+ * sugerencia). Para la ficha de Producto: basta poder abrir Producto. null si no viene de una recomendación.
+ */
+export async function exclusividadDeProducto(skuId: string): Promise<{ cliente: string; codigo: string; exclusividad: Exclusividad } | null> {
+  await requireModulo("producto");
+  if (!UUID.test(skuId)) return null;
+  const supabase = createServiceClient();
+  const { data: test } = await supabase.from("wms_productos_test").select("seleccion_id").eq("sku_maestro_id", skuId).not("seleccion_id", "is", null).limit(1).maybeSingle();
+  if (!test?.seleccion_id) return null;
+  const { data: sug } = await supabase.from(ENTIDAD).select("dropshipper_id, codigo, dropshippers(codigo, nombre)").eq("seleccion_id", test.seleccion_id).maybeSingle();
+  if (!sug) return null;
+  // El mismo cálculo que ve Atención en la ficha del cliente, para no tener dos reglas.
+  const r = await recomendacionesDeDropshipperSinPermiso(sug.dropshipper_id);
+  const rec = r.find((x) => x.codigo === sug.codigo);
+  if (!rec) return null;
+  const d = uno(sug.dropshippers as never) as { codigo: string | null; nombre: string } | null;
+  return { cliente: d ? `${d.codigo ? `${d.codigo} · ` : ""}${d.nombre}` : "un cliente", codigo: sug.codigo, exclusividad: rec.exclusividad };
 }

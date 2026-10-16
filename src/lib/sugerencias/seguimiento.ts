@@ -146,3 +146,43 @@ export function aciertoCliente(seguimientos: Seguimiento[]): { recomendados: num
   const comprados = seguimientos.filter((s) => s.comprado).length;
   return { recomendados, winners, comprados, pct: recomendados ? Math.round((winners / recomendados) * 100) : null };
 }
+
+/** Los plazos de exclusividad que se pueden elegir (días); 30 por defecto. */
+export const PLAZOS_EXCLUSIVIDAD = [30, 60, 90] as const;
+
+export interface Exclusividad {
+  dias: number;
+  /** «pendiente»: todavía no está disponible para vender (no ha empezado); «vigente»; «vencida»; «no_aplica»: no se compró. */
+  estado: "pendiente" | "vigente" | "vencida" | "no_aplica";
+  desde: string | null;
+  hasta: string | null;
+  /** Días que le quedan (solo vigente). */
+  quedan: number | null;
+}
+
+const sumarDias = (iso: string, dias: number) => {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * La exclusividad del cliente sobre lo que recomendó: corre `dias` desde que el producto quedó disponible para vender (la etapa
+ * «completado» del recorrido). Si el recorrido terminó sin compra (no se seleccionó, no pasó el test, no se compró), no aplica.
+ */
+export function exclusividadDe(seguimiento: Seguimiento, dias: number, hoy: string): Exclusividad {
+  const disponible = seguimiento.etapas.find((e) => e.clave === "completado" && e.estado !== "pendiente")?.fecha ?? null;
+  if (!disponible) return { dias, estado: seguimiento.terminado ? "no_aplica" : "pendiente", desde: null, hasta: null, quedan: null };
+  const desde = disponible.slice(0, 10);
+  const hasta = sumarDias(desde, dias);
+  const quedan = diasEntreFechas(hoy, hasta);
+  return hoy.slice(0, 10) <= hasta ? { dias, estado: "vigente", desde, hasta, quedan } : { dias, estado: "vencida", desde, hasta, quedan: null };
+}
+
+/** Cómo se cuenta la exclusividad en pantalla (fechas como dd/mm/aaaa). */
+export function textoExclusividad(e: Exclusividad, fecha: (iso: string) => string): string {
+  if (e.estado === "pendiente") return `${e.dias} días · empieza cuando esté disponible para vender`;
+  if (e.estado === "no_aplica") return "No aplica: no llegó a venderse";
+  if (e.estado === "vencida") return `Vencida el ${fecha(e.hasta!)} (${e.dias} días)`;
+  return `Vigente hasta el ${fecha(e.hasta!)} · ${e.quedan === 1 ? "queda 1 día" : `quedan ${e.quedan} días`}`;
+}

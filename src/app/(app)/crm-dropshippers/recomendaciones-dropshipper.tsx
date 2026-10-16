@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { anilloFoco } from "@/components/ui/field";
+import { useEffect, useState, useTransition } from "react";
+import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { AdjuntoIcon } from "@/lib/nav-icons";
-import { diasEntreFechas, type Etapa } from "@/lib/sugerencias/seguimiento";
-import { recomendacionesDeDropshipper, type RecomendacionCliente } from "../sugerencias-clientes/actions";
+import { diasEntreFechas, PLAZOS_EXCLUSIVIDAD, textoExclusividad, type Etapa, type Exclusividad } from "@/lib/sugerencias/seguimiento";
+import { cambiarExclusividad, recomendacionesDeDropshipper, type RecomendacionCliente } from "../sugerencias-clientes/actions";
 
 type Datos = Extract<Awaited<ReturnType<typeof recomendacionesDeDropshipper>>, { recomendaciones: unknown }>;
 
@@ -16,6 +17,60 @@ const COLOR_ETAPA: Record<Etapa["estado"], string> = {
   fallo: "bg-destructive",
 };
 const dias = (n: number) => `${n} ${n === 1 ? "día" : "días"}`;
+const COLOR_EXCLUSIVIDAD: Record<Exclusividad["estado"], string> = {
+  vigente: "text-success",
+  pendiente: "text-muted-foreground",
+  vencida: "text-muted-foreground",
+  no_aplica: "text-muted-foreground",
+};
+
+/**
+ * La exclusividad del cliente sobre lo que recomendó: corre desde que el producto quedó disponible para vender, 30 días por
+ * defecto; Atención la puede pasar a 60 o 90.
+ */
+function ExclusividadRecomendacion({ r, puedeEscribir, alCambiar }: { r: RecomendacionCliente; puedeEscribir: boolean; alCambiar: () => void }) {
+  const { mostrarToast } = useToast();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const e = r.exclusividad;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-2 text-xs">
+      <span className="font-medium">Exclusividad</span>
+      {puedeEscribir && e.estado !== "no_aplica" && (
+        <select
+          aria-label={`Plazo de exclusividad de ${r.nombre}`}
+          value={e.dias}
+          disabled={pending}
+          onChange={(ev) => {
+            const nuevo = Number(ev.target.value);
+            setError(null);
+            startTransition(async () => {
+              const res = await cambiarExclusividad(r.id, nuevo);
+              if (res.error) setError(res.error);
+              else {
+                mostrarToast(`Exclusividad: ${nuevo} días`);
+                alCambiar();
+              }
+            });
+          }}
+          className={`${fieldClassSm} w-24`}
+        >
+          {PLAZOS_EXCLUSIVIDAD.map((d) => (
+            <option key={d} value={d}>
+              {d} días
+            </option>
+          ))}
+        </select>
+      )}
+      <span className={COLOR_EXCLUSIVIDAD[e.estado]}>{textoExclusividad(e, formatearFecha)}</span>
+      {error && (
+        <span role="alert" className="w-full text-destructive">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
 
 /** La línea de tiempo de una recomendación: cada etapa con su fecha y los días desde que el cliente la recomendó. */
 function Recorrido({ r }: { r: RecomendacionCliente }) {
@@ -46,9 +101,11 @@ function Recorrido({ r }: { r: RecomendacionCliente }) {
  * Winner en el test. Cada producto dice en qué etapa va y cuántos días lleva, y despliega su recorrido completo para
  * contárselo al cliente: recomendado, seleccionado, oferta, test, resultado y compra (sin cantidades ni costos).
  */
-export function RecomendacionesDropshipper({ dropshipperId, version }: { dropshipperId: string; version: number }) {
+export function RecomendacionesDropshipper({ dropshipperId, version, puedeEscribir }: { dropshipperId: string; version: number; puedeEscribir: boolean }) {
   const [datos, setDatos] = useState<Datos | "error" | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Sube al cambiar un plazo, para volver a pedir los datos.
+  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
     let vigente = true;
@@ -58,7 +115,7 @@ export function RecomendacionesDropshipper({ dropshipperId, version }: { dropshi
     return () => {
       vigente = false;
     };
-  }, [dropshipperId, version]);
+  }, [dropshipperId, version, recarga]);
 
   if (datos === null) return <p className="m-0 text-[13px] text-muted-foreground">Cargando…</p>;
   if (datos === "error") return <p role="alert" className="m-0 text-[13px] text-destructive">No se pudieron cargar las recomendaciones.</p>;
@@ -115,7 +172,15 @@ export function RecomendacionesDropshipper({ dropshipperId, version }: { dropshi
                   </span>
                 </span>
               </button>
-              {abiertaEsta && <Recorrido r={r} />}
+              {r.exclusividad.estado === "vigente" && !abiertaEsta && (
+                <p className="m-0 mt-1.5 text-xs text-success">Exclusivo · {textoExclusividad(r.exclusividad, formatearFecha)}</p>
+              )}
+              {abiertaEsta && (
+                <>
+                  <Recorrido r={r} />
+                  <ExclusividadRecomendacion r={r} puedeEscribir={puedeEscribir} alCambiar={() => setRecarga((n) => n + 1)} />
+                </>
+              )}
             </li>
           );
         })}

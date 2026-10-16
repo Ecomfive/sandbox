@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { aciertoCliente, armarSeguimiento, type DatosRecorrido } from "./seguimiento";
+import { aciertoCliente, armarSeguimiento, exclusividadDe, type DatosRecorrido } from "./seguimiento";
 
 const base: DatosRecorrido = { recomendado: "2026-10-01T10:00:00Z", sugerencia: { estado: "nuevo", actualizadoEn: "2026-10-01T10:00:00Z" }, seleccion: null, test: null, compra: null };
 
@@ -63,4 +63,37 @@ test("% de acierto: winners sobre recomendados", () => {
   );
   assert.deepEqual(aciertoCliente([a, b]), { recomendados: 2, winners: 1, comprados: 0, pct: 50 });
   assert.equal(aciertoCliente([]).pct, null);
+});
+
+test("exclusividad: pendiente mientras no esté disponible, vigente 30 días desde Completado y luego vencida", () => {
+  const enCamino = armarSeguimiento(
+    {
+      ...base,
+      sugerencia: { estado: "seleccionado", actualizadoEn: "2026-10-02" },
+      seleccion: { estado: "en_test", creadoEn: "2026-10-02", enOfertaEn: null },
+      test: { estado: "winner", creadoEn: "2026-10-04", resultadoEn: null },
+      compra: { etapa: "tracking", anulada: false, etapas: { cotizar: "2026-10-09" } },
+    },
+    "2026-10-25",
+  );
+  assert.equal(exclusividadDe(enCamino, 30, "2026-10-25").estado, "pendiente");
+
+  const disponible = armarSeguimiento(
+    {
+      ...base,
+      sugerencia: { estado: "seleccionado", actualizadoEn: "2026-10-02" },
+      seleccion: { estado: "en_test", creadoEn: "2026-10-02", enOfertaEn: null },
+      test: { estado: "winner", creadoEn: "2026-10-04", resultadoEn: null },
+      compra: { etapa: "completado", anulada: false, etapas: { cotizar: "2026-10-09", completado: "2026-11-01T15:00:00Z" } },
+    },
+    "2026-11-10",
+  );
+  assert.deepEqual(exclusividadDe(disponible, 30, "2026-11-10"), { dias: 30, estado: "vigente", desde: "2026-11-01", hasta: "2026-12-01", quedan: 21 });
+  assert.equal(exclusividadDe(disponible, 30, "2026-12-02").estado, "vencida");
+  assert.equal(exclusividadDe(disponible, 90, "2026-12-02").estado, "vigente");
+});
+
+test("exclusividad: no aplica si el recorrido terminó sin compra", () => {
+  const s = armarSeguimiento({ ...base, sugerencia: { estado: "descartado", actualizadoEn: "2026-10-03" } }, "2026-10-20");
+  assert.equal(exclusividadDe(s, 30, "2026-10-20").estado, "no_aplica");
 });

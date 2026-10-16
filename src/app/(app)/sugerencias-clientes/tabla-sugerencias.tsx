@@ -22,6 +22,7 @@ const ICONOS: Record<string, IconoComp> = {
   dropshipper: DropshipperIcon,
   paisDetectado: UbicacionIcon,
   categoria: EstadoIcon,
+  exclusividad: CalendarioIcon,
   creadoEn: CalendarioIcon,
   notas: EstadoIcon,
 };
@@ -80,6 +81,7 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
     { id: "dropshipper", label: "Recomendado por", ocultable: true, clase: "whitespace-nowrap", render: (f) => f.dropshipper },
     { id: "paisDetectado", label: "País donde lo vio", ocultable: true, clase: "text-muted-foreground", render: (f) => nombrePaisIso(f.paisDetectado) },
     { id: "categoria", label: "Categoría", ocultable: true, clase: "text-muted-foreground", render: (f) => f.categoria ?? "—" },
+    { id: "exclusividad", label: "Exclusividad", ocultable: true, clase: "whitespace-nowrap tabular-nums text-muted-foreground", render: (f) => `${f.exclusividadDias} días` },
     { id: "creadoEn", label: "Recomendado el", ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (f) => formatearFecha(f.creadoEn) },
     {
       id: "seleccion",
