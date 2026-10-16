@@ -2,7 +2,7 @@
 
 import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { actualizarProductoTest, crearProductoTest } from "./actions";
+import { actualizarProductoTest, crearProductoTest, opcionesSeleccionParaTest } from "./actions";
 import {
   ESTADOS,
   TEST_NUMEROS,
@@ -81,6 +81,36 @@ function CampoMetrica({
  * modifica. A diferencia de Filtros, las métricas de Meta Ads sí se editan aquí (no vienen de una
  * importación externa) — se colorean en vivo con el mismo criterio para decidir cuánto pedir.
  */
+/**
+ * «Viene de Selección»: la fila de Selección de la que sale este test (migración 0110), para que el recorrido del producto quede
+ * enlazado aunque el test se cree aquí y no con «Enviar a Test» de Creación de ofertas. Las opciones se piden al abrir el
+ * formulario: las filas del país que todavía no tienen test, más la que ya tiene este.
+ */
+function CampoViene({ paisId, inicial }: { paisId: string; inicial: string | null }) {
+  const [opciones, setOpciones] = useState<{ id: string; etiqueta: string }[] | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    opcionesSeleccionParaTest(paisId, inicial)
+      .then((r) => vigente && setOpciones("opciones" in r ? r.opciones : []))
+      .catch(() => vigente && setOpciones([]));
+    return () => {
+      vigente = false;
+    };
+  }, [paisId, inicial]);
+  return (
+    <Campo etiqueta="Viene de Selección" id="campo-seleccion-test">
+      <select id="campo-seleccion-test" name="seleccion_id" defaultValue={inicial ?? ""} key={opciones ? "listo" : "cargando"} disabled={!opciones} className={fieldClass}>
+        <option value="">{opciones ? "No viene de Selección" : "Cargando…"}</option>
+        {(opciones ?? []).map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.etiqueta}
+          </option>
+        ))}
+      </select>
+    </Campo>
+  );
+}
+
 export function FormularioProductoTest({
   paisId,
   producto,
@@ -217,6 +247,7 @@ export function FormularioProductoTest({
               )}
             </span>
           </Campo>
+          <CampoViene paisId={paisId} inicial={producto?.seleccionId ?? null} />
           <Campo etiqueta="Nombre" id="campo-nombre-test" obligatorio faltante={faltante}>
             <input
               id="campo-nombre-test"

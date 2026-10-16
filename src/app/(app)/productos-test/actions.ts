@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { requireModuloEscritura } from "@/lib/auth";
+import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { ESTADOS, TEST_NUMEROS } from "./def-productos-test";
 import { crearProducto } from "../producto/actions";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
@@ -24,13 +24,45 @@ const textoOptativo = (formData: FormData, campo: string): string | null => {
 
 const fechaOptativa = (formData: FormData, campo: string): string | null => textoOptativo(formData, campo);
 
+/** Al vincular un test con su fila de Selección, esa fila pasa a «En test» (si todavía estaba antes). Nunca lanza. */
+async function marcarSeleccionEnTest(supabase: ReturnType<typeof createServiceClient>, formData: FormData) {
+  const seleccion = String(formData.get("seleccion_id") ?? "").trim();
+  if (!/^[0-9a-fA-F-]{36}$/.test(seleccion)) return;
+  await supabase.from("wms_seleccion_productos").update({ estado: "en_test", actualizado_en: new Date().toISOString() }).eq("id", seleccion).in("estado", ["seleccionado", "crear_oferta"]);
+  revalidatePath("/seleccion-productos");
+}
+
+/**
+ * Las filas de Selección de un país que todavía no tienen test (más la que ya tiene este), para el campo «Viene de
+ * Selección» del formulario. Basta poder abrir Test productos. Devuelve el error como valor.
+ */
+export async function opcionesSeleccionParaTest(paisId: string, actual: string | null): Promise<{ opciones: { id: string; etiqueta: string }[] } | { error: string }> {
+  await requireModulo("productos-test");
+  if (!/^[0-9a-fA-F-]{36}$/.test(paisId)) return { error: "País no válido." };
+  const supabase = createServiceClient();
+  const [{ data: filas, error }, { data: conTest }] = await Promise.all([
+    supabase.from("wms_seleccion_productos").select("id, numero, nombre, codigo_fuente").eq("pais_id", paisId).neq("estado", "descartado").order("numero", { ascending: false }).limit(500),
+    supabase.from("wms_productos_test").select("seleccion_id").not("seleccion_id", "is", null),
+  ]);
+  if (error) return { error: "No se pudo cargar Selección." };
+  const ocupadas = new Set((conTest ?? []).map((t) => t.seleccion_id as string));
+  return {
+    opciones: (filas ?? [])
+      .filter((f) => f.id === actual || !ocupadas.has(f.id))
+      .map((f) => ({ id: f.id as string, etiqueta: `SEL-${String(f.numero).padStart(4, "0")} · ${f.codigo_fuente} · ${f.nombre}` })),
+  };
+}
+
 /** Los campos comunes a crear y actualizar (todo lo que no sea el nombre, el país o el estado). */
 function leerCambios(formData: FormData) {
   const testNumero = (formData.get("test_numero") as string | null) || null;
   const sku = String(formData.get("sku_maestro_id") ?? "").trim();
+  const seleccion = String(formData.get("seleccion_id") ?? "").trim();
   return {
     // El producto de Producto con que se vincula (vacío = ninguno).
     sku_maestro_id: /^[0-9a-fA-F-]{36}$/.test(sku) ? sku : null,
+    // La fila de Selección de la que viene (migración 0110; vacío = ninguna): enlaza el recorrido del producto.
+    ...(formData.has("seleccion_id") ? { seleccion_id: /^[0-9a-fA-F-]{36}$/.test(seleccion) ? seleccion : null } : {}),
     fecha_creacion: fechaOptativa(formData, "fecha_creacion"),
     fuente: textoOptativo(formData, "fuente"),
     pagina_producto_url: textoOptativo(formData, "pagina_producto_url"),
@@ -72,8 +104,9 @@ export async function crearProductoTest(formData: FormData): Promise<{ error?: s
     .insert({ pais_id, nombre, estado, creado_por: usuario.id, ...leerCambios(formData) })
     .select("id")
     .single();
-  if (error) return { error: error.message };
+  if (error) return { error: error.code === "23505" ? "Esa fila de Selección ya está vinculada a otro test." : error.message };
 
+  await marcarSeleccionEnTest(supabase, formData);
   await registrarAuditoria({ accion: "crear_producto_test", entidad: "wms_productos_test", entidadId: data.id, detalle: nombre });
   // Vinculado a un producto Activo: pasa a Filtro de productos.
   if (await pasarTestsAFiltro(supabase, { testIds: [data.id] })) revalidatePath("/filtro-productos");
@@ -96,8 +129,9 @@ export async function actualizarProductoTest(formData: FormData): Promise<{ erro
     .from("wms_productos_test")
     .update({ nombre, estado, actualizado_en: new Date().toISOString(), ...leerCambios(formData) })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: error.code === "23505" ? "Esa fila de Selección ya está vinculada a otro test." : error.message };
 
+  await marcarSeleccionEnTest(supabase, formData);
   // Vinculado a un producto Activo: pasa a Filtro de productos.
   if (await pasarTestsAFiltro(supabase, { testIds: [id] })) revalidatePath("/filtro-productos");
   revalidatePath("/productos-test", "layout");
