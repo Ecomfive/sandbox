@@ -21,7 +21,7 @@ export default async function SugerenciasClientesPage() {
   const [sugerenciasR, clientesR] = await Promise.all([
     supabase
       .from("sugerencias_clientes")
-      .select("id, codigo, nombre, estado, foto_url, notas, categoria, pais_detectado, dropshipper_id, creado_en, dropshippers(codigo, nombre), wms_seleccion_productos!sugerencias_clientes_seleccion_id_fkey(numero)")
+      .select("id, codigo, nombre, estado, foto_url, notas, categoria, pais_detectado, dropshipper_id, creado_en, exclusividad_dias, dropshippers(codigo, nombre), wms_seleccion_productos!sugerencias_clientes_seleccion_id_fkey(numero)")
       .eq("pais_id", pais.id)
       .order("creado_en", { ascending: false })
       .limit(1000),
@@ -33,7 +33,7 @@ export default async function SugerenciasClientesPage() {
       <Pagina ancho="ancha" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Sugerencias de clientes" oculto />
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          No se pudieron cargar las sugerencias. Si es la primera vez, falta correr la migración 0109 en Supabase.
+          No se pudieron cargar las sugerencias. Si es la primera vez, faltan las migraciones 0109 y 0111 en Supabase.
         </p>
       </Pagina>
     );
@@ -51,6 +51,7 @@ export default async function SugerenciasClientesPage() {
     dropshipperId: s.dropshipper_id,
     dropshipper: etiquetaCliente(uno(s.dropshippers as never)),
     seleccionNumero: (uno(s.wms_seleccion_productos as never) as { numero: number } | null)?.numero ?? null,
+    exclusividadDias: s.exclusividad_dias,
     creadoEn: s.creado_en,
   }));
   const clientes = (clientesR.data ?? []).map((d) => ({ id: d.id as string, etiqueta: etiquetaCliente(d as { codigo: string | null; nombre: string }) }));

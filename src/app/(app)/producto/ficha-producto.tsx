@@ -24,6 +24,7 @@ import { FotoProducto } from "./foto-producto";
 import { NombreProducto } from "./nombre-producto";
 import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
+import { ExclusividadProducto } from "./exclusividad-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
@@ -143,6 +144,7 @@ export function FichaProducto({
             <FotoProducto key={producto.id} id={producto.id} nombre={producto.nombre} foto={producto.foto} puedeEscribir={puedeEscribir} />
             <p className="text-sm text-muted-foreground">{producto.nombre}</p>
           </div>
+          <ExclusividadProducto key={`exclusividad-${producto.id}`} skuId={producto.id} />
 
 
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">

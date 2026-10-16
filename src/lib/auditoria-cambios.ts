@@ -17,6 +17,7 @@ export function calcularCambios(
 }
 
 export const ETIQUETA_ACCION: Record<string, string> = {
+  cambiar_exclusividad: "Cambió la exclusividad",
   enviar_a_test: "Envió a Test",
   crear_sugerencia: "Registró la sugerencia",
   recomendar_producto: "Recomendó un producto",

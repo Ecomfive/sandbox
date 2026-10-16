@@ -17,6 +17,8 @@ export interface FilaSugerencia {
   dropshipper: string;
   /** La fila de Selección que nació al marcarla Seleccionado (SEL-0001), si ya pasó. */
   seleccionNumero: number | null;
+  /** Días de exclusividad para quien lo recomendó (30, 60 o 90), desde que quede disponible para vender. */
+  exclusividadDias: number;
   creadoEn: string;
 }
 
@@ -57,6 +59,7 @@ export const DEF_SUGERENCIAS: DefTabla<FilaSugerencia> = {
     { id: "dropshipper", etiqueta: "Recomendado por", tipo: "seleccion", valores: (f) => [f.dropshipper], agrupable: true },
     { id: "paisDetectado", etiqueta: "País donde lo vio", tipo: "seleccion", valores: (f) => [f.paisDetectado ?? SIN_VALOR], etiquetaSinValor: "Sin país", formatearValor: nombrePaisIso, agrupable: true },
     { id: "categoria", etiqueta: "Categoría", tipo: "seleccion", valores: (f) => [f.categoria ?? SIN_VALOR], etiquetaSinValor: "Sin categoría", agrupable: true },
+    { id: "exclusividad", etiqueta: "Exclusividad", tipo: "seleccion", valores: (f) => [String(f.exclusividadDias)], formatearValor: (v) => `${v} días`, agrupable: true },
     { id: "creadoEn", etiqueta: "Recomendado el", tipo: "fecha", valor: (f) => f.creadoEn.slice(0, 10) },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },
   ],
