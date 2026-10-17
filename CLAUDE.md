@@ -768,6 +768,13 @@ convenciones técnicas del código.
   muestra con `PlanificacionAutomatica` (llegada estimada y de dónde salen los días). `scripts/recalcular-planificacion.ts`
   recalcula las abiertas con fecha de envío. **«Documentos» y «Producto relacionado» ya no existen** (migración 0090): los
   archivos del campo Documentos de ClickUp quedaron dentro de un comentario «Documentos (factura o soporte)».
+  **Copiar cotización** (17 oct 2026, `copiar-cotizacion.tsx`): botón de la ficha que deja en el portapapeles una imagen PNG
+  (dibujada en un canvas, colores fijos) con las métricas del test y la fila del sheet de cotizaciones, para pegar en
+  WhatsApp. Los datos los arma `obtenerCotizacionCompra` (basta poder abrir Compras): las métricas salen del bloque
+  «**Métricas (…)**» de la descripción con sus puntos 🔴🟡🟢 (`leerMetricasDescripcion`) o, si no está, del test del producto
+  (solo con el módulo `productos-test`); la logística es la modalidad de la ruta del agente en `wms_rutas_envio` + la vía
+  («DDP BY SEA», `textoLogistica`); nombre y foto, de los productos de la compra. Lógica pura en `src/lib/compras/cotizacion.ts`
+  (con prueba). La copia empieza en el clic (`ClipboardItem` con promesa); si el navegador no deja, copia el texto.
   **Anular, no borrar** (migración 0096, 9 oct 2026): la ficha tiene «Anular» (pide motivo; `anularCompra`) en vez de
   «Eliminar». Anular pasa la compra a la etapa **Descartado** con Estado Completado (sella `cerrado_en`, deja los eventos) y la
   marca (`anulada_en`, `anulada_por`, `motivo_anulacion`; insignia «Anulada» en la lista y aviso con «Restaurar» en la ficha).

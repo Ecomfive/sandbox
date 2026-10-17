@@ -16,6 +16,7 @@ import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
+import { leerMetricasDescripcion, metricasDeTest, precioUnidad, textoLogistica, type Cotizacion, type TestParaCotizacion } from "@/lib/compras/cotizacion";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS_COMPRA.map((e) => e.valor));
@@ -1515,4 +1516,78 @@ export async function alternarReaccion(comentarioId: string, emoji: string): Pro
     g.nombres.push(r.usuario_nombre ?? "—");
   }
   return { reacciones };
+}
+
+// --- Copiar cotización (17 oct 2026) ---------------------------------------------------------------------------------
+
+/** Un texto para `ilike` sin comodines: el nombre se busca tal cual (sin importar mayúsculas). */
+const sinComodines = (t: string) => t.replace(/[%_\\]/g, (x) => `\\${x}`);
+
+/**
+ * Lo que va en la imagen de «Copiar cotización»: las métricas del test (de la descripción de la compra, con sus puntos de
+ * color; si no las trae, de su test en Test productos, solo para quien puede abrir ese módulo) y la fila de la cotización
+ * (producto, foto, destino, «DDP BY SEA» con la modalidad de la ruta del agente en Envíos, cantidad, monto y por unidad).
+ * Basta poder abrir Compras.
+ */
+export async function obtenerCotizacionCompra(compraId: string): Promise<{ cotizacion: Cotizacion } | { error: string }> {
+  const usuario = await requireModulo("compras");
+  if (!ES_ID(compraId)) return { error: "Compra no válida." };
+  const sinAcceso = await sinAccesoACompras([compraId]);
+  if (sinAcceso) return { error: sinAcceso };
+  const supabase = createServiceClient();
+  const [{ data: c }, { data: items }] = await Promise.all([
+    supabase
+      .from("wms_compras")
+      .select("nombre, descripcion, foto_url, qty_total, monto_total, via_envio, agente_envio, pais_id, paises_destino, paises(codigo, nombre)")
+      .eq("id", compraId)
+      .maybeSingle(),
+    supabase.from("wms_compra_items").select("sku_maestro_id, skus_maestros(nombre, foto_url)").eq("compra_id", compraId).order("creado_en"),
+  ]);
+  if (!c) return { error: "Compra no encontrada." };
+  const pais = (Array.isArray(c.paises) ? c.paises[0] : c.paises) as { codigo: string; nombre: string } | null;
+  const vias = (c.via_envio as string[] | null) ?? [];
+  const skuIds = (items ?? []).map((i) => i.sku_maestro_id as string).filter(Boolean);
+
+  let metricas = leerMetricasDescripcion(c.descripcion as string | null);
+  if (!metricas && usuario.modulos.includes("productos-test")) {
+    const columnas = "pais_id, fecha_test, metrica_oferta, metrica_cpm, metrica_efectividad, metrica_hook_rate, metrica_ctr, metrica_cpa, metrica_gasto, metrica_compras, metrica_cvr";
+    const consulta = supabase.from("wms_productos_test").select(columnas).order("fecha_test", { ascending: false, nullsFirst: false }).limit(20);
+    const { data: tests } = skuIds.length ? await consulta.in("sku_maestro_id", skuIds) : await consulta.ilike("nombre", sinComodines(String(c.nombre ?? "")));
+    const lista = (tests ?? []) as unknown as (TestParaCotizacion & { pais_id: string | null })[];
+    const test = lista.find((t) => t.pais_id === c.pais_id) ?? lista[0];
+    if (test) metricas = metricasDeTest(test, pais?.nombre ?? null);
+  }
+
+  let modalidad: string | null = null;
+  if (c.agente_envio && pais && vias.length === 1) {
+    const { data: ruta } = await supabase
+      .from("wms_rutas_envio")
+      .select("modalidad")
+      .ilike("agente", sinComodines(String(c.agente_envio)))
+      .eq("pais_codigo", pais.codigo)
+      .eq("via", vias[0])
+      .eq("activo", true)
+      .limit(1)
+      .maybeSingle();
+    modalidad = (ruta?.modalidad as string | null) ?? null;
+  }
+
+  // El nombre es el del producto de la compra (las compras ya no tienen nombre propio); sin productos, el que traía de ClickUp.
+  const skus = (items ?? []).map((i) => (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { nombre: string | null; foto_url: string | null } | null);
+  const fotoSku = skus.find((s) => s?.foto_url)?.foto_url;
+  const nombre = skus.map((s) => s?.nombre).filter(Boolean).join(" + ") || String(c.nombre ?? "");
+  const cantidad = c.qty_total === null ? null : Number(c.qty_total);
+  const monto = c.monto_total === null ? null : Number(c.monto_total);
+  return {
+    cotizacion: {
+      producto: nombre,
+      fotoUrl: (c.foto_url as string | null) ?? fotoSku ?? null,
+      destino: pais?.nombre ?? ((c.paises_destino as string[] | null) ?? []).join(", "),
+      logistica: textoLogistica(modalidad, vias),
+      cantidad,
+      monto,
+      porUnidad: precioUnidad(monto, cantidad),
+      metricas,
+    },
+  };
 }

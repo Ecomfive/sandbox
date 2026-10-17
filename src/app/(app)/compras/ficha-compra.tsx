@@ -12,6 +12,7 @@ import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
+import { CopiarCotizacionBoton } from "./copiar-cotizacion";
 import { AnularCompraBoton, AvisoAnulada } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
 import { ProductosCompra } from "./productos-compra";
@@ -222,7 +223,12 @@ export function FichaCompra({
               etiquetas={etiquetas}
               colores={colores}
               botonesArriba
-              acciones={compra.anulada ? undefined : <AnularCompraBoton id={compra.id} nombre={numeroOC(compra.numero)} alAnular={alCerrar} />}
+              acciones={
+                <>
+                  <CopiarCotizacionBoton compraId={compra.id} />
+                  {!compra.anulada && <AnularCompraBoton id={compra.id} nombre={numeroOC(compra.numero)} alAnular={alCerrar} />}
+                </>
+              }
               alGuardar={alGuardar}
               alCancelar={alCancelar}
               alCambiarGuardando={setGuardando}
@@ -231,7 +237,12 @@ export function FichaCompra({
               productos={compra.tipo === "pais" ? <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir incrustado /> : undefined}
             />
           ) : (
-            <DatosDeLaCompra compra={compra} codigoPais={MONEDA_COMPRAS} />
+            <>
+              <div className="flex gap-2 px-5 pt-4">
+                <CopiarCotizacionBoton compraId={compra.id} />
+              </div>
+              <DatosDeLaCompra compra={compra} codigoPais={MONEDA_COMPRAS} />
+            </>
           )}
           {/* A solo lectura no hay formulario: los productos se ven al final, como antes. */}
           {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} />}
