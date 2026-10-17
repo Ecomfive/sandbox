@@ -177,11 +177,12 @@ export function FichaInstagram({
   async function leerEnlace() {
     if (!fila || leyendo) return;
     setLeyendo(true);
-    const r: { error?: string; archivo?: boolean } = await leerEnlaceDeCaptura(fila.id).catch(() => ({ error: "No se pudo leer el enlace." }));
+    const r: { error?: string; archivo?: boolean; faltaArchivo?: string } = await leerEnlaceDeCaptura(fila.id).catch(() => ({ error: "No se pudo leer el enlace." }));
     setLeyendo(false);
     if (r.error) mostrarToast(r.error, "destructive");
     else {
-      mostrarToast(r.archivo ? "Archivo y datos completados" : "Datos completados");
+      // Si la red no entregó el archivo se dice aquí (y queda en la ficha), en vez de dar por completada una captura que sigue sin él.
+      mostrarToast(r.archivo ? "Archivo y datos completados" : r.faltaArchivo ? `Datos completados. Sin archivo: ${r.faltaArchivo}` : "Datos completados");
       setVersion((v) => v + 1);
       setVersionHistorial((v) => v + 1);
       router.refresh();

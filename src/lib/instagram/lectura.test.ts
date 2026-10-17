@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DatosEmbed } from "./embed";
-import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
+import { archivoDeLectura, candidatosDeArchivo, cifrasDeLectura, mezclarLectura } from "./lectura";
 import type { VistaPublica } from "./vista-previa";
 
 const AHORA = new Date("2026-10-14T20:00:00.000Z");
@@ -58,4 +58,27 @@ test("mezclar: lo corregido a mano no se pisa; solo se completa lo que falta", (
   const r = mezclarLectura(actual, { like_count: 50, comments_count: 7, view_count: 9, fuente: "vista_previa", leido_en: "t" });
   assert.deepEqual(r, { like_count: 1000, comments_count: 7, view_count: 9, fuente: "manual" });
   assert.deepEqual(mezclarLectura(null, { like_count: 3 }), { like_count: 3 });
+});
+
+test("candidatosDeArchivo: los videos (insertar y página principal) van antes que las imágenes, sin repetir", () => {
+  const principal = { video: "https://y.cdninstagram.com/v2.mp4", imagen: "https://y.cdninstagram.com/p2.jpg", esVideo: true };
+  const c = candidatosDeArchivo({ ok: true, datos: embed }, { ok: true, datos: vista, archivos: principal });
+  assert.deepEqual(c.videos, ["https://x.cdninstagram.com/v.mp4", "https://y.cdninstagram.com/v2.mp4"]);
+  // La portada de un video va al final de las imágenes: solo sirve cuando no hay video.
+  assert.deepEqual(c.imagenes, ["https://y.cdninstagram.com/p2.jpg", "https://x.cdninstagram.com/p.jpg"]);
+});
+
+test("candidatosDeArchivo: un reel cuya página de insertar no trae el video lo toma de la página principal (IG-0005 e IG-0020)", () => {
+  const sinVideo: DatosEmbed = { ...embed, videoUrl: null };
+  const c = candidatosDeArchivo({ ok: true, datos: sinVideo }, { ok: false, error: "La vista previa no trae cifras.", archivos: { video: "https://y.cdninstagram.com/o1/v.mp4", imagen: null, esVideo: true } });
+  assert.deepEqual(c.videos, ["https://y.cdninstagram.com/o1/v.mp4"]);
+});
+
+test("candidatosDeArchivo: una publicación de imagen aporta su foto y ningún video", () => {
+  const foto: DatosEmbed = { ...embed, esVideo: false, videoUrl: null };
+  const c = candidatosDeArchivo({ ok: true, datos: foto }, null);
+  assert.deepEqual(c.videos, []);
+  assert.deepEqual(c.imagenes, ["https://x.cdninstagram.com/p.jpg"]);
+  assert.deepEqual(candidatosDeArchivo(null, null), { videos: [], imagenes: [] });
+  assert.deepEqual(candidatosDeArchivo({ ok: false, error: "x" }, { ok: false, error: "y" }), { videos: [], imagenes: [] });
 });

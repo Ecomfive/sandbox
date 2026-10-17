@@ -330,3 +330,17 @@ con `node scripts/generar-iconos-fuentes.mjs`: fondo rojo de la marca (`#E83B3C`
 cuatro como el visor de una cámara (captura). Salen `public/pwa/icon-192.png` y `icon-512.png` (esquinas redondeadas), `icon-maskable-512.png` (a sangre, para el recorte circular de Android; el manifiesto lo declara
 con `purpose: "maskable"`), `src/app/apple-icon.png` (iPhone) y `src/app/icon.png` (la pestaña del navegador, solo la «E» porque el marco no se lee a 16 px). Ese mismo archivo es el ícono de la pestaña de **toda** la plataforma.
 Para cambiarlo, se edita el script y se vuelve a correr. En el celular, el ícono de una app ya instalada no se actualiza solo: hay que desinstalarla y volver a instalarla.
+
+## «Volver a leer el enlace» completa lo que faltó en la primera lectura (17 oct 2026)
+
+El botón de la ficha («Completar desde el enlace» / «Volver a leer el enlace», `completarCaptura`) ahora recupera en las tres redes lo que la primera lectura no pudo.
+
+- **Instagram: el video de los enlaces que «no descargaban».** La página de «insertar» de algunos reels no trae `video_url` (IG-0005 e IG-0020, de cuentas que no lo publican ahí), pero **la página principal del reel, pedida como lo hace
+  Facebook (`facebookexternalhit`), trae `og:video:secure_url` / `og:video`**: un MP4 de `cdninstagram.com` (9,1 MB y 2,4 MB, firma válida) que se baja sin cookies. `archivosDeLaPagina` (`vista-previa.ts`) lo lee del mismo pedido de la vista previa (sin un
+  pedido más) y `candidatosDeArchivo` (`lectura.ts`) ordena lo que se puede bajar: primero los **videos** (el de «insertar» y el `og:video`), luego las **imágenes** (la foto de una publicación de imagen, `og:image`, y la portada de un video). Una publicación de
+  imagen (IG-0027: `og:type` = `article`, sin video) queda con su foto de 44 KB. Solo se aceptan direcciones `https` de `cdninstagram.com` / `fbcdn.net`. El primer guardado (`guardarCapturas`) usa la misma lista.
+- **Una imagen se mejora con un video.** Si una captura quedó con solo la imagen (la portada que se guardó porque el video no se pudo bajar), «Volver a leer» baja el video si ya aparece, lo guarda y borra la imagen vieja
+  (`esSoloImagen`, `borrarArchivoViejo`; solo de la carpeta de esa captura). Con un video ya guardado no se toca el archivo.
+- **Reintento:** cada lectura (la vista previa y la de «insertar» de Instagram, la de TikTok y la de Facebook) se repite una vez, 1,5 s después, si falla o llega sin datos (`conReintento`; TikTok a veces contesta con una página de verificación).
+- **Si no hay archivo, lo dice.** La ficha ya no da por «completada» una captura que sigue sin archivo: el aviso dice «Datos completados. Sin archivo: …» y el motivo queda en `video_error` («La página pública de este enlace no trae el archivo…», «…no trae el archivo de este video»).
+- **Los datos de texto y cifras** ya se volvían a pedir cada vez: el copy, la cuenta y el nombre de la página se completan si faltaban (el copy cortado con «...» se reemplaza por el completo), las cifras y la fecha se refrescan, y lo corregido a mano (`fuente = "manual"`) no se pisa.

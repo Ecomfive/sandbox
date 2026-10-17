@@ -113,6 +113,37 @@ export function interpretarVistaPrevia(descripcion: string | null, titulo: strin
   return { megusta, comentarios, usuario, fecha, nombre: nombreDeVistaPrevia(titulo), copy: copyDeVistaPrevia(resto) };
 }
 
+/** Los archivos que anuncia la página principal de un reel o publicación (`og:video`, `og:image`), en la red de archivos de Instagram/Facebook. */
+export interface ArchivosDePagina {
+  video: string | null;
+  imagen: string | null;
+  /** `og:type` dice que es un video: una imagen sola es entonces apenas su portada. */
+  esVideo: boolean;
+}
+
+function archivoDeRedPermitido(valor: string | null): string | null {
+  if (!valor) return null;
+  try {
+    const u = new URL(decodificar(valor));
+    return u.protocol === "https:" && /(^|\.)(cdninstagram\.com|fbcdn\.net)$/i.test(u.hostname) ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * El video y la imagen que trae la página principal del reel o la publicación para quien la pide como lo hace Facebook (`og:video:secure_url`,
+ * `og:video`, `og:image`). Probado el 17 oct 2026: dos reels cuya página de «insertar» no trae el video (IG-0005 e IG-0020) sí lo traen aquí, como un
+ * MP4 de `cdninstagram.com`; una publicación de imagen trae solo `og:image` y un reel sin `og:video` queda con su portada.
+ */
+export function archivosDeLaPagina(html: string): ArchivosDePagina {
+  return {
+    video: archivoDeRedPermitido(contenidoDeMeta(html, ["og:video:secure_url", "og:video"])),
+    imagen: archivoDeRedPermitido(contenidoDeMeta(html, ["og:image"])),
+    esVideo: /^video/i.test(contenidoDeMeta(html, ["og:type"]) ?? ""),
+  };
+}
+
 /** El enlace de un reel o una publicación de instagram.com: lo único que se lee (no perfiles, ni otros sitios). */
 export function enlaceLegible(enlace: string): boolean {
   try {

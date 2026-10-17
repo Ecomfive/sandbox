@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, nombreDeVistaPrevia, tituloDeLaPagina } from "./vista-previa";
+import { archivosDeLaPagina, descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, nombreDeVistaPrevia, tituloDeLaPagina } from "./vista-previa";
 
 test("vista previa: lee me gusta, comentarios, cuenta y fecha de un texto real de Instagram", () => {
   const real = "43 likes, 12 comments - nuvotienda.ve on February 4, 2025: &quot;&#x2728;Nuestro Soporte celular para retrovisor brinda mayor";
@@ -53,4 +53,32 @@ test("vista previa: el nombre de la cuenta sale del título, sin entidades HTML"
   assert.equal(tituloDeLaPagina('<meta property="og:title" content="Nuvo Venezuela on Instagram: &quot;x&quot;" />'), "Nuvo Venezuela on Instagram: &quot;x&quot;");
   const r = interpretarVistaPrevia('43 likes, 12 comments - nuvotienda.ve on February 4, 2025: "x"', "Nuvo Venezuela on Instagram: &quot;x&quot;");
   assert.deepEqual(r, { megusta: 43, comentarios: 12, usuario: "nuvotienda.ve", fecha: "2025-02-04", nombre: "Nuvo Venezuela", copy: "x" });
+});
+
+test("archivosDeLaPagina: el video y la imagen que anuncia la página principal (IG-0020, 17 oct 2026)", () => {
+  const meta = (p: string, c: string) => `<meta property="${p}" content="${c}" />`;
+  const html = [
+    meta("og:type", "video"),
+    meta("og:video:type", "video/mp4"),
+    meta("og:video:secure_url", "https://scontent-mia5-1.cdninstagram.com/o1/v/t2/f2/m366/AQO.mp4?_nc_cat=105&amp;oh=00_AB&amp;oe=6AD9"),
+    meta("og:video", "https://scontent-mia5-1.cdninstagram.com/o1/v/t2/f2/m366/AQO.mp4?_nc_cat=105&amp;oh=00_AB&amp;oe=6AD9"),
+    meta("og:image", "https://scontent-mia5-1.cdninstagram.com/v/t51.71878-15/841.jpg?stp=cmp1&amp;_nc_cat=100"),
+  ].join("");
+  const a = archivosDeLaPagina(html);
+  assert.equal(a.video, "https://scontent-mia5-1.cdninstagram.com/o1/v/t2/f2/m366/AQO.mp4?_nc_cat=105&oh=00_AB&oe=6AD9");
+  assert.equal(a.imagen, "https://scontent-mia5-1.cdninstagram.com/v/t51.71878-15/841.jpg?stp=cmp1&_nc_cat=100");
+  assert.equal(a.esVideo, true);
+  // Una publicación de imagen (IG-0027): solo og:image y og:type article.
+  const foto = archivosDeLaPagina(meta("og:type", "article") + meta("og:image", "https://scontent-mia3-2.cdninstagram.com/v/t51/a.jpg?x=1"));
+  assert.deepEqual(foto, { video: null, imagen: "https://scontent-mia3-2.cdninstagram.com/v/t51/a.jpg?x=1", esVideo: false });
+});
+
+test("archivosDeLaPagina: solo direcciones https de la red de archivos de Instagram/Facebook", () => {
+  const meta = (p: string, c: string) => `<meta property="${p}" content="${c}" />`;
+  for (const malo of ["http://scontent.cdninstagram.com/a.mp4", "https://evil.com/cdninstagram.com/a.mp4", "https://cdninstagram.com.evil.com/a.mp4", "https://xcdninstagramxcom/a.mp4", "https://127.0.0.1/a.mp4", "javascript:alert(1)"]) {
+    const a = archivosDeLaPagina(meta("og:video", malo) + meta("og:image", malo));
+    assert.equal(a.video, null, malo);
+    assert.equal(a.imagen, null, malo);
+  }
+  assert.deepEqual(archivosDeLaPagina("<html></html>"), { video: null, imagen: null, esVideo: false });
 });
