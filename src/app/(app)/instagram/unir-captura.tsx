@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
@@ -74,6 +75,7 @@ export function UnirCaptura({ fila, otras, alUnir }: { fila: FilaInstagram; otra
           )}
         </select>
       </label>
+      {uniendo && <ProgresoEstimado compacta pasos={["Uniendo las capturas"]} estimadoMs={2500} etiqueta="Uniendo las dos capturas" />}
       <Button type="button" variant="secondary" onClick={() => void unir()} disabled={!elegida || uniendo} className="self-start">
         {uniendo ? "Uniendo…" : "Unir"}
       </Button>

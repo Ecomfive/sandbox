@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
+import { avisarActualizacionInstagram } from "@/lib/instagram/canal";
 import { enlaceDeApp, type Plataforma } from "@/lib/instagram/plataformas";
 import { etiquetaPlataforma, numeroInstagram } from "../def-instagram";
 import { compartirDesdeCelular, type ResultadoCompartido } from "../compartir-actions";
@@ -11,6 +13,8 @@ import { compartirDesdeCelular, type ResultadoCompartido } from "../compartir-ac
 type Estado = { tipo: "guardando" } | { tipo: "sin_datos" } | { tipo: "listo"; r: ResultadoCompartido };
 
 const caja = "rounded-lg border border-border bg-card px-4 py-3 text-sm";
+const PASOS = ["Recibiendo lo compartido", "Abriendo el enlace", "Leyendo el texto y las cifras", "Guardando el archivo", "Terminando la captura"];
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const enlaceBoton = `inline-flex items-center self-start rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted ${anilloFoco}`;
 
 /**
@@ -41,6 +45,8 @@ function Acciones({ plataforma }: { plataforma?: Plataforma }) {
  */
 export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolean }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "guardando" });
+  // Al llegar la respuesta la barra se completa un instante antes de mostrar el resultado.
+  const [terminado, setTerminado] = useState(false);
   const iniciada = useRef(false);
 
   useEffect(() => {
@@ -55,10 +61,17 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
             .catch((): ResultadoCompartido => ({ error: "No se pudo guardar. Inténtalo de nuevo." }))
             .then((r): Estado => ({ tipo: "listo", r }))
         : Promise.resolve<Estado>({ tipo: "sin_datos" });
-    void resultado.then(setEstado);
+    void resultado.then(async (e) => {
+      // Sin nada que esperar (no llegó nada o no hay permiso) se muestra al instante.
+      if (e.tipo !== "listo") return setEstado(e);
+      setTerminado(true);
+      if (!e.r.error) avisarActualizacionInstagram();
+      await esperar(450);
+      setEstado(e);
+    });
   }, [puedeEscribir]);
 
-  if (estado.tipo === "guardando") return <p role="status" className={`${caja} m-0 text-muted-foreground`}>Guardando en Fuentes…</p>;
+  if (estado.tipo === "guardando") return <ProgresoEstimado pasos={PASOS} estimadoMs={9000} terminado={terminado} etiqueta="Guardando lo compartido en Fuentes" />;
   if (estado.tipo === "sin_datos") {
     return (
       <div className="flex flex-col gap-3">

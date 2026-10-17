@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearFechaHora } from "@/lib/formato";
+import { escucharActualizacionesInstagram } from "@/lib/instagram/canal";
 import { CalendarioIcon, CheckIcon, EnlaceIcon, EstadoIcon, InstagramIcon, PersonaIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import {
@@ -154,7 +156,21 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
     const cada = setInterval(() => {
       if (document.visibilityState === "visible") router.refresh();
     }, 30_000);
-    return () => clearInterval(cada);
+    // Y al instante cuando otra pestaña guardó algo (la lectura de la Biblioteca, lo compartido desde el celular) o cuando esta pestaña vuelve a verse.
+    const alVolver = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    const dejarDeEscuchar = escucharActualizacionesInstagram(() => {
+      router.refresh();
+      // Algunos navegadores dejan traer esta pestaña al frente; si no, queda actualizada para cuando se vuelva a ella.
+      window.focus();
+    });
+    return () => {
+      clearInterval(cada);
+      document.removeEventListener("visibilitychange", alVolver);
+      dejarDeEscuchar();
+    };
   }, [router]);
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(null);
   // Los estados cambiados que el servidor todavía no devolvió: se ven al instante y vuelven atrás si se rechazan. Cada uno guarda
@@ -205,14 +221,14 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
   }
 
   // Unir y eliminar desde la lista, sin abrir la ficha: lo hace la barra de las capturas marcadas.
-  const [trabajando, setTrabajando] = useState(false);
+  const [trabajando, setTrabajando] = useState<"unir" | "eliminar" | null>(null);
   async function unirMarcadas(marcadas: FilaInstagram[], quitar: () => void) {
     if (marcadas.length !== 2 || trabajando) return;
     const [vieja, nueva] = marcadas[0].numero < marcadas[1].numero ? marcadas : [marcadas[1], marcadas[0]];
     if (!confirm(`Se unirán ${numeroInstagram(vieja.numero)} y ${numeroInstagram(nueva.numero)} en ${numeroInstagram(vieja.numero)}, la más antigua. ${numeroInstagram(nueva.numero)} se elimina y lo que aporte (enlace, copy, cifras, archivo) pasa a la que queda. ¿Continuar?`)) return;
-    setTrabajando(true);
+    setTrabajando("unir");
     const r = await unirCapturas(marcadas[0].id, marcadas[1].id).catch(() => ({ error: "No se pudieron unir las capturas." }) as { error?: string; numero?: number });
-    setTrabajando(false);
+    setTrabajando(null);
     if (r.error || r.numero === undefined) return mostrarToast(r.error ?? "No se pudieron unir las capturas.", "destructive");
     mostrarToast(`Unidas en ${numeroInstagram(r.numero)}`);
     quitar();
@@ -222,9 +238,9 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
     if (marcadas.length === 0 || trabajando) return;
     const nombres = marcadas.length <= 3 ? marcadas.map((f) => numeroInstagram(f.numero)).join(", ") : `${marcadas.length} capturas`;
     if (!confirm(`¿Eliminar ${nombres}? Se borran con sus archivos y no se puede deshacer.`)) return;
-    setTrabajando(true);
+    setTrabajando("eliminar");
     const r = await eliminarCapturas(marcadas.map((f) => f.id)).catch(() => ({ error: "No se pudieron eliminar las capturas." }) as { error?: string; eliminadas?: number });
-    setTrabajando(false);
+    setTrabajando(null);
     if (r.error) mostrarToast(r.error, "destructive");
     else mostrarToast(r.eliminadas === 1 ? "Captura eliminada" : `${r.eliminadas} capturas eliminadas`);
     if ((r.eliminadas ?? 0) > 0) {
@@ -258,15 +274,18 @@ export function TablaInstagram({ filas, codigoPais, puedeEscribir }: { filas: Fi
           puedeEscribir
             ? {
                 etiqueta: (f) => `Seleccionar la captura ${numeroInstagram(f.numero)}`,
-                barra: (marcadas, quitar) => <BarraLoteInstagram filas={marcadas} ocupada={trabajando} alUnir={() => void unirMarcadas(marcadas, quitar)} alEliminar={() => void eliminarMarcadas(marcadas, quitar)} alQuitar={quitar} />,
+                barra: (marcadas, quitar) => <BarraLoteInstagram filas={marcadas} trabajo={trabajando} alUnir={() => void unirMarcadas(marcadas, quitar)} alEliminar={() => void eliminarMarcadas(marcadas, quitar)} alQuitar={quitar} />,
               }
             : undefined
         }
         accionPrincipal={
           puedeEscribir && repetidas > 0 ? (
-            <button type="button" onClick={() => void fusionar()} disabled={fusionando} className={`inline-flex items-center justify-center gap-1 boton-neon border border-transparent px-4 py-2 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md`}>
+            <span className="inline-flex items-center gap-3">
+              {fusionando && <ProgresoEstimado compacta pasos={["Fusionando las repetidas"]} estimadoMs={Math.max(3000, repetidas * 1200)} etiqueta="Fusionando las capturas repetidas" />}
+              <button type="button" onClick={() => void fusionar()} disabled={fusionando} className={`inline-flex items-center justify-center gap-1 boton-neon border border-transparent px-4 py-2 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md`}>
               {fusionando ? "Fusionando..." : `Fusionar ${repetidas} ${repetidas === 1 ? "repetida" : "repetidas"}`}
             </button>
+            </span>
           ) : undefined
         }
         ariaLabel="Capturas de Instagram"

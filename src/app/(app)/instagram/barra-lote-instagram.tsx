@@ -2,6 +2,7 @@
 
 import { BotonDescargar } from "@/components/tabla/boton-descargar";
 import { anilloFoco } from "@/components/ui/field";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CerrarIcon, EnlaceIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { DEF_INSTAGRAM, numeroInstagram, type FilaInstagram } from "./def-instagram";
@@ -13,7 +14,8 @@ const botonBarra = `inline-flex min-h-8 items-center gap-1.5 !rounded-md border 
  * descargar solo lo marcado y quitar la selección. Así no hay que abrir la ficha de cada una. «Unir» solo se enciende con exactamente
  * dos; la unión y la eliminación piden confirmación (las hace la lista, que conoce los datos).
  */
-export function BarraLoteInstagram({ filas, ocupada, alUnir, alEliminar, alQuitar }: { filas: FilaInstagram[]; ocupada: boolean; alUnir: () => void; alEliminar: () => void; alQuitar: () => void }) {
+export function BarraLoteInstagram({ filas, trabajo, alUnir, alEliminar, alQuitar }: { filas: FilaInstagram[]; trabajo: "unir" | "eliminar" | null; alUnir: () => void; alEliminar: () => void; alQuitar: () => void }) {
+  const ocupada = trabajo !== null;
   const cantidad = `${filas.length} ${filas.length === 1 ? "seleccionada" : "seleccionadas"}`;
   return (
     <div
@@ -36,6 +38,11 @@ export function BarraLoteInstagram({ filas, ocupada, alUnir, alEliminar, alQuita
           Eliminar
         </button>
       </Tooltip>
+      {trabajo && (
+        <div className="min-w-56">
+          <ProgresoEstimado compacta pasos={[trabajo === "unir" ? "Uniendo las capturas" : "Eliminando las capturas y sus archivos"]} estimadoMs={trabajo === "unir" ? 2500 : Math.max(2000, filas.length * 900)} etiqueta={trabajo === "unir" ? "Uniendo las dos capturas" : "Eliminando las capturas seleccionadas"} />
+        </div>
+      )}
       <BotonDescargar def={DEF_INSTAGRAM} filas={filas} nombreFilas="capturas" ayuda="Descargar seleccionadas" />
       <Tooltip texto="Quitar selección">
         <button type="button" onClick={alQuitar} aria-label="Quitar la selección" className={`flex min-h-8 min-w-8 items-center justify-center !rounded-md text-muted-foreground hover:bg-muted ${anilloFoco}`}>

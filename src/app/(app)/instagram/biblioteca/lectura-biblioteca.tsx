@@ -1,19 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
+import { fieldClass, labelClass } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
+import { avisarActualizacionInstagram } from "@/lib/instagram/canal";
 import { mismaPagina, mismoCopy, type AnuncioBiblioteca, type CapturaParaVincular, type ResultadoLecturaBiblioteca, type ResultadoVinculo } from "@/lib/instagram/biblioteca-lectura";
 import { numeroInstagram } from "../def-instagram";
 import { guardarLecturaBiblioteca, vincularAnunciosACaptura } from "../biblioteca-actions";
+import { VolverAInstagram } from "../volver-a-instagram";
 
 type Estado = { tipo: "leyendo" } | { tipo: "sin_lectura" } | { tipo: "listo"; r: ResultadoLecturaBiblioteca };
 
 const caja = "rounded-lg border border-border bg-card px-4 py-3 text-sm";
-const enlaceBoton = `inline-flex items-center self-start rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted ${anilloFoco}`;
+const PASOS = ["Recibiendo la lectura", "Reconociendo los anuncios", "Contando los del mismo copy", "Guardando en las capturas"];
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const plural = (n: number, uno: string, varios: string) => `${n.toLocaleString("es-CR")} ${n === 1 ? uno : varios}`;
 
 /**
@@ -23,6 +26,8 @@ const plural = (n: number, uno: string, varios: string) => `${n.toLocaleString("
  */
 export function LecturaBiblioteca({ puedeEscribir }: { puedeEscribir: boolean }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "leyendo" });
+  // Al llegar la respuesta la barra se completa un instante antes de mostrar el resultado.
+  const [terminado, setTerminado] = useState(false);
   const iniciada = useRef(false);
 
   useEffect(() => {
@@ -36,17 +41,23 @@ export function LecturaBiblioteca({ puedeEscribir }: { puedeEscribir: boolean })
             .catch((): ResultadoLecturaBiblioteca => ({ error: "No se pudo guardar la lectura." }))
             .then((r): Estado => ({ tipo: "listo", r }))
         : Promise.resolve<Estado>({ tipo: "sin_lectura" });
-    void resultado.then(setEstado);
+    void resultado.then(async (e) => {
+      // Sin nada que esperar (no llegó nada o no hay permiso) se muestra al instante.
+      if (e.tipo !== "listo") return setEstado(e);
+      setTerminado(true);
+      // Las capturas que ya estaban abiertas en otra pestaña se actualizan solas.
+      if (!e.r.error) avisarActualizacionInstagram();
+      await esperar(450);
+      setEstado(e);
+    });
   }, [puedeEscribir]);
 
-  if (estado.tipo === "leyendo") return <p role="status" className={`${caja} m-0 text-muted-foreground`}>Leyendo la Biblioteca…</p>;
+  if (estado.tipo === "leyendo") return <ProgresoEstimado pasos={PASOS} estimadoMs={5000} terminado={terminado} etiqueta="Guardando la lectura de la Biblioteca" />;
   if (estado.tipo === "sin_lectura") {
     return (
       <div className="flex flex-col gap-3">
         <p className={`${caja} m-0 text-muted-foreground`}>{puedeEscribir ? "No llegó ninguna lectura. Abre la Biblioteca desde la ficha de una captura y pulsa el marcador." : "Tu rol solo puede ver Instagram: no puede guardar lecturas de la Biblioteca."}</p>
-        <Link href="/instagram" className={enlaceBoton}>
-          Ir a Instagram
-        </Link>
+        <VolverAInstagram />
       </div>
     );
   }
@@ -58,9 +69,7 @@ export function LecturaBiblioteca({ puedeEscribir }: { puedeEscribir: boolean })
         <p role="alert" className={`${caja} m-0 text-destructive`}>
           {r.error}
         </p>
-        <Link href="/instagram" className={enlaceBoton}>
-          Ir a Instagram
-        </Link>
+        <VolverAInstagram />
       </div>
     );
   }
@@ -106,9 +115,7 @@ export function LecturaBiblioteca({ puedeEscribir }: { puedeEscribir: boolean })
         </ul>
       )}
       {hayParaVincular && <VincularAMano anuncios={r.sinVincular ?? []} capturas={r.capturas ?? []} sinNingunaCoincidencia={actualizadas.length === 0 && omitidas.length === 0} />}
-      <Link href="/instagram" className={enlaceBoton}>
-        Ir a Instagram
-      </Link>
+      <VolverAInstagram />
     </div>
   );
 }
@@ -214,6 +221,7 @@ function VincularAMano({ anuncios, capturas, sinNingunaCoincidencia }: { anuncio
               {error}
             </p>
           )}
+          {guardando && <ProgresoEstimado compacta pasos={["Vinculando los anuncios"]} estimadoMs={1500} etiqueta="Vinculando los anuncios a la captura" />}
           <Button type="button" onClick={() => void vincular()} disabled={!puedeVincular} className="self-start">
             {guardando ? "Vinculando…" : `Vincular${marcados.size > 0 ? ` ${plural(marcados.size, "anuncio", "anuncios")}` : ""}`}
           </Button>
