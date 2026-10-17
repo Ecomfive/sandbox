@@ -43,6 +43,7 @@ export const numeroSeleccion = (n: number) => `SEL-${String(n).padStart(4, "0")}
 export const ESTADOS_SELECCION = [
   { valor: "seleccionado", etiqueta: "Seleccionado", color: "#1bbc9c" },
   { valor: "crear_oferta", etiqueta: "Crear oferta", color: "#5f43d1" },
+  { valor: "en_test", etiqueta: "En test", color: "#0880EA" },
   { valor: "descartado", etiqueta: "Descartado", color: "#e50000" },
 ] as const;
 
@@ -55,6 +56,7 @@ export const FUENTES = [
   { valor: "tu_winner", etiqueta: "Tu Winner", prefijo: "TW", color: "#d74c81" },
   { valor: "scraping_proveedores", etiqueta: "Scraping de proveedores", prefijo: "SP", color: "#0880EA" },
   { valor: "manual", etiqueta: "Manual", prefijo: "MAN", color: "#8D8D8D" },
+  { valor: "sugerencia_cliente", etiqueta: "Sugerencia de cliente", prefijo: "SUG", color: "#b12a97" },
 ] as const;
 
 export const etiquetaFuente = (v: string) => FUENTES.find((f) => f.valor === v)?.etiqueta ?? v;

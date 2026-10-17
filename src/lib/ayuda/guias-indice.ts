@@ -8,6 +8,7 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/creacion-ofertas": "creacion-ofertas",
   "/instagram": "instagram",
   "/seleccion-productos": "seleccion-productos",
+  "/sugerencias-clientes": "sugerencias-clientes",
   "/inventario": "inventario",
   "/wms-bodegas": "wms-bodegas",
   "/wms-ubicaciones": "wms-ubicaciones",
@@ -23,5 +24,6 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/inteligencia-competitiva": "inteligencia-competitiva",
   "/analisis-competencia": "analisis-competencia",
   "/usuarios": "usuarios",
+  "/puestos": "puestos",
   "/notificaciones": "notificaciones",
 };

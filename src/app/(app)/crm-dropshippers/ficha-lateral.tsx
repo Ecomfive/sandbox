@@ -12,12 +12,14 @@ import {
   FlechaArribaIcon,
   HistorialIcon,
   PersonaIcon,
+  SugerenciaIcon,
 } from "@/lib/nav-icons";
 import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
 import { BotonEscalar, LineaDeTiempo, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
-import { PanelCaso, PanelEditar, PanelNota, PanelPedido } from "./paneles-ficha";
+import { PanelCaso, PanelEditar, PanelNota, PanelPedido, PanelRecomendar } from "./paneles-ficha";
+import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import {
   etiquetaAntiguedad,
   etiquetaCanal,
@@ -159,6 +161,7 @@ export function FichaLateral({
               <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
               <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
               <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
+              <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
               <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
             </>
           )}
@@ -252,6 +255,10 @@ export function FichaLateral({
           </ul>
         </Bloque>
       )}
+
+      <Bloque icono={SugerenciaIcon} titulo="Productos recomendados">
+        <RecomendacionesDropshipper key={`recomendaciones-${d.id}`} dropshipperId={d.id} version={version} puedeEscribir={acceso.escribeAtencion} />
+      </Bloque>
 
       <Bloque icono={EnlaceIcon} titulo="Cuentas">
         <CuentasDropshipper key={`cuentas-${d.id}`} d={d} codigoPais={codigoPais} puedeEscribir={acceso.escribeAtencion} />

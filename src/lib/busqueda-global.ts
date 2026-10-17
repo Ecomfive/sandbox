@@ -8,7 +8,7 @@ import { formatearMoneda } from "@/lib/formato";
 import { etiquetaEstado as etiquetaEstadoTest } from "@/app/(app)/productos-test/def-productos-test";
 
 export interface ResultadoBusqueda {
-  tipo: "retiro" | "pedido" | "producto" | "producto-test" | "dropshipper";
+  tipo: "retiro" | "pedido" | "producto" | "producto-test" | "dropshipper" | "puesto";
   etiquetaTipo: string;
   titulo: string;
   detalle: string;
@@ -150,6 +150,22 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
               detalle: d.estado,
               href: `/crm-dropshippers/directorio?buscar=${encodeURIComponent(d.nombre)}`,
             });
+          }
+        })
+    );
+  }
+
+  if (buscaTexto && usuario.modulos.includes("puestos")) {
+    tareas.push(
+      supabase
+        .from("puestos")
+        .select("id, nombre, area")
+        .eq("activo", true)
+        .ilike("nombre", `%${texto}%`)
+        .limit(LIMITE_POR_TIPO)
+        .then(({ data }) => {
+          for (const p of data ?? []) {
+            resultados.push({ tipo: "puesto", etiquetaTipo: "Puesto", titulo: p.nombre, detalle: p.area, href: `/puestos?abrir=${encodeURIComponent(p.id)}` });
           }
         })
     );

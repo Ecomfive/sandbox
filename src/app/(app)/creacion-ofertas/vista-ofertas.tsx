@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { fieldClassSm } from "@/components/ui/field";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { useToast } from "@/components/ui/toast";
-import { eliminarOferta, guardarOferta } from "./actions";
+import { eliminarOferta, enviarATest, guardarOferta } from "./actions";
 
 export interface Oferta {
   id: string;
@@ -115,6 +115,52 @@ function FilaOferta({ producto, oferta, puedeEscribir, alListo }: { producto: Pr
   );
 }
 
+/**
+ * «Enviar a Test»: con al menos una oferta con precio, crea su producto (en Test) y su test ya vinculados, y la fila pasa a
+ * «En test» (sale de esta lista). Pide confirmación en el mismo botón: crea registros en Producto y Test productos.
+ */
+function BotonEnviarATest({ producto }: { producto: ProductoOferta }) {
+  const router = useRouter();
+  const { mostrarToast } = useToast();
+  const [confirmar, setConfirmar] = useState(false);
+  const [pendiente, iniciar] = useTransition();
+  const lista = producto.ofertas.some((o) => o.precio !== null);
+  if (!lista) return <span className="text-xs text-muted-foreground">Arma una oferta con precio para enviarlo a Test</span>;
+  if (!confirmar)
+    return (
+      <Button type="button" className="!px-2.5 !py-1 text-xs" onClick={() => setConfirmar(true)}>
+        Enviar a Test
+      </Button>
+    );
+  return (
+    <span className="flex items-center gap-1.5 text-xs">
+      <span className="text-muted-foreground">Crea su producto y su test.</span>
+      <Button
+        type="button"
+        className="!px-2.5 !py-1 text-xs"
+        disabled={pendiente}
+        onClick={() =>
+          iniciar(async () => {
+            const r = await enviarATest(producto.id);
+            if (r.error) {
+              mostrarToast(r.error, "destructive");
+              setConfirmar(false);
+              return;
+            }
+            mostrarToast(`Enviado a Test productos con el SKU ${r.sku}`);
+            router.refresh();
+          })
+        }
+      >
+        {pendiente ? "Enviando…" : "Confirmar"}
+      </Button>
+      <Button type="button" variant="ghost" className="!px-2.5 !py-1 text-xs" disabled={pendiente} onClick={() => setConfirmar(false)}>
+        Cancelar
+      </Button>
+    </span>
+  );
+}
+
 function TarjetaProducto({ producto, puedeEscribir }: { producto: ProductoOferta; puedeEscribir: boolean }) {
   const router = useRouter();
   // Una clave nueva tras crear vacía la fila de «nueva oferta».
@@ -148,7 +194,10 @@ function TarjetaProducto({ producto, puedeEscribir }: { producto: ProductoOferta
             SEL-{String(producto.numero).padStart(4, "0")} · {producto.codigoFuente} · Costo {usd(producto.costo)} por unidad · Precio de referencia {usd(producto.precioReferencia)}
           </p>
         </div>
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{producto.ofertas.length} de 3</span>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <span className="text-xs text-muted-foreground tabular-nums">{producto.ofertas.length} de 3</span>
+          {puedeEscribir && <BotonEnviarATest producto={producto} />}
+        </div>
       </header>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

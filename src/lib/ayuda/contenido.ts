@@ -25,6 +25,12 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Módulo", definicion: "Una página del sistema con su permiso propio (Compras, Producto, Inventario…). Tu rol decide qué módulos ves y si puedes modificarlos o solo leerlos." },
   { termino: "Rol", definicion: "El conjunto de permisos que tiene una persona: qué módulos abre y cuáles son solo de lectura. Se configura en Usuarios y roles." },
   { termino: "Países permitidos", definicion: "Los países cuyas compras, histórico y datos puede ver una persona. «Todos los países» no limita nada." },
+  { termino: "Puesto", definicion: "El cargo que ocupa una persona (Media Buyer, Analista de Compras…): su misión, responsabilidades, áreas de resultado, lo que puede decidir, a quién reporta y lo que tiene que aprender. Lo tuyo se ve en «Mi puesto», en el menú de tu cuenta." },
+  { termino: "Misión del puesto (JD)", definicion: "En una o dos frases, para qué existe el puesto. Es el resumen de su descripción de cargo (Job Description)." },
+  { termino: "Áreas de resultado (KRA)", definicion: "Las 3 a 6 cosas de las que responde un puesto (por ejemplo, rentabilidad de campañas y generación de pedidos). Key Result Areas." },
+  { termino: "SOP", definicion: "Procedimiento estándar de operación: el paso a paso de una tarea. En el sistema son los Manuales de proceso del Centro de ayuda, enlazados a cada puesto." },
+  { termino: "Onboarding 30/60/90", definicion: "Lo que una persona nueva aprende en sus primeros 30, 60 y 90 días: los manuales y cursos de su puesto por etapa. Cuenta como hecho un curso aprobado o un manual marcado como leído." },
+  { termino: "Puesto principal", definicion: "Si una persona ocupa varios puestos, el principal es el que decide su jefe en el organigrama y el que sale primero en «Mi puesto»." },
   { termino: "Ficha", definicion: "El panel que se abre a la derecha al pulsar una fila: muestra todo de ese registro y, si tienes permiso, ahí mismo se edita." },
   { termino: "Vista guardada", definicion: "Una combinación de filtros, agrupación y columnas que guardas con nombre en una tabla para volver a ella con un clic." },
   { termino: "Cerrados", definicion: "El botón de la barra de una tabla que muestra lo que ya terminó (compras completadas, retiros conciliados). Por defecto se ocultan." },
@@ -221,6 +227,7 @@ export const GUIAS: GuiaModulo[] = [
       {
         titulo: "Uso",
         pasos: [
+          "Con al menos una oferta con precio, «Enviar a Test» crea el producto en Producto (en Test, con un SKU sacado del nombre, código de barras interno y su foto) y su registro en Test productos, ya vinculados a la fila de Selección y con el precio de su primera oferta. La fila pasa a «En test» y sale de esta lista. Hace falta poder modificar Producto y Test productos.",
           "Aquí salen los productos de Selección de productos en estado «Crear oferta», del país de la barra de arriba.",
           "Cada producto puede tener de 1 a 3 ofertas: nombre (p. ej. «2x1»), unidades, precio en dólares y notas. Llena la fila vacía y pulsa «Agregar»; cambia una oferta y pulsa «Guardar»; «Quitar» la borra.",
           "El margen es el precio menos el costo del proveedor por las unidades de la oferta (en verde si gana, en rojo si pierde), con su porcentaje sobre el precio.",
@@ -247,6 +254,26 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "sugerencias-clientes",
+    titulo: "Sugerencias de clientes",
+    ruta: "/sugerencias-clientes",
+    resumen: "Los productos que nos recomiendan los dropshippers, para decidir cuáles pasan a Selección.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "En la ficha del cliente en el CRM, «Productos recomendados» muestra su % de acierto (Winners sobre recomendados), cuántos se compraron y el recorrido de cada producto con sus días, para contárselo al cliente (sin cantidades ni costos).",
+          "Exclusividad: el producto es exclusivo del cliente que lo recomendó durante 30 días desde que queda disponible para vender. Al abrir el producto en su ficha del CRM se puede pasar a 60 o 90 días; si no llegó a venderse, no aplica. La ficha del producto en Producto dice de quién es y hasta cuándo.",
+          "Las sugerencias llegan desde la ficha del cliente en el CRM (botón «Recomendar») o con «Agregar» aquí mismo, eligiendo el cliente por su código del CRM (DS-0014).",
+          "Cada una lleva su código SUG-, la foto, el nombre, quién la recomendó, el país donde la vio, la categoría y notas.",
+          "Estados: Nuevo, Seleccionado y Descartado. Al marcarla Seleccionado pasa sola a Selección de productos con el mismo código SUG-; si el producto ya se testeó o ya está en Producto, en Selección llega Descartado con el motivo.",
+          "Una sugerencia ya seleccionada no vuelve atrás: su recorrido sigue en Selección.",
+          "Lo descartado se oculta; el botón «Descartados» de la barra lo muestra aparte.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "seleccion-productos",
     titulo: "Selección de productos",
     ruta: "/seleccion-productos",
@@ -257,7 +284,7 @@ export const GUIAS: GuiaModulo[] = [
         pasos: [
           "Cada fila es un candidato, no un producto de Producto: no lleva SKU. Trae su N.º (SEL-0001), la fuente de donde salió y el código de esa fuente (DK-0001 Drop Killer, TW-0001 Tu Winner, SP-0001 Scraping de proveedores, MAN-0001 a mano).",
           "«Agregar» crea una fila a mano, siempre «Manual» (código MAN-): lo que sale de Drop Killer, Tu Winner o Scraping de proveedores se crea en su módulo y se envía desde ahí, para que quede en la base de la fuente y no se duplique. Lleva nombre, foto, fecha de captación, categoría, responsable, enlaces (página y Ad Library), precios de referencia en dólares y notas.",
-          "Los estados son Seleccionado, Crear oferta y Descartado. Lo que llega de una fuente o se crea a mano entra Seleccionado; pásalo a «Crear oferta» para armarle sus ofertas en Creación de ofertas. Cambia el estado pulsando la insignia de su celda o en la ficha; para varias filas, márcalas y usa «Estado» en la barra de abajo.",
+          "Los estados son Seleccionado, Crear oferta, En test y Descartado. Lo que llega de una fuente o se crea a mano entra Seleccionado; pásalo a «Crear oferta» para armarle sus ofertas en Creación de ofertas; al enviarlo a Test (o vincularlo a un test) pasa a «En test». Cambia el estado pulsando la insignia de su celda o en la ficha; para varias filas, márcalas y usa «Estado» en la barra de abajo.",
           "Si el producto ya se testeó (Test productos, de cualquier país) o ya está en Producto, entra Descartado solo, con la nota de por qué bajo su nombre («Ya testeado: … » o «Ya está en Producto: …»).",
           "«Prioridad» (en rojo bajo el nombre) marca lo que aparece en más de un proveedor de Scraping o en otra fuente: se está vendiendo fuerte. Pasa el cursor para ver dónde más está; se puede filtrar y agrupar por Prioridad.",
           "La columna «Ofertas» dice cuántas tiene (de 3). Los precios de Scraping llegan pasados a dólares; la ficha muestra también el costo en la moneda del proveedor.",
@@ -323,6 +350,19 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "puestos",
+    titulo: "Puestos y organigrama",
+    ruta: "/puestos",
+    resumen: "Qué hace cada puesto, de qué responde, a quién reporta, quién lo ocupa y qué manuales y cursos tiene que conocer.",
+    secciones: [
+      { titulo: "Crear un puesto", pasos: ["«Agregar» pide el nombre, el área, a quién reporta, cuántas plazas tiene y su misión.", "En su ficha se completan las responsabilidades, las áreas de resultado (una por línea, hasta 6) y la autoridad (lo que puede decidir o aprobar)."] },
+      { titulo: "Personas", pasos: ["En el bloque «Personas» de la ficha se asigna a alguien al puesto; también desde su ficha en Usuarios y roles.", "Una persona puede tener varios puestos: el primero queda como principal y se cambia con «Hacer principal».", "Un punto ámbar marca los puestos con plazas vacantes."] },
+      { titulo: "SOP y onboarding", pasos: ["«Añadir manual o curso» enlaza un Manual de proceso o un curso de la Universidad y elige en qué etapa va: Día 30, 60, 90 o De consulta.", "El avance de cada persona sale de los cursos que aprobó y los manuales que marcó como leídos. Si un manual cambia, hay que volver a leerlo."] },
+      { titulo: "Organigrama", pasos: ["La pestaña «Organigrama» arma el árbol con «Reporta a» y muestra quién ocupa cada puesto.", "Se filtra por área; pulsar una caja abre la ficha del puesto.", "Un puesto no se borra: se desactiva (antes hay que quitar a sus personas)."] },
+      { titulo: "Mi puesto", pasos: ["Cada persona ve lo suyo en «Mi puesto», en el menú de su cuenta (arriba a la derecha): su jefe, su equipo, su puesto y su onboarding."] },
+    ],
+  },
+  {
     modulo: "notificaciones",
     titulo: "Avisos",
     ruta: "/notificaciones",
@@ -350,6 +390,11 @@ export interface Novedad {
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
   { fecha: "2026-10-17", titulo: "Fuentes: texto completo de Facebook, guardados de TikTok y ícono nuevo", texto: "Las capturas de Facebook ahora guardan el texto completo del anuncio (antes se cortaba a 200 caracteres) y vuelven a pedir la página una vez si la primera lectura llega sin cifras. En TikTok se suman los «Guardados» y la fecha de publicación es la de Panamá. «Volver a leer el enlace» completa el texto cortado de las capturas viejas. La app «Ecomfive Fuentes» del celular estrena ícono: la E de Ecomfive dentro de un visor de captura, también en la pestaña del navegador. Para verlo en el celular hay que desinstalar la app y volver a instalarla.", modulo: "instagram", href: "/instagram" },
+  { fecha: "2026-10-16", titulo: "Puestos y organigrama", texto: "Nuevo módulo en Equipo: la ficha de cada puesto (misión, responsabilidades, áreas de resultado y autoridad), a quién reporta, quién lo ocupa y sus manuales y cursos por etapa del onboarding (Día 30, 60 y 90). La pestaña Organigrama arma el árbol. Cada persona ve lo suyo en «Mi puesto», en el menú de su cuenta, y marca los manuales como leídos.", modulo: "puestos", href: "/puestos" },
+  { fecha: "2026-10-16", titulo: "Exclusividad para quien recomienda", texto: "Un producto recomendado por un cliente es exclusivo suyo durante 30 días desde que queda disponible para vender. En «Productos recomendados» de su ficha del CRM se ve hasta cuándo y cuántos días quedan, y se puede pasar a 60 o 90 días. La ficha del producto en Producto también lo indica, y Sugerencias de clientes tiene la columna Exclusividad.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
+  { fecha: "2026-10-16", titulo: "Seguimiento de lo que recomienda un cliente", texto: "En la ficha del cliente en el CRM, «Productos recomendados» muestra su % de acierto (cuántos salieron Winner), cuántos se compraron y, por cada producto, en qué etapa va y cuántos días lleva. Al pulsarlo se ve su recorrido: recomendado, seleccionado, oferta, test, resultado y compra hasta que está disponible para vender, con fecha y día de cada etapa, sin cantidades ni costos.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
+  { fecha: "2026-10-16", titulo: "Enviar a Test y recorrido enlazado", texto: "En Creación de ofertas, «Enviar a Test» crea el producto (en Test) y su test ya vinculados a su fila de Selección, que pasa a «En test». En el formulario de un test, «Viene de Selección» lo vincula a mano. La compra que nace al pasar un producto a Activo ahora guarda de qué producto viene.", modulo: "creacion-ofertas", href: "/creacion-ofertas" },
+  { fecha: "2026-10-15", titulo: "Sugerencias de clientes", texto: "Nueva fuente en Testing Lab: lo que nos recomiendan los dropshippers. Atención lo registra desde la ficha del cliente en el CRM con «Recomendar» (sin necesitar el módulo), o se agrega a mano asignándolo a un cliente. La ficha del CRM muestra sus productos recomendados y su estado.", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
   { fecha: "2026-10-15", titulo: "Fuentes: ver todos los anuncios de una página", texto: "En el bloque «Biblioteca de anuncios» de la ficha, «Buscar solo la primera línea» se quitó (el copy completo es siempre más preciso) y ahora está «Ver los anuncios de la página», que abre la Biblioteca con el nombre de esa página para ver todo lo que está corriendo. Debajo van, en el mismo lugar, «Abrir el perfil de Instagram», «Abrir la página de Facebook» o «Abrir la cuenta» de TikTok, según la red.", modulo: "instagram", href: "/instagram" },
   { fecha: "2026-10-15", titulo: "Fuentes: fotos de Facebook, cuenta desde la Biblioteca y botón de volver", texto: "Un anuncio de Facebook con foto ahora guarda su imagen y el nombre de la página; «Leer Biblioteca» completa también la «Cuenta del video» cuando estaba vacía; cada red lleva su ícono en la ficha; y «Volver a Facebook/TikTok/Instagram», al terminar de compartir desde el celular, cierra la ventana y te deja donde estabas.", modulo: "instagram", href: "/instagram" },
   { fecha: "2026-10-15", titulo: "Fuentes: también Facebook y TikTok", texto: "Lo que compartes desde Facebook y TikTok con «Compartir en…» › «Ecomfive Fuentes» (o el atajo de iPhone) también se guarda: con su enlace, su texto, el nombre de la cuenta o página, las cifras y el video (en Facebook, si es un video público). La lista tiene una columna «Red». En Facebook la búsqueda del anuncio usa la misma Biblioteca de Meta; en TikTok la ficha ofrece buscar el texto en TikTok, abrir la cuenta y los Top Ads del país.", modulo: "instagram", href: "/instagram" },
