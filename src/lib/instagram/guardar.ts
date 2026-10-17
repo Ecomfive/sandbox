@@ -4,14 +4,14 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { extraerCapturas, formatoDeVideo, type CapturaInstagram, type NotaInstagram } from "./extraer";
 import { interpretarEmbed, urlDeEmbed, type DatosEmbed } from "./embed";
 import { enviosDe, fusionar, unirTextos, type FilaFusionable } from "./fusion";
-import { archivoDeLectura, cifrasDeLectura, mezclarLectura } from "./lectura";
+import { candidatosDeArchivo, cifrasDeLectura, mezclarLectura, type LecturaVista } from "./lectura";
 import { CAMPOS_MEDIA, interpretarMedia } from "./media";
 import { esEnvioPropio } from "./compartir";
 import { archivosDeEmbedFacebook, interpretarFacebook, interpretarPaginaFacebook, interpretarTikTok } from "./lectura-externa";
 import { codigoDeContenido, reconocerEnlace, type Plataforma } from "./plataformas";
 import { sonDeContenidosDistintos } from "./unir";
 import { repetidasDe } from "./repetidas";
-import { descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina, type VistaPublica } from "./vista-previa";
+import { archivosDeLaPagina, descripcionDeLaPagina, enlaceLegible, interpretarVistaPrevia, lecturaPublicaActiva, tituloDeLaPagina } from "./vista-previa";
 
 export const BUCKET_INSTAGRAM = "instagram-fuentes";
 /** Un reel pesa unos MB; el bucket acepta hasta 100 MB. */
@@ -66,7 +66,7 @@ async function consultarMedia(id: string): Promise<{ ok: true; datos: unknown } 
  * descargador seguro y pidiendo la página como lo hace Facebook para sus vistas previas. Nunca lanza: si Instagram no responde o
  * cambia el formato, el motivo queda anotado y la captura se guarda igual.
  */
-async function leerVistaPublica(enlace: string): Promise<{ ok: true; datos: VistaPublica } | { ok: false; error: string } | null> {
+async function leerVistaPublica(enlace: string): Promise<LecturaVista> {
   if (!lecturaPublicaActiva() || !enlaceLegible(enlace)) return null;
   const pagina = await descargarPublico(enlace, 3_000_000, {
     "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
@@ -76,7 +76,18 @@ async function leerVistaPublica(enlace: string): Promise<{ ok: true; datos: Vist
   if ("error" in pagina) return { ok: false, error: pagina.error };
   const html = new TextDecoder("utf-8").decode(pagina.bytes);
   const datos = interpretarVistaPrevia(descripcionDeLaPagina(html), tituloDeLaPagina(html));
-  return datos ? { ok: true, datos } : { ok: false, error: "La vista previa no trae cifras." };
+  // La misma página anuncia el video (`og:video`) o la imagen: sirve cuando la página de «insertar» no los trae.
+  const archivos = archivosDeLaPagina(html);
+  // Sin cifras la lectura cuenta como fallida (queda el motivo anotado), pero los archivos que anunció la página se conservan.
+  return datos ? { ok: true, datos, archivos } : { ok: false, error: "La vista previa no trae cifras.", archivos };
+}
+
+/** Repite una lectura una vez, 1,5 s después, si falló (la red a veces contesta mal un pedido suelto). */
+async function conReintento<T extends { ok: boolean } | null>(leer: () => Promise<T>): Promise<T> {
+  const primera = await leer();
+  if (!primera || primera.ok) return primera;
+  await new Promise((r) => setTimeout(r, 1500));
+  return leer();
 }
 
 const ENCABEZADOS_VISTA_PREVIA = {
@@ -116,7 +127,41 @@ async function copiarVideo(id: string, url: string, encabezados?: Record<string,
   return { ruta, bytes: descarga.bytes.length };
 }
 
+/** ¿El archivo guardado es solo una imagen (la foto de una publicación o la portada de un video)? Un video encontrado después la mejora. */
+export function esSoloImagen(ruta: string | null | undefined): boolean {
+  return !!ruta && /\/imagen\.[a-z0-9]+$/i.test(ruta);
+}
+
+/** Copia el primer archivo de la lista que se pueda bajar; devuelve su resultado, o el último error, o null si no había ninguna dirección. */
+async function copiarPrimero(id: string, urls: (string | null | undefined)[], encabezados?: Record<string, string>): Promise<{ ruta: string; bytes: number } | { error: string } | null> {
+  let resultado: { ruta: string; bytes: number } | { error: string } | null = null;
+  for (const url of new Set(urls.filter((u): u is string => !!u))) {
+    const copia = await copiarVideo(id, url, encabezados);
+    if (!("error" in copia)) return copia;
+    resultado = copia;
+  }
+  return resultado;
+}
+
+/** Borra del almacenamiento el archivo que un video acaba de reemplazar (solo de la carpeta de esa captura). */
+async function borrarArchivoViejo(supabase: Supabase, id: string, ruta: string): Promise<void> {
+  if (!ruta.startsWith(`${id}/`)) return;
+  await supabase.storage.from(BUCKET_INSTAGRAM).remove([ruta]);
+}
+
 const AGENTE_NAVEGADOR = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+/**
+ * ¿El texto guardado estaba cortado («…armar...», como lo daba la descripción de Facebook, de 200 caracteres) y el leído ahora es el mismo
+ * texto, completo? Solo en ese caso se reemplaza: un texto que una persona corrigió no se pisa.
+ */
+export function copyRecortadoCompletado(guardado: string, leido: string): boolean {
+  const g = guardado.replace(/\s+/g, " ").trim();
+  if (!/(\.{3}|…)$/.test(g)) return false;
+  const inicio = g.replace(/(\.{3}|…)$/, "").trim();
+  const l = leido.replace(/\s+/g, " ").trim();
+  return inicio.length >= 20 && l.length > inicio.length + 3 && l.startsWith(inicio);
+}
 
 /** Lo que se leyó de la página pública de un video de TikTok o una publicación de Facebook, ya en la forma en que se guarda. */
 interface LecturaExterna {
@@ -128,6 +173,8 @@ interface LecturaExterna {
   videoUrl: string | null;
   /** La imagen de la publicación, para las que no son video (la foto de un anuncio o de un post). */
   imagenUrl: string | null;
+  /** ¿Es un video (y no una foto)? Para decir por qué falta el archivo. */
+  esVideo: boolean;
   /** Las cookies de la página: TikTok solo entrega su video a quien las trae. */
   cookies: string[];
   /** De qué página se pide el archivo (la red lo pide). */
@@ -144,23 +191,44 @@ export async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plat
   const ahora = new Date().toISOString();
   try {
     if (plataforma === "tiktok") {
-      const p = await descargarConDetalle(enlace, 3_000_000, { "user-agent": AGENTE_NAVEGADOR, accept: "text/html", "accept-language": "en-US,en;q=0.9" });
-      if ("error" in p) return { ok: false, error: p.error };
-      const d = interpretarTikTok(new TextDecoder("utf-8").decode(p.bytes));
+      // TikTok a veces contesta un pedido con una página de verificación: si no trae los datos del video se vuelve a pedir una vez.
+      let p: Awaited<ReturnType<typeof descargarConDetalle>> | null = null;
+      let d: ReturnType<typeof interpretarTikTok> = null;
+      for (let intento = 0; intento < 2 && !d; intento++) {
+        if (intento > 0) await new Promise((r) => setTimeout(r, 1500));
+        const lectura = await descargarConDetalle(enlace, 3_000_000, { "user-agent": AGENTE_NAVEGADOR, accept: "text/html", "accept-language": "en-US,en;q=0.9" });
+        if (!p || !("error" in lectura)) p = lectura;
+        if (!("error" in lectura)) d = interpretarTikTok(new TextDecoder("utf-8").decode(lectura.bytes));
+      }
+      if (!p || "error" in p) return { ok: false, error: p && "error" in p ? p.error : "No se pudo leer la página." };
       if (!d) return { ok: false, error: "TikTok no entregó los datos del video." };
       const m: Record<string, unknown> = { plataforma, fuente: "vista_previa", leido_en: ahora };
       if (d.megusta !== null) m.like_count = d.megusta;
       if (d.comentarios !== null) m.comments_count = d.comentarios;
       if (d.vistas !== null) m.view_count = d.vistas;
       if (d.compartidos !== null) m.share_count = d.compartidos;
+      if (d.guardados !== null) m.save_count = d.guardados;
       if (d.fecha) m.fecha_publicacion = d.fecha;
       if (d.nombre) m.nombre_pagina = d.nombre;
       if (d.duracion !== null) m.duracion = d.duracion;
-      return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, imagenUrl: null, cookies: p.cookies, referer: "https://www.tiktok.com/" } };
+      return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, imagenUrl: null, esVideo: true, cookies: p.cookies, referer: "https://www.tiktok.com/" } };
     }
-    const p = await descargarConDetalle(enlace, 3_000_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
-    if ("error" in p) return { ok: false, error: p.error };
-    const d = interpretarFacebook(new TextDecoder("utf-8").decode(p.bytes));
+    // A veces Facebook contesta una vez sin las cifras (IG-0046 llegó así y la misma página, minutos después, ya traía las reproducciones y
+    // los comentarios) o falla un pedido suelto: si la primera lectura no trae ninguna cifra, se vuelve a pedir una vez.
+    let p: Awaited<ReturnType<typeof descargarConDetalle>> | null = null;
+    let d: ReturnType<typeof interpretarFacebook> = null;
+    for (let intento = 0; intento < 2; intento++) {
+      if (intento > 0) await new Promise((r) => setTimeout(r, 1500));
+      const lectura = await descargarConDetalle(enlace, 3_000_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
+      if ("error" in lectura) {
+        if (!p) p = lectura;
+        continue;
+      }
+      p = lectura;
+      d = interpretarFacebook(new TextDecoder("utf-8").decode(lectura.bytes));
+      if (d && (d.vistas !== null || d.reacciones !== null || d.comentarios !== null || d.compartidos !== null)) break;
+    }
+    if (!p || "error" in p) return { ok: false, error: p && "error" in p ? p.error : "No se pudo leer la página." };
     if (!d) return { ok: false, error: "Facebook no mostró esa publicación sin iniciar sesión (puede ser privada o estar borrada)." };
     const m: Record<string, unknown> = { plataforma, fuente: "vista_previa", leido_en: ahora };
     if (d.reacciones !== null) m.like_count = d.reacciones;
@@ -191,7 +259,7 @@ export async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plat
         videoUrl = archivos.hd ?? archivos.sd;
       }
     }
-    return { ok: true, lectura: { copy: d.copy, usuario, enlace: canonico?.enlace ?? null, metricas: m, videoUrl, imagenUrl: videoUrl ? null : d.imagen, cookies: [], referer: "https://www.facebook.com/" } };
+    return { ok: true, lectura: { copy: d.copy, usuario, enlace: canonico?.enlace ?? null, metricas: m, videoUrl, imagenUrl: videoUrl ? null : d.imagen, esVideo: canonico?.tipo === "video", cookies: [], referer: "https://www.facebook.com/" } };
   } catch {
     return { ok: false, error: "No se pudo leer la página." };
   }
@@ -279,7 +347,7 @@ async function aplicarLecturaExterna(
   supabase: Supabase,
   fila: { id: string; enlace: string; titulo: string | null; autor_usuario: string | null; metricas: Record<string, unknown> | null; video_ruta: string | null },
   plataforma: Exclude<Plataforma, "instagram">,
-): Promise<{ ok: true; archivo: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true; archivo: boolean; faltaArchivo?: string } | { ok: false; error: string }> {
   const leida = await leerPaginaExterna(fila.enlace, plataforma);
   if (!leida.ok) {
     // El motivo queda anotado para revisarlo; la captura no pierde lo que ya tenía.
@@ -289,25 +357,36 @@ async function aplicarLecturaExterna(
   const { lectura } = leida;
   const cambios: Record<string, unknown> = { metricas: mezclarLectura({ ...(fila.metricas ?? {}), vista_previa_error: undefined }, lectura.metricas), actualizado_en: new Date().toISOString() };
   if (!fila.titulo && lectura.copy) cambios.titulo = lectura.copy;
+  else if (fila.titulo && lectura.copy && copyRecortadoCompletado(fila.titulo, lectura.copy)) cambios.titulo = lectura.copy;
   if (!fila.autor_usuario && lectura.usuario) cambios.autor_usuario = lectura.usuario;
   if (lectura.enlace && lectura.enlace !== fila.enlace) cambios.enlace = lectura.enlace;
 
   let archivo = false;
-  // El video; si la publicación no es un video, su imagen (la foto de un anuncio).
-  const urlArchivo = lectura.videoUrl ?? lectura.imagenUrl;
-  if (!fila.video_ruta && urlArchivo) {
+  let faltaArchivo: string | undefined;
+  // Sin archivo: el video o, si la publicación no es un video, su imagen (la foto de un anuncio). Con solo una imagen (la portada que se guardó
+  // cuando el video no se pudo bajar), un video encontrado ahora la mejora y la reemplaza.
+  const soloImagen = esSoloImagen(fila.video_ruta);
+  const urlArchivo = !fila.video_ruta ? (lectura.videoUrl ?? lectura.imagenUrl) : soloImagen ? lectura.videoUrl : null;
+  if (urlArchivo) {
     const copia = await copiarVideo(fila.id, urlArchivo, { accept: "*/*", referer: lectura.referer, "user-agent": AGENTE_NAVEGADOR, ...(lectura.cookies.length > 0 ? { cookie: lectura.cookies.join("; ") } : {}) });
-    if ("error" in copia) cambios.video_error = copia.error;
-    else {
+    if ("error" in copia) {
+      if (!fila.video_ruta) cambios.video_error = copia.error;
+      faltaArchivo = copia.error;
+    } else {
       cambios.video_ruta = copia.ruta;
       cambios.video_bytes = copia.bytes;
       cambios.video_error = null;
       archivo = true;
     }
+  } else if (!fila.video_ruta) {
+    // La página no anunció ningún archivo: queda dicho en la ficha en vez de quedarse sin explicación.
+    faltaArchivo = lectura.esVideo ? "La página pública no trae el archivo de este video." : "La página pública no trae ninguna imagen de esta publicación.";
+    cambios.video_error = faltaArchivo;
   }
   const { error } = await supabase.from(TABLA).update(cambios).eq("id", fila.id);
   if (error) return { ok: false, error: "No se pudieron guardar los datos leídos." };
-  return { ok: true, archivo };
+  if (archivo && soloImagen && fila.video_ruta) await borrarArchivoViejo(supabase, fila.id, fila.video_ruta);
+  return faltaArchivo && !archivo && !fila.video_ruta ? { ok: true, archivo, faltaArchivo } : { ok: true, archivo };
 }
 
 /**
@@ -386,8 +465,9 @@ export async function guardarCapturas(aviso: unknown, capturas: CapturaInstagram
       const enlaceFinal = c.enlace ?? media?.enlace ?? null;
       // Con el enlace se lee la página pública (vista previa y «insertar»): de ahí salen las cifras y, si la captura no trajo archivo, el video.
       const [vista, embed] = await Promise.all([enlaceFinal ? leerVistaPublica(enlaceFinal) : null, enlaceFinal ? leerEmbedPublico(enlaceFinal) : null]);
-      const urlArchivo = urlVideo ?? archivoDeLectura(embed);
-      const video = urlArchivo ? await copiarVideo(data.id, urlArchivo) : null;
+      // El archivo: el del aviso; si no vino, el que traen la página de «insertar» o la página principal (video primero, imagen si no hay).
+      const candidatos = candidatosDeArchivo(embed, vista);
+      const video = await copiarPrimero(data.id, [urlVideo, ...candidatos.videos, ...candidatos.imagenes]);
 
       const cambios: Record<string, unknown> = {};
       if (remitente) {
@@ -459,7 +539,7 @@ export async function guardarNotas(notas: NotaInstagram[]): Promise<{ unidas: nu
  * ejemplo, una imagen que antes no se sabía guardar). Lo que una persona corrigió a mano no se pisa. Devuelve un mensaje de error si
  * no hay nada que leer ni que descargar.
  */
-export async function completarCaptura(id: string): Promise<{ ok: true; archivo: boolean } | { ok: false; error: string }> {
+export async function completarCaptura(id: string): Promise<{ ok: true; archivo: boolean; faltaArchivo?: string } | { ok: false; error: string }> {
   const supabase = createServiceClient();
   const { data } = await supabase.from(TABLA).select("id, mensaje_id, enlace, titulo, video_ruta, autor_usuario, metricas, payload").eq("id", id).maybeSingle();
   if (!data) return { ok: false, error: "La captura ya no existe." };
@@ -470,6 +550,7 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
     if (r.ok) await fusionarEnPrimera(supabase, data.id);
     return r;
   }
+  const soloImagen = esSoloImagen(data.video_ruta);
   const delAviso = data.video_ruta ? null : (extraerCapturas(data.payload).find((c) => c.mensajeId === data.mensaje_id)?.urlVideo ?? null);
 
   const cambios: Record<string, unknown> = { actualizado_en: new Date().toISOString() };
@@ -478,10 +559,13 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
   if (!enlace && !delAviso) return { ok: false, error: "Esta captura no tiene enlace de Instagram ni un archivo que volver a descargar." };
 
   let embed: Awaited<ReturnType<typeof leerEmbedPublico>> = null;
+  let vista: LecturaVista = null;
   let leyoPagina = false;
   if (enlace) {
     if (!lecturaPublicaActiva()) return { ok: false, error: "La lectura de la página pública está apagada." };
-    const [vista, e] = await Promise.all([leerVistaPublica(enlace), leerEmbedPublico(enlace)]);
+    // Cada lectura se repite una vez si falla: es el botón que se pulsa cuando la primera vez no funcionó.
+    const [v, e] = await Promise.all([conReintento(() => leerVistaPublica(enlace)), conReintento(() => leerEmbedPublico(enlace))]);
+    vista = v;
     embed = e;
     const lectura = cifrasDeLectura(vista, embed);
     if (Object.keys(lectura.metricas).length > 0) {
@@ -494,29 +578,35 @@ export async function completarCaptura(id: string): Promise<{ ok: true; archivo:
 
   let archivo = false;
   let errorArchivo: string | null = null;
-  if (!data.video_ruta) {
-    for (const url of [delAviso, archivoDeLectura(embed)]) {
-      if (!url) continue;
-      const copia = await copiarVideo(data.id, url);
-      if ("error" in copia) errorArchivo = copia.error;
-      else {
-        cambios.video_ruta = copia.ruta;
-        cambios.video_bytes = copia.bytes;
-        cambios.video_error = null;
-        archivo = true;
-        break;
-      }
+  let faltaArchivo: string | undefined;
+  const candidatos = candidatosDeArchivo(embed, vista);
+  // Sin archivo: el del aviso, luego los videos y, al final, las imágenes. Con solo una imagen guardada (la portada de un video que no se pudo
+  // bajar), solo un video la mejora.
+  const urls = !data.video_ruta ? [delAviso, ...candidatos.videos, ...candidatos.imagenes] : soloImagen ? candidatos.videos : [];
+  if (urls.length > 0) {
+    const copia = await copiarPrimero(data.id, urls);
+    if (copia && "error" in copia) errorArchivo = copia.error;
+    else if (copia) {
+      cambios.video_ruta = copia.ruta;
+      cambios.video_bytes = copia.bytes;
+      cambios.video_error = null;
+      archivo = true;
     }
-    if (!archivo && errorArchivo) cambios.video_error = errorArchivo;
+    if (!archivo && errorArchivo && !data.video_ruta) cambios.video_error = errorArchivo;
+  } else if (!data.video_ruta) {
+    errorArchivo = "La página pública de este enlace no trae el archivo (la cuenta no lo publica fuera de Instagram).";
+    cambios.video_error = errorArchivo;
   }
+  if (!data.video_ruta && !archivo) faltaArchivo = errorArchivo ?? undefined;
   const huboDatos = leyoPagina || cambios.enlace !== undefined || cambios.autor_usuario !== undefined || cambios.titulo !== undefined || archivo;
   if (!huboDatos) {
-    if (errorArchivo || cambios.metricas !== undefined) await supabase.from(TABLA).update({ ...(errorArchivo ? { video_error: errorArchivo } : {}), ...(cambios.metricas !== undefined ? { metricas: cambios.metricas } : {}) }).eq("id", id);
+    if (errorArchivo || cambios.metricas !== undefined) await supabase.from(TABLA).update({ ...(errorArchivo && !data.video_ruta ? { video_error: errorArchivo } : {}), ...(cambios.metricas !== undefined ? { metricas: cambios.metricas } : {}) }).eq("id", id);
     return { ok: false, error: errorArchivo ?? "Instagram no devolvió datos de este enlace." };
   }
   const { error } = await supabase.from(TABLA).update(cambios).eq("id", id);
   if (error) return { ok: false, error: "No se pudieron guardar los datos leídos." };
-  return { ok: true, archivo };
+  if (archivo && soloImagen && data.video_ruta) await borrarArchivoViejo(supabase, id, data.video_ruta);
+  return faltaArchivo ? { ok: true, archivo, faltaArchivo } : { ok: true, archivo };
 }
 
 /**

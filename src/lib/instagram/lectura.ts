@@ -1,7 +1,9 @@
 import type { DatosEmbed } from "./embed";
-import type { VistaPublica } from "./vista-previa";
+import type { ArchivosDePagina, VistaPublica } from "./vista-previa";
 
 type Lectura<T> = { ok: true; datos: T } | { ok: false; error: string } | null;
+/** La lectura de la vista previa, con los archivos que anunció la página principal (`og:video`, `og:image`). */
+export type LecturaVista = { ok: true; datos: VistaPublica; archivos?: ArchivosDePagina } | { ok: false; error: string; archivos?: ArchivosDePagina } | null;
 
 /**
  * Junta lo que se leyó de la página pública del enlace en lo que se guarda: la vista previa (me gusta, comentarios, fecha, nombre y
@@ -9,7 +11,7 @@ type Lectura<T> = { ok: true; datos: T } | { ok: false; error: string } | null;
  * (`fuente: "vista_previa"`) y con el motivo si alguna de las dos falló. También devuelve el copy de la publicación, para las capturas
  * que llegaron sin él (lo compartido desde el celular no lo trae). `ahora` solo existe para poder probarlo.
  */
-export function cifrasDeLectura(vista: Lectura<VistaPublica>, embed: Lectura<DatosEmbed>, ahora: Date = new Date()): { metricas: Record<string, unknown>; autor: string | null; copy: string | null } {
+export function cifrasDeLectura(vista: LecturaVista, embed: Lectura<DatosEmbed>, ahora: Date = new Date()): { metricas: Record<string, unknown>; autor: string | null; copy: string | null } {
   const v = vista?.ok ? vista.datos : null;
   const e = embed?.ok ? embed.datos : null;
   const m: Record<string, unknown> = {};
@@ -35,6 +37,21 @@ export function cifrasDeLectura(vista: Lectura<VistaPublica>, embed: Lectura<Dat
 export function archivoDeLectura(embed: Lectura<DatosEmbed>): string | null {
   if (!embed?.ok) return null;
   return embed.datos.esVideo === false ? embed.datos.imagenUrl : embed.datos.videoUrl;
+}
+
+/**
+ * Todo lo que se puede bajar de la lectura, de lo mejor a lo peor: los **videos** (el de la página de «insertar» si es un video y el `og:video` de la
+ * página principal) y las **imágenes** (la foto de una publicación de imagen y, al final, la portada de un video que no entregó su archivo).
+ * Quien llama decide qué usar: sin archivo, el primero que se pueda bajar; con una imagen guardada, solo un video la mejora.
+ */
+export function candidatosDeArchivo(embed: Lectura<DatosEmbed>, vista: LecturaVista): { videos: string[]; imagenes: string[] } {
+  const e = embed?.ok ? embed.datos : null;
+  const p = vista?.archivos;
+  const sinNulos = (a: (string | null | undefined)[]): string[] => [...new Set(a.filter((x): x is string => !!x))];
+  return {
+    videos: sinNulos([e && e.esVideo !== false ? e.videoUrl : null, p?.video]),
+    imagenes: sinNulos([e && e.esVideo === false ? e.imagenUrl : null, p?.imagen, e?.imagenUrl]),
+  };
 }
 
 /**

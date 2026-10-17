@@ -75,6 +75,8 @@ const CIFRAS_EXTRA = [
   ["view_count", "Vistas", "vistas"],
   ["share_count", "Compartidos", "compartidos"],
 ] as const;
+// Guardados: solo lo muestra TikTok.
+const CIFRAS_TIKTOK = [["save_count", "Guardados", "guardados"]] as const;
 const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1_048_576).toLocaleString("es-CR", { maximumFractionDigits: 1 })} MB`);
 
 /** El video de la captura, con su enlace firmado (el bucket es privado); sin video dice por qué, si se sabe. */
@@ -175,11 +177,12 @@ export function FichaInstagram({
   async function leerEnlace() {
     if (!fila || leyendo) return;
     setLeyendo(true);
-    const r: { error?: string; archivo?: boolean } = await leerEnlaceDeCaptura(fila.id).catch(() => ({ error: "No se pudo leer el enlace." }));
+    const r: { error?: string; archivo?: boolean; faltaArchivo?: string } = await leerEnlaceDeCaptura(fila.id).catch(() => ({ error: "No se pudo leer el enlace." }));
     setLeyendo(false);
     if (r.error) mostrarToast(r.error, "destructive");
     else {
-      mostrarToast(r.archivo ? "Archivo y datos completados" : "Datos completados");
+      // Si la red no entregó el archivo se dice aquí (y queda en la ficha), en vez de dar por completada una captura que sigue sin él.
+      mostrarToast(r.archivo ? "Archivo y datos completados" : r.faltaArchivo ? `Datos completados. Sin archivo: ${r.faltaArchivo}` : "Datos completados");
       setVersion((v) => v + 1);
       setVersionHistorial((v) => v + 1);
       router.refresh();
@@ -377,7 +380,7 @@ export function FichaInstagram({
                     </Campo>
                   ))}
                 {fila.plataforma !== "instagram" &&
-                  CIFRAS_EXTRA.map(([nombre, etiqueta, valor]) => (
+                  [...CIFRAS_EXTRA, ...(fila.plataforma === "tiktok" ? CIFRAS_TIKTOK : [])].map(([nombre, etiqueta, valor]) => (
                     <Campo key={nombre} etiqueta={etiqueta} id={`campo-${nombre}-instagram`}>
                       <input id={`campo-${nombre}-instagram`} type="number" inputMode="numeric" min="0" step="1" name={nombre} defaultValue={fila[valor] ?? ""} placeholder="Ej: 1200" className={`${fieldClass} tabular-nums`} />
                     </Campo>

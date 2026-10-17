@@ -19,6 +19,8 @@ export interface DatosTikTok {
   megusta: number | null;
   comentarios: number | null;
   compartidos: number | null;
+  /** Las veces que lo guardaron (el ícono de marcador de la página del video). */
+  guardados: number | null;
   vistas: number | null;
   /** La dirección canónica del video, con su cuenta y su id. */
   enlace: string | null;
@@ -69,6 +71,14 @@ export function archivoTikTokPermitido(url: unknown): string | null {
   }
 }
 
+/**
+ * La fecha (AAAA-MM-DD) de un instante, en la hora de Panamá (la de Costa Rica y Panamá, donde está el equipo): en UTC un video publicado
+ * a las 10 de la noche salía con la fecha del día siguiente (TikTok lo muestra «10-8» y se guardaba 2026-10-09).
+ */
+export function fechaEnPanama(segundos: number): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(segundos * 1000));
+}
+
 /** Lo que se aprovecha de la página de un video de TikTok, o null si no trae los datos del video (bloqueada, borrada o privada). */
 export function interpretarTikTok(html: string): DatosTikTok | null {
   const m = /<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/.exec(html);
@@ -94,10 +104,11 @@ export function interpretarTikTok(html: string): DatosTikTok | null {
     copy: texto(item.desc, 4000),
     usuario,
     nombre: texto(autor?.nickname, 120),
-    fecha: Number.isFinite(segundos) && segundos > 0 ? new Date(segundos * 1000).toISOString().slice(0, 10) : null,
+    fecha: Number.isFinite(segundos) && segundos > 0 ? fechaEnPanama(segundos) : null,
     megusta: cuenta(stats.diggCount),
     comentarios: cuenta(stats.commentCount),
     compartidos: cuenta(stats.shareCount),
+    guardados: cuenta(stats.collectCount),
     vistas: cuenta(stats.playCount),
     enlace: usuario && id ? `https://www.tiktok.com/@${usuario}/video/${id}` : null,
     videoUrl: archivoTikTokPermitido(video.playAddr) ?? archivoTikTokPermitido(video.downloadAddr),
@@ -138,6 +149,8 @@ export function cifraLocalizada(t: string | null | undefined): number | null {
 }
 
 const META = /<meta\s+(?:property|name)="og:([a-z:_]+)"\s+content="([^"]*)"/gi;
+/** La primera parte del título de una publicación: «2,8 mill. reproducciones · 1353 reacciones · 52 comentarios». */
+const CIFRAS_FB = /^\s*\d[\d.,\s]*\s*(?:mil millones|millones|mill\.?|mil|[KkMmBb])?\.?\s+(?:reproduc|visualiz|vistas|views|plays|reacc|reactions|me gusta|likes|comentarios|comments|veces compartido|compartidos|shares)/i;
 
 /** Lo que se aprovecha de la vista previa de una publicación de Facebook, o null si trae nada (pide iniciar sesión, borrada o privada). */
 export function interpretarFacebook(html: string): DatosFacebook | null {
@@ -147,20 +160,30 @@ export function interpretarFacebook(html: string): DatosFacebook | null {
   // Una página que pide iniciar sesión dice «Inicia sesión o regístrate para verlo»: no es una publicación.
   if (!og.title || /inicia sesi[oó]n|log in|log into|sign up|reg[ií]strate/i.test(titulo)) return null;
   const partes = titulo.split(" | ");
-  const estadisticas = partes.length >= 3 ? partes[0] : "";
+  // El título es «cifras | texto completo | nombre de la página» (antes la última parte era «Facebook»). Las cifras se reconocen por su contenido, no por
+  // cuántas partes tenga el título: sin la última parte, o con el texto cortado, las cifras dejaban de leerse.
+  const traeCifras = partes.length >= 2 && CIFRAS_FB.test(partes[0]);
+  const estadisticas = traeCifras ? partes[0] : "";
+  const resto = traeCifras ? partes.slice(1) : partes.length >= 3 ? partes.slice(1) : [];
+  const ultima = resto.length >= 2 ? resto[resto.length - 1].trim() : "";
+  const nombreDelTitulo = ultima && !/^facebook$/i.test(ultima) ? ultima : null;
+  const textoDelTitulo = resto.length >= 2 ? resto.slice(0, -1).join(" | ") : resto.join(" | ");
+  // La descripción viene cortada a 200 caracteres con «...»; el título trae el texto completo.
+  const descripcion = texto(og.description, 4000);
+  const copyCompleto = textoDelTitulo.trim() && (!descripcion || textoDelTitulo.trim().length >= descripcion.replace(/\.{3}$/, "").length) ? texto(textoDelTitulo, 4000) : null;
   const leer = (palabras: string): number | null => {
     const r = new RegExp(`([\\d][\\d.,\\s]*\\s*(?:mil millones|millones|mill\\.?|mil|[KkMmBb])?\\.?)\\s+(?:${palabras})`, "i").exec(estadisticas);
     return r ? cifraLocalizada(r[1]) : null;
   };
   const salida: DatosFacebook = {
-    copy: texto(og.description, 4000) ?? (partes.length >= 3 ? texto(partes.slice(1, -1).join(" | "), 4000) : null),
+    copy: copyCompleto ?? descripcion ?? (textoDelTitulo.trim() ? texto(textoDelTitulo, 4000) : null),
     vistas: leer("reproducciones|visualizaciones|vistas|views|plays"),
     reacciones: leer("reacciones|reactions|me gusta|likes"),
     comentarios: leer("comentarios|comments"),
     compartidos: leer("veces compartido|compartidos|shares"),
     enlace: og.url && /^https:\/\/(www\.|m\.|web\.)?facebook\.com\//.test(og.url) ? og.url.slice(0, 2000) : null,
     imagen: archivoFacebookPermitido(og.image),
-    nombrePagina: partes.length === 1 && !/\d[ \u00a0]*(reproduc|vistas|views|reacc|reactions|me gusta|likes|comentarios|comments)/i.test(titulo) ? texto(titulo.replace(/ [|·-] Facebook$/, ""), 120) : null,
+    nombrePagina: partes.length === 1 && !/\d[ \u00a0]*(reproduc|vistas|views|reacc|reactions|me gusta|likes|comentarios|comments)/i.test(titulo) ? texto(titulo.replace(/ [|·-] Facebook$/, ""), 120) : texto(nombreDelTitulo, 120),
     paginaId: /"pageID":"(\d{5,25})"/.exec(html)?.[1] ?? /"owner":\{"__typename":"[A-Za-z]+","id":"(\d{5,25})"/.exec(html)?.[1] ?? null,
   };
   return Object.values(salida).some((v) => v !== null) ? salida : null;

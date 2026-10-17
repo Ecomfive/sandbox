@@ -307,3 +307,40 @@ persona corrige algo en la ficha, pasa a `fuente: "manual"`. Probado con tres en
 aceptaron: las condiciones de Meta limitan el acceso automatizado, y Instagram puede dejar de responder o pedir inicio de sesión a las
 direcciones de Vercel (el motivo queda en `metricas.vista_previa_error`, y la captura se guarda igual). Una publicación (`ig_post`) no
 trae enlace, así que no tiene lectura. **Se apaga sin tocar el código** poniendo `INSTAGRAM_LECTURA_PUBLICA=0` en Vercel.
+
+## Revisión de las capturas de TikTok y Facebook contra sus páginas (17 oct 2026)
+
+Se abrieron en Chrome los 6 originales (IG-0038 y 0039 de TikTok; 0041, 0042, 0043 y 0046 de Facebook) y se compararon con lo guardado.
+
+- **TikTok:** copy, cuenta, nombre, fecha, me gusta, comentarios, compartidos, vistas y video estaban bien (las cifras suben con el tiempo; la lectura es la del momento de compartir). Faltaban dos cosas.
+  **Guardados:** la página muestra 4 cifras (me gusta, comentarios, **guardados**, compartidos) y `collectCount` no se leía; ahora queda en `metricas.save_count` y la ficha de TikTok trae «Guardados».
+  **Fecha:** se guardaba la fecha UTC (`createTime` del 9 oct 03:00 UTC salía «2026-10-09» y TikTok lo muestra «10-8»); ahora es la de Panamá (`fechaEnPanama`, `America/Panama`).
+- **Facebook:** (1) **el texto estaba cortado.** `og:description` viene recortada a 200 caracteres con «...», pero `og:title` ahora es «cifras | **texto completo** | nombre de la página» (662 caracteres en el reel de Oferta VE); ya no
+  termina en «| Facebook». Se toma el texto del título y la última parte es el nombre de la página. `copyRecortadoCompletado` reemplaza, al volver a leer, un texto guardado que terminaba en «...» y es el comienzo del leído (un texto
+  corregido a mano no se pisa). (2) **Las cifras dependían de que el título tuviera 3 partes**; ahora se reconocen por su contenido (`CIFRAS_FB`). (3) **IG-0046 llegó sin cifras** porque Facebook contestó esa vez sin ellas (la misma página, horas
+  después, trae «1026 reproducciones · 4 comentarios»): si la primera lectura no trae ninguna cifra se vuelve a pedir una vez, 1,5 s después (`leerPaginaExterna`).
+- **Lo que Facebook no entrega al servidor** (comprobado con `facebookexternalhit`, con un agente de navegador y con las páginas de «insertar» de video y de publicación): la **fecha de publicación** de un post («7 de octubre a las 8:39 am» se ve en la
+  página de IG-0041, pero solo en el HTML que se dibuja con JavaScript), las **reacciones** de un post (1 en IG-0041) o de un reel cuando el título no las trae (2 en IG-0046) y los **compartidos**. Esos datos se pueden escribir a mano en la ficha.
+  El nombre de la página de un reel de Facebook **sin nombre de usuario** (`Oferta VE`, `ingenio2.0`: su dirección es solo un número) deja «Cuenta del video» vacía: no es un error, esa página no tiene usuario.
+
+## Ícono de la app «Ecomfive Fuentes» (17 oct 2026)
+
+El ícono anterior (`public/pwa/icon-*.png` y `src/app/icon.png`, el mismo archivo) era un recorte del logo: una «E» cortada por la derecha y con el marco a medias, borrosa. Se rehízo en vectores
+con `node scripts/generar-iconos-fuentes.mjs`: fondo rojo de la marca (`#E83B3C`) con degradado y brillo, la **«E» con las medidas exactas de la del logo** y las esquinas del marco del logo repetidas en las
+cuatro como el visor de una cámara (captura). Salen `public/pwa/icon-192.png` y `icon-512.png` (esquinas redondeadas), `icon-maskable-512.png` (a sangre, para el recorte circular de Android; el manifiesto lo declara
+con `purpose: "maskable"`), `src/app/apple-icon.png` (iPhone) y `src/app/icon.png` (la pestaña del navegador, solo la «E» porque el marco no se lee a 16 px). Ese mismo archivo es el ícono de la pestaña de **toda** la plataforma.
+Para cambiarlo, se edita el script y se vuelve a correr. En el celular, el ícono de una app ya instalada no se actualiza solo: hay que desinstalarla y volver a instalarla.
+
+## «Volver a leer el enlace» completa lo que faltó en la primera lectura (17 oct 2026)
+
+El botón de la ficha («Completar desde el enlace» / «Volver a leer el enlace», `completarCaptura`) ahora recupera en las tres redes lo que la primera lectura no pudo.
+
+- **Instagram: el video de los enlaces que «no descargaban».** La página de «insertar» de algunos reels no trae `video_url` (IG-0005 e IG-0020, de cuentas que no lo publican ahí), pero **la página principal del reel, pedida como lo hace
+  Facebook (`facebookexternalhit`), trae `og:video:secure_url` / `og:video`**: un MP4 de `cdninstagram.com` (9,1 MB y 2,4 MB, firma válida) que se baja sin cookies. `archivosDeLaPagina` (`vista-previa.ts`) lo lee del mismo pedido de la vista previa (sin un
+  pedido más) y `candidatosDeArchivo` (`lectura.ts`) ordena lo que se puede bajar: primero los **videos** (el de «insertar» y el `og:video`), luego las **imágenes** (la foto de una publicación de imagen, `og:image`, y la portada de un video). Una publicación de
+  imagen (IG-0027: `og:type` = `article`, sin video) queda con su foto de 44 KB. Solo se aceptan direcciones `https` de `cdninstagram.com` / `fbcdn.net`. El primer guardado (`guardarCapturas`) usa la misma lista.
+- **Una imagen se mejora con un video.** Si una captura quedó con solo la imagen (la portada que se guardó porque el video no se pudo bajar), «Volver a leer» baja el video si ya aparece, lo guarda y borra la imagen vieja
+  (`esSoloImagen`, `borrarArchivoViejo`; solo de la carpeta de esa captura). Con un video ya guardado no se toca el archivo.
+- **Reintento:** cada lectura (la vista previa y la de «insertar» de Instagram, la de TikTok y la de Facebook) se repite una vez, 1,5 s después, si falla o llega sin datos (`conReintento`; TikTok a veces contesta con una página de verificación).
+- **Si no hay archivo, lo dice.** La ficha ya no da por «completada» una captura que sigue sin archivo: el aviso dice «Datos completados. Sin archivo: …» y el motivo queda en `video_error` («La página pública de este enlace no trae el archivo…», «…no trae el archivo de este video»).
+- **Los datos de texto y cifras** ya se volvían a pedir cada vez: el copy, la cuenta y el nombre de la página se completan si faltaban (el copy cortado con «...» se reemplaza por el completo), las cifras y la fecha se refrescan, y lo corregido a mano (`fuente = "manual"`) no se pisa.
