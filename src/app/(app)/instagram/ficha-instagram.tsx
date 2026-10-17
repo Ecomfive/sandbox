@@ -157,7 +157,11 @@ export function FichaInstagram({
   const [error, setError] = useState<string | null>(null);
   const [guardando, startTransition] = useTransition();
   const raiz = useRef<HTMLFormElement>(null);
-  const modificado = !!fila && modificadoId === fila.id;
+  // Lo que muestran los campos del formulario (no controlados: solo toman su valor al montarse). Cuando cambia en el servidor (al volver a leer el enlace o al
+  // guardar), el formulario se monta de nuevo con lo nuevo: si no, mostraba las cifras viejas y un «Guardar cambios» las habría puesto encima de las nuevas.
+  const firma = fila ? [fila.megusta, fila.comentarios, fila.vistas, fila.compartidos, fila.guardados, fila.fechaPublicacion, fila.autorUsuario, fila.nombrePagina, fila.enlace, fila.anuncios, fila.paginaDestino, fila.notas, fila.estado, fila.leidoEn, fila.bibliotecaLeidoEn].join("|") : "";
+  // Lo que se editó sin guardar pertenece a esa captura con esos datos: si los datos cambian, ya no cuenta.
+  const modificado = !!fila && modificadoId === `${fila.id}|${firma}`;
 
   const puedeDescartar = () => !modificado || confirm("Hay cambios sin guardar. ¿Descartarlos?");
   function cerrar() {
@@ -270,9 +274,9 @@ export function FichaInstagram({
         <div className="flex flex-1 flex-col">
           <form
             ref={raiz}
-            key={`${fila.id}-${version}`}
+            key={`${fila.id}-${version}-${firma}`}
             onSubmit={guardar}
-            onChange={() => setModificadoId(fila.id)}
+            onChange={() => setModificadoId(`${fila.id}|${firma}`)}
             aria-busy={guardando}
             className="flex flex-1 flex-col"
           >
