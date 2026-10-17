@@ -347,3 +347,16 @@ El botón de la ficha («Completar desde el enlace» / «Volver a leer el enlace
 - **La ficha mostraba las cifras viejas tras volver a leer (corregido el 17 oct 2026).** Los campos son no controlados (`defaultValue`): el formulario se volvía a montar al terminar la lectura, antes de que llegaran los datos nuevos, y se quedaba con
   los viejos (en IG-0039 la base ya tenía 21 900 me gusta y la ficha seguía diciendo 19 200); un «Guardar cambios» los habría puesto encima de los nuevos. Ahora la llave del formulario lleva una firma de los datos de la captura (`firma` en `ficha-instagram.tsx`)
   y se monta de nuevo cuando cambian; lo editado sin guardar solo cuenta para esos datos.
+
+## Animación de carga y «Volver a Instagram» (17 oct 2026)
+
+- **`ProgresoEstimado`** (`src/components/ui/progreso-estimado.tsx`, matemática en `src/lib/progreso-estimado.ts`, con prueba): la barra de un proceso que se espera sin saber cuánto tarda. **Arranca de golpe** (la mitad del
+  camino en el primer cuarto del tiempo esperado), frena sin llegar al final hasta que el proceso termina y, si tarda más de lo esperado, sigue avanzando muy despacio (nunca parece trabada); los **pasos** (de lo que se
+  está haciendo) cambian seguido al principio, así el proceso parece más rápido de lo que es; muestra los segundos que lleva y, al llegar la respuesta, se completa en verde con «Listo» unos 450 ms antes de dar paso al resultado.
+  Se monta solo mientras se espera (los segundos arrancan en cero). `compacta` deja solo el paso y la barra. Con «menos movimiento» no hay giro ni brillo (la barra igual avanza). Usa el rojo de la marca no: el color es `primario`.
+- **Dónde se usa:** compartir desde el celular (`compartir-celular.tsx`, ~9 s, 5 pasos), la lectura que deja el marcador de la Biblioteca (`lectura-biblioteca.tsx`, ~5 s, 4 pasos) y «Vincular a mano», «Volver a leer el enlace» / «Completar
+  desde el enlace» de la ficha (~8 s, 4 pasos), «Unir» (ficha y barra de la lista), «Eliminar» de la barra de la lista y «Fusionar repetidas». Un proceso nuevo y lento de este módulo usa el mismo componente.
+- **«Volver a Instagram»** (`volver-a-instagram.tsx`) reemplaza a «Ir a Instagram» en las pantallas que abre el marcador: **cierra esa pestaña** (la abrió un script, así que el navegador deja cerrarla; si no la
+  dejara, va a `/instagram`) y avisa a la lista que ya estaba abierta. El aviso es un `BroadcastChannel` del mismo origen (`src/lib/instagram/canal.ts`, sin datos: solo la orden de actualizar): se manda al terminar de guardar la lectura (o lo
+  compartido) y otra vez al pulsar el botón. La lista (`tabla-instagram.tsx`) se vuelve a pedir sola al recibirlo, además de cada 30 s y cada vez que la pestaña vuelve a verse (`visibilitychange`), y prueba `window.focus()`.
+  **Lo que un navegador no deja:** que una pestaña traiga otra al frente. Al cerrar la pestaña del resultado el navegador vuelve a la de la Biblioteca (de la que se abrió), no a la de la plataforma; esa ya está actualizada cuando se vuelve a ella.

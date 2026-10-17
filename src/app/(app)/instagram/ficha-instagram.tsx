@@ -7,6 +7,7 @@ import { BotonAccion } from "@/components/ui/boton-accion";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -77,6 +78,7 @@ const CIFRAS_EXTRA = [
 ] as const;
 // Guardados: solo lo muestra TikTok.
 const CIFRAS_TIKTOK = [["save_count", "Guardados", "guardados"]] as const;
+const PASOS_LEER_ENLACE = ["Abriendo la página", "Leyendo el texto y las cifras", "Buscando el archivo", "Guardando lo leído"];
 const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1_048_576).toLocaleString("es-CR", { maximumFractionDigits: 1 })} MB`);
 
 /** El video de la captura, con su enlace firmado (el bucket es privado); sin video dice por qué, si se sabe. */
@@ -150,6 +152,8 @@ export function FichaInstagram({
   const { mostrarToast } = useToast();
   const router = useRouter();
   const [leyendo, setLeyendo] = useState(false);
+  // Al volver la respuesta la barra se completa un instante antes de quitarse.
+  const [leyendoTerminado, setLeyendoTerminado] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [modificadoId, setModificadoId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -182,7 +186,12 @@ export function FichaInstagram({
     if (!fila || leyendo) return;
     setLeyendo(true);
     const r: { error?: string; archivo?: boolean; faltaArchivo?: string } = await leerEnlaceDeCaptura(fila.id).catch(() => ({ error: "No se pudo leer el enlace." }));
+    if (!r.error) {
+      setLeyendoTerminado(true);
+      await new Promise((x) => setTimeout(x, 450));
+    }
     setLeyendo(false);
+    setLeyendoTerminado(false);
     if (r.error) mostrarToast(r.error, "destructive");
     else {
       // Si la red no entregó el archivo se dice aquí (y queda en la ficha), en vez de dar por completada una captura que sigue sin él.
@@ -312,6 +321,7 @@ export function FichaInstagram({
             <div className="flex flex-1 flex-col divide-y divide-border p-5">
               <Seccion icono={iconoDeRed(fila.plataforma)} titulo={fila.archivoTipo === "imagen" ? "Imagen" : "Video"}>
                 <VideoCaptura fila={fila} />
+                {leyendo && <ProgresoEstimado pasos={PASOS_LEER_ENLACE} estimadoMs={8000} terminado={leyendoTerminado} etiqueta="Leyendo el enlace de la captura" />}
                 {puedeEscribir && (fila.enlace || !fila.tieneArchivo) && (
                   <button type="button" onClick={() => void leerEnlace()} disabled={leyendo || guardando} className={`self-start text-sm text-primario hover:underline disabled:opacity-60 ${anilloFoco}`}>
                     {leyendo ? "Leyendo..." : fila.enlace ? (fila.tieneArchivo ? "Volver a leer el enlace" : "Completar desde el enlace") : "Reintentar el archivo"}
