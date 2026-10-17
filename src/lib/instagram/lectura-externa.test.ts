@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { archivoTikTokPermitido, cifraLocalizada, decodificarHtml, interpretarFacebook, interpretarTikTok } from "./lectura-externa";
+import { archivoTikTokPermitido, cifraLocalizada, decodificarHtml, fechaEnPanama, interpretarFacebook, interpretarTikTok } from "./lectura-externa";
 
 // La forma real del bloque de datos de la página de un video de TikTok (probada el 15 oct 2026 con @scout2015), reducida a lo que se lee.
 const pagina = (item: unknown) => `<html><body><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">${JSON.stringify({ __DEFAULT_SCOPE__: { "webapp.video-detail": { itemInfo: { itemStruct: item } } } })}</script></body></html>`;
@@ -89,4 +89,14 @@ test("Facebook: un título sin cifras da solo el texto; una página que pide ini
   assert.equal(sola?.vistas, null);
   assert.equal(interpretarFacebook(fb("Inicia sesi&#xf3;n o reg&#xed;strate para verlo", "Ve publicaciones, fotos y mucho m&#xe1;s en Facebook.")), null);
   assert.equal(interpretarFacebook("<html></html>"), null);
+});
+
+test("TikTok: los guardados salen de collectCount y la fecha es la de Panamá, no la de UTC (@snappypick, 17 oct 2026)", () => {
+  // Publicado el 9 oct 2026 a las 03:00 UTC = 8 oct, 10 de la noche en Panamá: TikTok lo muestra «10-8».
+  const segundos = String(Date.UTC(2026, 9, 9, 3, 0, 0) / 1000);
+  const r = interpretarTikTok(pagina({ ...ITEM, createTime: segundos, stats: { diggCount: 21900, shareCount: 11700, commentCount: 520, playCount: 850500, collectCount: "8074" } }));
+  assert.equal(r?.guardados, 8074);
+  assert.equal(r?.fecha, "2026-10-08");
+  assert.equal(fechaEnPanama(Date.UTC(2026, 9, 9, 6, 0, 0) / 1000), "2026-10-09");
+  assert.equal(interpretarTikTok(pagina({ ...ITEM, stats: { diggCount: 1 } }))?.guardados, null);
 });

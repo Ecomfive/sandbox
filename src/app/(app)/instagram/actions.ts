@@ -23,6 +23,7 @@ const CIFRAS = [
 const CIFRAS_OPCIONALES = [
   ["view_count", "Vistas"],
   ["share_count", "Compartidos"],
+  ["save_count", "Guardados"],
 ] as const;
 const ESTADOS: Set<string> = new Set(ESTADOS_INSTAGRAM.map((e) => e.valor));
 

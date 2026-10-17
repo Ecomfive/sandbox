@@ -65,7 +65,7 @@ export interface DatosCompartibles {
 }
 
 /** Lo que se copia de una captura a otra del mismo contenido: solo lo que la segunda no tiene. */
-const CLAVES_A_COPIAR = ["like_count", "comments_count", "view_count", "share_count", "fecha_publicacion", "nombre_pagina"] as const;
+const CLAVES_A_COPIAR = ["like_count", "comments_count", "view_count", "share_count", "save_count", "fecha_publicacion", "nombre_pagina"] as const;
 
 /**
  * Lo que `destino` no tiene y `origen` sí (enlace, cuenta, nombre de la página, cifras y fecha), para completarla cuando es el mismo

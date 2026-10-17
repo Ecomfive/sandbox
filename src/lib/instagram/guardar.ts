@@ -118,6 +118,18 @@ async function copiarVideo(id: string, url: string, encabezados?: Record<string,
 
 const AGENTE_NAVEGADOR = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
+/**
+ * ¿El texto guardado estaba cortado («…armar...», como lo daba la descripción de Facebook, de 200 caracteres) y el leído ahora es el mismo
+ * texto, completo? Solo en ese caso se reemplaza: un texto que una persona corrigió no se pisa.
+ */
+export function copyRecortadoCompletado(guardado: string, leido: string): boolean {
+  const g = guardado.replace(/\s+/g, " ").trim();
+  if (!/(\.{3}|…)$/.test(g)) return false;
+  const inicio = g.replace(/(\.{3}|…)$/, "").trim();
+  const l = leido.replace(/\s+/g, " ").trim();
+  return inicio.length >= 20 && l.length > inicio.length + 3 && l.startsWith(inicio);
+}
+
 /** Lo que se leyó de la página pública de un video de TikTok o una publicación de Facebook, ya en la forma en que se guarda. */
 interface LecturaExterna {
   copy: string | null;
@@ -153,14 +165,28 @@ export async function leerPaginaExterna(enlace: string, plataforma: Exclude<Plat
       if (d.comentarios !== null) m.comments_count = d.comentarios;
       if (d.vistas !== null) m.view_count = d.vistas;
       if (d.compartidos !== null) m.share_count = d.compartidos;
+      if (d.guardados !== null) m.save_count = d.guardados;
       if (d.fecha) m.fecha_publicacion = d.fecha;
       if (d.nombre) m.nombre_pagina = d.nombre;
       if (d.duracion !== null) m.duracion = d.duracion;
       return { ok: true, lectura: { copy: d.copy, usuario: d.usuario, enlace: d.enlace ?? reconocerEnlace(p.urlFinal)?.enlace ?? null, metricas: m, videoUrl: d.videoUrl, imagenUrl: null, cookies: p.cookies, referer: "https://www.tiktok.com/" } };
     }
-    const p = await descargarConDetalle(enlace, 3_000_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
-    if ("error" in p) return { ok: false, error: p.error };
-    const d = interpretarFacebook(new TextDecoder("utf-8").decode(p.bytes));
+    // A veces Facebook contesta una vez sin las cifras (IG-0046 llegó así y la misma página, minutos después, ya traía las reproducciones y
+    // los comentarios) o falla un pedido suelto: si la primera lectura no trae ninguna cifra, se vuelve a pedir una vez.
+    let p: Awaited<ReturnType<typeof descargarConDetalle>> | null = null;
+    let d: ReturnType<typeof interpretarFacebook> = null;
+    for (let intento = 0; intento < 2; intento++) {
+      if (intento > 0) await new Promise((r) => setTimeout(r, 1500));
+      const lectura = await descargarConDetalle(enlace, 3_000_000, { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html", "accept-language": "es-ES,es;q=0.9,en;q=0.5" });
+      if ("error" in lectura) {
+        if (!p) p = lectura;
+        continue;
+      }
+      p = lectura;
+      d = interpretarFacebook(new TextDecoder("utf-8").decode(lectura.bytes));
+      if (d && (d.vistas !== null || d.reacciones !== null || d.comentarios !== null || d.compartidos !== null)) break;
+    }
+    if (!p || "error" in p) return { ok: false, error: p && "error" in p ? p.error : "No se pudo leer la página." };
     if (!d) return { ok: false, error: "Facebook no mostró esa publicación sin iniciar sesión (puede ser privada o estar borrada)." };
     const m: Record<string, unknown> = { plataforma, fuente: "vista_previa", leido_en: ahora };
     if (d.reacciones !== null) m.like_count = d.reacciones;
@@ -289,6 +315,7 @@ async function aplicarLecturaExterna(
   const { lectura } = leida;
   const cambios: Record<string, unknown> = { metricas: mezclarLectura({ ...(fila.metricas ?? {}), vista_previa_error: undefined }, lectura.metricas), actualizado_en: new Date().toISOString() };
   if (!fila.titulo && lectura.copy) cambios.titulo = lectura.copy;
+  else if (fila.titulo && lectura.copy && copyRecortadoCompletado(fila.titulo, lectura.copy)) cambios.titulo = lectura.copy;
   if (!fila.autor_usuario && lectura.usuario) cambios.autor_usuario = lectura.usuario;
   if (lectura.enlace && lectura.enlace !== fila.enlace) cambios.enlace = lectura.enlace;
 

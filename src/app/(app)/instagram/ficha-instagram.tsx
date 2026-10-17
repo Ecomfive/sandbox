@@ -75,6 +75,8 @@ const CIFRAS_EXTRA = [
   ["view_count", "Vistas", "vistas"],
   ["share_count", "Compartidos", "compartidos"],
 ] as const;
+// Guardados: solo lo muestra TikTok.
+const CIFRAS_TIKTOK = [["save_count", "Guardados", "guardados"]] as const;
 const megas = (bytes: number | null) => (bytes === null ? "" : ` · ${(bytes / 1_048_576).toLocaleString("es-CR", { maximumFractionDigits: 1 })} MB`);
 
 /** El video de la captura, con su enlace firmado (el bucket es privado); sin video dice por qué, si se sabe. */
@@ -377,7 +379,7 @@ export function FichaInstagram({
                     </Campo>
                   ))}
                 {fila.plataforma !== "instagram" &&
-                  CIFRAS_EXTRA.map(([nombre, etiqueta, valor]) => (
+                  [...CIFRAS_EXTRA, ...(fila.plataforma === "tiktok" ? CIFRAS_TIKTOK : [])].map(([nombre, etiqueta, valor]) => (
                     <Campo key={nombre} etiqueta={etiqueta} id={`campo-${nombre}-instagram`}>
                       <input id={`campo-${nombre}-instagram`} type="number" inputMode="numeric" min="0" step="1" name={nombre} defaultValue={fila[valor] ?? ""} placeholder="Ej: 1200" className={`${fieldClass} tabular-nums`} />
                     </Campo>

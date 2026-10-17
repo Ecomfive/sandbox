@@ -34,6 +34,8 @@ export interface FilaInstagram {
   /** Vistas y compartidos: solo los dan TikTok y Facebook (la ficha de Instagram no los muestra). */
   vistas: number | null;
   compartidos: number | null;
+  /** Las veces que lo guardaron: solo lo da TikTok. */
+  guardados: number | null;
   /** AAAA-MM-DD: cuándo se publicó en Instagram. */
   fechaPublicacion: string | null;
   /** De dónde salieron las cifras: «vista_previa» (leídas solas de la página pública, dato no oficial) o «manual» (escritas o corregidas por una persona). */

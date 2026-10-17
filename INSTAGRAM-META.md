@@ -307,3 +307,26 @@ persona corrige algo en la ficha, pasa a `fuente: "manual"`. Probado con tres en
 aceptaron: las condiciones de Meta limitan el acceso automatizado, y Instagram puede dejar de responder o pedir inicio de sesión a las
 direcciones de Vercel (el motivo queda en `metricas.vista_previa_error`, y la captura se guarda igual). Una publicación (`ig_post`) no
 trae enlace, así que no tiene lectura. **Se apaga sin tocar el código** poniendo `INSTAGRAM_LECTURA_PUBLICA=0` en Vercel.
+
+## Revisión de las capturas de TikTok y Facebook contra sus páginas (17 oct 2026)
+
+Se abrieron en Chrome los 6 originales (IG-0038 y 0039 de TikTok; 0041, 0042, 0043 y 0046 de Facebook) y se compararon con lo guardado.
+
+- **TikTok:** copy, cuenta, nombre, fecha, me gusta, comentarios, compartidos, vistas y video estaban bien (las cifras suben con el tiempo; la lectura es la del momento de compartir). Faltaban dos cosas.
+  **Guardados:** la página muestra 4 cifras (me gusta, comentarios, **guardados**, compartidos) y `collectCount` no se leía; ahora queda en `metricas.save_count` y la ficha de TikTok trae «Guardados».
+  **Fecha:** se guardaba la fecha UTC (`createTime` del 9 oct 03:00 UTC salía «2026-10-09» y TikTok lo muestra «10-8»); ahora es la de Panamá (`fechaEnPanama`, `America/Panama`).
+- **Facebook:** (1) **el texto estaba cortado.** `og:description` viene recortada a 200 caracteres con «...», pero `og:title` ahora es «cifras | **texto completo** | nombre de la página» (662 caracteres en el reel de Oferta VE); ya no
+  termina en «| Facebook». Se toma el texto del título y la última parte es el nombre de la página. `copyRecortadoCompletado` reemplaza, al volver a leer, un texto guardado que terminaba en «...» y es el comienzo del leído (un texto
+  corregido a mano no se pisa). (2) **Las cifras dependían de que el título tuviera 3 partes**; ahora se reconocen por su contenido (`CIFRAS_FB`). (3) **IG-0046 llegó sin cifras** porque Facebook contestó esa vez sin ellas (la misma página, horas
+  después, trae «1026 reproducciones · 4 comentarios»): si la primera lectura no trae ninguna cifra se vuelve a pedir una vez, 1,5 s después (`leerPaginaExterna`).
+- **Lo que Facebook no entrega al servidor** (comprobado con `facebookexternalhit`, con un agente de navegador y con las páginas de «insertar» de video y de publicación): la **fecha de publicación** de un post («7 de octubre a las 8:39 am» se ve en la
+  página de IG-0041, pero solo en el HTML que se dibuja con JavaScript), las **reacciones** de un post (1 en IG-0041) o de un reel cuando el título no las trae (2 en IG-0046) y los **compartidos**. Esos datos se pueden escribir a mano en la ficha.
+  El nombre de la página de un reel de Facebook **sin nombre de usuario** (`Oferta VE`, `ingenio2.0`: su dirección es solo un número) deja «Cuenta del video» vacía: no es un error, esa página no tiene usuario.
+
+## Ícono de la app «Ecomfive Fuentes» (17 oct 2026)
+
+El ícono anterior (`public/pwa/icon-*.png` y `src/app/icon.png`, el mismo archivo) era un recorte del logo: una «E» cortada por la derecha y con el marco a medias, borrosa. Se rehízo en vectores
+con `node scripts/generar-iconos-fuentes.mjs`: fondo rojo de la marca (`#E83B3C`) con degradado y brillo, la **«E» con las medidas exactas de la del logo** y las esquinas del marco del logo repetidas en las
+cuatro como el visor de una cámara (captura). Salen `public/pwa/icon-192.png` y `icon-512.png` (esquinas redondeadas), `icon-maskable-512.png` (a sangre, para el recorte circular de Android; el manifiesto lo declara
+con `purpose: "maskable"`), `src/app/apple-icon.png` (iPhone) y `src/app/icon.png` (la pestaña del navegador, solo la «E» porque el marco no se lee a 16 px). Ese mismo archivo es el ícono de la pestaña de **toda** la plataforma.
+Para cambiarlo, se edita el script y se vuelve a correr. En el celular, el ícono de una app ya instalada no se actualiza solo: hay que desinstalarla y volver a instalarla.
