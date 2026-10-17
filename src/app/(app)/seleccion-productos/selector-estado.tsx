@@ -5,41 +5,46 @@ import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { CheckIcon } from "@/lib/nav-icons";
 import { PanelCelda } from "../compras/panel-celda";
-import { colorEstadoSeleccion, ESTADOS_SELECCION, etiquetaEstadoSeleccion } from "./def-seleccion";
+import { ESTADOS_SELECCION } from "./def-seleccion";
+
+/** Una opción de estado con su color (Selección por defecto; Sugerencias de clientes pasa los suyos). */
+export type OpcionEstado = { readonly valor: string; readonly etiqueta: string; readonly color: string };
 
 /** La lista de estados en el panel flotante de las celdas (el de Compras): flechas, Enter y Escape, como en ClickUp. */
 function PanelEstados({
   ancla,
   actual,
   aria,
+  opciones,
   alElegir,
   alCerrar,
 }: {
+  opciones: readonly OpcionEstado[];
   ancla: React.RefObject<HTMLButtonElement | null>;
   actual: string | null;
   aria: string;
   alElegir: (estado: string) => void;
   alCerrar: () => void;
 }) {
-  const [activa, setActiva] = useState(() => Math.max(0, ESTADOS_SELECCION.findIndex((e) => e.valor === actual)));
+  const [activa, setActiva] = useState(() => Math.max(0, opciones.findIndex((e) => e.valor === actual)));
   const lista = useRef<HTMLUListElement>(null);
   useEffect(() => lista.current?.focus(), []);
 
   function teclas(e: KeyboardEvent) {
-    const n = ESTADOS_SELECCION.length;
+    const n = opciones.length;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       setActiva((i) => (i + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      alElegir(ESTADOS_SELECCION[activa].valor);
+      alElegir(opciones[activa].valor);
     }
   }
 
   return (
     <PanelCelda ancla={ancla} etiqueta={aria} alCerrar={alCerrar} ancho={220}>
       <ul ref={lista} role="listbox" aria-label={aria} aria-activedescendant={`estado-sel-${activa}`} tabIndex={0} onKeyDown={teclas} className="m-0 flex list-none flex-col gap-0.5 p-1.5 outline-none">
-        {ESTADOS_SELECCION.map((e, i) => (
+        {opciones.map((e, i) => (
           <li
             key={e.valor}
             id={`estado-sel-${i}`}
@@ -67,9 +72,12 @@ export function SelectorEstado({
   aria,
   puedeEscribir,
   alCambiar,
+  opciones = ESTADOS_SELECCION,
   children,
 }: {
   estado: string | null;
+  /** Los estados que se ofrecen, con su color (por defecto, los de Selección de productos). */
+  opciones?: readonly OpcionEstado[];
   aria: string;
   puedeEscribir: boolean;
   alCambiar: (estado: string) => void;
@@ -77,7 +85,8 @@ export function SelectorEstado({
 }) {
   const [abierto, setAbierto] = useState(false);
   const boton = useRef<HTMLButtonElement>(null);
-  const insignia = estado ? <Badge color={colorEstadoSeleccion(estado)}>{etiquetaEstadoSeleccion(estado)}</Badge> : null;
+  const opcion = opciones.find((o) => o.valor === estado);
+  const insignia = estado ? <Badge color={opcion?.color ?? "#8D8D8D"}>{opcion?.etiqueta ?? estado}</Badge> : null;
   if (!puedeEscribir) return insignia;
   return (
     <>
@@ -97,6 +106,7 @@ export function SelectorEstado({
           ancla={boton}
           actual={estado}
           aria={aria}
+          opciones={opciones}
           alElegir={(nuevo) => {
             setAbierto(false);
             if (nuevo !== estado) alCambiar(nuevo);

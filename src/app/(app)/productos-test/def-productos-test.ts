@@ -5,6 +5,8 @@ export interface FilaProductoTest {
   nombre: string;
   /** El producto de Producto con que se vinculó (migración 0099); null si todavía no existe ahí. */
   skuMaestroId: string | null;
+  /** La fila de Selección de la que viene (migración 0110); null si se creó directo en Test productos. */
+  seleccionId: string | null;
   /** La foto: la de su producto de Producto o, si no está vinculado, la de Filtro de productos con el mismo nombre. */
   fotoUrl: string | null;
   fechaCreacion: string | null;

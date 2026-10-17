@@ -785,6 +785,29 @@ export function InstagramIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** La «f» de Facebook. */
+export function FacebookIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </IconoLucide>
+  );
+}
+
+/** La nota musical de TikTok. */
+export function TikTokIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+    </IconoLucide>
+  );
+}
+
+/** El ícono de la red de una captura (Instagram, Facebook o TikTok): cada una lleva el suyo, no el de Instagram para todas. */
+export function iconoDeRed(plataforma: string): (props: SVGProps<SVGSVGElement>) => React.JSX.Element {
+  return plataforma === "facebook" ? FacebookIcon : plataforma === "tiktok" ? TikTokIcon : InstagramIcon;
+}
+
 /** Dos productos frente a frente: Análisis de competencia. */
 export function AnalisisCompetenciaIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -868,6 +891,18 @@ export function MargenIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 /** Persona con engranaje: Usuarios y roles. */
+export function PuestosIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <rect x="16" y="16" width="6" height="6" rx="1" />
+      <rect x="2" y="16" width="6" height="6" rx="1" />
+      <rect x="9" y="2" width="6" height="6" rx="1" />
+      <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+      <path d="M12 12V8" />
+    </IconoLucide>
+  );
+}
+
 export function UsuariosIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconoLucide {...props}>
@@ -886,6 +921,16 @@ export function UsuariosIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Corazón en un globo de diálogo: Sugerencias de clientes (lo que un dropshipper nos recomienda). */
+export function SugerenciaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
+      <path d="M7.5 9.5c0 .687.265 1.383.697 1.844l3.009 3.264a1.14 1.14 0 0 0 .407.314 1 1 0 0 0 .783-.004 1.14 1.14 0 0 0 .398-.31l3.008-3.264A2.77 2.77 0 0 0 16.5 9.5 2.5 2.5 0 0 0 12 8a2.5 2.5 0 0 0-4.5 1.5" />
+    </IconoLucide>
+  );
+}
+
 /**
  * El ícono de cada página del menú, por su ruta. Va aparte de `AREAS` (nav-data) porque el menú viaja del servidor al
  * navegador como datos y un componente no se puede enviar así. Una página nueva del menú suma aquí su ícono.
@@ -896,6 +941,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/tu-winner": TuWinnerIcon,
   "/scraping-proveedores": ScrapingIcon,
   "/instagram": InstagramIcon,
+  "/sugerencias-clientes": SugerenciaIcon,
   "/seleccion-productos": SeleccionIcon,
   "/creacion-ofertas": OfertaIcon,
   "/productos-test": TestIcon,
@@ -915,6 +961,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/gastos": GastoIcon,
   "/productos": MargenIcon,
   "/usuarios": UsuariosIcon,
+  "/puestos": PuestosIcon,
   "/wms-productos": TiendaIcon,
   "/wms-productos-dropi": CatalogoIcon,
   "/notificaciones": NotificacionesIcon,

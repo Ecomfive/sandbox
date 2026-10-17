@@ -28,22 +28,22 @@ export async function crearCompraDesdeProducto(opciones: {
   }
 
   const { data: codigo } = await supabase.rpc("wms_siguiente_codigo_compra", { p_clave: opciones.pais.codigo });
-  const { data: compra, error } = await supabase
-    .from("wms_compras")
-    .insert({
-      tipo: "pais",
-      pais_id: opciones.pais.id,
-      codigo: (codigo as string | null) ?? null,
-      nombre: String(sku.nombre),
-      etapa: "cotizar",
-      estado: "pendiente",
-      foto_url: foto,
-      descripcion: `Producto ${sku.codigo} · ${sku.nombre}. Orden creada sola al pasar el producto de Test a Activo.`,
-      responsable_nombre: opciones.autor,
-      creador_nombre: opciones.autor,
-    })
-    .select("id, numero, codigo")
-    .single();
+  const fila = {
+    tipo: "pais",
+    pais_id: opciones.pais.id,
+    codigo: (codigo as string | null) ?? null,
+    nombre: String(sku.nombre),
+    etapa: "cotizar",
+    estado: "pendiente",
+    foto_url: foto,
+    descripcion: `Producto ${sku.codigo} · ${sku.nombre}. Orden creada sola al pasar el producto de Test a Activo.`,
+    responsable_nombre: opciones.autor,
+    creador_nombre: opciones.autor,
+  };
+  // Guarda de qué producto viene (migración 0110): enlaza el recorrido Test → Filtro → Compra aunque aún no tenga su línea.
+  // Sin la migración, la columna no existe: se crea igual, sin el vínculo.
+  let { data: compra, error } = await supabase.from("wms_compras").insert({ ...fila, sku_maestro_id: opciones.skuId }).select("id, numero, codigo").single();
+  if (error && /sku_maestro_id/.test(error.message)) ({ data: compra, error } = await supabase.from("wms_compras").insert(fila).select("id, numero, codigo").single());
   if (error || !compra) return { error: "No se pudo crear la orden de compra." };
 
   await supabase.from("wms_compra_eventos").insert([

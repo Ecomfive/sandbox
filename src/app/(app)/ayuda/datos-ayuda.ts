@@ -37,10 +37,15 @@ export interface Manual {
   borrador: boolean;
   actualizadoPor: string | null;
   actualizadoEn: string;
+  /** Con `todos`: si es de sus módulos (o de todos). */
+  visible?: boolean;
 }
 
-/** Los manuales que puede ver una persona (los de sus módulos y los de todos). Sin la migración 0088, `null`. */
-export async function cargarManuales(usuario: UsuarioActual): Promise<Manual[] | null> {
+/**
+ * Los manuales que puede ver una persona (los de sus módulos y los de todos). Sin la migración 0088, `null`. Con `todos`
+ * vienen todos marcados con `visible` (para dejar abrir también los enlazados a su puesto).
+ */
+export async function cargarManuales(usuario: UsuarioActual, todos = false): Promise<Manual[] | null> {
   const { data, error } = await createServiceClient().from("manuales_proceso").select("id, titulo, contenido, modulos, borrador, actualizado_por, actualizado_en").order("titulo");
   if (error) return null;
   return (data ?? [])
@@ -53,7 +58,8 @@ export async function cargarManuales(usuario: UsuarioActual): Promise<Manual[] |
       actualizadoPor: m.actualizado_por as string | null,
       actualizadoEn: m.actualizado_en as string,
     }))
-    .filter((m) => puedeEditarManuales(usuario) || m.modulos.length === 0 || m.modulos.some((x) => usuario.modulos.includes(x)));
+    .map((m) => ({ ...m, visible: puedeEditarManuales(usuario) || m.modulos.length === 0 || m.modulos.some((x) => usuario.modulos.includes(x)) }))
+    .filter((m) => todos || m.visible);
 }
 
 /**

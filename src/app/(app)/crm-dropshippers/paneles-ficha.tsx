@@ -6,7 +6,9 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PedidoIcon, PersonaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PedidoIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
+import { recomendarProducto } from "../sugerencias-clientes/actions";
+import { FichaSugerencia } from "../sugerencias-clientes/ficha-sugerencia";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { CampoTiendas } from "./campo-tiendas";
 import { crearCaso, crearPedidoManual, editarDropshipper, registrarInteraccion } from "./actions";
@@ -261,6 +263,21 @@ export function PanelNota({ d, acceso, alGuardar }: { d: FilaDropshipper; acceso
         </Seccion>
       )}
     </FichaCrear>
+  );
+}
+
+/**
+ * «Recomendar»: el cliente nos recomienda un producto y Atención lo registra aquí. Llega a Testing Lab › Sugerencias de
+ * clientes con su código SUG- sin que quien lo carga necesite ese módulo.
+ */
+export function PanelRecomendar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: () => void }) {
+  return (
+    <FichaSugerencia
+      action={recomendarProducto}
+      ocultos={{ dropshipper_id: d.id }}
+      alGuardar={alGuardar}
+      boton={(abrir) => <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />}
+    />
   );
 }
 

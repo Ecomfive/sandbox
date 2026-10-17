@@ -1,3 +1,4 @@
+import { colorPlataforma, etiquetaPlataforma, PLATAFORMAS, type Plataforma } from "@/lib/instagram/plataformas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 /** Una captura de Instagram: lo que alguien del equipo compartió por mensaje directo con la cuenta de fuentes. */
@@ -6,6 +7,8 @@ export interface FilaInstagram {
   /** El N.º de la captura (se muestra IG-0001). */
   numero: number;
   recibidoEn: string;
+  /** La red de donde viene: Instagram, Facebook o TikTok. */
+  plataforma: Plataforma;
   remitenteId: string;
   remitenteUsuario: string | null;
   remitenteNombre: string | null;
@@ -21,11 +24,14 @@ export interface FilaInstagram {
   nombrePagina: string | null;
   /** El N.º de la primera captura del mismo contenido, si esta lo repite. */
   repetidaDe: number | null;
+  /** Los demás envíos del mismo contenido que se fusionaron en esta captura (quién y cuándo). */
+  envios: { mensajeId: string; quien: string; en: string }[];
   videoBytes: number | null;
   videoError: string | null;
   autorUsuario: string | null;
   megusta: number | null;
   comentarios: number | null;
+  /** Vistas y compartidos: solo los dan TikTok y Facebook (la ficha de Instagram no los muestra). */
   vistas: number | null;
   compartidos: number | null;
   /** AAAA-MM-DD: cuándo se publicó en Instagram. */
@@ -34,11 +40,23 @@ export interface FilaInstagram {
   fuenteCifras: string | null;
   leidoEn: string | null;
   paginaDestino: string | null;
+  /** Cuántos anuncios de la misma página llevan el mismo copy (leídos de la Biblioteca de anuncios o escritos a mano). */
+  anuncios: number | null;
+  /** De la última lectura de la Biblioteca: cuántos de esos anuncios están activos, desde cuándo circula el más antiguo y cuándo se leyó. */
+  bibliotecaActivos: number | null;
+  bibliotecaInactivos: number | null;
+  bibliotecaDesde: string | null;
+  bibliotecaLeidoEn: string | null;
+  /** El nombre con que la Biblioteca muestra la página (puede diferir del de la red) y si «Cuenta del video» salió de ahí (entonces es el usuario de Facebook de la página). */
+  bibliotecaPagina: string | null;
+  cuentaDeBiblioteca: boolean;
   notas: string | null;
   estado: string;
   /** El aviso de Meta y lo que respondió Instagram al consultar la publicación, en texto, para revisarlos. */
   datosMeta: string | null;
 }
+
+export { colorPlataforma, etiquetaPlataforma };
 
 export const numeroInstagram = (n: number) => `IG-${String(n).padStart(4, "0")}`;
 
@@ -102,6 +120,16 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
       ordenGrupos: FORMATOS_INSTAGRAM.map((t) => t.valor),
       colorValor: colorFormatoInstagram,
     },
+    {
+      id: "plataforma",
+      etiqueta: "Red",
+      tipo: "seleccion",
+      valores: (f) => [f.plataforma],
+      opciones: () => PLATAFORMAS.map((p) => ({ valor: p.valor, etiqueta: p.etiqueta })),
+      agrupable: true,
+      ordenGrupos: PLATAFORMAS.map((p) => p.valor),
+      colorValor: colorPlataforma,
+    },
     { id: "enviadoPor", etiqueta: "Enviado por", tipo: "seleccion", valores: (f) => [quienEnvio(f)], agrupable: true },
     { id: "autor", etiqueta: "Cuenta del video", tipo: "seleccion", valores: (f) => [f.autorUsuario ? `@${f.autorUsuario}` : SIN_VALOR], etiquetaSinValor: "Sin consultar", agrupable: true },
     { id: "recibido", etiqueta: "Recibido", tipo: "fecha", valor: (f) => aFecha(f.recibidoEn) },
@@ -112,8 +140,7 @@ export const DEF_INSTAGRAM: DefTabla<FilaInstagram> = {
     { id: "conDestino", etiqueta: "Página de destino", tipo: "seleccion", valores: (f) => [f.paginaDestino ? "con" : "sin"], opciones: () => [{ valor: "con", etiqueta: "Con página" }, { valor: "sin", etiqueta: "Sin página" }], agrupable: true },
     { id: "megusta", etiqueta: "Me gusta", tipo: "numero", valor: (f) => f.megusta },
     { id: "comentarios", etiqueta: "Comentarios", tipo: "numero", valor: (f) => f.comentarios },
-    { id: "vistas", etiqueta: "Vistas", tipo: "numero", valor: (f) => f.vistas },
-    { id: "compartidos", etiqueta: "Compartidos", tipo: "numero", valor: (f) => f.compartidos },
+    { id: "anuncios", etiqueta: "Anuncios con el mismo copy", tipo: "numero", valor: (f) => f.anuncios },
     { id: "publicado", etiqueta: "Publicado", tipo: "fecha", valor: (f) => f.fechaPublicacion },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },
   ],

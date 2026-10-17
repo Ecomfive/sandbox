@@ -63,6 +63,7 @@ const AREAS: NavSection[] = [
       { label: "Tu Winner", href: "/tu-winner", frente: "proveeduria", grupo: "Fuentes" },
       { label: "Scraping de proveedores", href: "/scraping-proveedores", frente: "proveeduria", grupo: "Fuentes" },
       { label: "Instagram", href: "/instagram", frente: "proveeduria", grupo: "Fuentes" },
+      { label: "Sugerencias de clientes", href: "/sugerencias-clientes", frente: "proveeduria", grupo: "Fuentes" },
       { label: "Selección de productos", href: "/seleccion-productos", frente: "proveeduria", grupo: "Selección" },
       { label: "Creación de ofertas", href: "/creacion-ofertas", frente: "proveeduria", grupo: "Producción" },
       { label: "Test productos", href: "/productos-test", frente: "proveeduria", grupo: "Resultados" },
@@ -118,8 +119,11 @@ const AREAS: NavSection[] = [
     title: "Equipo",
     panel: "Recursos humanos",
     frentes: true,
-    // Usuarios y roles es de toda la empresa: queda afuera de los tres frentes.
-    items: [{ label: "Usuarios y roles", href: "/usuarios" }],
+    // Usuarios y roles y Puestos son de toda la empresa: quedan afuera de los tres frentes.
+    items: [
+      { label: "Usuarios y roles", href: "/usuarios" },
+      { label: "Puestos", href: "/puestos" },
+    ],
   },
   // Las fichas de producto de Shopify y de Dropi ya no están en el menú (se llega a ellas desde Producto); la página y su
   // permiso siguen vivos, y esta área oculta mantiene sus migas, el buscador y los favoritos.

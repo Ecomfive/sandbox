@@ -126,6 +126,8 @@ interface Respuesta {
   estado: number;
   ubicacion: string | null;
   largo: number;
+  /** Las cookies que puso el sitio (`name=value`), para pedir un archivo que solo entrega a quien vio la página. */
+  cookies: string[];
   cuerpo: http.IncomingMessage;
 }
 
@@ -141,6 +143,7 @@ function pedir(url: URL, senal: AbortSignal, encabezados?: Record<string, string
           estado: r.statusCode ?? 0,
           ubicacion: typeof r.headers.location === "string" ? r.headers.location : null,
           largo: Number(r.headers["content-length"] ?? 0),
+          cookies: (r.headers["set-cookie"] ?? []).map((c) => c.split(";")[0]),
           cuerpo: r,
         }),
     );
@@ -153,8 +156,25 @@ function pedir(url: URL, senal: AbortSignal, encabezados?: Record<string, string
  * cambia lo que se pide (otro `accept`, otro agente) sin tocar ninguna de las revisiones de seguridad.
  */
 export async function descargarPublico(texto: string, maxBytes: number, encabezados?: Record<string, string>): Promise<{ bytes: Uint8Array } | { error: string }> {
+  const r = await descargarConDetalle(texto, maxBytes, encabezados);
+  return "error" in r ? r : { bytes: r.bytes };
+}
+
+/**
+ * Lo mismo que `descargarPublico`, pero además dice **en qué dirección terminó** (tras las redirecciones: un enlace corto de TikTok o
+ * Facebook se resuelve así) y **qué cookies puso el sitio** (TikTok solo entrega su video a quien trae las cookies de la página).
+ * Cada redirección se revisa igual que antes: ninguna sale a una dirección privada.
+ */
+export async function descargarConDetalle(
+  texto: string,
+  maxBytes: number,
+  encabezados?: Record<string, string>,
+  /** Con `parcial`, una respuesta más grande que `maxBytes` no es un error: se lee el comienzo y se cierra (sirve para las etiquetas del `<head>` de una página pesada). */
+  parcial = false,
+): Promise<{ bytes: Uint8Array; urlFinal: string; cookies: string[] } | { error: string }> {
   const senal = AbortSignal.timeout(10_000);
   let actual = texto;
+  const cookies: string[] = [];
   for (let salto = 0; salto < 4; salto++) {
     const revisada = await revisarUrlPublica(actual);
     if ("error" in revisada) return revisada;
@@ -165,6 +185,7 @@ export async function descargarPublico(texto: string, maxBytes: number, encabeza
       if ((error as { code?: string })?.code === "EPRIVADA") return { error: "Esa dirección no es pública." };
       return { error: "No se pudo descargar la imagen." };
     }
+    cookies.push(...r.cookies);
     if (r.estado >= 300 && r.estado < 400) {
       r.cuerpo.resume();
       if (!r.ubicacion) return { error: "No se pudo descargar la imagen." };
@@ -175,25 +196,34 @@ export async function descargarPublico(texto: string, maxBytes: number, encabeza
       r.cuerpo.resume();
       return { error: "El sitio no entregó la imagen." };
     }
-    if (r.largo > maxBytes) {
+    if (r.largo > maxBytes && !parcial) {
       r.cuerpo.destroy();
       return { error: "La imagen pesa demasiado." };
     }
     const partes: Buffer[] = [];
     let total = 0;
+    let cortada = false;
     try {
       for await (const trozo of r.cuerpo as AsyncIterable<Buffer>) {
         total += trozo.length;
         if (total > maxBytes) {
-          r.cuerpo.destroy();
-          return { error: "La imagen pesa demasiado." };
+          if (!parcial) {
+            r.cuerpo.destroy();
+            return { error: "La imagen pesa demasiado." };
+          }
+          // Lectura parcial: ya se tiene el comienzo; se deja de leer.
+          partes.push(trozo);
+          cortada = true;
+          break;
         }
         partes.push(trozo);
       }
     } catch {
-      return { error: "No se pudo descargar la imagen." };
+      // Al cortar una lectura parcial el cierre de la conexión puede avisar como error: ya se tiene lo que se quería.
+      if (!cortada) return { error: "No se pudo descargar la imagen." };
     }
-    return { bytes: new Uint8Array(Buffer.concat(partes, total)) };
+    if (cortada) r.cuerpo.destroy();
+    return { bytes: new Uint8Array(Buffer.concat(partes)), urlFinal: revisada.url.toString(), cookies };
   }
   return { error: "Demasiadas redirecciones." };
 }
