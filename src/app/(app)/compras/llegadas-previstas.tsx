@@ -69,7 +69,12 @@ export function LlegadasPrevistas({
   return (
     <section aria-labelledby="d-llegadas" className="min-w-0 rounded-[10px] border border-border bg-card">
       <CabeceraTarjeta id="d-llegadas" titulo="Llegadas previstas">
-        <span className="text-xs text-muted-foreground">por mes de planificación · pulsa un mes para filtrar</span>
+        <span className="flex items-center gap-3 text-xs text-muted-foreground">
+          pulsa un mes para filtrar
+          <Link href={`/compras/planificacion${vista === "todos" ? "" : `?ver=${vista}`}`} className={`rounded font-medium text-primario hover:underline ${anilloFoco}`}>
+            Ver planificación
+          </Link>
+        </span>
       </CabeceraTarjeta>
       <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-5">
         {columnas.map((col) => {
