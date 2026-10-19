@@ -3,13 +3,13 @@
 import { MapaComponentes } from "./mapa-componentes";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { anilloFoco } from "@/components/ui/field";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { Badge, claseTono } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
@@ -26,6 +26,7 @@ import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
 import { CategoriaProducto } from "./categoria-producto";
+import { SelectorClaseProducto } from "./selector-clase";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
@@ -164,18 +165,7 @@ export function FichaProducto({
                 </Dato>
                 <Dato etiqueta="Estado">
                   {puedeEscribir ? (
-                    <select
-                      aria-label="Estado del producto"
-                      value={producto.clase}
-                      disabled={pending}
-                      onChange={(e) => cambiarClase(e.target.value)}
-                      className={`${fieldClassSm} w-40 font-medium ${TONO_CLASE[producto.clase] ? claseTono(TONO_CLASE[producto.clase]) : ""}`}
-                    >
-                      <option value="fisico">{ETIQUETA_CLASE.fisico}</option>
-                      <option value="test">{ETIQUETA_CLASE.test}</option>
-                      <option value="inactivo">{ETIQUETA_CLASE.inactivo}</option>
-                      <option value="descontinuado">{ETIQUETA_CLASE.descontinuado}</option>
-                    </select>
+                    <SelectorClaseProducto clase={producto.clase} deshabilitado={pending} alCambiar={cambiarClase} />
                   ) : (
                     (ETIQUETA_CLASE[producto.clase] ?? producto.clase)
                   )}
