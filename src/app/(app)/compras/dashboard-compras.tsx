@@ -28,6 +28,7 @@ import {
   usd,
 } from "./calculos-compras";
 import { SelectorVista } from "./selector-vista";
+import { TiempoEtapas } from "./tiempo-etapas";
 
 type Evento = { compraId: string; campo: string; valor: string | null; ocurridoEn: string };
 type Dimension = "proveedor" | "tienda" | "pais" | "responsable" | "via";
@@ -227,7 +228,6 @@ export function DashboardCompras({
   const tramos = useMemo(() => tiemposPorTramo(filtradas), [filtradas]);
   const enEstados = useMemo(
     () => [
-      ...tiempoEnEstados(ev, filtradas, "etapa").map((e) => ({ ...e, nombre: `👣 ${etiquetaEtapa(e.valor)}` })),
       ...tiempoEnEstados(ev, filtradas, "estado").map((e) => ({ ...e, nombre: etiquetaEstado(e.valor) })),
     ]
       .filter((e) => e.n >= 3)
@@ -371,6 +371,8 @@ export function DashboardCompras({
         </Tarjeta>
       </div>
 
+      <TiempoEtapas compras={filtradas} eventos={ev} dia={dia} vista={vista} />
+
       <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
         <Tarjeta id="d-transito-mes" titulo="Días de tránsito por mes de llegada" extra={<span className="text-xs text-muted-foreground">mediana por vía</span>}>
           <div className="h-[240px] p-2">
@@ -420,7 +422,7 @@ export function DashboardCompras({
           </div>
         </Tarjeta>
 
-        <Tarjeta id="d-estados" titulo="Dónde se quedan más tiempo" extra={<span className="text-xs text-muted-foreground">estados y etapas, mediana</span>}>
+        <Tarjeta id="d-estados" titulo="Tiempo en cada estado" extra={<span className="text-xs text-muted-foreground">mediana · 9 de cada 10</span>}>
           <div className="flex flex-col p-2">
             {enEstados.length === 0 ? (
               <p className="p-2 text-sm text-muted-foreground">Sin historial suficiente con estos filtros.</p>
