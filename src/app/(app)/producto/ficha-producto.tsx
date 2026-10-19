@@ -25,6 +25,7 @@ import { NombreProducto } from "./nombre-producto";
 import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
+import { CategoriaProducto } from "./categoria-producto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
@@ -158,6 +159,9 @@ export function FichaProducto({
                   <SkuProducto key={`${producto.id}-${producto.codigo}`} id={producto.id} codigo={producto.codigo} puedeEscribir={puedeEscribir} />
                 </Dato>
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
+                <Dato etiqueta="Categoría">
+                  <CategoriaProducto key={`${producto.id}-${producto.categoria?.id ?? ""}-${producto.categoria?.revisar ?? ""}`} id={producto.id} categoria={producto.categoria} puedeEscribir={puedeEscribir} />
+                </Dato>
                 <Dato etiqueta="Estado">
                   {puedeEscribir ? (
                     <select

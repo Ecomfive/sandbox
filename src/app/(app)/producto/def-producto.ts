@@ -1,3 +1,5 @@
+import { SIN_VALOR } from "@/lib/tabla/motor";
+import { grupoReporte, primerNivel, rutaLegible } from "@/lib/categorias/taxonomia";
 import type { DefTabla } from "@/lib/tabla/motor";
 
 /** Simple: un solo producto. Compuesto: una combinación de productos simples (al venderlo se descuenta cada uno). */
@@ -54,6 +56,8 @@ export interface FilaProducto {
   numero: number | null;
   /** El SKU: la llave con la que una venta de cualquier plataforma encuentra el producto. */
   codigo: string;
+  /** Su categoría en la taxonomía de Shopify (migración 0113): id («hb-3-10-6»), ruta completa y si quedó para revisar. */
+  categoria: { id: string; ruta: string; revisar: boolean } | null;
   nombre: string;
   tipo: string;
   clase: string;
@@ -138,6 +142,34 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
       opciones: () => Object.entries(ETIQUETA_TIPO).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
     },
+    {
+      id: "categoria",
+      etiqueta: "Categoría",
+      tipo: "seleccion",
+      valores: (p) => [grupoReporte(p.categoria?.ruta) ?? SIN_VALOR],
+      formatearValor: (v) => rutaLegible(v),
+      etiquetaSinValor: "Sin categoría",
+      agrupable: true,
+    },
+    {
+      id: "categoriaPrincipal",
+      etiqueta: "Categoría principal",
+      tipo: "seleccion",
+      valores: (p) => [primerNivel(p.categoria?.ruta) ?? SIN_VALOR],
+      etiquetaSinValor: "Sin categoría",
+      agrupable: true,
+    },
+    {
+      id: "categoriaRevisar",
+      etiqueta: "Categoría por revisar",
+      tipo: "seleccion",
+      valores: (p) => [!p.categoria ? "sin" : p.categoria.revisar ? "revisar" : "ok"],
+      opciones: () => [
+        { valor: "revisar", etiqueta: "Por revisar" },
+        { valor: "ok", etiqueta: "Revisada" },
+        { valor: "sin", etiqueta: "Sin categoría" },
+      ],
+    },
     { id: "comprado", etiqueta: "Unidades compradas", tipo: "numero", valor: (p) => p.unidadesCompradas },
     { id: "oferta", etiqueta: "Oferta", tipo: "numero", valor: (p) => p.tests[0]?.oferta ?? null },
     {
@@ -158,6 +190,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
     { etiqueta: "Producto", valor: (p) => p.nombre },
     { etiqueta: "Tipo", valor: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
     { etiqueta: "Estado", valor: (p) => ETIQUETA_CLASE[p.clase] ?? p.clase },
+    { etiqueta: "Categoría (ruta Shopify)", valor: (p) => p.categoria?.ruta ?? "" },
     { etiqueta: "Código de barras", valor: (p) => p.codigoBarras ?? "" },
     { etiqueta: "Componentes", valor: (p) => p.componentes },
   ],
