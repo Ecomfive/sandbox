@@ -29,6 +29,7 @@ import {
 } from "./calculos-compras";
 import { SelectorVista } from "./selector-vista";
 import { TiempoEtapas } from "./tiempo-etapas";
+import { unidadesPorMes, type Periodo } from "@/lib/compras/unidades-mes";
 
 type Evento = { compraId: string; campo: string; valor: string | null; ocurridoEn: string };
 type Dimension = "proveedor" | "tienda" | "pais" | "responsable" | "via";
@@ -136,6 +137,59 @@ function BarraH({ nombre, valor, maximo, texto, activo, alPulsar }: { nombre: st
     </button>
   ) : (
     <div className="px-1.5 py-1">{contenido}</div>
+  );
+}
+
+const PERIODOS: { valor: Periodo; etiqueta: string }[] = [
+  { valor: "este_anio", etiqueta: "Este año" },
+  { valor: "ultimos_12", etiqueta: "Últimos 12 meses" },
+  { valor: "anio_pasado", etiqueta: "Año pasado" },
+];
+
+/**
+ * «Unidades compradas»: unidades (barras) y su valor en dólares (línea) mes a mes, por el mes en que se creó cada compra y sin
+ * las descartadas ni anuladas. Los botones eligen el periodo; respeta los demás filtros del Dashboard.
+ */
+function UnidadesCompradas({ compras, dia }: { compras: FilaCompra[]; dia: string }) {
+  const [periodo, setPeriodo] = useState<Periodo>("este_anio");
+  const r = useMemo(() => unidadesPorMes(compras, periodo, dia), [compras, periodo, dia]);
+  return (
+    <section aria-labelledby="d-unidades" className="min-w-0 rounded-[10px] border border-border bg-card">
+      <CabeceraTarjeta id="d-unidades" titulo="Unidades compradas">
+        <Segmentado etiqueta="Periodo de unidades compradas" opciones={PERIODOS} valor={periodo} alCambiar={setPeriodo} />
+      </CabeceraTarjeta>
+      <dl className="m-0 flex flex-wrap gap-x-8 gap-y-1 px-4 pt-3">
+        {[
+          ["Unidades", entero(r.unidades)],
+          ["Valor", usd(r.valor)],
+          ["Compras", entero(r.compras)],
+          ["Costo por unidad", r.unidades ? usd(r.valor / r.unidades) : "—"],
+        ].map(([t, v]) => (
+          <div key={t} className="flex flex-col">
+            <dt className="text-xs text-muted-foreground">{t}</dt>
+            <dd className="m-0 text-lg font-semibold tabular-nums">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="h-[280px] p-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={r.serie} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+            <DegradadosNeon />
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
+            <XAxis dataKey="etiqueta" {...ejes} interval={0} />
+            <YAxis yAxisId="u" {...ejes} width={52} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)} mil` : String(v))} />
+            <YAxis yAxisId="usd" orientation="right" {...ejes} width={56} tickFormatter={(v: number) => usd(v, true)} />
+            <Tooltip
+              contentStyle={estiloTooltip}
+              formatter={(v, nombre) => (nombre === "Valor" ? usd(Number(v)) : `${entero(Number(v))} unidades`)}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar yAxisId="u" dataKey="unidades" name="Unidades" fill="url(#neon-violeta)" radius={[4, 4, 0, 0]} />
+            <Line yAxisId="usd" type="monotone" dataKey="valor" name="Valor" stroke={NEON.rosa} strokeWidth={2.5} dot={{ r: 3, fill: NEON.rosa }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
   );
 }
 
@@ -370,6 +424,8 @@ export function DashboardCompras({
           </div>
         </Tarjeta>
       </div>
+
+      <UnidadesCompradas compras={filtradas} dia={dia} />
 
       <TiempoEtapas compras={filtradas} eventos={ev} dia={dia} vista={vista} />
 
