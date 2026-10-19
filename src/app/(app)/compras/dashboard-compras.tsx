@@ -29,10 +29,12 @@ import {
 } from "./calculos-compras";
 import { SelectorVista } from "./selector-vista";
 import { TiempoEtapas } from "./tiempo-etapas";
+import { ComprasPorCategoria } from "./compras-por-categoria";
+import { grupoReporte, rutaLegible } from "@/lib/categorias/taxonomia";
 import { unidadesPorMes, type Periodo } from "@/lib/compras/unidades-mes";
 
 type Evento = { compraId: string; campo: string; valor: string | null; ocurridoEn: string };
-type Dimension = "proveedor" | "tienda" | "pais" | "responsable" | "via";
+type Dimension = "proveedor" | "tienda" | "pais" | "responsable" | "via" | "categoria";
 
 interface Filtros {
   desde: string;
@@ -44,8 +46,10 @@ interface Filtros {
   responsable: string;
   etapa: string;
   abiertas: boolean;
+  /** Un grupo de categoría legible («Casa y jardín › Cocina y comedor»), desde «Comparar por» › Categoría. */
+  categoria: string;
 }
-const SIN_FILTROS: Filtros = { desde: "", hasta: "", pais: "", proveedor: "", via: "", tienda: "", responsable: "", etapa: "", abiertas: false };
+const SIN_FILTROS: Filtros = { desde: "", hasta: "", pais: "", proveedor: "", via: "", tienda: "", responsable: "", etapa: "", abiertas: false, categoria: "" };
 
 const NOMBRE_FILTRO: Record<keyof Filtros, string> = {
   desde: "Desde",
@@ -57,6 +61,7 @@ const NOMBRE_FILTRO: Record<keyof Filtros, string> = {
   responsable: "Responsable",
   etapa: "Etapa",
   abiertas: "Solo abiertas",
+  categoria: "Categoría",
 };
 const DIMENSIONES: { valor: Dimension; etiqueta: string; filtro: keyof Filtros }[] = [
   { valor: "proveedor", etiqueta: "Proveedor", filtro: "proveedor" },
@@ -64,6 +69,7 @@ const DIMENSIONES: { valor: Dimension; etiqueta: string; filtro: keyof Filtros }
   { valor: "pais", etiqueta: "País", filtro: "pais" },
   { valor: "responsable", etiqueta: "Responsable", filtro: "responsable" },
   { valor: "via", etiqueta: "Vía", filtro: "via" },
+  { valor: "categoria", etiqueta: "Categoría", filtro: "categoria" },
 ];
 const CLAVE: Record<Dimension, (c: FilaCompra) => string[]> = {
   proveedor: (c) => [c.proveedor ?? "Sin proveedor"],
@@ -71,6 +77,7 @@ const CLAVE: Record<Dimension, (c: FilaCompra) => string[]> = {
   pais: (c) => [c.paisCodigo ?? "Importadora"],
   responsable: (c) => [c.asignadoNombre ?? "Sin responsable"],
   via: (c) => (c.viaEnvio.length ? c.viaEnvio : ["sin"]),
+  categoria: (c) => (c.lineas.length ? [...new Set(c.lineas.map((l) => (grupoReporte(l.categoria) ? rutaLegible(grupoReporte(l.categoria)!) : "Sin categoría")))] : ["Sin productos vinculados"]),
 };
 
 const ejes = { tick: { fontSize: 11, fill: "var(--muted-foreground)" }, axisLine: false, tickLine: false } as const;
@@ -237,7 +244,8 @@ export function DashboardCompras({
           (!f.tienda || (c.tiendas.length ? c.tiendas : ["Sin tienda"]).includes(f.tienda)) &&
           (!f.responsable || (c.asignadoNombre ?? "Sin responsable") === f.responsable) &&
           (!f.etapa || c.etapa === f.etapa) &&
-          (!f.abiertas || estaAbierta(c)),
+          (!f.abiertas || estaAbierta(c)) &&
+          (!f.categoria || CLAVE.categoria(c).includes(f.categoria)),
       ),
     [compras, f],
   );
@@ -426,6 +434,8 @@ export function DashboardCompras({
       </div>
 
       <UnidadesCompradas compras={filtradas} dia={dia} />
+
+      <ComprasPorCategoria compras={filtradas} dia={dia} />
 
       <TiempoEtapas compras={filtradas} eventos={ev} dia={dia} vista={vista} />
 

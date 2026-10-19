@@ -16,13 +16,13 @@ const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? nu
 const txt = (v: unknown) => (v as string | null) ?? null;
 
 /** Los productos vinculados a una compra, en el orden en que se agregaron. */
-function lineasDe(items: unknown): Pick<FilaCompra, "productos" | "lineas"> {
+function lineasDe(items: unknown, categorias: Map<string, string>): Pick<FilaCompra, "productos" | "lineas"> {
   const filas = ((items as { cantidad_pedida: number; creado_en: string; skus_maestros: unknown }[] | null) ?? [])
     .slice()
     .sort((a, b) => a.creado_en.localeCompare(b.creado_en));
   const lineas = filas.map((i) => {
     const sku = uno<{ codigo: string; nombre: string }>(i.skus_maestros);
-    return { codigo: sku?.codigo ?? "", nombre: sku?.nombre ?? "", cantidad: Number(i.cantidad_pedida) };
+    return { codigo: sku?.codigo ?? "", nombre: sku?.nombre ?? "", cantidad: Number(i.cantidad_pedida), categoria: categorias.get(sku?.codigo ?? "") ?? null };
   });
   return { productos: lineas.length, lineas };
 }
@@ -85,6 +85,23 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
     }
   }
 
+  // La categoría de cada producto (taxonomía de Shopify, migración 0113), por su SKU. Va aparte: sin la migración no existe
+  // y las compras se cargan igual, sin categoría.
+  const categorias = new Map<string, string>();
+  if (!error) {
+    try {
+      const conCategoria = await traerTodasLasFilas<{ codigo: string; categorias_productos: unknown }>((desde, hasta) =>
+        supabase.from("skus_maestros").select("codigo, categorias_productos(ruta)").not("categoria_id", "is", null).order("id").range(desde, hasta),
+      );
+      for (const p of conCategoria) {
+        const ruta = uno<{ ruta: string }>(p.categorias_productos)?.ruta;
+        if (ruta) categorias.set(p.codigo, ruta);
+      }
+    } catch {
+      // Sin la migración 0113: sin categorías.
+    }
+  }
+
   const compras: FilaCompra[] = filas.map((c) => {
     const asignado = uno<{ nombre: string | null; email: string }>(c.perfiles);
     return {
@@ -126,7 +143,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       cerradoEn: txt(c.cerrado_en),
       creadoEn: String(c.creado_en),
       numero: Number(c.numero),
-      ...lineasDe(c.wms_compra_items),
+      ...lineasDe(c.wms_compra_items, categorias),
     };
   });
 

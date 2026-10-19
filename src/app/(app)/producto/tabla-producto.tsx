@@ -3,6 +3,7 @@
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip } from "@/components/ui/tooltip";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
@@ -15,11 +16,15 @@ import { VistaRapidaProducto } from "./vista-rapida-producto";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { CeldaTestProducto } from "./test-producto";
 import { usd } from "../productos-test/informe";
+import { rutaLegible, SEPARADOR } from "@/lib/categorias/taxonomia";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
   producto: ProductoIcon,
   clase: EstadoIcon,
+  categoria: CatalogoIcon,
+  categoriaPrincipal: CatalogoIcon,
+  categoriaRevisar: EstadoIcon,
   tipo: CatalogoIcon,
   codigo: ProductoIcon,
   nombre: ProductoIcon,
@@ -46,6 +51,24 @@ const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
         <span className="cursor-default underline decoration-dotted decoration-border-control underline-offset-4">{p.nombre}</span>
       </TarjetaEmergente>
     ),
+  },
+  {
+    id: "categoria",
+    label: "Categoría",
+    ocultable: true,
+    clase: "text-muted-foreground",
+    // El último nivel a la vista; la ruta completa de Shopify al pasar el cursor. Un punto ámbar si quedó para revisar.
+    render: (p) =>
+      p.categoria ? (
+        <Tooltip texto={`${rutaLegible(p.categoria.ruta)}${p.categoria.revisar ? " · por revisar" : ""}`}>
+          <span tabIndex={0} className="flex max-w-[16rem] items-center gap-1.5 rounded">
+            {p.categoria.revisar && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning" />}
+            <span className="truncate">{p.categoria.ruta.split(SEPARADOR).at(-1)}</span>
+          </span>
+        </Tooltip>
+      ) : (
+        "—"
+      ),
   },
   { id: "tipo", label: "Tipo", ocultable: true, clase: "text-muted-foreground", render: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
   { id: "clase", label: "Estado", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },

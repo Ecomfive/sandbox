@@ -7,7 +7,7 @@ export interface FilaCompra {
   /** Cuántos productos de la ficha tiene vinculados (las compras de ClickUp llegan sin ninguno y se vinculan a mano). */
   productos: number;
   /** Los productos vinculados, con lo pedido de cada uno. */
-  lineas: { codigo: string; nombre: string; cantidad: number }[];
+  lineas: { codigo: string; nombre: string; cantidad: number; categoria?: string | null }[];
   /** 'pais' (compra nuestra de un país) o 'importacion' (Compras Importadora: servicio a un cliente, sin país). */
   tipo: string;
   /** Código del país de la compra (null en Importadora). */

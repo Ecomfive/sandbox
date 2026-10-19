@@ -67,7 +67,7 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners, categorias] = await Promise.all([
     traerTodasConError<{ combo_id: string; componente_id: string; cantidad: number; componente: unknown }>((desde, hasta) =>
       supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)").order("combo_id").order("componente_id").range(desde, hasta),
     ),
@@ -102,7 +102,16 @@ export default async function ProductoPage() {
           supabase.from("wms_productos_test").select("metrica_compras, metrica_ctr, metrica_hook_rate, metrica_cvr, paises(codigo)").in("estado", ["winner", "enviado_a_compras"]).order("id").range(desde, hasta),
         )
       : Promise.resolve({ data: [] as never[] }),
+    // La categoría (taxonomía de Shopify) va aparte: sin la migración 0113 la columna no existe y la lista se carga igual.
+    traerTodasConError<{ id: string; categoria_id: string; categoria_revisar: boolean; categorias_productos: unknown }>((desde, hasta) =>
+      supabase.from("skus_maestros").select("id, categoria_id, categoria_revisar, categorias_productos(ruta)").not("categoria_id", "is", null).order("id").range(desde, hasta),
+    ),
   ]);
+  const categoriaPorId = new Map(
+    categorias.error
+      ? []
+      : (categorias.data ?? []).map((c) => [c.id, { id: c.categoria_id, ruta: (unoDe(c.categorias_productos as { ruta: string } | { ruta: string }[] | null)?.ruta ?? "") as string, revisar: !!c.categoria_revisar }]),
+  );
   const deWinners = ((winners.data ?? []) as Record<string, unknown>[]).filter((w) =>
     puedeVerPais(usuario.paisesPermitidos, unoDe(w.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? null),
   );
@@ -255,6 +264,7 @@ export default async function ProductoPage() {
       codigoSa: p.codigo_sa,
     },
     numero: numeroPorId.get(p.id) ?? null,
+    categoria: categoriaPorId.get(p.id) ?? null,
     foto: fotoPorId.get(p.id) ?? null,
     unidadesCompradas: compradoPorId.get(p.id) ?? 0,
     componentes: p.tipo === "combo" ? (componentesPorCombo.get(p.id) ?? []).join(", ") : "",
