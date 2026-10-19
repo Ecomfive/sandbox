@@ -28,8 +28,6 @@ import {
   usd,
 } from "./calculos-compras";
 import { SelectorVista } from "./selector-vista";
-import { LlegadasPrevistas } from "./llegadas-previstas";
-import { cubetaLlegada, etiquetaMes, mesesSiguientes } from "@/lib/compras/llegadas";
 
 type Evento = { compraId: string; campo: string; valor: string | null; ocurridoEn: string };
 type Dimension = "proveedor" | "tienda" | "pais" | "responsable" | "via";
@@ -44,10 +42,8 @@ interface Filtros {
   responsable: string;
   etapa: string;
   abiertas: boolean;
-  /** Mes de llegada prevista («2026-11») o «antes» (debían llegar), de «Llegadas previstas». */
-  llega: string;
 }
-const SIN_FILTROS: Filtros = { desde: "", hasta: "", pais: "", proveedor: "", via: "", tienda: "", responsable: "", etapa: "", abiertas: false, llega: "" };
+const SIN_FILTROS: Filtros = { desde: "", hasta: "", pais: "", proveedor: "", via: "", tienda: "", responsable: "", etapa: "", abiertas: false };
 
 const NOMBRE_FILTRO: Record<keyof Filtros, string> = {
   desde: "Desde",
@@ -59,7 +55,6 @@ const NOMBRE_FILTRO: Record<keyof Filtros, string> = {
   responsable: "Responsable",
   etapa: "Etapa",
   abiertas: "Solo abiertas",
-  llega: "Llega",
 };
 const DIMENSIONES: { valor: Dimension; etiqueta: string; filtro: keyof Filtros }[] = [
   { valor: "proveedor", etiqueta: "Proveedor", filtro: "proveedor" },
@@ -175,8 +170,7 @@ export function DashboardCompras({
     };
   }, [compras]);
 
-  const meses = useMemo(() => mesesSiguientes(dia), [dia]);
-  const sinLlegada = useMemo(
+  const filtradas = useMemo(
     () =>
       compras.filter(
         (c) =>
@@ -192,8 +186,6 @@ export function DashboardCompras({
       ),
     [compras, f],
   );
-  // «Llegadas previstas» se cuenta con los demás filtros, sin el suyo, para que se vean todos sus meses.
-  const filtradas = useMemo(() => (f.llega ? sinLlegada.filter((c) => cubetaLlegada(c, meses) === f.llega) : sinLlegada), [sinLlegada, f.llega, meses]);
 
   // Lo «normal» de cada vía se mide con todas las compras de la vista, no solo con las filtradas.
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
@@ -319,7 +311,7 @@ export function DashboardCompras({
               className={`rounded-full border border-primario/40 bg-primario-suave px-2 py-0.5 text-primario hover:border-primario ${anilloFoco}`}
             >
               {NOMBRE_FILTRO[x]}
-              {typeof f[x] === "string" ? `: ${x === "llega" ? (f.llega === "antes" ? "debían llegar" : etiquetaMes(f.llega)) : x === "etapa" ? etiquetaEtapa(f.etapa) : x === "via" ? (f.via === "sin" ? "Sin vía" : etiquetaVia(f.via)) : f[x]}` : ""} ×
+              {typeof f[x] === "string" ? `: ${x === "etapa" ? etiquetaEtapa(f.etapa) : x === "via" ? (f.via === "sin" ? "Sin vía" : etiquetaVia(f.via)) : f[x]}` : ""} ×
             </button>
           ))}
           <button type="button" onClick={() => setF(SIN_FILTROS)} className={`rounded px-1.5 py-0.5 text-muted-foreground underline-offset-2 hover:underline ${anilloFoco}`}>
@@ -345,8 +337,6 @@ export function DashboardCompras({
           <Indicador titulo="Fallas" punto={k.inconvenientes + k.descartadas ? "aviso" : undefined} valor={entero(k.inconvenientes + k.descartadas)} detalle={`${k.inconvenientes} inconvenientes · ${k.descartadas} descartadas`} />
         </div>
       </section>
-
-      <LlegadasPrevistas compras={sinLlegada} meses={meses} activa={f.llega} alElegir={(clave) => poner("llega", clave)} vista={vista} />
 
       <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Tarjeta id="d-meses" titulo="Compras y pagos por mes" extra={<span className="text-xs text-muted-foreground">pulsa un mes para filtrar</span>}>
