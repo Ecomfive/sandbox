@@ -36,6 +36,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Cerrados", definicion: "El botón de la barra de una tabla que muestra lo que ya terminó (compras completadas, retiros conciliados). Por defecto se ocultan." },
   { termino: "Mención (@)", definicion: "Escribir @ y el nombre de alguien en un comentario o nota: le llega un aviso en «Para ti» con el enlace al comentario." },
   { termino: "SKU", definicion: "El código único de un producto: lo identifica en el WMS, Shopify, las tiendas y Dropi, y con él una venta encuentra el producto para descontar inventario. Lo escribes al crear el producto y no puede repetirse: si ya existe, el sistema te avisa. Se puede corregir desde la ficha por uno que no exista (y hay que cambiarlo también en las plataformas).", modulos: ["producto", "inventario", "compras"] },
+  { termino: "Landing", definicion: "La página de venta del producto en test: portada con precio, beneficios, imágenes, ofertas, preguntas y garantía. Se arma en Testing Lab › Generador de landings, desde cero o tomando otra landing como modelo («clonar»); su código es LND-0001, LND-0002…", modulos: ["generador-landings"] },
   { termino: "Captura de Instagram", definicion: "Un reel, publicación o video que alguien del equipo compartió por mensaje directo con la cuenta de fuentes. Cae solo en Testing Lab › Instagram con su video guardado, su copy y quién lo envió; su código es IG-0001, IG-0002…", modulos: ["instagram"] },
   { termino: "Anuncios con el mismo copy", definicion: "Cuántos anuncios de la misma página, en la Biblioteca de anuncios de Meta, llevan el mismo texto que una captura de Instagram. Un número alto indica que el anunciante lo está escalando. Se llena con el marcador «Leer Biblioteca» y se puede corregir a mano.", modulos: ["instagram"] },
   { termino: "N.º de producto", definicion: "El correlativo que pone el sistema al crear un producto (#0001, #0002…). Ordena la lista de productos; no se repite ni se cambia.", modulos: ["producto"] },
@@ -242,6 +243,26 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "generador-landings",
+    titulo: "Generador de landings",
+    ruta: "/generador-landings",
+    resumen: "La landing del test de cada producto: imágenes, textos, secciones y vista previa.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Arriba salen las landings del país de la barra de arriba; debajo, los productos de Creación de ofertas (o ya en test) que todavía no tienen landing. Pulsa «Desde cero» o «Clonar una landing» para crearla: toma el nombre del producto, su foto como foto del proveedor y el precio de su primera oferta en la moneda de la tienda. «Agregar» crea una landing sin producto.",
+          "El editor tiene cinco pasos y, a la derecha, la vista previa de la landing en móvil o escritorio, que cambia mientras escribes. Lo escrito se guarda con «Guardar cambios» (arriba); las imágenes se guardan solas al subirlas.",
+          "Producto: cómo se arma (desde cero o clonando otra), nombre, ángulo de venta, precio, precio tachado, notas para la IA y las fotos del proveedor (hasta 6). Para clonar, pega el enlace de una landing que funcione y pulsa «Leer landing»: muestra sus títulos en orden, sus imágenes y cuántos botones de compra tiene, para tomar su estructura. No se copian sus textos ni sus fotos.",
+          "Imágenes: cinco espacios (Portada, Detalle, En uso, Variantes y Empaque), cada uno con su instrucción. «Generar con Gemini» crea la imagen de ese espacio (tarda de 10 a 40 segundos) usando como referencia las fotos del proveedor, para que el producto salga igual; si no hay fotos del proveedor, usa la portada. «Generar las que faltan» las hace una tras otra, la portada primero. «Regenerar con Gemini» reemplaza la que hay: cambia la instrucción si no te gustó. También se pueden subir a mano (JPG, PNG, WebP o GIF, hasta 10 MB). Cada imagen generada cuesta unos 3 centavos de dólar.",
+          "Textos: franja de arriba, titular, subtítulo, botón, beneficios, comparativa, preguntas frecuentes, reseñas y garantía. Las reseñas deben ser de clientes reales. «Escribir con Claude» se activa cuando se conecte Claude.",
+          "Secciones: sube, baja, muestra u oculta cada bloque. El bloque Ofertas muestra las de Creación de ofertas, pasadas a la moneda de la tienda con el tipo de cambio del día.",
+          "Publicar: lista lo que falta (titular, precio, portada y lo de los bloques visibles). Cuando no falta nada, al guardar la landing pasa sola a «Lista». «Crear borrador en Shopify» se activa cuando se conecte la tienda.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "instagram",
     titulo: "Instagram",
     ruta: "/instagram",
@@ -395,6 +416,8 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Imágenes de la landing con Gemini", texto: "En el Generador de landings, cada espacio de imagen tiene «Generar con Gemini»: crea la imagen con su instrucción, usando las fotos del proveedor para que el producto salga igual. «Generar las que faltan» hace todas las que no tienen imagen.", modulo: "generador-landings", href: "/generador-landings" },
+  { fecha: "2026-10-20", titulo: "Generador de landings", texto: "Testing Lab › Producción tiene «Generador de landings», debajo de Creación de ofertas: arma la landing del test de cada producto desde cero o tomando otra como modelo, con sus imágenes, textos, ofertas y secciones, y una vista previa en móvil y escritorio. Por ahora las imágenes se suben a mano; luego llegan Gemini, Claude y la publicación en Shopify.", modulo: "generador-landings", href: "/generador-landings" },
   { fecha: "2026-10-19", titulo: "Estado del producto con sus colores", texto: "En la ficha de un producto, el Estado se elige en una lista donde cada uno lleva su color, como las etiquetas: Activo en verde, Test en azul, Inactivo en rojo y Descontinuado en gris.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-19", titulo: "Categorías de producto", texto: "Los productos ya tienen categoría, con la taxonomía estándar de Shopify: se pusieron solas mirando la foto y el nombre. En Producto se ven, se filtran y se agrupan; las dudosas quedan «Por revisar» para confirmarlas o cambiarlas en la ficha. El Dashboard de Compras trae «Compras por categoría» y «Categoría» en «Comparar por».", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-19", titulo: "Unidades compradas por mes", texto: "El Dashboard de Compras trae «Unidades compradas»: las unidades y su valor mes a mes, con botones para ver este año, los últimos 12 meses o el año pasado, y los totales del periodo.", modulo: "compras", href: "/compras/dashboard" },

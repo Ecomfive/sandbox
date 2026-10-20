@@ -1,0 +1,350 @@
+/* La landing como la verá el cliente: es la página de una tienda, con su propia paleta (igual en los dos temas del sistema). */
+.lp {
+  --lp-noche: #0e1536;
+  --lp-tinta: #1a1f36;
+  --lp-papel: #ffffff;
+  --lp-suave: #f3f4fa;
+  --lp-oro: #f5c04a;
+  --lp-oro-tinta: #2b1d00;
+  --lp-gris: #5c6280;
+  --lp-linea: #e3e5ef;
+  --lp-verde: #17703a;
+  --lp-rojo: #b23b3b;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
+  color: var(--lp-tinta);
+  background: var(--lp-papel);
+  font-size: 14px;
+  line-height: 1.55;
+  color-scheme: light;
+}
+.lp img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.anuncio {
+  background: var(--lp-tinta);
+  color: #fff;
+  font-size: 11.5px;
+  text-align: center;
+  padding: 7px 10px;
+  letter-spacing: 0.02em;
+}
+.cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--lp-linea);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+.cabecera span {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12px;
+  color: var(--lp-gris);
+}
+.seccion {
+  padding: 26px 18px;
+}
+.lp h2 {
+  font-size: 21px;
+  line-height: 1.2;
+  margin: 0 0 14px;
+  font-weight: 800;
+  text-wrap: balance;
+}
+.portada {
+  padding: 0 0 22px;
+}
+.portadaTexto {
+  padding: 16px 18px 0;
+  display: grid;
+  gap: 10px;
+}
+.portada h1 {
+  font-size: 26px;
+  line-height: 1.15;
+  margin: 0;
+  font-weight: 800;
+  text-wrap: balance;
+}
+.portada p {
+  margin: 0;
+  color: var(--lp-gris);
+}
+.precio {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.precio b {
+  font-size: 24px;
+  font-weight: 800;
+}
+.precio s {
+  color: var(--lp-gris);
+}
+.precio em {
+  font-style: normal;
+  background: #e8f6ec;
+  color: var(--lp-verde);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.boton {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: var(--lp-oro);
+  color: var(--lp-oro-tinta);
+  font-weight: 800;
+  font-size: 15px;
+  padding: 14px;
+  border-radius: 12px;
+  box-shadow: 0 4px 0 #c99418;
+  text-align: center;
+}
+.confianza {
+  display: flex;
+  justify-content: space-around;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--lp-gris);
+  text-align: center;
+}
+.beneficios {
+  display: grid;
+  gap: 12px;
+}
+.beneficio {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--lp-suave);
+  border-radius: 14px;
+  padding: 12px;
+}
+.beneficio i {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 9px;
+  background: var(--lp-noche);
+  color: var(--lp-oro);
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 13px;
+}
+.beneficio b {
+  display: block;
+}
+.beneficio span {
+  font-size: 13px;
+  color: var(--lp-gris);
+}
+.oscura {
+  background: var(--lp-noche);
+  color: #eef0ff;
+}
+.oscura h2 {
+  color: #fff;
+}
+.redonda img,
+.redonda .vacia {
+  border-radius: 16px;
+}
+.ofertas {
+  display: grid;
+  gap: 10px;
+}
+.oferta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--lp-linea);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-variant-numeric: tabular-nums;
+}
+.oferta:first-child {
+  border-color: var(--lp-oro);
+  background: #fff8e4;
+}
+.oferta small {
+  display: block;
+  color: var(--lp-gris);
+  font-size: 12px;
+}
+.oferta b {
+  font-size: 17px;
+}
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tabla th,
+.tabla td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--lp-linea);
+  text-align: center;
+}
+.tabla th:first-child,
+.tabla td:first-child {
+  text-align: left;
+}
+.tabla thead th {
+  font-size: 12px;
+  color: var(--lp-gris);
+  font-weight: 600;
+}
+.tabla td:nth-child(2) {
+  background: #fff6dd;
+  font-weight: 700;
+  color: var(--lp-verde);
+}
+.tabla td:nth-child(3) {
+  color: var(--lp-rojo);
+}
+.resenas {
+  display: grid;
+  gap: 10px;
+}
+.resena {
+  border: 1px solid var(--lp-linea);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--lp-papel);
+}
+.resena p {
+  margin: 0 0 8px;
+}
+.resena small {
+  color: var(--lp-gris);
+  font-size: 12px;
+}
+.preguntas details {
+  border-bottom: 1px solid var(--lp-linea);
+  padding: 11px 0;
+}
+.preguntas summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.preguntas p {
+  margin: 8px 0 0;
+  color: var(--lp-gris);
+  font-size: 13px;
+}
+.garantia {
+  display: grid;
+  gap: 14px;
+  text-align: center;
+  justify-items: center;
+}
+.sello {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  border: 3px dashed var(--lp-oro);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1.15;
+}
+.sello b {
+  font-size: 24px;
+  display: block;
+}
+.pie {
+  padding: 16px 18px 80px;
+  font-size: 11px;
+  color: var(--lp-gris);
+  text-align: center;
+  border-top: 1px solid var(--lp-linea);
+}
+.fija {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 14px;
+  background: rgb(255 255 255 / 0.95);
+  border-top: 1px solid var(--lp-linea);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.fija b {
+  white-space: nowrap;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.fija .boton {
+  padding: 11px;
+  font-size: 14px;
+  box-shadow: none;
+}
+.vacia {
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(45deg, #eef0f6, #eef0f6 10px, #f6f7fb 10px, #f6f7fb 20px);
+  color: var(--lp-gris);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px dashed #c8cbe0;
+}
+.falta {
+  color: #a3a8c3;
+  font-style: italic;
+}
+
+/* Escritorio */
+.ancha .portada {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  padding: 28px;
+  align-items: center;
+}
+.ancha .portada img,
+.ancha .portada .vacia {
+  border-radius: 18px;
+}
+.ancha .portadaTexto {
+  padding: 0;
+}
+.ancha .portada h1 {
+  font-size: 34px;
+}
+.ancha .seccion {
+  padding: 40px max(28px, calc((100% - 760px) / 2));
+}
+.ancha .beneficios,
+.ancha .resenas {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.ancha .ofertas {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.ancha .dividida {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: center;
+}
+.ancha .fija {
+  display: none;
+}

@@ -385,6 +385,24 @@ convenciones técnicas del código.
   vinculados en la ficha del publicado, tiene el historial en tabla y envía a Selección (`enviarASeleccion`, fuente SP, en el
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
+- **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
+  0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
+  `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,
+  `moneda` (la del país, `monedaDePais`) con `precio` y `precio_tachado`, `contenido` (textos y orden/visibilidad de las secciones),
+  `imagenes` (`{ <espacio>: { ruta, instruccion } }`), `fotos_proveedor` y `estado` (borrador → lista, solo al guardar sin
+  faltantes; publicada queda para Shopify). Qué tiene una landing y cómo se valida vive en `src/lib/landings/landing.ts` (con
+  prueba): `ESPACIOS_IMAGEN`, `SECCIONES`, `normalizarContenido` (todo lo que llega del navegador pasa por aquí), `faltantesLanding`
+  y `leerReferencia` (título, h1–h3 en orden, imágenes grandes y botones de compra de un HTML, sin ejecutar nada). Las imágenes van
+  al bucket **privado** `landings`, bajo `<id de la landing>/` (`rutaDeLanding` lo confina), se suben directo con dirección firmada
+  y `guardarImagenLanding` las revisa por su firma (`detectarImagen`); se ven con enlaces firmados de una hora. «Leer landing» baja
+  la página con `descargarPublico` (hasta 3 MB). La vista previa (`[id]/vista-landing.tsx` + `.module.css`) tiene su propia paleta
+  de tienda, igual en los dos temas. Las ofertas salen de `wms_seleccion_ofertas` pasadas a la moneda con `tasasUsd`. **Gemini** (21 oct 2026): `generarImagenLanding`
+  pide la imagen de un espacio a la API de Interactions (`src/lib/landings/gemini-api.ts`, `POST v1beta/interactions`, clave
+  `GEMINI_API_KEY`, modelo `GEMINI_IMAGE_MODEL` o `gemini-nano-banana-2.1`, 1K, proporción por espacio en `PROPORCION`), con hasta 4
+  fotos del proveedor de referencia (o la portada); el pedido y la lectura de la respuesta son puros en `gemini.ts` (con prueba:
+  `extraerImagen` toma la última imagen de cualquier forma de respuesta). La imagen se valida por su firma, se guarda en el bucket y
+  queda en la auditoría (`generar_imagen_landing`). La página `[id]` tiene `maxDuration = 120`. Sin clave, el botón se ve
+  deshabilitado. **Pendiente:** Claude (textos) y Shopify (crear el producto y su plantilla), con `BotonPendiente`. Las reseñas son de clientes reales: la IA no las inventa.
 - **Testing Lab › Instagram** (`/instagram`, módulo `instagram`, migración 0106, 14 oct 2026). Una fuente más de Fuentes: lo que el
   equipo ve en Instagram y comparte **por mensaje directo con la cuenta de fuentes** (`@ecomfive.fuentes`, cuenta profesional ligada
   al Business Manager) cae solo en `instagram_capturas`. Meta llama al webhook **`/api/instagram/webhook`**

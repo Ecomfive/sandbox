@@ -40,6 +40,7 @@ test("Testing Lab: solo Proveeduría, con el recorrido del producto en secciones
       "Fuentes › /sugerencias-clientes",
       "Selección › /seleccion-productos",
       "Producción › /creacion-ofertas",
+      "Producción › /generador-landings",
       "Resultados › /productos-test",
       "Resultados › /filtro-productos",
     ],

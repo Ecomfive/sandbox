@@ -66,6 +66,7 @@ const AREAS: NavSection[] = [
       { label: "Sugerencias de clientes", href: "/sugerencias-clientes", frente: "proveeduria", grupo: "Fuentes" },
       { label: "Selección de productos", href: "/seleccion-productos", frente: "proveeduria", grupo: "Selección" },
       { label: "Creación de ofertas", href: "/creacion-ofertas", frente: "proveeduria", grupo: "Producción" },
+      { label: "Generador de landings", href: "/generador-landings", frente: "proveeduria", grupo: "Producción" },
       { label: "Test productos", href: "/productos-test", frente: "proveeduria", grupo: "Resultados" },
       { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria", grupo: "Resultados" },
     ],
