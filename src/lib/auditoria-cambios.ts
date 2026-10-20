@@ -40,6 +40,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   cambiar_estado_seleccion: "Cambió el estado",
   crear_oferta_seleccion: "Creó una oferta",
   crear_landing: "Creó la landing",
+  generar_imagen_landing: "Generó una imagen con Gemini",
   estado_landing: "Cambió el estado de la landing",
   eliminar_landing: "Eliminó la landing",
   eliminar_oferta_seleccion: "Quitó una oferta",

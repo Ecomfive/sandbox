@@ -21,6 +21,8 @@ import {
   etiquetaEstadoLanding,
   type LecturaReferencia,
 } from "@/lib/landings/landing";
+import { armarPromptImagen, MAX_REFERENCIAS, PROPORCION } from "@/lib/landings/gemini";
+import { generarImagen, modeloImagen } from "@/lib/landings/gemini-api";
 import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { getPaisActual } from "@/lib/pais";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -43,7 +45,7 @@ type Usuario = Awaited<ReturnType<typeof requireModuloEscritura>>;
 async function landingPermitida(id: string, usuario: Usuario) {
   if (!UUID.test(id)) return null;
   const supabase = createServiceClient();
-  const { data } = await supabase.from("landings").select("id, numero, nombre, pais_id, precio, contenido, imagenes, fotos_proveedor, estado").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("landings").select("id, numero, nombre, pais_id, precio, contenido, imagenes, fotos_proveedor, estado, angulo, notas_ia").eq("id", id).maybeSingle();
   if (!data || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, data.pais_id))) return null;
   return data;
 }
@@ -310,4 +312,58 @@ export async function eliminarLanding(id: string): Promise<{ error?: string }> {
   await registrarAuditoria({ accion: "eliminar_landing", entidad: "landings", entidadId: id, detalle: actual.nombre });
   revalidatePath(RUTA);
   return {};
+}
+
+/**
+ * Genera con Gemini la imagen de un espacio (la reemplaza si tenía). Manda como referencia las fotos del proveedor (o, si no
+ * hay, la portada) para que el producto salga igual. Guarda también la instrucción usada. Tarda de 10 a 40 segundos.
+ */
+export async function generarImagenLanding(id: string, espacio: string, instruccion: string): Promise<{ error?: string; url?: string; ruta?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const actual = await landingPermitida(id, usuario);
+  if (!actual) return { error: "La landing ya no existe o no es de tus países." };
+  if (!ES_ESPACIO(espacio)) return { error: "Espacio de imagen no válido." };
+  const supabase = createServiceClient();
+  const almacen = supabase.storage.from(BUCKET);
+  const imagenes = normalizarImagenes(actual.imagenes, id);
+  const fotos = normalizarFotosProveedor(actual.fotos_proveedor, id);
+  const texto = String(instruccion ?? "").trim().slice(0, 1000) || imagenes[espacio].instruccion;
+
+  // Referencias: las fotos del proveedor; sin ellas, la portada (para que las demás imágenes muestren el mismo producto).
+  const rutasRef = (fotos.length ? fotos : espacio !== "portada" && imagenes.portada.ruta ? [imagenes.portada.ruta] : []).slice(0, MAX_REFERENCIAS);
+  const referencias: { mime: string; base64: string }[] = [];
+  for (const ruta of rutasRef) {
+    const { data: archivo } = await almacen.download(ruta);
+    if (!archivo) continue;
+    const bytes = new Uint8Array(await archivo.arrayBuffer());
+    const tipo = detectarImagen(bytes.slice(0, 64));
+    if (tipo && tipo.tipo !== "image/gif") referencias.push({ mime: tipo.tipo, base64: Buffer.from(bytes).toString("base64") });
+  }
+
+  const prompt = armarPromptImagen({ espacio, instruccion: texto, nombre: actual.nombre, angulo: actual.angulo, notas: actual.notas_ia, referencias: referencias.length });
+  const r = await generarImagen(prompt, referencias, PROPORCION[espacio]);
+  if ("error" in r) return { error: r.error };
+  const bytes = new Uint8Array(Buffer.from(r.base64, "base64"));
+  const tipo = detectarImagen(bytes.slice(0, 64));
+  if (!tipo) return { error: "Gemini devolvió algo que no es una imagen." };
+
+  const ruta = `${id}/${Date.now()}-gemini-${espacio}.${tipo.extension}`;
+  const { error: errorSubida } = await almacen.upload(ruta, bytes, { contentType: tipo.tipo });
+  if (errorSubida) return { error: "No se pudo guardar la imagen generada." };
+  // Se vuelve a leer la fila: mientras Gemini trabajaba pudo cambiar otra imagen de la landing.
+  const fresca = await landingPermitida(id, usuario);
+  const nuevas = normalizarImagenes(fresca?.imagenes ?? actual.imagenes, id);
+  const anterior = nuevas[espacio].ruta;
+  nuevas[espacio] = { ruta, instruccion: texto };
+  const fotosFrescas = normalizarFotosProveedor(fresca?.fotos_proveedor ?? actual.fotos_proveedor, id);
+  const { error } = await supabase.from("landings").update({ imagenes: nuevas, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) {
+    await almacen.remove([ruta]);
+    return { error: "No se pudo guardar la imagen generada." };
+  }
+  if (anterior) await borrarSinUso(id, [anterior], [...Object.values(nuevas).map((i) => i.ruta ?? ""), ...fotosFrescas]);
+  await registrarAuditoria({ accion: "generar_imagen_landing", entidad: "landings", entidadId: id, detalle: `${actual.nombre}: ${espacio} (${modeloImagen()}, ${referencias.length} referencias)` });
+  const { data: firmada } = await almacen.createSignedUrl(ruta, SEGUNDOS_ENLACE);
+  revalidatePath(RUTA);
+  return { url: firmada?.signedUrl, ruta };
 }

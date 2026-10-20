@@ -4,6 +4,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { ESPACIOS_IMAGEN, normalizarContenido, normalizarFotosProveedor, normalizarImagenes, numeroLanding, type LecturaReferencia } from "@/lib/landings/landing";
+import { geminiConectado } from "@/lib/landings/gemini-api";
 import { tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -12,6 +13,9 @@ import { EditorLanding, type LandingEditor } from "./editor-landing";
 export const metadata = { title: "Generador de landings" };
 
 export const dynamic = "force-dynamic";
+
+// Generar una imagen con Gemini tarda de 10 a 40 segundos (la acción corre en esta página).
+export const maxDuration = 120;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -77,6 +81,7 @@ export default async function LandingPage({ params }: { params: Promise<{ id: st
         origen={sel ? `SEL-${String(sel.numero).padStart(4, "0")} · ${sel.codigo_fuente}` : null}
         ofertas={ofertas}
         puedeEscribir={!usuario.modulosSoloLectura.includes("generador-landings")}
+        gemini={geminiConectado()}
       />
     </Pagina>
   );

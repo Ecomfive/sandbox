@@ -26,7 +26,7 @@ import {
 } from "@/lib/landings/landing";
 import { CerrarIcon, FlechaAbajoIcon, FlechaArribaIcon } from "@/lib/nav-icons";
 import { supabase } from "@/lib/supabase/client";
-import { analizarReferencia, eliminarLanding, guardarImagenLanding, guardarLanding, prepararSubidaImagenLanding, quitarImagenLanding } from "../actions";
+import { analizarReferencia, eliminarLanding, generarImagenLanding, guardarImagenLanding, guardarLanding, prepararSubidaImagenLanding, quitarImagenLanding } from "../actions";
 import { formatoPrecio, VistaLanding, type OfertaVista } from "./vista-landing";
 
 interface ImagenEditor {
@@ -121,7 +121,20 @@ function Bloque({ titulo, accion, children }: { titulo: string; accion?: ReactNo
 }
 
 /** El editor de una landing: los cinco pasos a la izquierda y la vista previa a la derecha, que cambia al escribir. */
-export function EditorLanding({ landing, origen, ofertas, puedeEscribir }: { landing: LandingEditor; origen: string | null; ofertas: OfertaVista[]; puedeEscribir: boolean }) {
+export function EditorLanding({
+  landing,
+  origen,
+  ofertas,
+  puedeEscribir,
+  gemini,
+}: {
+  landing: LandingEditor;
+  origen: string | null;
+  ofertas: OfertaVista[];
+  puedeEscribir: boolean;
+  /** Hay clave de Gemini: los botones de generar funcionan. */
+  gemini: boolean;
+}) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [paso, setPaso] = useState(0);
@@ -133,6 +146,9 @@ export function EditorLanding({ landing, origen, ofertas, puedeEscribir }: { lan
   const [fotos, setFotos] = useState(landing.fotosProveedor);
   const [referencia, setReferencia] = useState(landing.referencia);
   const [subiendo, setSubiendo] = useState<string | null>(null);
+  // Los espacios que Gemini está generando ahora (puede haber varios a la vez).
+  const [generando, setGenerando] = useState<EspacioImagen[]>([]);
+  const [enCola, setEnCola] = useState(false);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
   const [guardando, iniciarGuardar] = useTransition();
   const [leyendo, iniciarLeer] = useTransition();
@@ -211,6 +227,41 @@ export function EditorLanding({ landing, origen, ofertas, puedeEscribir }: { lan
     if (r.error) return mostrarToast(r.error, "destructive");
     if (destino === "proveedor") setFotos((x) => x.filter((f) => f.ruta !== ruta));
     else setImagenes((x) => ({ ...x, [destino]: { ...x[destino as EspacioImagen], ruta: null, url: null } }));
+  }
+
+  /** Genera la imagen de un espacio con Gemini. Devuelve si salió bien (para la cola de «Generar las que faltan»). */
+  async function generar(clave: EspacioImagen): Promise<boolean> {
+    const instruccion = e.instrucciones[clave];
+    setGenerando((g) => [...g, clave]);
+    try {
+      const r = await generarImagenLanding(landing.id, clave, instruccion);
+      if (r.error || !r.ruta) {
+        mostrarToast(r.error ?? "No se pudo generar la imagen.", "destructive");
+        return false;
+      }
+      setImagenes((x) => ({ ...x, [clave]: { ruta: r.ruta!, instruccion, url: r.url ?? null } }));
+      // La instrucción usada ya quedó guardada junto a la imagen.
+      setGuardado((g) => ({ ...g, instrucciones: { ...g.instrucciones, [clave]: instruccion } }));
+      return true;
+    } catch {
+      mostrarToast("No se pudo generar la imagen.", "destructive");
+      return false;
+    } finally {
+      setGenerando((g) => g.filter((x) => x !== clave));
+    }
+  }
+
+  /** Genera, una tras otra, las imágenes que faltan (la portada primero: sirve de referencia a las demás si no hay fotos del proveedor). */
+  async function generarFaltantes() {
+    setEnCola(true);
+    let hechas = 0;
+    for (const esp of ESPACIOS_IMAGEN) {
+      if (imagenes[esp.clave].ruta) continue;
+      if (!(await generar(esp.clave))) break;
+      hechas++;
+    }
+    setEnCola(false);
+    if (hechas) mostrarToast(`${hechas} ${hechas === 1 ? "imagen generada" : "imágenes generadas"} con Gemini`);
   }
 
   function leerReferencia() {
@@ -360,7 +411,19 @@ export function EditorLanding({ landing, origen, ofertas, puedeEscribir }: { lan
     </div>
   );
 
+  const faltanImagenes = ESPACIOS_IMAGEN.filter((x) => !imagenes[x.clave].ruta).length;
   const pasoImagenes = (
+    <div className="flex flex-col gap-4">
+      {puedeEscribir && gemini && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            {fotos.length ? `Gemini usa ${Math.min(fotos.length, 4)} ${fotos.length === 1 ? "foto" : "fotos"} del proveedor de referencia.` : imagenes.portada.ruta ? "Gemini usa la portada de referencia." : "Sin fotos del proveedor: Gemini no sabe cómo es el producto."}
+          </p>
+          <Button type="button" disabled={enCola || !faltanImagenes || generando.length > 0} onClick={() => void generarFaltantes()}>
+            {enCola ? "Generando…" : faltanImagenes ? `Generar las que faltan (${faltanImagenes})` : "No falta ninguna"}
+          </Button>
+        </div>
+      )}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {ESPACIOS_IMAGEN.map((esp) => {
         const img = imagenes[esp.clave];
@@ -368,15 +431,20 @@ export function EditorLanding({ landing, origen, ofertas, puedeEscribir }: { lan
           <article key={esp.clave} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
             <div className="relative aspect-square bg-muted">
               {img.url ? (
-                <img src={img.url} alt={esp.etiqueta} className={`h-full w-full object-cover ${subiendo === esp.clave ? "opacity-40" : ""}`} />
+                <img src={img.url} alt={esp.etiqueta} className={`h-full w-full object-cover ${subiendo === esp.clave || generando.includes(esp.clave) ? "opacity-40" : ""}`} />
               ) : (
-                <div className="grid h-full place-items-center text-xs text-muted-foreground">{subiendo === esp.clave ? "Subiendo…" : "Sin imagen"}</div>
+                <div className="grid h-full place-items-center text-xs text-muted-foreground">{subiendo === esp.clave ? "Subiendo…" : generando.includes(esp.clave) ? "" : "Sin imagen"}</div>
+              )}
+              {generando.includes(esp.clave) && (
+                <div role="status" className="absolute inset-0 grid place-items-center">
+                  <span className="rounded-md bg-card/90 px-3 py-1.5 text-xs font-medium shadow-sm">Gemini está generando…</span>
+                </div>
               )}
             </div>
             <div className="flex flex-col gap-2 p-3">
               <h3 className="text-sm font-semibold">{esp.etiqueta}</h3>
               <Campo etiqueta="Instrucción para la imagen">
-                <textarea aria-label="Instrucción para la imagen"
+                <textarea aria-label={`Instrucción para la imagen ${esp.etiqueta}`}
                   rows={3}
                   value={e.instrucciones[esp.clave]}
                   disabled={bloqueado}
@@ -394,13 +462,20 @@ export function EditorLanding({ landing, origen, ofertas, puedeEscribir }: { lan
                       Quitar
                     </Button>
                   )}
-                  <BotonPendiente motivo="Falta conectar Gemini">Generar con Gemini</BotonPendiente>
+                  {gemini ? (
+                    <Button type="button" variant="secondary" className="!px-3 !py-1.5 text-xs" disabled={generando.includes(esp.clave) || subiendo === esp.clave} onClick={() => void generar(esp.clave)}>
+                      {generando.includes(esp.clave) ? "Generando…" : img.ruta ? "Regenerar con Gemini" : "Generar con Gemini"}
+                    </Button>
+                  ) : (
+                    <BotonPendiente motivo="Falta conectar Gemini">Generar con Gemini</BotonPendiente>
+                  )}
                 </div>
               )}
             </div>
           </article>
         );
       })}
+    </div>
     </div>
   );
 
