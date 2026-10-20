@@ -858,6 +858,20 @@ export function OfertaIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Ventana de navegador con su portada: Generador de landings. */
+export function LandingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M7 6h.01" />
+      <path d="M10 6h.01" />
+      <path d="M7 13h10" />
+      <path d="M7 17h6" />
+    </IconoLucide>
+  );
+}
+
 /** Almacén con estantes: Bodegas. */
 export function BodegaIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -944,6 +958,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/sugerencias-clientes": SugerenciaIcon,
   "/seleccion-productos": SeleccionIcon,
   "/creacion-ofertas": OfertaIcon,
+  "/generador-landings": LandingIcon,
   "/productos-test": TestIcon,
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,
