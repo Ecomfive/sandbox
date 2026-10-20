@@ -19,10 +19,14 @@ import {
   urlProductoShopify,
   ANGULOS,
   etiquetaEstadoLanding,
+  type EspacioImagen,
   type LecturaReferencia,
 } from "@/lib/landings/landing";
 import { armarPromptImagen, MAX_REFERENCIAS, PROPORCION } from "@/lib/landings/gemini";
 import { generarImagen, modeloImagen } from "@/lib/landings/gemini-api";
+import { ofertasEnMoneda } from "@/lib/landings/ofertas";
+import { archivosShopify, htmlDescripcion, variantesShopify, type DatosShopify } from "@/lib/landings/shopify";
+import { esperarFotos, guardarProducto, publicarProducto, shopifyConectado, shopifyGraphql, tiendaShopify, urlAdmin } from "@/lib/landings/shopify-api";
 import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { getPaisActual } from "@/lib/pais";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -38,6 +42,17 @@ const ANGULOS_VALIDOS = new Set<string>(ANGULOS.map((a) => a.valor));
 const NAVEGADOR = { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36", accept: "text/html,*/*" };
 /** Lo que dura un enlace firmado para ver una imagen en la página. */
 const SEGUNDOS_ENLACE = 60 * 60;
+
+/** Precio con su moneda, como en la vista previa. */
+function formatoPrecioMoneda(moneda: string) {
+  let f: Intl.NumberFormat;
+  try {
+    f = new Intl.NumberFormat("es", { style: "currency", currency: moneda, maximumFractionDigits: moneda === "USD" ? 2 : 0 });
+  } catch {
+    f = new Intl.NumberFormat("es", { maximumFractionDigits: 2 });
+  }
+  return (n: number) => f.format(n);
+}
 
 type Usuario = Awaited<ReturnType<typeof requireModuloEscritura>>;
 
@@ -366,4 +381,133 @@ export async function generarImagenLanding(id: string, espacio: string, instrucc
   const { data: firmada } = await almacen.createSignedUrl(ruta, SEGUNDOS_ENLACE);
   revalidatePath(RUTA);
   return { url: firmada?.signedUrl, ruta };
+}
+
+// --- Shopify ---------------------------------------------------------------------------------------------------------
+
+type FilaShopify = {
+  id: string;
+  nombre: string;
+  pais_id: string;
+  seleccion_id: string | null;
+  moneda: string;
+  precio: number | null;
+  precio_tachado: number | null;
+  contenido: unknown;
+  imagenes: unknown;
+  estado: string;
+  shopify: DatosShopify | null;
+};
+
+async function filaParaShopify(id: string, usuario: Usuario): Promise<FilaShopify | null> {
+  if (!UUID.test(id)) return null;
+  const supabase = createServiceClient();
+  const { data } = await supabase.from("landings").select("id, nombre, pais_id, seleccion_id, moneda, precio, precio_tachado, contenido, imagenes, estado, shopify").eq("id", id).maybeSingle();
+  if (!data || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, data.pais_id))) return null;
+  return { ...data, precio: data.precio === null ? null : Number(data.precio), precio_tachado: data.precio_tachado === null ? null : Number(data.precio_tachado) } as FilaShopify;
+}
+
+/**
+ * Crea el producto de la landing en Shopify como **borrador** (o, si ya existe, lo actualiza): título, precio y precio tachado,
+ * las ofertas como variantes, las imágenes (la portada primero) y la landing como descripción. Las imágenes se mandan con un
+ * enlace firmado; Shopify las copia y la descripción usa las direcciones de Shopify. Tarda de 10 a 60 segundos.
+ */
+export async function enviarAShopify(id: string): Promise<{ error?: string; shopify?: DatosShopify }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!shopifyConectado()) return { error: "Falta conectar Shopify." };
+  const l = await filaParaShopify(id, usuario);
+  if (!l) return { error: "La landing ya no existe o no es de tus países." };
+  const contenido = normalizarContenido(l.contenido);
+  const imagenes = normalizarImagenes(l.imagenes, id);
+  const faltan = faltantesLanding({ nombre: l.nombre, precio: l.precio, contenido, imagenes });
+  if (faltan.length || l.precio === null) return { error: `Antes de enviarla falta: ${faltan.join(", ").toLowerCase()}.` };
+
+  const supabase = createServiceClient();
+  const rutas = ESPACIOS_IMAGEN.map((e) => imagenes[e.clave].ruta).filter((r): r is string => !!r);
+  const { data: firmadas } = await supabase.storage.from(BUCKET).createSignedUrls(rutas, SEGUNDOS_ENLACE);
+  const url = new Map((firmadas ?? []).map((f) => [f.path, f.signedUrl]));
+  const conUrl = Object.fromEntries(
+    ESPACIOS_IMAGEN.map((e) => {
+      const ruta = imagenes[e.clave].ruta;
+      return [e.clave, ruta && url.get(ruta) ? { ruta, url: url.get(ruta)! } : null];
+    }),
+  ) as Partial<Record<EspacioImagen, { ruta: string; url: string }>>;
+  const previo = l.shopify?.productoId ? l.shopify : null;
+  const archivos = archivosShopify(conUrl, previo?.medios, l.nombre);
+  const ofertas = await ofertasEnMoneda(supabase, l.seleccion_id, l.moneda);
+  const formato = formatoPrecioMoneda(l.moneda);
+  // Primera pasada: la descripción con las fotos que ya estaban en Shopify (las nuevas se completan al terminar de procesarse).
+  const urlsPrevias = Object.fromEntries(archivos.map((a) => [a.espacio, "id" in a.entrada ? (previo?.medios[a.espacio]?.url ?? null) : null]));
+  const descripcion = (urls: Partial<Record<EspacioImagen, string | null>>) => htmlDescripcion({ nombre: l.nombre, contenido, imagenes: urls, ofertas, formato });
+
+  const guardado = await guardarProducto(
+    {
+      title: l.nombre,
+      descriptionHtml: descripcion(urlsPrevias),
+      status: previo && l.estado === "publicada" ? "ACTIVE" : "DRAFT",
+      ...variantesShopify({ precio: l.precio, precioTachado: l.precio_tachado, ofertas }),
+      files: archivos.map((a) => a.entrada),
+    },
+    previo?.productoId ?? null,
+  );
+  if ("error" in guardado) return { error: guardado.error };
+  const productoId = guardado.producto.id;
+
+  // Se espera a que Shopify procese las fotos: sus direcciones van en la descripción. Van en el mismo orden en que se mandaron.
+  const procesado = await esperarFotos(productoId);
+  const producto = "error" in procesado ? guardado.producto : procesado;
+  const medios: DatosShopify["medios"] = {};
+  archivos.forEach((a, i) => {
+    const m = producto.media.nodes[i];
+    if (m) medios[a.espacio] = { mediaId: m.id, ruta: conUrl[a.espacio]!.ruta, url: m.image?.url ?? null };
+  });
+  const urlsFinales = Object.fromEntries(Object.entries(medios).map(([k, v]) => [k, v?.url ?? null]));
+  if (!("error" in procesado)) {
+    const act = await shopifyGraphql<{ productUpdate: { userErrors: { message: string }[] } }>(
+      `mutation Descripcion($p: ProductUpdateInput!) { productUpdate(product: $p) { userErrors { field message } } }`,
+      { p: { id: productoId, descriptionHtml: descripcion(urlsFinales) } },
+    );
+    if ("error" in act) return { error: `El producto se guardó, pero no su descripción con imágenes: ${act.error}` };
+  }
+
+  const datos: DatosShopify = {
+    tienda: tiendaShopify()!,
+    productoId,
+    handle: producto.handle,
+    medios,
+    url: producto.onlineStoreUrl ?? producto.onlineStorePreviewUrl ?? "",
+    adminUrl: urlAdmin(productoId),
+    sincronizadoEn: new Date().toISOString(),
+    publicadoEn: previo?.publicadoEn ?? null,
+  };
+  const { error } = await supabase.from("landings").update({ shopify: datos, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "El producto se creó en Shopify, pero no se pudo guardar su enlace aquí." };
+  await registrarAuditoria({ accion: previo ? "actualizar_landing_shopify" : "crear_landing_shopify", entidad: "landings", entidadId: id, detalle: `${l.nombre} · ${datos.adminUrl}` });
+  revalidatePath(RUTA);
+  if ("error" in procesado) return { error: `El producto quedó en Shopify, pero sin terminar sus imágenes (${procesado.error}). Pulsa «Actualizar en Shopify» en un momento.`, shopify: datos };
+  return { shopify: datos };
+}
+
+/**
+ * Publica el producto en la tienda online (lo activa) y la landing pasa a «Publicada». Si viene de un producto de Selección,
+ * su enlace queda como página del producto en sus tests de Test productos que no tengan una.
+ */
+export async function publicarEnShopify(id: string): Promise<{ error?: string; shopify?: DatosShopify }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!shopifyConectado()) return { error: "Falta conectar Shopify." };
+  const l = await filaParaShopify(id, usuario);
+  if (!l) return { error: "La landing ya no existe o no es de tus países." };
+  if (!l.shopify?.productoId) return { error: "Primero crea el borrador en Shopify." };
+  const r = await publicarProducto(l.shopify.productoId);
+  if ("error" in r) return { error: r.error };
+  const datos: DatosShopify = { ...l.shopify, url: r.producto.onlineStoreUrl ?? l.shopify.url, publicadoEn: new Date().toISOString() };
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("landings").update({ shopify: datos, estado: "publicada", actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "Se publicó en Shopify, pero no se pudo guardar aquí." };
+  if (l.seleccion_id && datos.url)
+    await supabase.from("wms_productos_test").update({ pagina_producto_url: datos.url }).eq("seleccion_id", l.seleccion_id).is("pagina_producto_url", null);
+  await registrarAuditoria({ accion: "publicar_landing_shopify", entidad: "landings", entidadId: id, detalle: `${l.nombre} · ${datos.url}`, antes: { Estado: etiquetaEstadoLanding(l.estado) }, despues: { Estado: "Publicada" } });
+  revalidatePath(RUTA);
+  revalidatePath("/productos-test/productos");
+  return { shopify: datos };
 }
