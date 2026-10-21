@@ -53,7 +53,10 @@ const AREAS: NavSection[] = [
   {
     title: "Desempeño",
     frentes: true,
-    items: [{ label: "Hoy", href: "/", frente: "proveeduria" }],
+    items: [
+      { label: "Hoy", href: "/", frente: "proveeduria" },
+      { label: "Ventas Dropi", href: "/ventas-dropi", dropi: true, frente: "proveeduria" },
+    ],
   },
   // El recorrido de un producto antes de comprarse, en orden: de dónde sale (Fuentes), qué se elige (Selección), cómo se
   // prepara su oferta (Producción) y cómo le fue (Resultados). Solo es de Proveeduría.

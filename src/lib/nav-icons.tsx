@@ -925,6 +925,19 @@ export function UbicacionIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Barras con una línea que sube: Ventas Dropi. */
+export function VentasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+      <path d="M8 17v-4" />
+      <path d="M13 17v-6" />
+      <path d="M18 17V8" />
+      <path d="m7 9 5-4 4 2 4-3" />
+    </IconoLucide>
+  );
+}
+
 /** Tendencia al alza: Productos y márgenes. */
 export function MargenIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -982,6 +995,7 @@ export function SugerenciaIcon(props: SVGProps<SVGSVGElement>) {
  */
 export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
   "/": HoyIcon,
+  "/ventas-dropi": VentasIcon,
   "/drop-killer": DropKillerIcon,
   "/tu-winner": TuWinnerIcon,
   "/scraping-proveedores": ScrapingIcon,

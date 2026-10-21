@@ -246,6 +246,26 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "ventas-dropi",
+    titulo: "Ventas Dropi",
+    ruta: "/ventas-dropi",
+    resumen: "Cuánto vende cada producto que tenemos en Dropi, qué se está acabando, qué crece y qué cae, y quién vende.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Arriba: las unidades netas de los últimos 30 días contra los 30 anteriores, cuántos productos se venden y ya no tienen stock (y cuántos se acaban en menos de 15 días), el % cancelado y el % devuelto o rechazado de todo lo pedido, los productos sin ventas en 30 días y los dropshippers que pidieron en 30 días.",
+          "Netas = unidades pedidas − canceladas − rechazadas − devueltas. Una orden que todavía va en camino cuenta como neta; si la devuelven, se descuenta ese día.",
+          "«Unidades por mes» parte lo pedido en netas, canceladas y devueltas o rechazadas (el mes en curso lleva *); «Netas por día» muestra los últimos 90 días.",
+          "«Reponer ya»: lo que se vendió en 30 días y no tiene stock o le alcanza para menos de 15 días (días de inventario = stock ÷ netas por día de los últimos 30 días). «Crecen» y «Caen» comparan los últimos 30 días con los 30 anteriores (con 10 o más netas antes). «Stock que no se mueve»: productos activos con stock y sin ventas en 30 días.",
+          "«Todos los productos» se busca por nombre, ID o SKU, se filtra por categoría (Estrella 100+ al mes, Se vende 10 a 99, Lento 1 a 9, Sin ventas en 30 días, Nunca vendió) y se ordena con un clic en cada encabezado. Al tocar un producto se ven sus ventas por mes y sus alertas.",
+          "«Por SKU del sistema» suma las publicaciones de Dropi de un mismo producto (públicas y privadas) según el vínculo de Gestión de publicaciones Dropi. «Dropshippers»: quién creó cada orden; lo cancelado, rechazado o devuelto se le carga por el número de orden.",
+          "Los datos salen del Historial de Existencia de Dropi y se cargan con una importación; la página dice hasta qué día llegan. No se actualizan solos.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "publicaciones-dropi",
     titulo: "Gestión de publicaciones Dropi",
     ruta: "/publicaciones-dropi",
@@ -445,6 +465,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Ventas Dropi en Desempeño", texto: "Desempeño tiene «Ventas Dropi»: las unidades netas de cada producto que tenemos en Dropi (pedidas menos canceladas, rechazadas y devueltas), por mes y por día, qué hay que reponer, qué crece y qué cae, el stock que no se mueve, las ventas por SKU y por dropshipper. Sale del Historial de Existencia de Dropi.", modulo: "ventas-dropi", href: "/ventas-dropi" },
   { fecha: "2026-10-21", titulo: "Publicaciones Dropi: lista y tablero de acciones", texto: "Gestión de publicaciones Dropi se ve ahora como una lista de filas (foto, nombre con su ID y SKU, estado, precio, utilidad, margen, dónde está y revisión) en vez de una tabla, con un tablero de acciones arriba: lo que hay que revisar, bajar de precio, vincular o reponer, con su cantidad; al pulsar una tarjeta filtra la lista. Un administrador también puede eliminar una publicación, desde su ficha o desde la papelera de la fila.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "SKU con su variante", texto: "El SKU de un producto ahora dice qué lo distingue de otro igual: el color, la talla o la cantidad de cápsulas (por ejemplo BANDA/EJERCICIO/PEDALES/MORADO o ACEITE/OREGANO/CAPSULAS/300/VERDE), en vez de un /2 o /3. Al crear un producto, la sugerencia ya lo agrega sola desde el nombre, y los productos que se distinguían por número se pasaron a la nueva forma.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-21", titulo: "Cada persona ve solo lo suyo", texto: "Si tu rol no incluye una sección, esa sección ya no aparece ni te dice «sin acceso»: el menú muestra solo las áreas y páginas que puedes abrir, y si entras a una dirección que no es tuya vas directo a tu primera página. Tampoco salen enlaces a módulos que no puedes abrir." },
