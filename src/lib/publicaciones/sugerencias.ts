@@ -1,5 +1,5 @@
 // Carga lo necesario para sugerir el producto (SKU) de las publicaciones sin vincular y arma cada sugerencia (la usa la página
-// de Gestión de publicaciones Dropi). Las reglas están en `vincular.ts`.
+// de Gestión de IDs Dropi). Las reglas están en `vincular.ts`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";

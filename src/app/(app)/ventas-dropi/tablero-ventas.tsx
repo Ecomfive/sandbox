@@ -7,7 +7,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { CATEGORIAS, DIAS_REPONER, hayQueReponer, type Categoria, type ResumenProducto } from "@/lib/publicaciones/ventas";
 
 export interface ProductoVentas extends ResumenProducto {
-  /** El SKU del sistema, si alguna publicación de Gestión de publicaciones Dropi lo vincula. */
+  /** El SKU del sistema, si alguna publicación de Gestión de IDs Dropi lo vincula. */
   sku: string | null;
 }
 
@@ -415,7 +415,7 @@ export function TableroVentas({ corte, movimientos, productos, meses, dias, drop
 
       <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
         <Tarjeta id="vd-sku" titulo={`Por SKU del sistema (${porSku.length})`}>
-          <Nota>Suma las publicaciones de Dropi de un mismo producto (públicas y privadas), por el vínculo de Gestión de publicaciones Dropi.</Nota>
+          <Nota>Suma las publicaciones de Dropi de un mismo producto (públicas y privadas), por el vínculo de Gestión de IDs Dropi.</Nota>
           <TablaOrdenable
             etiqueta="Ventas por SKU"
             filas={porSku}

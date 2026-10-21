@@ -1,4 +1,4 @@
-// Gestión de publicaciones Dropi › vincular cada publicación con su producto de Producto (21 oct 2026). Sin base ni React, para
+// Gestión de IDs Dropi › vincular cada publicación con su producto de Producto (21 oct 2026). Sin base ni React, para
 // poder probarlo. Reglas (decididas por Hernán):
 // * Seguro: el SKU o el nombre del producto es idéntico al nombre de la publicación (o al del catálogo de Dropi con ese ID).
 //   Esas se vinculan de una vez; las demás se sugieren y una persona las confirma.

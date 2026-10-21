@@ -13,7 +13,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { TablaPublicaciones } from "./tabla-publicaciones";
 
-export const metadata = { title: "Gestión de publicaciones Dropi" };
+export const metadata = { title: "Gestión de IDs Dropi" };
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export default async function PublicacionesDropiPage() {
   if (filasR.error) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <EncabezadoPagina titulo="Gestión de publicaciones Dropi" oculto />
+        <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
           No se pudieron cargar las publicaciones. Falta correr en Supabase la migración 0116.
         </p>
@@ -113,7 +113,7 @@ export default async function PublicacionesDropiPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Gestión de publicaciones Dropi" oculto />
+      <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
       <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
     </Pagina>
   );

@@ -873,7 +873,7 @@ export function LandingIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 /**
- * El logo de Dropi (su mascota con audífonos dentro de un círculo): Gestión de publicaciones Dropi. Va relleno con el color del
+ * El logo de Dropi (su mascota con audífonos dentro de un círculo): Gestión de IDs Dropi. Va relleno con el color del
  * texto y lo blanco del logo es transparente (una máscara), así se ve bien en los dos temas y al estar seleccionado.
  */
 export function DropiIcon(props: SVGProps<SVGSVGElement>) {

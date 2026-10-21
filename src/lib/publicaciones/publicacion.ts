@@ -1,4 +1,4 @@
-// Gestión de publicaciones Dropi (21 oct 2026): las opciones de cada campo (con los colores de ClickUp) y cómo se lee una tarea
+// Gestión de IDs Dropi (21 oct 2026): las opciones de cada campo (con los colores de ClickUp) y cómo se lee una tarea
 // de la lista «GCC 🇵🇦 Ecomfive Panamá». Sin base ni React, para poder probarlo. Tabla `dropi_publicaciones` (migración 0116).
 
 export interface OpcionPublicacion {

@@ -170,7 +170,7 @@ export function totalesPorDia(dias: VentaDia[], corte: string, cuantos: number) 
   return [...t.values()];
 }
 
-// --- Gestión de publicaciones Dropi: las ventas de una publicación ---------------------------------------------------
+// --- Gestión de IDs Dropi: las ventas de una publicación ---------------------------------------------------
 
 /** Lo que muestra una publicación de sus ventas en Dropi (la suma de sus IDs, si tiene varios). */
 export interface VentasPublicacion {

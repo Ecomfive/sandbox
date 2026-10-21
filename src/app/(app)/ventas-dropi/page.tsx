@@ -54,7 +54,7 @@ export default async function VentasDropiPage() {
     );
   }
 
-  // El SKU del sistema de cada producto de Dropi, por el vínculo de Gestión de publicaciones Dropi.
+  // El SKU del sistema de cada producto de Dropi, por el vínculo de Gestión de IDs Dropi.
   const skuDe = new Map<number, string>();
   for (const p of pubsR.data ?? []) {
     const codigo = (p.skus_maestros as { codigo: string } | null)?.codigo;

@@ -43,7 +43,7 @@ export default async function ReponerComprasPage() {
     );
   }
 
-  // El SKU del sistema de cada producto de Dropi, por el vínculo de Gestión de publicaciones Dropi.
+  // El SKU del sistema de cada producto de Dropi, por el vínculo de Gestión de IDs Dropi.
   const skuDe: [number, { id: string; codigo: string; nombre: string }][] = [];
   for (const p of pubsR.data ?? []) {
     const sku = p.skus_maestros as { id: string; codigo: string; nombre: string } | null;
