@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CabeceraTarjeta, Indicador, Punto, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
+import { useEffect, useMemo, useState } from "react";
+import { Foto, Pestanas, Producto, TONO, Tarjeta, Vacio, VIA, botonNormal, botonPeligro, botonPrincipal, dinero, ent, fecha } from "@/components/proveedor/piezas-proveedor";
+import { Indicador, Punto, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -12,6 +13,7 @@ import { clavePlazo, type PedidoPortal } from "@/lib/proveedor/datos";
 import { hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoTransito, textoPlazo, type Plazo } from "@/lib/proveedor/transito";
 import { decidirPedido, guardarNotaProveedor, marcarLlegada, marcarNovedadesLeidas } from "./actions";
+import { CuentaProveedor, type CuentaPortal } from "./cuenta-proveedor";
 
 export interface Novedad {
   id: string;
@@ -32,18 +34,7 @@ export interface ResumenPais {
   real: { envios: number; mediana: number; min: number; max: number } | null;
 }
 
-type Tab = "novedades" | "decidir" | "cotizacion" | "transito";
-
-const TONO: Record<TonoCuota, Tone> = { exito: "success", aviso: "warning", peligro: "destructive", info: "azul", neutro: "neutral" };
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const fecha = (d: string | null) => (d ? `${Number(d.slice(8, 10))} ${MESES[Number(d.slice(5, 7)) - 1]}` : "—");
-const ent = (n: number | null) => (n == null ? "—" : n.toLocaleString("es-PA", { maximumFractionDigits: 0 }));
-const dinero = (n: number | null, decimales = 0) => (n == null ? "—" : `$${n.toLocaleString("es-PA", { minimumFractionDigits: decimales, maximumFractionDigits: decimales })}`);
-const VIA = { mar: "Marítimo", aire: "Aéreo" } as const;
-const claseBoton = `inline-flex h-8 items-center rounded-lg border px-3 text-[13px] font-medium whitespace-nowrap disabled:opacity-50 ${anilloFoco}`;
-const botonPrincipal = `${claseBoton} border-foreground bg-foreground text-background hover:opacity-90`;
-const botonNormal = `${claseBoton} border-border-control bg-card hover:bg-muted`;
-const botonPeligro = `${claseBoton} border-destructive/50 bg-card text-destructive hover:bg-destructive-soft`;
+type Tab = "novedades" | "decidir" | "cotizacion" | "transito" | "cuenta";
 
 /**
  * Operación › Portal del proveedor: el lado de Ecomfive del portal de Chin (fase 2 de PORTAL-PROVEEDOR.md, la interfaz del
@@ -59,6 +50,7 @@ export function PortalProveedor({
   fotosReales,
   puedeEscribir,
   tabInicial,
+  cuentaPortal,
 }: {
   proveedor: { id: string; nombre: string };
   pedidos: PedidoPortal[];
@@ -68,6 +60,8 @@ export function PortalProveedor({
   fotosReales: Record<string, string>;
   puedeEscribir: boolean;
   tabInicial: Tab | null;
+  /** Solo para un administrador: la cuenta con la que el proveedor entra a su portal. */
+  cuentaPortal: { cuenta: CuentaPortal | null; entrada: string } | null;
 }) {
   const [lista, setLista] = useState(pedidos);
   const [novs, setNovs] = useState(novedades);
@@ -91,27 +85,12 @@ export function PortalProveedor({
     { clave: "decidir", titulo: "Por decidir", cuenta: de("cotizado").length },
     { clave: "cotizacion", titulo: "En cotización", cuenta: de("por_cotizar").length },
     { clave: "transito", titulo: "Tránsito", cuenta: de("enviado").length },
+    ...(cuentaPortal ? [{ clave: "cuenta" as const, titulo: `Cuenta de ${proveedor.nombre}`, cuenta: 0 }] : []),
   ];
 
   return (
     <div className="flex flex-col gap-5">
-      <div role="tablist" aria-label={`Portal de ${nombre}`} className="flex gap-0.5 overflow-x-auto border-b border-border">
-        {tabs.map((t) => (
-          <button
-            key={t.clave}
-            role="tab"
-            type="button"
-            aria-selected={tab === t.clave}
-            onClick={() => setTab(t.clave)}
-            className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] whitespace-nowrap ${anilloFoco} ${tab === t.clave ? "border-primario font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          >
-            {t.titulo}
-            {t.cuenta > 0 && (
-              <span className={`rounded-full px-1.5 text-[11.5px] tabular-nums ${t.viva ? "bg-aviso text-white" : "bg-muted text-muted-foreground"}`}>{t.cuenta}</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <Pestanas etiqueta={`Portal de ${nombre}`} tabs={tabs} valor={tab} alCambiar={setTab} />
 
       {tab === "novedades" && (
         <Novedades
@@ -136,56 +115,13 @@ export function PortalProveedor({
           alGuardarNota={(id, nota) => cambiar(id, { notaParaProveedor: nota || null })}
         />
       )}
+      {tab === "cuenta" && cuentaPortal && <CuentaProveedor proveedor={proveedor} cuenta={cuentaPortal.cuenta} entrada={cuentaPortal.entrada} />}
       {tab === "transito" && (
         <Transito pedidos={de("enviado")} plazos={plazos} resumen={resumen} hoy={hoy} nombre={nombre} puedeEscribir={puedeEscribir} alLlegar={(id, f) => cambiar(id, { etapa: "llegado", fechaLlegada: f })} />
       )}
     </div>
   );
 }
-
-/** Foto de referencia (la de la compra) o la real (la que sube el proveedor). Sin foto, un recuadro con las iniciales o vacío. */
-function Foto({ url, nombre, real = false, grande = false }: { url: string | null; nombre: string; real?: boolean; grande?: boolean }) {
-  const tamano = grande ? "aspect-square w-full rounded-lg" : "h-10 w-10 shrink-0 rounded-md";
-  const etiqueta = grande && <span className="absolute bottom-1.5 left-1.5 rounded bg-black/60 px-1.5 py-px text-[10.5px] font-medium text-white">{real ? "Real" : "Referencia"}</span>;
-  if (url)
-    return (
-      <span className={`relative block overflow-hidden border border-border bg-muted ${tamano}`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt={`${real ? "Foto real" : "Foto de referencia"} de ${nombre}`} className="h-full w-full object-cover" loading="lazy" />
-        {etiqueta}
-      </span>
-    );
-  const iniciales = nombre.replace(/[^\p{L}\p{N} ]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  return (
-    <span role="img" aria-label={`${nombre}: ${real ? "sin foto real" : "sin foto de referencia"}`} className={`relative flex items-center justify-center border border-dashed border-border-control bg-muted text-muted-foreground ${grande ? "text-sm" : "text-[11px] font-semibold"} ${tamano}`}>
-      {real ? (grande ? "Sin foto real" : "—") : iniciales}
-      {etiqueta}
-    </span>
-  );
-}
-
-function Producto({ p, foto }: { p: PedidoPortal; foto?: boolean }) {
-  return (
-    <span className="flex min-w-[14rem] items-center gap-2.5">
-      {foto !== false && <Foto url={p.fotoReferencia} nombre={p.producto} />}
-      <span className="min-w-0 whitespace-normal">
-        <span className="block">{p.producto}</span>
-        {p.referencia && <span className="block text-xs text-muted-foreground tabular-nums">{p.referencia}</span>}
-      </span>
-    </span>
-  );
-}
-
-function Tarjeta({ titulo, accion, children }: { titulo: string; accion?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="min-w-0 rounded-[10px] border border-border bg-card">
-      <CabeceraTarjeta titulo={titulo}>{accion}</CabeceraTarjeta>
-      {children}
-    </section>
-  );
-}
-
-const Vacio = ({ children }: { children: ReactNode }) => <p className="m-0 px-4 py-4 text-sm text-muted-foreground">{children}</p>;
 
 // ── Novedades ──
 const ICONO_NOVEDAD: Record<string, { simbolo: string; tono: Tone }> = {

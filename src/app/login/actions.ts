@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSessionClient } from "@/lib/supabase/server";
+import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { createServiceClient, createSessionClient } from "@/lib/supabase/server";
 
 export interface LoginState {
   error?: string;
@@ -12,9 +13,15 @@ export async function iniciarSesion(_prevState: LoginState, formData: FormData):
   const password = formData.get("password") as string;
 
   const supabase = await createSessionClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     return { error: "Correo o contraseña incorrectos." };
+  }
+  // Una cuenta del portal del proveedor (Chin) entra a su portal, no al sistema.
+  const cuenta = data.user ? await cuentaDeProveedor(data.user.id) : null;
+  if (cuenta) {
+    await createServiceClient().from("proveedor_usuarios").update({ ultimo_ingreso_en: new Date().toISOString() }).eq("id", cuenta.cuentaId);
+    redirect(RUTA_PORTAL_PROVEEDOR);
   }
   redirect("/");
 }

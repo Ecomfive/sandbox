@@ -6,6 +6,7 @@ import { cuotasDe, cumplimiento, estadoCuota } from "./cuotas";
 import { ETAPA_PORTAL_DE_COMPRA, viaPortal } from "./espejo";
 import { sumarDias } from "./fechas";
 import { puedeAvisarPago, puedeConfirmarPago, puedePasar } from "./permisos-proveedor";
+import { rutaEsDelPedido, rutaFotoReal } from "./rutas";
 import { estadoTransito, textoPlazo } from "./transito";
 
 const pedido = { montoTotal: 5000, fechaEnvio: "2026-10-21", fechaLlegada: null, primerPago: null, fechaPago1: null, segundoPago: null, fechaPago2: null };
@@ -70,6 +71,23 @@ test("la cotización acepta costo por unidad o total y marca si cambió las unid
   assert.ok("error" in validarCotizacion({ unidades: 1000, montoTotal: 5_000_000 }));
   assert.deepEqual(cambioDeUnidades(1000, 960), { pedidas: 1000, cotizadas: 960 });
   assert.equal(cambioDeUnidades(1000, 1000), null);
+});
+
+test("las fotos del proveedor quedan en la carpeta de su pedido y no se acepta otra ruta", () => {
+  const prov = "01a1f0e2-1111-7000-8000-000000000001";
+  const ped = "01a1f0e2-2222-7000-8000-000000000002";
+  const otro = "01a1f0e2-3333-7000-8000-000000000003";
+  const id = "0f8b6a2c-9d1e-4c3b-8a7f-123456789abc";
+  const ruta = rutaFotoReal(prov, ped, "Foto Real.PNG", id);
+  assert.equal(ruta, `${prov}/${ped}/fotos/${id}.png`);
+  assert.equal(rutaFotoReal(prov, ped, "archivo.exe", id), `${prov}/${ped}/fotos/${id}.jpg`);
+  assert.equal(rutaFotoReal("../x", ped, "a.jpg", id), null);
+  assert.ok(rutaEsDelPedido(ruta, prov, ped));
+  assert.ok(!rutaEsDelPedido(ruta, prov, otro)); // de otro pedido
+  assert.ok(!rutaEsDelPedido(ruta, otro, ped)); // de otro proveedor
+  assert.ok(!rutaEsDelPedido(`${prov}/${ped}/fotos/../../${otro}/x.jpg`, prov, ped));
+  assert.ok(!rutaEsDelPedido(`${prov}/${ped}/otra/${id}.jpg`, prov, ped));
+  assert.ok(!rutaEsDelPedido(42, prov, ped));
 });
 
 test("cada lado solo da sus pasos", () => {

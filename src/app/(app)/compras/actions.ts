@@ -11,7 +11,8 @@ import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } 
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
-import { estimarPlanificacion, nuevaPlanificacion, tiemposDeTransito, type Estimacion, type TiemposTransito } from "@/lib/compras/planificacion";
+import { estimarPlanificacion, nuevaPlanificacion, type Estimacion, type TiemposTransito } from "@/lib/compras/planificacion";
+import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
@@ -183,28 +184,7 @@ async function leerTipoYPais(formData: FormData): Promise<{ tipo: string; pais_i
 // No se escribe: es el mes de la llegada estimada (fecha de envío + lo que tardaron los envíos anteriores de su país por su
 // vía). Se calcula al crear la compra y cada vez que cambia su fecha de envío, su vía, su país o su tipo.
 
-/** De qué país es una compra para medir sus envíos: su país, o Importadora. */
-const claveTransito = (tipo: string, paisId: string | null) => (tipo === "importacion" ? "importacion" : (paisId ?? ""));
-
-/** Lo que tardaron los envíos que ya llegaron (fecha de envío → fecha de llegada), por país y vía. */
-async function cargarTiempos(): Promise<TiemposTransito> {
-  const filas = await traerTodasLasFilas<{ tipo: string; pais_id: string | null; via_envio: string[] | null; fecha_envio: string; fecha_llegada: string }>((desde, hasta) =>
-    createServiceClient()
-      .from("wms_compras")
-      .select("tipo, pais_id, via_envio, fecha_envio, fecha_llegada")
-      .not("fecha_envio", "is", null)
-      .not("fecha_llegada", "is", null)
-      .is("anulada_en", null)
-      .order("id")
-      .range(desde, hasta),
-  );
-  // Una compra que viajó por dos vías no dice cuánto tarda cada una: no se mide.
-  return tiemposDeTransito(
-    filas
-      .filter((f) => (f.via_envio ?? []).length === 1)
-      .map((f) => ({ clave: claveTransito(f.tipo, f.pais_id), via: f.via_envio![0], dias: Math.round((Date.parse(f.fecha_llegada) - Date.parse(f.fecha_envio)) / 864e5) })),
-  );
-}
+// `claveTransito` y `cargarTiempos` viven en src/lib/compras/tiempos-datos.ts (también los usa el portal del proveedor).
 
 /** La planificación que tendría una compra con estos datos (para verla en la ficha antes de guardar). */
 export async function estimarPlanificacionCompra(tipo: string, pais: string, vias: string[], fechaEnvio: string): Promise<Estimacion | null> {

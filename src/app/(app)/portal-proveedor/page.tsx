@@ -1,11 +1,14 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
+import { headers } from "next/headers";
 import { requireModulo } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { cargarEspejo, clavePlazo } from "@/lib/proveedor/datos";
 import { diasEntre } from "@/lib/proveedor/fechas";
 import { resumenTransito } from "@/lib/proveedor/transito";
 import { createServiceClient } from "@/lib/supabase/server";
+import type { CuentaPortal } from "./cuenta-proveedor";
 import { PortalProveedor, type Novedad, type ResumenPais } from "./portal-proveedor";
 
 export const metadata = { title: "Portal del proveedor" };
@@ -13,7 +16,7 @@ export const metadata = { title: "Portal del proveedor" };
 export const dynamic = "force-dynamic";
 
 /** Las pestañas que se pueden pedir en la dirección (`?tab=`). */
-const TABS = ["novedades", "decidir", "cotizacion", "transito"] as const;
+const TABS = ["novedades", "decidir", "cotizacion", "transito", "cuenta"] as const;
 /** Desde cuándo se cuenta el tránsito real de cada país. */
 const TRANSITO_DESDE = "2026-01-01";
 
@@ -89,6 +92,18 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     creadoEn: n.creado_en as string,
   }));
 
+  // La cuenta del proveedor solo la ve (y la administra) un administrador.
+  const admin = esAdministrador(usuario);
+  let cuenta: CuentaPortal | null = null;
+  let entrada = "/login";
+  if (admin) {
+    const { data } = await supabase.from("proveedor_usuarios").select("id, nombre, email, activo, ultimo_ingreso_en").eq("proveedor_id", espejo.proveedor.id).order("creado_en").limit(1).maybeSingle();
+    if (data) cuenta = { id: data.id as string, nombre: data.nombre as string, email: (data.email as string | null) ?? null, activo: !!data.activo, ultimoIngreso: (data.ultimo_ingreso_en as string | null) ?? null };
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (host) entrada = `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}/login`;
+  }
+
   const tabInicial = typeof tab === "string" && (TABS as readonly string[]).includes(tab) ? (tab as (typeof TABS)[number]) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -101,7 +116,8 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
         novedades={novedades}
         fotosReales={fotosReales}
         puedeEscribir={!usuario.modulosSoloLectura.includes("portal-proveedor")}
-        tabInicial={tabInicial}
+        tabInicial={tabInicial === "cuenta" && !admin ? null : tabInicial}
+        cuentaPortal={admin ? { cuenta, entrada } : null}
       />
     </Pagina>
   );

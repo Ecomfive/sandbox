@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
+import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
@@ -51,6 +53,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     getUsuarioIdSesion().then((id) => (id ? obtenerFavoritos(supabase, id) : [])),
     usuarioP,
   ]);
+  // Una cuenta del portal del proveedor no tiene perfil: no ve ni el menú del sistema, vuelve a su portal.
+  if (!usuario) {
+    const usuarioId = await getUsuarioIdSesion();
+    if (usuarioId && (await cuentaDeProveedor(usuarioId))) redirect(RUTA_PORTAL_PROVEEDOR);
+  }
   const favoritos = usuario ? favoritosDeSesion : [];
   const areas = construirAreas(plataformasPais);
   const pestanasOcultas = usuario ? [...pestanasOcultasDe(usuario.afinado), ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN)] : [];

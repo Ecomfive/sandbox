@@ -467,6 +467,17 @@ convenciones técnicas del código.
   la nota para el proveedor se escribe en «En cotización». «Nueva compra en Cotizar» lleva a `/compras/lista?proveedor=Chin`, que
   abre la compra nueva con proveedor y agente puestos (`CrearCompraPanel` se abre sola después de montarse: `Ventana` no se puede
   dibujar en el servidor). Los plazos salen de Compras › Envíos (si un país y vía tienen dos rutas, la última cambiada).
+  **Fase 3** (migración 0126): el portal de Chin en **`/proveedor`** (`src/app/proveedor/`, fuera de `(app)`: su propio layout sin menú).
+  Solo lo abre una cuenta de `proveedor_usuarios` (`requireProveedor` / `cuentaProveedorActual`, `src/lib/proveedor/sesion.ts`); el login
+  la manda ahí, y `requireModulo` y el layout de `(app)` devuelven al portal a una cuenta de proveedor que abra otra página
+  (`cuentaDeProveedor`, `src/lib/proveedor/cuenta.ts`). Lo que hace el proveedor lo aplica `src/lib/proveedor/aplicar.ts` **a la compra**
+  sin pasar por los permisos de Compras (el proveedor no tiene perfil): cotizar = línea de producto (si tiene una), `qty_total`,
+  `monto_total` y etapa `cotizado` en un solo update, comentario «Cotización de Chin…» con la foto real como adjunto (origen
+  `proveedor`, copiada de `proveedor-portal` a `wms-compras`, validada por su firma; ruta `<proveedor>/<pedido>/fotos/<id>`,
+  `rutaEsDelPedido`); enviar = etapa `tracking`, `fecha_envio` (hasta 60 días atrás, nunca futura) y su planificación
+  (`cargarTiempos`, ahora en `src/lib/compras/tiempos-datos.ts`). Cada cambio: evento con origen `proveedor`, auditoría, novedad y aviso
+  en la campana de `proveedores.notificar_a`. La cuenta la crea un administrador en la pestaña «Cuenta de Chin» (`cuenta-actions.ts`, clave
+  temporal con `crypto.randomInt`, una sola cuenta por proveedor).
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,
