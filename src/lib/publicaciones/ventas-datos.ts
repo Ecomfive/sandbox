@@ -4,7 +4,7 @@ import { resumirProductos, type ResumenProducto } from "./ventas";
 
 /**
  * La última carga de ventas de Dropi del país (migración 0120), resumida por producto de Dropi: para mostrar las ventas de
- * cada publicación en Gestión de publicaciones Dropi. `null` si no hay ninguna carga o falta la migración.
+ * cada publicación en Gestión de IDs Dropi. `null` si no hay ninguna carga o falta la migración.
  */
 export async function cargarResumenVentas(supabase: SupabaseClient, paisId: string): Promise<{ corte: string; resumen: Map<number, ResumenProducto> } | null> {
   const { data: carga, error } = await supabase.from("dropi_ventas_cargas").select("corte").eq("pais_id", paisId).order("corte", { ascending: false }).limit(1).maybeSingle();

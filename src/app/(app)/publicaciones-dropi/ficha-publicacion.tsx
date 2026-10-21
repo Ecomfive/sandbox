@@ -383,11 +383,11 @@ function ContenidoFicha({
             </div>
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
               <div>
-                <dt className="text-xs text-muted-foreground">Utilidad</dt>
+                <dt className="text-xs text-muted-foreground">Utilidad bruta</dt>
                 <dd className="font-semibold">{usd(utilidad)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Margen</dt>
+                <dt className="text-xs text-muted-foreground">Margen bruto</dt>
                 <dd className="flex items-center gap-1.5 font-semibold">
                   {margen !== null && margen < MARGEN_BAJO && <span role="img" aria-label="Margen bajo" className="h-2 w-2 rounded-full bg-destructive" />}
                   {margen === null ? "—" : `${Math.round(margen * 100)} %`}
