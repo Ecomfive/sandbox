@@ -94,7 +94,7 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
     .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), ultimo_cambio_precio: datos.ultimo_cambio_precio ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
     .select("id")
     .single();
-  if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0115." : "No se pudo crear la publicación." };
+  if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0116." : "No se pudo crear la publicación." };
   await registrarAuditoria({ accion: "crear_publicacion_dropi", entidad: "dropi_publicaciones", entidadId: data.id, detalle: `${datos.nombre}${datos.dropi_id ? ` (ID ${datos.dropi_id})` : ""}` });
   revalidatePath(RUTA);
   return {};

@@ -1,5 +1,5 @@
 // Importa la lista «GCC 🇵🇦 Ecomfive Panamá» de ClickUp (datos-privados/clickup-gcc-panama.json, la baja
-// clickup-exportar-publicaciones-dropi.mjs) a Gestión de publicaciones Dropi (`dropi_publicaciones`, migración 0115): una tarea
+// clickup-exportar-publicaciones-dropi.mjs) a Gestión de publicaciones Dropi (`dropi_publicaciones`, migración 0116): una tarea
 // es una publicación de Panamá, con su tarea original completa en `clickup` (nada se pierde). Se puede repetir: actualiza por
 // `clickup_id` y no duplica; la foto solo se copia si la publicación aún no tiene una.
 //
@@ -43,7 +43,7 @@ async function main() {
   };
 
   const { data: existentes, error: errorExistentes } = await supabase.from("dropi_publicaciones").select("id, clickup_id, foto_url").not("clickup_id", "is", null);
-  if (errorExistentes) throw new Error(`Falta correr la migración 0115: ${errorExistentes.message}`);
+  if (errorExistentes) throw new Error(`Falta correr la migración 0116: ${errorExistentes.message}`);
   const yaEsta = new Map((existentes ?? []).map((e) => [e.clickup_id as string, e]));
 
   const avisos: Record<string, number> = {};

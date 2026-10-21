@@ -393,7 +393,7 @@ convenciones técnicas del código.
   vinculados en la ficha del publicado, tiene el historial en tabla y envía a Selección (`enviarASeleccion`, fuente SP, en el
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
-- **Operación › Fulfillment › Gestión de publicaciones Dropi** (`/publicaciones-dropi`, módulo `publicaciones-dropi`, migración 0115, 21 oct
+- **Operación › Fulfillment › Gestión de publicaciones Dropi** (`/publicaciones-dropi`, módulo `publicaciones-dropi`, migración 0116, 21 oct
   2026; debajo de Compras). Los productos que ECOMFIVE tiene publicados en Dropi como proveedor; reemplaza la lista «GCC 🇵🇦 Ecomfive
   Panamá» de ClickUp. Una fila de `dropi_publicaciones` por publicación (por país): `dropi_id` (texto: a veces son dos, «7231-7679»),
   `estado` (el flujo de ClickUp: producto_nuevo → revisar_precio → verificar_dropshipper → validar_bajar_precio → bajar_precio → al_dia

@@ -43,7 +43,7 @@ export default async function PublicacionesDropiPage() {
       <Pagina ancho="ancha" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Gestión de publicaciones Dropi" oculto />
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          No se pudieron cargar las publicaciones. Falta correr en Supabase la migración 0115.
+          No se pudieron cargar las publicaciones. Falta correr en Supabase la migración 0116.
         </p>
       </Pagina>
     );
