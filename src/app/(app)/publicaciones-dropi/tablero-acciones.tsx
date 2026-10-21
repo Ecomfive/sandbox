@@ -1,7 +1,7 @@
 "use client";
 
 import { KpiFiltro } from "@/components/ui/kpi-filtro";
-import { KpiGrid, KpiGroup, type Tono } from "@/components/ui/kpi-card";
+import { KpiGroup, type Tono } from "@/components/ui/kpi-card";
 import type { AtajoFiltro } from "@/lib/tabla/atajos";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
 import { DEF_PUBLICACIONES, estadoVinculo, type FilaPublicacion } from "./def-publicaciones";
@@ -74,12 +74,13 @@ export function TableroAcciones({ publicaciones }: { publicaciones: FilaPublicac
   const abiertas = publicaciones.filter((f) => f.estado !== "archivado");
   return (
     <KpiGroup titulo="Tablero de acciones" accion={<span className="tabular-nums">{abiertas.length} publicaciones abiertas</span>}>
-      <KpiGrid compacta>
+      {/* Ocho tarjetas: 2 por fila en el celular, 4 en tablet y las ocho juntas en una pantalla ancha. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8 [&>*]:min-w-0">
         {ACCIONES.map((a) => {
           const n = abiertas.filter(a.cuenta).length;
           return <KpiFiltro key={a.id} def={DEF_PUBLICACIONES} atajo={a.atajo} titulo={a.titulo} valor={n} subtexto={a.subtexto} tono={n > 0 ? a.tono : "neutral"} compacta />;
         })}
-      </KpiGrid>
+      </div>
     </KpiGroup>
   );
 }
