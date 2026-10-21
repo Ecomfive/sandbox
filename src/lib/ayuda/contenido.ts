@@ -281,7 +281,7 @@ export const GUIAS: GuiaModulo[] = [
           "«Reponer ya»: lo que se vendió en 30 días y no tiene stock o le alcanza para menos de 15 días (días de inventario = stock ÷ netas por día de los últimos 30 días). «Crecen» y «Caen» comparan los últimos 30 días con los 30 anteriores (con 10 o más netas antes). «Stock que no se mueve»: productos activos con stock y sin ventas en 30 días.",
           "«Todos los productos» se busca por nombre, ID o SKU, se filtra por categoría (Estrella 100+ al mes, Se vende 10 a 99, Lento 1 a 9, Sin ventas en 30 días, Nunca vendió) y se ordena con un clic en cada encabezado. Al tocar un producto se ven sus ventas por mes y sus alertas.",
           "«Por SKU del sistema» suma las publicaciones de Dropi de un mismo producto (públicas y privadas) según el vínculo de Gestión de IDs Dropi. «Dropshippers»: quién creó cada orden; lo cancelado, rechazado o devuelto se le carga por el número de orden.",
-          "Los datos salen del Historial de Existencia de Dropi y se cargan con una importación; la página dice hasta qué día llegan. No se actualizan solos.",
+          "Los datos salen del Historial de Existencia de Dropi y se actualizan cada día de madrugada con una tarea programada (con la sesión de ECOMFIVE en Dropi Panamá); la página dice hasta qué día llegan. Si una mañana no se actualizaron, la sesión de Dropi expiró: hay que volver a iniciarla.",
         ],
       },
     ],
@@ -487,6 +487,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Ventas de Dropi al día, cada mañana", texto: "Las ventas en Dropi (Desempeño › Ventas Dropi, las de cada publicación en Gestión de IDs Dropi, Compras › Reponer y la ficha del dropshipper) ya no son una carga suelta: se actualizan solas cada día de madrugada desde el Historial de Existencia de todos los productos de ECOMFIVE, activos y archivados. El stock es el que muestra Dropi.", modulo: "ventas-dropi", href: "/ventas-dropi" },
   { fecha: "2026-10-21", titulo: "Gestión de IDs Dropi: la ficha sin responsable ni revisión", texto: "La ficha de una publicación ya no trae el responsable ni el bloque «Revisión» (última y próxima revisión), ni el botón «Marcar revisada hoy»; «Agregar» tampoco pide responsable. Las notas siguen en su propio bloque.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Producto: las compras, agrupadas por país", texto: "En la ficha de un producto, el bloque «Compras» agrupa las compras por país (cada país con sus compras juntas y su total de compras y unidades) cuando se compró en más de uno.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-21", titulo: "Envíos: ya se guardan los cambios de una ruta", texto: "En Compras › Envíos no se podían guardar los cambios de una ruta (ni activarla, eliminarla o agregarle tarifas): ya funciona. Si lo intentaste antes, vuelve a hacerlo.", modulo: "compras", href: "/compras/envios" },
