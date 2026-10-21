@@ -31,11 +31,6 @@ import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { VinculoSku } from "./vinculo-sku";
 
-export interface Persona {
-  id: string;
-  nombre: string;
-}
-
 interface Formulario {
   nombre: string;
   dropi_id: string;

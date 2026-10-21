@@ -11,7 +11,7 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
 import { DEF_PUBLICACIONES, DEF_PUBLICACIONES_ADMIN, type FilaPublicacion } from "./def-publicaciones";
-import { FichaPublicacion, type Persona } from "./ficha-publicacion";
+import { FichaPublicacion } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 
@@ -25,7 +25,6 @@ const ICONOS: Record<string, IconoComp> = {
   tipo: EstadoIcon,
   publicacion: EstadoIcon,
   privatizado: PersonaIcon,
-  responsable: PersonaIcon,
   competencia: EstadoIcon,
   vinculo: ProductoIcon,
   nombre: ProductoIcon,
@@ -52,7 +51,6 @@ const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS, vent
 export function TablaPublicaciones({
   publicaciones,
   opcionesSku,
-  personas,
   paisId,
   codigoPais,
   nombrePais,
@@ -62,7 +60,6 @@ export function TablaPublicaciones({
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
-  personas: Persona[];
   paisId: string;
   codigoPais: string;
   nombrePais: string;
@@ -101,7 +98,7 @@ export function TablaPublicaciones({
           const o = COLOR_GRUPO[campo] && grupo.clave !== SIN_VALOR ? opcion(COLOR_GRUPO[campo], grupo.clave) : null;
           return o ? <Badge color={o.color}>{o.etiqueta}</Badge> : <span className="font-semibold">{grupo.etiqueta}</span>;
         }}
-        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} personas={personas} /> : undefined}
+        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} /> : undefined}
         vacio="Todavía no hay publicaciones en este país."
       />
       <FichaPublicacion

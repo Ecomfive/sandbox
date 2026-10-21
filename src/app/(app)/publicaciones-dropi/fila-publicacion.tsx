@@ -161,14 +161,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
           apoyo={reposicion ? <ConPunto color={reposicion.color} texto={reposicion.etiqueta} /> : "Sin reposición"}
         />
         <Celda
-          nombre="Próxima revisión y responsable"
+          nombre="Próxima revisión"
           principal={
             <span className="inline-flex items-center gap-1.5 tabular-nums">
               {f.revisionVencida && <Punto clase="bg-warning" texto="Revisión vencida" />}
               {fechaCorta(f.proximaRevision)}
             </span>
           }
-          apoyo={f.responsableNombre ?? "Sin responsable"}
         />
       </span>
 
