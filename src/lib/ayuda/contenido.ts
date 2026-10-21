@@ -383,7 +383,7 @@ export const GUIAS: GuiaModulo[] = [
     ruta: "/crm-dropshippers",
     resumen: "La ficha de cada dropshipper con su historial, casos, notas y desempeño.",
     secciones: [
-      { titulo: "Uso", pasos: ["Directorio: busca y abre la ficha de un dropshipper.", "Registra interacciones y casos; con @ avisas a un compañero.", "Vínculos: une a cada dropshipper con su usuario de Dropi para ver su desempeño."] },
+      { titulo: "Uso", pasos: ["Directorio: busca y abre la ficha de un dropshipper.", "Registra interacciones y casos; con @ avisas a un compañero.", "Vínculos: une a cada dropshipper con su usuario de Dropi para ver su desempeño.", "«Ventas en Dropi» de la ficha muestra lo que vendió en Dropi por sus cuentas vinculadas (de Desempeño › Ventas Dropi): netas de los últimos 30 días y de siempre, % no efectivo (cancelado, rechazado o devuelto), última orden, netas por mes y qué productos vende. Las fichas con la etiqueta «Creado desde Dropi» se crearon solas a partir de quienes compran en Dropi Panamá, con su nombre, correo, teléfono y cuenta de Dropi; las que dicen «Revisar: ¿cuenta interna?» pueden ser cuentas de ECOMFIVE."] },
     ],
   },
   {
@@ -467,6 +467,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Ventas en Dropi en la ficha de cada dropshipper", texto: "La ficha del dropshipper en el CRM tiene «Ventas en Dropi»: netas de 30 días y de siempre, % no efectivo, última orden, netas por mes y qué productos vende. Se vincularon 53 dropshippers con su usuario de Dropi Panamá (por correo, teléfono o nombre idéntico) y se crearon 372 fichas nuevas para quienes compran en Dropi y no estaban en el CRM (etiqueta «Creado desde Dropi»).", modulo: "crm-dropshippers", href: "/crm-dropshippers/directorio" },
   { fecha: "2026-10-21", titulo: "Compras › Reponer", texto: "Para administradores: Compras tiene la pestaña «Reponer», con lo que se vende en Dropi y se está acabando, por SKU, lo que ya viene en compras abiertas y cuánto comprar para cubrir 60 días de venta (o 30 o 90). «Crear compra» abre la compra nueva con el producto y la cantidad ya elegidos.", modulo: "compras", href: "/compras/reponer" },
   { fecha: "2026-10-21", titulo: "Ventas de Dropi en cada publicación", texto: "Para administradores: Gestión de publicaciones Dropi muestra las ventas en Dropi de cada publicación (netas de 30 días, stock y días de inventario) y, en la ficha, sus ventas por mes y el estado de venta que dicen los datos, con «Usar» para ponerlo. Nuevos filtros: Stock en Dropi y Estado de venta según Dropi.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Ventas Dropi en Desempeño", texto: "Desempeño tiene «Ventas Dropi»: las unidades netas de cada producto que tenemos en Dropi (pedidas menos canceladas, rechazadas y devueltas), por mes y por día, qué hay que reponer, qué crece y qué cae, el stock que no se mueve, las ventas por SKU y por dropshipper. Sale del Historial de Existencia de Dropi.", modulo: "ventas-dropi", href: "/ventas-dropi" },

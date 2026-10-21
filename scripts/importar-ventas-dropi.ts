@@ -40,6 +40,8 @@ async function main() {
   const diarias: Record<string, unknown>[] = [];
   const ds = new Map<number, { pedidas: number; ordenes: Set<number>; negativas: number; n30: number; productos: Set<number>; ultima: string | null }>();
   const desde30 = restarDias(corteFecha, 29);
+  // Cada dropshipper por producto y mes (migración 0122), para su ficha del CRM.
+  const dsMes = new Map<string, { usuario: number; producto: number; mes: string; pedidas: number; ordenes: Set<number>; noEfectivas: number }>();
   let movimientos = 0;
 
   for (const p of R.productos) {
@@ -74,6 +76,13 @@ async function main() {
       const x = ds.get(quien) ?? { pedidas: 0, ordenes: new Set<number>(), negativas: 0, n30: 0, productos: new Set<number>(), ultima: null };
       ds.set(quien, x);
       const signo = c === "pedido" ? 1 : -1;
+      const claveMes = `${quien}|${id}|${dia.slice(0, 7)}`;
+      const xm = dsMes.get(claveMes) ?? { usuario: quien, producto: id, mes: `${dia.slice(0, 7)}-01`, pedidas: 0, ordenes: new Set<number>(), noEfectivas: 0 };
+      dsMes.set(claveMes, xm);
+      if (c === "pedido") {
+        xm.pedidas += m[2];
+        if (m[4] !== null) xm.ordenes.add(m[4]);
+      } else xm.noEfectivas += m[2];
       if (c === "pedido") {
         x.pedidas += m[2];
         if (m[4] !== null) x.ordenes.add(m[4]);
@@ -100,17 +109,19 @@ async function main() {
     .filter(([, x]) => x.pedidas > 0)
     .map(([usuario, x]) => ({ pais_id: pais.id, dropi_usuario_id: usuario, nombre: M.usuarios[String(usuario)] ?? `Usuario ${usuario}`, pedidas: x.pedidas, ordenes: x.ordenes.size, no_efectivas: x.negativas, netas_30d: x.n30, productos: x.productos.size, ultima_orden: x.ultima }));
 
+  const porMes = [...dsMes.values()].map((x) => ({ pais_id: pais.id, dropi_usuario_id: x.usuario, dropi_producto_id: x.producto, mes: x.mes, pedidas: x.pedidas, ordenes: x.ordenes.size, no_efectivas: x.noEfectivas }));
   const netasTotal = diarias.reduce((a, d) => a + netas(d as never), 0);
-  console.log(`Corte ${corteFecha}: ${productos.length} productos, ${movimientos} movimientos, ${diarias.length} filas por día, ${dropshippers.length} dropshippers, ${netasTotal} unidades netas.`);
+  console.log(`Corte ${corteFecha}: ${productos.length} productos, ${movimientos} movimientos, ${diarias.length} filas por día, ${dropshippers.length} dropshippers (${porMes.length} filas por producto y mes), ${netasTotal} unidades netas.`);
   if (!aplicar) return console.log("Con --aplicar se cargan (reemplazan la carga anterior de Panamá).");
 
-  for (const t of ["dropi_ventas_diarias", "dropi_ventas_productos", "dropi_ventas_dropshippers"]) {
+  for (const t of ["dropi_ventas_diarias", "dropi_ventas_productos", "dropi_ventas_dropshippers", "dropi_ventas_dropshipper_mes"]) {
     const { error } = await supabase.from(t).delete().eq("pais_id", pais.id);
-    if (error) throw new Error(error.message.includes("does not exist") ? "Falta correr la migración 0120." : `${t}: ${error.message}`);
+    if (error) throw new Error(error.message.includes("does not exist") || error.message.includes("schema cache") ? `Falta correr la migración ${t === "dropi_ventas_dropshipper_mes" ? "0122" : "0120"}.` : `${t}: ${error.message}`);
   }
   await enTandas("dropi_ventas_productos", productos);
   await enTandas("dropi_ventas_diarias", diarias);
   await enTandas("dropi_ventas_dropshippers", dropshippers);
+  await enTandas("dropi_ventas_dropshipper_mes", porMes);
   const { error } = await supabase.from("dropi_ventas_cargas").insert({ pais_id: pais.id, corte: R.generado, productos: productos.length, movimientos });
   if (error) throw new Error(`dropi_ventas_cargas: ${error.message}`);
   console.log("Cargado.");
