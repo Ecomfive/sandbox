@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { deClickup, ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, idsDropi, leerTareaGcc, revisionVencida, UBICACIONES, type TareaClickup } from "./publicacion";
+import { deClickup, ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, idsDropi, leerTareaGcc, margenBajo, revisionVencida, UBICACIONES, type TareaClickup } from "./publicacion";
 
 test("deClickup: reconoce lo de ClickUp sin importar emojis, acentos ni espacios", () => {
   assert.equal(deClickup(ESTADOS_VENTA, "Más Vendidos✅ +500"), "mas_vendidos");
@@ -70,4 +70,11 @@ test("leerTareaGcc: campos, opciones, fechas, relacionados, foto y avisos", () =
   assert.deepEqual(p.responsables, ["nicol@ecomfive.io"]);
   assert.equal(p.estado_reposicion, null);
   assert.deepEqual(p.avisos, ["Estado de Reposición: «Algo raro»"]);
+});
+
+test("margenBajo: bajo el 30 %; sin margen calculado no cuenta", () => {
+  assert.equal(margenBajo(0.29), true);
+  assert.equal(margenBajo(0.3), false);
+  assert.equal(margenBajo(0.55), false);
+  assert.equal(margenBajo(null), false);
 });

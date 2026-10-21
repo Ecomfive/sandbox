@@ -83,3 +83,7 @@ export function diferencias(permisosDelRol: PermisoRol[], efectivos: Record<stri
   const orden = new Map(MODULOS_ACCESO.map((m, i) => [m.clave, i]));
   return lista.sort((x, y) => (orden.get(x.modulo) ?? 999) - (orden.get(y.modulo) ?? 999));
 }
+
+/** Administra el sistema: puede modificar Usuarios y roles (la misma regla de «Ver así» y de los manuales de proceso). */
+export const esAdministrador = (u: { modulos: readonly string[]; modulosSoloLectura: readonly string[] }): boolean =>
+  u.modulos.includes("usuarios") && !u.modulosSoloLectura.includes("usuarios");

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MODULOS } from "../modulos";
-import { aAccesoPlano, cobertura, diferencias, nivelesDeRol, nivelesEfectivos } from "./acceso";
+import { aAccesoPlano, cobertura, diferencias, esAdministrador, nivelesDeRol, nivelesEfectivos } from "./acceso";
 import { accionPermitida, alcanceDe, campoVisible, contarAjustes, filasDeAfinado, nivelDeCampo, pestanaVisible, resolverAfinado, valorValido, type FilaAfinada } from "./afinado";
 import { AREAS_ACCESO, CATALOGO_COMPRAS, MODULOS_ACCESO, catalogoDe } from "./catalogo";
 import { colorDeRol } from "./color-rol";
@@ -113,4 +113,10 @@ test("el color de un rol es el elegido o siempre el mismo para el mismo nombre",
   assert.equal(colorDeRol("verde", "X").valor, "verde");
   assert.equal(colorDeRol(null, "Compras").valor, colorDeRol(undefined, "Compras").valor);
   assert.equal(colorDeRol("no-existe", "Compras").valor, colorDeRol(null, "Compras").valor);
+});
+
+test("administra quien puede modificar Usuarios y roles; con solo lectura o sin el módulo, no", () => {
+  assert.equal(esAdministrador({ modulos: ["usuarios", "compras"], modulosSoloLectura: [] }), true);
+  assert.equal(esAdministrador({ modulos: ["usuarios"], modulosSoloLectura: ["usuarios"] }), false);
+  assert.equal(esAdministrador({ modulos: ["compras"], modulosSoloLectura: [] }), false);
 });

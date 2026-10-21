@@ -57,6 +57,8 @@ export const etiqueta = (lista: OpcionPublicacion[], valor: string | null | unde
 
 /** Margen bajo el que se marca con un punto rojo (30 %). */
 export const MARGEN_BAJO = 0.3;
+/** El margen está por debajo del mínimo (sin margen calculado no cuenta). */
+export const margenBajo = (margen: number | null): boolean => margen !== null && margen < MARGEN_BAJO;
 /** Días entre revisiones (la próxima revisión = la última + 28, como la fecha límite de ClickUp). */
 export const DIAS_REVISION = 28;
 

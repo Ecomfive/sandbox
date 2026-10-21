@@ -43,6 +43,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_publicacion_dropi: "Creó la publicación",
   editar_publicacion_dropi: "Editó la publicación",
   revisar_publicacion_dropi: "Marcó la publicación como revisada",
+  eliminar_publicacion_dropi: "Eliminó la publicación",
   vincular_sku_publicacion: "Vinculó el producto",
   desvincular_sku_publicacion: "Quitó el producto vinculado",
   generar_imagen_landing: "Generó una imagen con Gemini",

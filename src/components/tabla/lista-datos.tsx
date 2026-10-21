@@ -29,6 +29,7 @@ export function ListaDatos<F>({
   encima,
   porPagina = POR_PAGINA,
   accionPrincipal,
+  variante = "tarjetas",
   vacio,
 }: {
   def: DefTabla<F>;
@@ -36,7 +37,8 @@ export function ListaDatos<F>({
   iconos: Record<string, IconoComp>;
   nombre: NombreFilas;
   claveFila: (fila: F) => string;
-  renderFila: (fila: F) => ReactNode;
+  /** Dibuja una fila; recibe también las filas en el orden en que se ven (para pasar a la anterior y la siguiente de una ficha). */
+  renderFila: (fila: F, enOrden: F[]) => ReactNode;
   etiquetaGrupo?: (campo: string, grupo: Grupo<F>) => ReactNode;
   formatearTotal?: (total: number) => string;
   /** Bloque entre la barra y la lista que necesita saber qué filas se ven (p. ej. seleccionar todas). */
@@ -45,11 +47,30 @@ export function ListaDatos<F>({
   porPagina?: number;
   /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
   accionPrincipal?: ReactNode;
+  /**
+   * `tarjetas` (por defecto): cada fila es su propia tarjeta. `filas`: las filas van juntas en una sola tarjeta, separadas por una
+   * línea fina, como una lista (una fila la dibuja `renderFila` sin borde propio).
+   */
+  variante?: "tarjetas" | "filas";
   vacio: string;
 }) {
   const tabla = useTablaInteractiva(def, filas, { porPagina });
   const { vista, resultado, visibles, grupos, contraidos, hayFiltros, agrupado, paginacion } = tabla;
   const { raiz, alIrA } = useIrAPaginaArriba(tabla.irAPagina);
+
+  // Las filas como se ven, de arriba abajo: con grupos, en el orden de los grupos y sin las de un grupo contraído.
+  const enOrden = vista.agrupar ? grupos.filter((g) => !contraidos.has(g.clave)).flatMap((g) => g.filas) : visibles;
+  const dibujar = (f: F) => <div key={claveFila(f)}>{renderFila(f, enOrden)}</div>;
+  const juntas = (filasDelGrupo: F[]) =>
+    variante === "filas" ? (
+      <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card p-0">
+        {filasDelGrupo.map((f) => (
+          <li key={claveFila(f)}>{renderFila(f, enOrden)}</li>
+        ))}
+      </ul>
+    ) : (
+      filasDelGrupo.map(dibujar)
+    );
 
   const notas = notasPie({
     hayFiltros,
@@ -102,11 +123,11 @@ export function ListaDatos<F>({
                   nombre={nombre}
                   total={formatearTotal ? formatearTotal(grupo.total) : undefined}
                 />
-                {!contraido && grupo.filas.map((f) => <div key={claveFila(f)}>{renderFila(f)}</div>)}
+                {!contraido && juntas(grupo.filas)}
               </section>
             );
           })
-        : visibles.map((f) => <div key={claveFila(f)}>{renderFila(f)}</div>)}
+        : juntas(visibles)}
 
       {paginacion && (
         // La paginación trae su propio borde superior; aquí va en su propia tarjeta, así que se quita.
