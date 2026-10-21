@@ -92,6 +92,15 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   }
 
   const supabase = createServiceClient();
+  // La categoría elegida (o sugerida) en la ficha: debe existir en la taxonomía (migración 0113).
+  const categoriaId = texto(formData, "categoria_id");
+  let categoria: { categoria_id: string; categoria_origen: string; categoria_revisar: boolean } | null = null;
+  if (categoriaId) {
+    if (!/^[a-z]{2}(-\d+)*$/.test(categoriaId)) return { error: "Categoría no válida." };
+    const { data: cat } = await supabase.from("categorias_productos").select("id").eq("id", categoriaId).maybeSingle();
+    if (!cat) return { error: "Esa categoría no existe." };
+    categoria = { categoria_id: categoriaId, categoria_origen: "manual", categoria_revisar: false };
+  }
   if (componentes.size > 0) {
     const { data: simples } = await supabase.from("skus_maestros").select("id").eq("tipo", "simple").in("id", [...componentes.keys()]);
     if ((simples ?? []).length !== componentes.size) return { error: "Un componente no es un producto simple válido." };
@@ -112,6 +121,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
       ...(barras ? { codigo_barras: barras, codigo_barras_origen: "fabricante" } : internoVisto ? { codigo_barras: internoVisto, codigo_barras_origen: "interno" } : {}),
       ...(manejaVencimiento ? { maneja_vencimiento: true, dias_aviso_vencimiento: diasAviso ?? DIAS_AVISO_PREDETERMINADO } : {}),
       ...(envio ?? {}),
+      ...(categoria ?? {}),
     })
     .select("id")
     .single();
