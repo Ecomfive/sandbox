@@ -73,5 +73,4 @@ async function guardar(ruta, opciones, lado) {
 await guardar(join(raiz, "public/pwa/icon-512.png"), { redondeo: 112, conVisor: true }, 512);
 await guardar(join(raiz, "public/pwa/icon-192.png"), { redondeo: 112, conVisor: true }, 192);
 await guardar(join(raiz, "public/pwa/icon-maskable-512.png"), { redondeo: 0, conVisor: true }, 512);
-await guardar(join(raiz, "src/app/apple-icon.png"), { redondeo: 0, conVisor: true }, 180);
-await guardar(join(raiz, "src/app/icon.png"), { redondeo: 112, conVisor: false }, 512);
+// El favicon (src/app/icon.png y apple-icon.png) ya no sale de aquí: lo dibuja scripts/generar-favicon.mjs (la E con su línea en L).
