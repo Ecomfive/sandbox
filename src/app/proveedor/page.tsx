@@ -1,4 +1,7 @@
 import { cargarEspejo } from "@/lib/proveedor/datos";
+import { hoyPanama } from "@/lib/proveedor/fechas";
+import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
+import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
 import { requireProveedor } from "@/lib/proveedor/sesion";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -43,6 +46,9 @@ export default async function PortalProveedorPage() {
     .limit(20);
   const nuevos: AvisoEcomfive[] = (avisos ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string }));
 
+  const estado = await estadoPagos(supabase, espejo);
+  const pagos = "error" in estado ? null : { resumen: estado.resumen, avisos: await avisosParaVista(supabase, estado.avisos.filter((a) => a.estado === "avisado")), plazos: filasPlazos(estado.envios, hoyPanama()) };
+
   return (
     <PortalChin
       cuenta={{ nombre: cuenta.nombre, proveedor: cuenta.proveedor.nombre, diasAnticipo: cuenta.proveedor.diasAnticipo }}
@@ -50,6 +56,7 @@ export default async function PortalProveedorPage() {
       plazos={espejo.plazos}
       fotosReales={fotosReales}
       avisos={nuevos}
+      pagos={pagos}
     />
   );
 }

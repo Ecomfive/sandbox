@@ -478,6 +478,15 @@ convenciones técnicas del código.
   (`cargarTiempos`, ahora en `src/lib/compras/tiempos-datos.ts`). Cada cambio: evento con origen `proveedor`, auditoría, novedad y aviso
   en la campana de `proveedores.notificar_a`. La cuenta la crea un administrador en la pestaña «Cuenta de Chin» (`cuenta-actions.ts`, clave
   temporal con `crypto.randomInt`, una sola cuenta por proveedor).
+  **Fase 4** (migración 0127): pagos. **Lo pagado vive en `proveedor_pagos`, nunca en los campos de pago de la compra** (en Compras
+  `fecha_pago_1` es la fecha en que vence; decidido con Hernán). Entra por avisos de Ecomfive (`proveedor_avisos_pago` + `_cuotas`,
+  `pagos-actions.ts`: los montos los recalcula el servidor con `estadoPagos`; comprobante imagen/PDF en `proveedor-portal/<prov>/avisos/`)
+  que el proveedor confirma (`confirmarAvisoPago`, primero marca confirmado para no duplicar), o por las hojas de pagos de Chin
+  (`scripts/importar-pagos-proveedor.ts`, se puede repetir; `proveedor_historial` con `pedido_id` si se emparejó —`emparejar`,
+  `hoja-pagos.ts`— o historial suelto que cuenta para el cumplimiento). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
+  UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto
+  (un pedido viejo sin hoja saldría vencido sin estarlo). La ficha de compra muestra «Pagos a Chin» (solo lectura,
+  `pagos-proveedor-compra.tsx`, oculto si el rol no ve el monto).
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,

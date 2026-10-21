@@ -5,7 +5,9 @@ import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { cargarEspejo, clavePlazo } from "@/lib/proveedor/datos";
-import { diasEntre } from "@/lib/proveedor/fechas";
+import { diasEntre, hoyPanama } from "@/lib/proveedor/fechas";
+import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
+import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
 import { resumenTransito } from "@/lib/proveedor/transito";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CuentaPortal } from "./cuenta-proveedor";
@@ -16,7 +18,7 @@ export const metadata = { title: "Portal del proveedor" };
 export const dynamic = "force-dynamic";
 
 /** Las pestañas que se pueden pedir en la dirección (`?tab=`). */
-const TABS = ["novedades", "decidir", "cotizacion", "transito", "cuenta"] as const;
+const TABS = ["novedades", "decidir", "cotizacion", "transito", "pagos", "cuenta"] as const;
 /** Desde cuándo se cuenta el tránsito real de cada país. */
 const TRANSITO_DESDE = "2026-01-01";
 
@@ -92,6 +94,18 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     creadoEn: n.creado_en as string,
   }));
 
+  // Pagos (fase 4): lo que falta pagar de los países que la persona ve, los avisos y los plazos de los últimos envíos.
+  const estado = await estadoPagos(supabase, { ...espejo, pedidos });
+  const pagos =
+    "error" in estado
+      ? null
+      : {
+          resumen: estado.resumen,
+          porPagar: estado.porPagar,
+          avisos: await avisosParaVista(supabase, estado.avisos.filter((a) => a.cuotas.every((c) => pedidos.some((p) => p.id === c.pedidoId)))),
+          plazos: filasPlazos(estado.envios.filter((e) => !e.pedidoId || pedidos.some((p) => p.id === e.pedidoId)), hoyPanama()),
+        };
+
   // La cuenta del proveedor solo la ve (y la administra) un administrador.
   const admin = esAdministrador(usuario);
   let cuenta: CuentaPortal | null = null;
@@ -118,6 +132,7 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
         puedeEscribir={!usuario.modulosSoloLectura.includes("portal-proveedor")}
         tabInicial={tabInicial === "cuenta" && !admin ? null : tabInicial}
         cuentaPortal={admin ? { cuenta, entrada } : null}
+        pagos={pagos}
       />
     </Pagina>
   );

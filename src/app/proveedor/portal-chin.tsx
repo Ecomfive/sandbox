@@ -15,6 +15,9 @@ import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { estadoTransito, textoPlazo, type Plazo } from "@/lib/proveedor/transito";
 import { supabase } from "@/lib/supabase/client";
 import { cotizarPedido, marcarEnviado, marcarVistoPorProveedor, prepararSubidaFotoReal } from "./actions";
+import { PagosChin } from "./pagos-chin";
+import type { AvisoVista, FilaPlazo } from "@/components/proveedor/pagos-proveedor";
+import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 
 export interface AvisoEcomfive {
   id: string;
@@ -22,7 +25,7 @@ export interface AvisoEcomfive {
   creadoEn: string;
 }
 
-type Tab = "cotizar" | "cotizado" | "produccion" | "enviado";
+type Tab = "cotizar" | "cotizado" | "produccion" | "enviado" | "pagos";
 
 /**
  * El portal de Chin (la vista del proveedor del prototipo aprobado, en español y con los colores del sistema): Por cotizar, Cotizado,
@@ -35,12 +38,15 @@ export function PortalChin({
   plazos,
   fotosReales,
   avisos,
+  pagos,
 }: {
   cuenta: { nombre: string; proveedor: string; diasAnticipo: number };
   pedidos: PedidoPortal[];
   plazos: Record<string, Plazo>;
   fotosReales: Record<string, string>;
   avisos: AvisoEcomfive[];
+  /** Pagos (fase 4); null si falta la migración 0127. */
+  pagos: { resumen: ResumenPagos; avisos: AvisoVista[]; plazos: FilaPlazo[] } | null;
 }) {
   const [lista, setLista] = useState(pedidos);
   const [fotos, setFotos] = useState(fotosReales);
@@ -95,6 +101,7 @@ export function PortalChin({
             { clave: "cotizado" as const, titulo: "Cotizado", cuenta: de("cotizado").length },
             { clave: "produccion" as const, titulo: "En producción", cuenta: de("produccion").length },
             { clave: "enviado" as const, titulo: "Enviado", cuenta: de("enviado").length },
+            ...(pagos ? [{ clave: "pagos" as const, titulo: "Pagos", cuenta: pagos.avisos.length, viva: true }] : []),
           ]}
           valor={tab}
           alCambiar={setTab}
@@ -104,6 +111,7 @@ export function PortalChin({
         {tab === "cotizado" && <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={setCotizando} />}
         {tab === "produccion" && <EnProduccion pedidos={de("produccion")} hoy={hoy} diasAnticipo={cuenta.diasAnticipo} alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })} />}
         {tab === "enviado" && <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />}
+        {tab === "pagos" && pagos && <PagosChin resumen={pagos.resumen} avisos={pagos.avisos} plazos={pagos.plazos} />}
       </main>
 
       {cotizando && (

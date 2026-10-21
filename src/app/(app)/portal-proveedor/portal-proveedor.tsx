@@ -14,6 +14,9 @@ import { hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoTransito, textoPlazo, type Plazo } from "@/lib/proveedor/transito";
 import { decidirPedido, guardarNotaProveedor, marcarLlegada, marcarNovedadesLeidas } from "./actions";
 import { CuentaProveedor, type CuentaPortal } from "./cuenta-proveedor";
+import { PagosEcomfive } from "./pagos-ecomfive";
+import type { AvisoVista, FilaPlazo } from "@/components/proveedor/pagos-proveedor";
+import type { CuotaPorPagar, ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 
 export interface Novedad {
   id: string;
@@ -34,7 +37,7 @@ export interface ResumenPais {
   real: { envios: number; mediana: number; min: number; max: number } | null;
 }
 
-type Tab = "novedades" | "decidir" | "cotizacion" | "transito" | "cuenta";
+type Tab = "novedades" | "decidir" | "cotizacion" | "transito" | "pagos" | "cuenta";
 
 /**
  * Operación › Portal del proveedor: el lado de Ecomfive del portal de Chin (fase 2 de PORTAL-PROVEEDOR.md, la interfaz del
@@ -51,6 +54,7 @@ export function PortalProveedor({
   puedeEscribir,
   tabInicial,
   cuentaPortal,
+  pagos,
 }: {
   proveedor: { id: string; nombre: string };
   pedidos: PedidoPortal[];
@@ -62,6 +66,8 @@ export function PortalProveedor({
   tabInicial: Tab | null;
   /** Solo para un administrador: la cuenta con la que el proveedor entra a su portal. */
   cuentaPortal: { cuenta: CuentaPortal | null; entrada: string } | null;
+  /** Pagos (fase 4); null si falta la migración 0127. */
+  pagos: { resumen: ResumenPagos; porPagar: CuotaPorPagar[]; avisos: AvisoVista[]; plazos: FilaPlazo[] } | null;
 }) {
   const [lista, setLista] = useState(pedidos);
   const [novs, setNovs] = useState(novedades);
@@ -85,6 +91,7 @@ export function PortalProveedor({
     { clave: "decidir", titulo: "Por decidir", cuenta: de("cotizado").length },
     { clave: "cotizacion", titulo: "En cotización", cuenta: de("por_cotizar").length },
     { clave: "transito", titulo: "Tránsito", cuenta: de("enviado").length },
+    { clave: "pagos" as const, titulo: "Pagos", cuenta: pagos ? pagos.porPagar.filter((c) => !c.avisada && c.estado.tono === "peligro").length : 0, viva: true },
     ...(cuentaPortal ? [{ clave: "cuenta" as const, titulo: `Cuenta de ${proveedor.nombre}`, cuenta: 0 }] : []),
   ];
 
@@ -115,6 +122,14 @@ export function PortalProveedor({
           alGuardarNota={(id, nota) => cambiar(id, { notaParaProveedor: nota || null })}
         />
       )}
+      {tab === "pagos" &&
+        (pagos ? (
+          <PagosEcomfive nombre={nombre} resumen={pagos.resumen} porPagar={pagos.porPagar} avisos={pagos.avisos} plazos={pagos.plazos} puedeEscribir={puedeEscribir} />
+        ) : (
+          <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
+            Falta correr en Supabase la migración 0127 (pagos del proveedor).
+          </p>
+        ))}
       {tab === "cuenta" && cuentaPortal && <CuentaProveedor proveedor={proveedor} cuenta={cuentaPortal.cuenta} entrada={cuentaPortal.entrada} />}
       {tab === "transito" && (
         <Transito pedidos={de("enviado")} plazos={plazos} resumen={resumen} hoy={hoy} nombre={nombre} puedeEscribir={puedeEscribir} alLlegar={(id, f) => cambiar(id, { etapa: "llegado", fechaLlegada: f })} />

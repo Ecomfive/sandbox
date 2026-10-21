@@ -108,8 +108,10 @@ Todas con RLS activado y **sin políticas** (solo el servidor). Llaves UUID v7.
 3. **Portal de Chin.** Cuenta de Chin (se crea desde Usuarios y roles como «usuario de proveedor»), entrada `/proveedor`, sus cinco
    pestañas, el panel «Cotizar» (costo, total, unidades por caja, foto real, comentario) y «Marcar enviado». Cada cambio llega a la
    compra y a Novedades/campana.
-4. **Pagos.** «Avisar pago» con reparto por cuota y comprobante; Chin lo confirma y se actualizan los pagos de la compra.
-   Indicadores de cumplimiento en las dos vistas.
+4. **Pagos.** «Avisar pago» con reparto por cuota y comprobante; Chin lo confirma y queda pagado. Indicadores de cumplimiento en las
+   dos vistas. **Decidido (21 oct 2026):** lo pagado vive en el portal (`proveedor_pagos`) y **no se escribe en los campos de pago de
+   la compra**; la ficha de la compra muestra «Pagos a Chin» de solo lectura. El historial de las hojas de Chin se carga en esta fase
+   (lo que estaba en la 5): 706 de 743 filas se emparejan con su compra y las demás quedan como historial suelto que cuenta igual.
 5. **Historial.** Importar las hojas de Chin (pagos de PA/CR/MX y cotizaciones) para que el cumplimiento y el tránsito tengan los
    datos desde 2025: lo que se pueda emparejar con una compra (producto, país y fecha de envío) se vincula; el resto queda como
    historial. Script con `--aplicar`, como las demás importaciones.
