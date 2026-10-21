@@ -118,7 +118,7 @@ export default async function PublicacionesDropiPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
-      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
+      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} nombrePais={pais.nombre} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
     </Pagina>
   );
 }

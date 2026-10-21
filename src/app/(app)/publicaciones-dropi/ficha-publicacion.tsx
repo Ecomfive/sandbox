@@ -11,7 +11,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CalendarioIcon, CerrarIcon, CheckIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
   DIAS_REVISION,
   ESTADOS,
@@ -25,6 +25,7 @@ import {
   opcion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
+import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { actualizarPublicacion, eliminarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
@@ -129,6 +130,7 @@ export function FichaPublicacion({
   publicacion,
   personas,
   codigoPais,
+  nombrePais,
   puedeEscribir,
   puedeEliminar,
   corteVentas = null,
@@ -139,6 +141,7 @@ export function FichaPublicacion({
   publicacion: FilaPublicacion | undefined;
   personas: Persona[];
   codigoPais: string;
+  nombrePais: string;
   puedeEscribir: boolean;
   /** Solo un administrador: elimina la publicación de verdad. */
   puedeEliminar: boolean;
@@ -155,6 +158,7 @@ export function FichaPublicacion({
       p={publicacion}
       personas={personas}
       codigoPais={codigoPais}
+      nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
       puedeEliminar={puedeEliminar}
       corteVentas={corteVentas}
@@ -169,6 +173,7 @@ function ContenidoFicha({
   p,
   personas,
   codigoPais,
+  nombrePais,
   puedeEscribir,
   puedeEliminar,
   corteVentas,
@@ -179,6 +184,7 @@ function ContenidoFicha({
   p: FilaPublicacion;
   personas: Persona[];
   codigoPais: string;
+  nombrePais: string;
   puedeEscribir: boolean;
   puedeEliminar: boolean;
   corteVentas: string | null;
@@ -444,6 +450,13 @@ function ContenidoFicha({
               </label>
             </div>
           </Seccion>
+
+          {/* Lo que viene en camino del producto vinculado: solo unidades, del país seleccionado (las órdenes que ya salieron y no han llegado). */}
+          {p.sku && p.sku.tipo !== "combo" && (
+            <Seccion icono={ComprasIcon} titulo="En camino">
+              <EnCaminoProducto key={`${p.sku.id}-${codigoPais}`} id={p.sku.id} pais={codigoPais} nombrePais={nombrePais} />
+            </Seccion>
+          )}
 
           {/* La competencia del producto vinculado: los mismos datos que se ven en su ficha de Producto y en Compras. Un compuesto no la tiene. */}
           {p.sku && p.sku.tipo !== "combo" && (
