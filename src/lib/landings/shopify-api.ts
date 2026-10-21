@@ -31,9 +31,17 @@ async function token(tienda: string): Promise<string | { error: string }> {
   } catch {
     return { error: "No se pudo conectar con Shopify." };
   }
-  const json = (await r.json().catch(() => null)) as { access_token?: string; expires_in?: number; error?: string; error_description?: string } | null;
+  // Un error de OAuth puede llegar como página HTML («400 - Oauth error app_not_installed»), no como JSON.
+  const cuerpo = await r.text().catch(() => "");
+  let json: { access_token?: string; expires_in?: number; error?: string; error_description?: string } | null = null;
+  try {
+    json = JSON.parse(cuerpo);
+  } catch {
+    // No era JSON: el motivo se busca en el texto.
+  }
   if (!r.ok || !json?.access_token) {
-    const motivo = `${json?.error ?? ""} ${json?.error_description ?? ""}`;
+    const motivo = `${json?.error ?? ""} ${json?.error_description ?? ""} ${cuerpo.slice(0, 500)}`;
+    if (/app_not_installed/i.test(motivo)) return { error: "La app de Shopify no está instalada en la tienda: instálala desde el Dev Dashboard." };
     if (/shop_not_permitted/i.test(motivo)) return { error: "La tienda no está en la misma organización que la app de Shopify: hay que instalarla con autorización (ver la guía)." };
     if (r.status === 400 || r.status === 401) return { error: "Shopify rechazó el id o el secreto de la app (o la app no está instalada en la tienda)." };
     return { error: "Shopify no entregó el permiso de acceso." };
