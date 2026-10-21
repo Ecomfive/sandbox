@@ -24,7 +24,7 @@ export interface VentasDropiDropshipper {
 }
 
 /**
- * Las ventas en Dropi del dropshipper (Desempeño › Ventas Dropi, migraciones 0120 y 0121), por sus cuentas de Dropi vinculadas:
+ * Las ventas en Dropi del dropshipper (Desempeño › Ventas Dropi, migraciones 0120 y 0122), por sus cuentas de Dropi vinculadas:
  * unidades pedidas y netas, lo no efectivo (cancelado, rechazado o devuelto), por mes y por producto. Es una lectura: basta
  * poder abrir el CRM. Devuelve el error como valor.
  */
@@ -52,7 +52,7 @@ export async function obtenerVentasDropi(dropshipperId: string): Promise<VentasD
       supabase.from("dropi_ventas_dropshippers").select("pedidas, ordenes, no_efectivas, netas_30d, ultima_orden").eq("pais_id", paisId).in("dropi_usuario_id", usuarios),
       supabase.from("dropi_ventas_dropshipper_mes").select("dropi_producto_id, mes, pedidas, no_efectivas").eq("pais_id", paisId).in("dropi_usuario_id", usuarios).limit(10000),
     ]);
-    if (totales.error || meses.error) return { error: "No se pudieron cargar las ventas. Falta correr en Supabase la migración 0121." };
+    if (totales.error || meses.error) return { error: "No se pudieron cargar las ventas. Falta correr en Supabase la migración 0122." };
     if (!carga.data || !(totales.data ?? []).length) continue;
     const corte = new Date(new Date(carga.data.corte as string).getTime() - 5 * 3600e3).toISOString().slice(0, 10);
     if (!resultado.corte || corte > resultado.corte) resultado.corte = corte;

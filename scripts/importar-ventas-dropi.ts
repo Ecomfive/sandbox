@@ -40,7 +40,7 @@ async function main() {
   const diarias: Record<string, unknown>[] = [];
   const ds = new Map<number, { pedidas: number; ordenes: Set<number>; negativas: number; n30: number; productos: Set<number>; ultima: string | null }>();
   const desde30 = restarDias(corteFecha, 29);
-  // Cada dropshipper por producto y mes (migración 0121), para su ficha del CRM.
+  // Cada dropshipper por producto y mes (migración 0122), para su ficha del CRM.
   const dsMes = new Map<string, { usuario: number; producto: number; mes: string; pedidas: number; ordenes: Set<number>; noEfectivas: number }>();
   let movimientos = 0;
 
@@ -116,7 +116,7 @@ async function main() {
 
   for (const t of ["dropi_ventas_diarias", "dropi_ventas_productos", "dropi_ventas_dropshippers", "dropi_ventas_dropshipper_mes"]) {
     const { error } = await supabase.from(t).delete().eq("pais_id", pais.id);
-    if (error) throw new Error(error.message.includes("does not exist") || error.message.includes("schema cache") ? `Falta correr la migración ${t === "dropi_ventas_dropshipper_mes" ? "0121" : "0120"}.` : `${t}: ${error.message}`);
+    if (error) throw new Error(error.message.includes("does not exist") || error.message.includes("schema cache") ? `Falta correr la migración ${t === "dropi_ventas_dropshipper_mes" ? "0122" : "0120"}.` : `${t}: ${error.message}`);
   }
   await enTandas("dropi_ventas_productos", productos);
   await enTandas("dropi_ventas_diarias", diarias);

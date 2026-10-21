@@ -69,8 +69,8 @@ async function main() {
     supabase.from("dropi_ventas_dropshipper_mes").select("dropi_usuario_id, mes").eq("pais_id", pais.id).limit(20000),
   ]);
   if (e1 || e2 || e3) throw new Error((e1 ?? e2 ?? e3)!.message);
-  // Sin la migración 0121 no se sabe el primer mes de cada uno (la fecha de ingreso): el informe sale igual, la carga no.
-  if (e4 && aplicar) throw new Error(`Falta correr la migración 0121: ${e4.message}`);
+  // Sin la migración 0122 no se sabe el primer mes de cada uno (la fecha de ingreso): el informe sale igual, la carga no.
+  if (e4 && aplicar) throw new Error(`Falta correr la migración 0122: ${e4.message}`);
   const yaVinculados = new Set((cuentas ?? []).map((c) => Number(c.id_externo)));
   const primerMes = new Map<number, string>();
   for (const r of porMes ?? []) {
