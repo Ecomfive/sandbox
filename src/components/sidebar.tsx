@@ -123,10 +123,13 @@ function SubTitulo({ children }: { children: ReactNode }) {
 function PaginasDeArea({
   area,
   items,
+  limitado = false,
   ...resto
 }: {
   area: NavSection;
   items: NavItem[];
+  /** Con acceso limitado solo se dibujan los frentes que tienen páginas suyas. */
+  limitado?: boolean;
   pathname: string;
   favoritos: string[];
   pendientes: PendientesMenu;
@@ -152,8 +155,8 @@ function PaginasDeArea({
         </div>
       )}
       {FRENTES.filter((f) => !area.soloFrentes || area.soloFrentes.includes(f.id))
-        // Un frente que quedó sin páginas porque no son suyas simplemente no está; el «Próximamente» es solo de un frente vacío por diseño.
-        .filter((f) => items.some((i) => i.frente === f.id) || !area.items.some((i) => i.frente === f.id))
+        // Un frente sin páginas suyas simplemente no está; el «Próximamente» de un frente vacío por diseño es solo del acceso completo.
+        .filter((f) => items.some((i) => i.frente === f.id) || (!limitado && !area.items.some((i) => i.frente === f.id)))
         .map((f) => {
         const delFrente = items.filter((i) => i.frente === f.id);
         const grupos = [...new Set(delFrente.map((i) => i.grupo))];
@@ -398,7 +401,7 @@ function RielYPanel({
             mostrada && (
               <section aria-label={mostrada.area.panel ?? mostrada.area.title}>
                 <Titulo>{mostrada.area.panel ?? mostrada.area.title}</Titulo>
-                <PaginasDeArea area={mostrada.area} items={mostrada.items} pathname={pathname} favoritos={favoritos} pendientes={pendientes} />
+                <PaginasDeArea area={mostrada.area} items={mostrada.items} limitado={limitado} pathname={pathname} favoritos={favoritos} pendientes={pendientes} />
               </section>
             )
           )}
@@ -434,7 +437,7 @@ function ListaMovil({
         .map((v) => (
           <section key={v.area.title} aria-label={v.area.panel ?? v.area.title}>
             <Titulo>{v.area.panel ?? v.area.title}</Titulo>
-            <PaginasDeArea area={v.area} items={v.items} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
+            <PaginasDeArea area={v.area} items={v.items} limitado={limitado} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
           </section>
         ))}
       {(puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0) && (
