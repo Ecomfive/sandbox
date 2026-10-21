@@ -20,6 +20,14 @@ import {
   mesesSiguientes,
 } from "@/lib/compras/llegadas";
 import {
+  GRUPOS_TIENDA,
+  VIAS_PLANIFICACION,
+  enGrupoTienda,
+  enViaPlanificacion,
+  type GrupoTienda,
+  type ViaPlanificacion,
+} from "@/lib/compras/grupos-planificacion";
+import {
   etiquetaEtapa,
   etiquetaVia,
   numeroOC,
@@ -64,9 +72,9 @@ export function PlanificacionCompras({
   paises: { codigo: string; nombre: string }[];
 }) {
   const meses = useMemo(() => mesesSiguientes(hoy()), []);
-  const [via, setVia] = useState("");
+  const [via, setVia] = useState<ViaPlanificacion | "">("");
   const [proveedor, setProveedor] = useState("");
-  const [tienda, setTienda] = useState("");
+  const [tienda, setTienda] = useState<GrupoTienda | "">("");
   const [modo, setModo] = useState<Vista>("pais");
   const [buscar, setBuscar] = useState("");
   // La celda elegida: fila (país o SKU; "" = todas) y columna ("" = todas).
@@ -76,16 +84,15 @@ export function PlanificacionCompras({
     () => new Map(paises.map((p) => [p.codigo, p.nombre])),
     [paises],
   );
-  const opciones = useMemo(() => {
-    const unicos = (fn: (c: FilaCompra) => (string | null)[]) =>
-      [...new Set(compras.flatMap(fn).filter((x): x is string => !!x))].sort(
-        (a, b) => a.localeCompare(b),
-      );
-    return {
-      proveedor: unicos((c) => [c.proveedor]),
-      tienda: unicos((c) => c.tiendas),
-    };
-  }, [compras]);
+  const proveedores = useMemo(
+    () =>
+      [
+        ...new Set(
+          compras.map((c) => c.proveedor).filter((x): x is string => !!x),
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
+    [compras],
+  );
 
   // Las compras por llegar, con su columna, después de los filtros.
   const porLlegar = useMemo(
@@ -95,12 +102,9 @@ export function PlanificacionCompras({
         .filter(
           (x): x is { c: FilaCompra; col: string } =>
             x.col !== null &&
-            (!via ||
-              (via === "sin"
-                ? x.c.viaEnvio.length === 0
-                : x.c.viaEnvio.includes(via))) &&
+            (!via || enViaPlanificacion(x.c.viaEnvio, via)) &&
             (!proveedor || x.c.proveedor === proveedor) &&
-            (!tienda || x.c.tiendas.includes(tienda)),
+            (!tienda || enGrupoTienda(x.c.tiendas, tienda)),
         ),
     [compras, meses, via, proveedor, tienda],
   );
@@ -273,14 +277,15 @@ export function PlanificacionCompras({
         <select
           aria-label="Vía de envío"
           value={via}
-          onChange={(e) => setVia(e.target.value)}
+          onChange={(e) => setVia(e.target.value as ViaPlanificacion | "")}
           className={claseSelect}
         >
           <option value="">Todas las vías</option>
-          <option value="mar">{etiquetaVia("mar")}</option>
-          <option value="aire">{etiquetaVia("aire")}</option>
-          <option value="tierra">{etiquetaVia("tierra")}</option>
-          <option value="sin">Sin vía</option>
+          {VIAS_PLANIFICACION.map((v) => (
+            <option key={v} value={v}>
+              {etiquetaVia(v)}
+            </option>
+          ))}
         </select>
         <select
           aria-label="Proveedor"
@@ -289,18 +294,18 @@ export function PlanificacionCompras({
           className={claseSelect}
         >
           <option value="">Todos los proveedores</option>
-          {opciones.proveedor.map((p) => (
+          {proveedores.map((p) => (
             <option key={p}>{p}</option>
           ))}
         </select>
         <select
           aria-label="Tienda"
           value={tienda}
-          onChange={(e) => setTienda(e.target.value)}
+          onChange={(e) => setTienda(e.target.value as GrupoTienda | "")}
           className={claseSelect}
         >
           <option value="">Todas las tiendas</option>
-          {opciones.tienda.map((p) => (
+          {GRUPOS_TIENDA.map((p) => (
             <option key={p}>{p}</option>
           ))}
         </select>
