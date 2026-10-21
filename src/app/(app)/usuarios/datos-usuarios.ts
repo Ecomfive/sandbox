@@ -14,7 +14,7 @@ export async function consultaSegura<T>(consulta: PromiseLike<{ data: T[] | null
   }
 }
 
-/** Los roles con su color; sin la migración 0116 no existe la columna y se piden sin ella. */
+/** Los roles con su color; sin la migración 0118 no existe la columna y se piden sin ella. */
 export async function consultarRoles(supabase: Cliente): Promise<Rol[]> {
   const conColor = await supabase.from("roles").select("id, nombre, descripcion, color").order("nombre");
   if (!conColor.error) return (conColor.data ?? []) as Rol[];

@@ -586,7 +586,7 @@ export async function obtenerLideresComerciales(): Promise<{ lideres: LiderComer
   const { data: roles, error } = await supabase.from("permisos_rol").select("rol_id").eq("modulo", MODULO_COMERCIAL);
   if (error) return { error: "No se pudo cargar la lista." };
   const ids = (roles ?? []).map((r) => r.rol_id);
-  // Lo propio de cada persona (migración 0116) manda sobre su rol: a quien se le dio el área comercial aparte también cuenta, y a
+  // Lo propio de cada persona (migración 0118) manda sobre su rol: a quien se le dio el área comercial aparte también cuenta, y a
   // quien se le quitó, no. Sin la migración, no hay nada propio.
   const { data: propios, error: errorPropios } = await supabase.from("permisos_persona").select("perfil_id, nivel").eq("modulo", MODULO_COMERCIAL);
   const conPropio = errorPropios ? [] : (propios ?? []);

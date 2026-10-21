@@ -44,7 +44,7 @@ interface Permiso {
   solo_lectura: boolean;
 }
 
-/** Lo afinado y lo propio de una persona (migración 0116). Cada consulta falla en silencio: sin la migración todos ven lo de siempre. */
+/** Lo afinado y lo propio de una persona (migración 0118). Cada consulta falla en silencio: sin la migración todos ven lo de siempre. */
 interface PermisosFinos {
   propios: PermisoPropio[];
   afinadosPersona: FilaAfinada[];

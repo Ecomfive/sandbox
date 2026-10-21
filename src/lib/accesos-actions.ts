@@ -31,7 +31,7 @@ export async function obtenerAccesoSeccion(moduloHref: string): Promise<AccesoSe
     rol: (p.roles as unknown as { nombre: string } | null)?.nombre ?? "Sin rol",
   }));
 
-  // Lo propio de cada persona sobre este módulo (migración 0116; sin ella, nadie tiene nada propio).
+  // Lo propio de cada persona sobre este módulo (migración 0118; sin ella, nadie tiene nada propio).
   const { data: propiosFilas, error: errorPropios } = await supabase.from("permisos_persona").select("perfil_id, nivel").eq("modulo", clave);
   const propios = (errorPropios ? [] : (propiosFilas ?? [])) as PermisoPropioDeModulo[];
 

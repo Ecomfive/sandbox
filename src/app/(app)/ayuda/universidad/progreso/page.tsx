@@ -23,7 +23,7 @@ export default async function ProgresoEquipoPage() {
     supabase.from("perfiles").select("id, nombre, email, rol_id, activo").eq("activo", true).order("nombre"),
     supabase.from("permisos_rol").select("rol_id, modulo"),
     supabase.from("cursos_progreso").select("usuario_id, curso_id, puntaje, completado_en"),
-    // Lo propio de cada persona (migración 0116); sin ella, nada.
+    // Lo propio de cada persona (migración 0118); sin ella, nada.
     supabase.from("permisos_persona").select("perfil_id, modulo, nivel"),
   ]);
   const modulosPorRol = new Map<string, Set<string>>();

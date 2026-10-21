@@ -264,7 +264,7 @@ convenciones técnicas del código.
   Conciliación y Productos y márgenes solo Finanzas y Dirección; Producto va en lectura para casi todos (Compras, Inventario y la competencia de un
   producto dependen de verlo); Selección y Scraping van juntos en Investigación (enviar a Selección exige modificarla). Reversa:
   `supabase/rollbacks/0115_rollback.sql`. Un módulo nuevo debe sumarse a estos roles (a mano en Usuarios y roles o con otra migración).
-- **Usuarios y roles: matriz, permisos propios y «Afinar»** (migración 0116, 20 oct 2026; rediseño aprobado con maqueta). Tres pantallas
+- **Usuarios y roles: matriz, permisos propios y «Afinar»** (migración 0118, 20 oct 2026; rediseño aprobado con maqueta). Tres pantallas
   bajo el módulo `usuarios`, con pestañas **Personas** (`/usuarios`), **Roles** (`/usuarios/roles?rol=<id>`) e **Historial de auditoría**.
   *Roles*: lista de roles al lado de un editor (`roles/editor-rol.tsx`) con la barra de cobertura y la **matriz** (`AREAS_ACCESO`,
   `src/lib/permisos/catalogo.ts`): un `SelectorNivel` de tres niveles por módulo (Sin acceso · Solo lectura · Edición, guardado en

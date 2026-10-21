@@ -11,7 +11,7 @@
 --   * `roles.color`: el color con el que se dibuja el rol.
 --
 -- Todas con RLS y sin políticas (solo el servidor con la clave de servicio las toca). No cambia ningún permiso existente.
--- Para deshacerlo: supabase/rollbacks/0116_rollback.sql.
+-- Para deshacerlo: supabase/rollbacks/0118_rollback.sql.
 
 begin;
 

@@ -82,7 +82,14 @@ function ItemPagina({
       >
         <span className="flex min-w-0 items-center gap-2">
           {Icono && <Icono className={`h-4 w-4 shrink-0 ${activo ? "" : "text-muted-foreground"}`} />}
-          <span className="truncate">{item.label}</span>
+          {item.lineasMenu ? (
+            <span className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate">{item.lineasMenu[0]}</span>
+              <span className="truncate">{item.lineasMenu[1]}</span>
+            </span>
+          ) : (
+            <span className="truncate">{item.label}</span>
+          )}
         </span>
         <ContadorMenu cantidad={cantidadDe(item, pendientes)} />
       </Link>
