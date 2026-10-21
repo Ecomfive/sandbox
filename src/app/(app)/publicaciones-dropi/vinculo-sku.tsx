@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Button } from "@/components/ui/button";
+import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import type { SkuResumen } from "@/lib/publicaciones/sugerencias";
@@ -17,7 +18,7 @@ function Producto({ sku, pequeño = false }: { sku: SkuResumen; pequeño?: boole
     <span className="flex min-w-0 items-center gap-2.5">
       {sku.foto ? <img src={sku.foto} alt="" className={`${pequeño ? "h-8 w-8" : "h-10 w-10"} shrink-0 rounded-md border border-border object-cover`} /> : <span aria-hidden="true" className={`${pequeño ? "h-8 w-8" : "h-10 w-10"} shrink-0 rounded-md border border-dashed border-border-control`} />}
       <span className="flex min-w-0 flex-col">
-        <span className="truncate font-mono text-xs font-semibold">{sku.codigo}</span>
+        <SkuCopiable codigo={sku.codigo} className="font-mono text-xs font-semibold" />
         <span className="truncate text-xs text-muted-foreground">
           {sku.nombre}
           {sku.tipo === "combo" && " · compuesto"}

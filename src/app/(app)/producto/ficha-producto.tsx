@@ -23,6 +23,7 @@ import { VariantesProducto } from "./variantes-producto";
 import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto, type ReferenciasTest } from "./def-producto";
 import { FotoProducto } from "./foto-producto";
 import { NombreProducto } from "./nombre-producto";
+import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
@@ -129,7 +130,7 @@ export function FichaProducto({
         producto && (
           <>
             {producto.numero !== null && <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroProducto(producto.numero)}</span>}
-            <span className="text-lg font-semibold">{producto.codigo}</span>
+            <SkuCopiable codigo={producto.codigo} className="text-lg font-semibold" />
             <Badge tone="neutral">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Badge>
             <Badge tone={TONO_CLASE[producto.clase]}>{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Badge>
           </>
@@ -157,6 +158,21 @@ export function FichaProducto({
                 <Dato etiqueta="Nombre">
                   <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
                 </Dato>
+                {producto.nombresDropi.length > 0 && (
+                  <Dato etiqueta="Nombre en Dropi">
+                    <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                      {producto.nombresDropi.map((n, i) => (
+                        <li key={`${n.pais}-${n.dropiId}-${i}`} className="flex flex-col">
+                          <span>{n.nombre}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {n.pais}
+                            {n.dropiId ? ` · ID ${n.dropiId}` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Dato>
+                )}
                 <Dato etiqueta="N.º">{numeroProducto(producto.numero)}</Dato>
                 <Dato etiqueta="SKU">
                   <SkuProducto key={`${producto.id}-${producto.codigo}`} id={producto.id} codigo={producto.codigo} puedeEscribir={puedeEscribir} />

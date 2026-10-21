@@ -67,7 +67,7 @@ export default async function ProductoPage() {
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners, categorias] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners, categorias, publicaciones] = await Promise.all([
     traerTodasConError<{ combo_id: string; componente_id: string; cantidad: number; componente: unknown }>((desde, hasta) =>
       supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)").order("combo_id").order("componente_id").range(desde, hasta),
     ),
@@ -106,7 +106,20 @@ export default async function ProductoPage() {
     traerTodasConError<{ id: string; categoria_id: string; categoria_revisar: boolean; categorias_productos: unknown }>((desde, hasta) =>
       supabase.from("skus_maestros").select("id, categoria_id, categoria_revisar, categorias_productos(ruta)").not("categoria_id", "is", null).order("id").range(desde, hasta),
     ),
+    // El nombre con que está cada producto en Dropi: el de sus publicaciones vinculadas (migración 0116; sin ella, nada).
+    supabase.from("dropi_publicaciones").select("sku_maestro_id, nombre, dropi_id, estado, paises(codigo)").not("sku_maestro_id", "is", null),
   ]);
+  const nombresDropiPorSku = new Map<string, FilaProducto["nombresDropi"]>();
+  const publicacionesOrdenadas = [...((publicaciones.error ? [] : publicaciones.data) ?? [])].sort((a, b) => Number(a.estado === "archivado") - Number(b.estado === "archivado"));
+  for (const pub of publicacionesOrdenadas) {
+    const pais = unoDe(pub.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? "";
+    if (!puedeVerPais(usuario.paisesPermitidos, pais || null)) continue;
+    const id = pub.sku_maestro_id as string;
+    const nombre = String(pub.nombre ?? "").trim();
+    const actuales = nombresDropiPorSku.get(id) ?? [];
+    if (!nombre || actuales.some((n) => n.nombre === nombre && n.pais === pais)) continue;
+    nombresDropiPorSku.set(id, [...actuales, { nombre, pais, dropiId: String(pub.dropi_id ?? "") }]);
+  }
   const categoriaPorId = new Map(
     categorias.error
       ? []
@@ -272,6 +285,7 @@ export default async function ProductoPage() {
     compras: comprasDe(p.id),
     creado: p.creado_en.slice(0, 10),
     asociaciones: asociacionesPorSku.get(p.id) ?? [],
+    nombresDropi: nombresDropiPorSku.get(p.id) ?? [],
     tests: testsPorId.get(p.id) ?? [],
     padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre } : null,
     opciones: (p.opciones ?? null) as Record<string, string> | null,
