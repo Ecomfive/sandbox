@@ -36,20 +36,21 @@ interface AreaVisible {
   items: NavItem[];
 }
 
-/**
- * Las áreas tal como las ve la persona: solo las páginas de sus módulos y sin áreas vacías. Un área que está vacía por diseño
- * (`mostrarVacia`, «Próximamente») solo se ve si las páginas no se le quitaron por permisos.
- */
-function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined): AreaVisible[] {
-  return areas
-    .map((area) => ({ area, items: area.items.filter((item) => puedeVer(modulos, item.href)) }))
-    .filter((a) => a.items.length > 0 || (a.area.mostrarVacia && a.area.items.length === 0));
-}
-
 /** Si a la persona le falta algún módulo del menú: su menú es solo lo suyo, sin «Próximamente» ni Baby Yoda que no le tocan. */
 function tieneAccesoLimitado(areas: NavSection[], modulos: string[] | null | undefined): boolean {
   if (!modulos) return false;
   return areas.some((a) => a.items.some((i) => !puedeVer(modulos, i.href)));
+}
+
+/**
+ * Las áreas tal como las ve la persona: solo las páginas de sus módulos y sin áreas vacías. Un área vacía por diseño
+ * (`mostrarVacia`, «Próximamente») solo se ve con acceso completo: con acceso limitado el menú es solo lo suyo.
+ */
+function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined): AreaVisible[] {
+  const limitado = tieneAccesoLimitado(areas, modulos);
+  return areas
+    .map((area) => ({ area, items: area.items.filter((item) => puedeVer(modulos, item.href)) }))
+    .filter((a) => a.items.length > 0 || (!limitado && a.area.mostrarVacia));
 }
 
 /** Pendientes de una página: el Centro de notificaciones muestra el total; las demás, lo suyo. */
