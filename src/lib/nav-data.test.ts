@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FRENTES, construirAreas, encontrarSeccionActiva } from "./nav-data";
+import { FRENTES, construirAreas, encontrarSeccionActiva, paginaInicialDe } from "./nav-data";
 import { ICONOS_PAGINA } from "./nav-icons";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del menú)
@@ -111,4 +111,14 @@ test("las fichas de Shopify y de Dropi ya no están en el menú, pero siguen reg
 test("cada página del menú tiene su ícono", () => {
   const sinIcono = areas.flatMap((a) => a.items).filter((i) => i.href && !ICONOS_PAGINA[i.href]).map((i) => i.href);
   assert.deepEqual(sinIcono, []);
+});
+
+test("sin acceso a una página, la persona cae en la primera suya y nunca en el módulo que la rechazó", () => {
+  assert.equal(paginaInicialDe(["dashboard", "compras"]), "/");
+  assert.equal(paginaInicialDe(["dashboard", "compras"], "dashboard"), "/compras");
+  const sola = paginaInicialDe(["compras"]);
+  assert.equal(sola, "/compras");
+  // Un rol con un solo módulo cuyas pestañas están todas ocultas no tiene a dónde ir: se queda sin página.
+  assert.equal(paginaInicialDe(["compras"], "compras"), null);
+  assert.equal(paginaInicialDe([]), null);
 });

@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Button } from "@/components/ui/button";
 import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
@@ -34,6 +35,7 @@ const COMO: Record<string, string> = { codigo: "el SKU es igual al nombre en Dro
  */
 export function VinculoSku({ p, puedeEscribir, siguiente }: { p: FilaPublicacion; puedeEscribir: boolean; siguiente?: () => void }) {
   const { mostrarToast } = useToast();
+  const puedeCrearProducto = usePuedeAbrir("producto");
   const [pendiente, empezar] = useTransition();
   const [elegido, setElegido] = useState<OpcionSkuMaestro | null>(null);
   const [cambiando, setCambiando] = useState(false);
@@ -115,9 +117,11 @@ export function VinculoSku({ p, puedeEscribir, siguiente }: { p: FilaPublicacion
             Es un pack de {s.pack}: falta su compuesto en Producto. Créalo (con {s.pack} × {s.sku.codigo}) y vincúlalo aquí.
           </p>
           <Producto sku={s.sku} pequeño />
-          <Link href="/producto?nuevo=1" className="w-fit text-xs font-medium underline underline-offset-2">
-            Crear el compuesto en Producto
-          </Link>
+          {puedeCrearProducto && (
+            <Link href="/producto?nuevo=1" className="w-fit text-xs font-medium underline underline-offset-2">
+              Crear el compuesto en Producto
+            </Link>
+          )}
         </div>
       )}
       {s && s.alternativas.length > 0 && (

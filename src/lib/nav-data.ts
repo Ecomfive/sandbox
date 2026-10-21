@@ -176,6 +176,22 @@ export const PAISES_NAV: PaisNav[] = [
 export const PAIS_COOKIE = "pais_actual";
 export const PAIS_DEFAULT = "CR";
 
+/**
+ * La primera página del menú que una persona puede abrir (en el orden del menú), para llevarla ahí cuando entra a una que no es
+ * suya: no se le dice «sin acceso», simplemente cae en lo suyo. `excluirModulo` evita volver al módulo que acaba de rechazarla
+ * (por ejemplo, cuando su rol le oculta todas las pestañas). `null` = no tiene ningún módulo.
+ */
+export function paginaInicialDe(modulos: readonly string[], excluirModulo?: string): string | null {
+  for (const area of AREAS) {
+    for (const item of area.items) {
+      if (!item.href) continue;
+      const modulo = moduloDeHref(item.href);
+      if (modulo !== excluirModulo && modulos.includes(modulo)) return item.href;
+    }
+  }
+  return null;
+}
+
 /** Clave de módulo (permisos) correspondiente a un href de navegación. */
 export function moduloDeHref(href: string): string {
   return href === "/" ? "dashboard" : href.slice(1);
