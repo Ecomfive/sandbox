@@ -47,13 +47,13 @@ interface Fila {
 /**
  * La competencia de un producto de Producto (también se pide desde una línea de una compra): en cada país con Análisis de
  * competencia, los productos de Dropi que son el mismo por nombre o por foto (y los iguales a nuestro producto de ECOMFIVE,
- * si está), con su precio, stock y lo que vendieron en 7 y 30 días. Basta poder abrir Producto, Compras o Análisis de
- * competencia. Devuelve el error como valor.
+ * si está), con su precio, stock y lo que vendieron en 7 y 30 días. Basta poder abrir Producto, Compras, Gestión de
+ * publicaciones Dropi o Análisis de competencia. Devuelve el error como valor.
  */
 export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos?: CompetenciaDeProducto[]; error?: string }> {
   const usuario = await getUsuarioActual();
   if (!usuario) return { error: "No hay sesión activa." };
-  if (!["producto", "compras", "analisis-competencia"].some((m) => usuario.modulos.includes(m))) return { error: "No tienes acceso." };
+  if (!["producto", "compras", "analisis-competencia", "publicaciones-dropi"].some((m) => usuario.modulos.includes(m))) return { error: "No tienes acceso." };
   if (!UUID.test(skuId)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
   const { data: sku } = await supabase.from("skus_maestros").select("nombre, foto_huella").eq("id", skuId).maybeSingle();
