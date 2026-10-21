@@ -77,6 +77,17 @@ export function ComprasIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Caja abierta: el «Portal del proveedor» (lo que el proveedor cotiza y envía). */
+export function ProveedorIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 8.5 12 4l9 4.5v7L12 20l-9-4.5v-7Z" />
+      <path d="M3 8.5 12 13l9-4.5" />
+      <path d="M12 13v7" />
+    </Icon>
+  );
+}
+
 /** Bolsa de compras: la sección "Gestión de Tiendas" (distinta del ícono de vitrina de "Tiendas"). */
 export function GestionTiendasIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -1016,6 +1027,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/wms-bodegas": BodegaIcon,
   "/wms-ubicaciones": UbicacionIcon,
   "/compras": ComprasIcon,
+  "/portal-proveedor": ProveedorIcon,
   "/producto": ProductoIcon,
   "/retiros": ConciliacionIcon,
   "/extractos": ExtractoIcon,

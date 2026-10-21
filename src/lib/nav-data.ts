@@ -109,6 +109,7 @@ const AREAS: NavSection[] = [
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
+      { label: "Portal del proveedor", href: "/portal-proveedor", frente: "fulfillment" },
       { label: "Gestión de IDs Dropi", href: "/publicaciones-dropi", frente: "fulfillment" },
       { label: "Producto", href: "/producto", frente: "fulfillment" },
     ],
