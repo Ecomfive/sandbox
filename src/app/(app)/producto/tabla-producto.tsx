@@ -3,6 +3,7 @@
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -39,7 +40,7 @@ const ICONOS: Record<string, IconoComp> = {
 
 const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
   { id: "numero", label: "N.º", ocultable: false, clase: "tabular-nums text-muted-foreground whitespace-nowrap", render: (p) => numeroProducto(p.numero) },
-  { id: "codigo", label: "SKU", ocultable: true, clase: "font-medium", render: (p) => p.codigo },
+  { id: "codigo", label: "SKU", ocultable: true, clase: "font-medium", render: (p) => <SkuCopiable codigo={p.codigo} /> },
   { id: "foto", label: "Foto", ocultable: true, render: (p) => <MiniaturaFoto url={p.foto} nombre={p.nombre} /> },
   {
     id: "nombre",
