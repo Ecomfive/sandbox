@@ -25,6 +25,7 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import { actualizarPublicacion, eliminarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
+import { VentasEnDropi } from "./ventas-publicacion";
 import { VinculoSku } from "./vinculo-sku";
 
 export interface Persona {
@@ -128,6 +129,7 @@ export function FichaPublicacion({
   codigoPais,
   puedeEscribir,
   puedeEliminar,
+  corteVentas = null,
   anterior,
   siguiente,
   alCerrar,
@@ -138,6 +140,8 @@ export function FichaPublicacion({
   puedeEscribir: boolean;
   /** Solo un administrador: elimina la publicación de verdad. */
   puedeEliminar: boolean;
+  /** Hasta qué día llegan las ventas de Dropi (solo un administrador las ve); `null` si no se muestran. */
+  corteVentas?: string | null;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -151,6 +155,7 @@ export function FichaPublicacion({
       codigoPais={codigoPais}
       puedeEscribir={puedeEscribir}
       puedeEliminar={puedeEliminar}
+      corteVentas={corteVentas}
       anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
@@ -164,6 +169,7 @@ function ContenidoFicha({
   codigoPais,
   puedeEscribir,
   puedeEliminar,
+  corteVentas,
   anterior,
   siguiente,
   alCerrar,
@@ -173,6 +179,7 @@ function ContenidoFicha({
   codigoPais: string;
   puedeEscribir: boolean;
   puedeEliminar: boolean;
+  corteVentas: string | null;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -394,11 +401,27 @@ function ContenidoFicha({
             </dl>
           </Seccion>
 
+          {p.ventas && corteVentas && (
+            <Seccion icono={MargenIcon} titulo="Ventas en Dropi">
+              <VentasEnDropi v={p.ventas} corte={corteVentas} />
+            </Seccion>
+          )}
+
           <Seccion icono={InventarioIcon} titulo="Venta y stock">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Estado de venta</span>
                 <Selector nombre="Estado de venta" valor={d.estado_venta} lista={ESTADOS_VENTA} cambiar={(v) => cambiar({ estado_venta: v })} />
+                {p.ventas && (
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    Según Dropi: <b className="font-medium text-foreground">{opcion(ESTADOS_VENTA, p.ventas.estadoSugerido)?.etiqueta}</b>
+                    {puedeEscribir && d.estado_venta !== p.ventas.estadoSugerido && (
+                      <button type="button" onClick={() => p.ventas && cambiar({ estado_venta: p.ventas.estadoSugerido })} className={`rounded border border-primario/40 bg-primario-suave px-1.5 py-0.5 font-medium text-primario hover:border-primario ${anilloFoco}`}>
+                        Usar
+                      </button>
+                    )}
+                  </span>
+                )}
               </div>
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>
