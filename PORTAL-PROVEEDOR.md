@@ -100,7 +100,9 @@ Todas con RLS activado y **sin políticas** (solo el servidor). Llaves UUID v7.
 
 1. **Base y espejo.** Migración (tablas, disparador, bucket, carga inicial, ruta CR 80 días), reglas puras con pruebas y la lectura
    del espejo. Sin pantallas. *Hernán corre la migración y verifico que las ~300 compras de Chin quedaron en el espejo.*
-2. **Nuestra vista.** Página «Portal del proveedor» debajo de Compras con sus cinco pestañas; «Por decidir» y «Marcar llegada»
+2. **Nuestra vista.** Página «Portal del proveedor» debajo de Compras con Novedades, Por decidir, En cotización y Tránsito
+   (**Pagos pasa a la fase 4**: en Compras, `fecha_pago_1` es en realidad la fecha en que vence y casi no hay montos pagados, así
+   que el cumplimiento saldría falso hasta tener los avisos confirmados y el historial de las hojas de Chin); «Por decidir» y «Marcar llegada»
    cambian la compra; «Nueva compra en Cotizar» abre la ficha de Compras con el proveedor Chin. Módulo `portal-proveedor` (se da a
    los roles que tienen Compras), guía del Centro de ayuda y novedad.
 3. **Portal de Chin.** Cuenta de Chin (se crea desde Usuarios y roles como «usuario de proveedor»), entrada `/proveedor`, sus cinco
@@ -130,8 +132,10 @@ Cada fase con interfaz pasa por `ui-ux-pro-max` e `impeccable`, y por `tsc`, `te
 | Panel lateral de cotizar y de aviso de pago | `Ventana lado="derecha"` + `Seccion` |
 | Tipografía Geist | la del sistema |
 
-## Por confirmar antes de la fase 3
+## Decidido para la fase 3 (Hernán, 21 oct 2026)
 
-- ¿A quién avisa la campana cuando Chin cambia algo: al responsable de la compra, a quien la creó o a todos los que tienen el módulo?
-- ¿Chin tendrá una sola cuenta o varias personas de su equipo con la suya?
-- La foto real de Chin: ¿reemplaza la foto de la compra o queda aparte (como adjunto) y la de referencia se mantiene?
+- **La campana avisa a Francis Aponte** cuando Chin cambia algo (precio, foto, envío, pago confirmado). Se guarda como dato del
+  proveedor (`proveedores.notificar_a`, la persona), no fijo en el código, para poder cambiarlo.
+- **Chin tiene una sola cuenta** por ahora (la tabla ya admite más).
+- **La foto real queda aparte**: va como adjunto de la compra (origen `proveedor`) y la foto de la compra sigue siendo la de
+  referencia.

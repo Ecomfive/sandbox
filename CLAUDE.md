@@ -460,6 +460,13 @@ convenciones técnicas del código.
   `src/lib/proveedor/` (con prueba que compara el `case` del disparador con `ETAPA_PORTAL_DE_COMPRA`): cuotas 50 % a los 10 días
   corridos del envío y 50 % a la llegada, tránsito contra `wms_rutas_envio` (CR mar = 80 días), cotización y qué paso da cada lado.
   Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`.
+  **Fase 2** (migración 0125: módulo `portal-proveedor` para quien tiene Compras y `proveedores.notificar_a` = Francis): página
+  `/portal-proveedor` debajo de Compras (`portal-proveedor.tsx`, la interfaz del prototipo con los tokens del sistema), pestañas
+  Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
+  **con `actualizarCampoCompra`** (mismos permisos de Compras, evento, Actividad y auditoría) y dejan una novedad para el proveedor;
+  la nota para el proveedor se escribe en «En cotización». «Nueva compra en Cotizar» lleva a `/compras/lista?proveedor=Chin`, que
+  abre la compra nueva con proveedor y agente puestos (`CrearCompraPanel` se abre sola después de montarse: `Ventana` no se puede
+  dibujar en el servidor). Los plazos salen de Compras › Envíos (si un país y vía tienen dos rutas, la última cambiada).
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,

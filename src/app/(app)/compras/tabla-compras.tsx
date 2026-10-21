@@ -294,6 +294,7 @@ export function TablaCompras({
   abrirInicial = null,
   comentarioInicial = null,
   reponerInicial = null,
+  proveedorInicial = null,
   coloresEtiquetas = {},
   coloresTiendas: coloresTiendasServidor = {},
   restricciones = SIN_RESTRICCIONES,
@@ -315,6 +316,8 @@ export function TablaCompras({
   comentarioInicial?: string | null;
   /** Desde Compras › Reponer: abre la compra nueva con ese producto y esa cantidad elegidos. */
   reponerInicial?: { skuId: string; cantidad: number } | null;
+  /** `?proveedor=Chin` (desde el Portal del proveedor): abre la compra nueva con ese proveedor. */
+  proveedorInicial?: string | null;
   /** El color elegido de cada etiqueta (por su nombre). */
   coloresEtiquetas?: Record<string, string>;
   /** El color elegido de cada tienda (por su nombre). */
@@ -622,7 +625,7 @@ export function TablaCompras({
           accionPrincipal={
             <div className="flex items-center gap-2">
               <SelectorVista vista={vista} paises={paises} />
-              {puedeEscribir && accionPermitidaEnCompras(restricciones, "crear") && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} inicial={reponerInicial} />}
+              {puedeEscribir && accionPermitidaEnCompras(restricciones, "crear") && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} inicial={reponerInicial} proveedorInicial={proveedorInicial} />}
             </div>
           }
           ariaLabel="Tablero de compras"

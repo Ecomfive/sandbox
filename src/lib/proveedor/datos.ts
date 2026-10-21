@@ -111,9 +111,10 @@ export async function cargarEspejo(supabase: SupabaseClient, proveedorId: string
     traerTodasConError<Fila>((desde, hasta) =>
       supabase.from("proveedor_pedidos").select(COLUMNAS).eq("proveedor_id", proveedorId).eq("visible", true).order("actualizado_en", { ascending: false }).range(desde, hasta),
     ),
-    supabase.from("wms_rutas_envio").select("agente, pais_codigo, via, dias_min, dias_max").eq("activo", true).ilike("agente", proveedor.nombreEnCompras),
+    supabase.from("wms_rutas_envio").select("agente, pais_codigo, via, dias_min, dias_max").eq("activo", true).ilike("agente", proveedor.nombreEnCompras).order("actualizado_en"),
   ]);
   if (pedidos.error) return { error: "No se pudieron cargar los pedidos del proveedor." };
+  // Si un país y vía tienen dos rutas activas, manda la que se cambió por último (van en orden).
   const plazos: Record<string, Plazo> = {};
   for (const r of rutas.data ?? []) {
     if (r.via !== "mar" && r.via !== "aire") continue;

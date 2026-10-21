@@ -3,6 +3,7 @@
 export const MODULOS_CON_GUIA: Record<string, string> = {
   "/": "dashboard",
   "/compras": "compras",
+  "/portal-proveedor": "portal-proveedor",
   "/producto": "producto",
   "/scraping-proveedores": "scraping-proveedores",
   "/creacion-ofertas": "creacion-ofertas",

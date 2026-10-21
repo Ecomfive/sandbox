@@ -67,6 +67,7 @@ export function FormularioCompra({
   comentarios,
   alCreada,
   puedeAgregarPais = false,
+  proveedorInicial,
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
   vista: string;
@@ -87,6 +88,8 @@ export function FormularioCompra({
   conProductos?: boolean;
   /** Puede modificar Configuración: «Agregar país» al final de la lista de países. */
   puedeAgregarPais?: boolean;
+  /** Compra nueva desde el Portal del proveedor: el proveedor y el agente de envío ya puestos. */
+  proveedorInicial?: string;
   /** Compra nueva: el bloque de comentarios en borrador (va al final, como la actividad de la ficha). */
   comentarios?: ReactNode;
   /** Compra nueva: lo que se hace con la compra recién creada antes de cerrar (publicar los comentarios en borrador). */
@@ -348,12 +351,12 @@ export function FormularioCompra({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CampoGobernado clave="proveedor">
               <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
-                <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
+                <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? proveedorInicial ?? ""} placeholder="Ej: Chin" className={fieldClass} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="agente">
               <Campo etiqueta={conEmoji("agenteEnvio", "Agente de envío")} id="campo-agente-envio">
-                <input id="campo-agente-envio" type="text" name="agente_envio" list="agentes-envio" defaultValue={compra?.agenteEnvio ?? ""} placeholder="Ej: Chin" className={fieldClass} />
+                <input id="campo-agente-envio" type="text" name="agente_envio" list="agentes-envio" defaultValue={compra?.agenteEnvio ?? proveedorInicial ?? ""} placeholder="Ej: Chin" className={fieldClass} />
                 <datalist id="agentes-envio">
                   <option value="Chin" />
                   <option value="Avery" />

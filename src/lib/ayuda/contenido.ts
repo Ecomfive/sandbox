@@ -115,6 +115,19 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "portal-proveedor",
+    titulo: "Portal del proveedor",
+    ruta: "/portal-proveedor",
+    resumen: "Lo que Chin cotiza, produce y envía, visto desde Ecomfive: sus cotizaciones para decidir, lo que espera precio y lo que viene en camino contra el plazo prometido.",
+    secciones: [
+      { titulo: "Qué es", pasos: ["Chin (proveedor y agente logístico) trabaja en un portal aparte, sin entrar al sistema. Ve una copia de sus compras con solo lo que le toca: producto, foto de referencia, país, vía, unidades y la nota que le dejes. No ve precios de venta, tiendas, responsables ni comentarios internos.", "Esta página es el lado de Ecomfive de ese portal. Lo que cambies aquí cambia la compra en Compras, y lo que cambies en Compras se ve aquí y en el portal de Chin.", "Una compra entra al portal cuando su proveedor es Chin y está en «01 - Cotizar» o más adelante. En Backlog o anulada no se ve."] },
+      { titulo: "Pedir una cotización", pasos: ["En «En cotización» están las compras de Chin en «01 - Cotizar»: Chin las ve para ponerles precio.", "«Nueva compra en Cotizar» abre la compra nueva de Compras con Chin como proveedor y agente; la etapa ya arranca en «01 - Cotizar».", "Pulsa la columna «Nota para Chin» para escribirle algo de ese pedido (por ejemplo «Por favor cotizar 500 units y confirmar»). Se guarda con Enter o al salir del campo; Escape cancela."] },
+      { titulo: "Decidir una cotización", pasos: ["En «Por decidir» están las que Chin ya cotizó: la foto de referencia (la de la compra) y la foto real que subió Chin, lado a lado, con unidades, costo por unidad y total.", "Si Chin cambió las unidades (la caja trae 960 y pediste 1,000), aparece «pediste 1,000».", "«Pasar a Producción» o «Descartar» (pide confirmar) cambia la etapa de la compra, igual que en Compras, y Chin lo ve en su portal. Necesitas poder modificar Compras."] },
+      { titulo: "Tránsito", pasos: ["Arriba, una tarjeta por país y vía: la franja verde es el plazo que prometió Chin (el de su ruta en Compras › Envíos; por ejemplo, Costa Rica por mar 80 días), la barra gris el rango real de lo que llegó en 2026 y la raya su mediana.", "Abajo, lo que Chin envió y todavía no llega: días desde el envío, su plazo y el estado (En plazo, Llega en ≤ 7 días, Atrasado). Lo atrasado va primero.", "Cuando llega, «Marcar llegada» (pide confirmar) pasa la compra a «Arribo mercancía» con la fecha de hoy."] },
+      { titulo: "Novedades", pasos: ["«Novedades del proveedor» junta lo que cambió Chin: cotizaciones, fotos, envíos y pagos confirmados. Lo nuevo va resaltado y la pestaña muestra cuántos hay sin leer.", "«Marcar todo como leído» los da por vistos."] },
+    ],
+  },
+  {
     modulo: "producto",
     titulo: "Producto",
     ruta: "/producto",
@@ -469,6 +482,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Portal del proveedor", texto: "Debajo de Compras está «Portal del proveedor»: lo que Chin cotiza, produce y envía. Ahí decides sus cotizaciones (con la foto de referencia y la real lado a lado), le dejas notas a lo que está en Cotizar y ves lo que viene en camino contra el plazo prometido, con «Marcar llegada». El portal de Chin llega en la próxima entrega.", modulo: "portal-proveedor", href: "/portal-proveedor" },
   { fecha: "2026-10-21", titulo: "Eliminar productos (administradores)", texto: "En la ficha de un producto, los administradores ven «Eliminar». Solo borra un producto que nada usa (sin compras, publicaciones, tests, fichas, variantes, movimientos ni stock); si algo lo usa, el aviso dice qué lo bloquea. Requiere correr la migración 0125.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-21", titulo: "Predicción de la fecha límite", texto: "En la ficha de una compra, al poner el país, la vía (marítimo, aéreo…) y la fecha de envío, bajo la Fecha límite aparece cuándo llegaría según lo que tardaron los envíos anteriores de ese país por esa vía, con su rango habitual y un botón «Usar como fecha límite».", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-21", titulo: "Envíos, más fácil de leer", texto: "Compras › Envíos ahora es una sola lista de rutas, agrupable por país, agente o vía, con las mismas columnas en cada fila: plazo prometido, real, estado (En plazo, Fuera de plazo, Sin medir, Sin plazo) y una barra que compara lo que tardó con el plazo. A la derecha ves qué atender primero. Ya no hay vista de tarjetas ni de tabla, y el interruptor de activar o desactivar está en la ficha de cada ruta.", modulo: "compras", href: "/compras/envios" },
