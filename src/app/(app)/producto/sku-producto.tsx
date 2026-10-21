@@ -23,7 +23,10 @@ export function SkuProducto({ id, codigo, puedeEscribir }: { id: string; codigo:
   if (!editando)
     return (
       <span className="flex min-w-0 flex-wrap items-center gap-x-2">
-        <SkuCopiable codigo={codigo} className="min-w-0 font-medium [overflow-wrap:anywhere]" />
+        <SkuCopiable codigo={codigo} className="min-w-0 font-medium">
+          {/* Un SKU largo («ACEITE/OREGANO/CAPSULAS/300/BLANCO») parte la línea en vez de pisar la columna de al lado. */}
+          <span className="[overflow-wrap:anywhere]">{codigo}</span>
+        </SkuCopiable>
         {puedeEscribir && (
           <button type="button" onClick={() => setEditando(true)} className={`rounded text-xs text-primario hover:underline ${anilloFoco}`}>
             Cambiar
