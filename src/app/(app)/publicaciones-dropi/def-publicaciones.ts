@@ -11,6 +11,7 @@ import {
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
+import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
@@ -52,6 +53,8 @@ export interface FilaPublicacion {
   sku: SkuResumen | null;
   /** Si no está vinculada: el producto sugerido y cómo se encontró. */
   sugerencia: SugerenciaVista | null;
+  /** Sus ventas en Dropi (Desempeño › Ventas Dropi): solo llegan a un administrador; `null` si no tiene datos. */
+  ventas: VentasPublicacion | null;
 }
 
 /** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */
@@ -68,6 +71,14 @@ export const VINCULOS = [
 const opciones = (lista: OpcionPublicacion[]) => () => lista.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }));
 const color = (lista: OpcionPublicacion[]) => (v: string) => opcion(lista, v)?.color;
 const uno = (v: string | null) => [v ?? SIN_VALOR];
+
+/** Cómo anda el stock de una publicación según sus ventas en Dropi. */
+export const STOCK_DROPI = [
+  { valor: "sin_stock_vende", etiqueta: "Sin stock y se vende" },
+  { valor: "se_acaba", etiqueta: "Se acaba (menos de 15 días)" },
+  { valor: "alcanza", etiqueta: "Alcanza" },
+  { valor: "sin_ventas", etiqueta: "Sin ventas en 30 días" },
+];
 
 /** Cómo se filtra y agrupa la lista: arranca agrupada por estado y los archivados van ocultos (botón «Archivados»). */
 export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
@@ -130,4 +141,34 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { etiqueta: "SKU", valor: (f) => f.sku?.codigo ?? "" },
   ],
   vistaInicial: { agrupar: "estado" },
+};
+
+/** La misma lista para un administrador: suma los filtros y columnas de las ventas en Dropi. */
+export const DEF_PUBLICACIONES_ADMIN: DefTabla<FilaPublicacion> = {
+  ...DEF_PUBLICACIONES,
+  campos: [
+    ...DEF_PUBLICACIONES.campos,
+    { id: "stockDropi", etiqueta: "Stock en Dropi", tipo: "seleccion", valores: (f) => uno(f.ventas?.stockEstado ?? null), opciones: () => STOCK_DROPI, etiquetaSinValor: "Sin datos de Dropi", agrupable: true, ordenGrupos: STOCK_DROPI.map((s) => s.valor) },
+    { id: "ventaDropi", etiqueta: "Estado de venta según Dropi", tipo: "seleccion", valores: (f) => uno(f.ventas?.estadoSugerido ?? null), opciones: opciones(ESTADOS_VENTA), etiquetaSinValor: "Sin datos de Dropi", agrupable: true, ordenGrupos: ESTADOS_VENTA.map((e) => e.valor), colorValor: color(ESTADOS_VENTA) },
+    {
+      id: "ventaCoincide",
+      etiqueta: "Estado de venta vs. Dropi",
+      tipo: "seleccion",
+      valores: (f) => [!f.ventas ? SIN_VALOR : f.estadoVenta === f.ventas.estadoSugerido ? "coincide" : "distinto"],
+      opciones: () => [
+        { valor: "distinto", etiqueta: "No coincide con Dropi" },
+        { valor: "coincide", etiqueta: "Coincide con Dropi" },
+      ],
+      etiquetaSinValor: "Sin datos de Dropi",
+      agrupable: true,
+    },
+    { id: "netas30", etiqueta: "Netas 30 días (Dropi)", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },
+    { id: "stockDropiNum", etiqueta: "Stock en Dropi", tipo: "numero", valor: (f) => f.ventas?.stock ?? null },
+    { id: "diasInventario", etiqueta: "Días de inventario", tipo: "numero", valor: (f) => f.ventas?.diasInventario ?? null },
+  ],
+  csvAntes: [
+    ...(DEF_PUBLICACIONES.csvAntes ?? []),
+    { etiqueta: "Netas 30 días (Dropi)", valor: (f) => (f.ventas ? String(f.ventas.netas30) : "") },
+    { etiqueta: "Stock en Dropi", valor: (f) => (f.ventas ? String(f.ventas.stock) : "") },
+  ],
 };

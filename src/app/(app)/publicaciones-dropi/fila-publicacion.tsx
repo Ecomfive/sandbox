@@ -13,6 +13,7 @@ import { eliminarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
+const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 const fechaCorta = (f: string | null) => (f ? new Date(`${f}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "short" }) : "—");
 
 const Punto = ({ clase, texto }: { clase: string; texto: string }) => (
@@ -68,11 +69,31 @@ function BotonEliminarFila({ f, alEliminar }: { f: FilaPublicacion; alEliminar: 
   );
 }
 
+/** Las ventas en Dropi de la fila (solo un administrador): netas de 30 días, stock y para cuántos días alcanza. */
+function CeldaVentas({ f }: { f: FilaPublicacion }) {
+  const v = f.ventas;
+  if (!v) return <Celda nombre="Ventas en Dropi" alinear="derecha" principal={<span className="text-muted-foreground">—</span>} apoyo="Sin datos de Dropi" />;
+  return (
+    <Celda
+      nombre="Ventas en Dropi, últimos 30 días"
+      alinear="derecha"
+      principal={
+        <span className="inline-flex items-center gap-1.5 tabular-nums">
+          {v.stockEstado === "sin_stock_vende" && <Punto clase="bg-destructive" texto="Sin stock y se vende" />}
+          {v.stockEstado === "se_acaba" && <Punto clase="bg-warning" texto="Se acaba el stock" />}
+          {entero(v.netas30)} netas en 30 días
+        </span>
+      }
+      apoyo={<span className="tabular-nums">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>}
+    />
+  );
+}
+
 /**
  * Una publicación como fila de la lista: foto, nombre con su ID y su SKU, estado, precio, utilidad y margen, dónde está,
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
  */
-export function FilaPublicacionLista({ f, alAbrir, alEliminar }: { f: FilaPublicacion; alAbrir: () => void; alEliminar?: () => void }) {
+export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; alEliminar?: () => void }) {
   const estado = opcion(ESTADOS, f.estado);
   const venta = opcion(ESTADOS_VENTA, f.estadoVenta);
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
@@ -83,7 +104,7 @@ export function FilaPublicacionLista({ f, alAbrir, alEliminar }: { f: FilaPublic
       type="button"
       onClick={alAbrir}
       aria-label={`Abrir la ficha de ${f.nombre}`}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(0,1fr)_1rem] ${anilloFoco}`}
+      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_1rem]" : "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(0,1fr)_1rem]"} ${anilloFoco}`}
     >
       {/* Producto */}
       <span className="flex min-w-0 items-center gap-3">
@@ -132,6 +153,7 @@ export function FilaPublicacionLista({ f, alAbrir, alEliminar }: { f: FilaPublic
           principal={estado ? <Badge color={estado.color}>{estado.etiqueta}</Badge> : <span className="text-muted-foreground">—</span>}
           apoyo={venta ? <ConPunto color={venta.color} texto={venta.etiqueta} /> : "Sin estado de venta"}
         />
+        {verVentas && <CeldaVentas f={f} />}
         <Celda
           nombre="Dónde está y reposición"
           principal={ubicacion ? <ConPunto color={ubicacion.color} texto={ubicacion.etiqueta} /> : <span className="text-muted-foreground">—</span>}

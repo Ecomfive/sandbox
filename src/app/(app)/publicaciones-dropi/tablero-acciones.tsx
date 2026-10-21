@@ -4,6 +4,7 @@ import { KpiFiltro } from "@/components/ui/kpi-filtro";
 import { KpiGroup, type Tono } from "@/components/ui/kpi-card";
 import type { AtajoFiltro } from "@/lib/tabla/atajos";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
+import type { DefTabla } from "@/lib/tabla/motor";
 import { DEF_PUBLICACIONES, estadoVinculo, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
@@ -70,7 +71,7 @@ const ACCIONES: Accion[] = [
  * vencidas, el margen bajo, lo que falta vincular y lo que no tiene stock). Cada tarjeta cuenta las publicaciones abiertas y,
  * al pulsarla, filtra la lista de abajo; pulsarla otra vez quita el filtro. Los estados del flujo se pueden juntar (uno u otro).
  */
-export function TableroAcciones({ publicaciones }: { publicaciones: FilaPublicacion[] }) {
+export function TableroAcciones({ publicaciones, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; def?: DefTabla<FilaPublicacion> }) {
   const abiertas = publicaciones.filter((f) => f.estado !== "archivado");
   return (
     <KpiGroup titulo="Tablero de acciones" accion={<span className="tabular-nums">{abiertas.length} publicaciones abiertas</span>}>
@@ -78,7 +79,7 @@ export function TableroAcciones({ publicaciones }: { publicaciones: FilaPublicac
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8 [&>*]:min-w-0">
         {ACCIONES.map((a) => {
           const n = abiertas.filter(a.cuenta).length;
-          return <KpiFiltro key={a.id} def={DEF_PUBLICACIONES} atajo={a.atajo} titulo={a.titulo} valor={n} subtexto={a.subtexto} tono={n > 0 ? a.tono : "neutral"} compacta />;
+          return <KpiFiltro key={a.id} def={def} atajo={a.atajo} titulo={a.titulo} valor={n} subtexto={a.subtexto} tono={n > 0 ? a.tono : "neutral"} compacta />;
         })}
       </div>
     </KpiGroup>

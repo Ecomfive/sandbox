@@ -10,7 +10,7 @@ import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, ESTADOS_VENTA, TIPOS,
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
-import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, DEF_PUBLICACIONES_ADMIN, type FilaPublicacion } from "./def-publicaciones";
 import { FichaPublicacion, type Persona } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
@@ -35,9 +35,15 @@ const ICONOS: Record<string, IconoComp> = {
   ultimaRevision: CalendarioIcon,
   proximaRevision: CalendarioIcon,
   fechaPublicacion: CalendarioIcon,
+  stockDropi: InventarioIcon,
+  ventaDropi: MargenIcon,
+  ventaCoincide: MargenIcon,
+  netas30: MargenIcon,
+  stockDropiNum: InventarioIcon,
+  diasInventario: CalendarioIcon,
 };
 
-const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS, venta: ESTADOS_VENTA, ubicacion: UBICACIONES, reposicion: ESTADOS_REPOSICION, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
+const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS, venta: ESTADOS_VENTA, ventaDropi: ESTADOS_VENTA, ubicacion: UBICACIONES, reposicion: ESTADOS_REPOSICION, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
 
 /**
  * Las publicaciones del país: el tablero de acciones arriba y, debajo, la lista de filas con la barra de herramientas común y
@@ -51,6 +57,7 @@ export function TablaPublicaciones({
   codigoPais,
   puedeEscribir,
   puedeEliminar,
+  corteVentas,
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
@@ -59,15 +66,19 @@ export function TablaPublicaciones({
   codigoPais: string;
   puedeEscribir: boolean;
   puedeEliminar: boolean;
+  /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
+  corteVentas: string | null;
 }) {
+  const verVentas = corteVentas !== null;
+  const def = verVentas ? DEF_PUBLICACIONES_ADMIN : DEF_PUBLICACIONES;
   const [abierta, setAbierta] = useState<string | null>(null);
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
   return (
     <ProveedorSkusMaestros opciones={opcionesSku}>
-      <TableroAcciones publicaciones={publicaciones} />
+      <TableroAcciones publicaciones={publicaciones} def={def} />
       <ListaDatos
-        def={DEF_PUBLICACIONES}
+        def={def}
         filas={publicaciones}
         iconos={ICONOS}
         nombre={NOMBRE}
@@ -76,6 +87,7 @@ export function TablaPublicaciones({
         renderFila={(f, enOrden) => (
           <FilaPublicacionLista
             f={f}
+            verVentas={verVentas}
             alAbrir={() => {
               setOrden(enOrden.map((x) => x.id));
               setAbierta(f.id);
@@ -96,6 +108,7 @@ export function TablaPublicaciones({
         codigoPais={codigoPais}
         puedeEscribir={puedeEscribir}
         puedeEliminar={puedeEliminar}
+        corteVentas={corteVentas}
         anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}

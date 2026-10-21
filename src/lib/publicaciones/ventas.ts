@@ -169,3 +169,76 @@ export function totalesPorDia(dias: VentaDia[], corte: string, cuantos: number) 
   }
   return [...t.values()];
 }
+
+// --- Gestión de publicaciones Dropi: las ventas de una publicación ---------------------------------------------------
+
+/** Lo que muestra una publicación de sus ventas en Dropi (la suma de sus IDs, si tiene varios). */
+export interface VentasPublicacion {
+  /** Los IDs de Dropi que suma (los que tienen datos). */
+  ids: number[];
+  netas30: number;
+  netas30Antes: number;
+  netas90: number;
+  pedidas: number;
+  canceladas: number;
+  rechazadas: number;
+  devueltas: number;
+  netasTotal: number;
+  pctCancelacion: number | null;
+  pctDevolucion: number | null;
+  stock: number;
+  diasInventario: number | null;
+  ultimaVenta: string | null;
+  /** Netas por mes (YYYY-MM). */
+  porMes: Record<string, number>;
+  /** El estado de venta que dicen los datos (valores de `ESTADOS_VENTA`). */
+  estadoSugerido: "mas_vendidos" | "estable" | "lento" | "estancado" | "sin_stock";
+  /** Cómo anda el stock: sin stock vendiéndose, se acaba (menos de 15 días), alcanza o sin ventas. */
+  stockEstado: "sin_stock_vende" | "se_acaba" | "alcanza" | "sin_ventas";
+}
+
+/**
+ * El estado de venta según Dropi, con los mismos cortes de la lista de ClickUp por unidades netas de los últimos 30 días:
+ * Más vendidos +500, Estable +100, Lento 20 a 99, Estancado menos de 20; Sin stock si no le queda stock.
+ */
+export function estadoVentaSugerido(netas30: number, stock: number): VentasPublicacion["estadoSugerido"] {
+  if (stock <= 0) return "sin_stock";
+  if (netas30 >= 500) return "mas_vendidos";
+  if (netas30 >= 100) return "estable";
+  if (netas30 >= 20) return "lento";
+  return "estancado";
+}
+
+/** Suma las ventas de los IDs de Dropi de una publicación («7231-7679» son dos). `null` si ninguno tiene datos. */
+export function ventasDePublicacion(ids: number[], resumen: Map<number, ResumenProducto>): VentasPublicacion | null {
+  const rs = [...new Set(ids)].map((id) => resumen.get(id)).filter((r): r is ResumenProducto => !!r);
+  if (!rs.length) return null;
+  const suma = (f: (r: ResumenProducto) => number) => rs.reduce((a, r) => a + f(r), 0);
+  const v = {
+    netas30: suma((r) => r.netas30),
+    netas30Antes: suma((r) => r.netas30Antes),
+    netas90: suma((r) => r.netas90),
+    pedidas: suma((r) => r.pedidas),
+    canceladas: suma((r) => r.canceladas),
+    rechazadas: suma((r) => r.rechazadas),
+    devueltas: suma((r) => r.devueltas),
+    stock: suma((r) => Math.max(r.stock, 0)),
+  };
+  const porMes: Record<string, number> = {};
+  for (const r of rs) for (const [m, n] of Object.entries(r.porMes)) porMes[m] = (porMes[m] ?? 0) + n;
+  const porDia = Math.max(v.netas30, 0) / 30;
+  const diasInventario = porDia > 0 ? Math.round(v.stock / porDia) : null;
+  const ultimaVenta = rs.reduce<string | null>((a, r) => (r.ultimaVenta && (!a || r.ultimaVenta > a) ? r.ultimaVenta : a), null);
+  return {
+    ids: rs.map((r) => r.id),
+    ...v,
+    netasTotal: netas(v),
+    pctCancelacion: v.pedidas ? v.canceladas / v.pedidas : null,
+    pctDevolucion: v.pedidas ? (v.devueltas + v.rechazadas) / v.pedidas : null,
+    diasInventario,
+    ultimaVenta,
+    porMes,
+    estadoSugerido: estadoVentaSugerido(v.netas30, v.stock),
+    stockEstado: v.netas30 <= 0 ? "sin_ventas" : v.stock <= 0 ? "sin_stock_vende" : diasInventario !== null && diasInventario < DIAS_REPONER ? "se_acaba" : "alcanza",
+  };
+}

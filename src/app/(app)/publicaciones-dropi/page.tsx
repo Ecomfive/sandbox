@@ -5,6 +5,8 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
 import { revisionVencida } from "@/lib/publicaciones/publicacion";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
+import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
+import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -28,6 +30,8 @@ export default async function PublicacionesDropiPage() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
+  // Las ventas de Dropi (Desempeño › Ventas Dropi) solo las ve un administrador, por ahora.
+  const admin = esAdministrador(usuario);
   const [filasR, perfilesR] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
@@ -58,13 +62,14 @@ export default async function PublicacionesDropiPage() {
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
-  const [{ skus, sugerencias }, opcionesSku] = await Promise.all([
+  const [{ skus, sugerencias }, opcionesSku, ventas] = await Promise.all([
     cargarSugerencias(
       supabase,
       pais.id,
       datos.map((d) => ({ id: d.id, nombre: d.nombre as string, dropiId: (d.dropi_id as string | null) ?? "", skuId: (d.sku_maestro_id as string | null) ?? null })),
     ),
     obtenerOpcionesSkuMaestro(supabase),
+    admin ? cargarResumenVentas(supabase, pais.id) : Promise.resolve(null),
   ]);
 
   const filas: FilaPublicacion[] = datos.map((d) => {
@@ -102,13 +107,14 @@ export default async function PublicacionesDropiPage() {
       deClickup: !!d.clickup_id,
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
       sugerencia: sugerencias.get(d.id) ?? null,
+      ventas: ventas ? ventasDePublicacion((String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? []).map(Number), ventas.resumen) : null,
     };
   });
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de publicaciones Dropi" oculto />
-      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && esAdministrador(usuario)} />
+      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
     </Pagina>
   );
 }

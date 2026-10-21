@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hayQueReponer, mesesEntre, restarDias, resumirProductos, totalesPorDia, totalesPorMes, type ProductoDropi, type VentaDia } from "./ventas";
+import { estadoVentaSugerido, hayQueReponer, mesesEntre, restarDias, resumirProductos, totalesPorDia, totalesPorMes, ventasDePublicacion, type ProductoDropi, type VentaDia } from "./ventas";
 
 const CORTE = "2026-10-21";
 const prod = (id: number, stock: number): ProductoDropi => ({ id, nombre: `P${id}`, lista: "activo", privado: false, variable: false, stock, primeraVenta: null, ultimaVenta: null });
@@ -56,4 +56,25 @@ test("totales por mes y por día", () => {
   assert.deepEqual(meses.map((m) => [m.mes, m.netas]), [["2026-09", 3], ["2026-10", 6]]);
   const ultimos = totalesPorDia(dias, CORTE, 3);
   assert.deepEqual(ultimos, [{ dia: "2026-10-19", pedidas: 0, netas: 0 }, { dia: "2026-10-20", pedidas: 2, netas: 0 }, { dia: "2026-10-21", pedidas: 6, netas: 6 }]);
+});
+
+test("estado de venta sugerido con los cortes de ClickUp", () => {
+  assert.equal(estadoVentaSugerido(600, 10), "mas_vendidos");
+  assert.equal(estadoVentaSugerido(100, 10), "estable");
+  assert.equal(estadoVentaSugerido(20, 10), "lento");
+  assert.equal(estadoVentaSugerido(0, 10), "estancado");
+  assert.equal(estadoVentaSugerido(900, 0), "sin_stock");
+});
+
+test("una publicación con dos IDs de Dropi suma los dos", () => {
+  const resumen = new Map(resumirProductos([prod(1, 30), prod(2, 0)], [dia(1, CORTE, 40), dia(2, CORTE, 20, { devueltas: 5 }), dia(2, "2026-08-10", 3)], CORTE).map((r) => [r.id, r]));
+  const v = ventasDePublicacion([1, 2, 99], resumen)!;
+  assert.deepEqual(v.ids, [1, 2]);
+  assert.equal(v.netas30, 55);
+  assert.equal(v.stock, 30);
+  assert.equal(v.diasInventario, 16); // 30 ÷ (55 ÷ 30)
+  assert.equal(v.stockEstado, "alcanza");
+  assert.equal(v.estadoSugerido, "lento");
+  assert.equal(v.porMes["2026-08"], 3);
+  assert.equal(ventasDePublicacion([99], resumen), null);
 });
