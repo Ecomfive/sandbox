@@ -15,7 +15,7 @@
 --
 -- Uso: select wms_unir_productos('<id que se conserva>', '<id que se elimina>', false);   -- simular
 --      select wms_unir_productos('<id que se conserva>', '<id que se elimina>', true);    -- aplicar
--- Para deshacer la función: supabase/rollbacks/0120_rollback.sql (lo que ya se unió no se puede separar).
+-- Para deshacer la función: supabase/rollbacks/0121_rollback.sql (lo que ya se unió no se puede separar).
 
 create or replace function _wms_unir_productos(p_conservar uuid, p_eliminar uuid)
 returns jsonb
