@@ -106,12 +106,15 @@ export function TablaProducto({
   opcionesSimples,
   codigoPais,
   puedeEscribir,
+  puedeEliminar,
   referenciasTest,
 }: {
   productos: FilaProducto[];
   opcionesSimples: OpcionSkuMaestro[];
   codigoPais: string;
   puedeEscribir: boolean;
+  /** Solo un administrador: elimina el producto de verdad (si nada depende de él). */
+  puedeEliminar: boolean;
   referenciasTest: ReferenciasTest;
 }) {
   // Qué producto está abierto y en qué orden se veían las filas al abrirlo (para las flechas de anterior y siguiente).
@@ -141,6 +144,7 @@ export function TablaProducto({
         orden={abierto?.orden ?? []}
         codigoPais={codigoPais}
         puedeEscribir={puedeEscribir}
+        puedeEliminar={puedeEliminar}
         referenciasTest={referenciasTest}
         alIr={(id) => setAbierto((a) => (a ? { ...a, id } : a))}
         alCerrar={() => setAbierto(null)}
