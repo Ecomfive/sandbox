@@ -450,6 +450,16 @@ convenciones técnicas del código.
   compuestos. La página calcula las sugerencias al cargar (`cargarSugerencias`, `src/lib/publicaciones/sugerencias.ts`); la ficha las
   confirma con `vincularSkuPublicacion` («Vincular y siguiente»), con `CampoSkuMaestro` para elegir otro. Las exactas se vinculan con
   `npx tsx scripts/vincular-skus-publicaciones.ts --aplicar` (también calcula las huellas que falten; actividad «Vínculo automático»).
+- **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin
+  cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
+  llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de
+  `proveedores` desde «Cotizar» (Backlog, anuladas u otro proveedor quedan `visible = false`); si la copia falla, la compra se guarda
+  igual (solo un aviso en el registro). La compra es la fuente: lo que el proveedor cambie se aplica a la compra y el disparador lo
+  trae de vuelta (al aplicar, cambiar unidades y etapa en **un solo update**: `unidades_pedidas` se congela al salir de «Por
+  cotizar»). Cuentas del portal en `proveedor_usuarios` (sin fila en `perfiles`: el sistema no las reconoce). Reglas puras en
+  `src/lib/proveedor/` (con prueba que compara el `case` del disparador con `ETAPA_PORTAL_DE_COMPRA`): cuotas 50 % a los 10 días
+  corridos del envío y 50 % a la llegada, tránsito contra `wms_rutas_envio` (CR mar = 80 días), cotización y qué paso da cada lado.
+  Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`.
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,
