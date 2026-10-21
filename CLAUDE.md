@@ -256,6 +256,14 @@ convenciones técnicas del código.
   solo muestra lo suyo (jefe, equipo, cada puesto con su onboarding). Lectura de todo en `cargarPuestos` (`src/lib/puestos/datos.ts`);
   sin la migración las páginas avisan. La migración da `puestos` a los roles que tienen `usuarios`. Fuera de la fase 1: KPI,
   scorecard, OKR, evaluaciones, PDI e incentivos.
+- **Perfiles de acceso por área** (migración 0115, 20 oct 2026; cuadro en `Perfiles-de-acceso-Ecomfive.pdf`, junto a la carpeta del proyecto). Roles
+  listos con los módulos de cada área y qué es solo lectura: **nuevos** Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo,
+  Talento humano y Consulta; **completados** Administrativo (Finanzas), Atención al cliente, Líder comercial y Operaciones (Bodega); Admin
+  (Dirección) no cambia. La migración solo **agrega** permisos (nunca quita ni cambia un «solo lectura» ya puesto), no mueve a nadie de rol y no le
+  da Nómina y gastos a Administrativo. Reglas que la guían: Usuarios y roles y Configuración solo Dirección; Nómina y gastos, Extractos, Retiros,
+  Conciliación y Productos y márgenes solo Finanzas y Dirección; Producto va en lectura para casi todos (Compras, Inventario y la competencia de un
+  producto dependen de verlo); Selección y Scraping van juntos en Investigación (enviar a Selección exige modificarla). Reversa:
+  `supabase/rollbacks/0115_rollback.sql`. Un módulo nuevo debe sumarse a estos roles (a mano en Usuarios y roles o con otra migración).
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo
