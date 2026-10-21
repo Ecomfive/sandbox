@@ -1,6 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
 import { revisionVencida } from "@/lib/publicaciones/publicacion";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
@@ -26,6 +27,7 @@ export default async function PublicacionesDropiPage() {
   const usuario = await requireModulo("publicaciones-dropi");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
   const [filasR, perfilesR] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
@@ -106,7 +108,7 @@ export default async function PublicacionesDropiPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de publicaciones Dropi" oculto />
-      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={!usuario.modulosSoloLectura.includes("publicaciones-dropi")} />
+      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && esAdministrador(usuario)} />
     </Pagina>
   );
 }

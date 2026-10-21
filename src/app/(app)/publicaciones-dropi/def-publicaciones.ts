@@ -1,4 +1,6 @@
 import {
+  MARGEN_BAJO,
+  margenBajo,
   ESTADOS,
   ESTADOS_PUBLICACION,
   ESTADOS_REPOSICION,
@@ -81,6 +83,18 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
         { valor: "vencida", etiqueta: "Revisión vencida" },
         { valor: "al_dia", etiqueta: "Revisión al día" },
       ],
+      agrupable: true,
+    },
+    {
+      id: "margenBajo",
+      etiqueta: "Margen",
+      tipo: "seleccion",
+      valores: (f) => [f.margen === null ? SIN_VALOR : margenBajo(f.margen) ? "bajo" : "sano"],
+      opciones: () => [
+        { valor: "bajo", etiqueta: `Margen bajo (menos de ${Math.round(MARGEN_BAJO * 100)} %)` },
+        { valor: "sano", etiqueta: "Margen sano" },
+      ],
+      etiquetaSinValor: "Sin margen",
       agrupable: true,
     },
     { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },

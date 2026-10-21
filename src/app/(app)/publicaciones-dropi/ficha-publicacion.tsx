@@ -10,7 +10,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CalendarioIcon, CerrarIcon, CheckIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CerrarIcon, CheckIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
   DIAS_REVISION,
   ESTADOS,
@@ -23,7 +23,7 @@ import {
   opcion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
-import { actualizarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
+import { actualizarPublicacion, eliminarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VinculoSku } from "./vinculo-sku";
 
@@ -127,6 +127,7 @@ export function FichaPublicacion({
   personas,
   codigoPais,
   puedeEscribir,
+  puedeEliminar,
   anterior,
   siguiente,
   alCerrar,
@@ -135,6 +136,8 @@ export function FichaPublicacion({
   personas: Persona[];
   codigoPais: string;
   puedeEscribir: boolean;
+  /** Solo un administrador: elimina la publicación de verdad. */
+  puedeEliminar: boolean;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -147,6 +150,7 @@ export function FichaPublicacion({
       personas={personas}
       codigoPais={codigoPais}
       puedeEscribir={puedeEscribir}
+      puedeEliminar={puedeEliminar}
       anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
@@ -159,6 +163,7 @@ function ContenidoFicha({
   personas,
   codigoPais,
   puedeEscribir,
+  puedeEliminar,
   anterior,
   siguiente,
   alCerrar,
@@ -167,6 +172,7 @@ function ContenidoFicha({
   personas: Persona[];
   codigoPais: string;
   puedeEscribir: boolean;
+  puedeEliminar: boolean;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -218,6 +224,19 @@ function ContenidoFicha({
     });
   }
 
+  function eliminar() {
+    if (!confirm(`¿Eliminar "${p.nombre}"? No se puede deshacer.`)) return;
+    setError(null);
+    empezar(async () => {
+      const r = await eliminarPublicacion(p.id).catch(() => ({ error: "No se pudo eliminar. Inténtalo de nuevo." }));
+      if (r.error) setError(r.error);
+      else {
+        mostrarToast("Publicación eliminada");
+        alCerrar();
+      }
+    });
+  }
+
   return (
     <Ventana
       abierto
@@ -256,6 +275,11 @@ function ContenidoFicha({
               {!sinGuardar && (
                 <BotonAccion icono={CalendarioIcon} tono={p.revisionVencida ? "alerta" : "neutro"} disabled={pendiente} onClick={revisada}>
                   Marcar revisada hoy
+                </BotonAccion>
+              )}
+              {!sinGuardar && puedeEliminar && (
+                <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
+                  {pendiente ? "Eliminando..." : "Eliminar"}
                 </BotonAccion>
               )}
             </div>

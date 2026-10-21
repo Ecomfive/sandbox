@@ -4,12 +4,16 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, ESTADOS_VENTA, TIPOS, UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
+import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "publicaciones-dropi";
 const RUTA = "/publicaciones-dropi";
+const BUCKET_FOTOS = "wms-productos";
+const PREFIJO_URL_PUBLICA = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -209,6 +213,46 @@ export async function vincularSkuPublicacion(id: string, skuId: string | null): 
     entidadId: id,
     antes: { Producto: previo },
     despues: { Producto: nuevo ? `${nuevo.codigo} · ${nuevo.nombre}` : "Sin vincular" },
+  });
+  revalidatePath(RUTA);
+  return {};
+}
+
+/**
+ * Elimina una publicación de verdad (no se puede deshacer). **Solo un administrador** (quien puede modificar Usuarios y roles): el
+ * resto archiva con el estado «Archivado». Se quita también de las «relacionadas» de las demás y se borra su foto si ninguna otra
+ * fila la usa. Queda en la auditoría con lo que era. Devuelve el error como valor.
+ */
+export async function eliminarPublicacion(id: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!esAdministrador(usuario)) return { error: "Solo un administrador puede eliminar publicaciones." };
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  const supabase = createServiceClient();
+
+  // Las demás publicaciones que la tenían como relacionada dejan de apuntarle (son ids dentro de una lista, sin llave foránea).
+  const { data: conRelacion } = await supabase.from("dropi_publicaciones").select("id, relacionados").contains("relacionados", [id]);
+  for (const fila of conRelacion ?? []) {
+    const restantes = ((fila.relacionados as string[] | null) ?? []).filter((r) => r !== id);
+    await supabase.from("dropi_publicaciones").update({ relacionados: restantes }).eq("id", fila.id);
+  }
+
+  const { error } = await supabase.from("dropi_publicaciones").delete().eq("id", id);
+  if (error) return { error: "No se pudo eliminar la publicación." };
+
+  // La foto solo se borra si es de la carpeta de las publicaciones y ninguna otra fila la sigue usando.
+  const foto = (antes.foto_url as string | null) ?? null;
+  const ruta = rutaPropia(foto, PREFIJO_URL_PUBLICA, "publicaciones");
+  if (ruta && foto) {
+    const { count } = await supabase.from("dropi_publicaciones").select("id", { count: "exact", head: true }).eq("foto_url", foto);
+    if (!count) await supabase.storage.from(BUCKET_FOTOS).remove([ruta]);
+  }
+
+  await registrarAuditoria({
+    accion: "eliminar_publicacion_dropi",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre}${antes.dropi_id ? ` · ID Dropi ${antes.dropi_id}` : ""}`,
   });
   revalidatePath(RUTA);
   return {};
