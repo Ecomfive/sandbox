@@ -150,7 +150,8 @@ export const CURSOS: Curso[] = [
         titulo: "Anular y Envíos",
         parrafos: [
           "Una compra no se borra: «Anular» pide el motivo y la pasa a la etapa Descartado con la insignia «Anulada», conservando su código y su historial. «Restaurar» la devuelve a la etapa que tenía.",
-          "En la pestaña Envíos ves, por país, cada agente y vía: lo que promete, lo que de verdad tarda (histórico, últimos 12 meses y últimos 2 meses) y su tarifa por CBM o kg; ahí activas o desactivas cada ruta.",
+          "En la pestaña Envíos ves una lista de rutas (la puedes agrupar por país, agente o vía): cada fila dice lo que promete el agente, lo que de verdad tarda (últimos 12 meses y últimos 2 meses), si está En plazo o Fuera de plazo —con una barra que lo compara— y su tarifa por CBM o kg. Pulsa una ruta para abrir su ficha: ahí la activas o desactivas, cambias lo que promete y agregas tarifas.",
+          "En la ficha de una compra, bajo la Fecha límite, aparece la predicción de cuándo llegará según su país, su vía y su fecha de envío (con el rango habitual). «Usar como fecha límite» la pone en el campo; nunca la cambia sola.",
         ],
       },
     ],
@@ -161,6 +162,7 @@ export const CURSOS: Curso[] = [
       { pregunta: "¿Cómo se pone la Planificación de una compra?", opciones: ["Se escribe a mano el mes", "Se calcula sola con la fecha de envío y lo que tardan los envíos de su país por esa vía", "Es el mes en que se creó la compra"], correcta: 1 },
       { pregunta: "Una compra se pidió por error. ¿Qué haces?", opciones: ["La elimino para que no quede rastro", "La anulo con su motivo: pasa a Descartado y se puede restaurar", "Le cambio el nombre"], correcta: 1 },
       { pregunta: "Escribiste mal un comentario tuyo. ¿Qué haces?", opciones: ["Pulso «Editar» en mi comentario y lo corrijo: queda marcado «(editado)»", "Pido a otra persona que lo borre", "No se puede cambiar"], correcta: 0 },
+      { pregunta: "En la ficha de una compra aparece la predicción de la fecha límite. ¿Qué hace «Usar como fecha límite»?", opciones: ["Guarda la compra como completada", "Pone la fecha predicha en el campo Fecha límite (tú decides si guardas)", "Cambia la fecha de envío"], correcta: 1 },
       { pregunta: "¿Cómo marcas una venta de importación (para un cliente)?", opciones: ["Eligiendo el país Importadora", "Con su «Tipo de venta»: Venta de importación", "Con una etiqueta"], correcta: 1 },
     ],
   },

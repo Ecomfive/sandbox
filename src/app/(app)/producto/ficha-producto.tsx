@@ -31,11 +31,11 @@ import { ExclusividadProducto } from "./exclusividad-producto";
 import { CategoriaProducto } from "./categoria-producto";
 import { SelectorClaseProducto } from "./selector-clase";
 
-function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
+function Dato({ etiqueta, children, className = "" }: { etiqueta: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className={`flex min-w-0 flex-col gap-0.5 ${className}`}>
       <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
-      <dd className="text-sm break-words">{children}</dd>
+      <dd className="text-sm [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
@@ -182,33 +182,15 @@ export function FichaProducto({
 
           <div className="flex flex-col divide-y divide-border border-t border-border p-5">
             <Seccion icono={CatalogoIcon} titulo="Producto">
-              <dl className="flex flex-col gap-3">
-                <Dato etiqueta="Nombre">
+              {/* En cuadrícula para aprovechar el ancho de la ventana: el nombre a lo ancho y lo corto de a tres por línea. */}
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                <Dato etiqueta="Nombre" className="sm:col-span-2 xl:col-span-3">
                   <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
                 </Dato>
-                {producto.nombresDropi.length > 0 && (
-                  <Dato etiqueta="Publicaciones en Dropi">
-                    <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                      {producto.nombresDropi.map((n, i) => (
-                        <li key={`${n.pais}-${n.dropiId}-${i}`} className="flex flex-col">
-                          <span>{n.nombre}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {n.pais}
-                            {n.dropiId ? ` · ID ${n.dropiId}` : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </Dato>
-                )}
-                <Dato etiqueta="N.º">{numeroProducto(producto.numero)}</Dato>
                 <Dato etiqueta="SKU">
                   <SkuProducto key={`${producto.id}-${producto.codigo}`} id={producto.id} codigo={producto.codigo} puedeEscribir={puedeEscribir} />
                 </Dato>
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
-                <Dato etiqueta="Categoría">
-                  <CategoriaProducto key={`${producto.id}-${producto.categoria?.id ?? ""}-${producto.categoria?.revisar ?? ""}`} id={producto.id} categoria={producto.categoria} puedeEscribir={puedeEscribir} />
-                </Dato>
                 <Dato etiqueta="Estado">
                   {puedeEscribir ? (
                     <SelectorClaseProducto clase={producto.clase} deshabilitado={pending} alCambiar={cambiarClase} />
@@ -221,6 +203,24 @@ export function FichaProducto({
                     </span>
                   )}
                 </Dato>
+                <Dato etiqueta="Categoría" className="sm:col-span-2 xl:col-span-1">
+                  <CategoriaProducto key={`${producto.id}-${producto.categoria?.id ?? ""}-${producto.categoria?.revisar ?? ""}`} id={producto.id} categoria={producto.categoria} puedeEscribir={puedeEscribir} />
+                </Dato>
+                {producto.nombresDropi.length > 0 && (
+                  <Dato etiqueta="Publicaciones en Dropi" className="sm:col-span-2">
+                    <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                      {producto.nombresDropi.map((n, i) => (
+                        <li key={`${n.pais}-${n.dropiId}-${i}`} className="flex flex-col">
+                          <span>{n.nombre}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {n.pais}
+                            {n.dropiId ? ` · ID ${n.dropiId}` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Dato>
+                )}
               </dl>
             </Seccion>
 
@@ -259,6 +259,9 @@ export function FichaProducto({
               </Seccion>
             )}
 
+            {/* Los bloques cortos van lado a lado: Código de barras a la izquierda, Vencimiento e Inventario a la derecha (en
+                pantallas angostas se apilan). Envío, con sus campos de medidas, va a lo ancho. */}
+            <div className="grid grid-cols-1 gap-x-8 gap-y-5 py-5 md:grid-cols-2 [&>section]:py-0">
             <Seccion icono={CatalogoIcon} titulo="Código de barras">
               <CodigoBarrasProducto
                 key={producto.id}
@@ -271,10 +274,8 @@ export function FichaProducto({
               />
             </Seccion>
 
-            <Seccion icono={EnvioIcon} titulo="Envío">
-              <EnvioProductoBloque key={producto.id} id={producto.id} envio={producto.envio} puedeEscribir={puedeEscribir} />
-            </Seccion>
 
+            <div className="flex flex-col gap-5 [&>section]:py-0">
             {producto.tipo !== "combo" && (
               <Seccion icono={CalendarioIcon} titulo="Vencimiento">
                 <VencimientoProducto
@@ -297,6 +298,13 @@ export function FichaProducto({
                   Ver en Inventario
                 </Link>
               ) : null}
+            </Seccion>
+
+            </div>
+            </div>
+
+            <Seccion icono={EnvioIcon} titulo="Envío">
+              <EnvioProductoBloque key={producto.id} id={producto.id} envio={producto.envio} puedeEscribir={puedeEscribir} />
             </Seccion>
 
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
