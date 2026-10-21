@@ -2,7 +2,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
-import { armarPersonasConAcceso, type AccesoSeccion, type PerfilConRol, type PermisoDeRol } from "@/lib/acceso-seccion";
+import { armarPersonasConAcceso, type AccesoSeccion, type PerfilConRol, type PermisoDeRol, type PermisoPropioDeModulo } from "@/lib/acceso-seccion";
 import { MODULOS } from "@/lib/modulos";
 import { moduloDeHref } from "@/lib/nav-data";
 
@@ -31,19 +31,24 @@ export async function obtenerAccesoSeccion(moduloHref: string): Promise<AccesoSe
     rol: (p.roles as unknown as { nombre: string } | null)?.nombre ?? "Sin rol",
   }));
 
+  // Lo propio de cada persona sobre este módulo (migración 0116; sin ella, nadie tiene nada propio).
+  const { data: propiosFilas, error: errorPropios } = await supabase.from("permisos_persona").select("perfil_id, nivel").eq("modulo", clave);
+  const propios = (errorPropios ? [] : (propiosFilas ?? [])) as PermisoPropioDeModulo[];
+
   let perfiles: PerfilConRol[] = [];
-  if (permisos.length > 0) {
-    const { data, error } = await supabase
-      .from("perfiles")
-      .select("id, nombre, email, avatar_url, rol_id, activo")
-      .eq("activo", true)
-      .in("rol_id", permisos.map((p) => p.rol_id));
+  let nombresDeRol = new Map<string, string>();
+  if (permisos.length > 0 || propios.length > 0) {
+    const [{ data, error }, { data: roles }] = await Promise.all([
+      supabase.from("perfiles").select("id, nombre, email, avatar_url, rol_id, activo").eq("activo", true),
+      supabase.from("roles").select("id, nombre"),
+    ]);
     if (error) throw new Error(error.message);
     perfiles = (data ?? []) as PerfilConRol[];
+    nombresDeRol = new Map((roles ?? []).map((r) => [r.id as string, r.nombre as string]));
   }
 
   return {
-    personas: armarPersonasConAcceso(perfiles, permisos),
+    personas: armarPersonasConAcceso(perfiles, permisos, propios, nombresDeRol),
     yoId: usuario.id,
     puedeAdministrar: usuario.modulos.includes("usuarios"),
   };

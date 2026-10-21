@@ -1,6 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { cargarCompras } from "../datos-compras";
 import { PlanificacionCompras } from "../planificacion-compras";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Compras › Planificación: lo que llega en el mes en curso y los 3 siguientes, por país y por producto. */
 export default async function PlanificacionComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
-  await requireModulo("compras");
+  await requirePestana("compras", "planificacion");
   const { ver } = await searchParams;
   const { compras, paises, vista, error } = await cargarCompras(ver);
   return (

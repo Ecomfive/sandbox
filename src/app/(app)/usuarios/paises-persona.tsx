@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Bandera } from "@/components/paises/bandera";
+import { SeccionTarjeta } from "@/components/permisos/seccion-tarjeta";
+import { MundoIcon } from "@/lib/nav-icons";
 import { useToast } from "@/components/ui/toast";
 import { guardarPaisesUsuario, listarPaisesParaPermisos } from "./actions";
 
@@ -45,10 +47,7 @@ export function PaisesPersona({ id, nombre, inicial }: { id: string; nombre: str
   // Importadora ya no es una opción: las ventas de importación son compras de un país (migración 0094).
   const opciones = paises ?? [];
   return (
-    <section className="p-5" aria-labelledby={`paises-${id}`}>
-      <h3 id={`paises-${id}`} className="mb-3 text-sm font-semibold">
-        Países
-      </h3>
+    <SeccionTarjeta id={`paises-${id}`} icono={MundoIcon} titulo="Países">
       {inicial === undefined ? (
         <p role="alert" className="text-sm text-destructive">
           Falta correr la migración 0087 en Supabase para limitar los países.
@@ -84,6 +83,6 @@ export function PaisesPersona({ id, nombre, inicial }: { id: string; nombre: str
           )}
         </fieldset>
       )}
-    </section>
+    </SeccionTarjeta>
   );
 }

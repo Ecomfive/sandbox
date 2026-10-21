@@ -1,14 +1,12 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { crearUsuario, eliminarRol } from "./actions";
-import type { FilaUsuario, Rol } from "./def-usuarios";
-import { FichaRol } from "./ficha-rol";
+import { crearUsuario } from "./actions";
+import type { Rol } from "./def-usuarios";
+import { AvatarRol } from "@/components/permisos/piezas-permisos";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
-import { useToast } from "@/components/ui/toast";
-import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { LapizIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
+import { MasIcon } from "@/lib/nav-icons";
 
 const Obligatorio = () => (
   <span aria-hidden="true" className="text-destructive">
@@ -18,31 +16,15 @@ const Obligatorio = () => (
 );
 
 /** Botón "Crear usuario" y su ficha: nombre, correo, el rol elegido de una tarjeta (con su descripción, como en
- * "Nuevo retiro") y una contraseña temporal. Al guardar, la muestra una sola vez para pasarla a mano.
- * Cada tarjeta de rol lleva, aparte, un lápiz (abre su `FichaRol` completa, encima de esta ventana) y una
- * papelera (elimina de una vez, con confirmación) — así no hace falta salir de "Crear usuario" para arreglar
- * un rol, como uno creado por error. */
-export function CrearUsuarioPanel({
-  roles,
-  modulosPorRol,
-  soloLecturaPorRol,
-  personasPorRol,
-}: {
-  roles: Rol[];
-  modulosPorRol: Map<string, Set<string>>;
-  soloLecturaPorRol: Map<string, Set<string>>;
-  personasPorRol: Map<string, FilaUsuario[]>;
-}) {
+ * "Nuevo retiro") y una contraseña temporal. Al guardar, la muestra una sola vez para pasarla a mano. Los roles se editan
+ * en la pestaña Roles, no aquí. */
+export function CrearUsuarioPanel({ roles }: { roles: Rol[] }) {
   const [abierto, setAbierto] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [contrasena, setContrasena] = useState<string | null>(null);
-  const [rolEditando, setRolEditando] = useState<Rol | null>(null);
-  const [eliminandoRolId, setEliminandoRolId] = useState<string | null>(null);
-  const [, startTransitionRol] = useTransition();
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const { mostrarToast } = useToast();
 
   function cerrar() {
     if (pending) return;
@@ -64,26 +46,13 @@ export function CrearUsuarioPanel({
     });
   }
 
-  function alEliminarRol(r: Rol) {
-    if (!confirm(`¿Está seguro de que desea eliminar el rol "${r.nombre}"?`)) return;
-    setEliminandoRolId(r.id);
-    const formData = new FormData();
-    formData.set("id", r.id);
-    startTransitionRol(async () => {
-      const resultado = await eliminarRol(formData).catch(() => ({ error: "Inténtalo de nuevo." }));
-      setEliminandoRolId(null);
-      if (resultado?.error) mostrarToast(resultado.error, "destructive");
-      else mostrarToast("Rol eliminado");
-    });
-  }
-
   return (
     <>
       <button
         ref={botonAbrirRef}
         type="button"
         onClick={() => setAbierto(true)}
-        className={`inline-flex items-center gap-1.5 rounded-full bg-[#202020] px-4 py-2 text-sm font-medium text-white hover:bg-[#2d2d2d] ${anilloFoco}`}
+        className={`boton-neon inline-flex h-9 items-center gap-2 rounded-[10px] px-3.5 text-[13px] font-semibold text-white ${anilloFoco}`}
       >
         <MasIcon className="h-4 w-4" />
         Crear usuario
@@ -99,7 +68,7 @@ export function CrearUsuarioPanel({
             <button
               type="button"
               onClick={cerrar}
-              className={`self-start rounded-md bg-[#202020] px-4 py-2 text-sm font-medium text-white hover:bg-[#2d2d2d] ${anilloFoco}`}
+              className={`boton-neon self-start rounded-[10px] px-4 py-2 text-sm font-semibold text-white ${anilloFoco}`}
             >
               Listo
             </button>
@@ -130,41 +99,14 @@ export function CrearUsuarioPanel({
                 </p>
                 <div className="mt-1 flex flex-col gap-2">
                   {roles.map((r) => (
-                    <div
-                      key={r.id}
-                      className="flex items-start gap-2.5 rounded-md border border-border p-3 has-[:checked]:border-foreground"
-                    >
-                      <label className="flex flex-1 cursor-pointer items-start gap-2.5">
-                        <input type="radio" name="rol_id" value={r.id} required className="mt-1 accent-foreground" />
-                        <span>
-                          <span className="block text-sm font-semibold">{r.nombre}</span>
-                          {r.descripcion && <span className="block text-xs text-muted-foreground">{r.descripcion}</span>}
-                        </span>
-                      </label>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Tooltip texto={`Editar ${r.nombre}`}>
-                          <button
-                            type="button"
-                            onClick={() => setRolEditando(r)}
-                            aria-label={`Editar ${r.nombre}`}
-                            className={`rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-                          >
-                            <LapizIcon className="h-4 w-4" />
-                          </button>
-                        </Tooltip>
-                        <Tooltip texto={`Eliminar ${r.nombre}`}>
-                          <button
-                            type="button"
-                            onClick={() => alEliminarRol(r)}
-                            disabled={eliminandoRolId === r.id || (personasPorRol.get(r.id)?.length ?? 0) > 0}
-                            aria-label={`Eliminar ${r.nombre}`}
-                            className={`rounded p-1.5 text-muted-foreground hover:bg-destructive-soft hover:text-destructive disabled:opacity-50 ${anilloFoco}`}
-                          >
-                            <PapeleraIcon className="h-4 w-4" />
-                          </button>
-                        </Tooltip>
-                      </div>
-                    </div>
+                    <label key={r.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border p-3 has-[:checked]:border-primario has-[:checked]:bg-primario-suave">
+                      <input type="radio" name="rol_id" value={r.id} required className="mt-2 accent-[var(--nivel-edicion)]" />
+                      <AvatarRol nombre={r.nombre} color={r.color ?? null} />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{r.nombre}</span>
+                        {r.descripcion && <span className="block text-xs text-muted-foreground">{r.descripcion}</span>}
+                      </span>
+                    </label>
                   ))}
                 </div>
               </div>
@@ -185,7 +127,7 @@ export function CrearUsuarioPanel({
               <button
                 type="submit"
                 disabled={pending || roles.length === 0}
-                className={`rounded-full bg-[#202020] px-4 py-2 text-sm font-medium text-white hover:bg-[#2d2d2d] disabled:opacity-50 ${anilloFoco}`}
+                className={`boton-neon rounded-[10px] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${anilloFoco}`}
               >
                 {pending ? "Creando..." : "Crear usuario"}
               </button>
@@ -194,13 +136,6 @@ export function CrearUsuarioPanel({
         )}
       </Ventana>
 
-      <FichaRol
-        rol={rolEditando ?? undefined}
-        modulosActivos={rolEditando ? (modulosPorRol.get(rolEditando.id) ?? new Set()) : new Set()}
-        modulosSoloLectura={rolEditando ? (soloLecturaPorRol.get(rolEditando.id) ?? new Set()) : new Set()}
-        personas={rolEditando ? (personasPorRol.get(rolEditando.id)?.length ?? 0) : 0}
-        alCerrar={() => setRolEditando(null)}
-      />
     </>
   );
 }

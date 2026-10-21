@@ -4,6 +4,8 @@ export interface Rol {
   id: string;
   nombre: string;
   descripcion: string | null;
+  /** El color con el que se dibuja (migración 0116); sin elegir, uno que sale del nombre. */
+  color?: string | null;
 }
 
 export interface FilaUsuario {

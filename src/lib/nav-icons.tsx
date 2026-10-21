@@ -992,3 +992,100 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/wms-productos-dropi": CatalogoIcon,
   "/notificaciones": NotificacionesIcon,
 };
+
+export function OjoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </Icon>
+  );
+}
+
+export function OjoTachadoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.8M6.6 6.7C3.8 8.4 2 12 2 12s3.5 6 10 6c1.6 0 3-.4 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </Icon>
+  );
+}
+
+export function CandadoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </Icon>
+  );
+}
+
+/** Los controles deslizantes: «Afinar» lo que ve un rol o una persona dentro de un módulo. */
+export function AfinarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+    </Icon>
+  );
+}
+
+export function EscudoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />
+    </Icon>
+  );
+}
+
+export function ReiniciarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 12a8 8 0 1 0 8-8" />
+      <path d="M4 4v5h5" />
+    </Icon>
+  );
+}
+
+export function PestanasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 10h18M9 5v5" />
+    </Icon>
+  );
+}
+
+export function RayoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M13 3L5 14h6l-1 7 8-11h-6z" />
+    </Icon>
+  );
+}
+
+export function ListaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 6h16M4 12h16M4 18h10" />
+    </Icon>
+  );
+}
+
+export function EmbudoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+    </Icon>
+  );
+}
+
+export function MundoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" />
+    </Icon>
+  );
+}

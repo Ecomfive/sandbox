@@ -33,24 +33,37 @@ export interface PerfilConRol {
 
 const nombreVisible = (p: { nombre: string | null; email: string }) => (p.nombre?.trim() || p.email).toLowerCase();
 
+/** Lo propio de una persona sobre el módulo (Usuarios y roles › Permisos propios): manda sobre lo que da su rol. */
+export interface PermisoPropioDeModulo {
+  perfil_id: string;
+  nivel: "ninguno" | "lectura" | "edicion";
+}
+
 /**
- * Quién puede entrar a un módulo: las personas activas cuyo rol tiene ese módulo. Se ordenan por
- * rol y, dentro de cada rol, por nombre; así la lista se lee agrupada y no cambia de una carga a otra.
+ * Quién puede entrar a un módulo: las personas activas cuyo rol tiene ese módulo, o a quienes se les dio aparte, y no las que
+ * tienen un permiso propio de «sin acceso». Se ordenan por rol y, dentro de cada rol, por nombre; así la lista se lee agrupada y
+ * no cambia de una carga a otra.
  */
-export function armarPersonasConAcceso(perfiles: PerfilConRol[], permisos: PermisoDeRol[]): PersonaConAcceso[] {
+export function armarPersonasConAcceso(
+  perfiles: PerfilConRol[],
+  permisos: PermisoDeRol[],
+  propios: PermisoPropioDeModulo[] = [],
+  nombresDeRol: Map<string, string> = new Map(),
+): PersonaConAcceso[] {
   const porRol = new Map(permisos.map((p) => [p.rol_id, p]));
-  return perfiles
-    .filter((p) => p.activo && p.rol_id !== null && porRol.has(p.rol_id))
-    .map((p) => {
-      const permiso = porRol.get(p.rol_id!)!;
-      return {
-        id: p.id,
-        nombre: p.nombre,
-        email: p.email,
-        avatarUrl: p.avatar_url,
-        rol: permiso.rol,
-        soloLectura: permiso.solo_lectura,
-      };
-    })
-    .sort((a, b) => a.rol.localeCompare(b.rol, "es") || nombreVisible(a).localeCompare(nombreVisible(b), "es"));
+  const propioDe = new Map(propios.map((p) => [p.perfil_id, p]));
+  const lista: PersonaConAcceso[] = [];
+  for (const p of perfiles) {
+    if (!p.activo) continue;
+    const propio = propioDe.get(p.id);
+    const delRol = p.rol_id !== null ? porRol.get(p.rol_id) : undefined;
+    const rol = delRol?.rol ?? (p.rol_id ? (nombresDeRol.get(p.rol_id) ?? "Sin rol") : "Sin rol");
+    if (propio) {
+      if (propio.nivel === "ninguno") continue;
+      lista.push({ id: p.id, nombre: p.nombre, email: p.email, avatarUrl: p.avatar_url, rol, soloLectura: propio.nivel === "lectura" });
+    } else if (delRol) {
+      lista.push({ id: p.id, nombre: p.nombre, email: p.email, avatarUrl: p.avatar_url, rol: delRol.rol, soloLectura: delRol.solo_lectura });
+    }
+  }
+  return lista.sort((a, b) => a.rol.localeCompare(b.rol, "es") || nombreVisible(a).localeCompare(nombreVisible(b), "es"));
 }

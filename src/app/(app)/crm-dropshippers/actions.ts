@@ -586,9 +586,16 @@ export async function obtenerLideresComerciales(): Promise<{ lideres: LiderComer
   const { data: roles, error } = await supabase.from("permisos_rol").select("rol_id").eq("modulo", MODULO_COMERCIAL);
   if (error) return { error: "No se pudo cargar la lista." };
   const ids = (roles ?? []).map((r) => r.rol_id);
-  if (ids.length === 0) return { lideres: [] };
-  const { data: perfiles } = await supabase.from("perfiles").select("id, nombre, email").in("rol_id", ids).eq("activo", true).order("nombre");
-  return { lideres: (perfiles ?? []).map((p) => ({ id: p.id, nombre: p.nombre || p.email })) };
+  // Lo propio de cada persona (migración 0116) manda sobre su rol: a quien se le dio el área comercial aparte también cuenta, y a
+  // quien se le quitó, no. Sin la migración, no hay nada propio.
+  const { data: propios, error: errorPropios } = await supabase.from("permisos_persona").select("perfil_id, nivel").eq("modulo", MODULO_COMERCIAL);
+  const conPropio = errorPropios ? [] : (propios ?? []);
+  const sumados = conPropio.filter((p) => p.nivel !== "ninguno").map((p) => p.perfil_id as string);
+  const quitados = new Set(conPropio.filter((p) => p.nivel === "ninguno").map((p) => p.perfil_id as string));
+  if (ids.length === 0 && sumados.length === 0) return { lideres: [] };
+  const { data: perfiles } = await supabase.from("perfiles").select("id, nombre, email, rol_id").eq("activo", true).order("nombre");
+  const elegibles = (perfiles ?? []).filter((p) => !quitados.has(p.id) && ((p.rol_id && ids.includes(p.rol_id)) || sumados.includes(p.id)));
+  return { lideres: elegibles.map((p) => ({ id: p.id, nombre: p.nombre || p.email })) };
 }
 
 /** Cambia la fase de captación de un dropshipper y/o le asigna su líder comercial (la «transferencia»). */

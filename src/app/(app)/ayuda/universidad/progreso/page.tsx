@@ -19,13 +19,17 @@ export default async function ProgresoEquipoPage() {
   const usuario = await requireSesion();
   if (!usuario.modulos.includes("usuarios")) redirect("/sin-acceso");
   const supabase = createServiceClient();
-  const [perfiles, permisos, progreso] = await Promise.all([
+  const [perfiles, permisos, progreso, propios] = await Promise.all([
     supabase.from("perfiles").select("id, nombre, email, rol_id, activo").eq("activo", true).order("nombre"),
     supabase.from("permisos_rol").select("rol_id, modulo"),
     supabase.from("cursos_progreso").select("usuario_id, curso_id, puntaje, completado_en"),
+    // Lo propio de cada persona (migración 0116); sin ella, nada.
+    supabase.from("permisos_persona").select("perfil_id, modulo, nivel"),
   ]);
   const modulosPorRol = new Map<string, Set<string>>();
   for (const p of permisos.data ?? []) modulosPorRol.set(p.rol_id, (modulosPorRol.get(p.rol_id) ?? new Set()).add(p.modulo));
+  const propiosPorPersona = new Map<string, { modulo: string; nivel: string }[]>();
+  for (const p of propios.error ? [] : (propios.data ?? [])) propiosPorPersona.set(p.perfil_id, [...(propiosPorPersona.get(p.perfil_id) ?? []), { modulo: p.modulo, nivel: p.nivel }]);
   const nota = new Map((progreso.data ?? []).map((p) => [`${p.usuario_id}:${p.curso_id}`, p]));
 
   return (
@@ -51,7 +55,11 @@ export default async function ProgresoEquipoPage() {
             </thead>
             <tbody>
               {(perfiles.data ?? []).map((p) => {
-                const modulos = modulosPorRol.get(p.rol_id as string) ?? new Set<string>();
+                const modulos = new Set(modulosPorRol.get(p.rol_id as string) ?? []);
+                for (const x of propiosPorPersona.get(p.id) ?? []) {
+                  if (x.nivel === "ninguno") modulos.delete(x.modulo);
+                  else modulos.add(x.modulo);
+                }
                 return (
                   <tr key={p.id}>
                     <th scope="row" className={`${claseTd} text-left font-medium`}>

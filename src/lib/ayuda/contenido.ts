@@ -23,7 +23,9 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Área", definicion: "Cada botón de la barra negra de la izquierda (Desempeño, Marketing, Operación, Finanzas…). Agrupa las páginas por tema." },
   { termino: "Frente", definicion: "Cómo se reparte cada área: Proveeduría (venta a dropshippers), Gestión de tienda (tiendas propias) y Fulfillment (bodega e inventario)." },
   { termino: "Módulo", definicion: "Una página del sistema con su permiso propio (Compras, Producto, Inventario…). Tu rol decide qué módulos ves y si puedes modificarlos o solo leerlos." },
-  { termino: "Rol", definicion: "El conjunto de permisos que tiene una persona: qué módulos abre y cuáles son solo de lectura. Se configura en Usuarios y roles." },
+  { termino: "Rol", definicion: "El conjunto de permisos que tiene una persona: qué módulos abre, si cada uno es de edición o de solo lectura y, en los que lo permiten, qué ve dentro. Se configura en Usuarios y roles." },
+  { termino: "Permisos propios", definicion: "Lo que se le da o quita a una persona sola, encima de su rol: un módulo de más, uno de menos, o pasar uno de edición a lectura. Se ven en su ficha, y «Acceso efectivo» muestra el resultado." },
+  { termino: "Afinar", definicion: "Decidir, dentro de un módulo, qué pestañas, acciones, campos y datos ve un rol o una persona. Lo que no puede ver no aparece." },
   { termino: "Países permitidos", definicion: "Los países cuyas compras, histórico y datos puede ver una persona. «Todos los países» no limita nada." },
   { termino: "Puesto", definicion: "El cargo que ocupa una persona (Media Buyer, Analista de Compras…): su misión, responsabilidades, áreas de resultado, lo que puede decidir, a quién reporta y lo que tiene que aprender. Lo tuyo se ve en «Mi puesto», en el menú de tu cuenta." },
   { termino: "Misión del puesto (JD)", definicion: "En una o dos frases, para qué existe el puesto. Es el resumen de su descripción de cargo (Job Description)." },
@@ -394,10 +396,12 @@ export const GUIAS: GuiaModulo[] = [
     modulo: "usuarios",
     titulo: "Usuarios y roles",
     ruta: "/usuarios",
-    resumen: "Quién trabaja en el sistema, qué módulos ve cada rol y qué países ve cada persona.",
+    resumen: "Quién trabaja en el sistema, qué módulos ve cada rol, qué ve cada persona dentro de un módulo y qué países ve.",
     secciones: [
-      { titulo: "Personas", pasos: ["«Agregar» crea la cuenta; comparte la contraseña temporal por fuera.", "En la ficha: rol, países permitidos, suspender o eliminar."] },
-      { titulo: "Roles", pasos: ["Cada rol marca qué módulos abre y cuáles son solo de lectura.", "«Ver así» te deja probar el sistema con los permisos de otro rol."] },
+      { titulo: "Personas", pasos: ["«Crear usuario» crea la cuenta; comparte la contraseña temporal por fuera.", "Pulsa el nombre de una persona para abrir su ficha: rol, permisos propios, países, puestos, datos, suspender o eliminar.", "«Ver así» te deja ver el sistema como lo ve esa persona."] },
+      { titulo: "Roles", pasos: ["Elige un rol en la lista: a la derecha está su matriz, con tres niveles por módulo: Sin acceso, Solo lectura y Edición.", "Los botones de cada área aplican un nivel a todos sus módulos. Los cambios se guardan solos.", "«Crear rol» parte de otro rol, en blanco o con todo en solo lectura; también se puede duplicar un rol o copiarle los permisos de otro."] },
+      { titulo: "Afinar un módulo", pasos: ["En un módulo que lo permite (hoy Compras) pulsa «Afinar»: decide qué pestañas ve el rol, qué acciones puede usar, qué campos ve, solo ve u oculta y qué compras alcanza.", "A la derecha ves cómo lo vería: lo que no puede ver simplemente no aparece."] },
+      { titulo: "Permisos propios", pasos: ["En la ficha de una persona, «Permisos propios» suma, quita, sube o baja un módulo solo para ella, encima de lo que da su rol.", "«Acceso efectivo» muestra lo que de verdad puede."] },
     ],
   },
   {
@@ -440,6 +444,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-20", titulo: "Usuarios y roles, rediseñado", texto: "Personas, Roles y la ficha de cada persona se ven distintos: cada módulo se da con tres niveles (Sin acceso, Solo lectura o Edición), con una barra que muestra cuánto cubre el rol. Se pueden crear roles copiando otro, y darle a una persona permisos propios encima de su rol. En Compras, «Afinar» decide qué pestañas, acciones, campos y compras ve cada rol o persona: lo que no puede ver no aparece.", modulo: "usuarios", href: "/usuarios" },
   { fecha: "2026-10-21", titulo: "Publicaciones Dropi vinculadas con Producto", texto: "Cada publicación de Gestión de publicaciones Dropi se vincula con su producto (SKU) de Producto. Las de SKU o nombre idéntico ya quedaron vinculadas; para las demás, la ficha sugiere el producto (misma foto o nombre parecido) y se confirma con un clic. Los packs van a su compuesto.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Gestión de publicaciones Dropi", texto: "Operación › Fulfillment tiene «Gestión de publicaciones Dropi», debajo de Compras: los productos que tenemos publicados en Dropi como proveedor (antes la lista GCC de ClickUp), con precio, margen calculado, estado de venta, dónde está el stock, reposición, privatización y la próxima revisión cada 28 días.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Landings a Shopify", texto: "El Generador de landings crea el producto en la tienda de Shopify como borrador (precio, fotos, ofertas como variantes y la landing como descripción) y lo publica en la Tienda online con un clic. El enlace publicado queda en el test del producto.", modulo: "generador-landings", href: "/generador-landings" },

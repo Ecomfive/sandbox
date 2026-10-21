@@ -30,10 +30,13 @@ function hayPaginaAnteriorDeLaApp(): boolean {
 export function BarraMigas({
   areas,
   favoritos,
+  pestanasOcultas = [],
   rutaActual,
 }: {
   areas: NavSection[];
   favoritos: string[];
+  /** Las pestañas que esta persona no debe ver (las que su rol o su ficha esconden con «Afinar»). */
+  pestanasOcultas?: string[];
   /** Solo para pruebas visuales: fuerza la ruta en vez de leerla del navegador. */
   rutaActual?: string;
 }) {
@@ -48,7 +51,7 @@ export function BarraMigas({
 
   if (migas.length === 0) return null;
 
-  const pestanas = pestanasDe(moduloHref);
+  const pestanas = pestanasDe(moduloHref).filter((p) => !pestanasOcultas.includes(p.href));
   const pestanaActual = pestanaActiva(pestanas, ruta);
 
   // Volver = la página anterior del historial (respeta el botón "atrás" del navegador). Si esta
