@@ -106,7 +106,6 @@ export function TablaPublicaciones({
       />
       <FichaPublicacion
         publicacion={publicaciones.find((p) => p.id === abierta)}
-        personas={personas}
         codigoPais={codigoPais}
         nombrePais={nombrePais}
         puedeEscribir={puedeEscribir}
