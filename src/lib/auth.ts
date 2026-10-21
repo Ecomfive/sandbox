@@ -2,6 +2,9 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSessionClient, createServiceClient } from "@/lib/supabase/server";
+import { aAccesoPlano, nivelesEfectivos, type PermisoPropio } from "@/lib/permisos/acceso";
+import { accionPermitida, contarAjustes, pestanaVisible, resolverAfinado, type Afinado, type FilaAfinada } from "@/lib/permisos/afinado";
+import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
  * navegador de quien la prende (ver `src/lib/vista-previa-actions.ts`), nunca en la base. */
@@ -24,6 +27,12 @@ export interface UsuarioActual {
    * (que quedan en `rolId`/`rolNombre`). `modulos`/`modulosSoloLectura` ya son los de ese rol mientras dura. */
   vistaPrevia: { rolId: string; rolNombre: string } | null;
   /**
+   * Lo afinado dentro de cada módulo (pestañas, acciones, campos y alcance que se aparta del acceso completo), ya con lo del
+   * rol y lo propio de la persona juntos. Solo trae los módulos con algún ajuste: sin entrada, ve todo lo que su nivel permite.
+   * Se consulta con los ayudantes de `src/lib/permisos/afinado.ts` (`pestanaVisible`, `accionPermitida`, `nivelDeCampo`…).
+   */
+  afinado: Record<string, Afinado>;
+  /**
    * Los países que puede ver (códigos, y «importacion» para Compras Importadora); `null` = todos. Limita Compras, el
    * histórico de compras de Producto e Inventario y el país de la barra (ver `src/lib/paises-permitidos.ts`).
    */
@@ -33,6 +42,45 @@ export interface UsuarioActual {
 interface Permiso {
   modulo: string;
   solo_lectura: boolean;
+}
+
+/** Lo afinado y lo propio de una persona (migración 0116). Cada consulta falla en silencio: sin la migración todos ven lo de siempre. */
+interface PermisosFinos {
+  propios: PermisoPropio[];
+  afinadosPersona: FilaAfinada[];
+  afinadosRoles: (FilaAfinada & { rol_id: string })[];
+}
+
+async function cargarPermisosFinos(supabase: ReturnType<typeof createServiceClient>, perfilId: string): Promise<PermisosFinos> {
+  const seguro = async <T,>(consulta: PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> => {
+    try {
+      const r = await consulta;
+      return r.error ? [] : (r.data ?? []);
+    } catch {
+      return [];
+    }
+  };
+  const [propios, afinadosPersona, afinadosRoles] = await Promise.all([
+    seguro<PermisoPropio>(supabase.from("permisos_persona").select("modulo, nivel").eq("perfil_id", perfilId)),
+    seguro<FilaAfinada>(supabase.from("permisos_persona_afinados").select("modulo, tipo, clave, valor").eq("perfil_id", perfilId)),
+    // Es una tabla chica (unas decenas de filas): se trae entera y se separa por rol aquí, para no esperar a saber el rol.
+    seguro<FilaAfinada & { rol_id: string }>(supabase.from("permisos_afinados").select("rol_id, modulo, tipo, clave, valor")),
+  ]);
+  return { propios, afinadosPersona, afinadosRoles };
+}
+
+/** Los módulos afinables con algún ajuste, juntando lo del rol y, encima, lo de la persona. */
+function juntarAfinado(rolId: string | null, finos: Pick<PermisosFinos, "afinadosPersona" | "afinadosRoles">): Record<string, Afinado> {
+  const resultado: Record<string, Afinado> = {};
+  for (const modulo of MODULOS_AFINABLES) {
+    const filas: FilaAfinada[] = [
+      ...finos.afinadosRoles.filter((f) => f.rol_id === rolId && f.modulo === modulo),
+      ...finos.afinadosPersona.filter((f) => f.modulo === modulo),
+    ];
+    const afinado = resolverAfinado(catalogoDe(modulo), filas);
+    if (contarAjustes(afinado) > 0) resultado[modulo] = afinado;
+  }
+  return resultado;
 }
 
 /**
@@ -54,6 +102,8 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
   if (!userId) return null;
 
   const supabase = createServiceClient();
+  // Lo afinado y lo propio arrancan a la vez que el perfil (no dependen de él).
+  const finosPendientes = cargarPermisosFinos(supabase, userId);
   // Perfil, rol y permisos en una sola consulta (antes eran dos, una tras otra). Si la base no devuelve los permisos
   // incluidos (o la consulta falla), se piden aparte como antes: el acceso nunca depende de que esto funcione.
   // `paises_permitidos` (migración 0087) va en la misma consulta; sin la migración se pide como antes y la persona ve todos
@@ -85,29 +135,50 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
     }
   }
 
-  let modulos = permisos.map((p) => p.modulo);
-  let modulosSoloLectura = permisos.filter((p) => p.solo_lectura).map((p) => p.modulo);
+  const finos = await finosPendientes;
+  // El acceso de la persona: el de su rol y, encima, lo que se le dio o quitó solo a ella.
+  const efectivo = aAccesoPlano(nivelesEfectivos(permisos, finos.propios));
+  let modulos = efectivo.modulos;
+  let modulosSoloLectura = efectivo.modulosSoloLectura;
+  let afinado = juntarAfinado(rol?.id ?? null, finos);
   let vistaPrevia: { rolId: string; rolNombre: string } | null = null;
 
   // "Ver así": solo quien de verdad administra Usuarios y roles puede probar la app con los
-  // permisos de otro rol — así que el cambio se aplica DESPUÉS de calcular los permisos reales,
+  // permisos de otro rol (o de otra persona) — así que el cambio se aplica DESPUÉS de calcular los permisos reales,
   // y solo si esta persona puede MODIFICAR Usuarios y roles (lo mismo que exige prenderlo; con solo
   // lectura, poner la cookie a mano daba los permisos de cualquier rol). La cookie lleva además el id
   // de quien la prendió: una cookie de otra persona, o escrita a mano sin ese id, no vale.
+  // Formato: `<quien la prendió>:<rol>` o `<quien la prendió>:p-<persona>` (la app como la ve esa persona, con lo suyo).
   if (modulos.includes("usuarios") && !modulosSoloLectura.includes("usuarios")) {
     const valor = (await cookies()).get(VISTA_PREVIA_COOKIE)?.value || "";
-    const [duenoId, rolPreviaId] = valor.split(":");
-    if (duenoId === perfil.id && rolPreviaId && ES_UUID.test(rolPreviaId)) {
-      const { data: rolPrevia } = await supabase
-        .from("roles")
-        .select("id, nombre, permisos_rol(modulo, solo_lectura)")
-        .eq("id", rolPreviaId)
-        .maybeSingle();
-      if (rolPrevia) {
-        const permisosPrevia = (rolPrevia.permisos_rol ?? []) as Permiso[];
-        modulos = permisosPrevia.map((p) => p.modulo);
-        modulosSoloLectura = permisosPrevia.filter((p) => p.solo_lectura).map((p) => p.modulo);
-        vistaPrevia = { rolId: rolPrevia.id, rolNombre: rolPrevia.nombre };
+    const [duenoId, objetivo] = valor.split(":");
+    const comoPersona = !!objetivo && objetivo.startsWith("p-");
+    const idObjetivo = comoPersona ? objetivo.slice(2) : objetivo;
+    if (duenoId === perfil.id && idObjetivo && ES_UUID.test(idObjetivo)) {
+      if (comoPersona) {
+        const { data: otra } = await supabase.from("perfiles").select("id, nombre, email, rol_id, roles(id, nombre, permisos_rol(modulo, solo_lectura))").eq("id", idObjetivo).maybeSingle();
+        if (otra) {
+          const rolOtra = otra.roles as unknown as { id: string; nombre: string; permisos_rol?: Permiso[] } | null;
+          const finosOtra = await cargarPermisosFinos(supabase, otra.id);
+          const plano = aAccesoPlano(nivelesEfectivos(rolOtra?.permisos_rol ?? [], finosOtra.propios));
+          modulos = plano.modulos;
+          modulosSoloLectura = plano.modulosSoloLectura;
+          afinado = juntarAfinado(rolOtra?.id ?? null, { afinadosPersona: finosOtra.afinadosPersona, afinadosRoles: finos.afinadosRoles });
+          vistaPrevia = { rolId: rolOtra?.id ?? "", rolNombre: `${otra.nombre || otra.email}${rolOtra ? ` (${rolOtra.nombre})` : ""}` };
+        }
+      } else {
+        const { data: rolPrevia } = await supabase
+          .from("roles")
+          .select("id, nombre, permisos_rol(modulo, solo_lectura)")
+          .eq("id", idObjetivo)
+          .maybeSingle();
+        if (rolPrevia) {
+          const permisosPrevia = (rolPrevia.permisos_rol ?? []) as Permiso[];
+          modulos = permisosPrevia.map((p) => p.modulo);
+          modulosSoloLectura = permisosPrevia.filter((p) => p.solo_lectura).map((p) => p.modulo);
+          afinado = juntarAfinado(rolPrevia.id, { afinadosPersona: [], afinadosRoles: finos.afinadosRoles });
+          vistaPrevia = { rolId: rolPrevia.id, rolNombre: rolPrevia.nombre };
+        }
       }
     }
   }
@@ -123,6 +194,7 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
     vistaPrevia,
     modulos,
     modulosSoloLectura,
+    afinado,
     paisesPermitidos: listaPaises((perfil as { paises_permitidos?: unknown }).paises_permitidos),
   };
 });
@@ -149,6 +221,28 @@ export async function requireModuloEscritura(clave: string): Promise<UsuarioActu
   if (!usuario.modulos.includes(clave)) throw new Error("No tienes acceso a este módulo.");
   if (usuario.modulosSoloLectura.includes(clave)) {
     throw new Error("Tu rol solo tiene acceso de lectura a este módulo.");
+  }
+  return usuario;
+}
+
+/** Lo que dice el error cuando una acción está bloqueada para el rol (o la persona) dentro de un módulo que sí abre. */
+export const MENSAJE_ACCION_BLOQUEADA = "Tu rol no puede hacer esto en este módulo.";
+
+/** ¿Esta acción está bloqueada para la persona en ese módulo? (ver «Afinar» en Usuarios y roles). Solo mira lo afinado: el nivel del módulo se exige aparte. */
+export function accionBloqueada(usuario: UsuarioActual, modulo: string, accion: string): boolean {
+  return !accionPermitida(usuario.afinado[modulo], accion);
+}
+
+/**
+ * Exige acceso al módulo y que la pestaña no esté oculta para la persona. Si está oculta la lleva a la primera que sí ve; sin
+ * ninguna, a «Sin acceso». Para el `page.tsx` de cada pestaña de un módulo afinable.
+ */
+export async function requirePestana(modulo: string, pestana: string): Promise<UsuarioActual> {
+  const usuario = await requireModulo(modulo);
+  const afinado = usuario.afinado[modulo];
+  if (!pestanaVisible(afinado, pestana)) {
+    const primera = catalogoDe(modulo)?.pestanas.find((p) => pestanaVisible(afinado, p.clave));
+    redirect(primera?.href ?? "/sin-acceso");
   }
   return usuario;
 }

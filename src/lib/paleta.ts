@@ -23,7 +23,7 @@ const PAGINAS_FIJAS: PaginaBuscable[] = [
  * Todas las páginas a las que esta persona puede ir: las del menú (y las subpáginas de cada módulo, como
  * «Cuentas destino»), solo las de los módulos a los que tiene acceso. `permitidos` null = todas.
  */
-export function paginasBuscables(areas: NavSection[], permitidos: string[] | null): PaginaBuscable[] {
+export function paginasBuscables(areas: NavSection[], permitidos: string[] | null, pestanasOcultas: string[] = []): PaginaBuscable[] {
   const puede = (href: string) => !permitidos || permitidos.includes(moduloDeHref(href));
   const paginas: PaginaBuscable[] = [];
   const vistos = new Set<string>();
@@ -45,6 +45,7 @@ export function paginasBuscables(areas: NavSection[], permitidos: string[] | nul
     if (!modulo) continue;
     // El permiso ya se comprobó con el módulo (una subpágina no es un módulo aparte).
     for (const pestana of pestanas.slice(1)) {
+      if (pestanasOcultas.includes(pestana.href)) continue;
       agregar({ etiqueta: pestana.etiqueta, href: pestana.href, contexto: `${modulo.contexto} › ${modulo.etiqueta}` }, false);
     }
   }

@@ -13,7 +13,8 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Cuentas destino", href: "/retiros/cuentas" },
   ],
   "/usuarios": [
-    { etiqueta: "Usuarios y roles", href: "/usuarios" },
+    { etiqueta: "Personas", href: "/usuarios" },
+    { etiqueta: "Roles", href: "/usuarios/roles" },
     { etiqueta: "Historial de auditoría", href: "/usuarios/auditoria" },
   ],
   "/puestos": [
