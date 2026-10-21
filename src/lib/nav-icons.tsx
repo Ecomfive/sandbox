@@ -872,13 +872,34 @@ export function LandingIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Etiqueta de precio sobre una caja: Gestión de publicaciones Dropi (lo que ofrecemos en Dropi). */
-export function PublicacionIcon(props: SVGProps<SVGSVGElement>) {
+/**
+ * El logo de Dropi (su mascota con audífonos dentro de un círculo): Gestión de publicaciones Dropi. Va relleno con el color del
+ * texto y lo blanco del logo es transparente (una máscara), así se ve bien en los dos temas y al estar seleccionado.
+ */
+export function DropiIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <IconoLucide {...props}>
-      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
-      <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
-    </IconoLucide>
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <defs>
+        <mask id="icono-dropi-mascara" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <rect width="24" height="24" fill="white" />
+          {/* La cabeza. */}
+          <path d="M9.6 8.6c1.3-1.2 3.3-1.7 5.3-1.4 3 .5 5 2.8 5 5.7 0 3.3-2.6 5.7-5.8 5.7-2.6 0-4.5-1-5.4-2.7-.8-1.5-.8-3.3-.3-4.8.3-.9.6-1.8 1.2-2.5z" fill="black" />
+          {/* El audífono: la diadema y el auricular. */}
+          <path d="M5.9 13.2c0-3.6 2.4-6.4 5.8-6.9" fill="none" stroke="black" strokeWidth="1.3" strokeLinecap="round" />
+          <rect x="4.4" y="11.6" width="2.9" height="4.4" rx="1.3" fill="black" />
+          {/* La antena. */}
+          <path d="M7.2 8.4 5.9 6.9" stroke="black" strokeWidth="1.2" strokeLinecap="round" />
+          <circle cx="5.5" cy="6.4" r="1" fill="black" />
+          {/* La flecha de abajo. */}
+          <path d="M14.4 20.2c1.4.2 2.8-.3 3.8-1.3" fill="none" stroke="black" strokeWidth="1.2" strokeLinecap="round" />
+          <path d="m17.3 18.3 1.1.5-.2 1.2" fill="none" stroke="black" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+        </mask>
+      </defs>
+      <circle cx="12" cy="12" r="11" fill="currentColor" mask="url(#icono-dropi-mascara)" />
+      {/* Los ojos, dentro de la cabeza. */}
+      <ellipse cx="12.9" cy="12.6" rx="1.05" ry="1.55" fill="currentColor" />
+      <ellipse cx="16.7" cy="12.6" rx="1.05" ry="1.55" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -969,7 +990,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/seleccion-productos": SeleccionIcon,
   "/creacion-ofertas": OfertaIcon,
   "/generador-landings": LandingIcon,
-  "/publicaciones-dropi": PublicacionIcon,
+  "/publicaciones-dropi": DropiIcon,
   "/productos-test": TestIcon,
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,

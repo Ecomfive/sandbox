@@ -14,6 +14,9 @@ export interface NavItem {
   dropi?: boolean;
   /** El frente al que pertenece. Sin frente la página va «afuera» de los tres (es de toda la empresa). */
   frente?: FrenteId;
+  /** Cómo se ve el nombre en el menú lateral cuando no cabe en una línea: cada texto va en su propia línea. El nombre completo
+   * (`label`) sigue en las migas, el buscador y los favoritos. */
+  lineasMenu?: [string, string];
   /** Una sección dentro del frente, con su título (Testing Lab: Fuentes, Selección, Producción, Resultados). Las
    * secciones salen en el orden en que aparecen sus páginas. */
   grupo?: string;
@@ -103,7 +106,7 @@ const AREAS: NavSection[] = [
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
-      { label: "Gestión de publicaciones Dropi", href: "/publicaciones-dropi", frente: "fulfillment" },
+      { label: "Gestión de publicaciones Dropi", href: "/publicaciones-dropi", frente: "fulfillment", lineasMenu: ["Gestión de publicaciones", "Dropi"] },
       { label: "Producto", href: "/producto", frente: "fulfillment" },
     ],
   },
