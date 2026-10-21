@@ -24,9 +24,10 @@ import {
   type EspacioImagen,
   type LecturaReferencia,
 } from "@/lib/landings/landing";
+import type { DatosShopify } from "@/lib/landings/shopify";
 import { CerrarIcon, FlechaAbajoIcon, FlechaArribaIcon } from "@/lib/nav-icons";
 import { supabase } from "@/lib/supabase/client";
-import { analizarReferencia, eliminarLanding, generarImagenLanding, guardarImagenLanding, guardarLanding, prepararSubidaImagenLanding, quitarImagenLanding } from "../actions";
+import { analizarReferencia, eliminarLanding, enviarAShopify, generarImagenLanding, publicarEnShopify, guardarImagenLanding, guardarLanding, prepararSubidaImagenLanding, quitarImagenLanding } from "../actions";
 import { formatoPrecio, VistaLanding, type OfertaVista } from "./vista-landing";
 
 interface ImagenEditor {
@@ -51,6 +52,8 @@ export interface LandingEditor {
   contenido: ContenidoLanding;
   imagenes: Record<EspacioImagen, ImagenEditor>;
   fotosProveedor: { ruta: string; url: string | null }[];
+  /** El producto en Shopify, si ya se envió. */
+  shopify: DatosShopify | null;
 }
 
 /** Lo que se guarda con «Guardar cambios» (las imágenes se guardan solas al subirlas). */
@@ -127,6 +130,7 @@ export function EditorLanding({
   ofertas,
   puedeEscribir,
   gemini,
+  tiendaShopify,
 }: {
   landing: LandingEditor;
   origen: string | null;
@@ -134,6 +138,8 @@ export function EditorLanding({
   puedeEscribir: boolean;
   /** Hay clave de Gemini: los botones de generar funcionan. */
   gemini: boolean;
+  /** La tienda de Shopify conectada (oferfy.myshopify.com) o `null` si no hay conexión. */
+  tiendaShopify: string | null;
 }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -149,6 +155,9 @@ export function EditorLanding({
   // Los espacios que Gemini está generando ahora (puede haber varios a la vez).
   const [generando, setGenerando] = useState<EspacioImagen[]>([]);
   const [enCola, setEnCola] = useState(false);
+  const [shopify, setShopify] = useState(landing.shopify);
+  const [enviando, iniciarEnvio] = useTransition();
+  const [confirmarPublicar, setConfirmarPublicar] = useState(false);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
   const [guardando, iniciarGuardar] = useTransition();
   const [leyendo, iniciarLeer] = useTransition();
@@ -262,6 +271,28 @@ export function EditorLanding({
     }
     setEnCola(false);
     if (hechas) mostrarToast(`${hechas} ${hechas === 1 ? "imagen generada" : "imágenes generadas"} con Gemini`);
+  }
+
+  function aShopify() {
+    iniciarEnvio(async () => {
+      const r = await enviarAShopify(landing.id);
+      if (r.shopify) setShopify(r.shopify);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast(shopify ? "Producto actualizado en Shopify" : "Borrador creado en Shopify");
+      router.refresh();
+    });
+  }
+
+  function publicar() {
+    iniciarEnvio(async () => {
+      const r = await publicarEnShopify(landing.id);
+      setConfirmarPublicar(false);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      if (r.shopify) setShopify(r.shopify);
+      setEstado("publicada");
+      mostrarToast("Publicada en la tienda");
+      router.refresh();
+    });
   }
 
   function leerReferencia() {
@@ -609,19 +640,69 @@ export function EditorLanding({
         {cambiado && <p className="text-sm text-muted-foreground">Guarda los cambios para que el estado se actualice.</p>}
       </Bloque>
       <Bloque titulo="Shopify">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-muted-foreground">Tienda</dt>
-          <dd>Sin conectar</dd>
+          <dd className="min-w-0 break-all">{tiendaShopify ?? "Sin conectar"}</dd>
           <dt className="text-muted-foreground">Producto</dt>
           <dd className="tabular-nums">
             {e.nombre || "—"} · {aNumero(e.precio) === null ? "sin precio" : f.format(aNumero(e.precio)!)}
+            {ofertas.filter((o) => o.precio !== null).length > 1 && ` · ${ofertas.filter((o) => o.precio !== null).length} ofertas como variantes`}
           </dd>
+          {shopify && (
+            <>
+              <dt className="text-muted-foreground">Estado</dt>
+              <dd>
+                {estado === "publicada" ? "Publicada en la tienda" : "Borrador en Shopify"} · enviado el{" "}
+                {new Date(shopify.publicadoEn ?? shopify.sincronizadoEn).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" })}
+              </dd>
+              <dt className="text-muted-foreground">Enlaces</dt>
+              <dd className="flex flex-wrap gap-x-4 gap-y-1">
+                <a href={shopify.adminUrl} target="_blank" rel="noreferrer noopener" className="font-medium underline underline-offset-2">
+                  Abrir en el admin de Shopify<span className="sr-only"> (se abre en una pestaña nueva)</span>
+                </a>
+                {shopify.url && (
+                  <a href={shopify.url} target="_blank" rel="noreferrer noopener" className="font-medium underline underline-offset-2">
+                    {estado === "publicada" ? "Ver en la tienda" : "Vista previa en la tienda"}
+                    <span className="sr-only"> (se abre en una pestaña nueva)</span>
+                  </a>
+                )}
+              </dd>
+            </>
+          )}
         </dl>
-        {puedeEscribir && (
-          <div className="flex flex-wrap gap-2">
-            <BotonPendiente motivo="Falta conectar Shopify">Crear borrador en Shopify</BotonPendiente>
-          </div>
-        )}
+        {puedeEscribir &&
+          (tiendaShopify ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant={shopify ? "secondary" : "primary"} disabled={enviando || cambiado || faltantes.length > 0} onClick={aShopify}>
+                  {enviando && !confirmarPublicar ? "Enviando a Shopify…" : shopify ? "Actualizar en Shopify" : "Crear borrador en Shopify"}
+                </Button>
+                {shopify &&
+                  estado !== "publicada" &&
+                  (confirmarPublicar ? (
+                    <span className="flex flex-wrap items-center gap-2 text-sm">
+                      ¿Publicar? Quedará visible en la tienda.
+                      <Button type="button" disabled={enviando} onClick={publicar}>
+                        {enviando ? "Publicando…" : "Sí, publicar"}
+                      </Button>
+                      <Button type="button" variant="ghost" disabled={enviando} onClick={() => setConfirmarPublicar(false)}>
+                        Cancelar
+                      </Button>
+                    </span>
+                  ) : (
+                    <Button type="button" disabled={enviando || cambiado} onClick={() => setConfirmarPublicar(true)}>
+                      Publicar en la tienda
+                    </Button>
+                  ))}
+              </div>
+              {cambiado && <p className="text-sm text-muted-foreground">Guarda los cambios antes de enviarla a Shopify.</p>}
+              {enviando && !confirmarPublicar && <p role="status" className="text-sm text-muted-foreground">Shopify está copiando las imágenes; tarda hasta un minuto.</p>}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <BotonPendiente motivo="Falta conectar Shopify">Crear borrador en Shopify</BotonPendiente>
+            </div>
+          ))}
       </Bloque>
     </div>
   );

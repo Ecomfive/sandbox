@@ -402,7 +402,16 @@ convenciones técnicas del código.
   fotos del proveedor de referencia (o la portada); el pedido y la lectura de la respuesta son puros en `gemini.ts` (con prueba:
   `extraerImagen` toma la última imagen de cualquier forma de respuesta). La imagen se valida por su firma, se guarda en el bucket y
   queda en la auditoría (`generar_imagen_landing`). La página `[id]` tiene `maxDuration = 120`. Sin clave, el botón se ve
-  deshabilitado. **Pendiente:** Claude (textos) y Shopify (crear el producto y su plantilla), con `BotonPendiente`. Las reseñas son de clientes reales: la IA no las inventa.
+  deshabilitado. **Shopify** (21 oct 2026, tienda Oferfy Panamá): `enviarAShopify` crea o actualiza el producto con
+  `productSet` (borrador; título, `variantesShopify`: una variante «Oferta» por oferta con precio o la única con el precio de la landing;
+  `files` con la portada primero, las que no cambiaron van por su `mediaId`), espera a que Shopify procese las fotos (`esperarFotos`) y
+  pone la landing como descripción (`htmlDescripcion`, texto escapado, imágenes con las direcciones de Shopify). `publicarEnShopify`
+  lo activa y lo publica en el canal «Tienda online» (`publishablePublish`), pasa la landing a «Publicada» y copia el enlace a
+  `wms_productos_test.pagina_producto_url` de sus tests sin página. Lo enviado queda en `landings.shopify` (`DatosShopify`). La conexión
+  (`src/lib/landings/shopify-api.ts`) usa una app del Dev Dashboard con *client credentials* (`SHOPIFY_TIENDA`, `SHOPIFY_CLIENT_ID`,
+  `SHOPIFY_CLIENT_SECRET`; el permiso dura 24 h y se guarda en memoria) o un token fijo de una app vieja (`SHOPIFY_ADMIN_TOKEN`);
+  permisos `write_products`, `read_products`, `read_publications`, `write_publications`; versión `SHOPIFY_API_VERSION` o 2026-10.
+  **Pendiente:** Claude (textos), con `BotonPendiente`. Las reseñas son de clientes reales: la IA no las inventa.
 - **Testing Lab › Instagram** (`/instagram`, módulo `instagram`, migración 0106, 14 oct 2026). Una fuente más de Fuentes: lo que el
   equipo ve en Instagram y comparte **por mensaje directo con la cuenta de fuentes** (`@ecomfive.fuentes`, cuenta profesional ligada
   al Business Manager) cae solo en `instagram_capturas`. Meta llama al webhook **`/api/instagram/webhook`**

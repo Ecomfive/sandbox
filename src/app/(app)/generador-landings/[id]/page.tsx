@@ -5,7 +5,9 @@ import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { ESPACIOS_IMAGEN, normalizarContenido, normalizarFotosProveedor, normalizarImagenes, numeroLanding, type LecturaReferencia } from "@/lib/landings/landing";
 import { geminiConectado } from "@/lib/landings/gemini-api";
-import { tasasUsd } from "@/lib/moneda/tipo-cambio";
+import { ofertasEnMoneda } from "@/lib/landings/ofertas";
+import type { DatosShopify } from "@/lib/landings/shopify";
+import { shopifyConectado, tiendaShopify } from "@/lib/landings/shopify-api";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { EditorLanding, type LandingEditor } from "./editor-landing";
@@ -28,7 +30,7 @@ export default async function LandingPage({ params }: { params: Promise<{ id: st
   const supabase = createServiceClient();
   const { data: l } = await supabase
     .from("landings")
-    .select("id, numero, nombre, pais_id, seleccion_id, modo, referencia_url, referencia, angulo, notas_ia, moneda, precio, precio_tachado, contenido, imagenes, fotos_proveedor, estado")
+    .select("id, numero, nombre, pais_id, seleccion_id, modo, referencia_url, referencia, angulo, notas_ia, moneda, precio, precio_tachado, contenido, imagenes, fotos_proveedor, estado, shopify")
     .eq("id", id)
     .maybeSingle();
   if (!l || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, l.pais_id))) notFound();
@@ -37,19 +39,13 @@ export default async function LandingPage({ params }: { params: Promise<{ id: st
   const fotos = normalizarFotosProveedor(l.fotos_proveedor, l.id);
   const rutas = [...ESPACIOS_IMAGEN.map((e) => imagenes[e.clave].ruta).filter((r): r is string => !!r), ...fotos];
 
-  const [firmadasR, seleccionR, ofertasR, tasas] = await Promise.all([
+  const [firmadasR, seleccionR, ofertas] = await Promise.all([
     rutas.length ? supabase.storage.from("landings").createSignedUrls(rutas, 60 * 60) : Promise.resolve({ data: [] as { path: string | null; signedUrl: string }[] }),
     l.seleccion_id ? supabase.from("wms_seleccion_productos").select("numero, codigo_fuente").eq("id", l.seleccion_id).maybeSingle() : Promise.resolve({ data: null }),
-    l.seleccion_id ? supabase.from("wms_seleccion_ofertas").select("nombre, unidades, precio").eq("seleccion_id", l.seleccion_id).order("orden") : Promise.resolve({ data: [] }),
-    tasasUsd(supabase),
+    // Las ofertas están en dólares: se muestran en la moneda de la tienda con el tipo de cambio del día.
+    ofertasEnMoneda(supabase, l.seleccion_id, l.moneda),
   ]);
   const url = new Map((firmadasR.data ?? []).map((f) => [f.path, f.signedUrl]));
-  // Las ofertas están en dólares: se muestran en la moneda de la tienda con el tipo de cambio del día.
-  const tasa = l.moneda === "USD" ? 1 : (tasas.porUsd[l.moneda] ?? null);
-  const ofertas = (ofertasR.data ?? []).map((o) => {
-    const usd = num(o.precio);
-    return { nombre: o.nombre as string, unidades: o.unidades as number, precio: usd === null || tasa === null ? null : l.moneda === "USD" ? usd : Math.round(usd * tasa) };
-  });
 
   const landing: LandingEditor = {
     id: l.id,
@@ -69,6 +65,7 @@ export default async function LandingPage({ params }: { params: Promise<{ id: st
       ESPACIOS_IMAGEN.map((e) => [e.clave, { ruta: imagenes[e.clave].ruta, instruccion: imagenes[e.clave].instruccion, url: imagenes[e.clave].ruta ? (url.get(imagenes[e.clave].ruta) ?? null) : null }]),
     ) as LandingEditor["imagenes"],
     fotosProveedor: fotos.map((r) => ({ ruta: r, url: url.get(r) ?? null })),
+    shopify: (l.shopify as DatosShopify | null)?.productoId ? (l.shopify as DatosShopify) : null,
   };
   const sel = seleccionR.data as { numero: number; codigo_fuente: string } | null;
 
@@ -82,6 +79,7 @@ export default async function LandingPage({ params }: { params: Promise<{ id: st
         ofertas={ofertas}
         puedeEscribir={!usuario.modulosSoloLectura.includes("generador-landings")}
         gemini={geminiConectado()}
+        tiendaShopify={shopifyConectado() ? tiendaShopify() : null}
       />
     </Pagina>
   );
