@@ -417,6 +417,30 @@ convenciones técnicas del código.
   vinculados en la ficha del publicado, tiene el historial en tabla y envía a Selección (`enviarASeleccion`, fuente SP, en el
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
+- **Operación › Fulfillment › Gestión de publicaciones Dropi** (`/publicaciones-dropi`, módulo `publicaciones-dropi`, migración 0116, 21 oct
+  2026; debajo de Compras). Los productos que ECOMFIVE tiene publicados en Dropi como proveedor; reemplaza la lista «GCC 🇵🇦 Ecomfive
+  Panamá» de ClickUp. Una fila de `dropi_publicaciones` por publicación (por país): `dropi_id` (texto: a veces son dos, «7231-7679»),
+  `estado` (el flujo de ClickUp: producto_nuevo → revisar_precio → verificar_dropshipper → validar_bajar_precio → bajar_precio → al_dia
+  → archivado, oculto), `estado_publicacion`, `tipo_publicacion`, privatización (`privatizado_a`, `privatizado_email`, `dropshipper_id`
+  para cuando se vincule el CRM), precios (`precio_venta`, `costo_mercancia`, `fulfillment`, `coste_real` = costo de la última compra) con
+  `utilidad` y `margen` **generadas**, `estado_venta`, `ubicacion`, `estado_reposicion`, `competencia`, fechas y `proxima_revision`
+  **generada** (`ultima_revision + 28`: en ClickUp la fecha límite era eso), `relacionados` (uuid[]), `sku_maestro_id` (para vincular los
+  SKU después) y la tarea original en `clickup`. Opciones, colores (los de ClickUp) y la lectura de una tarea viven en
+  `src/lib/publicaciones/publicacion.ts` (con prueba: `leerTareaGcc`, `deClickup`). Lista con `TablaDatos` (agrupada por estado, filtro
+  «Revisión vencida», punto rojo si el margen < 30 %), ficha lateral que ya es el formulario (`actualizarPublicacion`: si cambia el precio,
+  el último cambio de precio pasa a hoy; «Marcar revisada hoy»; actividad con `HistorialGenerico`) y «Agregar» con `FichaCrear`.
+  **Importar:** `node scripts/clickup-exportar-publicaciones-dropi.mjs` (baja la lista a `datos-privados/clickup-gcc-panama.json`) y
+  `npx tsx scripts/importar-publicaciones-dropi.ts --aplicar` (por `clickup_id`, se puede repetir; copia la foto a
+  `wms-productos/publicaciones/<id>/`; responsables por nombre). El campo «ID» de ClickUp es el ID de Dropi: 177 de los 178 productos
+  públicos de ECOMFIVE en el catálogo de Análisis de competencia (14 oct) están en la lista. «%», «URL» y «Países» de ClickUp no se
+  traen (el % es el margen escrito a mano; los otros dos están vacíos). **Vincular los SKU** (migración 0117, `foto_huella`): las reglas
+  viven en `src/lib/publicaciones/vincular.ts` (con prueba). `sugerirSku`: exacta si el código o el nombre de un producto es idéntico al de
+  la publicación (o al del catálogo de Dropi con su ID, `competencia_productos`); si no, el cruce de Testing Lab (`todasLasCoincidencias`,
+  nombre o foto). Un pack (`detectarPack`: «PACK 2», «2x1», «x2») va al **compuesto** de un solo simple con esa cantidad
+  (`sku_maestro_componentes`); si no existe, «Falta el compuesto» (nunca al simple: descontaría mal). Un «combo» solo busca entre
+  compuestos. La página calcula las sugerencias al cargar (`cargarSugerencias`, `src/lib/publicaciones/sugerencias.ts`); la ficha las
+  confirma con `vincularSkuPublicacion` («Vincular y siguiente»), con `CampoSkuMaestro` para elegir otro. Las exactas se vinculan con
+  `npx tsx scripts/vincular-skus-publicaciones.ts --aplicar` (también calcula las huellas que falten; actividad «Vínculo automático»).
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,

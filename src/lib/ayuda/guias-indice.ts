@@ -7,6 +7,7 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/scraping-proveedores": "scraping-proveedores",
   "/creacion-ofertas": "creacion-ofertas",
   "/generador-landings": "generador-landings",
+  "/publicaciones-dropi": "publicaciones-dropi",
   "/instagram": "instagram",
   "/seleccion-productos": "seleccion-productos",
   "/sugerencias-clientes": "sugerencias-clientes",
