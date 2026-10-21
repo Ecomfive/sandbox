@@ -142,8 +142,8 @@ export function FichaProducto({
     <Ventana
       abierto={!!producto}
       alCerrar={alCerrar}
-      lado="derecha"
-      ancho="lg"
+      lado="centro"
+      ancho="xl"
       titulo={
         producto && (
           <>
@@ -162,7 +162,10 @@ export function FichaProducto({
       }
     >
       {producto && (
-        <div className="flex flex-1 flex-col">
+        // Dos columnas, como la vista de una tarea de ClickUp: los datos a la izquierda y la actividad a la derecha, cada una con
+        // su propio desplazamiento. En pantallas angostas se apilan y se desplaza todo junto.
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] lg:overflow-hidden">
+        <div className="flex min-h-0 flex-col lg:overflow-y-auto">
           <div className="flex items-center gap-3 px-5 pt-5 pb-4">
             <FotoProducto key={producto.id} id={producto.id} nombre={producto.nombre} foto={producto.foto} puedeEscribir={puedeEscribir} />
             <p className="text-sm text-muted-foreground">{producto.nombre}</p>
@@ -177,7 +180,7 @@ export function FichaProducto({
                   <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
                 </Dato>
                 {producto.nombresDropi.length > 0 && (
-                  <Dato etiqueta="Nombre en Dropi">
+                  <Dato etiqueta="Publicaciones en Dropi">
                     <ul className="m-0 flex list-none flex-col gap-1 p-0">
                       {producto.nombresDropi.map((n, i) => (
                         <li key={`${n.pais}-${n.dropiId}-${i}`} className="flex flex-col">
@@ -340,7 +343,10 @@ export function FichaProducto({
             </div>
           )}
 
+        </div>
+        <aside aria-label="Actividad del producto" className="min-h-0 border-t border-border bg-muted/30 lg:overflow-y-auto lg:border-t-0 lg:border-l">
           <HistorialGenerico id={producto.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialProducto} />
+        </aside>
         </div>
       )}
     </Ventana>
