@@ -109,7 +109,7 @@ export async function guardarDatosRol(id: string, datos: DatosRol): Promise<Resu
   const supabase = createServiceClient();
   const { error } = await supabase.from("roles").update(limpios).eq("id", id);
   if (error) {
-    if (error.message.includes("color")) return { error: "Falta correr la migración 0116 en Supabase." };
+    if (error.message.includes("color")) return { error: "Falta correr la migración 0118 en Supabase." };
     return { error: error.code === "23505" ? ERROR_NOMBRE_REPETIDO : error.message };
   }
   await registrarAuditoria({ accion: "editar_rol", entidad: "roles", entidadId: id, detalle: limpios.nombre });
@@ -136,7 +136,7 @@ async function copiarPermisos(origenId: string, destinoId: string, reemplazar: b
     const { error } = await supabase.from("permisos_rol").insert((permisos ?? []).map((p) => ({ rol_id: destinoId, modulo: p.modulo, solo_lectura: p.solo_lectura })));
     if (error) return { error: error.message };
   }
-  // Sin la migración 0116 no hay nada afinado que copiar: se sigue igual.
+  // Sin la migración 0118 no hay nada afinado que copiar: se sigue igual.
   if (!afinados.error && (afinados.data ?? []).length > 0) {
     const { error } = await supabase.from("permisos_afinados").insert((afinados.data ?? []).map((a) => ({ rol_id: destinoId, modulo: a.modulo, tipo: a.tipo, clave: a.clave, valor: a.valor })));
     if (error) return { error: error.message };
@@ -155,7 +155,7 @@ export async function crearRolConPermisos(datos: DatosRol, inicio: InicioRol): P
   const supabase = createServiceClient();
   const { data: creado, error } = await supabase.from("roles").insert(limpios).select("id").single();
   if (error || !creado) {
-    if (error?.message.includes("color")) return { error: "Falta correr la migración 0116 en Supabase." };
+    if (error?.message.includes("color")) return { error: "Falta correr la migración 0118 en Supabase." };
     return { error: error?.code === "23505" ? ERROR_NOMBRE_REPETIDO : (error?.message ?? "No se pudo crear el rol.") };
   }
 
@@ -259,10 +259,10 @@ export async function fijarNivelPersona(perfilId: string, modulo: string, nivel:
   const delRol = await nivelDelRolDe(perfilId, modulo);
   if (nivel === "rol" || nivel === delRol) {
     const { error } = await supabase.from("permisos_persona").delete().eq("perfil_id", perfilId).eq("modulo", modulo);
-    if (error) return { error: error.message.includes("permisos_persona") ? "Falta correr la migración 0116 en Supabase." : error.message };
+    if (error) return { error: error.message.includes("permisos_persona") ? "Falta correr la migración 0118 en Supabase." : error.message };
   } else {
     const { error } = await supabase.from("permisos_persona").upsert({ perfil_id: perfilId, modulo, nivel: propioDeNivel(nivel) }, { onConflict: "perfil_id,modulo" });
-    if (error) return { error: error.message.includes("permisos_persona") ? "Falta correr la migración 0116 en Supabase." : error.message };
+    if (error) return { error: error.message.includes("permisos_persona") ? "Falta correr la migración 0118 en Supabase." : error.message };
   }
   await registrarAuditoria({
     accion: "cambiar_permiso_persona",
@@ -363,7 +363,7 @@ export async function fijarAfinado(destino: DestinoAfinado, modulo: string, camb
     const { error } = await supabase
       .from(tabla)
       .upsert(aGuardar.map((c) => ({ [columnaId]: destino.id, modulo, tipo: c.tipo, clave: c.clave, valor: c.valor })), { onConflict: `${columnaId},modulo,tipo,clave` });
-    if (error) return { error: error.message.includes(tabla) ? "Falta correr la migración 0116 en Supabase." : error.message };
+    if (error) return { error: error.message.includes(tabla) ? "Falta correr la migración 0118 en Supabase." : error.message };
   }
   for (const c of aBorrar) {
     const { error } = await supabase.from(tabla).delete().eq(columnaId, destino.id).eq("modulo", modulo).eq("tipo", c.tipo).eq("clave", c.clave);

@@ -51,7 +51,7 @@ export default async function UsuariosPage() {
     supabase.auth.admin.listUsers({ perPage: 1000 }),
     // Aparte: sin la migración 0087 la columna no existe y la lista se carga igual.
     supabase.from("perfiles").select("id, paises_permitidos"),
-    // Lo propio de cada persona (migración 0116): sin ella, nadie tiene nada propio.
+    // Lo propio de cada persona (migración 0118): sin ella, nadie tiene nada propio.
     consultaSegura<PermisoPropio & { perfil_id: string }>(supabase.from("permisos_persona").select("perfil_id, modulo, nivel")),
     consultaSegura<{ perfil_id: string }>(supabase.from("permisos_persona_afinados").select("perfil_id")),
     supabase.from("paises").select("codigo, nombre").order("nombre"),
