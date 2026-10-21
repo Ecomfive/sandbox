@@ -26,3 +26,11 @@ test("sin nada en camino, lista vacía; una línea sin país va a «—»; las c
   assert.deepEqual(enCaminoPorPais([l({ fechaEnvio: null })]), []);
   assert.deepEqual(enCaminoPorPais([l({ pais: null, unidades: 10 }), l({ unidades: 0 })]), [{ pais: "—", unidades: 10, compras: 1 }]);
 });
+
+test("con un país marcado, solo lo en camino de ese país", () => {
+  const lineas = [l({ unidades: 300, codigoPais: "PA" }), l({ unidades: 200, pais: "México", codigoPais: "MX" }), l({ unidades: 100, codigoPais: "PA" })];
+  assert.deepEqual(enCaminoPorPais(lineas, "PA"), [{ pais: "Panamá", unidades: 400, compras: 2 }]);
+  assert.deepEqual(enCaminoPorPais(lineas, "mx"), [{ pais: "México", unidades: 200, compras: 1 }]);
+  assert.deepEqual(enCaminoPorPais(lineas, "CR"), []);
+  assert.equal(enCaminoPorPais(lineas).length, 2); // sin país marcado, todos
+});

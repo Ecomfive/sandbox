@@ -6,7 +6,10 @@
 const ETAPAS_CERRADAS = ["completado", "descartado"];
 
 export interface LineaEnCamino {
+  /** El nombre del país («Panamá»), que es lo que se muestra. */
   pais: string | null;
+  /** Su código («PA»), para quedarse con un solo país. */
+  codigoPais?: string | null;
   unidades: number;
   etapa: string;
   fechaEnvio: string | null;
@@ -23,11 +26,15 @@ export interface EnCaminoPais {
 /** Una línea está en camino: orden abierta, ya salió y no ha llegado. */
 export const lineaEnCamino = (l: LineaEnCamino): boolean => !l.anulada && !ETAPAS_CERRADAS.includes(l.etapa) && !!l.fechaEnvio && !l.fechaLlegada;
 
-/** Las unidades en camino por país, el país con más unidades primero. Sin nada en camino, lista vacía. */
-export function enCaminoPorPais(lineas: LineaEnCamino[]): EnCaminoPais[] {
+/**
+ * Las unidades en camino por país, el país con más unidades primero. Con `codigoPais` solo las de ese país (el que está marcado en
+ * Compras). Sin nada en camino, lista vacía.
+ */
+export function enCaminoPorPais(lineas: LineaEnCamino[], codigoPais?: string | null): EnCaminoPais[] {
   const porPais = new Map<string, EnCaminoPais>();
   for (const l of lineas) {
     if (!lineaEnCamino(l) || !(l.unidades > 0)) continue;
+    if (codigoPais && (l.codigoPais ?? "").toUpperCase() !== codigoPais.toUpperCase()) continue;
     const pais = l.pais ?? "—";
     const actual = porPais.get(pais) ?? { pais, unidades: 0, compras: 0 };
     actual.unidades += l.unidades;

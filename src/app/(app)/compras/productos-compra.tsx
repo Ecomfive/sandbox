@@ -3,6 +3,7 @@
 import { startTransition, useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CompetenciaDesplegable } from "@/components/competencia/piezas-competencia";
+import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -21,14 +22,20 @@ import { campoEditable, campoOculto } from "./permisos-compras";
  * Una línea de la orden: lo pedido y el costo (unitario o total) se editan en el lugar, en cualquier momento (también con la
  * compra cerrada), y se guardan al salir del campo, con «Guardando…» y «✓ Guardado» a la vista.
  */
+/** El país marcado en Compras para «En camino»: uno solo, «todos» o `null` (Importadora: no aplica). */
+type EnCaminoVista = { codigo: string; nombre: string } | "todos" | null;
+
 function FilaItem({
   item,
   puedeEscribir,
   alCambiar,
   alEscribir,
+  enCamino,
 }: {
   item: ItemCompra;
   puedeEscribir: boolean;
+  /** Lo marcado arriba en Compras: con un país, solo lo en camino de ese país. */
+  enCamino: EnCaminoVista;
   alCambiar: () => void;
   /** Lo que se ve escrito ahora (aunque no se haya guardado), para el total de la orden en vivo. */
   alEscribir: (id: string, vivo: { cantidad: number; subtotal: number | null }) => void;
@@ -131,6 +138,7 @@ function FilaItem({
         </label>
         {verCostos && <CamposCosto costo={costo} deshabilitado={!puedeEscribir || pendiente || !editarCostos} alSalir={guardar} />}
       </div>
+      {enCamino && <EnCaminoProducto id={item.skuId} compacto pais={enCamino === "todos" ? null : enCamino.codigo} nombrePais={enCamino === "todos" ? undefined : enCamino.nombre} />}
       <CompetenciaDesplegable skuId={item.skuId} nombre={item.nombre} />
     </li>
   );
@@ -151,9 +159,12 @@ export function ProductosCompra({
   incrustado = false,
   alCambiarBorrador,
   sugerido = null,
+  enCamino = null,
 }: {
   compraId: string | null;
   puedeEscribir: boolean;
+  /** Lo marcado arriba en Compras (un país, «todos» o `null`): «En camino» de cada producto, solo unidades. */
+  enCamino?: EnCaminoVista;
   incrustado?: boolean;
   /** Compra nueva: cuántas líneas lleva el borrador (la QTY y el monto saldrán de ellas). */
   alCambiarBorrador?: (lineas: number) => void;
@@ -315,7 +326,7 @@ export function ProductosCompra({
         {items.length > 0 && (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {items.map((i) => (
-              <FilaItem key={i.id} item={i} puedeEscribir={puedeEscribir} alCambiar={() => void trasCambio()} alEscribir={alEscribir} />
+              <FilaItem key={i.id} item={i} puedeEscribir={puedeEscribir} alCambiar={() => void trasCambio()} alEscribir={alEscribir} enCamino={enCamino} />
             ))}
           </ul>
         )}

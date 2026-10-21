@@ -10,19 +10,43 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  * Lo que viene en camino de un producto, solo unidades por país (sin el detalle de cada compra): las órdenes que ya salieron y
  * todavía no llegan, la misma regla de «En tránsito» de Compras. Se pide al abrir la ficha.
  */
-export function EnCaminoProducto({ id }: { id: string }) {
+export function EnCaminoProducto({ id, pais, nombrePais, compacto = false }: { id: string; pais?: string | null; nombrePais?: string; compacto?: boolean }) {
   const [datos, setDatos] = useState<EnCaminoPais[] | "error" | null>(null);
 
   useEffect(() => {
     let vigente = true;
-    obtenerEnCaminoProducto(id)
+    obtenerEnCaminoProducto(id, pais ?? null)
       .then((r) => vigente && setDatos("enCamino" in r ? r.enCamino : "error"))
       .catch(() => vigente && setDatos("error"));
     return () => {
       vigente = false;
     };
-  }, [id]);
+  }, [id, pais]);
 
+  // Compacto (la línea de un producto en una compra): una sola línea. Con un país marcado en Compras, solo las de ese país.
+  if (compacto) {
+    const donde = nombrePais ? ` en ${nombrePais}` : "";
+    if (datos === null) return <p className="m-0 text-xs text-muted-foreground">En camino: cargando…</p>;
+    if (datos === "error")
+      return (
+        <p role="alert" className="m-0 text-xs text-destructive">
+          No se pudo cargar lo que viene en camino.
+        </p>
+      );
+    if (datos.length === 0) return <p className="m-0 text-xs text-muted-foreground">Nada en camino{donde}.</p>;
+    return (
+      <p className="m-0 text-xs text-muted-foreground">
+        En camino{donde}:{" "}
+        {datos.map((d, i) => (
+          <span key={d.pais}>
+            {i > 0 && " · "}
+            {!nombrePais && `${d.pais === "—" ? "Sin país" : d.pais} `}
+            <strong className="font-semibold text-foreground tabular-nums">{entero(d.unidades)} u.</strong>
+          </span>
+        ))}
+      </p>
+    );
+  }
   if (datos === null) return <p className="text-sm text-muted-foreground">Cargando…</p>;
   if (datos === "error")
     return (

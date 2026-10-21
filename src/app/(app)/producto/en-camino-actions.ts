@@ -10,14 +10,16 @@ const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
 /**
  * Lo que viene en camino de un producto: las unidades de las órdenes que ya salieron y todavía no llegan, por país (la misma regla de
- * «En tránsito» de Compras). Un producto con variantes suma las de sus variantes. Solo unidades: no trae costos. Lo pueden ver quienes abren
+ * «En tránsito» de Compras); con `codigoPais`, solo el de ese país (el que está marcado en Compras). Un producto con variantes suma las de sus variantes. Solo unidades: no trae costos. Lo pueden ver quienes abren
  * Producto, Inventario, Compras o Gestión de publicaciones Dropi, y cada uno solo los países que tiene permitidos y las compras que
  * su rol alcanza (Usuarios y roles › Afinar). Devuelve el error como valor.
  */
-export async function obtenerEnCaminoProducto(id: string): Promise<{ enCamino: EnCaminoPais[] } | { error: string }> {
+export async function obtenerEnCaminoProducto(id: string, codigoPais?: string | null): Promise<{ enCamino: EnCaminoPais[] } | { error: string }> {
   const usuario = await getUsuarioActual();
   if (!usuario || !["producto", "inventario", "compras", "publicaciones-dropi"].some((m) => usuario.modulos.includes(m))) return { error: "No tienes acceso." };
   if (!ES_ID(id)) return { error: "Producto no válido." };
+  const filtro = codigoPais ? String(codigoPais).trim().toUpperCase() : null;
+  if (filtro && !/^[A-Z]{2,12}$/.test(filtro)) return { error: "País no válido." };
   const supabase = createServiceClient();
   const { data: variantes } = await supabase.from("skus_maestros").select("id").eq("padre_id", id);
   const ids = [id, ...(variantes ?? []).map((v) => v.id as string)];
@@ -33,10 +35,10 @@ export async function obtenerEnCaminoProducto(id: string): Promise<{ enCamino: E
   for (const l of data ?? []) {
     const c = uno(l.wms_compras as unknown as Compra | null);
     if (!c) continue;
-    const pais = uno(c.paises);
-    if (!puedeVerPais(usuario.paisesPermitidos, pais?.codigo ?? null)) continue;
+    const delPais = uno(c.paises);
+    if (!puedeVerPais(usuario.paisesPermitidos, delPais?.codigo ?? null)) continue;
     if (!dentroDelAlcance(limites.alcance, { asignadoId: c.asignado_a, creadoPorId: c.creado_por, responsableNombre: c.responsable_nombre, creadorNombre: c.creador_nombre }, usuario)) continue;
-    lineas.push({ pais: pais?.nombre ?? null, unidades: Number(l.cantidad_pedida), etapa: c.etapa, fechaEnvio: c.fecha_envio, fechaLlegada: c.fecha_llegada, anulada: !!c.anulada_en });
+    lineas.push({ pais: delPais?.nombre ?? null, codigoPais: delPais?.codigo ?? null, unidades: Number(l.cantidad_pedida), etapa: c.etapa, fechaEnvio: c.fecha_envio, fechaLlegada: c.fecha_llegada, anulada: !!c.anulada_en });
   }
-  return { enCamino: enCaminoPorPais(lineas) };
+  return { enCamino: enCaminoPorPais(lineas, filtro) };
 }
