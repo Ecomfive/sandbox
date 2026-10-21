@@ -1,4 +1,5 @@
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
+import { estadoRuta, realQueManda, type EstadoRuta } from "@/lib/compras/estado-ruta";
 import { etiquetaVia, VIAS_RUTA, type EnvioReal, type ResumenesReales } from "@/lib/compras/rutas-envio";
 
 export interface TarifaRuta {
@@ -38,9 +39,23 @@ export function tarifasVigentes(tarifas: TarifaRuta[]): TarifaRuta[] {
   return tarifas.filter((t) => (vistos.has(t.tipo) ? false : (vistos.add(t.tipo), true)));
 }
 
+/** Lo que de verdad tarda una ruta (12 meses o, si no hay, el histórico) y cómo está contra lo que promete. */
+export function medidaRuta(r: FilaRuta): { real: number | null; envios: number; estado: EstadoRuta; delta: number | null } {
+  const real = realQueManda(r.real);
+  return { real: real.promedio, envios: real.n, ...estadoRuta(r.diasMax, real.promedio) };
+}
+
+/** «10 d» o «45–55 d»; null si no se definió el plazo. */
+export function plazoCorto(r: FilaRuta): string | null {
+  if (r.diasMax === null && r.diasMin === null) return null;
+  const min = r.diasMin ?? r.diasMax!;
+  const max = r.diasMax ?? r.diasMin!;
+  return min === max ? `${max} d` : `${min}–${max} d`;
+}
+
 export const textoTarifa = (t: TarifaRuta) => `$${t.precio.toLocaleString("es-PA", { maximumFractionDigits: 2 })} ${t.unidad === "cbm" ? "por CBM" : "por kg"}`;
 
-/** Cómo se filtra y agrupa la lista de rutas; arranca agrupada por país. «Inactivas» muestra los canales cerrados. */
+/** Los datos de una ruta para «Descargar» (la lista de Envíos filtra y agrupa por su cuenta). */
 export const DEF_ENVIOS: DefTabla<FilaRuta> = {
   clave: "compras-envios",
   campos: [
@@ -78,6 +93,14 @@ export const DEF_ENVIOS: DefTabla<FilaRuta> = {
       ],
       agrupable: true,
     },
+    { id: "modalidad", etiqueta: "Modalidad", tipo: "texto", valor: (r) => [r.modalidad, r.courier].filter(Boolean).join(" ") },
+    { id: "plazo_min", etiqueta: "Plazo mínimo (días)", tipo: "numero", valor: (r) => r.diasMin },
+    { id: "plazo_max", etiqueta: "Plazo máximo (días)", tipo: "numero", valor: (r) => r.diasMax },
+    { id: "real_12", etiqueta: "Real, últimos 12 meses (días)", tipo: "numero", valor: (r) => r.real.ultimos12.promedio },
+    { id: "real_2", etiqueta: "Real, últimos 2 meses (días)", tipo: "numero", valor: (r) => r.real.ultimos2.promedio },
+    { id: "real_hist", etiqueta: "Real, histórico (días)", tipo: "numero", valor: (r) => r.real.historico.promedio },
+    { id: "envios", etiqueta: "Envíos medidos", tipo: "numero", valor: (r) => r.real.historico.n },
+    { id: "tarifa", etiqueta: "Tarifa vigente", tipo: "texto", valor: (r) => tarifasVigentes(r.tarifas).map((t) => `${t.tipo}: ${textoTarifa(t)}`).join("; ") },
     { id: "nota", etiqueta: "Nota", tipo: "texto", valor: (r) => r.nota ?? "" },
   ],
   cerrados: {

@@ -6,7 +6,9 @@ import { numeroOC } from "./def-compras";
 import { SelectorPais } from "./selector-pais";
 import { PastillaTienda, useTiendas } from "./tiendas";
 import { useRouter } from "next/navigation";
+import { EstimacionEnvio } from "./estimacion-envio";
 import { PlanificacionAutomatica } from "./planificacion-automatica";
+import { PrediccionFechaLimite } from "./prediccion-fecha-limite";
 import { useToast } from "@/components/ui/toast";
 import { conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
@@ -427,30 +429,33 @@ export function FormularioCompra({
         </Seccion>
 
         <Seccion icono={CalendarioIcon} titulo="Fechas">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <CampoGobernado clave="limite">
-              <Campo etiqueta={conEmoji("fechaLimite", "Fecha límite")} id="campo-fecha-limite">
-                <input id="campo-fecha-limite" type="date" name="fecha_limite" defaultValue={compra?.fechaLimite ?? ""} className={fieldClass} />
+          <EstimacionEnvio fechaEnvio={compra?.fechaEnvio ?? null}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <CampoGobernado clave="limite">
+                <Campo etiqueta={conEmoji("fechaLimite", "Fecha límite")} id="campo-fecha-limite">
+                  <input id="campo-fecha-limite" type="date" name="fecha_limite" defaultValue={compra?.fechaLimite ?? ""} className={fieldClass} />
+                  <PrediccionFechaLimite fechaLimite={compra?.fechaLimite ?? null} />
+                </Campo>
+              </CampoGobernado>
+              <Campo etiqueta={conEmoji("fechaLlegada", "Fecha de llegada")} id="campo-fecha-llegada">
+                <input id="campo-fecha-llegada" type="date" name="fecha_llegada" defaultValue={compra?.fechaLlegada ?? ""} className={fieldClass} />
               </Campo>
-            </CampoGobernado>
-            <Campo etiqueta={conEmoji("fechaLlegada", "Fecha de llegada")} id="campo-fecha-llegada">
-              <input id="campo-fecha-llegada" type="date" name="fecha_llegada" defaultValue={compra?.fechaLlegada ?? ""} className={fieldClass} />
-            </Campo>
-            <CampoGobernado clave="pago1">
-              <Campo etiqueta={conEmoji("fechaPago1", "Fecha de Pago (1)")} id="campo-fecha-pago-1">
-                <input id="campo-fecha-pago-1" type="date" name="fecha_pago_1" defaultValue={compra?.fechaPago1 ?? ""} className={fieldClass} />
+              <CampoGobernado clave="pago1">
+                <Campo etiqueta={conEmoji("fechaPago1", "Fecha de Pago (1)")} id="campo-fecha-pago-1">
+                  <input id="campo-fecha-pago-1" type="date" name="fecha_pago_1" defaultValue={compra?.fechaPago1 ?? ""} className={fieldClass} />
+                </Campo>
+              </CampoGobernado>
+              <CampoGobernado clave="pago2">
+                <Campo etiqueta={conEmoji("fechaPago2", "Fecha de Pago (2)")} id="campo-fecha-pago-2">
+                  <input id="campo-fecha-pago-2" type="date" name="fecha_pago_2" defaultValue={compra?.fechaPago2 ?? ""} className={fieldClass} />
+                </Campo>
+              </CampoGobernado>
+              <Campo etiqueta={conEmoji("fechaEnvio", "Fecha de Envío")} id="campo-fecha-envio">
+                <input id="campo-fecha-envio" type="date" name="fecha_envio" defaultValue={compra?.fechaEnvio ?? ""} className={fieldClass} />
               </Campo>
-            </CampoGobernado>
-            <CampoGobernado clave="pago2">
-              <Campo etiqueta={conEmoji("fechaPago2", "Fecha de Pago (2)")} id="campo-fecha-pago-2">
-                <input id="campo-fecha-pago-2" type="date" name="fecha_pago_2" defaultValue={compra?.fechaPago2 ?? ""} className={fieldClass} />
-              </Campo>
-            </CampoGobernado>
-            <Campo etiqueta={conEmoji("fechaEnvio", "Fecha de Envío")} id="campo-fecha-envio">
-              <input id="campo-fecha-envio" type="date" name="fecha_envio" defaultValue={compra?.fechaEnvio ?? ""} className={fieldClass} />
-            </Campo>
-            <PlanificacionAutomatica planificacion={compra?.planificacion ?? null} fechaEnvio={compra?.fechaEnvio ?? null} />
-          </div>
+              <PlanificacionAutomatica planificacion={compra?.planificacion ?? null} fechaEnvio={compra?.fechaEnvio ?? null} />
+            </div>
+          </EstimacionEnvio>
         </Seccion>
 
         {comentarios}
