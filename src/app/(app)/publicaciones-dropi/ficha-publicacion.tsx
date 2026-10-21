@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- foto de Storage */
 import { useState, useTransition } from "react";
+import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
@@ -10,7 +11,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CalendarioIcon, CerrarIcon, CheckIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CerrarIcon, CheckIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
   DIAS_REVISION,
   ESTADOS,
@@ -441,6 +442,13 @@ function ContenidoFicha({
               </label>
             </div>
           </Seccion>
+
+          {/* La competencia del producto vinculado: los mismos datos que se ven en su ficha de Producto y en Compras. Un compuesto no la tiene. */}
+          {p.sku && p.sku.tipo !== "combo" && (
+            <Seccion icono={InteligenciaIcon} titulo="Competencia del producto">
+              <BloqueCompetencia key={p.sku.id} skuId={p.sku.id} />
+            </Seccion>
+          )}
 
           <Seccion icono={PersonaIcon} titulo="Revisión">
             <div className="grid gap-3 sm:grid-cols-2">
