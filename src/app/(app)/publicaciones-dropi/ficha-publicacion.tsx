@@ -11,9 +11,8 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CalendarioIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
-  DIAS_REVISION,
   ESTADOS,
   ESTADOS_PUBLICACION,
   ESTADOS_REPOSICION,
@@ -26,7 +25,7 @@ import {
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
-import { actualizarPublicacion, eliminarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
+import { actualizarPublicacion, eliminarPublicacion, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { VinculoSku } from "./vinculo-sku";
@@ -80,11 +79,6 @@ const desde = (p: FilaPublicacion): Formulario => ({
 
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
 const usd = (v: number | null) => (v === null || !Number.isFinite(v) ? "—" : `$${v.toFixed(2)}`);
-const masDias = (f: string, dias: number) => {
-  const d = new Date(`${f}T12:00:00`);
-  d.setDate(d.getDate() + dias);
-  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" });
-};
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -118,8 +112,8 @@ function Selector({ valor, lista, cambiar, nombre, vacio = "—" }: { valor: str
 
 /**
  * Ficha de una publicación: el panel a la derecha que se abre al pulsar su fila. **La ficha ya es el formulario**: se cambia
- * un dato y arriba aparecen «Guardar cambios» y «Cancelar». «Marcar revisada hoy» pone la última revisión en hoy. Utilidad,
- * margen y próxima revisión se calculan solos. Con cambios sin guardar, cerrar o pasar a otra pide confirmación.
+ * un dato y arriba aparecen «Guardar cambios» y «Cancelar». Utilidad y
+ * margen se calculan solos. Con cambios sin guardar, cerrar o pasar a otra pide confirmación.
  */
 export function FichaPublicacion({
   publicacion,
@@ -217,18 +211,6 @@ function ContenidoFicha({
     });
   }
 
-  function revisada() {
-    setError(null);
-    empezar(async () => {
-      const r = await marcarRevisada(p.id).catch(() => ({ error: "No se pudo marcar como revisada." }));
-      if (r.error) setError(r.error);
-      else {
-        mostrarToast(`Revisada: la próxima revisión es en ${DIAS_REVISION} días`);
-        setVersion((v) => v + 1);
-      }
-    });
-  }
-
   function eliminar() {
     if (!confirm(`¿Eliminar "${p.nombre}"? No se puede deshacer.`)) return;
     setError(null);
@@ -277,11 +259,6 @@ function ContenidoFicha({
                     Cancelar
                   </button>
                 </>
-              )}
-              {!sinGuardar && (
-                <BotonAccion icono={CalendarioIcon} tono={p.revisionVencida ? "alerta" : "neutro"} disabled={pendiente} onClick={revisada}>
-                  Marcar revisada hoy
-                </BotonAccion>
               )}
               {!sinGuardar && puedeEliminar && (
                 <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
@@ -455,22 +432,9 @@ function ContenidoFicha({
             </Seccion>
           )}
 
-          <Seccion icono={PersonaIcon} titulo="Revisión">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Última revisión</span>
-                <input type="date" value={d.ultima_revision} onChange={(e) => cambiar({ ultima_revision: e.target.value })} className={`${fieldClass} w-full`} />
-              </label>
-              <div className="flex flex-col gap-1">
-                <span className={labelClassSm}>Próxima revisión</span>
-                <span className="flex items-center gap-1.5 py-2 text-sm tabular-nums">
-                  {p.revisionVencida && d.ultima_revision === (p.ultimaRevision ?? "") && <span role="img" aria-label="Revisión vencida" className="h-2 w-2 rounded-full bg-warning" />}
-                  {d.ultima_revision ? masDias(d.ultima_revision, DIAS_REVISION) : "Sin revisar"}
-                </span>
-              </div>
-            </div>
+          <Seccion icono={ComprasIcon} titulo="Notas">
             <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Notas</span>
+              <span className={labelClassSm}>Notas</span>
               <textarea value={d.notas} onChange={(e) => cambiar({ notas: e.target.value })} rows={4} maxLength={5000} placeholder="Ej: competencia en Dropi, por qué se bajó el precio…" className={`${fieldClass} w-full resize-y`} />
             </label>
           </Seccion>
