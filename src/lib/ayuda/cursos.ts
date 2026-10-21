@@ -90,7 +90,8 @@ export const CURSOS: Curso[] = [
         titulo: "Activo o Test, código de barras y foto",
         parrafos: [
           "Un producto nace en Test: se está probando, aparece en Inventario pero no tiene stock y no se compra. Cuando se decide comprarlo, pásalo a Activo desde su ficha.",
-          "Si un producto ya no se vende bien, pásalo a Inactivo: sigue vendiendo el stock que le queda, pero no se puede volver a comprar hasta que se pase otra vez a Activo.",
+          "Si un producto ya no se vende bien, pásalo a Inactivo: sigue vendiendo el stock que le queda, pero no se puede volver a comprar hasta que se pase otra vez a Activo. Si ya no se va a traer más, pásalo a Descontinuado: tampoco se puede comprar.",
+          "Al crear un producto, si ya hay otro con un nombre o una foto parecidos, sale el aviso «Posible duplicado» con ese producto. Revísalo antes de crear: el aviso no lo impide, pero dos productos repetidos luego hay que unirlos.",
           "Al crear el producto se le genera un código de barras interno (un EAN-13 que empieza por 20); si trae el del fabricante, se elige «Del fabricante» y se escribe. La foto se sube desde la ficha y se ve en Producto e Inventario.",
           "El bloque «Compras» de la ficha suma las unidades compradas desde la primera vez, a partir de las compras donde el producto está vinculado.",
         ],
@@ -101,6 +102,7 @@ export const CURSOS: Curso[] = [
       { pregunta: "Un producto se vende en tres colores. ¿Cómo se compra?", opciones: ["Por el producto padre", "Por cada variante, con su cantidad", "Como compuesto"], correcta: 1 },
       { pregunta: "¿Qué pasa con un producto en Test?", opciones: ["Se compra normal", "Aparece en Inventario pero no tiene stock ni se compra", "No aparece en ningún lado"], correcta: 1 },
       { pregunta: "Un producto compuesto (combo)…", opciones: ["Guarda su propio stock", "No guarda stock: al venderlo se descuenta cada componente", "Solo existe en Dropi"], correcta: 1 },
+      { pregunta: "Al crear un producto sale el aviso «Posible duplicado». ¿Qué haces?", opciones: ["Lo ignoro, el sistema los junta solo", "Reviso el producto parecido antes de crear el nuevo", "No puedo crearlo"], correcta: 1 },
     ],
   },
   {
@@ -200,6 +202,45 @@ export const CURSOS: Curso[] = [
       { pregunta: "¿Se puede hacer una entrada a mano en la bodega de Dropi?", opciones: ["Sí, como cualquier bodega", "No: es externa y su stock llega por sincronización", "Solo con permiso de Ajustes"], correcta: 1 },
       { pregunta: "Una salida sin lote de un producto con vencimiento…", opciones: ["Toma el lote más nuevo", "Sale por FEFO y nunca toma un lote vencido", "Se rechaza siempre"], correcta: 1 },
       { pregunta: "¿Se puede borrar un movimiento?", opciones: ["Sí, desde la ficha", "No: el libro no se edita ni se borra; se corrige con otro movimiento", "Solo el mismo día"], correcta: 1 },
+    ],
+  },
+  {
+    id: "publicaciones-dropi",
+    titulo: "Gestión de IDs Dropi",
+    descripcion: "Las publicaciones de Ecomfive en Dropi: tablero de acciones, margen, revisión y vínculo con Producto.",
+    modulo: "publicaciones-dropi",
+    minutos: 7,
+    lecciones: [
+      {
+        titulo: "La lista y el tablero de acciones",
+        parrafos: [
+          "Cada fila es un producto que Ecomfive tiene publicado en Dropi como proveedor, en el país de la barra de arriba, con su foto, su ID de Dropi, su SKU y su número propio (PUB-0001…), que es distinto al ID de Dropi y no cambia.",
+          "La lista arranca agrupada por estado: Producto nuevo, Revisar precio y venta, Verificar con dropshipper, Validar bajar precio, Bajar precio y Al día. Los archivados se ven con el botón «Archivados».",
+          "Arriba, el tablero de acciones cuenta lo que espera una decisión (los estados del flujo, Revisión vencida, Margen bajo, Sin vincular a Producto y Sin stock). Pulsa una tarjeta para filtrar la lista y otra vez para quitar el filtro.",
+        ],
+      },
+      {
+        titulo: "Margen y revisión",
+        parrafos: [
+          "La utilidad bruta es el precio de venta menos el costo mercancía y el fulfillment; el margen bruto es esa utilidad dividida entre el precio. Se calculan solos, y un punto rojo avisa que el margen está por debajo de 30 %.",
+          "Cada producto se revisa cada 28 días: la próxima revisión sale de la última y un punto ámbar avisa que ya pasó. El filtro «Revisión vencida» muestra lo que toca revisar.",
+          "En la ficha cambias el estado, el precio y los costos, la venta, dónde está, la reposición, la privatización y las notas, y guardas con «Guardar cambios». Si cambias el precio, «Último cambio de precio» pasa a hoy.",
+        ],
+      },
+      {
+        titulo: "Vínculo con Producto",
+        parrafos: [
+          "Cada publicación se vincula con su producto de Producto. Si falta, la ficha sugiere uno (por la misma foto o un nombre parecido) con «Vincular» o «Vincular y siguiente»; si no es el correcto, busca otro por SKU o nombre.",
+          "Un pack («PACK 2», «2x1») se vincula con su compuesto, no con el producto simple, porque al vender descontaría mal el inventario. Si el compuesto no existe, la ficha dice «Falta el compuesto»: créalo en Producto y vincúlalo.",
+          "Con el vínculo, la ficha muestra «En camino» (las unidades de compras que ya salieron hacia ese país) y la competencia del producto en Dropi. Sin vínculo, el producto no se puede comprar desde Compras › Reponer.",
+        ],
+      },
+    ],
+    examen: [
+      { pregunta: "¿Qué es el número PUB-0001 de una publicación?", opciones: ["El ID que pone Dropi", "Un número propio del sistema, distinto al ID de Dropi, que no cambia", "El SKU del producto"], correcta: 1 },
+      { pregunta: "¿Qué indica el punto rojo en el margen bruto?", opciones: ["Que el margen está por debajo de 30 %", "Que no tiene stock", "Que la revisión está vencida"], correcta: 0 },
+      { pregunta: "Una publicación «2x1» se vincula con…", opciones: ["El producto simple", "Su compuesto en Producto", "Ningún producto"], correcta: 1 },
+      { pregunta: "¿Cómo ves lo que espera una decisión?", opciones: ["Pulsando una tarjeta del tablero de acciones", "Descargando la lista", "Abriendo cada ficha una por una"], correcta: 0 },
     ],
   },
 ];
