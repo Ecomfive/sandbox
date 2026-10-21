@@ -885,7 +885,7 @@ convenciones técnicas del código.
   / 7 tierra; con varias vías, la más lenta). La calculan `crearCompra`, `actualizarCompra` (solo si cambió fecha de envío, vía,
   país o tipo), `actualizarCampoCompra` y el lote al cambiar fecha de envío o vía (devuelven `planificacion` y la lista la
   pinta). Sin fecha de envío: una compra que nunca la tuvo conserva la de ClickUp; si se le quita, queda vacía. La ficha la
-  muestra con `PlanificacionAutomatica` (llegada estimada y de dónde salen los días). `scripts/recalcular-planificacion.ts`
+  muestra con `PlanificacionAutomatica` (llegada estimada y de dónde salen los días). **Predicción de la fecha límite** (21 oct 2026): bajo el campo «Fecha límite» de la ficha, `PrediccionFechaLimite` (`prediccion-fecha-limite.tsx`) muestra la llegada más probable (la misma `estimarPlanificacion`: mediana del país por esa vía, o de todos los países, o lo típico), el **rango habitual** (cuartiles 25 a 75 de esos envíos, `Estimacion.rango`, null si solo hay lo típico) y «Usar como fecha límite», que escribe la fecha en el campo (setter nativo + evento `input`, para que se encienda «Guardar cambios»); **nunca la guarda ni la cambia sola**. La estimación se calcula una sola vez por formulario (`EstimacionEnvio`, `estimacion-envio.tsx`, un contexto que escucha país, vía, tipo y fecha de envío) y la comparten ella y la planificación. `scripts/recalcular-planificacion.ts`
   recalcula las abiertas con fecha de envío. **«Documentos» y «Producto relacionado» ya no existen** (migración 0090): los
   archivos del campo Documentos de ClickUp quedaron dentro de un comentario «Documentos (factura o soporte)».
   **Copiar cotización** (17 oct 2026, `copiar-cotizacion.tsx`): botón de la ficha que deja en el portapapeles una imagen PNG

@@ -28,6 +28,16 @@ describe("estimarPlanificacion", () => {
     assert.equal(e.planificacion, "Nov26");
   });
 
+  it("da el rango habitual (cuartiles 25 a 75) de ese país por esa vía", () => {
+    // PA por mar: 50, 59, 70 → cuartiles 54.5 → 55 y 64.5 → 65
+    const e = estimarPlanificacion(tiempos, "PA", ["mar"], "2026-09-10")!;
+    assert.deepEqual(e.rango, { desde: "2026-11-04", hasta: "2026-11-14", diasBajo: 55, diasAlto: 65 });
+  });
+
+  it("sin envíos para medir no hay rango", () => {
+    assert.equal(estimarPlanificacion(tiempos, "PA", ["tierra"], "2026-09-10")!.rango, null);
+  });
+
   it("cada país tiene su tiempo", () => {
     assert.equal(estimarPlanificacion(tiempos, "CR", ["mar"], "2026-09-10")!.dias, 88);
   });

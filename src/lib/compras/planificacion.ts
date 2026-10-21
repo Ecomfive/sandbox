@@ -26,6 +26,9 @@ export interface EnvioHistorico {
 export interface Transito {
   dias: number;
   muestra: number;
+  /** Los envíos más rápidos y más lentos de lo normal: el cuartil 25 y el 75 de sus días (el «rango habitual»). */
+  bajo: number;
+  alto: number;
 }
 /** Lo que tarda cada país por cada vía (`clave|via`) y cada vía en todos los países (`*|via`). */
 export type TiemposTransito = Map<string, Transito>;
@@ -36,13 +39,22 @@ const mediana = (v: number[]) => {
   return o.length % 2 ? o[m] : Math.round((o[m - 1] + o[m]) / 2);
 };
 
+/** El percentil `p` (0 a 1) de una lista de días, con interpolación, redondeado. */
+const percentil = (v: number[], p: number) => {
+  const o = [...v].sort((a, b) => a - b);
+  const i = (o.length - 1) * p;
+  const abajo = Math.floor(i);
+  const arriba = Math.ceil(i);
+  return Math.round(o[abajo] + (o[arriba] - o[abajo]) * (i - abajo));
+};
+
 export function tiemposDeTransito(historial: EnvioHistorico[]): TiemposTransito {
   const grupos = new Map<string, number[]>();
   for (const e of historial) {
     if (!(e.dias >= 0) || e.dias > 365) continue; // una fecha mal puesta no cuenta
     for (const k of [`${e.clave}|${e.via}`, `*|${e.via}`]) grupos.set(k, [...(grupos.get(k) ?? []), e.dias]);
   }
-  return new Map([...grupos].map(([k, v]) => [k, { dias: mediana(v), muestra: v.length }]));
+  return new Map([...grupos].map(([k, v]) => [k, { dias: mediana(v), muestra: v.length, bajo: percentil(v, 0.25), alto: percentil(v, 0.75) }]));
 }
 
 export interface Estimacion {
@@ -53,6 +65,11 @@ export interface Estimacion {
   /** De dónde salen los días: los envíos de ese país, los de todos los países o lo típico de la vía. */
   base: "pais" | "todos" | "defecto";
   muestra: number;
+  /**
+   * Cuándo llegaría lo habitual (de los cuartiles 25 a 75 de los envíos anteriores): la fecha más temprana y la más tardía. null si
+   * no hay envíos para medir (se usó lo típico de la vía).
+   */
+  rango: { desde: string; hasta: string; diasBajo: number; diasAlto: number } | null;
   /** En palabras, para la ficha: «marítimo: 59 días (mediana de 306 envíos de este país)». */
   explicacion: string;
 }
@@ -64,29 +81,34 @@ export interface Estimacion {
 export function estimarPlanificacion(tiempos: TiemposTransito, clave: string, vias: string[], fechaEnvio: string | null): Estimacion | null {
   if (!fechaEnvio || !/^\d{4}-\d{2}-\d{2}/.test(fechaEnvio)) return null;
   const candidatas = (vias.length ? vias : ["mar"]).filter((v) => v in DIAS_POR_DEFECTO);
-  let mejor: Omit<Estimacion, "planificacion" | "llegadaEstimada" | "explicacion"> | null = null;
+  type Base = Omit<Estimacion, "planificacion" | "llegadaEstimada" | "explicacion" | "rango"> & { bajo: number | null; alto: number | null };
+  let mejor: Base | null = null;
   for (const via of candidatas.length ? candidatas : ["mar"]) {
     const delPais = tiempos.get(`${clave}|${via}`);
     const deTodos = tiempos.get(`*|${via}`);
-    const t: Omit<Estimacion, "planificacion" | "llegadaEstimada" | "explicacion"> =
+    const t: Base =
       delPais && delPais.muestra >= MIN_MUESTRA
-        ? { dias: delPais.dias, via, base: "pais", muestra: delPais.muestra }
+        ? { dias: delPais.dias, via, base: "pais", muestra: delPais.muestra, bajo: delPais.bajo, alto: delPais.alto }
         : deTodos && deTodos.muestra >= MIN_MUESTRA
-          ? { dias: deTodos.dias, via, base: "todos", muestra: deTodos.muestra }
-          : { dias: DIAS_POR_DEFECTO[via], via, base: "defecto", muestra: 0 };
+          ? { dias: deTodos.dias, via, base: "todos", muestra: deTodos.muestra, bajo: deTodos.bajo, alto: deTodos.alto }
+          : { dias: DIAS_POR_DEFECTO[via], via, base: "defecto", muestra: 0, bajo: null, alto: null };
     if (!mejor || t.dias > mejor.dias) mejor = t;
   }
   const e = mejor!;
-  const llegada = new Date(`${fechaEnvio.slice(0, 10)}T12:00:00Z`);
-  llegada.setUTCDate(llegada.getUTCDate() + e.dias);
-  const llegadaEstimada = llegada.toISOString().slice(0, 10);
+  const sumar = (dias: number) => {
+    const d = new Date(`${fechaEnvio.slice(0, 10)}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+  };
+  const llegadaEstimada = sumar(e.dias);
+  const rango = e.bajo !== null && e.alto !== null ? { desde: sumar(e.bajo), hasta: sumar(e.alto), diasBajo: e.bajo, diasAlto: e.alto } : null;
   const de =
     e.base === "pais"
       ? `mediana de ${e.muestra} envío${e.muestra === 1 ? "" : "s"} de este país`
       : e.base === "todos"
         ? `mediana de ${e.muestra} envíos de todos los países; este país aún tiene pocos`
         : "lo típico de la vía; aún no hay envíos para medir";
-  return { ...e, planificacion: mesPlanificacion(llegadaEstimada), llegadaEstimada, explicacion: `${NOMBRE_VIA[e.via]}: ${e.dias} días (${de})` };
+  return { dias: e.dias, via: e.via, base: e.base, muestra: e.muestra, rango, planificacion: mesPlanificacion(llegadaEstimada), llegadaEstimada, explicacion: `${NOMBRE_VIA[e.via]}: ${e.dias} días (${de})` };
 }
 
 /**
