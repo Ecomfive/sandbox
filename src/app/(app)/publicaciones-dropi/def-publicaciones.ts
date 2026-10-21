@@ -8,6 +8,8 @@ import {
   opcion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
+import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
+import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 /** Una publicación de ECOMFIVE en Dropi (una fila de `dropi_publicaciones`), lista para la tabla y la ficha. */
@@ -44,7 +46,22 @@ export interface FilaPublicacion {
   relacionados: string[];
   /** Viene de la lista GCC de ClickUp. */
   deClickup: boolean;
+  /** El producto de Producto vinculado. */
+  sku: SkuResumen | null;
+  /** Si no está vinculada: el producto sugerido y cómo se encontró. */
+  sugerencia: SugerenciaVista | null;
 }
+
+/** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */
+export const estadoVinculo = (f: FilaPublicacion) => (f.sku ? "vinculado" : (f.sugerencia?.tipo ?? "ninguno"));
+export const VINCULOS = [
+  { valor: "vinculado", etiqueta: "Vinculado" },
+  { valor: "seguro", etiqueta: ETIQUETA_SUGERENCIA.seguro },
+  { valor: "sugerido", etiqueta: ETIQUETA_SUGERENCIA.sugerido },
+  { valor: "varios", etiqueta: ETIQUETA_SUGERENCIA.varios },
+  { valor: "falta_compuesto", etiqueta: ETIQUETA_SUGERENCIA.falta_compuesto },
+  { valor: "ninguno", etiqueta: ETIQUETA_SUGERENCIA.ninguno },
+];
 
 const opciones = (lista: OpcionPublicacion[]) => () => lista.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }));
 const color = (lista: OpcionPublicacion[]) => (v: string) => opcion(lista, v)?.color;
@@ -66,6 +83,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       ],
       agrupable: true,
     },
+    { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },
     { id: "venta", etiqueta: "Estado de venta", tipo: "seleccion", valores: (f) => uno(f.estadoVenta), opciones: opciones(ESTADOS_VENTA), agrupable: true, ordenGrupos: ESTADOS_VENTA.map((e) => e.valor), colorValor: color(ESTADOS_VENTA) },
     { id: "ubicacion", etiqueta: "Dónde está", tipo: "seleccion", valores: (f) => uno(f.ubicacion), opciones: opciones(UBICACIONES), agrupable: true, colorValor: color(UBICACIONES) },
     { id: "reposicion", etiqueta: "Reposición", tipo: "seleccion", valores: (f) => uno(f.estadoReposicion), opciones: opciones(ESTADOS_REPOSICION), agrupable: true, colorValor: color(ESTADOS_REPOSICION) },
@@ -93,6 +111,9 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "fechaPublicacion", etiqueta: "Fecha de publicación", tipo: "fecha", valor: (f) => f.fechaPublicacion },
   ],
   cerrados: { etiqueta: "Archivados", esCerrado: (f) => f.estado === "archivado", campoEstado: "estado", valoresCerrados: ["archivado"], ocultosPorDefecto: true },
-  csvAntes: [{ etiqueta: "ID Dropi", valor: (f) => f.dropiId }],
+  csvAntes: [
+    { etiqueta: "ID Dropi", valor: (f) => f.dropiId },
+    { etiqueta: "SKU", valor: (f) => f.sku?.codigo ?? "" },
+  ],
   vistaInicial: { agrupar: "estado" },
 };

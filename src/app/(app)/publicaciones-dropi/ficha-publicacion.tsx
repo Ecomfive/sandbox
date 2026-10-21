@@ -25,6 +25,7 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import { actualizarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
+import { VinculoSku } from "./vinculo-sku";
 
 export interface Persona {
   id: string;
@@ -265,6 +266,12 @@ function ContenidoFicha({
             )}
           </div>
         )}
+
+        <div className="border-b border-border px-5 py-5">
+          <Seccion icono={InventarioIcon} titulo="Producto vinculado (SKU)">
+            <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} />
+          </Seccion>
+        </div>
 
         <fieldset disabled={!puedeEscribir} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-5">
           <Seccion icono={ProductoIcon} titulo="Producto">

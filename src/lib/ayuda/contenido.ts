@@ -257,7 +257,9 @@ export const GUIAS: GuiaModulo[] = [
           "Cada producto se revisa cada 28 días: la próxima revisión se calcula sola a partir de la última, y un punto ámbar avisa que ya pasó. Filtra «Revisión» › «Revisión vencida» para ver lo que toca revisar.",
           "Pulsa una fila para abrir su ficha: ahí se cambia todo (estado, precio y costos, venta, dónde está, reposición, privatización, responsable y notas) y se guarda con «Guardar cambios». Si cambias el precio, «Último cambio de precio» pasa a hoy. «Marcar revisada hoy» pone la última revisión en hoy. Las flechas de arriba pasan a la anterior o la siguiente.",
           "«Agregar» crea una publicación nueva: arranca como «Producto nuevo», publicada hoy y a tu cargo.",
-          "Los datos vienen de la lista «GCC 🇵🇦 Ecomfive Panamá» de ClickUp. Los SKU de Producto se vinculan en una etapa siguiente.",
+          "Los datos vienen de la lista «GCC 🇵🇦 Ecomfive Panamá» de ClickUp.",
+          "Cada publicación se vincula con su producto de Producto (columna «SKU»). Las que tenían el SKU o el nombre idéntico ya se vincularon solas. Para las demás, la ficha muestra una sugerencia (por la misma foto o un nombre parecido) con «Vincular» o «Vincular y siguiente» para revisarlas una tras otra; si no es la correcta, busca otro producto por SKU o nombre. Filtra «Vínculo con Producto» para ver las pendientes.",
+          "Un pack («PACK 2», «2x1») se vincula con su compuesto de Producto, no con el producto simple (al vender descontaría mal el inventario). Si el compuesto no existe, la ficha dice «Falta el compuesto»: créalo en Producto con esa cantidad y vincúlalo.",
         ],
       },
     ],
@@ -438,6 +440,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Publicaciones Dropi vinculadas con Producto", texto: "Cada publicación de Gestión de publicaciones Dropi se vincula con su producto (SKU) de Producto. Las de SKU o nombre idéntico ya quedaron vinculadas; para las demás, la ficha sugiere el producto (misma foto o nombre parecido) y se confirma con un clic. Los packs van a su compuesto.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Gestión de publicaciones Dropi", texto: "Operación › Fulfillment tiene «Gestión de publicaciones Dropi», debajo de Compras: los productos que tenemos publicados en Dropi como proveedor (antes la lista GCC de ClickUp), con precio, margen calculado, estado de venta, dónde está el stock, reposición, privatización y la próxima revisión cada 28 días.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Landings a Shopify", texto: "El Generador de landings crea el producto en la tienda de Shopify como borrador (precio, fotos, ofertas como variantes y la landing como descripción) y lo publica en la Tienda online con un clic. El enlace publicado queda en el test del producto.", modulo: "generador-landings", href: "/generador-landings" },
   { fecha: "2026-10-21", titulo: "Imágenes de la landing con Gemini", texto: "En el Generador de landings, cada espacio de imagen tiene «Generar con Gemini»: crea la imagen con su instrucción, usando las fotos del proveedor para que el producto salga igual. «Generar las que faltan» hace todas las que no tienen imagen.", modulo: "generador-landings", href: "/generador-landings" },

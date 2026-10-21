@@ -12,6 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { leerTareaGcc, type TareaClickup } from "../src/lib/publicaciones/publicacion";
 import { detectarImagen } from "../src/lib/seguridad/imagen";
+import { huellaFoto } from "../src/lib/wms/huella-foto";
 
 const aplicar = process.argv.includes("--aplicar");
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -85,7 +86,10 @@ async function main() {
           const { error: e2 } = await supabase.storage.from(BUCKET).upload(ruta, bytes, { contentType: tipo.tipo });
           if (!e2) {
             const url = supabase.storage.from(BUCKET).getPublicUrl(ruta).data.publicUrl;
-            await supabase.from("dropi_publicaciones").update({ foto_url: url }).eq("id", data.id);
+            // La huella de la foto sirve para sugerir su producto de Producto (migración 0117; sin ella se guarda solo la foto).
+            const huella = await huellaFoto(bytes);
+            const { error: e3 } = await supabase.from("dropi_publicaciones").update({ foto_url: url, foto_huella: huella }).eq("id", data.id);
+            if (e3) await supabase.from("dropi_publicaciones").update({ foto_url: url }).eq("id", data.id);
             fotos++;
           }
         }
