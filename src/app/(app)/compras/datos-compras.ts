@@ -40,18 +40,56 @@ export interface DatosCompras {
   restricciones: RestriccionesCompras;
 }
 
+/** Las fallas: el último comentario «Inconveniente: …» de cada compra. */
+async function cargarInconvenientes(): Promise<Map<string, string>> {
+  const inconvenientes = new Map<string, string>();
+  const { data: marcados } = await createServiceClient()
+    .from("wms_compra_comentarios")
+    .select("compra_id, texto, creado_en")
+    .ilike("texto", "inconveniente%")
+    .order("creado_en", { ascending: false });
+  for (const m of marcados ?? []) {
+    const texto = String(m.texto).replace(/^inconveniente\s*:?\s*/i, "").trim();
+    if (!inconvenientes.has(m.compra_id) && texto) inconvenientes.set(m.compra_id, texto);
+  }
+  return inconvenientes;
+}
+
+/** La categoría de cada producto (taxonomía de Shopify, migración 0113), por su SKU. Sin la migración, ninguna. */
+async function cargarCategoriasPorSku(): Promise<Map<string, string>> {
+  const categorias = new Map<string, string>();
+  try {
+    const supabase = createServiceClient();
+    const conCategoria = await traerTodasLasFilas<{ codigo: string; categorias_productos: unknown }>((desde, hasta) =>
+      supabase.from("skus_maestros").select("codigo, categorias_productos(ruta)").not("categoria_id", "is", null).order("id").range(desde, hasta),
+    );
+    for (const p of conCategoria) {
+      const ruta = uno<{ ruta: string }>(p.categorias_productos)?.ruta;
+      if (ruta) categorias.set(p.codigo, ruta);
+    }
+  } catch {
+    // Sin la migración 0113: sin categorías.
+  }
+  return categorias;
+}
+
 /**
  * Las compras de la vista pedida (`?ver=`, o la última elegida): todos los países, uno solo o Importadora (que nunca se
  * mezcla con las de un país). La usan Informe, Compras y Tiempos y fallas.
  */
 export async function cargarCompras(ver: string | string[] | undefined): Promise<DatosCompras> {
   const supabase = createServiceClient();
+  // Lo que no depende de la vista arranca ya y se espera al final, en paralelo con las compras (antes iba una consulta tras
+  // otra: compras → comentarios → categorías).
+  const inconvenientesP = cargarInconvenientes();
+  const categoriasP = cargarCategoriasPorSku();
+  const paisesP = supabase.from("paises").select("id, codigo, nombre").order("nombre");
   // Solo los países que la persona puede ver (y Importadora si la tiene): lo demás no se pide a la base.
   const usuario = await getUsuarioActual();
   const permitidos = usuario?.paisesPermitidos ?? null;
   const restricciones = restriccionesDe(usuario?.afinado.compras);
   const verImportadora = puedeVerPais(permitidos, null);
-  const { data: paisesBd } = await supabase.from("paises").select("id, codigo, nombre").order("nombre");
+  const { data: paisesBd } = await paisesP;
   const paises = filtrarPaises(permitidos, (paisesBd ?? []) as DatosCompras["paises"]);
   const guardada = (await cookies()).get(COOKIE_VISTA_COMPRAS)?.value;
   const pedido = typeof ver === "string" ? ver : (guardada ?? "todos");
@@ -76,36 +114,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
     error = true;
   }
 
-  // Las fallas: el último comentario «Inconveniente: …» de cada compra.
-  const inconvenientes = new Map<string, string>();
-  if (!error) {
-    const { data: marcados } = await supabase
-      .from("wms_compra_comentarios")
-      .select("compra_id, texto, creado_en")
-      .ilike("texto", "inconveniente%")
-      .order("creado_en", { ascending: false });
-    for (const m of marcados ?? []) {
-      const texto = String(m.texto).replace(/^inconveniente\s*:?\s*/i, "").trim();
-      if (!inconvenientes.has(m.compra_id) && texto) inconvenientes.set(m.compra_id, texto);
-    }
-  }
-
-  // La categoría de cada producto (taxonomía de Shopify, migración 0113), por su SKU. Va aparte: sin la migración no existe
-  // y las compras se cargan igual, sin categoría.
-  const categorias = new Map<string, string>();
-  if (!error) {
-    try {
-      const conCategoria = await traerTodasLasFilas<{ codigo: string; categorias_productos: unknown }>((desde, hasta) =>
-        supabase.from("skus_maestros").select("codigo, categorias_productos(ruta)").not("categoria_id", "is", null).order("id").range(desde, hasta),
-      );
-      for (const p of conCategoria) {
-        const ruta = uno<{ ruta: string }>(p.categorias_productos)?.ruta;
-        if (ruta) categorias.set(p.codigo, ruta);
-      }
-    } catch {
-      // Sin la migración 0113: sin categorías.
-    }
-  }
+  const [inconvenientes, categorias] = error ? [new Map<string, string>(), new Map<string, string>()] : await Promise.all([inconvenientesP, categoriasP]);
 
   // Qué compras alcanza: todas, o solo las asignadas o creadas por la persona (lo decide su rol en Usuarios y roles › Afinar).
   const alcanzadas = usuario
@@ -167,13 +176,13 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
 }
 
 /** Eventos de etapa y estado de las compras de la vista (para los tiempos por estado). */
-export async function cargarEventos(ids: Set<string>): Promise<{ compraId: string; campo: string; valor: string | null; ocurridoEn: string }[]> {
+export async function cargarEventos(ids?: Set<string>): Promise<{ compraId: string; campo: string; valor: string | null; ocurridoEn: string }[]> {
   const supabase = createServiceClient();
   try {
     const filas = await traerTodasLasFilas<{ compra_id: string; campo: string; valor_despues: string | null; ocurrido_en: string }>((desde, hasta) =>
       supabase.from("wms_compra_eventos").select("compra_id, campo, valor_despues, ocurrido_en").order("ocurrido_en").range(desde, hasta),
     );
-    return filas.filter((e) => ids.has(e.compra_id)).map((e) => ({ compraId: e.compra_id, campo: e.campo, valor: e.valor_despues, ocurridoEn: e.ocurrido_en }));
+    return filas.filter((e) => !ids || ids.has(e.compra_id)).map((e) => ({ compraId: e.compra_id, campo: e.campo, valor: e.valor_despues, ocurridoEn: e.ocurrido_en }));
   } catch {
     return [];
   }
