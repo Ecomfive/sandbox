@@ -36,6 +36,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Cerrados", definicion: "El botón de la barra de una tabla que muestra lo que ya terminó (compras completadas, retiros conciliados). Por defecto se ocultan." },
   { termino: "Mención (@)", definicion: "Escribir @ y el nombre de alguien en un comentario o nota: le llega un aviso en «Para ti» con el enlace al comentario." },
   { termino: "SKU", definicion: "El código único de un producto: lo identifica en el WMS, Shopify, las tiendas y Dropi, y con él una venta encuentra el producto para descontar inventario. Lo escribes al crear el producto y no puede repetirse: si ya existe, el sistema te avisa. Se puede corregir desde la ficha por uno que no exista (y hay que cambiarlo también en las plataformas).", modulos: ["producto", "inventario", "compras"] },
+  { termino: "Publicación en Dropi", definicion: "Un producto que ECOMFIVE ofrece en Dropi como proveedor, con su ID de Dropi, precio, margen, estado de venta, dónde está el stock y cuándo toca revisarlo. Se gestiona en Operación › Gestión de publicaciones Dropi (antes, la lista GCC de ClickUp). Se revisa cada 28 días.", modulos: ["publicaciones-dropi"] },
   { termino: "Landing", definicion: "La página de venta del producto en test: portada con precio, beneficios, imágenes, ofertas, preguntas y garantía. Se arma en Testing Lab › Generador de landings, desde cero o tomando otra landing como modelo («clonar»); su código es LND-0001, LND-0002…", modulos: ["generador-landings"] },
   { termino: "Captura de Instagram", definicion: "Un reel, publicación o video que alguien del equipo compartió por mensaje directo con la cuenta de fuentes. Cae solo en Testing Lab › Instagram con su video guardado, su copy y quién lo envió; su código es IG-0001, IG-0002…", modulos: ["instagram"] },
   { termino: "Anuncios con el mismo copy", definicion: "Cuántos anuncios de la misma página, en la Biblioteca de anuncios de Meta, llevan el mismo texto que una captura de Instagram. Un número alto indica que el anunciante lo está escalando. Se llena con el marcador «Leer Biblioteca» y se puede corregir a mano.", modulos: ["instagram"] },
@@ -243,6 +244,25 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "publicaciones-dropi",
+    titulo: "Gestión de publicaciones Dropi",
+    ruta: "/publicaciones-dropi",
+    resumen: "Los productos que tenemos publicados en Dropi como proveedor: precio, margen, venta, stock y revisión.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cada fila es un producto publicado en Dropi en el país de la barra de arriba, con su foto, su ID de Dropi, su estado y sus números. La tabla arranca agrupada por estado (Producto nuevo, Revisar precio y venta, Verificar con dropshipper, Validar bajar precio, Bajar precio, Al día); los archivados se ven con el botón «Archivados».",
+          "Utilidad = precio de venta − costo mercancía − fulfillment, y Margen = utilidad ÷ precio: se calculan solos. Un punto rojo en el margen avisa que está por debajo de 30 %. «Coste real» es lo que costó la última compra (aparte del costo mercancía).",
+          "Cada producto se revisa cada 28 días: la próxima revisión se calcula sola a partir de la última, y un punto ámbar avisa que ya pasó. Filtra «Revisión» › «Revisión vencida» para ver lo que toca revisar.",
+          "Pulsa una fila para abrir su ficha: ahí se cambia todo (estado, precio y costos, venta, dónde está, reposición, privatización, responsable y notas) y se guarda con «Guardar cambios». Si cambias el precio, «Último cambio de precio» pasa a hoy. «Marcar revisada hoy» pone la última revisión en hoy. Las flechas de arriba pasan a la anterior o la siguiente.",
+          "«Agregar» crea una publicación nueva: arranca como «Producto nuevo», publicada hoy y a tu cargo.",
+          "Los datos vienen de la lista «GCC 🇵🇦 Ecomfive Panamá» de ClickUp. Los SKU de Producto se vinculan en una etapa siguiente.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "generador-landings",
     titulo: "Generador de landings",
     ruta: "/generador-landings",
@@ -418,6 +438,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Gestión de publicaciones Dropi", texto: "Operación › Fulfillment tiene «Gestión de publicaciones Dropi», debajo de Compras: los productos que tenemos publicados en Dropi como proveedor (antes la lista GCC de ClickUp), con precio, margen calculado, estado de venta, dónde está el stock, reposición, privatización y la próxima revisión cada 28 días.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Landings a Shopify", texto: "El Generador de landings crea el producto en la tienda de Shopify como borrador (precio, fotos, ofertas como variantes y la landing como descripción) y lo publica en la Tienda online con un clic. El enlace publicado queda en el test del producto.", modulo: "generador-landings", href: "/generador-landings" },
   { fecha: "2026-10-21", titulo: "Imágenes de la landing con Gemini", texto: "En el Generador de landings, cada espacio de imagen tiene «Generar con Gemini»: crea la imagen con su instrucción, usando las fotos del proveedor para que el producto salga igual. «Generar las que faltan» hace todas las que no tienen imagen.", modulo: "generador-landings", href: "/generador-landings" },
   { fecha: "2026-10-20", titulo: "Perfiles de acceso por área", texto: "Usuarios y roles tiene perfiles listos para cada área: Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo, Talento humano y Consulta, y los roles Administrativo, Atención al cliente, Líder comercial y Operaciones quedaron completos con los módulos que usan (muchos en solo lectura). Nómina y gastos, Extractos, Retiros, Conciliación y Productos y márgenes siguen solo para Finanzas y Dirección. Se asignan desde la ficha de cada persona.", modulo: "usuarios", href: "/usuarios" },
