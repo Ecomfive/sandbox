@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -71,7 +72,15 @@ export function TablaPublicaciones({
 }) {
   const verVentas = corteVentas !== null;
   const def = verVentas ? DEF_PUBLICACIONES_ADMIN : DEF_PUBLICACIONES;
-  const [abierta, setAbierta] = useState<string | null>(null);
+  // La ficha abierta también queda en la dirección (`?abrir=<id>`): si la lista se vuelve a cargar (al guardar), sigue abierta.
+  const params = useSearchParams();
+  const [abierta, setAbierta] = useState<string | null>(() => params.get("abrir"));
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (abierta) url.searchParams.set("abrir", abierta);
+    else url.searchParams.delete("abrir");
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
+  }, [abierta]);
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
   return (
