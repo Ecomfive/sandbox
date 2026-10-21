@@ -156,18 +156,6 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   return {};
 }
 
-/** «Marcar revisada»: la última revisión pasa a hoy (y con ella la próxima, 28 días después). */
-export async function marcarRevisada(id: string): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura(MODULO);
-  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
-  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
-  const { error } = await createServiceClient().from("dropi_publicaciones").update({ ultima_revision: hoy(), actualizado_en: new Date().toISOString() }).eq("id", id);
-  if (error) return { error: "No se pudo marcar como revisada." };
-  await registrarAuditoria({ accion: "revisar_publicacion_dropi", entidad: "dropi_publicaciones", entidadId: id, antes: { "Última revisión": String(antes.ultima_revision ?? "—") }, despues: { "Última revisión": hoy() } });
-  revalidatePath(RUTA);
-  return {};
-}
-
 /** La actividad de una publicación para su ficha. Es una lectura: basta poder abrir el módulo. */
 export async function obtenerHistorialPublicacion(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
   const usuario = await requireModulo(MODULO);
