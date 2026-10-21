@@ -25,8 +25,10 @@ type Fila = Record<string, unknown> & { id: string };
  * Operación › Fulfillment: los productos que ECOMFIVE tiene publicados en Dropi como proveedor (del país de la barra), con su
  * precio, margen, estado de venta, stock, reposición, privatización y revisión. Reemplaza la lista GCC de ClickUp.
  */
-export default async function PublicacionesDropiPage() {
+export default async function PublicacionesDropiPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("publicaciones-dropi");
+  // Desde la ficha de un producto (Asociaciones) se llega con `?abrir=<publicación>`: la abre al cargar.
+  const { abrir } = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
@@ -114,7 +116,7 @@ export default async function PublicacionesDropiPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
-      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} paisId={pais.id} codigoPais={pais.codigo} nombrePais={pais.nombre} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
+      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} paisId={pais.id} codigoPais={pais.codigo} nombrePais={pais.nombre} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} abrirInicial={typeof abrir === "string" ? abrir : null} />
     </Pagina>
   );
 }

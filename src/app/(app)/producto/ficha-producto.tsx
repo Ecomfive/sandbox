@@ -91,6 +91,7 @@ export function FichaProducto({
 }) {
   const { mostrarToast } = useToast();
   const puedeVerInventario = usePuedeAbrir("inventario");
+  const puedeVerPublicaciones = usePuedeAbrir("publicaciones-dropi");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // Sube cada vez que se cambia el estado, para que la línea de tiempo se vuelva a pedir.
@@ -203,24 +204,9 @@ export function FichaProducto({
                     </span>
                   )}
                 </Dato>
-                <Dato etiqueta="Categoría" className="sm:col-span-2 xl:col-span-1">
+                <Dato etiqueta="Categoría" className="sm:col-span-2 xl:col-span-3">
                   <CategoriaProducto key={`${producto.id}-${producto.categoria?.id ?? ""}-${producto.categoria?.revisar ?? ""}`} id={producto.id} categoria={producto.categoria} puedeEscribir={puedeEscribir} />
                 </Dato>
-                {producto.nombresDropi.length > 0 && (
-                  <Dato etiqueta="Publicaciones en Dropi" className="sm:col-span-2">
-                    <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                      {producto.nombresDropi.map((n, i) => (
-                        <li key={`${n.pais}-${n.dropiId}-${i}`} className="flex flex-col">
-                          <span>{n.nombre}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {n.pais}
-                            {n.dropiId ? ` · ID ${n.dropiId}` : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </Dato>
-                )}
               </dl>
             </Seccion>
 
@@ -308,7 +294,32 @@ export function FichaProducto({
             </Seccion>
 
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
-              {producto.asociaciones.length === 0 ? (
+              {/* Sus publicaciones de Dropi como proveedor (Gestión de IDs Dropi): cómo se llama allá, en qué país y con qué ID. */}
+              {producto.nombresDropi.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <h4 className="m-0 text-xs font-medium text-muted-foreground">Publicaciones en Dropi</h4>
+                  <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-2 p-0 text-sm sm:grid-cols-2">
+                    {producto.nombresDropi.map((n, i) => (
+                      <li key={`${n.id}-${i}`} className="flex min-w-0 flex-col">
+                        {puedeVerPublicaciones ? (
+                          <Link href={`/publicaciones-dropi?abrir=${n.id}`} className={`w-fit rounded font-medium underline-offset-2 hover:underline ${anilloFoco}`}>
+                            {n.nombre}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{n.nombre}</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {n.pais}
+                          {n.dropiId ? ` · ID ${n.dropiId}` : ""}
+                          {n.archivada ? " · archivada" : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {producto.nombresDropi.length > 0 && producto.asociaciones.length > 0 && <h4 className="m-0 mt-1 text-xs font-medium text-muted-foreground">Otras fichas</h4>}
+              {producto.asociaciones.length === 0 && producto.nombresDropi.length > 0 ? null : producto.asociaciones.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sin fichas enlazadas.</p>
               ) : (
                 <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">

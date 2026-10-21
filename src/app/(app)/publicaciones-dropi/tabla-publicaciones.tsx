@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -57,6 +57,7 @@ export function TablaPublicaciones({
   puedeEscribir,
   puedeEliminar,
   corteVentas,
+  abrirInicial = null,
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
@@ -67,12 +68,21 @@ export function TablaPublicaciones({
   puedeEliminar: boolean;
   /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
   corteVentas: string | null;
+  /** La publicación que se abre al cargar (`?abrir=`, desde la ficha de un producto); si no es de este país, nada. */
+  abrirInicial?: string | null;
 }) {
   const verVentas = corteVentas !== null;
   const def = verVentas ? DEF_PUBLICACIONES_ADMIN : DEF_PUBLICACIONES;
-  const [abierta, setAbierta] = useState<string | null>(null);
+  const [abierta, setAbierta] = useState<string | null>(() => (abrirInicial && publicaciones.some((p) => p.id === abrirInicial) ? abrirInicial : null));
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
+  // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador (en el
+  // servidor no hay `document`).
+  const enNavegador = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   return (
     <ProveedorSkusMaestros opciones={opcionesSku}>
       <TableroAcciones publicaciones={publicaciones} def={def} />
@@ -102,7 +112,7 @@ export function TablaPublicaciones({
         vacio="Todavía no hay publicaciones en este país."
       />
       <FichaPublicacion
-        publicacion={publicaciones.find((p) => p.id === abierta)}
+        publicacion={enNavegador ? publicaciones.find((p) => p.id === abierta) : undefined}
         codigoPais={codigoPais}
         nombrePais={nombrePais}
         puedeEscribir={puedeEscribir}
