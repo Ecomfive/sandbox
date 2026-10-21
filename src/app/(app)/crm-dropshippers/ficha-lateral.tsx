@@ -18,6 +18,7 @@ import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
 import { BotonEscalar, LineaDeTiempo, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
+import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
 import { PanelCaso, PanelEditar, PanelNota, PanelPedido, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import {
@@ -269,6 +270,10 @@ export function FichaLateral({
           <SeguimientosDropshipper key={`seguimientos-${d.id}`} dropshipperId={d.id} puedeEscribir={acceso.escribeComercial} version={version} />
         </Bloque>
       )}
+
+      <Bloque icono={EstadoIcon} titulo="Ventas en Dropi">
+        <VentasDropiDropshipperBloque key={`ventas-dropi-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
+      </Bloque>
 
       <Bloque icono={EstadoIcon} titulo="Desempeño en la plataforma">
         <DesempenoDropshipper key={`desempeno-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
