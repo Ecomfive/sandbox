@@ -55,6 +55,7 @@ export function TablaPublicaciones({
   personas,
   paisId,
   codigoPais,
+  nombrePais,
   puedeEscribir,
   puedeEliminar,
   corteVentas,
@@ -64,6 +65,7 @@ export function TablaPublicaciones({
   personas: Persona[];
   paisId: string;
   codigoPais: string;
+  nombrePais: string;
   puedeEscribir: boolean;
   puedeEliminar: boolean;
   /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
@@ -106,6 +108,7 @@ export function TablaPublicaciones({
         publicacion={publicaciones.find((p) => p.id === abierta)}
         personas={personas}
         codigoPais={codigoPais}
+        nombrePais={nombrePais}
         puedeEscribir={puedeEscribir}
         puedeEliminar={puedeEliminar}
         corteVentas={corteVentas}

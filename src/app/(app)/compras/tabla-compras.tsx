@@ -632,7 +632,6 @@ export function TablaCompras({
       </div>
 
       <FichaCompra
-        vista={vista}
         tiendas={todasTiendas}
         etiquetas={todasEtiquetas}
         colores={colores}

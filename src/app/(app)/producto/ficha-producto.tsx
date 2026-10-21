@@ -24,7 +24,6 @@ import { ETIQUETA_ASOCIACION, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TON
 import { FotoProducto } from "./foto-producto";
 import { NombreProducto } from "./nombre-producto";
 import { SkuCopiable } from "@/components/ui/sku-copiable";
-import { EnCaminoProducto } from "./en-camino-producto";
 import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
@@ -207,12 +206,6 @@ export function FichaProducto({
             {producto.tipo !== "combo" && (
               <Seccion icono={InteligenciaIcon} titulo="Competencia en Dropi">
                 <BloqueCompetencia key={producto.id} skuId={producto.id} />
-              </Seccion>
-            )}
-
-            {producto.tipo !== "combo" && (
-              <Seccion icono={ComprasIcon} titulo="En camino">
-                <EnCaminoProducto key={producto.id} id={producto.id} />
               </Seccion>
             )}
 

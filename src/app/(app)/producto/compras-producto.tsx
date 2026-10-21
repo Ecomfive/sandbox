@@ -15,7 +15,8 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  * El histórico de compras de un producto (bloque «Compras» de su ficha en Producto y en Inventario): arriba lo comprado desde
  * la primera vez (unidades, total, costo promedio, cuántas compras y entre qué fechas; por país si se compra en varios) y
  * debajo cada compra, de la más nueva a la más vieja, que se abre en Compras. Solo cuenta las compras con el producto
- * vinculado (Compras › Productos). Con `limite` muestra solo las últimas. Con `pais` (Inventario, que es de un país) cuenta y
+ * vinculado (Compras › Productos). Si se compró en varios países, las compras van **agrupadas por país** (cada país con sus compras
+ * juntas, el que más compró primero) y no mezcladas. Con `limite` muestra solo las últimas. Con `pais` (Inventario, que es de un país) cuenta y
  * lista solo las compras de ese país, y dice aparte lo comprado en todos.
  */
 export function ComprasProducto({ id, limite, pais }: { id: string; limite?: number; pais?: string }) {
@@ -63,6 +64,14 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
   const primera = datos[datos.length - 1].fecha;
   const ultima = datos[0].fecha;
   const vistas = limite ? datos.slice(0, limite) : datos;
+  // En varios países: un bloque por país, el que más unidades compró primero; dentro, de la más nueva a la más vieja.
+  const grupos =
+    !pais && porPais.size > 1
+      ? [...porPais]
+          .sort((a, b) => b[1] - a[1])
+          .map(([nombre, unidadesPais]) => ({ pais: nombre, unidades: unidadesPais, compras: vistas.filter((c) => (c.pais ?? "—") === nombre) }))
+          .filter((g) => g.compras.length > 0)
+      : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -74,30 +83,22 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
       </dl>
       <p className="m-0 text-xs text-muted-foreground">
         {datos.length === 1 ? `El ${formatearFecha(primera)}` : `Del ${formatearFecha(primera)} al ${formatearFecha(ultima)}`}
-        {!pais &&
-          porPais.size > 1 &&
-          ` · ${[...porPais]
-            .sort((a, b) => b[1] - a[1])
-            .map(([p, n]) => `${p}: ${entero(n)} u.`)
-            .join(" · ")}`}
       </p>
-      <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-[13px]">
-        {vistas.map((c) => (
-          <li key={`${c.compraId}-${c.sku}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-            <Link href={`/compras/lista?ver=todos&abrir=${c.compraId}`} className={`rounded font-medium hover:underline ${anilloFoco}`}>
-              {c.codigo ?? numeroOC(c.numero)}
-            </Link>
-            <span className="text-xs text-muted-foreground tabular-nums">{formatearFecha(c.fecha)}</span>
-            {c.pais && <span className="text-xs text-muted-foreground">{c.pais}</span>}
-            <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
-            {c.variante && <span className="text-xs text-muted-foreground">{c.variante}</span>}
-            <span className="ml-auto text-right tabular-nums">
-              <strong className="font-medium">{entero(c.unidades)} u.</strong>
-              <span className="text-muted-foreground">{c.costoUnitario !== null ? ` · ${usd(c.costoUnitario)} c/u · ${usd(c.total ?? 0)}` : " · sin costo"}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {grupos ? (
+        grupos.map((g) => (
+          <section key={g.pais} aria-label={`Compras en ${g.pais}`} className="flex flex-col gap-1">
+            <h4 className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border pb-1 text-xs font-semibold">
+              <span>{g.pais === "—" ? "Sin país" : g.pais}</span>
+              <span className="font-normal text-muted-foreground tabular-nums">
+                {entero(g.compras.length)} {g.compras.length === 1 ? "compra" : "compras"} · {entero(g.unidades)} u.
+              </span>
+            </h4>
+            <ListaCompras compras={g.compras} conPais={false} />
+          </section>
+        ))
+      ) : (
+        <ListaCompras compras={vistas} conPais={!pais} />
+      )}
       {otrosPaises}
       {limite && datos.length > limite && (
         <p className="m-0 text-xs text-muted-foreground">
@@ -105,6 +106,29 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
         </p>
       )}
     </div>
+  );
+}
+
+/** Las compras de una lista, cada una con su orden, fecha, etapa y unidades; el país solo si la lista no está ya agrupada por país. */
+function ListaCompras({ compras, conPais }: { compras: CompraDeProducto[]; conPais: boolean }) {
+  return (
+    <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-[13px]">
+      {compras.map((c) => (
+        <li key={`${c.compraId}-${c.sku}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+          <Link href={`/compras/lista?ver=todos&abrir=${c.compraId}`} className={`rounded font-medium hover:underline ${anilloFoco}`}>
+            {c.codigo ?? numeroOC(c.numero)}
+          </Link>
+          <span className="text-xs text-muted-foreground tabular-nums">{formatearFecha(c.fecha)}</span>
+          {conPais && c.pais && <span className="text-xs text-muted-foreground">{c.pais}</span>}
+          <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
+          {c.variante && <span className="text-xs text-muted-foreground">{c.variante}</span>}
+          <span className="ml-auto text-right tabular-nums">
+            <strong className="font-medium">{entero(c.unidades)} u.</strong>
+            <span className="text-muted-foreground">{c.costoUnitario !== null ? ` · ${usd(c.costoUnitario)} c/u · ${usd(c.total ?? 0)}` : " · sin costo"}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

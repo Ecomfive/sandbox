@@ -130,6 +130,7 @@ export function FichaPublicacion({
   publicacion,
   personas,
   codigoPais,
+  nombrePais,
   puedeEscribir,
   puedeEliminar,
   corteVentas = null,
@@ -140,6 +141,7 @@ export function FichaPublicacion({
   publicacion: FilaPublicacion | undefined;
   personas: Persona[];
   codigoPais: string;
+  nombrePais: string;
   puedeEscribir: boolean;
   /** Solo un administrador: elimina la publicación de verdad. */
   puedeEliminar: boolean;
@@ -156,6 +158,7 @@ export function FichaPublicacion({
       p={publicacion}
       personas={personas}
       codigoPais={codigoPais}
+      nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
       puedeEliminar={puedeEliminar}
       corteVentas={corteVentas}
@@ -170,6 +173,7 @@ function ContenidoFicha({
   p,
   personas,
   codigoPais,
+  nombrePais,
   puedeEscribir,
   puedeEliminar,
   corteVentas,
@@ -180,6 +184,7 @@ function ContenidoFicha({
   p: FilaPublicacion;
   personas: Persona[];
   codigoPais: string;
+  nombrePais: string;
   puedeEscribir: boolean;
   puedeEliminar: boolean;
   corteVentas: string | null;
@@ -446,10 +451,10 @@ function ContenidoFicha({
             </div>
           </Seccion>
 
-          {/* Lo que viene en camino del producto vinculado: solo unidades por país (las órdenes que ya salieron y no han llegado). */}
+          {/* Lo que viene en camino del producto vinculado: solo unidades, del país seleccionado (las órdenes que ya salieron y no han llegado). */}
           {p.sku && p.sku.tipo !== "combo" && (
             <Seccion icono={ComprasIcon} titulo="En camino">
-              <EnCaminoProducto key={p.sku.id} id={p.sku.id} />
+              <EnCaminoProducto key={`${p.sku.id}-${codigoPais}`} id={p.sku.id} pais={codigoPais} nombrePais={nombrePais} />
             </Seccion>
           )}
 

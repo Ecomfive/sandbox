@@ -127,10 +127,7 @@ export function FichaCompra({
   tiendas,
   etiquetas,
   colores,
-  vista = "todos",
 }: {
-  /** Lo que está marcado arriba en Compras: «todos», el código de un país o «importacion». Manda en «En camino» de cada producto. */
-  vista?: string;
   /** El comentario al que lleva un aviso «Para ti» (se señala y se muestra). */
   comentarioResaltado?: string | null;
   /** Las tiendas que ya existen en otras compras, para elegir en el campo Tienda. */
@@ -148,9 +145,6 @@ export function FichaCompra({
   alCerrar: () => void;
 }) {
   const { mostrarToast } = useToast();
-  // «En camino» de cada producto sigue al país marcado en Compras: con uno solo, solo las de ese país; con todos, por país; en Importadora no aplica.
-  const paisMarcado = paises.find((p) => p.codigo === vista) ?? null;
-  const enCamino = vista === "importacion" ? null : paisMarcado ? { codigo: paisMarcado.codigo, nombre: paisMarcado.nombre } : ("todos" as const);
   const puedeCotizar = usePuedeAccion("cotizacion");
   const puedeAnular = usePuedeAccion("anular");
   const puedeComentar = usePuedeAccion("comentar");
@@ -244,7 +238,7 @@ export function FichaCompra({
               alCambiarGuardando={setGuardando}
               alModificar={() => setSinGuardarId(compra.id)}
               // Los productos van arriba, en el bloque «Compra» debajo de Etiquetas (solo compras de país).
-              productos={compra.tipo === "pais" ? <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir incrustado enCamino={enCamino} /> : undefined}
+              productos={compra.tipo === "pais" ? <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir incrustado /> : undefined}
             />
           ) : (
             <>
@@ -257,7 +251,7 @@ export function FichaCompra({
             </>
           )}
           {/* A solo lectura no hay formulario: los productos se ven al final, como antes. */}
-          {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} enCamino={enCamino} />}
+          {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} />}
           <ActividadCompra key={compra.id} id={compra.id} puedeComentar={puedeEscribir && puedeComentar} comentarioResaltado={comentarioResaltado} />
         </div>
       )}
