@@ -1,6 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { cargarRutas } from "./datos-envios";
 import { PanelEnvios } from "./panel-envios";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Compras › Envíos: lo que promete cada agente de envío por país y vía, sus tarifas y lo que de verdad tardó. */
 export default async function EnviosComprasPage() {
-  const usuario = await requireModulo("compras");
+  const usuario = await requirePestana("compras", "envios");
   const { rutas, agentes, tipos, error } = await cargarRutas();
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">

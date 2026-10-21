@@ -18,6 +18,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { CampoLista } from "./campo-lista";
 import { PastillaEtiqueta } from "./selector-etiquetas";
+import { CampoGobernado } from "./restricciones-contexto";
 import {
   CalendarioIcon,
   CheckIcon,
@@ -231,16 +232,18 @@ export function FormularioCompra({
                 />
               </Campo>
             )}
-            <Campo etiqueta={conEmoji("etiquetas", "Etiquetas")} id="campo-etiquetas-compra">
-              <CampoLista
-                id="campo-etiquetas-compra"
-                nombre="etiquetas"
-                etiqueta="etiqueta"
-                inicial={compra?.etiquetas ?? []}
-                todas={etiquetas}
-                renderValor={(n) => <PastillaEtiqueta nombre={n} color={colores[n]} />}
-              />
-            </Campo>
+            <CampoGobernado clave="etiquetas">
+              <Campo etiqueta={conEmoji("etiquetas", "Etiquetas")} id="campo-etiquetas-compra">
+                <CampoLista
+                  id="campo-etiquetas-compra"
+                  nombre="etiquetas"
+                  etiqueta="etiqueta"
+                  inicial={compra?.etiquetas ?? []}
+                  todas={etiquetas}
+                  renderValor={(n) => <PastillaEtiqueta nombre={n} color={colores[n]} />}
+                />
+              </Campo>
+            </CampoGobernado>
           </div>
           {productos && (
             // Los productos viven dentro del formulario solo en el espacio: guardan solos (cada campo, al salir de él), así que
@@ -255,6 +258,7 @@ export function FormularioCompra({
               {productos}
             </div>
           )}
+          <CampoGobernado clave="via">
           <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
             <legend className="mb-1.5 text-xs font-medium text-muted-foreground">{conEmoji("viaEnvio", "Vía de envío")}</legend>
             <div className="flex flex-wrap gap-4">
@@ -266,6 +270,7 @@ export function FormularioCompra({
               ))}
             </div>
           </fieldset>
+          </CampoGobernado>
           <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
             <legend className="mb-1.5 text-xs font-medium text-muted-foreground">{conEmoji("ventaImportacion", "Tipo de venta")}</legend>
             <div className="flex flex-wrap gap-4">
@@ -298,65 +303,75 @@ export function FormularioCompra({
             soltarEnTodo={!editando}
           />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta={conEmoji("etapa", "Etapa")} id="campo-etapa" obligatorio faltante={faltante}>
-              <select
-                id="campo-etapa"
-                name="etapa"
-                required
-                aria-invalid={invalido("campo-etapa")}
-                defaultValue={compra?.etapa ?? "cotizar"}
-                className={fieldClass}
-              >
-                {ETAPAS_COMPRA.map((e) => (
-                  <option key={e.valor} value={e.valor}>
-                    {e.etiqueta}
-                  </option>
-                ))}
-                {compra && !ETAPAS_COMPRA.some((e) => e.valor === compra.etapa) && (
-                  <option value={compra.etapa}>{etiquetaEtapa(compra.etapa)}</option>
-                )}
-              </select>
-            </Campo>
-            <Campo etiqueta={conEmoji("estado", "Estado")} id="campo-estado" obligatorio faltante={faltante}>
-              <select
-                id="campo-estado"
-                name="estado"
-                required
-                aria-invalid={invalido("campo-estado")}
-                defaultValue={compra?.estado ?? "backlog"}
-                className={fieldClass}
-              >
-                {ESTADOS_COMPRA.map((e) => (
-                  <option key={e.valor} value={e.valor}>
-                    {e.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </Campo>
+            <CampoGobernado clave="etapa">
+              <Campo etiqueta={conEmoji("etapa", "Etapa")} id="campo-etapa" obligatorio faltante={faltante}>
+                <select
+                  id="campo-etapa"
+                  name="etapa"
+                  required
+                  aria-invalid={invalido("campo-etapa")}
+                  defaultValue={compra?.etapa ?? "cotizar"}
+                  className={fieldClass}
+                >
+                  {ETAPAS_COMPRA.map((e) => (
+                    <option key={e.valor} value={e.valor}>
+                      {e.etiqueta}
+                    </option>
+                  ))}
+                  {compra && !ETAPAS_COMPRA.some((e) => e.valor === compra.etapa) && (
+                    <option value={compra.etapa}>{etiquetaEtapa(compra.etapa)}</option>
+                  )}
+                </select>
+              </Campo>
+            </CampoGobernado>
+            <CampoGobernado clave="estado">
+              <Campo etiqueta={conEmoji("estado", "Estado")} id="campo-estado" obligatorio faltante={faltante}>
+                <select
+                  id="campo-estado"
+                  name="estado"
+                  required
+                  aria-invalid={invalido("campo-estado")}
+                  defaultValue={compra?.estado ?? "backlog"}
+                  className={fieldClass}
+                >
+                  {ESTADOS_COMPRA.map((e) => (
+                    <option key={e.valor} value={e.valor}>
+                      {e.etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+            </CampoGobernado>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
-              <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
-            </Campo>
-            <Campo etiqueta={conEmoji("agenteEnvio", "Agente de envío")} id="campo-agente-envio">
-              <input id="campo-agente-envio" type="text" name="agente_envio" list="agentes-envio" defaultValue={compra?.agenteEnvio ?? ""} placeholder="Ej: Chin" className={fieldClass} />
-              <datalist id="agentes-envio">
-                <option value="Chin" />
-                <option value="Avery" />
-              </datalist>
-            </Campo>
-            <Campo etiqueta={conEmoji("tienda", "Tienda")} id="campo-tienda">
-              <CampoLista
-                id="campo-tienda"
-                nombre="tiendas"
-                etiqueta="tienda"
-                inicial={compra?.tiendas ?? []}
-                todas={tiendas}
-                renderValor={(n) => <PastillaTienda nombre={n} />}
-                gestion={gestionTiendas}
-                unica
-              />
-            </Campo>
+            <CampoGobernado clave="proveedor">
+              <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
+                <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
+              </Campo>
+            </CampoGobernado>
+            <CampoGobernado clave="agente">
+              <Campo etiqueta={conEmoji("agenteEnvio", "Agente de envío")} id="campo-agente-envio">
+                <input id="campo-agente-envio" type="text" name="agente_envio" list="agentes-envio" defaultValue={compra?.agenteEnvio ?? ""} placeholder="Ej: Chin" className={fieldClass} />
+                <datalist id="agentes-envio">
+                  <option value="Chin" />
+                  <option value="Avery" />
+                </datalist>
+              </Campo>
+            </CampoGobernado>
+            <CampoGobernado clave="tienda">
+              <Campo etiqueta={conEmoji("tienda", "Tienda")} id="campo-tienda">
+                <CampoLista
+                  id="campo-tienda"
+                  nombre="tiendas"
+                  etiqueta="tienda"
+                  inicial={compra?.tiendas ?? []}
+                  todas={tiendas}
+                  renderValor={(n) => <PastillaTienda nombre={n} />}
+                  gestion={gestionTiendas}
+                  unica
+                />
+              </Campo>
+            </CampoGobernado>
           </div>
         </Seccion>
 
@@ -368,29 +383,39 @@ export function FormularioCompra({
                 <Campo etiqueta={conEmoji("qtyTotal", "Cantidad total")} id="campo-qty">
                   <input id="campo-qty" type="text" readOnly value="Se calcula de los productos" className={`${fieldClass} bg-muted text-muted-foreground`} />
                 </Campo>
-                <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
-                  <input id="campo-monto-total" type="text" readOnly value="Se calcula de los productos" className={`${fieldClass} bg-muted text-muted-foreground`} />
-                </Campo>
+                <CampoGobernado clave="monto">
+                  <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
+                    <input id="campo-monto-total" type="text" readOnly value="Se calcula de los productos" className={`${fieldClass} bg-muted text-muted-foreground`} />
+                  </Campo>
+                </CampoGobernado>
               </>
             ) : (
               <>
                 <Campo etiqueta={conEmoji("qtyTotal", "Cantidad total")} id="campo-qty">
                   <input id="campo-qty" type="number" step="1" min="0" name="qty_total" defaultValue={compra?.qtyTotal ?? ""} className={`${fieldClass} tabular-nums`} />
                 </Campo>
-                <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
-                  <input id="campo-monto-total" type="number" step="0.01" min="0" name="monto_total" defaultValue={compra?.montoTotal ?? ""} className={`${fieldClass} tabular-nums`} />
-                </Campo>
+                <CampoGobernado clave="monto">
+                  <Campo etiqueta={conEmoji("montoTotal", "Monto Total")} id="campo-monto-total">
+                    <input id="campo-monto-total" type="number" step="0.01" min="0" name="monto_total" defaultValue={compra?.montoTotal ?? ""} className={`${fieldClass} tabular-nums`} />
+                  </Campo>
+                </CampoGobernado>
               </>
             )}
-            <Campo etiqueta={conEmoji("primerPago", "Primer Pago")} id="campo-primer-pago">
-              <input id="campo-primer-pago" type="number" step="0.01" min="0" name="primer_pago" defaultValue={compra?.primerPago ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta={conEmoji("segundoPago", "Segundo Pago")} id="campo-segundo-pago">
-              <input id="campo-segundo-pago" type="number" step="0.01" min="0" name="segundo_pago" defaultValue={compra?.segundoPago ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
-            <Campo etiqueta={conEmoji("pagadoAProveedor", "Pagado a Proveedor")} id="campo-pagado-proveedor">
-              <input id="campo-pagado-proveedor" type="number" step="0.01" min="0" name="pagado_a_proveedor" defaultValue={compra?.pagadoAProveedor ?? ""} className={`${fieldClass} tabular-nums`} />
-            </Campo>
+            <CampoGobernado clave="pago1">
+              <Campo etiqueta={conEmoji("primerPago", "Primer Pago")} id="campo-primer-pago">
+                <input id="campo-primer-pago" type="number" step="0.01" min="0" name="primer_pago" defaultValue={compra?.primerPago ?? ""} className={`${fieldClass} tabular-nums`} />
+              </Campo>
+            </CampoGobernado>
+            <CampoGobernado clave="pago2">
+              <Campo etiqueta={conEmoji("segundoPago", "Segundo Pago")} id="campo-segundo-pago">
+                <input id="campo-segundo-pago" type="number" step="0.01" min="0" name="segundo_pago" defaultValue={compra?.segundoPago ?? ""} className={`${fieldClass} tabular-nums`} />
+              </Campo>
+            </CampoGobernado>
+            <CampoGobernado clave="pagado">
+              <Campo etiqueta={conEmoji("pagadoAProveedor", "Pagado a Proveedor")} id="campo-pagado-proveedor">
+                <input id="campo-pagado-proveedor" type="number" step="0.01" min="0" name="pagado_a_proveedor" defaultValue={compra?.pagadoAProveedor ?? ""} className={`${fieldClass} tabular-nums`} />
+              </Campo>
+            </CampoGobernado>
           </div>
           <div className="flex flex-wrap gap-4 pt-1">
             <Casilla id="factura" texto={conEmoji("factura", "Factura")} defaultChecked={compra?.factura} />
@@ -400,18 +425,24 @@ export function FormularioCompra({
 
         <Seccion icono={CalendarioIcon} titulo="Fechas">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta={conEmoji("fechaLimite", "Fecha límite")} id="campo-fecha-limite">
-              <input id="campo-fecha-limite" type="date" name="fecha_limite" defaultValue={compra?.fechaLimite ?? ""} className={fieldClass} />
-            </Campo>
+            <CampoGobernado clave="limite">
+              <Campo etiqueta={conEmoji("fechaLimite", "Fecha límite")} id="campo-fecha-limite">
+                <input id="campo-fecha-limite" type="date" name="fecha_limite" defaultValue={compra?.fechaLimite ?? ""} className={fieldClass} />
+              </Campo>
+            </CampoGobernado>
             <Campo etiqueta={conEmoji("fechaLlegada", "Fecha de llegada")} id="campo-fecha-llegada">
               <input id="campo-fecha-llegada" type="date" name="fecha_llegada" defaultValue={compra?.fechaLlegada ?? ""} className={fieldClass} />
             </Campo>
-            <Campo etiqueta={conEmoji("fechaPago1", "Fecha de Pago (1)")} id="campo-fecha-pago-1">
-              <input id="campo-fecha-pago-1" type="date" name="fecha_pago_1" defaultValue={compra?.fechaPago1 ?? ""} className={fieldClass} />
-            </Campo>
-            <Campo etiqueta={conEmoji("fechaPago2", "Fecha de Pago (2)")} id="campo-fecha-pago-2">
-              <input id="campo-fecha-pago-2" type="date" name="fecha_pago_2" defaultValue={compra?.fechaPago2 ?? ""} className={fieldClass} />
-            </Campo>
+            <CampoGobernado clave="pago1">
+              <Campo etiqueta={conEmoji("fechaPago1", "Fecha de Pago (1)")} id="campo-fecha-pago-1">
+                <input id="campo-fecha-pago-1" type="date" name="fecha_pago_1" defaultValue={compra?.fechaPago1 ?? ""} className={fieldClass} />
+              </Campo>
+            </CampoGobernado>
+            <CampoGobernado clave="pago2">
+              <Campo etiqueta={conEmoji("fechaPago2", "Fecha de Pago (2)")} id="campo-fecha-pago-2">
+                <input id="campo-fecha-pago-2" type="date" name="fecha_pago_2" defaultValue={compra?.fechaPago2 ?? ""} className={fieldClass} />
+              </Campo>
+            </CampoGobernado>
             <Campo etiqueta={conEmoji("fechaEnvio", "Fecha de Envío")} id="campo-fecha-envio">
               <input id="campo-fecha-envio" type="date" name="fecha_envio" defaultValue={compra?.fechaEnvio ?? ""} className={fieldClass} />
             </Campo>

@@ -15,6 +15,8 @@ import { combinarLista, type ModoLote } from "@/lib/compras/lote";
 import { actualizarCampoCompra, actualizarCampoComprasLote, guardarColorEtiqueta, guardarColorTienda, renombrarTienda } from "./actions";
 import { colorTiendaAutomatico, PastillaTienda, ProveedorTiendas, type GestionTiendas } from "./tiendas";
 import { BarraLoteCompras } from "./barra-lote-compras";
+import { SIN_RESTRICCIONES, accionPermitidaEnCompras, campoOculto, celdaEditable, columnasOcultas, type RestriccionesCompras } from "./permisos-compras";
+import { ProveedorRestricciones } from "./restricciones-contexto";
 import { CeldaEditable, type GuardarCelda } from "./celda-editable";
 import { EtiquetasCompra, PastillaEtiqueta } from "./selector-etiquetas";
 import { CrearCompraPanel } from "./crear-compra-panel";
@@ -130,6 +132,7 @@ function columnas(
   dia: string,
   edicion: {
     puedeEscribir: boolean;
+    restricciones: RestriccionesCompras;
     guardar: GuardarCelda;
     etiquetas: string[];
     tiendas: string[];
@@ -140,7 +143,7 @@ function columnas(
   const resto = { ocultable: true } as const;
   /** El contenido de una celda, editable en su sitio si su dato se puede editar (ver `CAMPOS_EDITABLES`). */
   const ed = (c: FilaCompra, campo: string, contenido: ReactNode, opcionesLista?: string[]) => (
-    <CeldaEditable compra={c} campo={campo} puedeEscribir={edicion.puedeEscribir} guardar={edicion.guardar} opcionesLista={opcionesLista}>
+    <CeldaEditable compra={c} campo={campo} puedeEscribir={edicion.puedeEscribir && celdaEditable(edicion.restricciones, campo)} guardar={edicion.guardar} opcionesLista={opcionesLista}>
       {contenido}
     </CeldaEditable>
   );
@@ -292,11 +295,14 @@ export function TablaCompras({
   comentarioInicial = null,
   coloresEtiquetas = {},
   coloresTiendas: coloresTiendasServidor = {},
+  restricciones = SIN_RESTRICCIONES,
 }: {
   compras: FilaCompra[];
   vista: string;
   paises: { id: string; codigo: string; nombre: string }[];
   puedeEscribir: boolean;
+  /** Lo que su rol tiene limitado dentro de Compras (Usuarios y roles › Afinar): columnas ocultas, datos de solo ver y acciones bloqueadas. */
+  restricciones?: RestriccionesCompras;
   /** Puede modificar Configuración: agrega un país desde «Elige el país» de la compra nueva. */
   puedeAgregarPais: boolean;
   /** Filtro de un toque con que se llega (los enlaces del informe y del dashboard). */
@@ -486,15 +492,19 @@ export function TablaCompras({
     [coloresTiendas, compras, mostrarToast],
   );
   const edicion = useMemo(
-    () => ({ puedeEscribir, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, colores, cambiarColor }),
-    [puedeEscribir, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
+    () => ({ puedeEscribir, restricciones, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, colores, cambiarColor }),
+    [puedeEscribir, restricciones, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
   );
 
   // Una anulada es una descartada más (etapa Descartado, con su insignia «Anulada»): no va aparte.
   const base = compras;
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
   const dia = hoy();
-  const cols = useMemo(() => columnas(umbral, dia, edicion), [umbral, dia, edicion]);
+  // Las columnas de datos que su rol no ve no se dibujan (y sus datos ni siquiera llegan del servidor).
+  const cols = useMemo(() => {
+    const ocultas = columnasOcultas(restricciones);
+    return columnas(umbral, dia, edicion).filter((c) => !ocultas.includes(c.id));
+  }, [umbral, dia, edicion, restricciones]);
   const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, base.filter((c) => enGrupo(c, r.valor, umbral)).length])), [base, umbral]);
   const filas = useMemo(
     () => base.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
@@ -506,6 +516,7 @@ export function TablaCompras({
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
   return (
+    <ProveedorRestricciones value={restricciones}>
     <ProveedorTiendas value={gestionTiendas}>
     <div className="flex flex-col">
       <div className="flex min-w-0 flex-col gap-3">
@@ -557,6 +568,7 @@ export function TablaCompras({
               <span className="font-semibold">{grupo.etiqueta}</span>
             )
           }
+          sinDescarga={!accionPermitidaEnCompras(restricciones, "descargar")}
           anchoMinimo="72rem"
           porPagina={100}
           paginarSiempre
@@ -569,13 +581,14 @@ export function TablaCompras({
             columna: "nombre",
             soloColumna: true,
             // El botón de etiquetas va junto al nombre, fuera del botón que abre la compra.
-            junto: (c) => (
+            junto: (c) =>
+              campoOculto(restricciones, "etiquetas") ? null : (
               <span className="flex h-5 items-center">
                 <EtiquetasCompra
                   compra={c}
                   todas={edicion.etiquetas}
                   colores={edicion.colores}
-                  puedeEscribir={edicion.puedeEscribir}
+                  puedeEscribir={edicion.puedeEscribir && celdaEditable(restricciones, "etiquetas")}
                   guardar={edicion.guardar}
                   cambiarColor={edicion.cambiarColor}
                   sinPastillas
@@ -586,7 +599,7 @@ export function TablaCompras({
           claseFila={(c) => (c.id === abierta?.id ? "bg-accent" : "")}
           // Casillas y la barra de abajo para cambiar un dato de varias compras a la vez (solo con permiso de escritura).
           seleccion={
-            puedeEscribir
+            puedeEscribir && accionPermitidaEnCompras(restricciones, "lote")
               ? {
                   etiqueta: (c) => `Seleccionar la compra ${c.productos > 0 ? numeroOC(c.numero) : c.nombre}`,
                   barra: (marcadas, quitar) => (
@@ -606,7 +619,7 @@ export function TablaCompras({
           accionPrincipal={
             <div className="flex items-center gap-2">
               <SelectorVista vista={vista} paises={paises} />
-              {puedeEscribir && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} />}
+              {puedeEscribir && accionPermitidaEnCompras(restricciones, "crear") && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} />}
             </div>
           }
           ariaLabel="Tablero de compras"
@@ -629,5 +642,6 @@ export function TablaCompras({
       />
     </div>
     </ProveedorTiendas>
+    </ProveedorRestricciones>
   );
 }

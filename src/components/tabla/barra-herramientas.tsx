@@ -31,6 +31,7 @@ export function BarraHerramientas<F>({
   atajos,
   extra,
   descargaCompleta,
+  sinDescarga,
   accionPrincipal,
 }: {
   def: DefTabla<F>;
@@ -46,6 +47,8 @@ export function BarraHerramientas<F>({
   extra?: ReactNode;
   /** Si la tabla tiene cargada solo una parte y el servidor arma el total: el botón Descargar ofrece las dos opciones. */
   descargaCompleta?: DescargaCompleta;
+  /** Sin el botón Descargar: el rol de la persona no puede sacar los datos de esta tabla (Usuarios y roles › Afinar). */
+  sinDescarga?: boolean;
   /** Botón principal del módulo (p. ej. «+ Agregar»), al final de la derecha, después de Descargar. */
   accionPrincipal?: ReactNode;
 }) {
@@ -125,7 +128,7 @@ export function BarraHerramientas<F>({
           nombreFilas={nombreFilas}
         />
         {columnas && <MenuColumnas columnas={columnas.defs} estado={columnas.estado} alCambiar={columnas.cambiar} />}
-        <BotonDescargar def={def} filas={filasParaDescargar} nombreFilas={nombreFilas} completa={descargaCompleta} />
+        {!sinDescarga && <BotonDescargar def={def} filas={filasParaDescargar} nombreFilas={nombreFilas} completa={descargaCompleta} />}
         {accionPrincipal}
       </div>
     </div>

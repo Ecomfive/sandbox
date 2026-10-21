@@ -4,12 +4,13 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { getUsuarioActual } from "@/lib/auth";
 import { filtrarPaises, puedeVerPais } from "@/lib/paises-permitidos";
 import type { FilaCompra } from "./def-compras";
+import { SIN_RESTRICCIONES, dentroDelAlcance, enmascarar, restriccionesDe, type RestriccionesCompras } from "./permisos-compras";
 
 /** La cookie con la última vista elegida (todos, un país o Importadora), para que se mantenga al cambiar de pestaña. */
 export const COOKIE_VISTA_COMPRAS = "compras-vista";
 
 const COLUMNAS =
-  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))";
+  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, asignado_a, creado_por, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? null) : ((r as T) ?? null));
@@ -35,6 +36,8 @@ export interface DatosCompras {
   error: boolean;
   /** Si la persona puede ver Compras Importadora (sus países permitidos, migración 0087). */
   verImportadora: boolean;
+  /** Lo que su rol (o ella misma) tiene limitado dentro de Compras (Usuarios y roles › Afinar). Los datos que no ve ya no vienen en `compras`. */
+  restricciones: RestriccionesCompras;
 }
 
 /**
@@ -44,7 +47,9 @@ export interface DatosCompras {
 export async function cargarCompras(ver: string | string[] | undefined): Promise<DatosCompras> {
   const supabase = createServiceClient();
   // Solo los países que la persona puede ver (y Importadora si la tiene): lo demás no se pide a la base.
-  const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
+  const usuario = await getUsuarioActual();
+  const permitidos = usuario?.paisesPermitidos ?? null;
+  const restricciones = restriccionesDe(usuario?.afinado.compras);
   const verImportadora = puedeVerPais(permitidos, null);
   const { data: paisesBd } = await supabase.from("paises").select("id, codigo, nombre").order("nombre");
   const paises = filtrarPaises(permitidos, (paisesBd ?? []) as DatosCompras["paises"]);
@@ -102,9 +107,20 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
     }
   }
 
-  const compras: FilaCompra[] = filas.map((c) => {
+  // Qué compras alcanza: todas, o solo las asignadas o creadas por la persona (lo decide su rol en Usuarios y roles › Afinar).
+  const alcanzadas = usuario
+    ? filas.filter((c) =>
+        dentroDelAlcance(
+          restricciones.alcance,
+          { asignadoId: txt(c.asignado_a), creadoPorId: txt(c.creado_por), responsableNombre: txt(c.responsable_nombre), creadorNombre: txt(c.creador_nombre) },
+          usuario,
+        ),
+      )
+    : filas;
+
+  const compras: FilaCompra[] = alcanzadas.map((c) => {
     const asignado = uno<{ nombre: string | null; email: string }>(c.perfiles);
-    return {
+    return enmascarar({
       id: String(c.id),
       tipo: String(c.tipo),
       paisCodigo: uno<{ codigo: string }>(c.paises)?.codigo ?? null,
@@ -144,10 +160,10 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       creadoEn: String(c.creado_en),
       numero: Number(c.numero),
       ...lineasDe(c.wms_compra_items, categorias),
-    };
+    }, restricciones);
   });
 
-  return { compras, paises, vista, error, verImportadora };
+  return { compras, paises, vista, error, verImportadora, restricciones: usuario ? restricciones : SIN_RESTRICCIONES };
 }
 
 /** Eventos de etapa y estado de las compras de la vista (para los tiempos por estado). */

@@ -14,6 +14,8 @@ import { actualizarProductoCompra, agregarProductoCompra, obtenerProductosCompra
 import { useConfirmarProductoActivo } from "./confirmar-producto-activo";
 import { usd } from "./calculos-compras";
 import { aNumero, CamposCosto, claseNumero, DECIMALES_UNITARIO, redondear, useCosto } from "./costo-linea";
+import { useRestricciones } from "./restricciones-contexto";
+import { campoEditable, campoOculto } from "./permisos-compras";
 
 /**
  * Una línea de la orden: lo pedido y el costo (unitario o total) se editan en el lugar, en cualquier momento (también con la
@@ -32,6 +34,10 @@ function FilaItem({
   alEscribir: (id: string, vivo: { cantidad: number; subtotal: number | null }) => void;
 }) {
   const { mostrarToast } = useToast();
+  // El costo es dinero de la compra: sin ver el monto no se ven los costos, y sin poder editarlo se ven pero no se cambian.
+  const restricciones = useRestricciones();
+  const verCostos = !campoOculto(restricciones, "monto");
+  const editarCostos = campoEditable(restricciones, "monto");
   const [cantidad, setCantidad] = useState(String(item.cantidadPedida));
   const n = Number(cantidad);
   const costo = useCosto(n, item.costoUnitario);
@@ -123,7 +129,7 @@ function FilaItem({
             className={claseNumero}
           />
         </label>
-        <CamposCosto costo={costo} deshabilitado={!puedeEscribir || pendiente} alSalir={guardar} />
+        {verCostos && <CamposCosto costo={costo} deshabilitado={!puedeEscribir || pendiente || !editarCostos} alSalir={guardar} />}
       </div>
       <CompetenciaDesplegable skuId={item.skuId} nombre={item.nombre} />
     </li>
@@ -237,6 +243,9 @@ export function ProductosCompra({
   }
 
   // El total de la orden, con lo que está escrito ahora en cada línea (guardado o no) y la línea por agregar.
+  const restriccionesBloque = useRestricciones();
+  const verCostos = !campoOculto(restriccionesBloque, "monto");
+  const editarCostos = campoEditable(restriccionesBloque, "monto");
   const lineaVivo = (i: ItemCompra) => vivo[i.id] ?? { cantidad: i.cantidadPedida, subtotal: i.costoUnitario !== null ? redondear(i.costoUnitario * i.cantidadPedida, 2) : null };
   const nuevaSubtotal = aNumero(costoNuevo.total);
   const hayNueva = !!elegido && cantidadNueva > 0;
@@ -279,7 +288,7 @@ export function ProductosCompra({
                   </p>
                   <p className="m-0 text-xs text-muted-foreground tabular-nums">
                     {l.cantidad.toLocaleString("es-PA")} u.
-                    {l.costoUnitario !== null ? ` · ${usd(l.costoUnitario)} c/u · ${usd(subtotalBorrador(l) ?? 0)}` : " · sin costo"}
+                    {verCostos ? (l.costoUnitario !== null ? ` · ${usd(l.costoUnitario)} c/u · ${usd(subtotalBorrador(l) ?? 0)}` : " · sin costo") : ""}
                   </p>
                 </div>
                 <button
@@ -370,7 +379,7 @@ export function ProductosCompra({
                 ) : (
                   <p className="m-0 pb-2 text-muted-foreground">Unidades: {cantidadNueva.toLocaleString("es-PA")}</p>
                 )}
-                <CamposCosto costo={costoNuevo} />
+                {verCostos && <CamposCosto costo={costoNuevo} deshabilitado={!editarCostos} />}
                 <BotonBarra principal disabled={!listo || pendiente} onClick={() => void agregar()} className="ml-auto">
                   {pendiente ? "Agregando…" : "Agregar a la orden"}
                 </BotonBarra>
@@ -383,12 +392,12 @@ export function ProductosCompra({
             <span className="text-sm font-medium">
               Total de la orden · {totalLineas + (hayNueva ? 1 : 0)} producto{totalLineas + (hayNueva ? 1 : 0) === 1 ? "" : "s"} · {unidades.toLocaleString("es-PA")} u.
             </span>
-            <span className="text-base font-semibold tabular-nums">{usd(monto)}</span>
+            {verCostos && <span className="text-base font-semibold tabular-nums">{usd(monto)}</span>}
             {hayNueva && (
               <span className="w-full text-xs text-muted-foreground">Incluye la línea que estás agregando: pulsa «Agregar a la orden» para {borrador ? "sumarla" : "guardarla"}.</span>
             )}
             {borrador && lineasBorrador.length > 0 && <span className="w-full text-xs text-muted-foreground">Se guardan al pulsar «Crear compra».</span>}
-            {sinCosto > 0 && (
+            {verCostos && sinCosto > 0 && (
               <span className="w-full text-xs text-warning">
                 {sinCosto} producto{sinCosto === 1 ? "" : "s"} sin costo: no {sinCosto === 1 ? "suma" : "suman"} al total.
               </span>

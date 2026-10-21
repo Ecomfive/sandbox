@@ -10,6 +10,8 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { EditorFecha, EditorOpciones, EditorTexto } from "./celda-editable";
 import { DEF_COMPRAS, type FilaCompra } from "./def-compras";
 import { CAMPOS_EDITABLES } from "./def-edicion-compras";
+import { accionPermitidaEnCompras, celdaEditable } from "./permisos-compras";
+import { useRestricciones } from "./restricciones-contexto";
 import { claseOpcionPanel, PanelCelda, type MotivoCierre } from "./panel-celda";
 import { PastillaEtiqueta } from "./selector-etiquetas";
 import { PanelLista } from "./selector-lista";
@@ -69,7 +71,10 @@ export function BarraLoteCompras({
   const botonMas = useRef<HTMLButtonElement>(null);
   const [menuMas, setMenuMas] = useState(false);
   const [campoMas, setCampoMas] = useState<string | null>(null);
-  const restantes = Object.keys(CAMPOS_EDITABLES).filter((c) => !(PRINCIPALES as readonly string[]).includes(c));
+  // Solo los datos que su rol le deja cambiar (Usuarios y roles › Afinar).
+  const restricciones = useRestricciones();
+  const principales = PRINCIPALES.filter((c) => celdaEditable(restricciones, c));
+  const restantes = Object.keys(CAMPOS_EDITABLES).filter((c) => !(PRINCIPALES as readonly string[]).includes(c) && celdaEditable(restricciones, c));
 
   return (
     <div
@@ -82,10 +87,10 @@ export function BarraLoteCompras({
       <p role="status" className="mr-1 font-medium tabular-nums">
         {cantidad}
       </p>
-      {PRINCIPALES.map((campo) => (
+      {principales.map((campo) => (
         <BotonCampoLote key={campo} campo={campo} filas={filas} aplicar={aplicar} etiquetas={etiquetas} tiendas={tiendas} colores={colores} deshabilitado={guardando} />
       ))}
-      <button
+      {restantes.length > 0 && <button
         ref={botonMas}
         type="button"
         aria-haspopup="dialog"
@@ -96,7 +101,7 @@ export function BarraLoteCompras({
       >
         Más
         <FlechaAbajoIcon className="h-3.5 w-3.5 text-muted-foreground" />
-      </button>
+      </button>}
       {menuMas && (
         <PanelCelda
           ancla={botonMas}
@@ -140,7 +145,7 @@ export function BarraLoteCompras({
           }}
         />
       )}
-      <BotonDescargar def={DEF_COMPRAS} filas={filas} nombreFilas="compras" ayuda="Descargar seleccionadas" />
+      {accionPermitidaEnCompras(restricciones, "descargar") && <BotonDescargar def={DEF_COMPRAS} filas={filas} nombreFilas="compras" ayuda="Descargar seleccionadas" />}
       <Tooltip texto="Quitar selección">
         <button
           type="button"

@@ -17,6 +17,7 @@ import { AnularCompraBoton, AvisoAnulada } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
 import { ProductosCompra } from "./productos-compra";
 import { PastillaTienda } from "./tiendas";
+import { DatoGobernado, usePuedeAccion } from "./restricciones-contexto";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
@@ -76,31 +77,31 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
           <Dato etiqueta="Estado">
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
           </Dato>
-          <Dato etiqueta="Proveedor">{compra.proveedor || SIN_DATO}</Dato>
-          <Dato etiqueta="Agente de envío">{compra.agenteEnvio || SIN_DATO}</Dato>
+          <DatoGobernado clave="proveedor"><Dato etiqueta="Proveedor">{compra.proveedor || SIN_DATO}</Dato></DatoGobernado>
+          <DatoGobernado clave="agente"><Dato etiqueta="Agente de envío">{compra.agenteEnvio || SIN_DATO}</Dato></DatoGobernado>
           <Dato etiqueta="Tipo de venta">{compra.ventaImportacion ? "Venta de importación" : "Proveeduría"}</Dato>
-          <Dato etiqueta="Tienda">{compra.tiendas.length ? <span className="flex flex-wrap gap-1">{compra.tiendas.map((t) => <PastillaTienda key={t} nombre={t} />)}</span> : SIN_DATO}</Dato>
-          <Dato etiqueta="Persona asignada">{compra.asignadoNombre || SIN_DATO}</Dato>
+          <DatoGobernado clave="tienda"><Dato etiqueta="Tienda">{compra.tiendas.length ? <span className="flex flex-wrap gap-1">{compra.tiendas.map((t) => <PastillaTienda key={t} nombre={t} />)}</span> : SIN_DATO}</Dato></DatoGobernado>
+          <DatoGobernado clave="responsable"><Dato etiqueta="Persona asignada">{compra.asignadoNombre || SIN_DATO}</Dato></DatoGobernado>
         </dl>
       </Seccion>
       <Seccion icono={GastoIcon} titulo="Cantidad y pagos">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Dato etiqueta="Cantidad total">{compra.qtyTotal ?? SIN_DATO}</Dato>
-          <Dato etiqueta="Monto Total">{dinero(compra.montoTotal)}</Dato>
-          <Dato etiqueta="Valor Unitario">{dinero(valorUnitario(compra))}</Dato>
-          <Dato etiqueta="Primer Pago">{dinero(compra.primerPago)}</Dato>
-          <Dato etiqueta="Segundo Pago">{dinero(compra.segundoPago)}</Dato>
-          <Dato etiqueta="Pagado a Proveedor">{dinero(compra.pagadoAProveedor)}</Dato>
+          <DatoGobernado clave="monto"><Dato etiqueta="Monto Total">{dinero(compra.montoTotal)}</Dato></DatoGobernado>
+          <DatoGobernado clave="unitario"><Dato etiqueta="Valor Unitario">{dinero(valorUnitario(compra))}</Dato></DatoGobernado>
+          <DatoGobernado clave="pago1"><Dato etiqueta="Primer Pago">{dinero(compra.primerPago)}</Dato></DatoGobernado>
+          <DatoGobernado clave="pago2"><Dato etiqueta="Segundo Pago">{dinero(compra.segundoPago)}</Dato></DatoGobernado>
+          <DatoGobernado clave="pagado"><Dato etiqueta="Pagado a Proveedor">{dinero(compra.pagadoAProveedor)}</Dato></DatoGobernado>
           <Dato etiqueta="Factura">{compra.factura ? "Sí" : "No"}</Dato>
           <Dato etiqueta="Financiamiento">{compra.financiamiento ? "Sí" : "No"}</Dato>
         </dl>
       </Seccion>
       <Seccion icono={CalendarioIcon} titulo="Fechas">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Dato etiqueta="Fecha límite">{fecha(compra.fechaLimite)}</Dato>
+          <DatoGobernado clave="limite"><Dato etiqueta="Fecha límite">{fecha(compra.fechaLimite)}</Dato></DatoGobernado>
           <Dato etiqueta="Fecha de llegada">{fecha(compra.fechaLlegada)}</Dato>
-          <Dato etiqueta="Fecha de Pago (1)">{fecha(compra.fechaPago1)}</Dato>
-          <Dato etiqueta="Fecha de Pago (2)">{fecha(compra.fechaPago2)}</Dato>
+          <DatoGobernado clave="pago1"><Dato etiqueta="Fecha de Pago (1)">{fecha(compra.fechaPago1)}</Dato></DatoGobernado>
+          <DatoGobernado clave="pago2"><Dato etiqueta="Fecha de Pago (2)">{fecha(compra.fechaPago2)}</Dato></DatoGobernado>
           <Dato etiqueta="Fecha de Envío">{fecha(compra.fechaEnvio)}</Dato>
           <Dato etiqueta="Planificación">{compra.planificacion || SIN_DATO}</Dato>
         </dl>
@@ -144,6 +145,9 @@ export function FichaCompra({
   alCerrar: () => void;
 }) {
   const { mostrarToast } = useToast();
+  const puedeCotizar = usePuedeAccion("cotizacion");
+  const puedeAnular = usePuedeAccion("anular");
+  const puedeComentar = usePuedeAccion("comentar");
   const [guardando, setGuardando] = useState(false);
   const [sinGuardarId, setSinGuardarId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -212,7 +216,7 @@ export function FichaCompra({
     >
       {compra && (
         <div ref={raiz} className="flex flex-1 flex-col">
-          <AvisoAnulada compra={compra} puedeEscribir={puedeEscribir} />
+          <AvisoAnulada compra={compra} puedeEscribir={puedeEscribir && puedeAnular} />
           {puedeEscribir ? (
             <FormularioCompra
               key={`${compra.id}-${version}`}
@@ -225,8 +229,8 @@ export function FichaCompra({
               botonesArriba
               acciones={
                 <>
-                  <CopiarCotizacionBoton compraId={compra.id} />
-                  {!compra.anulada && <AnularCompraBoton id={compra.id} nombre={numeroOC(compra.numero)} alAnular={alCerrar} />}
+                  {puedeCotizar && <CopiarCotizacionBoton compraId={compra.id} />}
+                  {!compra.anulada && puedeAnular && <AnularCompraBoton id={compra.id} nombre={numeroOC(compra.numero)} alAnular={alCerrar} />}
                 </>
               }
               alGuardar={alGuardar}
@@ -238,15 +242,17 @@ export function FichaCompra({
             />
           ) : (
             <>
-              <div className="flex gap-2 px-5 pt-4">
-                <CopiarCotizacionBoton compraId={compra.id} />
-              </div>
+              {puedeCotizar && (
+                <div className="flex gap-2 px-5 pt-4">
+                  <CopiarCotizacionBoton compraId={compra.id} />
+                </div>
+              )}
               <DatosDeLaCompra compra={compra} codigoPais={MONEDA_COMPRAS} />
             </>
           )}
           {/* A solo lectura no hay formulario: los productos se ven al final, como antes. */}
           {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} />}
-          <ActividadCompra key={compra.id} id={compra.id} comentarioResaltado={comentarioResaltado} />
+          <ActividadCompra key={compra.id} id={compra.id} puedeComentar={puedeEscribir && puedeComentar} comentarioResaltado={comentarioResaltado} />
         </div>
       )}
     </Ventana>

@@ -264,6 +264,30 @@ convenciones técnicas del código.
   Conciliación y Productos y márgenes solo Finanzas y Dirección; Producto va en lectura para casi todos (Compras, Inventario y la competencia de un
   producto dependen de verlo); Selección y Scraping van juntos en Investigación (enviar a Selección exige modificarla). Reversa:
   `supabase/rollbacks/0115_rollback.sql`. Un módulo nuevo debe sumarse a estos roles (a mano en Usuarios y roles o con otra migración).
+- **Usuarios y roles: matriz, permisos propios y «Afinar»** (migración 0116, 20 oct 2026; rediseño aprobado con maqueta). Tres pantallas
+  bajo el módulo `usuarios`, con pestañas **Personas** (`/usuarios`), **Roles** (`/usuarios/roles?rol=<id>`) e **Historial de auditoría**.
+  *Roles*: lista de roles al lado de un editor (`roles/editor-rol.tsx`) con la barra de cobertura y la **matriz** (`AREAS_ACCESO`,
+  `src/lib/permisos/catalogo.ts`): un `SelectorNivel` de tres niveles por módulo (Sin acceso · Solo lectura · Edición, guardado en
+  `permisos_rol.solo_lectura`; sin acceso = sin fila), botones por área y por módulo con su marca «Sensible» (`MODULOS_SENSIBLES`). Las
+  acciones (`permisos-actions.ts`) devuelven `{ error }`, exigen poder modificar Usuarios y roles y **no dejan que alguien se quite a sí
+  misma la edición de Usuarios y roles**. El rol tiene `color` (`color-rol.ts`) y se puede duplicar, copiar de otro o crear desde otro.
+  *Persona* (`/usuarios/personas/[id]`, ya no es un panel): rol base, **permisos propios** (`permisos_persona`: sin acceso, lectura o
+  edición por módulo, mandan sobre el rol; igual al del rol no se guarda), países, puestos, alta y datos, y «Acceso efectivo»
+  (`src/lib/permisos/acceso.ts`: `nivelesEfectivos`, `diferencias`). «Ver así» ahora también va por persona (cookie `<dueno>:p-<persona>`).
+  **Afinar** (`/usuarios/roles/[id]/afinar/[modulo]` y `/usuarios/personas/[id]/afinar/[modulo]`, `afinar/afinar-modulo.tsx`): dentro de un
+  módulo que tiene catálogo (`CATALOGO_COMPRAS`; **solo Compras por ahora**; los demás módulos se dan o se quitan completos) se decide qué
+  *pestañas* ve, qué *acciones* usa, qué *campos* ve/solo ve/oculta y qué *alcance* tiene (todas, solo las asignadas, solo las que creó). Se
+  guarda **solo lo que se aparta del acceso completo** (`permisos_afinados` por rol y `permisos_persona_afinados` por persona; la de la
+  persona manda y puede soltar lo que el rol restringe) y `resolverAfinado` lo junta; `getUsuarioActual` lo trae en `usuario.afinado[modulo]`.
+  **Cómo se aplica en Compras** (el servidor manda, la pantalla solo esconde): las pestañas se protegen con `requirePestana` y se quitan de
+  la franja y de la paleta (`pestanasOcultasDe`); `cargarCompras` **no manda** los campos ocultos (`enmascarar`) y filtra por alcance
+  (`dentroDelAlcance`); cada acción comprueba `accionBloqueadaEnCompras` (crear, lote, anular, comentar, cotización) y las celdas, el lote
+  y `actualizarCompra` ignoran lo que no se puede cambiar (guardar la ficha **no pisa** un dato oculto); la Actividad no muestra cambios
+  de un dato oculto ni los montos de las líneas; el histórico de compras de Producto también respeta el monto y el alcance. Etapa y estado
+  no se pueden ocultar (el tablero se agrupa por ellos). La pantalla de afinar avisa si se ocultan campos de dinero con Informe,
+  Dashboard, Planificación o Tiempos visibles (sus cifras saldrían en cero). **Un módulo nuevo que se quiera afinar**: agrega su
+  `CatalogoModulo` a `src/lib/permisos/catalogo.ts` y aplica sus claves en el servidor como Compras (`permisos-compras.ts` es el modelo).
+  `acceso-seccion.ts`, «Líderes comerciales» del CRM y el progreso de la Universidad ya cuentan lo propio de cada persona.
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo

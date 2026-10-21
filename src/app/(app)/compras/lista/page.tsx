@@ -1,6 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { cargarColoresEtiquetas, cargarColoresTiendas, cargarCompras } from "../datos-compras";
 import type { Grupo } from "../calculos-compras";
 import { TablaCompras } from "../tabla-compras";
@@ -13,9 +13,9 @@ const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atr
 
 /** Compras › Compras: el tablero (todas las columnas, agrupar, filtros de un toque) con la ficha de resumen a la derecha. */
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
-  const usuario = await requireModulo("compras");
+  const usuario = await requirePestana("compras", "lista");
   const { ver, grupo, etapa, abrir, comentario } = await searchParams;
-  const [{ compras, paises, vista, error }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
+  const [{ compras, paises, vista, error, restricciones }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -32,6 +32,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
          
           paises={paises}
           puedeEscribir={!usuario.modulosSoloLectura.includes("compras")}
+          restricciones={restricciones}
           puedeAgregarPais={usuario.modulos.includes("configuracion") && !usuario.modulosSoloLectura.includes("configuracion")}
           grupoInicial={grupoInicial}
           etapaInicial={typeof etapa === "string" ? etapa : ""}

@@ -62,6 +62,7 @@ export function TablaDatos<F, C = undefined>({
   porPagina = POR_PAGINA,
   paginarSiempre,
   descargaCompleta,
+  sinDescarga,
   accionPrincipal,
   seleccion,
   fijarEncabezado,
@@ -110,6 +111,8 @@ export function TablaDatos<F, C = undefined>({
   paginarSiempre?: boolean;
   /** Descarga que arma el servidor con más filas que las cargadas; el botón Descargar la ofrece junto a «Lo que se ve». */
   descargaCompleta?: DescargaCompleta;
+  /** Sin el botón Descargar (el rol de la persona no puede sacar los datos de esta tabla). */
+  sinDescarga?: boolean;
   /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
   accionPrincipal?: ReactNode;
   /**
@@ -322,6 +325,7 @@ export function TablaDatos<F, C = undefined>({
         nombreFilas={nombre.plural}
         columnas={{ defs: columnas, estado: guardadas, cambiar: cambiarColumnas }}
         descargaCompleta={descargaCompleta}
+        sinDescarga={sinDescarga}
         accionPrincipal={accionPrincipal}
       />
       <ContenedorTabla ariaLabel={ariaLabel} aspecto={aspecto} encabezadoFijo={encabezadoFijo} totales={totales}>

@@ -6,7 +6,6 @@ import { getUsuarioActual } from "@/lib/auth";
 import { cobertura, nivelesEfectivos, type PermisoPropio, type PermisoRol } from "@/lib/permisos/acceso";
 import { CrearUsuarioPanel } from "./crear-usuario-panel";
 import { consultarRoles, consultaSegura } from "./datos-usuarios";
-import type { Rol } from "./def-usuarios";
 import { ListaPersonas, type FilaPersonaLista } from "./lista-personas";
 
 export const metadata = { title: "Usuarios y roles" };

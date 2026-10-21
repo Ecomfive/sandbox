@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
-import { requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
+import { MENSAJE_ACCION_BLOQUEADA, requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
 import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSeguro } from "@/lib/compras/adjuntos";
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
@@ -16,6 +16,7 @@ import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
+import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, dentroDelAlcance, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
 import { leerMetricasDescripcion, metricasDeTest, precioUnidad, textoLogistica, type Cotizacion, type TestParaCotizacion } from "@/lib/compras/cotizacion";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
@@ -30,14 +31,39 @@ const SIN_ACCESO_PAIS = "No tienes acceso a las compras de ese país.";
 type CompraPais = { id: string; tipo: string; paises: { codigo: string } | { codigo: string }[] | null };
 const codigoDe = (c: CompraPais) => (c.tipo === "importacion" ? null : ((Array.isArray(c.paises) ? c.paises[0] : c.paises)?.codigo ?? null));
 
-/** El error si la persona no puede ver alguna de esas compras por su país; null si puede (o no tiene países limitados). */
+// --- Lo afinado en Usuarios y roles (pestañas, acciones, campos y alcance de Compras) ---------------------------------------
+// La pantalla ya esconde lo que la persona no puede ver o hacer, pero cada acción lo vuelve a comprobar aquí: es la barrera real.
+const SIN_ACCESO_COMPRA = "No tienes acceso a esta compra.";
+const SIN_PERMISO_DATO = "Tu rol no puede cambiar este dato.";
+
+/** Lo que tiene limitado la persona dentro de Compras. */
+async function restriccionesActuales(): Promise<RestriccionesCompras> {
+  return restriccionesDe((await getUsuarioActual())?.afinado.compras);
+}
+
+/** El error si la acción está bloqueada para la persona (por ejemplo «anular»); null si la puede usar. */
+async function accionBloqueadaEnCompras(accion: string): Promise<string | null> {
+  return accionPermitidaEnCompras(await restriccionesActuales(), accion) ? null : MENSAJE_ACCION_BLOQUEADA;
+}
+
+/**
+ * El error si la persona no puede ver alguna de esas compras: por su país (si lo tiene limitado) o porque su rol solo le deja las que
+ * tiene asignadas o creó; null si puede.
+ */
 async function sinAccesoACompras(ids: string[]): Promise<string | null> {
-  const permitidos = (await getUsuarioActual())?.paisesPermitidos ?? null;
-  if (permitidos === null || ids.length === 0) return null;
-  const { data } = await createServiceClient().from("wms_compras").select("id, tipo, paises(codigo)").in("id", ids);
-  const filas = (data ?? []) as unknown as CompraPais[];
+  const usuario = await getUsuarioActual();
+  const permitidos = usuario?.paisesPermitidos ?? null;
+  const alcance = restriccionesDe(usuario?.afinado.compras).alcance;
+  if ((permitidos === null && !ES_ALCANCE_LIMITADO(alcance)) || ids.length === 0) return null;
+  const { data } = await createServiceClient().from("wms_compras").select("id, tipo, paises(codigo), asignado_a, creado_por, responsable_nombre, creador_nombre").in("id", ids);
+  const filas = (data ?? []) as unknown as (CompraPais & { asignado_a: string | null; creado_por: string | null; responsable_nombre: string | null; creador_nombre: string | null })[];
   if (filas.length !== new Set(ids).size) return "Compra no válida.";
-  return filas.every((c) => puedeVerPais(permitidos, codigoDe(c))) ? null : SIN_ACCESO_PAIS;
+  if (permitidos !== null && !filas.every((c) => puedeVerPais(permitidos, codigoDe(c)))) return SIN_ACCESO_PAIS;
+  if (usuario && ES_ALCANCE_LIMITADO(alcance)) {
+    const dentro = filas.every((c) => dentroDelAlcance(alcance, { asignadoId: c.asignado_a, creadoPorId: c.creado_por, responsableNombre: c.responsable_nombre, creadorNombre: c.creador_nombre }, usuario));
+    if (!dentro) return SIN_ACCESO_COMPRA;
+  }
+  return null;
 }
 /** Lo mismo, para una línea de producto de una compra. */
 async function sinAccesoALinea(itemId: string): Promise<string | null> {
@@ -275,7 +301,10 @@ async function anotarEventos(compraId: string, antes: { etapa: string; estado: s
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearCompra(formData: FormData): Promise<{ error?: string; codigo?: string | null; id?: string }> {
-  await requireModuloEscritura("compras");
+  const creador = await requireModuloEscritura("compras");
+  const bloqueada = await accionBloqueadaEnCompras("crear");
+  if (bloqueada) return { error: bloqueada };
+  const limites = restriccionesDe(creador.afinado.compras);
   // El nombre es opcional (venía de ClickUp; una compra con productos se titula por su N.º OC). Sin nombre, toma su código.
   const nombreEscrito = String(formData.get("nombre") ?? "").trim();
   const etapa = (formData.get("etapa") as string) || "cotizar";
@@ -295,6 +324,7 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string;
   } catch {
     return { error: "Los productos de la compra no son válidos." };
   }
+  if (!campoEditableParaRol(limites, "monto")) lineas = lineas.map((l) => ({ ...l, costo: null }));
   if (lineas.length > 0 && tipoYPais.tipo !== "pais") return { error: "Solo las compras de un país llevan productos del inventario." };
   if (new Set(lineas.map((l) => l.sku)).size !== lineas.length) return { error: "Hay un producto repetido en la compra." };
   for (const l of lineas) {
@@ -308,13 +338,14 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string;
   const supabase = createServiceClient();
   const codigo = await siguienteCodigo(tipoYPais.tipo, tipoYPais.pais_id);
   const nombre = nombreEscrito || codigo || "Orden de compra";
-  const datos = leerCambios(formData);
+  // Lo que la persona no puede cambiar no entra (un campo oculto no viaja en el formulario).
+  const datos = sinColumnasBloqueadas(leerCambios(formData), limites);
   const planificacion = datos.fecha_envio
-    ? nuevaPlanificacion(await cargarTiempos(), null, { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: datos.via_envio, fechaEnvio: datos.fecha_envio })
+    ? nuevaPlanificacion(await cargarTiempos(), null, { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: datos.via_envio ?? [], fechaEnvio: datos.fecha_envio })
     : null;
   const { data, error } = await supabase
     .from("wms_compras")
-    .insert({ ...tipoYPais, nombre, etapa, estado, ...datos, planificacion, codigo })
+    .insert({ ...tipoYPais, nombre, etapa, estado, ...datos, planificacion, codigo, creado_por: creador.id, ...(limites.alcance === "asignadas" ? { asignado_a: creador.id } : {}) })
     .select("id")
     .single();
   if (error) return { error: error.message };
@@ -358,16 +389,20 @@ export async function vistaPreviaCompra(clave: string): Promise<{ codigo: string
 
 /** Edita cualquier dato de una compra ya creada — todo junto, desde su ficha. */
 export async function actualizarCompra(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+  const usuario = await requireModuloEscritura("compras");
+  const limites = restriccionesDe(usuario.afinado.compras);
   const id = formData.get("id") as string;
   const nombreEscrito = String(formData.get("nombre") ?? "").trim();
-  const etapa = formData.get("etapa") as string;
-  const estado = formData.get("estado") as string;
+  // La etapa y el estado que llegan solo valen si la persona puede cambiarlos; si no, la compra se queda como estaba.
+  const puedeEtapa = campoEditableParaRol(limites, "etapa");
+  const puedeEstado = campoEditableParaRol(limites, "estado");
+  const etapaDelFormulario = formData.get("etapa") as string;
+  const estadoDelFormulario = formData.get("estado") as string;
   if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
   if (sinAcceso) return { error: sinAcceso };
 
-  if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
+  if (puedeEstado && !ESTADOS_VALIDOS.has(estadoDelFormulario)) return { error: "Elige un estado válido." };
 
   const tipoYPais = await leerTipoYPais(formData);
   if ("error" in tipoYPais) return tipoYPais;
@@ -375,27 +410,33 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   const supabase = createServiceClient();
   const { data: actualCompleta } = await supabase.from("wms_compras").select("*").eq("id", id).single();
   const actual = actualCompleta as Record<string, unknown> & { foto_url: string | null; etapa: string; estado: string } | null;
+  const etapa = puedeEtapa ? etapaDelFormulario : String(actual?.etapa ?? etapaDelFormulario);
+  const estado = puedeEstado ? estadoDelFormulario : String(actual?.estado ?? estadoDelFormulario);
   // Una compra que sigue en una etapa que ya no se elige (la migración 0098 las mueve) puede guardarse sin cambiarla.
   if (!ETAPAS_VALIDAS.has(etapa) && etapa !== actual?.etapa) return { error: "Elige una etapa válida." };
   // Sin nombre se conserva el que tenía (el nombre es opcional: el título sale del N.º OC o del código).
   const nombre = nombreEscrito || String(actual?.nombre ?? "") || String(actual?.codigo ?? "") || "Orden de compra";
-  const { qty_total, monto_total, ...resto } = leerCambios(formData);
+  // Lo que la persona no puede cambiar (un dato oculto o de solo ver) no se toca: un campo oculto no viaja en el formulario y se guardaría vacío.
+  const { qty_total, monto_total, ...resto } = sinColumnasBloqueadas(leerCambios(formData), limites);
   // Con productos vinculados, la cantidad y el monto los calcula el bloque «Productos»: el formulario no los pisa.
   const { count: lineas } = await supabase.from("wms_compra_items").select("id", { count: "exact", head: true }).eq("compra_id", id);
-  const sinPlanificar = (lineas ?? 0) > 0 ? resto : { ...resto, qty_total, monto_total };
+  const sinPlanificar = (lineas ?? 0) > 0 ? resto : { ...resto, qty_total, ...(monto_total !== undefined ? { monto_total } : {}) };
+  // Lo que mueve la planificación (la fecha de envío y la vía), con lo que ya tenía si la persona no puede cambiar la vía.
+  const fechaEnvioNueva = resto.fecha_envio !== undefined ? resto.fecha_envio : ((actual?.fecha_envio as string | null) ?? null);
+  const viasNuevas: string[] = resto.via_envio !== undefined ? resto.via_envio : ((actual?.via_envio as string[] | null) ?? []);
   // La planificación se vuelve a calcular solo si cambió lo que la mueve (si no, guardar otro dato la movería sola cada vez
   // que llega un envío nuevo al historial).
   const mueve =
     !actual ||
-    (actual.fecha_envio ?? null) !== resto.fecha_envio ||
-    JSON.stringify(ordenada(actual.via_envio ?? [])) !== JSON.stringify(ordenada(resto.via_envio)) ||
+    (actual.fecha_envio ?? null) !== fechaEnvioNueva ||
+    JSON.stringify(ordenada(actual.via_envio ?? [])) !== JSON.stringify(ordenada(viasNuevas)) ||
     actual.tipo !== tipoYPais.tipo ||
     (actual.pais_id ?? null) !== tipoYPais.pais_id;
   const planificacion = mueve
     ? nuevaPlanificacion(
         await cargarTiempos(),
         actual ? { fechaEnvio: (actual.fecha_envio as string | null) ?? null, planificacion: (actual.planificacion as string | null) ?? null } : null,
-        { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: resto.via_envio, fechaEnvio: resto.fecha_envio },
+        { clave: claveTransito(tipoYPais.tipo, tipoYPais.pais_id), vias: viasNuevas, fechaEnvio: fechaEnvioNueva },
       )
     : ((actual?.planificacion as string | null) ?? null);
   const cambios = { ...sinPlanificar, planificacion };
@@ -440,6 +481,7 @@ export async function actualizarCampoCompra(
   if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
   const def = campoEditable(String(campo));
   if (!def) return { error: "Ese dato no se edita aquí." };
+  if (!celdaEditable(await restriccionesActuales(), String(campo))) return { error: SIN_PERMISO_DATO };
   const normalizado = normalizarValor(def, bruto);
   if ("error" in normalizado) return normalizado;
   const sinAcceso = await sinAccesoACompras([id]);
@@ -507,6 +549,9 @@ export async function actualizarCampoComprasLote(
   modo: ModoLote = "poner",
 ): Promise<{ error?: string; aplicadas?: { id: string; valor: ValorCampo; cerradoEn?: string | null; planificacion?: string | null }[]; omitidas?: number }> {
   await requireModuloEscritura("compras");
+  const bloqueada = await accionBloqueadaEnCompras("lote");
+  if (bloqueada) return { error: bloqueada };
+  if (!celdaEditable(await restriccionesActuales(), String(campo))) return { error: SIN_PERMISO_DATO };
   if (!Array.isArray(ids) || ids.length === 0) return { error: "Marca al menos una compra." };
   const unicos = [...new Set(ids.map(String))];
   if (unicos.length > MAX_COMPRAS_LOTE) return { error: `Se pueden cambiar hasta ${MAX_COMPRAS_LOTE} compras a la vez.` };
@@ -634,6 +679,8 @@ export async function actualizarCampoComprasLote(
  */
 export async function anularCompra(id: string, motivo: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
+  const bloqueada = await accionBloqueadaEnCompras("anular");
+  if (bloqueada) return { error: bloqueada };
   if (!ES_ID(String(id))) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
   if (sinAcceso) return { error: sinAcceso };
@@ -671,6 +718,8 @@ export async function anularCompra(id: string, motivo: string): Promise<{ error?
  */
 export async function restaurarCompra(id: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
+  const bloqueada = await accionBloqueadaEnCompras("anular");
+  if (bloqueada) return { error: bloqueada };
   if (!ES_ID(String(id))) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
   if (sinAcceso) return { error: sinAcceso };
@@ -795,6 +844,7 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   type FilaComentario = { id: string; autor: string | null; autor_id?: string | null; texto: string; creado_en: string; respuesta_a?: string | null; editado_en?: string | null };
   const filasComentarios = (comentarios.data ?? []) as unknown as FilaComentario[];
   const usuarioActual = await getUsuarioActual();
+  const limitesActividad = restriccionesDe(usuarioActual?.afinado.compras);
   const yo = usuarioActual?.id ?? null;
   const miNombre = usuarioActual ? usuarioActual.nombre || usuarioActual.email : null;
   const reacciones = new Map<string, ReaccionComentario[]>();
@@ -841,8 +891,14 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
     })),
     subtareas: (subtareas.data ?? []).map((t) => ({ id: t.id, nombre: t.nombre, estado: t.estado, responsable: t.responsable_nombre, creadoEn: t.creado_en, cerradoEn: t.cerrado_en })),
     adjuntos: filasAdjuntos.filter((a) => !a.comentario_id).map(aAdjunto),
-    eventos: (eventos.data ?? []).map((e) => ({ id: e.id, campo: e.campo, antes: e.valor_antes, despues: e.valor_despues, ocurridoEn: e.ocurrido_en, autor: e.autor, origen: e.origen })),
+    // Los cambios de un dato que la persona no ve tampoco se muestran en la actividad.
+    eventos: (eventos.data ?? []).filter((e) => cambioVisibleEnActividad(limitesActividad, String(e.campo))).map((e) => ({ id: e.id, campo: e.campo, antes: sinMonto(limitesActividad, e.campo, e.valor_antes), despues: sinMonto(limitesActividad, e.campo, e.valor_despues), ocurridoEn: e.ocurrido_en, autor: e.autor, origen: e.origen })),
   };
+}
+
+/** Las líneas de producto de la Actividad llevan su monto («1.040 u. · $1.270,00»): sin ver el monto, se queda solo con las unidades. */
+function sinMonto(limites: RestriccionesCompras, campo: string, texto: string | null): string | null {
+  return campoOculto(limites, "monto") && texto && /^producto(Agregado|Cambiado|Quitado)$/.test(campo) ? textoSinMonto(texto) : texto;
 }
 
 /**
@@ -868,6 +924,10 @@ export async function editarComentarioCompra(
   archivos: { quitar?: string[]; agregar?: AdjuntoSubido[] } = {},
 ): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
+  {
+    const bloqueada = await accionBloqueadaEnCompras("comentar");
+    if (bloqueada) return { error: bloqueada };
+  }
   if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
   const supabase = createServiceClient();
   const quitar = Array.isArray(archivos.quitar) ? archivos.quitar.filter((x) => ES_ID(String(x))) : [];
@@ -955,6 +1015,10 @@ export async function editarComentarioCompra(
  */
 export async function eliminarComentarioCompra(comentarioId: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
+  {
+    const bloqueada = await accionBloqueadaEnCompras("comentar");
+    if (bloqueada) return { error: bloqueada };
+  }
   if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
   const supabase = createServiceClient();
   const { data: c } = await supabase.from("wms_compra_comentarios").select("id, compra_id, autor, autor_id, texto").eq("id", comentarioId).maybeSingle();
@@ -1001,6 +1065,10 @@ export interface AdjuntoSubido {
  */
 export async function prepararSubidaAdjuntoComentario(compraId: string, nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
   await requireModuloEscritura("compras");
+  {
+    const bloqueada = await accionBloqueadaEnCompras("comentar");
+    if (bloqueada) return { error: bloqueada };
+  }
   if (typeof compraId !== "string" || !ES_ID(compraId)) return { error: "Compra no válida." };
   if (typeof nombreArchivo !== "string" || !nombreArchivo.trim()) return { error: "El archivo no tiene nombre." };
   const sinAcceso = await sinAccesoACompras([compraId]);
@@ -1104,6 +1172,10 @@ export async function comentarCompra(
   respuestaA: string | null = null,
 ): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
+  {
+    const bloqueada = await accionBloqueadaEnCompras("comentar");
+    if (bloqueada) return { error: bloqueada };
+  }
   if (!ES_ID(id)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([id]);
   if (sinAcceso) return { error: sinAcceso };
@@ -1233,6 +1305,8 @@ const aProductoComprable = (p: FilaProductoComprable) => ({ id: p.id, codigo: p.
 /** Los productos de una compra y los que se le pueden agregar. Basta poder abrir Compras. */
 export async function obtenerProductosCompra(compraId: string): Promise<{ items: ItemCompra[]; productos: ProductoComprable[] } | { error: string }> {
   await requireModulo("compras");
+  // El costo de cada línea es dinero de la compra: sin ver el monto, tampoco se ve el costo.
+  const verCostos = !campoOculto(await restriccionesActuales(), "monto");
   if (!ES_ID(compraId)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([compraId]);
   if (sinAcceso) return { error: sinAcceso };
@@ -1255,7 +1329,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
         codigo: sku?.codigo ?? "",
         nombre: sku?.nombre ?? "",
         cantidadPedida: i.cantidad_pedida,
-        costoUnitario: i.costo_unitario === null ? null : Number(i.costo_unitario),
+        costoUnitario: !verCostos || i.costo_unitario === null ? null : Number(i.costo_unitario),
         loteNumero: i.lote_numero,
         cantidadRecibida: i.cantidad_recibida,
         fechaRecepcion: i.fecha_recepcion,
@@ -1299,8 +1373,11 @@ async function sincronizarCantidad(compraId: string) {
  * de ese producto en el país de la compra (Lote #1, #2…). Un producto en Test no se compra: primero pasa a Activo
  * (`useConfirmarProductoActivo`).
  */
-export async function agregarProductoCompra(compraId: string, skuId: string, cantidad: number, costo: number | null): Promise<{ error?: string }> {
+export async function agregarProductoCompra(compraId: string, skuId: string, cantidadPedida: number, costoPedido: number | null): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
+  const cantidad = cantidadPedida;
+  // El costo es dinero de la compra: sin poder editar el monto, la línea entra sin costo.
+  const costo = campoEditableParaRol(restriccionesDe(usuario.afinado.compras), "monto") ? costoPedido : null;
   if (!ES_ID(compraId) || !ES_ID(skuId)) return { error: "Datos no válidos." };
   const sinAcceso = await sinAccesoACompras([compraId]);
   if (sinAcceso) return { error: sinAcceso };
@@ -1351,15 +1428,17 @@ export async function productosComprables(): Promise<{ productos: ProductoCompra
 }
 
 /** Cambia lo pedido o el costo unitario de un producto de una compra. */
-export async function actualizarProductoCompra(itemId: string, cantidad: number, costo: number | null): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+export async function actualizarProductoCompra(itemId: string, cantidad: number, costoPedido: number | null): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("compras");
   if (!ES_ID(itemId)) return { error: "Producto no válido." };
   const sinAcceso = await sinAccesoALinea(itemId);
   if (sinAcceso) return { error: sinAcceso };
   if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
-  if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
+  if (!ES_COSTO(costoPedido)) return { error: "El costo unitario no es válido." };
   const supabase = createServiceClient();
   const { data: antes } = await supabase.from("wms_compra_items").select("cantidad_pedida, costo_unitario, skus_maestros(codigo, nombre)").eq("id", itemId).maybeSingle();
+  // Sin poder editar el monto, el costo de la línea se queda como estaba.
+  const costo = campoEditableParaRol(restriccionesDe(usuario.afinado.compras), "monto") ? costoPedido : antes && antes.costo_unitario !== null ? Number(antes.costo_unitario) : null;
   const { data, error } = await supabase
     .from("wms_compra_items")
     .update({ cantidad_pedida: cantidad, costo_unitario: costo, actualizado_en: new Date().toISOString() })
@@ -1490,6 +1569,10 @@ export async function guardarColorEtiqueta(nombre: string, color: string): Promi
  */
 export async function alternarReaccion(comentarioId: string, emoji: string): Promise<{ error?: string; reacciones?: ReaccionComentario[] }> {
   const usuario = await requireModuloEscritura("compras");
+  {
+    const bloqueada = await accionBloqueadaEnCompras("comentar");
+    if (bloqueada) return { error: bloqueada };
+  }
   if (!ES_ID(String(comentarioId))) return { error: "Comentario no válido." };
   if (!(EMOJIS_REACCION as readonly string[]).includes(emoji)) return { error: "Esa reacción no está permitida." };
   const supabase = createServiceClient();
@@ -1531,6 +1614,10 @@ const sinComodines = (t: string) => t.replace(/[%_\\]/g, (x) => `\\${x}`);
  */
 export async function obtenerCotizacionCompra(compraId: string): Promise<{ cotizacion: Cotizacion } | { error: string }> {
   const usuario = await requireModulo("compras");
+  {
+    const bloqueada = await accionBloqueadaEnCompras("cotizacion");
+    if (bloqueada) return { error: bloqueada };
+  }
   if (!ES_ID(compraId)) return { error: "Compra no válida." };
   const sinAcceso = await sinAccesoACompras([compraId]);
   if (sinAcceso) return { error: sinAcceso };
