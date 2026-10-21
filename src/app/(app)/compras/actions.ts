@@ -18,6 +18,7 @@ import { detectarImagen } from "@/lib/seguridad/imagen";
 import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, dentroDelAlcance, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
+import { fotoDeProducto, fotosPorNombre } from "@/lib/compras/foto-producto";
 import { leerMetricasDescripcion, metricasDeTest, precioUnidad, textoLogistica, type Cotizacion, type TestParaCotizacion } from "@/lib/compras/cotizacion";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
@@ -1247,6 +1248,8 @@ export interface ItemCompra {
   cantidadRecibida: number | null;
   fechaRecepcion: string | null;
   origen: string;
+  /** La foto comercial del producto (la de Producto o la de otro con el mismo nombre). */
+  foto: string | null;
 }
 
 /** Un producto de la ficha que se puede agregar a una compra (los compuestos no: no se compran, salen de sus componentes). */
@@ -1294,15 +1297,17 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
   const [items, productos] = await Promise.all([
     supabase
       .from("wms_compra_items")
-      .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre)")
+      .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre, foto_url)")
       .eq("compra_id", compraId)
       .order("creado_en"),
     cargarProductosComprables(supabase),
   ]);
   if (items.error || !productos) return { error: "No se pudieron cargar los productos." };
+  // La foto comercial de cada línea: la de su producto o, si no tiene, la de otro producto con el mismo nombre.
+  const porNombre = fotosPorNombre(productos.map((p) => ({ nombre: p.nombre, foto: p.foto_url ?? null })));
   return {
     items: (items.data ?? []).map((i) => {
-      const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string } | null;
+      const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string; foto_url: string | null } | null;
       return {
         id: i.id,
         skuId: i.sku_maestro_id,
@@ -1314,6 +1319,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
         cantidadRecibida: i.cantidad_recibida,
         fechaRecepcion: i.fecha_recepcion,
         origen: i.origen,
+        foto: sku ? fotoDeProducto({ nombre: sku.nombre, foto: sku.foto_url }, porNombre) : null,
       };
     }),
     productos: productos.map(aProductoComprable),

@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { getUsuarioActual } from "@/lib/auth";
 import { filtrarPaises, puedeVerPais } from "@/lib/paises-permitidos";
+import { productoDeCompra } from "@/lib/compras/foto-producto";
+import { cargarFotosDeProductos, type FotosDeProductos } from "@/lib/compras/fotos-productos-datos";
 import type { FilaCompra } from "./def-compras";
 import { SIN_RESTRICCIONES, dentroDelAlcance, enmascarar, restriccionesDe, type RestriccionesCompras } from "./permisos-compras";
 
@@ -10,22 +12,37 @@ import { SIN_RESTRICCIONES, dentroDelAlcance, enmascarar, restriccionesDe, type 
 export const COOKIE_VISTA_COMPRAS = "compras-vista";
 
 const COLUMNAS =
-  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, asignado_a, creado_por, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))";
+  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, asignado_a, creado_por, descripcion, url_producto, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, sku_maestro_id, skus_maestros(codigo, nombre))";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? null) : ((r as T) ?? null));
 const txt = (v: unknown) => (v as string | null) ?? null;
 
 /** Los productos vinculados a una compra, en el orden en que se agregaron. */
-function lineasDe(items: unknown, categorias: Map<string, string>): Pick<FilaCompra, "productos" | "lineas"> {
-  const filas = ((items as { cantidad_pedida: number; creado_en: string; skus_maestros: unknown }[] | null) ?? [])
+function lineasDe(items: unknown, categorias: Map<string, string>, fotos: Map<string, string>): Pick<FilaCompra, "productos" | "lineas"> {
+  const filas = ((items as { cantidad_pedida: number; creado_en: string; sku_maestro_id: string; skus_maestros: unknown }[] | null) ?? [])
     .slice()
     .sort((a, b) => a.creado_en.localeCompare(b.creado_en));
   const lineas = filas.map((i) => {
     const sku = uno<{ codigo: string; nombre: string }>(i.skus_maestros);
-    return { codigo: sku?.codigo ?? "", nombre: sku?.nombre ?? "", cantidad: Number(i.cantidad_pedida), categoria: categorias.get(sku?.codigo ?? "") ?? null };
+    return {
+      codigo: sku?.codigo ?? "",
+      nombre: sku?.nombre ?? "",
+      cantidad: Number(i.cantidad_pedida),
+      categoria: categorias.get(sku?.codigo ?? "") ?? null,
+      foto: fotos.get(i.sku_maestro_id) ?? null,
+    };
   });
   return { productos: lineas.length, lineas };
+}
+
+/** La foto comercial de la compra (la de Producto): la de su primer producto con foto o, sin productos, la del producto con su
+ * mismo nombre. La foto real del proveedor es otra (`fotoUrl`). */
+function conFotoComercial(nombre: string, l: Pick<FilaCompra, "productos" | "lineas">, fotos: FotosDeProductos): Pick<FilaCompra, "productos" | "lineas" | "fotoComercial"> {
+  const deLinea = l.lineas.find((x) => x.foto)?.foto ?? null;
+  if (deLinea || l.lineas.length) return { ...l, fotoComercial: deLinea };
+  const parecido = nombre ? productoDeCompra(nombre, null, fotos.indice) : null;
+  return { ...l, fotoComercial: parecido ? (fotos.porId.get(parecido.id) ?? null) : null };
 }
 
 export interface DatosCompras {
@@ -83,6 +100,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
   // otra: compras → comentarios → categorías).
   const inconvenientesP = cargarInconvenientes();
   const categoriasP = cargarCategoriasPorSku();
+  const fotosP = cargarFotosDeProductos(supabase);
   const paisesP = supabase.from("paises").select("id, codigo, nombre").order("nombre");
   // Solo los países que la persona puede ver (y Importadora si la tiene): lo demás no se pide a la base.
   const usuario = await getUsuarioActual();
@@ -114,7 +132,11 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
     error = true;
   }
 
-  const [inconvenientes, categorias] = error ? [new Map<string, string>(), new Map<string, string>()] : await Promise.all([inconvenientesP, categoriasP]);
+  const [inconvenientes, categorias, fotos] = await Promise.all([
+    error ? new Map<string, string>() : inconvenientesP,
+    error ? new Map<string, string>() : categoriasP,
+    fotosP,
+  ]);
 
   // Qué compras alcanza: todas, o solo las asignadas o creadas por la persona (lo decide su rol en Usuarios y roles › Afinar).
   const alcanzadas = usuario
@@ -168,7 +190,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       cerradoEn: txt(c.cerrado_en),
       creadoEn: String(c.creado_en),
       numero: Number(c.numero),
-      ...lineasDe(c.wms_compra_items, categorias),
+      ...conFotoComercial(String(c.nombre ?? ""), lineasDe(c.wms_compra_items, categorias, fotos.porId), fotos),
     }, restricciones);
   });
 

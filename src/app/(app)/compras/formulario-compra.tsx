@@ -14,8 +14,9 @@ import { conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, VIAS_ENVIO, typ
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { CampoFoto } from "@/components/ui/campo-foto";
+import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { Campo } from "@/components/ui/campo-ficha";
-import { fieldClass } from "@/components/ui/field";
+import { fieldClass, labelClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { CampoLista } from "./campo-lista";
@@ -250,6 +251,26 @@ export function FormularioCompra({
               </Campo>
             </CampoGobernado>
           </div>
+          {/* La foto comercial (la del producto en Producto, solo se ve) al lado de la foto real que manda el proveedor. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {editando && (
+              <div className="flex flex-col gap-1">
+                <span className={labelClass}>Foto comercial</span>
+                <FotoAmpliable url={compra?.fotoComercial ?? null} nombre={compra?.lineas[0]?.nombre ?? "el producto"} tam="h-16 w-16" />
+              </div>
+            )}
+            <CampoFoto
+              nombreCampo="foto_url"
+              etiqueta="Foto real del producto"
+              valorInicial={compra?.fotoUrl ?? null}
+              alCambiarSubiendo={setSubiendoFoto}
+              prepararSubida={prepararSubidaFotoCompra}
+              subirDesdeUrl={subirFotoCompraDesdeUrl}
+              // Al crear, la imagen se suelta en cualquier parte del panel; en la ficha, sobre el cuadro (los comentarios
+              // también reciben archivos).
+              soltarEnTodo={!editando}
+            />
+          </div>
           {productos && (
             // Los productos viven dentro del formulario solo en el espacio: guardan solos (cada campo, al salir de él), así que
             // lo que se escribe aquí no cuenta como «cambios sin guardar» de la compra y Enter no la envía.
@@ -296,17 +317,6 @@ export function FormularioCompra({
           <Campo etiqueta="Descripción" id="campo-descripcion-compra">
             <textarea id="campo-descripcion-compra" name="descripcion" rows={4} defaultValue={compra?.descripcion ?? ""} className={`${fieldClass} resize-y`} />
           </Campo>
-          <CampoFoto
-            nombreCampo="foto_url"
-            etiqueta="Foto real del producto"
-            valorInicial={compra?.fotoUrl ?? null}
-            alCambiarSubiendo={setSubiendoFoto}
-            prepararSubida={prepararSubidaFotoCompra}
-            subirDesdeUrl={subirFotoCompraDesdeUrl}
-            // Al crear, la imagen se suelta en cualquier parte del panel; en la ficha, sobre el cuadro (los comentarios
-            // también reciben archivos).
-            soltarEnTodo={!editando}
-          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CampoGobernado clave="etapa">
               <Campo etiqueta={conEmoji("etapa", "Etapa")} id="campo-etapa" obligatorio faltante={faltante}>

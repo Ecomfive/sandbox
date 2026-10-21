@@ -212,23 +212,26 @@ function columnas(
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("foto", "Foto", {
       ...resto,
-      render: (c) =>
-        c.fotoUrl ? (
+      // La foto comercial (la de Producto); sin ella, la foto real que subió el proveedor.
+      render: (c) => {
+        const foto = c.fotoComercial ?? c.fotoUrl;
+        return foto ? (
           <TarjetaEmergente
             clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
             contenido={
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={c.fotoUrl} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
+              <img src={foto} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
             }
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.fotoUrl} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+            <img src={foto} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
           </TarjetaEmergente>
         ) : (
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
             <AdjuntoIcon className="h-3.5 w-3.5" />
           </div>
-        ),
+        );
+      },
     }),
     col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),

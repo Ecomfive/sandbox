@@ -972,6 +972,12 @@ convenciones técnicas del código.
   (modernos por su carpeta interna del ZIP; viejos por el contenedor OLE + extensión), CSV y texto (sin bytes nulos ni HTML), hasta
   25 MB (`detectarAdjunto(bytes, nombre)`); el servidor vuelve a guardar el archivo con el tipo de su contenido (un texto se sirve
   como `text/plain`, nunca como página).
+  **Foto comercial y foto real** (21 oct 2026): la foto comercial es la del producto en Producto; la foto real (`foto_url`,
+  «Foto real del producto») es la que manda el proveedor. `FilaCompra.fotoComercial` = la de su primer producto con foto o, sin
+  productos, la del producto con su mismo nombre (`productoDeCompra`); cada línea trae la suya (`lineas[].foto`, `ItemCompra.foto`:
+  la del producto o la de otro con el mismo nombre, `fotoDeProducto`). Lógica pura en `src/lib/compras/foto-producto.ts` (con
+  prueba) y carga en `cargarFotosDeProductos` (`fotos-productos-datos.ts`). La columna «Foto» de la lista muestra la comercial (o la
+  real si no hay); la ficha pone «Foto comercial» (solo se ve) al lado de «Foto real del producto», arriba de los productos.
   **Productos en la ficha:** el bloque «Productos» (`productos-compra.tsx`, solo compras de país) va **dentro del formulario**,
   en el bloque «Compra» justo debajo de Etiquetas (`FormularioCompra` recibe `productos` y `FichaCompra` se lo
   pasa con `incrustado`). Como está dentro del `<form>` pero guarda por su cuenta (cada campo, al salir de él), su contenedor

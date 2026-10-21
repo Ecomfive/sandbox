@@ -7,7 +7,10 @@ export interface FilaCompra {
   /** Cuántos productos de la ficha tiene vinculados (las compras de ClickUp llegan sin ninguno y se vinculan a mano). */
   productos: number;
   /** Los productos vinculados, con lo pedido de cada uno. */
-  lineas: { codigo: string; nombre: string; cantidad: number; categoria?: string | null }[];
+  lineas: { codigo: string; nombre: string; cantidad: number; categoria?: string | null; foto?: string | null }[];
+  /** La foto comercial: la del producto en Producto (la de su primer producto con foto o, sin productos, la del producto con
+   * su mismo nombre). Es la que se ve en la lista; la foto real del proveedor es `fotoUrl`. */
+  fotoComercial: string | null;
   /** 'pais' (compra nuestra de un país) o 'importacion' (Compras Importadora: servicio a un cliente, sin país). */
   tipo: string;
   /** Código del país de la compra (null en Importadora). */
