@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { deClickup, ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, idsDropi, leerTareaGcc, margenBajo, revisionVencida, UBICACIONES, type TareaClickup } from "./publicacion";
+import { deClickup, ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, idsDropi, leerTareaGcc, margenBajo, numeroPublicacion, revisionVencida, UBICACIONES, type TareaClickup } from "./publicacion";
 
 test("deClickup: reconoce lo de ClickUp sin importar emojis, acentos ni espacios", () => {
   assert.equal(deClickup(ESTADOS_VENTA, "Más Vendidos✅ +500"), "mas_vendidos");
@@ -77,4 +77,11 @@ test("margenBajo: bajo el 30 %; sin margen calculado no cuenta", () => {
   assert.equal(margenBajo(0.3), false);
   assert.equal(margenBajo(0.55), false);
   assert.equal(margenBajo(null), false);
+});
+
+test("numeroPublicacion: PUB- con cuatro cifras; sin número, un guion", () => {
+  assert.equal(numeroPublicacion(7), "PUB-0007");
+  assert.equal(numeroPublicacion(1234), "PUB-1234");
+  assert.equal(numeroPublicacion(12345), "PUB-12345");
+  assert.equal(numeroPublicacion(null), "—");
 });

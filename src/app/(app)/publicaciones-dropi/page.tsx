@@ -32,7 +32,7 @@ export default async function PublicacionesDropiPage() {
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
   // Las ventas de Dropi (Desempeño › Ventas Dropi) solo las ve un administrador, por ahora.
   const admin = esAdministrador(usuario);
-  const [filasR, perfilesR] = await Promise.all([
+  const [filasR, perfilesR, numerosR] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
         .from("dropi_publicaciones")
@@ -44,7 +44,10 @@ export default async function PublicacionesDropiPage() {
         .range(desde, hasta),
     ),
     supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre"),
+    // El correlativo va aparte: sin la migración 0123 la columna no existe y la lista se carga igual, sin números.
+    traerTodasConError<{ id: string; numero: number }>((desde, hasta) => supabase.from("dropi_publicaciones").select("id, numero").eq("pais_id", pais.id).order("id").range(desde, hasta)),
   ]);
+  const numeroPorId = new Map(numerosR.error ? [] : (numerosR.data ?? []).map((n) => [n.id, Number(n.numero)]));
 
   if (filasR.error) {
     return (
@@ -77,6 +80,7 @@ export default async function PublicacionesDropiPage() {
     const proxima = (d.proxima_revision as string | null) ?? null;
     return {
       id: d.id,
+      numero: numeroPorId.get(d.id) ?? null,
       nombre: d.nombre as string,
       dropiId: (d.dropi_id as string | null) ?? "",
       estado,
