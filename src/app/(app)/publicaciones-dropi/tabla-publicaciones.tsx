@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
@@ -11,6 +12,7 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
 import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
+import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { FichaPublicacion, type Persona } from "./ficha-publicacion";
 
 const NOMBRE: NombreFilas = { singular: "publicación", plural: "publicaciones" };
@@ -25,6 +27,7 @@ const ICONOS: Record<string, IconoComp> = {
   privatizado: PersonaIcon,
   responsable: PersonaIcon,
   competencia: EstadoIcon,
+  vinculo: ProductoIcon,
   nombre: ProductoIcon,
   precio: MargenIcon,
   margen: MargenIcon,
@@ -57,6 +60,29 @@ const COLUMNAS: ColumnaTabla<FilaPublicacion>[] = [
         </span>
       </span>
     ),
+  },
+  {
+    id: "sku",
+    label: "SKU",
+    ocultable: true,
+    descripcion: "El producto de Producto vinculado. Si no hay, la sugerencia (se confirma en la ficha).",
+    render: (f) =>
+      f.sku ? (
+        <span className="flex min-w-[9rem] flex-col">
+          <span className="font-mono text-xs font-semibold">{f.sku.codigo}</span>
+          <span className="truncate text-xs text-muted-foreground">{f.sku.tipo === "combo" ? "Compuesto" : "Simple"}</span>
+        </span>
+      ) : f.sugerencia && f.sugerencia.tipo !== "ninguno" ? (
+        <span className="flex min-w-[9rem] flex-col">
+          <span className="inline-flex items-center gap-1.5 text-xs">
+            <Punto clase="bg-warning" texto="Sin vincular" />
+            {ETIQUETA_SUGERENCIA[f.sugerencia.tipo]}
+          </span>
+          <span className="truncate font-mono text-xs text-muted-foreground">{f.sugerencia.tipo === "varios" ? `${f.sugerencia.alternativas.length} posibles` : (f.sugerencia.sku?.codigo ?? "")}</span>
+        </span>
+      ) : (
+        <span className="text-xs text-muted-foreground">Sin SKU</span>
+      ),
   },
   { id: "estado", label: "Estado", ocultable: true, render: (f) => pastilla(ESTADOS, f.estado) },
   { id: "venta", label: "Venta", ocultable: true, render: (f) => pastilla(ESTADOS_VENTA, f.estadoVenta) },
@@ -123,12 +149,14 @@ const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS, vent
 /** La lista de publicaciones del país con la barra de herramientas común y «Agregar». Toda la fila abre la ficha. */
 export function TablaPublicaciones({
   publicaciones,
+  opcionesSku,
   personas,
   paisId,
   codigoPais,
   puedeEscribir,
 }: {
   publicaciones: FilaPublicacion[];
+  opcionesSku: OpcionSkuMaestro[];
   personas: Persona[];
   paisId: string;
   codigoPais: string;
@@ -138,7 +166,7 @@ export function TablaPublicaciones({
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
   return (
-    <>
+    <ProveedorSkusMaestros opciones={opcionesSku}>
       <TablaDatos
         def={DEF_PUBLICACIONES}
         filas={publicaciones}
@@ -172,6 +200,6 @@ export function TablaPublicaciones({
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}
       />
-    </>
+    </ProveedorSkusMaestros>
   );
 }

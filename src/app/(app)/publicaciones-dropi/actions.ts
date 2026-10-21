@@ -178,3 +178,38 @@ export async function obtenerHistorialPublicacion(id: string): Promise<{ eventos
   if (error) return { error: "No se pudo cargar la actividad." };
   return { eventos: (data ?? []).map((e) => ({ id: e.id, evento: formatearEventoAuditoria(e), creadoEn: e.creado_en })) };
 }
+
+/**
+ * Vincula la publicación con un producto de Producto (o quita el vínculo, con `null`). Queda en la actividad. Devuelve el error
+ * como valor.
+ */
+export async function vincularSkuPublicacion(id: string, skuId: string | null): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  const supabase = createServiceClient();
+  let nuevo: { codigo: string; nombre: string } | null = null;
+  if (skuId !== null) {
+    if (!UUID.test(skuId)) return { error: "Producto no válido." };
+    const { data } = await supabase.from("skus_maestros").select("codigo, nombre").eq("id", skuId).maybeSingle();
+    if (!data) return { error: "Ese producto ya no existe en Producto." };
+    nuevo = data;
+  }
+  if ((antes.sku_maestro_id ?? null) === skuId) return {};
+  let previo = "Sin vincular";
+  if (antes.sku_maestro_id) {
+    const { data } = await supabase.from("skus_maestros").select("codigo, nombre").eq("id", antes.sku_maestro_id as string).maybeSingle();
+    if (data) previo = `${data.codigo} · ${data.nombre}`;
+  }
+  const { error } = await supabase.from("dropi_publicaciones").update({ sku_maestro_id: skuId, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudo guardar el vínculo." };
+  await registrarAuditoria({
+    accion: skuId ? "vincular_sku_publicacion" : "desvincular_sku_publicacion",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    antes: { Producto: previo },
+    despues: { Producto: nuevo ? `${nuevo.codigo} · ${nuevo.nombre}` : "Sin vincular" },
+  });
+  revalidatePath(RUTA);
+  return {};
+}

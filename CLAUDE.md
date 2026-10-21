@@ -409,7 +409,14 @@ convenciones técnicas del código.
   `npx tsx scripts/importar-publicaciones-dropi.ts --aplicar` (por `clickup_id`, se puede repetir; copia la foto a
   `wms-productos/publicaciones/<id>/`; responsables por nombre). El campo «ID» de ClickUp es el ID de Dropi: 177 de los 178 productos
   públicos de ECOMFIVE en el catálogo de Análisis de competencia (14 oct) están en la lista. «%», «URL» y «Países» de ClickUp no se
-  traen (el % es el margen escrito a mano; los otros dos están vacíos).
+  traen (el % es el margen escrito a mano; los otros dos están vacíos). **Vincular los SKU** (migración 0117, `foto_huella`): las reglas
+  viven en `src/lib/publicaciones/vincular.ts` (con prueba). `sugerirSku`: exacta si el código o el nombre de un producto es idéntico al de
+  la publicación (o al del catálogo de Dropi con su ID, `competencia_productos`); si no, el cruce de Testing Lab (`todasLasCoincidencias`,
+  nombre o foto). Un pack (`detectarPack`: «PACK 2», «2x1», «x2») va al **compuesto** de un solo simple con esa cantidad
+  (`sku_maestro_componentes`); si no existe, «Falta el compuesto» (nunca al simple: descontaría mal). Un «combo» solo busca entre
+  compuestos. La página calcula las sugerencias al cargar (`cargarSugerencias`, `src/lib/publicaciones/sugerencias.ts`); la ficha las
+  confirma con `vincularSkuPublicacion` («Vincular y siguiente»), con `CampoSkuMaestro` para elegir otro. Las exactas se vinculan con
+  `npx tsx scripts/vincular-skus-publicaciones.ts --aplicar` (también calcula las huellas que falten; actividad «Vínculo automático»).
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,
