@@ -80,6 +80,7 @@ export function TablaPublicaciones({
               setOrden(enOrden.map((x) => x.id));
               setAbierta(f.id);
             }}
+            alEliminar={puedeEliminar ? () => setAbierta((a) => (a === f.id ? null : a)) : undefined}
           />
         )}
         etiquetaGrupo={(campo, grupo) => {

@@ -1,12 +1,15 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
-import type { ReactNode } from "react";
+import { useTransition, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
-import { ChevronRightIcon } from "@/lib/nav-icons";
+import { useToast } from "@/components/ui/toast";
+import { Tooltip } from "@/components/ui/tooltip";
+import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, UBICACIONES, margenBajo, opcion } from "@/lib/publicaciones/publicacion";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
+import { eliminarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
@@ -35,17 +38,47 @@ function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: st
   );
 }
 
+/** «Eliminar» de la fila (solo un administrador): pide confirmación y borra la publicación de verdad. */
+function BotonEliminarFila({ f, alEliminar }: { f: FilaPublicacion; alEliminar: () => void }) {
+  const { mostrarToast } = useToast();
+  const [pendiente, empezar] = useTransition();
+  function eliminar() {
+    if (!confirm(`¿Eliminar "${f.nombre}"? No se puede deshacer.`)) return;
+    empezar(async () => {
+      const r = await eliminarPublicacion(f.id).catch(() => ({ error: "No se pudo eliminar. Inténtalo de nuevo." }));
+      if (r.error) mostrarToast(r.error, "destructive");
+      else {
+        mostrarToast("Publicación eliminada");
+        alEliminar();
+      }
+    });
+  }
+  return (
+    <Tooltip texto="Eliminar publicación">
+      <button
+        type="button"
+        onClick={eliminar}
+        disabled={pendiente}
+        aria-label={`Eliminar la publicación ${f.nombre}`}
+        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive disabled:opacity-50 ${anilloFoco}`}
+      >
+        <PapeleraIcon className="h-4 w-4" />
+      </button>
+    </Tooltip>
+  );
+}
+
 /**
  * Una publicación como fila de la lista: foto, nombre con su ID y su SKU, estado, precio, utilidad y margen, dónde está,
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
  */
-export function FilaPublicacionLista({ f, alAbrir }: { f: FilaPublicacion; alAbrir: () => void }) {
+export function FilaPublicacionLista({ f, alAbrir, alEliminar }: { f: FilaPublicacion; alAbrir: () => void; alEliminar?: () => void }) {
   const estado = opcion(ESTADOS, f.estado);
   const venta = opcion(ESTADOS_VENTA, f.estadoVenta);
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
   const reposicion = opcion(ESTADOS_REPOSICION, f.estadoReposicion);
   const sugerida = !f.sku && f.sugerencia && f.sugerencia.tipo !== "ninguno" ? f.sugerencia : null;
-  return (
+  const fila = (
     <button
       type="button"
       onClick={alAbrir}
@@ -118,5 +151,13 @@ export function FilaPublicacionLista({ f, alAbrir }: { f: FilaPublicacion; alAbr
 
       <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />
     </button>
+  );
+  // Con «Eliminar» (solo un administrador) la fila es el botón que abre la ficha y, al lado, el de eliminar: un botón no va dentro de otro.
+  if (!alEliminar) return fila;
+  return (
+    <div className="flex items-center">
+      <div className="min-w-0 flex-1">{fila}</div>
+      <BotonEliminarFila f={f} alEliminar={alEliminar} />
+    </div>
   );
 }
