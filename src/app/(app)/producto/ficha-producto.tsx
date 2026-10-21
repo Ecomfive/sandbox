@@ -11,11 +11,12 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
-import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, PapeleraIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
+import { BotonAccion } from "@/components/ui/boton-accion";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
-import { cambiarClaseProducto, obtenerHistorialProducto } from "./actions";
+import { cambiarClaseProducto, eliminarProducto, obtenerHistorialProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
@@ -69,6 +70,7 @@ export function FichaProducto({
   orden,
   codigoPais,
   puedeEscribir,
+  puedeEliminar,
   referenciasTest,
   alIr,
   alCerrar,
@@ -80,6 +82,8 @@ export function FichaProducto({
   /** El producto es igual para todos los países; el código de país solo da formato a las fechas de la actividad. */
   codigoPais: string;
   puedeEscribir: boolean;
+  /** Solo un administrador: elimina el producto de verdad (si nada depende de él). */
+  puedeEliminar: boolean;
   /** El promedio de los winners: la marca negra del «Resultado del test». */
   referenciasTest: ReferenciasTest;
   alIr: (id: string) => void;
@@ -115,6 +119,20 @@ export function FichaProducto({
             : `Estado: ${ETIQUETA_CLASE[nueva]}`,
         );
         setVersion((v) => v + 1);
+      }
+    });
+  }
+
+  function eliminar() {
+    if (!producto) return;
+    if (!confirm(`¿Eliminar el producto ${producto.codigo}? No se puede deshacer.`)) return;
+    setError(null);
+    startTransition(async () => {
+      const r = await eliminarProducto(producto.id).catch(() => ({ error: "No se pudo eliminar. Inténtalo de nuevo." }));
+      if (r.error) setError(r.error);
+      else {
+        mostrarToast("Producto eliminado");
+        alCerrar();
       }
     });
   }
@@ -308,6 +326,19 @@ export function FichaProducto({
               </dl>
             </Seccion>
           </div>
+
+          {puedeEliminar && (
+            <div className="flex flex-col gap-2 px-5 pb-5">
+              <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pending} onClick={eliminar} className="w-fit">
+                {pending ? "Eliminando..." : "Eliminar"}
+              </BotonAccion>
+              {error && (
+                <p role="alert" className="m-0 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+            </div>
+          )}
 
           <HistorialGenerico id={producto.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialProducto} />
         </div>

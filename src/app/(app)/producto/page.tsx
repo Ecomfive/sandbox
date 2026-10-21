@@ -4,6 +4,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
 import { KpiGroup } from "@/components/ui/kpi-card";
 import type { Asociacion, FilaProducto, ReferenciasTest, TestProducto } from "./def-producto";
@@ -315,6 +316,7 @@ export default async function ProductoPage() {
         opcionesSimples={opcionesSimples}
         codigoPais={pais.codigo}
         puedeEscribir={!usuario.modulosSoloLectura.includes("producto")}
+        puedeEliminar={!usuario.modulosSoloLectura.includes("producto") && esAdministrador(usuario)}
         referenciasTest={referenciasTest}
       />
     </Pagina>

@@ -5,6 +5,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
+import { mensajeBloqueos } from "@/lib/wms/eliminar-producto";
 import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
@@ -230,6 +232,35 @@ async function aplicarEstado(id: string, clase: Clase, desde?: string): Promise<
 }
 
 /** El estado de un producto desde su ficha: Activo ('fisico'), Test o Inactivo. Devuelve el error como valor. */
+/**
+ * Elimina un producto de verdad (solo un administrador): la base (`wms_eliminar_producto`, migración 0125) lo borra únicamente si
+ * nada depende de él —compras, publicaciones, tests, fichas de Shopify o Dropi, variantes, movimientos, stock—; si algo lo usa,
+ * no borra nada y se dice qué lo bloquea. Un producto con historia se pasa a Inactivo o Descontinuado. Borra también su foto si
+ * ningún otro producto la usa y queda en la auditoría.
+ */
+export async function eliminarProducto(id: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("producto");
+  if (!esAdministrador(usuario)) return { error: "Solo un administrador puede eliminar productos." };
+  if (typeof id !== "string" || !/^[0-9a-fA-F-]{36}$/.test(id)) return { error: "Producto no válido." };
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("wms_eliminar_producto", { p_id: id });
+  if (error) {
+    if (error.code === "42883" || error.code === "PGRST202") return { error: "Falta correr en Supabase la migración 0125." };
+    return { error: error.message.includes("no existe") ? "El producto ya no existe." : "No se pudo eliminar el producto." };
+  }
+  const r = data as { eliminado: boolean; codigo: string; nombre: string; foto_url: string | null; bloqueos: Record<string, number> };
+  if (!r.eliminado) return { error: mensajeBloqueos(r.codigo, r.bloqueos) };
+
+  // La foto solo se borra de Storage si ningún otro producto la sigue usando.
+  if (r.foto_url && r.foto_url.startsWith(PREFIJO_FOTOS)) {
+    const { count } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("foto_url", r.foto_url);
+    if (!count) await supabase.storage.from(BUCKET_FOTOS).remove([r.foto_url.slice(PREFIJO_FOTOS.length)]);
+  }
+  await registrarAuditoria({ accion: "eliminar_producto", entidad: "skus_maestros", entidadId: id, detalle: `${r.codigo} · ${r.nombre}` });
+  revalidatePath("/producto");
+  return {};
+}
+
 export async function cambiarClaseProducto(id: string, clase: string): Promise<{ error?: string; compra?: { numero: number; codigo: string | null; pais: string } }> {
   await requireModuloEscritura(MODULO);
   if (!ES_ID(id)) return { error: "Producto no válido." };
