@@ -158,12 +158,17 @@ export function Indicador({
   valor,
   detalle,
   href,
+  alPulsar,
+  activo,
 }: {
   titulo: string;
   punto?: "aviso" | "peligro" | "exito";
   valor: string;
   detalle: ReactNode;
   href?: string;
+  /** La celda es un botón (con `aria-pressed` = `activo`): enciende o apaga un filtro de la misma página. */
+  alPulsar?: () => void;
+  activo?: boolean;
 }) {
   const contenido = (
     <>
@@ -176,6 +181,12 @@ export function Indicador({
     </>
   );
   const clase = "-mr-px -mb-px block min-w-0 flex-[1_1_10.5rem] border-r border-b border-border px-3.5 py-3 text-left";
+  if (alPulsar)
+    return (
+      <button type="button" aria-pressed={activo} onClick={alPulsar} className={`${clase} cursor-pointer hover:bg-muted ${anilloFoco} ${activo ? "bg-primario-suave" : "bg-transparent"}`}>
+        {contenido}
+      </button>
+    );
   return href ? (
     <Link href={href} className={`${clase} hover:bg-muted ${anilloFoco}`}>
       {contenido}

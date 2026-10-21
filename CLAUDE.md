@@ -903,6 +903,14 @@ convenciones técnicas del código.
   «Chin» quedaron con agente «Chin»), del mismo país y una sola vía, con fecha de envío y de llegada: histórico, últimos 12 meses
   y año en curso por la fecha de llegada (`src/lib/compras/rutas-envio.ts`, con prueba); punto rojo si el promedio de 12 meses
   pasa del máximo prometido. Quien tiene países limitados solo ve y toca las rutas de sus países.
+  **La pantalla** (21 oct 2026, rediseño aprobado con maqueta; `panel-envios.tsx`): filtros arriba (vía, agente, país, «Solo activas», «Agrupar por» país/agente/vía —se recuerda en el
+  navegador—, «Descargar» con `DEF_ENVIOS` y «Agregar ruta»), una sola barra de indicadores (`Indicador`; «Fuera de plazo» es un botón que recorta la lista) y, debajo, **una sola lista**
+  (`lista-rutas.tsx`: grupos con una fila-botón por ruta y siempre las mismas columnas —plazo, real 12 m con los últimos 2 meses, estado, «uso del plazo», envíos, tarifa—) con un panel
+  a la derecha («Para atender»: fuera de plazo de más a menos atrasada; «Falta definir el plazo»; «Agentes» con cuántas de sus rutas medidas cumplen). **Ya no hay vista de tarjetas ni
+  de tabla** (`TablaEnvios` se quitó) y la fila no lleva el interruptor de activa: eso se hace en la ficha (`FichaRuta`, que no cambió). El estado de cada ruta es texto + ícono, nunca solo
+  color (`estadoRuta`, `src/lib/compras/estado-ruta.ts`, con prueba: En plazo / Fuera de plazo / Sin medir / Sin plazo, contra el real de 12 meses o el histórico). La barra
+  (`barra-uso.tsx`, `geometriaBarra`) va de 0 a 2,2 veces el plazo máximo para que todas se comparen y la línea del máximo caiga siempre en el mismo sitio: franja verde = plazo
+  prometido, barra oscura = lo que tardó, rayas rojas = lo que se pasó. Los indicadores y el panel de la derecha respetan los filtros de la barra pero no «Fuera de plazo».
   **Tiendas con color y nombre editable** (migración 0091, `wms_compras_tiendas`, como `wms_compras_etiquetas`; las que existían
   arrancan con colores distintos): `tiendas.tsx` da el contexto `ProveedorTiendas` (lo pone `TablaCompras`) con `colorDe`,
   `cambiarColor` (`guardarColorTienda`) y `renombrar` (`renombrarTienda`: cambia el nombre en todas las compras de todos los
