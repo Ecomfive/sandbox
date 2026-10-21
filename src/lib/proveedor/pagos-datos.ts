@@ -40,16 +40,14 @@ export async function cargarPagosProveedor(supabase: SupabaseClient, proveedorId
     const destino = p.pedido_id ? (pagosPorPedido[p.pedido_id as string] ??= { anticipo: [], saldo: [] }) : (pagosPorHistorial[p.historial_id as string] ??= { anticipo: [], saldo: [] });
     destino[p.cuota as TipoCuota].push({ monto: Number(p.monto), fecha: p.fecha as string });
   }
-  const llegadaHoja: Record<string, string> = {};
-  const conHoja: string[] = [];
+  const hojaPorPedido: DatosPagos["hojaPorPedido"] = {};
   const historialSuelto: HistorialSuelto[] = [];
   let ultimaHoja: string | null = null;
   for (const h of historial.data ?? []) {
     const envio = h.fecha_envio as string;
     if (!ultimaHoja || envio > ultimaHoja) ultimaHoja = envio;
     if (h.pedido_id) {
-      conHoja.push(h.pedido_id as string);
-      if (h.fecha_llegada) llegadaHoja[h.pedido_id as string] = h.fecha_llegada as string;
+      hojaPorPedido[h.pedido_id as string] = { monto: Number(h.monto_total), anticipo: Number(h.anticipo_monto), llegada: (h.fecha_llegada as string | null) ?? null };
       continue;
     }
     historialSuelto.push({
@@ -81,5 +79,5 @@ export async function cargarPagosProveedor(supabase: SupabaseClient, proveedorId
       producto: ((c.proveedor_pedidos as { producto: string } | null)?.producto as string) ?? "—",
     })),
   }));
-  return { datos: { pagosPorPedido, llegadaHoja, conHoja, historialSuelto, ultimaHoja }, avisos: listaAvisos };
+  return { datos: { pagosPorPedido, hojaPorPedido, historialSuelto, ultimaHoja }, avisos: listaAvisos };
 }

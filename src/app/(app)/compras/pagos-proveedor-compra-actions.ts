@@ -32,7 +32,7 @@ export async function obtenerPagosProveedorCompra(compraId: string): Promise<Pag
   if (!prov) return null;
   const [pagos, historial, avisadas] = await Promise.all([
     supabase.from("proveedor_pagos").select("cuota, monto, fecha").eq("pedido_id", p.id),
-    supabase.from("proveedor_historial").select("fecha_llegada").eq("pedido_id", p.id).maybeSingle(),
+    supabase.from("proveedor_historial").select("fecha_llegada, monto_total, anticipo_monto").eq("pedido_id", p.id).maybeSingle(),
     supabase.from("proveedor_aviso_cuotas").select("cuota, proveedor_avisos_pago!inner(estado)").eq("pedido_id", p.id).eq("proveedor_avisos_pago.estado", "avisado"),
   ]);
   if (pagos.error) return null;
@@ -41,10 +41,11 @@ export async function obtenerPagosProveedorCompra(compraId: string): Promise<Pag
   const enAviso = new Set((avisadas.data ?? []).map((x) => x.cuota as string));
   const cuotas = cuotasDe(
     {
-      montoTotal: p.monto_total == null ? null : Number(p.monto_total),
+      // Si vino en la hoja de Chin, manda el total y el anticipo que él facturó.
+      montoTotal: historial.data ? Number(historial.data.monto_total) : p.monto_total == null ? null : Number(p.monto_total),
       fechaEnvio: p.fecha_envio as string,
       fechaLlegada: (p.fecha_llegada as string | null) ?? (historial.data?.fecha_llegada as string | null) ?? null,
-      anticipoMonto: p.anticipo_monto == null ? null : Number(p.anticipo_monto),
+      anticipoMonto: historial.data ? Number(historial.data.anticipo_monto) : p.anticipo_monto == null ? null : Number(p.anticipo_monto),
       pagosAnticipo: de("anticipo"),
       pagosSaldo: de("saldo"),
     },

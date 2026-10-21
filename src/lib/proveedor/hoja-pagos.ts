@@ -81,6 +81,9 @@ function pagosDe(montos: string | undefined, cuando: string | undefined, porDefe
 /** Las filas de una hoja de pagos. */
 export function leerHojaPagos(texto: string): FilaHoja[] {
   const filas: FilaHoja[] = [];
+  // Lo que la hoja dice que falta del anticipo («Unpaid Amount»), para ajustar al final (las partes pueden venir en filas de abajo).
+  const faltaAnticipo = new Map<FilaHoja, number>();
+  const saldoHoja = new Map<FilaHoja, { fechas: string[]; falta: number }>();
   for (const r of leerCsv(texto).slice(1)) {
     const producto = (r[0] ?? "").replace(/\s+/g, " ").trim();
     // Una fila sin producto con un monto pagado es otra parte del anticipo de la fila de arriba.
@@ -102,7 +105,22 @@ export function leerHojaPagos(texto: string): FilaHoja[] {
     const pagadoSaldo = fechas(r[11]);
     const falta = numero(r[9]);
     const pagosSaldo: Pago[] = saldo > 0 && pagadoSaldo.length && falta < saldo ? [{ monto: redondear(saldo - falta), fecha: pagadoSaldo.at(-1)! }] : [];
-    filas.push({ producto, unidades: numero(r[1]) || null, monto, anticipo, fechaEnvio: envio, fechaLlegada: fechas(r[10]).at(-1) ?? null, pagosAnticipo, pagosSaldo });
+    const fila: FilaHoja = { producto, unidades: numero(r[1]) || null, monto, anticipo, fechaEnvio: envio, fechaLlegada: fechas(r[10]).at(-1) ?? null, pagosAnticipo, pagosSaldo };
+    filas.push(fila);
+    faltaAnticipo.set(fila, numero(r[7]));
+    saldoHoja.set(fila, { fechas: pagadoSaldo, falta });
+  }
+  // Si la hoja dice que no falta nada del anticipo pero lo pagado es menos que la columna «Dowm payment» (un anticipo mal escrito, p.
+  // ej. el total en vez de la mitad), manda lo pagado: el anticipo fue eso y el resto es saldo.
+  for (const f of filas) {
+    const pagado = redondear(f.pagosAnticipo.reduce((s, p) => s + p.monto, 0));
+    if (faltaAnticipo.get(f) === 0 && pagado > 0 && pagado < f.anticipo - 1) {
+      f.anticipo = pagado;
+      // El saldo crece; se paga según lo que dice la hoja del saldo (su fecha de pago y lo que falta).
+      const s = saldoHoja.get(f)!;
+      const saldo = redondear(f.monto - pagado);
+      f.pagosSaldo = s.fechas.length && s.falta < saldo ? [{ monto: redondear(saldo - s.falta), fecha: s.fechas.at(-1)! }] : [];
+    }
   }
   return filas;
 }

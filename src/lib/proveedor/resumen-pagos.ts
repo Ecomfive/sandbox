@@ -50,10 +50,11 @@ export interface EnvioConCuotas {
 
 export interface DatosPagos {
   pagosPorPedido: Record<string, PagosDe>;
-  /** La llegada que dice la hoja de Chin, si la compra no la tiene. */
-  llegadaHoja: Record<string, string>;
-  /** Los pedidos que salieron de la hoja (sus pagos se conocen). */
-  conHoja: string[];
+  /**
+   * Lo que dice la hoja de Chin de los pedidos que vinieron en ella (sus pagos se conocen): el total y el anticipo que facturó (manda
+   * sobre el total de la compra, que a veces difiere en unos dólares) y la llegada, si la compra no la tiene.
+   */
+  hojaPorPedido: Record<string, { monto: number; anticipo: number; llegada: string | null }>;
   historialSuelto: HistorialSuelto[];
   /** El envío más reciente de las hojas: lo que salió después se controla solo con los avisos del portal. */
   ultimaHoja: string | null;
@@ -65,14 +66,15 @@ export interface DatosPagos {
  * pagó y saldría vencido sin estarlo.
  */
 export function enviosConCuotas(pedidos: PedidoConPagos[], datos: DatosPagos, porcentajeAnticipo: number, diasAnticipo: number): EnvioConCuotas[] {
-  const conHoja = new Set(datos.conHoja);
   const vacio: PagosDe = { anticipo: [], saldo: [] };
   const envios: EnvioConCuotas[] = [];
   for (const p of pedidos) {
-    if (!p.fechaEnvio || !p.montoTotal) continue;
-    if (!conHoja.has(p.id) && datos.ultimaHoja && p.fechaEnvio <= datos.ultimaHoja) continue;
+    const hoja = datos.hojaPorPedido[p.id];
+    const montoTotal = hoja?.monto ?? p.montoTotal;
+    if (!p.fechaEnvio || !montoTotal) continue;
+    if (!hoja && datos.ultimaHoja && p.fechaEnvio <= datos.ultimaHoja) continue;
     const pagos = datos.pagosPorPedido[p.id] ?? vacio;
-    const fechaLlegada = p.fechaLlegada ?? datos.llegadaHoja[p.id] ?? null;
+    const fechaLlegada = p.fechaLlegada ?? hoja?.llegada ?? null;
     envios.push({
       clave: p.id,
       pedidoId: p.id,
@@ -82,8 +84,8 @@ export function enviosConCuotas(pedidos: PedidoConPagos[], datos: DatosPagos, po
       fotoReferencia: p.fotoReferencia,
       fechaEnvio: p.fechaEnvio,
       fechaLlegada,
-      montoTotal: p.montoTotal,
-      cuotas: cuotasDe({ montoTotal: p.montoTotal, fechaEnvio: p.fechaEnvio, fechaLlegada, anticipoMonto: p.anticipoMonto, pagosAnticipo: pagos.anticipo, pagosSaldo: pagos.saldo }, porcentajeAnticipo, diasAnticipo),
+      montoTotal,
+      cuotas: cuotasDe({ montoTotal, fechaEnvio: p.fechaEnvio, fechaLlegada, anticipoMonto: hoja?.anticipo ?? p.anticipoMonto, pagosAnticipo: pagos.anticipo, pagosSaldo: pagos.saldo }, porcentajeAnticipo, diasAnticipo),
     });
   }
   for (const h of datos.historialSuelto) {

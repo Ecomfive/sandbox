@@ -104,6 +104,8 @@ export async function cancelarAvisoPago(avisoId: string): Promise<{ error?: stri
   const { error } = await supabase.from("proveedor_avisos_pago").delete().eq("id", avisoId).eq("estado", "avisado");
   if (error) return { error: "No se pudo cancelar el aviso." };
   if (data.comprobante_ruta) await supabase.storage.from(BUCKET_PROVEEDOR).remove([data.comprobante_ruta as string]);
+  const prov = await proveedorActivo();
+  if (prov) await supabase.from("proveedor_novedades").insert({ proveedor_id: prov.id, lado: "ecomfive", tipo: "pago", texto: `Ecomfive canceló el aviso de pago de $${data.monto}${data.referencia ? ` (${data.referencia})` : ""}`, autor_nombre: usuario.nombre });
   await registrarAuditoria({ accion: "editar_campo_compra", entidad: "proveedor_avisos_pago", entidadId: avisoId, detalle: `Canceló el aviso de pago de $${data.monto}${data.referencia ? ` (${data.referencia})` : ""} (${usuario.nombre})` });
   return {};
 }
