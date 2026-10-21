@@ -31,11 +31,6 @@ import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { VinculoSku } from "./vinculo-sku";
 
-export interface Persona {
-  id: string;
-  nombre: string;
-}
-
 interface Formulario {
   nombre: string;
   dropi_id: string;
@@ -128,7 +123,6 @@ function Selector({ valor, lista, cambiar, nombre, vacio = "—" }: { valor: str
  */
 export function FichaPublicacion({
   publicacion,
-  personas,
   codigoPais,
   nombrePais,
   puedeEscribir,
@@ -139,7 +133,6 @@ export function FichaPublicacion({
   alCerrar,
 }: {
   publicacion: FilaPublicacion | undefined;
-  personas: Persona[];
   codigoPais: string;
   nombrePais: string;
   puedeEscribir: boolean;
@@ -156,7 +149,6 @@ export function FichaPublicacion({
     <ContenidoFicha
       key={JSON.stringify(desde(publicacion)) + publicacion.id}
       p={publicacion}
-      personas={personas}
       codigoPais={codigoPais}
       nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
@@ -171,7 +163,6 @@ export function FichaPublicacion({
 
 function ContenidoFicha({
   p,
-  personas,
   codigoPais,
   nombrePais,
   puedeEscribir,
@@ -182,7 +173,6 @@ function ContenidoFicha({
   alCerrar,
 }: {
   p: FilaPublicacion;
-  personas: Persona[];
   codigoPais: string;
   nombrePais: string;
   puedeEscribir: boolean;
@@ -478,17 +468,6 @@ function ContenidoFicha({
                   {d.ultima_revision ? masDias(d.ultima_revision, DIAS_REVISION) : "Sin revisar"}
                 </span>
               </div>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Responsable</span>
-                <select value={d.responsable_id} onChange={(e) => cambiar({ responsable_id: e.target.value })} className={`${fieldClass} w-full`}>
-                  <option value="">Sin responsable</option>
-                  {personas.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
             <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Notas</span>

@@ -32,7 +32,7 @@ export default async function PublicacionesDropiPage() {
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
   // Las ventas de Dropi (Desempeño › Ventas Dropi) solo las ve un administrador, por ahora.
   const admin = esAdministrador(usuario);
-  const [filasR, perfilesR, numerosR] = await Promise.all([
+  const [filasR, numerosR] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
         .from("dropi_publicaciones")
@@ -43,7 +43,6 @@ export default async function PublicacionesDropiPage() {
         .order("nombre")
         .range(desde, hasta),
     ),
-    supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre"),
     // El correlativo va aparte: sin la migración 0123 la columna no existe y la lista se carga igual, sin números.
     traerTodasConError<{ id: string; numero: number }>((desde, hasta) => supabase.from("dropi_publicaciones").select("id, numero").eq("pais_id", pais.id).order("id").range(desde, hasta)),
   ]);
@@ -60,8 +59,6 @@ export default async function PublicacionesDropiPage() {
     );
   }
 
-  const personas = (perfilesR.data ?? []).map((p) => ({ id: p.id as string, nombre: (p.nombre as string | null) || (p.email as string) }));
-  const nombrePersona = new Map(personas.map((p) => [p.id, p.nombre]));
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
@@ -106,7 +103,6 @@ export default async function PublicacionesDropiPage() {
       fotoUrl: (d.foto_url as string | null) ?? null,
       notas: (d.notas as string | null) ?? "",
       responsableId: (d.responsable_id as string | null) ?? null,
-      responsableNombre: d.responsable_id ? (nombrePersona.get(d.responsable_id as string) ?? null) : null,
       relacionados: ((d.relacionados as string[] | null) ?? []).map((r) => nombrePorId.get(r)).filter((x): x is string => !!x),
       deClickup: !!d.clickup_id,
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
@@ -118,7 +114,7 @@ export default async function PublicacionesDropiPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
-      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} personas={personas} paisId={pais.id} codigoPais={pais.codigo} nombrePais={pais.nombre} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
+      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} paisId={pais.id} codigoPais={pais.codigo} nombrePais={pais.nombre} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
     </Pagina>
   );
 }

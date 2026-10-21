@@ -7,10 +7,9 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
 import { ESTADOS, TIPOS, UBICACIONES } from "@/lib/publicaciones/publicacion";
 import { crearPublicacion } from "./actions";
-import type { Persona } from "./ficha-publicacion";
 
-/** «Agregar»: un producto recién publicado en Dropi. Arranca como «Producto nuevo», publicado hoy y a cargo de quien lo crea. */
-export function CrearPublicacionPanel({ paisId, personas }: { paisId: string; personas: Persona[] }) {
+/** «Agregar»: un producto recién publicado en Dropi. Arranca como «Producto nuevo», publicado hoy. */
+export function CrearPublicacionPanel({ paisId }: { paisId: string }) {
   return (
     <FichaCrear titulo="Nueva publicación en Dropi" etiquetaCrear="Crear publicación" action={crearPublicacion} mensajeExito="Publicación creada" ocultos={{ pais_id: paisId, estado: ESTADOS[0].valor }}>
       {({ faltante, invalido }) => (
@@ -50,16 +49,6 @@ export function CrearPublicacionPanel({ paisId, personas }: { paisId: string; pe
                 {UBICACIONES.map((o) => (
                   <option key={o.valor} value={o.valor}>
                     {o.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </Campo>
-            <Campo etiqueta="Responsable" id="pub-responsable">
-              <select id="pub-responsable" name="responsable_id" defaultValue="" className={`${fieldClass} w-full`}>
-                <option value="">Yo</option>
-                {personas.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.nombre}
                   </option>
                 ))}
               </select>
