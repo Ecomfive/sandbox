@@ -9,12 +9,23 @@ export const metadata = { title: "Compras" };
 
 export const dynamic = "force-dynamic";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** «Crear compra» desde Compras › Reponer llega con `?reponer=<id del SKU>.<cantidad>`: abre la compra nueva con ese producto. */
+function leerReponer(v: string | string[] | undefined): { skuId: string; cantidad: number } | null {
+  if (typeof v !== "string") return null;
+  const [skuId, n] = v.split(".");
+  const cantidad = Number(n);
+  return UUID.test(skuId ?? "") && Number.isInteger(cantidad) && cantidad > 0 && cantidad < 1e7 ? { skuId, cantidad } : null;
+}
+
 const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atrasadas", "cerradas"];
 
 /** Compras › Compras: el tablero (todas las columnas, agrupar, filtros de un toque) con la ficha de resumen a la derecha. */
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requirePestana("compras", "lista");
-  const { ver, grupo, etapa, abrir, comentario } = await searchParams;
+  const { ver, grupo, etapa, abrir, comentario, reponer } = await searchParams;
+  const reponerInicial = leerReponer(reponer);
   const [{ compras, paises, vista, error, restricciones }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
@@ -26,7 +37,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
         </p>
       ) : (
         <TablaCompras
-          key={`${vista}-${grupoInicial ?? ""}-${typeof etapa === "string" ? etapa : ""}-${typeof abrir === "string" ? abrir : ""}-${typeof comentario === "string" ? comentario : ""}`}
+          key={`${vista}-${grupoInicial ?? ""}-${typeof etapa === "string" ? etapa : ""}-${typeof abrir === "string" ? abrir : ""}-${typeof comentario === "string" ? comentario : ""}-${reponerInicial ? `${reponerInicial.skuId}.${reponerInicial.cantidad}` : ""}`}
           compras={compras}
           vista={vista}
          
@@ -40,6 +51,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
           coloresEtiquetas={coloresEtiquetas}
           coloresTiendas={coloresTiendas}
           comentarioInicial={typeof comentario === "string" ? comentario : null}
+          reponerInicial={reponerInicial}
         />
       )}
     </Pagina>

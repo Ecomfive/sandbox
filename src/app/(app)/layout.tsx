@@ -12,7 +12,8 @@ import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
-import { pestanasOcultasDe } from "@/lib/permisos/ocultas";
+import { esAdministrador } from "@/lib/permisos/acceso";
+import { PESTANAS_SOLO_ADMIN, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
@@ -52,7 +53,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   ]);
   const favoritos = usuario ? favoritosDeSesion : [];
   const areas = construirAreas(plataformasPais);
-  const pestanasOcultas = usuario ? pestanasOcultasDe(usuario.afinado) : [];
+  const pestanasOcultas = usuario ? [...pestanasOcultasDe(usuario.afinado), ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN)] : [];
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
 
   return (

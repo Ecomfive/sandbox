@@ -19,6 +19,7 @@ export function CrearCompraPanel({
   etiquetas,
   colores,
   puedeAgregarPais = false,
+  inicial = null,
 }: {
   vista: string;
   paises: { id: string; codigo: string; nombre: string }[];
@@ -28,8 +29,12 @@ export function CrearCompraPanel({
   etiquetas?: string[];
   colores?: Record<string, string>;
   puedeAgregarPais?: boolean;
+  /** Desde Compras › Reponer: la ficha abre sola con este producto y esta cantidad elegidos (falta pulsar «Agregar»). */
+  inicial?: { skuId: string; cantidad: number } | null;
 }) {
-  const [abierto, setAbierto] = useState(false);
+  const [abierto, setAbierto] = useState(!!inicial);
+  // El producto sugerido se usa solo la primera vez que se abre.
+  const [sugerido, setSugerido] = useState(inicial);
   const [guardando, setGuardando] = useState(false);
   const [lineas, setLineas] = useState(0);
   // Los comentarios escritos antes de crear la compra: se publican en ella al crearla.
@@ -39,6 +44,7 @@ export function CrearCompraPanel({
 
   function cerrar() {
     setAbierto(false);
+    setSugerido(null);
     setBorradores([]);
     setGuardando(false);
     requestAnimationFrame(() => botonAbrirRef.current?.focus());
@@ -71,7 +77,7 @@ export function CrearCompraPanel({
             if (fallidos) mostrarToast(`La compra se creó, pero ${fallidos} comentario${fallidos === 1 ? "" : "s"} no se pudo guardar: agrégalo desde su ficha.`, "destructive");
           }}
           // El mismo bloque «Productos» de la ficha, en el mismo lugar (las compras de Importadora no llevan productos).
-          productos={vista === "importacion" ? undefined : <ProductosCompra key={String(abierto)} compraId={null} puedeEscribir incrustado alCambiarBorrador={setLineas} />}
+          productos={vista === "importacion" ? undefined : <ProductosCompra key={String(abierto)} compraId={null} puedeEscribir incrustado alCambiarBorrador={setLineas} sugerido={sugerido} />}
         />
       </Ventana>
     </>

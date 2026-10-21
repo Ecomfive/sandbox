@@ -150,12 +150,15 @@ export function ProductosCompra({
   puedeEscribir,
   incrustado = false,
   alCambiarBorrador,
+  sugerido = null,
 }: {
   compraId: string | null;
   puedeEscribir: boolean;
   incrustado?: boolean;
   /** Compra nueva: cuántas líneas lleva el borrador (la QTY y el monto saldrán de ellas). */
   alCambiarBorrador?: (lineas: number) => void;
+  /** Compra nueva desde Compras › Reponer: deja elegidos este producto y esta cantidad (se agregan con «Agregar»). */
+  sugerido?: { skuId: string; cantidad: number } | null;
 }) {
   const borrador = compraId === null;
   const [lineasBorrador, setLineasBorrador] = useState<{ skuId: string; codigo: string; nombre: string; cantidad: number; costoUnitario: number | null }[]>([]);
@@ -189,8 +192,13 @@ export function ProductosCompra({
     else {
       setError(null);
       setDatos(r);
+      const p = sugerido ? r.productos.find((x) => x.id === sugerido.skuId) : undefined;
+      if (p && !compraId) {
+        setElegido(p);
+        setCantidad(String(sugerido!.cantidad));
+      }
     }
-  }, [compraId]);
+  }, [compraId, sugerido]);
 
   /** Después de un cambio: recarga las líneas y refresca la tabla de Compras en segundo plano (sin bloquear). */
   const trasCambio = useCallback(async () => {
