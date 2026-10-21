@@ -1,4 +1,5 @@
 import {
+  numeroPublicacion,
   MARGEN_BAJO,
   margenBajo,
   ESTADOS,
@@ -18,6 +19,8 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 /** Una publicación de ECOMFIVE en Dropi (una fila de `dropi_publicaciones`), lista para la tabla y la ficha. */
 export interface FilaPublicacion {
   id: string;
+  /** El correlativo propio (PUB-0012), distinto al ID de Dropi. Sin la migración 0123, null. */
+  numero: number | null;
   nombre: string;
   dropiId: string;
   estado: string;
@@ -128,7 +131,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       etiquetaSinValor: "Sin revisar",
       agrupable: true,
     },
-    { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${f.nombre} ${f.dropiId}` },
+    { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${numeroPublicacion(f.numero)} ${f.nombre} ${f.dropiId}` },
     { id: "precio", etiqueta: "Precio de venta", tipo: "numero", valor: (f) => f.precioVenta },
     { id: "margen", etiqueta: "Margen (%)", tipo: "numero", valor: (f) => (f.margen === null ? null : Math.round(f.margen * 1000) / 10) },
     { id: "ultimaRevision", etiqueta: "Última revisión", tipo: "fecha", valor: (f) => f.ultimaRevision },
@@ -137,6 +140,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
   ],
   cerrados: { etiqueta: "Archivados", esCerrado: (f) => f.estado === "archivado", campoEstado: "estado", valoresCerrados: ["archivado"], ocultosPorDefecto: true },
   csvAntes: [
+    { etiqueta: "N.º", valor: (f) => numeroPublicacion(f.numero) },
     { etiqueta: "ID Dropi", valor: (f) => f.dropiId },
     { etiqueta: "SKU", valor: (f) => f.sku?.codigo ?? "" },
   ],

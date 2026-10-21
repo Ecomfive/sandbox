@@ -55,6 +55,9 @@ export const ESTADOS_REPOSICION = [
 export const opcion = (lista: OpcionPublicacion[], valor: string | null | undefined) => lista.find((o) => o.valor === valor);
 export const etiqueta = (lista: OpcionPublicacion[], valor: string | null | undefined) => opcion(lista, valor)?.etiqueta ?? valor ?? "—";
 
+/** El correlativo propio de una publicación (migración 0123), distinto al ID de Dropi: «PUB-0012». Sin la migración, «—». */
+export const numeroPublicacion = (n: number | null | undefined): string => (n === null || n === undefined ? "—" : `PUB-${String(n).padStart(4, "0")}`);
+
 /** Margen bajo el que se marca con un punto rojo (30 %). */
 export const MARGEN_BAJO = 0.3;
 /** El margen está por debajo del mínimo (sin margen calculado no cuenta). */
