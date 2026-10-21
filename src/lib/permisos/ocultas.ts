@@ -4,6 +4,9 @@
 import type { Afinado } from "./afinado";
 import { catalogoDe } from "./catalogo";
 
+/** Pestañas que por ahora solo ve un administrador (no se afinan por rol): Compras › Reponer. */
+export const PESTANAS_SOLO_ADMIN = ["/compras/reponer"];
+
 export function pestanasOcultasDe(afinado: Record<string, Afinado>): string[] {
   const ocultas: string[] = [];
   for (const [modulo, a] of Object.entries(afinado)) {
