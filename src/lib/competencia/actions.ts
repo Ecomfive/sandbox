@@ -1,7 +1,8 @@
 "use server";
 
 import { getUsuarioActual } from "@/lib/auth";
-import { unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
+import { unidadesBajadas, unirCoincidencias, type CambioStock } from "@/lib/competencia/analisis";
+import { idsDropi } from "@/lib/publicaciones/publicacion";
 import { indexar, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -32,6 +33,7 @@ export interface CompetenciaDeProducto {
 
 interface Fila {
   id: string;
+  dropi_producto_id: number | string;
   pais_id: string;
   proveedor_dropi_id: number;
   proveedor_nombre: string;
@@ -62,13 +64,16 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
   const { data: filas, error } = await traerTodasConError<Fila>((a, b) =>
     supabase
       .from("competencia_productos")
-      .select("id, pais_id, proveedor_dropi_id, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, es_nuestro, igual_a")
+      .select("id, dropi_producto_id, pais_id, proveedor_dropi_id, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, es_nuestro, igual_a")
       .eq("estado", "activo")
       .order("id")
       .range(a, b),
   );
   if (error) return { datos: [] }; // Sin la migración 0108 no hay competencia que mostrar.
   const todas = filas ?? [];
+  // Las publicaciones de Dropi vinculadas a este producto (migración 0116; sin ella, nada): su ID de Dropi une el producto con nuestra
+  // fila del análisis aunque los nombres no se parezcan, y su nombre en Dropi sirve para buscar a los competidores.
+  const { data: publicaciones } = await supabase.from("dropi_publicaciones").select("pais_id, nombre, dropi_id").eq("sku_maestro_id", skuId);
   const { data: paises } = await supabase.from("paises").select("id, codigo, nombre");
   const paisDe = new Map((paises ?? []).map((p) => [p.id, p]));
   const n = (v: string | null) => (v === null ? null : Number(v));
@@ -78,12 +83,18 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
     const delPais = todas.filter((f) => f.pais_id === paisId);
     const indice = indexar(delPais.map((f) => ({ tipo: "producto" as const, id: f.id, nombre: f.nombre, huella: f.foto_huella, detalle: "" })));
     const porId = new Map(delPais.map((f) => [f.id, f]));
-    const coincidencias = todasLasCoincidencias(sku.nombre, sku.foto_huella ?? null, indice);
-    const nuestra = coincidencias.map((c) => porId.get(c.id)!).find((f) => f.es_nuestro) ?? null;
+    const deEstePais = (publicaciones ?? []).filter((p) => p.pais_id === paisId);
+    const idsPublicados = new Set(deEstePais.flatMap((p) => idsDropi(p.dropi_id as string | null)));
+    const nombres = [...new Set([sku.nombre, ...deEstePais.map((p) => String(p.nombre ?? "")).filter(Boolean)])];
+    const coincidencias = unirCoincidencias(nombres.map((nombre) => todasLasCoincidencias(nombre, sku.foto_huella ?? null, indice)));
+    // Nuestra fila: la de su publicación de Dropi (por el ID) y, si no hay, la que se parece por nombre o foto.
+    const delID = delPais.filter((f) => f.es_nuestro && idsPublicados.has(Number(f.dropi_producto_id)));
+    const nuestra = delID[0] ?? coincidencias.map((c) => porId.get(c.id)!).find((f) => f.es_nuestro) ?? null;
+    const nuestrasIds = new Set([...delID.map((f) => f.id), ...(nuestra ? [nuestra.id] : [])]);
     const elegidos = new Map<string, { porFoto: boolean; parecido: number }>();
     for (const c of coincidencias) if (!porId.get(c.id)!.es_nuestro) elegidos.set(c.id, { porFoto: c.porFoto, parecido: Math.round(c.parecido * 100) });
     // Los que ya están emparejados con nuestro producto de ECOMFIVE cuentan aunque el nombre de Producto sea distinto.
-    if (nuestra) for (const f of delPais) if (f.igual_a === nuestra.id && !elegidos.has(f.id)) elegidos.set(f.id, { porFoto: false, parecido: 0 });
+    if (nuestra) for (const f of delPais) if (f.igual_a && nuestrasIds.has(f.igual_a) && !elegidos.has(f.id)) elegidos.set(f.id, { porFoto: false, parecido: 0 });
     if (!nuestra && !elegidos.size) continue;
 
     const ids = [...elegidos.keys()];

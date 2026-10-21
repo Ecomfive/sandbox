@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEquivalente, precioPorUnidad, unidadesBajadas, unidadesEnNombre, type ProductoAlerta } from "./analisis";
+import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEquivalente, precioPorUnidad, unidadesBajadas, unirCoincidencias, unidadesEnNombre, type ProductoAlerta } from "./analisis";
 
 test("normaliza un producto con su proveedor y reconoce los nuestros", () => {
   const p = normalizarCompetencia({ id: 7, name: "King Maker 120", sale_price: 6.99, user: { id: 2094, name: "ECOMFIVE" }, warehouse_product: [{ stock: 5 }] });
@@ -134,4 +134,13 @@ test("contenido y precio equivalente a nuestro producto", () => {
   assert.deepEqual(precioEquivalente("King Maker Capsulas PACK-2", { precio: 8.99, nombre: "KINGMAKER 120 CAPSULAS" }), { precio: 17.98, nota: "$8.99 por 1 unidad" });
   // Igual tamaño: sin conversión.
   assert.deepEqual(precioEquivalente("Parches Kinoki", { precio: 3, nombre: "PARCHES KINOKI" }), { precio: 3, nota: null });
+});
+
+test("unirCoincidencias: un competidor encontrado por dos nombres cuenta una vez, con lo mejor de cada búsqueda", () => {
+  const c = (id: string, parecido: number, porFoto = false) => ({ tipo: "producto" as const, id, nombre: id, detalle: "", porFoto, parecido });
+  const r = unirCoincidencias([[c("a", 0.9), c("b", 0.86)], [c("a", 0.95, true), c("c", 0.88)], []]);
+  assert.deepEqual(r.map((x) => x.id), ["a", "c", "b"]);
+  assert.equal(r[0].parecido, 0.95);
+  assert.equal(r[0].porFoto, true);
+  assert.deepEqual(unirCoincidencias([]), []);
 });
