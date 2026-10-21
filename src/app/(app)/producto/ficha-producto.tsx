@@ -12,7 +12,6 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, PapeleraIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
-import { BotonAccion } from "@/components/ui/boton-accion";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
@@ -158,6 +157,18 @@ export function FichaProducto({
       navegacion={
         <>
           {/* La fecha de creación arriba a la derecha, como en una tarea de ClickUp. */}
+          {/* Eliminar arriba, a la mano (solo administradores, y solo si nada depende del producto). */}
+          {producto && puedeEliminar && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={eliminar}
+              className={`mr-1 inline-flex h-9 items-center gap-1.5 rounded-md border border-destructive/40 px-2.5 text-xs font-medium text-destructive hover:bg-destructive-soft disabled:opacity-50 ${anilloFoco}`}
+            >
+              <PapeleraIcon aria-hidden="true" className="h-3.5 w-3.5" />
+              {pending ? "Eliminando..." : "Eliminar"}
+            </button>
+          )}
           {producto && (
             <span className="mr-2 hidden items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground sm:inline-flex">
               <CalendarioIcon aria-hidden="true" className="h-3.5 w-3.5" />
@@ -170,21 +181,19 @@ export function FichaProducto({
       }
     >
       {producto && (
-        // Una sola columna a todo el ancho (la actividad va abajo, no al lado como en ClickUp: así los datos aprovechan el ancho
-        // de la ventana). Orden pedido por Alcides (21 oct 2026): Producto, Asociaciones, Competencia, Compras, Código de barras y
-        // Envío; después lo demás.
+        // Los bloques en dos columnas que se llenan cada una por su lado (sin huecos), leyendo de izquierda a derecha en el orden
+        // pedido por Alcides (21 oct 2026): Producto, Asociaciones, Competencia, Compras, Código de barras, Envío… La actividad, al
+        // final y a todo el ancho. En pantallas angostas, una sola columna.
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex items-center gap-3 px-5 pt-5 pb-4">
-            <FotoProducto key={producto.id} id={producto.id} nombre={producto.nombre} foto={producto.foto} puedeEscribir={puedeEscribir} />
-            <p className="text-sm text-muted-foreground">{producto.nombre}</p>
-          </div>
           <ExclusividadProducto key={`exclusividad-${producto.id}`} skuId={producto.id} />
-
-          <div className="flex flex-col divide-y divide-border border-t border-border p-5">
+          <div className="grid grid-cols-1 gap-x-10 p-5 lg:grid-cols-2">
+            <div className="flex min-w-0 flex-col divide-y divide-border">
             <Seccion icono={CatalogoIcon} titulo="Producto">
-              {/* En cuadrícula para aprovechar el ancho de la ventana: el nombre a lo ancho y SKU, Tipo, Estado y Categoría en una línea. */}
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)]">
-                <Dato etiqueta="Nombre" className="sm:col-span-2 xl:col-span-4">
+              {/* La foto al lado de los datos; el nombre a lo ancho y SKU, Tipo, Estado y Categoría de a dos. */}
+              <div className="flex items-start gap-4">
+              <FotoProducto key={producto.id} id={producto.id} nombre={producto.nombre} foto={producto.foto} puedeEscribir={puedeEscribir} />
+              <dl className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <Dato etiqueta="Nombre" className="sm:col-span-2">
                   <NombreProducto key={`${producto.id}-${producto.nombre}`} id={producto.id} nombre={producto.nombre} puedeEscribir={puedeEscribir} />
                 </Dato>
                 <Dato etiqueta="SKU">
@@ -203,12 +212,47 @@ export function FichaProducto({
                     </span>
                   )}
                 </Dato>
-                <Dato etiqueta="Categoría" className="sm:col-span-2 xl:col-span-1">
+                <Dato etiqueta="Categoría">
                   <CategoriaProducto key={`${producto.id}-${producto.categoria?.id ?? ""}-${producto.categoria?.revisar ?? ""}`} id={producto.id} categoria={producto.categoria} puedeEscribir={puedeEscribir} />
                 </Dato>
               </dl>
+              </div>
             </Seccion>
-
+            {producto.tipo !== "combo" && (
+              <Seccion icono={InteligenciaIcon} titulo="Competencia en Dropi">
+                <BloqueCompetencia key={producto.id} skuId={producto.id} />
+              </Seccion>
+            )}
+            <Seccion icono={CatalogoIcon} titulo="Código de barras">
+              <CodigoBarrasProducto
+                key={producto.id}
+                id={producto.id}
+                codigoBarras={producto.codigoBarras}
+                origen={producto.codigoBarrasOrigen}
+                nombre={producto.nombre}
+                sku={producto.codigo}
+                puedeEscribir={puedeEscribir}
+              />
+            </Seccion>
+            {/* Si salió de Test productos: cómo le fue, con las mismas barras de su ficha allá. */}
+            {producto.tests.length > 0 && (
+              <Seccion icono={TestIcon} titulo="Resultado del test">
+                <ResultadoTestProducto producto={producto} referencias={referenciasTest} />
+              </Seccion>
+            )}
+            <Seccion icono={InventarioIcon} titulo="Inventario">
+              {esTest ? (
+                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo.</p>
+              ) : producto.variantes.length > 0 ? (
+                <p className="text-sm text-muted-foreground">El stock se lleva en cada variante (ábrelas desde Variantes).</p>
+              ) : puedeVerInventario ? (
+                <Link href="/inventario" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
+                  Ver en Inventario
+                </Link>
+              ) : null}
+            </Seccion>
+            </div>
+            <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 lg:border-t-0 lg:pt-0">
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
               {/* Sus publicaciones de Dropi como proveedor (Gestión de IDs Dropi): cómo se llama allá, en qué país y con qué ID. */}
               {producto.nombresDropi.length > 0 && (
@@ -264,50 +308,19 @@ export function FichaProducto({
                 </Link>
               )}
             </Seccion>
-
-            {producto.tipo !== "combo" && (
-              <Seccion icono={InteligenciaIcon} titulo="Competencia en Dropi">
-                <BloqueCompetencia key={producto.id} skuId={producto.id} />
-              </Seccion>
-            )}
-
             {producto.tipo !== "combo" && (
               <Seccion icono={ComprasIcon} titulo="Compras">
                 <ComprasProducto key={producto.id} id={producto.id} />
               </Seccion>
             )}
-
-            {/* Código de barras y Envío, lado a lado (en pantallas angostas se apilan). */}
-            <div className="grid grid-cols-1 gap-x-8 gap-y-5 py-5 md:grid-cols-2 [&>section]:py-0">
-            <Seccion icono={CatalogoIcon} titulo="Código de barras">
-              <CodigoBarrasProducto
-                key={producto.id}
-                id={producto.id}
-                codigoBarras={producto.codigoBarras}
-                origen={producto.codigoBarrasOrigen}
-                nombre={producto.nombre}
-                sku={producto.codigo}
-                puedeEscribir={puedeEscribir}
-              />
-            </Seccion>
             <Seccion icono={EnvioIcon} titulo="Envío">
               <EnvioProductoBloque key={producto.id} id={producto.id} envio={producto.envio} puedeEscribir={puedeEscribir} />
             </Seccion>
-            </div>
-
-            {/* Si salió de Test productos: cómo le fue, con las mismas barras de su ficha allá. */}
-            {producto.tests.length > 0 && (
-              <Seccion icono={TestIcon} titulo="Resultado del test">
-                <ResultadoTestProducto producto={producto} referencias={referenciasTest} />
-              </Seccion>
-            )}
-
             {producto.tipo !== "combo" && (
               <Seccion icono={ProductoIcon} titulo="Variantes">
                 <VariantesProducto key={producto.id} producto={producto} puedeEscribir={puedeEscribir} alAbrir={irA} />
               </Seccion>
             )}
-
             {producto.tipo === "combo" && (
               <Seccion icono={ProductoIcon} titulo="Componentes">
                 {producto.listaComponentes.length ? (
@@ -317,20 +330,6 @@ export function FichaProducto({
                 )}
               </Seccion>
             )}
-
-            {/* Inventario y Vencimiento, lado a lado. */}
-            <div className="grid grid-cols-1 gap-x-8 gap-y-5 py-5 md:grid-cols-2 [&>section]:py-0">
-            <Seccion icono={InventarioIcon} titulo="Inventario">
-              {esTest ? (
-                <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo.</p>
-              ) : producto.variantes.length > 0 ? (
-                <p className="text-sm text-muted-foreground">El stock se lleva en cada variante (ábrelas desde Variantes).</p>
-              ) : puedeVerInventario ? (
-                <Link href="/inventario" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
-                  Ver en Inventario
-                </Link>
-              ) : null}
-            </Seccion>
             {producto.tipo !== "combo" && (
               <Seccion icono={CalendarioIcon} titulo="Vencimiento">
                 <VencimientoProducto
@@ -344,21 +343,6 @@ export function FichaProducto({
             )}
             </div>
           </div>
-
-          {(puedeEliminar || error) && (
-            <div className="flex flex-col gap-2 border-t border-border px-5 py-3">
-              {puedeEliminar && (
-                <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pending} onClick={eliminar} className="w-fit">
-                  {pending ? "Eliminando..." : "Eliminar"}
-                </BotonAccion>
-              )}
-              {error && (
-                <p role="alert" className="m-0 text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-            </div>
-          )}
           <section aria-label="Actividad del producto" className="border-t border-border bg-muted/30">
           <HistorialGenerico id={producto.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialProducto} />
           </section>
