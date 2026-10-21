@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { CerrarIcon } from "@/lib/nav-icons";
+import { SeccionTarjeta } from "@/components/permisos/seccion-tarjeta";
+import { CerrarIcon, PuestosIcon } from "@/lib/nav-icons";
 import { asignarPersona, marcarPrincipal, quitarPersona } from "../puestos/actions";
 
 export interface PuestosDeUsuarios {
@@ -45,8 +46,7 @@ export function PuestosPersona({ personaId, nombre }: { personaId: string; nombr
   }
 
   return (
-    <section className="p-5">
-      <h3 className="mb-3 text-sm font-semibold">Puesto</h3>
+    <SeccionTarjeta id={`puestos-${personaId}`} icono={PuestosIcon} titulo="Puestos">
       {suyos.length === 0 ? (
         <p className="mb-3 text-sm text-muted-foreground">Sin puesto asignado.</p>
       ) : (
@@ -111,6 +111,6 @@ export function PuestosPersona({ personaId, nombre }: { personaId: string; nombr
           {error}
         </p>
       )}
-    </section>
+    </SeccionTarjeta>
   );
 }

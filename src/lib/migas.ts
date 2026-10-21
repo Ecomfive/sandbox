@@ -39,6 +39,7 @@ const SUBPAGINAS_AYUDA: [string, string][] = [
 const SUBPAGINAS: Record<string, string> = {
   "/retiros/cuentas": "Cuentas destino",
   "/usuarios/auditoria": "Historial de auditoría",
+  "/usuarios/roles": "Roles",
   "/puestos/organigrama": "Organigrama",
   "/extractos/patrones": "Diccionario de patrones bancarios",
   "/compras/dashboard": "Dashboard",

@@ -1,6 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { cargarCompras } from "../datos-compras";
 import { InformeCompras } from "../informe-compras";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Compras › Informe: el resumen de la operación de compras por día, semana o mes, de todos los países o de uno. */
 export default async function InformeComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
-  await requireModulo("compras");
+  await requirePestana("compras", "informe");
   const { ver } = await searchParams;
   const { compras, paises, vista, error } = await cargarCompras(ver);
   return (

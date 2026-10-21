@@ -41,6 +41,10 @@
   --neon-brillo: 0 6px 20px -6px rgb(155 47 168 / 0.6);
   --primario: #8a35c9;
   --primario-suave: #f3ecfc;
+  /* Los niveles de acceso de Usuarios y roles cuando están elegidos (relleno sólido con texto blanco, ≥ 4,5:1 en los dos temas). */
+  --nivel-lectura: #1d4ed8;
+  --nivel-edicion: #8a35c9;
+  --sin-acceso: #c9c6d1;
 }
 
 @theme inline {
@@ -69,6 +73,9 @@
   --color-aviso: var(--aviso);
   --color-primario: var(--primario);
   --color-primario-suave: var(--primario-suave);
+  --color-nivel-lectura: var(--nivel-lectura);
+  --color-nivel-edicion: var(--nivel-edicion);
+  --color-sin-acceso: var(--sin-acceso);
   --font-sans: var(--font-inter);
 }
 
@@ -101,6 +108,9 @@
   --destructive-soft: #4c0519;
   --azul: #93c5fd;
   --azul-soft: #172554;
+  --nivel-lectura: #2563eb;
+  --nivel-edicion: #8a35c9;
+  --sin-acceso: #4a4a52;
 }
 
 body {
@@ -291,5 +301,55 @@ html {
   .barra-progreso[data-avanzando="true"]::after {
     animation: none;
     display: none;
+  }
+}
+
+/* Matriz de permisos de un rol (Usuarios y roles › Roles): módulo | nivel de acceso | detalle. Se adapta al ancho de su propia caja
+   (que cambia con la lista de roles al lado), no al de la pantalla. */
+.matriz-permisos {
+  container-type: inline-size;
+}
+.mp-fila {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 332px 170px;
+  grid-template-areas: "nm lv dt";
+  column-gap: 16px;
+  align-items: center;
+}
+.mp-fila > .mp-nm {
+  grid-area: nm;
+  min-width: 0;
+}
+.mp-fila > .mp-lv {
+  grid-area: lv;
+}
+.mp-fila > .mp-dt {
+  grid-area: dt;
+}
+@container (max-width: 820px) {
+  .mp-fila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "nm lv" "dt lv";
+    row-gap: 2px;
+  }
+  .mp-fila > .mp-dt.mp-cab-dt {
+    display: none;
+  }
+}
+@container (max-width: 560px) {
+  .mp-fila {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "nm" "lv" "dt";
+    row-gap: 8px;
+  }
+  .mp-fila > .mp-lv.mp-cab-lv {
+    display: none;
+  }
+  .mp-fila > .mp-lv fieldset > div {
+    display: flex;
+    width: 100%;
+  }
+  .mp-fila > .mp-lv fieldset > div > label {
+    flex: 1;
   }
 }

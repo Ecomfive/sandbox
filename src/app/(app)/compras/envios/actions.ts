@@ -2,12 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
+import { MENSAJE_ACCION_BLOQUEADA, getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
+import { pestanaVisible } from "@/lib/permisos/afinado";
 import { createServiceClient } from "@/lib/supabase/server";
 import { paisesDelMundo } from "@/lib/paises-mundo";
 
 // Compras › Envíos: las rutas de cada agente de envío (país, vía, tiempo prometido, activo) y sus tarifas. Todo devuelve el
 // error como valor (en producción Next.js oculta el mensaje de una excepción).
+
+/** Poder modificar Compras y que su pestaña Envíos no esté oculta para la persona (Usuarios y roles › Afinar). */
+async function exigirEscrituraEnEnvios() {
+  const usuario = await requireModuloEscritura("compras");await exigirEscrituraEnEnvios();
+  if (!pestanaVisible(usuario.afinado.compras, "envios")) throw new Error(MENSAJE_ACCION_BLOQUEADA);
+  return usuario;
+}
 
 const ES_ID = (v: unknown) => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
 const texto = (f: FormData, k: string, max = 200) => {
@@ -59,7 +67,7 @@ async function sinAcceso(codigo: string): Promise<string | null> {
 const etiquetaRuta = (r: Record<string, unknown>) => `${r.agente ?? "Sin agente"} · ${r.pais_nombre} · ${r.via}`;
 
 export async function crearRuta(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+  await exigirEscrituraEnEnvios();
   const datos = leerRuta(formData);
   if ("error" in datos) return datos as { error: string };
   const noPuede = await sinAcceso(String(datos.pais_codigo));
@@ -87,7 +95,7 @@ export async function crearRuta(formData: FormData): Promise<{ error?: string }>
 }
 
 export async function actualizarRuta(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+  await exigirEscrituraEnEnvios();
   const id = formData.get("id");
   if (!ES_ID(id)) return { error: "Ruta no válida." };
   const datos = leerRuta(formData);
@@ -113,7 +121,7 @@ export async function actualizarRuta(formData: FormData): Promise<{ error?: stri
 
 /** Activa o desactiva el canal (la ruta no se borra: queda su historial). */
 export async function cambiarActivoRuta(id: string, activo: boolean): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+  await exigirEscrituraEnEnvios();
   if (!ES_ID(id)) return { error: "Ruta no válida." };
   const supabase = createServiceClient();
   const { data: ruta } = await supabase.from("wms_rutas_envio").select("pais_codigo, pais_nombre, agente, via").eq("id", id).maybeSingle();
@@ -128,7 +136,7 @@ export async function cambiarActivoRuta(id: string, activo: boolean): Promise<{ 
 }
 
 export async function eliminarRuta(id: string): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+  await exigirEscrituraEnEnvios();
   if (!ES_ID(id)) return { error: "Ruta no válida." };
   const supabase = createServiceClient();
   const { data: ruta } = await supabase.from("wms_rutas_envio").select("pais_codigo, pais_nombre, agente, via").eq("id", id).maybeSingle();
@@ -144,7 +152,7 @@ export async function eliminarRuta(id: string): Promise<{ error?: string }> {
 
 /** Una tarifa nueva de una ruta (la anterior del mismo tipo queda como historial). */
 export async function agregarTarifa(rutaId: string, tipo: string, precio: number, unidad: string, vigenteDesde: string): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("compras");
+  const usuario = await exigirEscrituraEnEnvios();
   if (!ES_ID(rutaId)) return { error: "Ruta no válida." };
   const tipoLimpio = String(tipo ?? "").trim().replace(/\s+/g, " ").slice(0, 60) || "General";
   const monto = Number(precio);
@@ -166,7 +174,7 @@ export async function agregarTarifa(rutaId: string, tipo: string, precio: number
 }
 
 export async function eliminarTarifa(id: string): Promise<{ error?: string }> {
-  await requireModuloEscritura("compras");
+  await exigirEscrituraEnEnvios();
   if (!ES_ID(id)) return { error: "Tarifa no válida." };
   const supabase = createServiceClient();
   const { data: t } = await supabase.from("wms_rutas_envio_tarifas").select("ruta_id, tipo_producto, precio, unidad, wms_rutas_envio(pais_codigo)").eq("id", id).maybeSingle();

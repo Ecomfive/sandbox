@@ -11,6 +11,7 @@ import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
+import { pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
@@ -50,7 +51,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   ]);
   const favoritos = usuario ? favoritosDeSesion : [];
   const areas = construirAreas(plataformasPais);
-  const paginas = paginasBuscables(areas, usuario?.modulos ?? null);
+  const pestanasOcultas = usuario ? pestanasOcultasDe(usuario.afinado) : [];
+  const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
 
   return (
     <ToastProvider>
@@ -60,7 +62,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
-          <BarraMigas areas={areas} favoritos={favoritos} />
+          <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>
       </div>

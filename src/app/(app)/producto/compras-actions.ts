@@ -3,6 +3,7 @@
 import { getUsuarioActual } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { campoOculto, dentroDelAlcance, restriccionesDe } from "../compras/permisos-compras";
 
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
@@ -38,17 +39,22 @@ export async function obtenerComprasProducto(id: string): Promise<{ compras: Com
   const ids = [id, ...(variantes ?? []).map((v) => v.id as string)];
   const { data, error } = await supabase
     .from("wms_compra_items")
-    .select("cantidad_pedida, costo_unitario, lote_numero, sku_maestro_id, skus_maestros(codigo, nombre, opciones), wms_compras(id, numero, codigo, etapa, creado_en, anulada_en, paises(codigo))")
+    .select("cantidad_pedida, costo_unitario, lote_numero, sku_maestro_id, skus_maestros(codigo, nombre, opciones), wms_compras(id, numero, codigo, etapa, creado_en, anulada_en, asignado_a, creado_por, responsable_nombre, creador_nombre, paises(codigo))")
     .in("sku_maestro_id", ids);
   if (error) return { error: "No se pudieron cargar las compras." };
+  // Lo que su rol tiene limitado en Compras (Usuarios y roles › Afinar) vale también aquí: sin ver el monto no se ven los costos, y
+  // solo se ven las compras que alcanza.
+  const limites = restriccionesDe(usuario.afinado.compras);
+  const verCostos = !campoOculto(limites, "monto");
   const uno = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
   const compras: CompraDeProducto[] = (data ?? [])
     .map((l) => {
-      const c = uno(l.wms_compras as unknown as { id: string; numero: number; codigo: string | null; etapa: string; creado_en: string; anulada_en: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null);
+      const c = uno(l.wms_compras as unknown as { id: string; numero: number; codigo: string | null; etapa: string; creado_en: string; anulada_en: string | null; asignado_a: string | null; creado_por: string | null; responsable_nombre: string | null; creador_nombre: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null);
       const sku = uno(l.skus_maestros as unknown as { codigo: string; nombre: string; opciones: Record<string, string> | null } | null);
       if (!c || c.anulada_en) return null; // una compra anulada no cuenta en el histórico
+      if (!dentroDelAlcance(limites.alcance, { asignadoId: c.asignado_a, creadoPorId: c.creado_por, responsableNombre: c.responsable_nombre, creadorNombre: c.creador_nombre }, usuario)) return null;
       const unidades = Number(l.cantidad_pedida);
-      const costo = l.costo_unitario === null ? null : Number(l.costo_unitario);
+      const costo = !verCostos || l.costo_unitario === null ? null : Number(l.costo_unitario);
       return {
         compraId: c.id,
         numero: c.numero,
