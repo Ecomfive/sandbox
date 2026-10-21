@@ -22,8 +22,8 @@ export function SkuProducto({ id, codigo, puedeEscribir }: { id: string; codigo:
 
   if (!editando)
     return (
-      <span className="flex items-center gap-2">
-        <SkuCopiable codigo={codigo} className="font-medium" />
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+        <SkuCopiable codigo={codigo} className="min-w-0 font-medium [overflow-wrap:anywhere]" />
         {puedeEscribir && (
           <button type="button" onClick={() => setEditando(true)} className={`rounded text-xs text-primario hover:underline ${anilloFoco}`}>
             Cambiar
