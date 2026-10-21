@@ -529,7 +529,7 @@ convenciones técnicas del código.
   tamaño del nuestro: por contenido si los dos lo dicen (`medidaEnNombre`: cápsulas/caps/cap/softgels/tabletas/gomitas, ml, g)
   y si no por unidades (`unidadesEnNombre`: PACK-N, Nx1, xN —no «x 60 cápsulas»—, «N pares/unidades», «COMBO A y B»); devuelve
   la `nota` de la conversión. Posición, decisiones, diferencias y Resumen comparan nuestro precio real con ese equivalente.
-  **Competencia de un producto** (Producto y Compras): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
+  **Competencia de un producto** (Producto, Compras y Gestión de publicaciones Dropi; 21 oct 2026: **se une también por la publicación de Dropi**: `obtenerCompetenciaProducto` toma las publicaciones vinculadas al producto, enlaza su ID de Dropi con nuestra fila del análisis —`dropi_producto_id`— aunque los nombres no se parezcan, y busca a los competidores con el nombre del producto **y** con el nombre en Dropi; `unirCoincidencias`, con prueba. Antes 34 de los 175 productos nuestros sin competencia en su ficha eran solo porque su nombre no calzaba con el de su fila en Dropi): `obtenerCompetenciaProducto(skuId)` (`src/lib/competencia/actions.ts`,
   basta Producto, Compras o Análisis) busca el producto por nombre y foto con `todasLasCoincidencias` (cruces.ts) entre todo
   el catálogo guardado y suma los iguales a nuestro producto de ECOMFIVE (el «SKU» de Dropi es el nombre, no nuestro código);
   `BloqueCompetencia` / `CompetenciaDesplegable` (`src/components/competencia/piezas-competencia.tsx`, con `FotoAmpliable` y

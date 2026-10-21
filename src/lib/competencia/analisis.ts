@@ -7,6 +7,7 @@
 // común, o la misma foto con alguna palabra en común.
 
 import { normalizarDropi, type Evento, type ProductoVisto } from "@/lib/scraping/comparar";
+import type { Coincidencia } from "@/lib/scraping/cruces";
 
 /** Nuestro proveedor en Dropi: lo que vende se compara con todo lo demás. */
 export const NUESTRO_PROVEEDOR = /^ecomfive$/i;
@@ -352,4 +353,17 @@ export function precioEquivalente(nuestroNombre: string, otro: { precio: number 
   }
   if (un === uo) return { precio: otro.precio, nota: null };
   return { precio: redondo((otro.precio / uo) * un), nota: `$${otro.precio.toFixed(2)} por ${uo} unidad${uo === 1 ? "" : "es"}` };
+}
+
+/**
+ * Junta las coincidencias de varias búsquedas (el nombre del producto y el nombre con que está en Dropi): un mismo producto de la
+ * competencia cuenta una vez, con el mayor parecido y «por foto» si alguna búsqueda lo encontró por la foto. Las más parecidas primero.
+ */
+export function unirCoincidencias(listas: Coincidencia[][]): Coincidencia[] {
+  const porId = new Map<string, Coincidencia>();
+  for (const c of listas.flat()) {
+    const antes = porId.get(c.id);
+    porId.set(c.id, antes ? { ...antes, parecido: Math.max(antes.parecido, c.parecido), porFoto: antes.porFoto || c.porFoto } : c);
+  }
+  return [...porId.values()].sort((a, b) => (Number(b.porFoto) + b.parecido) - (Number(a.porFoto) + a.parecido));
 }
