@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { useToast } from "@/components/ui/toast";
 import { cambiarSkuProducto, revisarSku } from "./actions";
 
@@ -22,7 +23,7 @@ export function SkuProducto({ id, codigo, puedeEscribir }: { id: string; codigo:
   if (!editando)
     return (
       <span className="flex items-center gap-2">
-        <span className="font-medium">{codigo}</span>
+        <SkuCopiable codigo={codigo} className="font-medium" />
         {puedeEscribir && (
           <button type="button" onClick={() => setEditando(true)} className={`rounded text-xs text-primario hover:underline ${anilloFoco}`}>
             Cambiar

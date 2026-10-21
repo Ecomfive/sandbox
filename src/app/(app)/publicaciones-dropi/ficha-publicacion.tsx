@@ -311,7 +311,7 @@ function ContenidoFicha({
               {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nombre} className="h-24 w-24 shrink-0 rounded-lg border border-border object-cover" /> : <span aria-hidden="true" className="h-24 w-24 shrink-0 rounded-lg border border-dashed border-border-control" />}
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Nombre</span>
+                <span className={labelClassSm}>Nombre en Dropi</span>
                   <input value={d.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} required maxLength={300} className={`${fieldClass} w-full`} />
                 </label>
                 <label className="flex min-w-0 flex-col gap-1">
