@@ -288,6 +288,15 @@ convenciones técnicas del código.
   Dashboard, Planificación o Tiempos visibles (sus cifras saldrían en cero). **Un módulo nuevo que se quiera afinar**: agrega su
   `CatalogoModulo` a `src/lib/permisos/catalogo.ts` y aplica sus claves en el servidor como Compras (`permisos-compras.ts` es el modelo).
   `acceso-seccion.ts`, «Líderes comerciales» del CRM y el progreso de la Universidad ya cuentan lo propio de cada persona.
+- **Acceso en silencio** (21 oct 2026). Una sección a la que la persona no tiene acceso **no se le muestra ni se le rechaza con un aviso**.
+  `requireModulo`, `requirePestana` y las páginas de Usuarios llaman a `irAlInicio(usuario, moduloRechazado?)` (`src/lib/auth.ts`), que
+  la lleva a `paginaInicialDe` (`src/lib/nav-data.ts`: la primera página del menú que su rol le deja abrir, sin volver al módulo que la
+  rechazó, con prueba). `/sin-acceso` quedó solo para una cuenta **sin ningún módulo** («Tu cuenta aún no tiene áreas asignadas»); con
+  módulos redirige a su inicio. El menú (`sidebar.tsx`) muestra solo las áreas y los frentes con páginas suyas y, con acceso limitado
+  (`tieneAccesoLimitado`), no dibuja Baby Yoda ni «Próximamente». Un enlace a **otro módulo** desde una ficha se dibuja solo si la persona
+  lo puede abrir: en un Client Component con `usePuedeAbrir("modulo")` (`src/components/modulos-contexto.tsx`, lo provee el layout de
+  `(app)`), en un Server Component con `usuario.modulos.includes(...)`. Un enlace nuevo a otro módulo debe hacer lo mismo. Las acciones
+  del servidor siguen devolviendo `{ error }` o lanzando: eso es defensa, no pantalla.
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo

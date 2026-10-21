@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUsuarioActual } from "@/lib/auth";
+import { getUsuarioActual, irAlInicio } from "@/lib/auth";
 import { cobertura, nivelesEfectivos, type PermisoPropio, type PermisoRol } from "@/lib/permisos/acceso";
 import { CrearUsuarioPanel } from "./crear-usuario-panel";
 import { consultarRoles, consultaSegura } from "./datos-usuarios";
@@ -36,7 +36,7 @@ export default async function UsuariosPage() {
     );
   }
 
-  if (!usuario.modulos.includes("usuarios")) redirect("/sin-acceso");
+  if (!usuario.modulos.includes("usuarios")) irAlInicio(usuario, "usuarios");
 
   const [roles, { data: perfiles }, permisos, { data: listaAuth }, paisesPersonas, propios, afinadosPersona, { data: paises }] = await Promise.all([
     consultarRoles(supabase),

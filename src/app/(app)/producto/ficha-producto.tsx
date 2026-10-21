@@ -3,6 +3,7 @@
 import { MapaComponentes } from "./mapa-componentes";
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { anilloFoco } from "@/components/ui/field";
 import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -84,6 +85,7 @@ export function FichaProducto({
   alCerrar: () => void;
 }) {
   const { mostrarToast } = useToast();
+  const puedeVerInventario = usePuedeAbrir("inventario");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // Sube cada vez que se cambia el estado, para que la línea de tiempo se vuelva a pedir.
@@ -246,11 +248,11 @@ export function FichaProducto({
                 <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo.</p>
               ) : producto.variantes.length > 0 ? (
                 <p className="text-sm text-muted-foreground">El stock se lleva en cada variante (ábrelas desde Variantes).</p>
-              ) : (
+              ) : puedeVerInventario ? (
                 <Link href="/inventario" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
                   Ver en Inventario
                 </Link>
-              )}
+              ) : null}
             </Seccion>
 
             <Seccion icono={ProductoIcon} titulo="Asociaciones">

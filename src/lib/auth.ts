@@ -5,6 +5,7 @@ import { createSessionClient, createServiceClient } from "@/lib/supabase/server"
 import { aAccesoPlano, nivelesEfectivos, type PermisoPropio } from "@/lib/permisos/acceso";
 import { accionPermitida, contarAjustes, pestanaVisible, resolverAfinado, type Afinado, type FilaAfinada } from "@/lib/permisos/afinado";
 import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
+import { paginaInicialDe } from "@/lib/nav-data";
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
  * navegador de quien la prende (ver `src/lib/vista-previa-actions.ts`), nunca en la base. */
@@ -204,11 +205,19 @@ function listaPaises(v: unknown): string[] | null {
   return Array.isArray(v) ? v.map(String) : null;
 }
 
-/** Exige sesión activa y acceso al módulo dado; redirige si no se cumple. */
+/**
+ * Lleva a la persona a la primera sección que sí puede abrir, sin avisos: una página que no es suya simplemente no está. Solo si no
+ * tiene ningún módulo cae en `/sin-acceso`, que no es un rechazo sino la pantalla de una cuenta todavía sin áreas.
+ */
+export function irAlInicio(usuario: Pick<UsuarioActual, "modulos">, excluirModulo?: string): never {
+  redirect(paginaInicialDe(usuario.modulos, excluirModulo) ?? "/sin-acceso");
+}
+
+/** Exige sesión activa y acceso al módulo dado; si no lo tiene, la lleva a lo suyo. */
 export async function requireModulo(clave: string): Promise<UsuarioActual> {
   const usuario = await getUsuarioActual();
   if (!usuario) redirect("/login");
-  if (!usuario.modulos.includes(clave)) redirect("/sin-acceso");
+  if (!usuario.modulos.includes(clave)) irAlInicio(usuario, clave);
   return usuario;
 }
 
@@ -242,7 +251,8 @@ export async function requirePestana(modulo: string, pestana: string): Promise<U
   const afinado = usuario.afinado[modulo];
   if (!pestanaVisible(afinado, pestana)) {
     const primera = catalogoDe(modulo)?.pestanas.find((p) => pestanaVisible(afinado, p.clave));
-    redirect(primera?.href ?? "/sin-acceso");
+    if (primera) redirect(primera.href);
+    irAlInicio(usuario, modulo);
   }
   return usuario;
 }
