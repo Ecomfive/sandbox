@@ -11,7 +11,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CalendarioIcon, CerrarIcon, CheckIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
   DIAS_REVISION,
   ESTADOS,
@@ -25,6 +25,7 @@ import {
   opcion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
+import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { actualizarPublicacion, eliminarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
@@ -444,6 +445,13 @@ function ContenidoFicha({
               </label>
             </div>
           </Seccion>
+
+          {/* Lo que viene en camino del producto vinculado: solo unidades por país (las órdenes que ya salieron y no han llegado). */}
+          {p.sku && p.sku.tipo !== "combo" && (
+            <Seccion icono={ComprasIcon} titulo="En camino">
+              <EnCaminoProducto key={p.sku.id} id={p.sku.id} />
+            </Seccion>
+          )}
 
           {/* La competencia del producto vinculado: los mismos datos que se ven en su ficha de Producto y en Compras. Un compuesto no la tiene. */}
           {p.sku && p.sku.tipo !== "combo" && (
