@@ -40,8 +40,9 @@ export interface FilaPublicacion {
   revisionVencida: boolean;
   fotoUrl: string | null;
   notas: string;
-  responsableId: string | null;
-  responsableNombre: string | null;
+  /** Pueden ser varios (como en ClickUp), en orden. */
+  responsables: string[];
+  responsablesNombres: string[];
   /** Los nombres de las publicaciones relacionadas. */
   relacionados: string[];
   /** Viene de la lista GCC de ClickUp. */
@@ -90,7 +91,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "tipo", etiqueta: "Tipo", tipo: "seleccion", valores: (f) => uno(f.tipo), opciones: opciones(TIPOS), agrupable: true, colorValor: color(TIPOS) },
     { id: "publicacion", etiqueta: "En Dropi", tipo: "seleccion", valores: (f) => uno(f.estadoPublicacion), opciones: opciones(ESTADOS_PUBLICACION), agrupable: true, colorValor: color(ESTADOS_PUBLICACION) },
     { id: "privatizado", etiqueta: "Privatizado a", tipo: "seleccion", valores: (f) => uno(f.privatizadoA || null), etiquetaSinValor: "Sin privatizar", agrupable: true },
-    { id: "responsable", etiqueta: "Responsable", tipo: "seleccion", valores: (f) => uno(f.responsableNombre), etiquetaSinValor: "Sin responsable", agrupable: true },
+    { id: "responsable", etiqueta: "Responsable", tipo: "seleccion", valores: (f) => (f.responsablesNombres.length ? f.responsablesNombres : [SIN_VALOR]), etiquetaSinValor: "Sin responsable", agrupable: true },
     {
       id: "competencia",
       etiqueta: "Competencia",

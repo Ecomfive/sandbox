@@ -31,7 +31,7 @@ export default async function PublicacionesDropiPage() {
       supabase
         .from("dropi_publicaciones")
         .select(
-          "id, nombre, dropi_id, estado, estado_publicacion, tipo_publicacion, privatizado_a, privatizado_email, precio_venta, costo_mercancia, fulfillment, coste_real, utilidad, margen, estado_venta, ubicacion, estado_reposicion, competencia, fecha_publicacion, ultima_revision, proxima_revision, ultimo_cambio_precio, foto_url, notas, responsable_id, relacionados, clickup_id, sku_maestro_id",
+          "id, nombre, dropi_id, estado, estado_publicacion, tipo_publicacion, privatizado_a, privatizado_email, precio_venta, costo_mercancia, fulfillment, coste_real, utilidad, margen, estado_venta, ubicacion, estado_reposicion, competencia, fecha_publicacion, ultima_revision, proxima_revision, ultimo_cambio_precio, foto_url, notas, responsables, relacionados, clickup_id, sku_maestro_id",
         )
         .eq("pais_id", pais.id)
         .order("nombre")
@@ -94,8 +94,8 @@ export default async function PublicacionesDropiPage() {
       revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
       fotoUrl: (d.foto_url as string | null) ?? null,
       notas: (d.notas as string | null) ?? "",
-      responsableId: (d.responsable_id as string | null) ?? null,
-      responsableNombre: d.responsable_id ? (nombrePersona.get(d.responsable_id as string) ?? null) : null,
+      responsables: (d.responsables as string[] | null) ?? [],
+      responsablesNombres: ((d.responsables as string[] | null) ?? []).map((r) => nombrePersona.get(r)).filter((x): x is string => !!x),
       relacionados: ((d.relacionados as string[] | null) ?? []).map((r) => nombrePorId.get(r)).filter((x): x is string => !!x),
       deClickup: !!d.clickup_id,
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,

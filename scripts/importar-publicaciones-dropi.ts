@@ -35,13 +35,8 @@ async function main() {
   const { data: perfiles } = await supabase.from("perfiles").select("id, nombre, email");
   const porNombre = new Map((perfiles ?? []).filter((p) => p.nombre).map((p) => [norm(p.nombre as string), p.id as string]));
   const porCorreo = new Map((perfiles ?? []).map((p) => [String(p.email).toLowerCase(), p.id as string]));
-  const responsable = (t: TareaClickup) => {
-    for (const a of t.assignees) {
-      const id = porNombre.get(norm(a.username)) ?? porCorreo.get(a.email?.toLowerCase());
-      if (id) return id;
-    }
-    return null;
-  };
+  // Todos los asignados de la tarea que tienen usuario, en orden (migración 0119); el primero queda en `responsable_id`.
+  const responsablesDe = (t: TareaClickup) => [...new Set(t.assignees.map((a) => porNombre.get(norm(a.username)) ?? porCorreo.get(a.email?.toLowerCase())).filter((x): x is string => !!x))];
 
   const { data: existentes, error: errorExistentes } = await supabase.from("dropi_publicaciones").select("id, clickup_id, foto_url").not("clickup_id", "is", null);
   if (errorExistentes) throw new Error(`Falta correr la migración 0116: ${errorExistentes.message}`);
@@ -58,7 +53,8 @@ async function main() {
   for (const t of tareas) {
     const p = leerTareaGcc(t);
     for (const a of p.avisos) avisos[a] = (avisos[a] ?? 0) + 1;
-    const resp = responsable(t);
+    const responsables = responsablesDe(t);
+    const resp = responsables[0] ?? null;
     if (!resp && t.assignees.length) sinResponsable.add(t.assignees.map((a) => a.username).join("+"));
     const previa = yaEsta.get(t.id);
     if (previa) actualizadas++;
@@ -67,7 +63,7 @@ async function main() {
 
     const { relacionadosClickup, foto } = p;
     const datos = Object.fromEntries(Object.entries(p).filter(([k]) => !["avisos", "relacionadosClickup", "foto", "responsables"].includes(k)));
-    const fila = { ...datos, pais_id: pais.id, responsable_id: resp, clickup_id: t.id, clickup: t, actualizado_en: new Date().toISOString() };
+    const fila = { ...datos, pais_id: pais.id, responsable_id: resp, responsables, clickup_id: t.id, clickup: t, actualizado_en: new Date().toISOString() };
     const { data, error } = previa
       ? await supabase.from("dropi_publicaciones").update(fila).eq("id", previa.id).select("id, foto_url").single()
       : await supabase.from("dropi_publicaciones").insert({ ...fila, creado_en: new Date(Number(t.date_created)).toISOString() }).select("id, foto_url").single();

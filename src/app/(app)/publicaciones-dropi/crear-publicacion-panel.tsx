@@ -1,13 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { Campo } from "@/components/ui/campo-ficha";
-import { fieldClass } from "@/components/ui/field";
+import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
 import { ESTADOS, TIPOS, UBICACIONES } from "@/lib/publicaciones/publicacion";
 import { crearPublicacion } from "./actions";
 import type { Persona } from "./ficha-publicacion";
+import { SelectorResponsables } from "./selector-responsables";
+
+/** Los responsables al crear (sin elegir a nadie, queda quien la crea). */
+function ResponsablesNuevos({ personas }: { personas: Persona[] }) {
+  const [valor, setValor] = useState<string[]>([]);
+  return <SelectorResponsables valor={valor} cambiar={setValor} personas={personas} nombre="responsables" vacio="Yo" />;
+}
 
 /** «Agregar»: un producto recién publicado en Dropi. Arranca como «Producto nuevo», publicado hoy y a cargo de quien lo crea. */
 export function CrearPublicacionPanel({ paisId, personas }: { paisId: string; personas: Persona[] }) {
@@ -54,16 +62,10 @@ export function CrearPublicacionPanel({ paisId, personas }: { paisId: string; pe
                 ))}
               </select>
             </Campo>
-            <Campo etiqueta="Responsable" id="pub-responsable">
-              <select id="pub-responsable" name="responsable_id" defaultValue="" className={`${fieldClass} w-full`}>
-                <option value="">Yo</option>
-                {personas.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.nombre}
-                  </option>
-                ))}
-              </select>
-            </Campo>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className={labelClassSm}>Responsables</span>
+              <ResponsablesNuevos personas={personas} />
+            </div>
           </Seccion>
         </>
       )}

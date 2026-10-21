@@ -136,7 +136,7 @@ const COLUMNAS: ColumnaTabla<FilaPublicacion>[] = [
       </span>
     ),
   },
-  { id: "responsable", label: "Responsable", ocultable: true, clase: "text-muted-foreground whitespace-nowrap", render: (f) => f.responsableNombre ?? "—" },
+  { id: "responsable", label: "Responsable", ocultable: true, clase: "text-muted-foreground whitespace-nowrap", render: (f) => (f.responsablesNombres.length ? f.responsablesNombres.join(", ") : "—") },
   { id: "competencia", label: "Competencia", ocultable: true, oculta: true, render: (f) => (f.competencia === null ? "—" : f.competencia ? "Sí" : "No") },
   { id: "publicacion", label: "En Dropi", ocultable: true, oculta: true, render: (f) => pastilla(ESTADOS_PUBLICACION, f.estadoPublicacion) },
   { id: "costeReal", label: "Coste real", ocultable: true, oculta: true, clase: "text-right tabular-nums", render: (f) => usd(f.costeReal), descripcion: "Lo que costó la última compra." },

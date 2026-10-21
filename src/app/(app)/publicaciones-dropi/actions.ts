@@ -33,7 +33,10 @@ const fecha = (f: FormData, k: string) => {
   return FECHA.test(t) ? t : null;
 };
 
-type Datos = Record<string, string | number | boolean | null>;
+type Datos = Record<string, string | number | boolean | null | string[]>;
+
+/** El error de Supabase cuando todavía no existe la columna `responsables`. */
+const faltaResponsables = (e: { message?: string } | null) => !!e?.message?.includes("responsables");
 
 /** Lee y valida los datos de la ficha (crear o guardar). Devuelve el error como valor. */
 function leerDatos(f: FormData): Datos | { error: string } {
@@ -47,7 +50,8 @@ function leerDatos(f: FormData): Datos | { error: string } {
   const comp = texto(f, "competencia", 3);
   const email = texto(f, "privatizado_email", 200).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "El correo del dropshipper no es válido." };
-  const resp = texto(f, "responsable_id", 64);
+  // Pueden ser varios; el primero queda también en `responsable_id` (migración 0119).
+  const responsables = [...new Set(f.getAll("responsables").filter((v): v is string => typeof v === "string" && UUID.test(v)))].slice(0, 10);
   return {
     nombre,
     dropi_id: texto(f, "dropi_id", 60) || null,
@@ -68,7 +72,8 @@ function leerDatos(f: FormData): Datos | { error: string } {
     ultima_revision: fecha(f, "ultima_revision"),
     ultimo_cambio_precio: fecha(f, "ultimo_cambio_precio"),
     notas: texto(f, "notas", 5000) || null,
-    responsable_id: UUID.test(resp) ? resp : null,
+    responsables,
+    responsable_id: responsables[0] ?? null,
   };
 }
 
@@ -89,12 +94,14 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
   if (!UUID.test(paisId) || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, paisId))) return { error: "País no válido." };
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
+  // Sin responsables elegidos, queda quien la crea.
+  if (!(datos.responsables as string[]).length) Object.assign(datos, { responsables: [usuario.id], responsable_id: usuario.id });
   const { data, error } = await supabase
     .from("dropi_publicaciones")
-    .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), ultimo_cambio_precio: datos.ultimo_cambio_precio ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
+    .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), ultimo_cambio_precio: datos.ultimo_cambio_precio ?? hoy(), creado_por: usuario.id })
     .select("id")
     .single();
-  if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0116." : "No se pudo crear la publicación." };
+  if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0116." : faltaResponsables(error) ? "Falta correr en Supabase la migración 0119." : "No se pudo crear la publicación." };
   await registrarAuditoria({ accion: "crear_publicacion_dropi", entidad: "dropi_publicaciones", entidadId: data.id, detalle: `${datos.nombre}${datos.dropi_id ? ` (ID ${datos.dropi_id})` : ""}` });
   revalidatePath(RUTA);
   return {};
@@ -134,19 +141,31 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
     .from("dropi_publicaciones")
     .update({ ...datos, actualizado_en: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: "No se pudo guardar la publicación." };
+  if (error) return { error: faltaResponsables(error) ? "Falta correr en Supabase la migración 0119." : "No se pudo guardar la publicación." };
 
   const cambios = VISTA.filter(([k]) => {
     const a = antes[k] === null || antes[k] === undefined ? null : typeof datos[k] === "number" ? Number(antes[k]) : antes[k];
     return a !== datos[k];
   });
-  if (cambios.length)
+  const antesV: Record<string, string> = Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(antes[k] ?? null)]));
+  const despuesV: Record<string, string> = Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k])]));
+  // Los responsables se muestran con sus nombres.
+  const respAntes = (antes.responsables as string[] | null) ?? [];
+  const respDespues = datos.responsables as string[];
+  if (respAntes.join() !== respDespues.join()) {
+    const { data: gente } = await createServiceClient().from("perfiles").select("id, nombre").in("id", [...new Set([...respAntes, ...respDespues])]);
+    const nombre = new Map((gente ?? []).map((g) => [g.id as string, (g.nombre as string | null) ?? "Usuario"]));
+    const ver = (ids: string[]) => (ids.length ? ids.map((x) => nombre.get(x) ?? "Usuario").join(", ") : "—");
+    antesV.Responsables = ver(respAntes);
+    despuesV.Responsables = ver(respDespues);
+  }
+  if (Object.keys(despuesV).length)
     await registrarAuditoria({
       accion: "editar_publicacion_dropi",
       entidad: "dropi_publicaciones",
       entidadId: id,
-      antes: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(antes[k] ?? null)])),
-      despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k])])),
+      antes: antesV,
+      despues: despuesV,
     });
   revalidatePath(RUTA);
   return {};

@@ -25,6 +25,7 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import { actualizarPublicacion, marcarRevisada, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
+import { SelectorResponsables } from "./selector-responsables";
 import { VinculoSku } from "./vinculo-sku";
 
 export interface Persona {
@@ -51,7 +52,6 @@ interface Formulario {
   fecha_publicacion: string;
   ultima_revision: string;
   ultimo_cambio_precio: string;
-  responsable_id: string;
   notas: string;
 }
 
@@ -75,7 +75,6 @@ const desde = (p: FilaPublicacion): Formulario => ({
   fecha_publicacion: p.fechaPublicacion ?? "",
   ultima_revision: p.ultimaRevision ?? "",
   ultimo_cambio_precio: p.ultimoCambioPrecio ?? "",
-  responsable_id: p.responsableId ?? "",
   notas: p.notas,
 });
 
@@ -176,7 +175,8 @@ function ContenidoFicha({
   const [pendiente, empezar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
-  const sinGuardar = JSON.stringify(d) !== JSON.stringify(desde(p));
+  const [responsables, setResponsables] = useState<string[]>(p.responsables);
+  const sinGuardar = JSON.stringify(d) !== JSON.stringify(desde(p)) || responsables.join() !== p.responsables.join();
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
   const estado = opcion(ESTADOS, p.estado);
 
@@ -196,6 +196,7 @@ function ContenidoFicha({
     const formData = new FormData();
     formData.set("id", p.id);
     for (const [k, v] of Object.entries(d)) formData.set(k, v);
+    for (const r of responsables) formData.append("responsables", r);
     empezar(async () => {
       const r = await actualizarPublicacion(formData).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
       if (r.error) setError(r.error);
@@ -408,17 +409,10 @@ function ContenidoFicha({
                   {d.ultima_revision ? masDias(d.ultima_revision, DIAS_REVISION) : "Sin revisar"}
                 </span>
               </div>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Responsable</span>
-                <select value={d.responsable_id} onChange={(e) => cambiar({ responsable_id: e.target.value })} className={`${fieldClass} w-full`}>
-                  <option value="">Sin responsable</option>
-                  {personas.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="flex min-w-0 flex-col gap-1 sm:col-span-2">
+                <span className={labelClassSm}>Responsables</span>
+                <SelectorResponsables valor={responsables} cambiar={setResponsables} personas={personas} />
+              </div>
             </div>
             <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Notas</span>
