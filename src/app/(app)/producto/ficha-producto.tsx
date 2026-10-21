@@ -156,6 +156,13 @@ export function FichaProducto({
       }
       navegacion={
         <>
+          {/* La fecha de creación arriba a la derecha, como en una tarea de ClickUp. */}
+          {producto && (
+            <span className="mr-2 hidden items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground sm:inline-flex">
+              <CalendarioIcon aria-hidden="true" className="h-3.5 w-3.5" />
+              Creado el {formatearFecha(producto.creado)}
+            </span>
+          )}
           <BotonNavegar texto="Producto anterior" icono={FlechaArribaIcon} activo={!!anterior && !pending} alHacerClic={() => anterior && irA(anterior)} />
           <BotonNavegar texto="Producto siguiente" icono={FlechaAbajoIcon} activo={!!siguiente && !pending} alHacerClic={() => siguiente && irA(siguiente)} />
         </>
@@ -322,19 +329,19 @@ export function FichaProducto({
                 </Link>
               )}
             </Seccion>
-
-            <Seccion icono={CalendarioIcon} titulo="Fechas">
-              <dl className="flex flex-col gap-3">
-                <Dato etiqueta="Creado el">{formatearFecha(producto.creado)}</Dato>
-              </dl>
-            </Seccion>
           </div>
 
-          {puedeEliminar && (
-            <div className="flex flex-col gap-2 px-5 pb-5">
-              <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pending} onClick={eliminar} className="w-fit">
-                {pending ? "Eliminando..." : "Eliminar"}
-              </BotonAccion>
+
+        </div>
+        <aside aria-label="Actividad del producto" className="min-h-0 border-t border-border bg-muted/30 lg:overflow-y-auto lg:border-t-0 lg:border-l">
+          {/* Eliminar va encima de la actividad (solo administradores, y solo si nada depende del producto). */}
+          {(puedeEliminar || error) && (
+            <div className="flex flex-col gap-2 border-b border-border px-5 py-3">
+              {puedeEliminar && (
+                <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pending} onClick={eliminar} className="w-fit">
+                  {pending ? "Eliminando..." : "Eliminar"}
+                </BotonAccion>
+              )}
               {error && (
                 <p role="alert" className="m-0 text-sm text-destructive">
                   {error}
@@ -342,9 +349,6 @@ export function FichaProducto({
               )}
             </div>
           )}
-
-        </div>
-        <aside aria-label="Actividad del producto" className="min-h-0 border-t border-border bg-muted/30 lg:overflow-y-auto lg:border-t-0 lg:border-l">
           <HistorialGenerico id={producto.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialProducto} />
         </aside>
         </div>
