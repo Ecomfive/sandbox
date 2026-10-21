@@ -19,6 +19,7 @@ import { claseTono, type Tone } from "@/components/ui/badge";
 import { TONO_CLASE } from "./def-producto";
 import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
 import { AvisoDuplicados } from "./aviso-duplicados";
+import { CategoriaNuevoProducto } from "./categoria-nuevo-producto";
 
 /**
  * «Agregar» de Producto: la ficha para crear un producto. El estado (Activo o Test) dice si ya se compra o se está probando;
@@ -180,6 +181,7 @@ export function CrearProductoPanel({
               />
             </Campo>
             <AvisoDuplicados nombre={nombre} foto={foto} />
+            <CategoriaNuevoProducto key={`categoria-${vueltaEnvio}`} nombre={nombre} foto={foto} />
             <Campo etiqueta="SKU" id="campo-codigo-producto" obligatorio faltante={faltante}>
               <input
                 id="campo-codigo-producto"
