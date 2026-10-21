@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
+import { ProveedorModulos } from "@/components/modulos-contexto";
 import { NavBar } from "@/components/nav";
 import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
@@ -55,6 +56,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
 
   return (
+    <ProveedorModulos modulos={usuario?.modulos ?? null}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
@@ -67,5 +69,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     </ToastProvider>
+    </ProveedorModulos>
   );
 }

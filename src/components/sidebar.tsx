@@ -36,11 +36,20 @@ interface AreaVisible {
   items: NavItem[];
 }
 
-/** Las áreas tal como las ve la persona: solo las páginas de sus módulos y sin áreas vacías. */
+/**
+ * Las áreas tal como las ve la persona: solo las páginas de sus módulos y sin áreas vacías. Un área que está vacía por diseño
+ * (`mostrarVacia`, «Próximamente») solo se ve si las páginas no se le quitaron por permisos.
+ */
 function areasVisibles(areas: NavSection[], modulos: string[] | null | undefined): AreaVisible[] {
   return areas
     .map((area) => ({ area, items: area.items.filter((item) => puedeVer(modulos, item.href)) }))
-    .filter((a) => a.items.length > 0 || a.area.mostrarVacia);
+    .filter((a) => a.items.length > 0 || (a.area.mostrarVacia && a.area.items.length === 0));
+}
+
+/** Si a la persona le falta algún módulo del menú: su menú es solo lo suyo, sin «Próximamente» ni Baby Yoda que no le tocan. */
+function tieneAccesoLimitado(areas: NavSection[], modulos: string[] | null | undefined): boolean {
+  if (!modulos) return false;
+  return areas.some((a) => a.items.some((i) => !puedeVer(modulos, i.href)));
 }
 
 /** Pendientes de una página: el Centro de notificaciones muestra el total; las demás, lo suyo. */
@@ -141,7 +150,10 @@ function PaginasDeArea({
           ))}
         </div>
       )}
-      {FRENTES.filter((f) => !area.soloFrentes || area.soloFrentes.includes(f.id)).map((f) => {
+      {FRENTES.filter((f) => !area.soloFrentes || area.soloFrentes.includes(f.id))
+        // Un frente que quedó sin páginas porque no son suyas simplemente no está; el «Próximamente» es solo de un frente vacío por diseño.
+        .filter((f) => items.some((i) => i.frente === f.id) || !area.items.some((i) => i.frente === f.id))
+        .map((f) => {
         const delFrente = items.filter((i) => i.frente === f.id);
         const grupos = [...new Set(delFrente.map((i) => i.grupo))];
         return (
@@ -261,6 +273,7 @@ function RielYPanel({
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
+  const limitado = tieneAccesoLimitado(areas, modulosPermitidos);
   // Las áreas «ocultas» (Avisos) no tienen botón en el riel: tienen el suyo abajo.
   const delRiel = visibles.filter((v) => !v.area.oculta);
   const deLaRuta = encontrarSeccionActiva(pathname, visibles.map((v) => ({ ...v.area, items: v.items })));
@@ -288,7 +301,7 @@ function RielYPanel({
 
   const titulo = elegida && elegida.ruta === pathname ? elegida.titulo : activa;
   const verFavoritos = titulo === "Favoritos";
-  const verYoda = titulo === "Baby Yoda";
+  const verYoda = !limitado && titulo === "Baby Yoda";
   const verAyuda = titulo === "Ayuda";
   const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
@@ -329,7 +342,7 @@ function RielYPanel({
             <Fragment key={v.area.title}>
               {boton}
               {botonRiel("Favoritos", verFavoritos, SECTION_ICONS.Favoritos)}
-              {botonRiel("Baby Yoda", verYoda, BabyYodaIcon)}
+              {!limitado && botonRiel("Baby Yoda", verYoda, BabyYodaIcon)}
             </Fragment>
           ) : (
             boton
@@ -388,7 +401,7 @@ function RielYPanel({
               </section>
             )
           )}
-          {!verAyuda && <Proximamente className="mt-auto" />}
+          {!verAyuda && !limitado && <Proximamente className="mt-auto" />}
         </nav>
       )}
     </>
@@ -411,6 +424,7 @@ function ListaMovil({
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
+  const limitado = tieneAccesoLimitado(areas, modulosPermitidos);
   return (
     <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
       <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
@@ -462,7 +476,7 @@ function ListaMovil({
           Centro de ayuda
         </Link>
       </section>
-      <Proximamente />
+      {!limitado && <Proximamente />}
     </nav>
   );
 }

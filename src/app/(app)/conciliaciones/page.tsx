@@ -23,7 +23,7 @@ interface Grupo {
 }
 
 export default async function ConciliacionesPage() {
-  await requireModulo("conciliaciones");
+  const usuario = await requireModulo("conciliaciones");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
@@ -76,11 +76,16 @@ export default async function ConciliacionesPage() {
         <EstadoVacio
           mensaje={
             <>
-              Todavía no hay depósitos asignados a una plataforma para {pais.nombre}. Ve a{" "}
-              <Link href="/extractos" className={linkClass}>
-                Extractos
-              </Link>{" "}
-              y asigna plataforma a los movimientos.
+              Todavía no hay depósitos asignados a una plataforma para {pais.nombre}.
+              {usuario.modulos.includes("extractos") && (
+                <>
+                  {" "}Ve a{" "}
+                  <Link href="/extractos" className={linkClass}>
+                    Extractos
+                  </Link>{" "}
+                  y asigna plataforma a los movimientos.
+                </>
+              )}
             </>
           }
         />

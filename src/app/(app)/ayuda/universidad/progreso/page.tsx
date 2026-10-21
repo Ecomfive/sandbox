@@ -1,10 +1,10 @@
-import { redirect } from "next/navigation";
 import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { CURSOS } from "@/lib/ayuda/cursos";
 import { formatearFecha } from "@/lib/formato";
+import { irAlInicio } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireSesion } from "../../datos-ayuda";
 
@@ -17,7 +17,7 @@ export const metadata = { title: "Progreso del equipo" };
  */
 export default async function ProgresoEquipoPage() {
   const usuario = await requireSesion();
-  if (!usuario.modulos.includes("usuarios")) redirect("/sin-acceso");
+  if (!usuario.modulos.includes("usuarios")) irAlInicio(usuario, "usuarios");
   const supabase = createServiceClient();
   const [perfiles, permisos, progreso, propios] = await Promise.all([
     supabase.from("perfiles").select("id, nombre, email, rol_id, activo").eq("activo", true).order("nombre"),

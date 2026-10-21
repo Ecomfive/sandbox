@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
@@ -27,7 +28,7 @@ const ICONOS: Record<string, IconoComp> = {
   notas: EstadoIcon,
 };
 
-function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) => void): ColumnaTabla<FilaSugerencia, undefined>[] {
+function columnas(puedeEscribir: boolean, puedeVerSeleccion: boolean, cambiar: (id: string, estado: string) => void): ColumnaTabla<FilaSugerencia, undefined>[] {
   return [
     { id: "codigo", label: "Código", ocultable: false, clase: "tabular-nums whitespace-nowrap text-muted-foreground", render: (f) => f.codigo },
     {
@@ -90,9 +91,13 @@ function columnas(puedeEscribir: boolean, cambiar: (id: string, estado: string) 
       clase: "tabular-nums whitespace-nowrap",
       render: (f) =>
         f.seleccionNumero !== null ? (
-          <a href="/seleccion-productos" className={`text-primario hover:underline ${anilloFoco}`}>
-            {numeroSeleccion(f.seleccionNumero)}
-          </a>
+          puedeVerSeleccion ? (
+            <a href="/seleccion-productos" className={`text-primario hover:underline ${anilloFoco}`}>
+              {numeroSeleccion(f.seleccionNumero)}
+            </a>
+          ) : (
+            <span>{numeroSeleccion(f.seleccionNumero)}</span>
+          )
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -126,7 +131,8 @@ export function TablaSugerencias({ filas, puedeEscribir, clientes }: { filas: Fi
     },
     [mostrarToast],
   );
-  const cols = useMemo(() => columnas(puedeEscribir, (id, estado) => void cambiar([id], estado)), [puedeEscribir, cambiar]);
+  const puedeVerSeleccion = usePuedeAbrir("seleccion-productos");
+  const cols = useMemo(() => columnas(puedeEscribir, puedeVerSeleccion, (id, estado) => void cambiar([id], estado)), [puedeEscribir, puedeVerSeleccion, cambiar]);
 
   return (
     <TablaDatos
