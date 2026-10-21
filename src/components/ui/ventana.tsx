@@ -27,7 +27,9 @@ export function Ventana({
   alCerrar: () => void;
   titulo: ReactNode;
   lado?: "centro" | "derecha";
-  ancho?: "sm" | "md" | "lg";
+  /** `xl`: la ventana grande al centro, como la vista de una tarea de ClickUp (casi toda la pantalla, de alto fijo: el
+   * contenido decide qué se desplaza, p. ej. dos columnas con su propio scroll). */
+  ancho?: "sm" | "md" | "lg" | "xl";
   /** Botones de la cabecera junto a «Cerrar» (p. ej. pasar al registro anterior o siguiente). */
   navegacion?: ReactNode;
   children: ReactNode;
@@ -103,7 +105,8 @@ export function Ventana({
 
   if (!abierto) return null;
 
-  const anchoClase = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl" }[ancho];
+  const anchoClase = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-6xl" }[ancho];
+  const grande = lado === "centro" && ancho === "xl";
   return createPortal(
     <div
       className={`fixed inset-0 z-50 flex bg-black/40 ${lado === "derecha" ? "justify-end" : "items-center justify-center p-4"}`}
@@ -118,13 +121,15 @@ export function Ventana({
         className={
           lado === "derecha"
             ? `animate-entrar-derecha flex h-full w-full ${anchoClase} flex-col overflow-y-auto border-l border-border bg-card shadow-xl`
-            : `max-h-[90vh] w-full ${anchoClase} overflow-y-auto rounded-xl border border-border bg-card shadow-xl`
+            : grande
+              ? `animate-entrar-centro flex h-[92vh] w-full ${anchoClase} flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl`
+              : `max-h-[90vh] w-full ${anchoClase} overflow-y-auto rounded-xl border border-border bg-card shadow-xl`
         }
       >
         <div
           ref={cabeceraRef}
           className={`sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card ${
-            lado === "derecha" ? "px-5 py-3" : "px-4 py-2.5"
+            lado === "derecha" || grande ? "px-5 py-3" : "px-4 py-2.5"
           }`}
         >
           <h2 id={tituloId} className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold">
@@ -137,7 +142,7 @@ export function Ventana({
               onClick={alCerrar}
               aria-label="Cerrar"
               className={
-                lado === "derecha"
+                lado === "derecha" || grande
                   ? `flex h-9 w-9 items-center justify-center border border-border bg-card text-foreground hover:bg-muted ${anilloFoco} !rounded-md`
                   : `p-1.5 text-muted-foreground hover:text-foreground ${anilloFoco}`
               }
