@@ -7,7 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, UBICACIONES, margenBajo, opcion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
@@ -116,6 +116,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="truncate text-sm font-medium">{f.nombre}</span>
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
             <span className="tabular-nums">{f.dropiId ? `ID ${f.dropiId}` : "Sin ID de Dropi"}</span>
             {f.sku ? (
               <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>

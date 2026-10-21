@@ -21,6 +21,7 @@ import {
   MARGEN_BAJO,
   TIPOS,
   UBICACIONES,
+  numeroPublicacion,
   opcion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
@@ -253,6 +254,7 @@ function ContenidoFicha({
       ancho="lg"
       titulo={
         <>
+          <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroPublicacion(p.numero)}</span>
           <span className="text-lg font-semibold">{p.nombre}</span>
           {estado && <Badge color={estado.color}>{estado.etiqueta}</Badge>}
         </>
