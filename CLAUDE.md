@@ -748,7 +748,7 @@ convenciones técnicas del código.
   **Cómo se abre una ficha** (22 oct 2026, como las vistas de una tarea de ClickUp): una `Ventana` que es **ficha** —un panel a la derecha o la grande
   `ancho="xl"` al centro, `esFicha` en `src/lib/ficha/modo.ts`, con prueba— se abre en el modo que cada persona eligió: **barra lateral**, **cuadro de
   diálogo** al centro o **pantalla completa** (`lateral` / `centro` / `completa`). El botón de la cabecera (`SelectorModoFicha`,
-  `src/components/ui/selector-modo-ficha.tsx`: tres miniaturas, como el de ClickUp) lo cambia y la elección vale para **todas las fichas** (almacén
+  `src/components/ui/selector-modo-ficha.tsx`: el ícono «Cambiar diseño» de ClickUp; **las tres miniaturas se despliegan al pasar el cursor** —o con clic, Enter o flecha abajo— y **se repliegan al elegir una o al sacar el cursor**, quedando solo el ícono; no usa `MenuDesplegable` ni `Tooltip`) lo cambia y la elección vale para **todas las fichas** (almacén
   `modo-ficha-v1` en el navegador, `useModoFicha`; sin base de datos, así que no viaja a otro equipo). Mientras no elija, cada ficha se abre como siempre
   (`modoPorDefecto`: el panel a la derecha → lateral; la de Producto → centro). Un diálogo pequeño (atajos, copiar permisos) no es ficha y no cambia. En los tres
   modos el panel se desplaza por dentro; a pantalla completa el contenido se centra con un ancho cómodo. **Una ficha nueva** solo usa `<Ventana lado="derecha">`:
