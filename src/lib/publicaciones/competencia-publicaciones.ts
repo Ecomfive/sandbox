@@ -71,6 +71,51 @@ export function competidorMinimo(
   return mejor;
 }
 
+export interface NuestroEnDropi {
+  nombre: string;
+  precio: number | null;
+  precioSugerido: number | null;
+  categoria: string | null;
+  /** null = todavía no se leyó (migración 0129 y la lectura siguiente). */
+  fotos: number | null;
+  videos: number | null;
+  descripcionLargo: number | null;
+}
+
+/**
+ * Cómo se ven nuestros productos en el catálogo de Dropi (la última lectura de Análisis de competencia), por su ID de Dropi: el
+ * título, el precio y el sugerido y, desde la migración 0129, las fotos, los videos y el largo de la descripción. Sin la tabla, vacío.
+ */
+export async function cargarNuestrosEnDropi(supabase: SupabaseClient, paisId: string): Promise<Map<number, NuestroEnDropi>> {
+  const out = new Map<number, NuestroEnDropi>();
+  type F = { dropi_producto_id: number; nombre: string; precio: number | null; precio_sugerido: number | null; categoria: string | null; fotos?: number | null; videos?: number | null; descripcion_largo?: number | null };
+  const leer = (columnas: string) =>
+    traerTodasLasFilas<F>((d, h) => supabase.from("competencia_productos").select(columnas as "*").eq("pais_id", paisId).eq("es_nuestro", true).eq("estado", "activo").order("id").range(d, h) as unknown as PromiseLike<{ data: F[] | null; error: unknown }>);
+  const base = "dropi_producto_id, nombre, precio, precio_sugerido, categoria";
+  let filas: F[] = [];
+  try {
+    filas = await leer(`${base}, fotos, videos, descripcion_largo`);
+  } catch {
+    try {
+      filas = await leer(base);
+    } catch {
+      return out;
+    }
+  }
+  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  for (const f of filas)
+    out.set(Number(f.dropi_producto_id), {
+      nombre: f.nombre,
+      precio: n(f.precio),
+      precioSugerido: n(f.precio_sugerido),
+      categoria: f.categoria,
+      fotos: n(f.fotos),
+      videos: n(f.videos),
+      descripcionLargo: n(f.descripcion_largo),
+    });
+  return out;
+}
+
 export interface CambioPrecio {
   /** Cuándo se vio el cambio en Dropi (la lectura del catálogo que lo encontró, no el minuto exacto). */
   fecha: string;

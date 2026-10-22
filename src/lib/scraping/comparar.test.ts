@@ -48,6 +48,9 @@ test("normaliza un producto simple y uno variable de Dropi", () => {
     stock: 50,
     categoria: "Belleza",
     creadoEnDropi: null,
+    fotos: 1,
+    videos: null,
+    descripcionLargo: null,
   });
   const variable = normalizarDropi({
     id: 1,
@@ -105,4 +108,15 @@ test("compara con lo guardado: nuevos, cambios, desaparecidos y reaparecidos", (
     ["g3", "privatizado"],
   ]);
   assert.deepEqual(r.cuentas, { vistos: 5, nuevos: 2, desaparecidos: 2, cambiosPrecio: 1, cambiosStock: 2, privados: 1 });
+});
+
+test("cuenta las fotos de la galería y deja video y descripción sin datos si no vienen", async () => {
+  const { normalizarDropi } = await import("./comparar");
+  const v = normalizarDropi({ id: 1, name: "X", gallery: [{ urlS3: "a.jpg", main: true }, { urlS3: "b.jpg" }], videos: 2, descripcion_largo: 240 });
+  assert.equal(v?.fotos, 2);
+  assert.equal(v?.videos, 2);
+  assert.equal(v?.descripcionLargo, 240);
+  const w = normalizarDropi({ id: 2, name: "Y" });
+  assert.equal(w?.fotos, null);
+  assert.equal(w?.videos, null);
 });

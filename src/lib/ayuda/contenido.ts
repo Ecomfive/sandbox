@@ -328,9 +328,19 @@ export const GUIAS: GuiaModulo[] = [
         ],
       },
       {
+        titulo: "Optimización en Dropi",
+        pasos: [
+          "La ficha de cada publicación trae el bloque «Optimización en Dropi»: lo que se revisa de cómo se ve en Dropi, con Cumple, Falta, Revisar o Sin datos, y la nota (cuántos puntos cumple). Se revisa con lo que muestra Dropi en la última lectura del catálogo, no con el nombre guardado aquí.",
+          "Título: en español (sin palabras en inglés como hair, growth, cream, blocker), con la cantidad si es un suplemento (60 cápsulas, 30 gomitas), que diga para qué sirve («para la ciática», «contra la caída»; si no lo dice, queda para revisar) y claro (no muy corto ni todo en mayúsculas).",
+          "Fotos (7 como mínimo), video, descripción (200 caracteres como mínimo) y precio sugerido (que exista y sea mayor que nuestro precio, para que al dropshipper le quede margen). Fotos, video y descripción dicen «Sin datos» hasta la próxima lectura del catálogo de Dropi.",
+          "Lo que falta sale como recomendación (Optimizar el título, Agregar fotos, Agregar video, Mejorar la descripción, Ajustar el precio sugerido) en la tarjeta «Por optimizar» del tablero y en la pestaña Recomendaciones (grupo «Optimización en Dropi»). Se acepta y se asigna como las demás, y el sistema la da por hecha cuando la lectura de Dropi ya no ve lo que faltaba.",
+          "El filtro «Optimización» de la lista separa las que les falta mucho, algo o están completas, y «Nota de optimización (%)» permite ordenarlas.",
+        ],
+      },
+      {
         titulo: "Reglas",
         pasos: [
-          "La pestaña «Reglas» tiene los números con que el sistema decide: margen mínimo (30 %), crítico (20 %) y saludable (40 %), la caída de ventas (50 %), las ventas mínimas para comparar (10), los días de producto nuevo (30) para el combo x2, las ventas mínimas en 30 días (5) y su descuento (10 %), y el plazo para hacer una recomendación aceptada (7 días). Entre paréntesis, los valores de siempre.",
+          "La pestaña «Reglas» tiene los números con que el sistema decide: margen mínimo (30 %), crítico (20 %) y saludable (40 %), la caída de ventas (50 %), las ventas mínimas para comparar (10), los días de producto nuevo (30) para el combo x2, las ventas mínimas en 30 días (5) y su descuento (10 %), el mínimo de fotos (7) y de caracteres de la descripción (200), y el plazo para hacer una recomendación aceptada (7 días). Entre paréntesis, los valores de siempre.",
           "Cámbialos y pulsa «Guardar reglas»: las tarjetas, los filtros de margen y las recomendaciones se calculan con los nuevos. Queda quién cambió cada uno y cuándo (también en la auditoría). «Valores de siempre» los devuelve a los del sistema. Solo los cambia quien puede modificar este módulo.",
         ],
       },
@@ -514,6 +524,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-22", titulo: "Optimización de las publicaciones en Dropi", texto: "Gestión de IDs Dropi revisa cómo se ve cada publicación en Dropi: título en español, con la cantidad y para qué sirve, fotos (7 como mínimo), video, descripción y precio sugerido. Lo que falta sale como recomendación en la nueva tarjeta «Por optimizar» y en la ficha, y se vuelve tarea al aceptarlo.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/recomendaciones" },
   { fecha: "2026-10-21", titulo: "Recomendaciones aceptadas, como tareas", texto: "En Gestión de IDs Dropi, aceptar una recomendación la vuelve una tarea con responsable (le llega un aviso) y plazo. El sistema la marca hecha solo cuando Dropi muestra el precio nuevo o el combo x2 ya está publicado; si no, «Ya lo hice». Las atrasadas salen en Hoy. Nuevas vistas Por hacer y Hechas en la pestaña Recomendaciones.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/recomendaciones?ver=por_hacer" },
   { fecha: "2026-10-21", titulo: "Recomendaciones y Reglas en Gestión de IDs Dropi", texto: "El sistema ahora recomienda qué hacer con cada publicación (crear un combo x2, subir el precio o bajarlo frente a la competencia), con el porqué y el resultado esperado. Se aceptan, rechazan o posponen explicando por qué, y cada decisión queda guardada. La nueva pestaña Reglas deja cambiar los umbrales (margen mínimo, crítico, caída de ventas, combo…) sin pedirlo a sistemas.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/recomendaciones" },
   { fecha: "2026-10-21", titulo: "Proveedor y agente con color", texto: "En Compras, Chin, Zion y Alibaba (proveedor) y Chin y Avery (agente de envío) se ven cada uno con su propio color, con los tonos del sistema.", modulo: "compras", href: "/compras/lista" },
