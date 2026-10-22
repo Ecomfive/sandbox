@@ -10,6 +10,7 @@ import { diasEntre, hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
 import { resumenTransito } from "@/lib/proveedor/transito";
+import { traducirTextos } from "@/lib/proveedor/traducir";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CuentaPortal } from "./cuenta-proveedor";
 import { PortalProveedor, type Novedad, type ResumenPais } from "./portal-proveedor";
@@ -19,7 +20,7 @@ export const metadata = { title: "Portal del proveedor" };
 export const dynamic = "force-dynamic";
 
 /** Las pestañas que se pueden pedir en la dirección (`?tab=`). */
-const TABS = ["novedades", "decidir", "cotizacion", "transito", "pagos", "cuenta"] as const;
+const TABS = ["novedades", "decidir", "cotizacion", "transito", "pagos", "tablero", "cuenta"] as const;
 /** Desde cuándo se cuenta el tránsito real de cada país. */
 const TRANSITO_DESDE = "2026-01-01";
 
@@ -73,16 +74,6 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     .filter((r) => puedeVerPais(usuario.paisesPermitidos, r.pais))
     .sort((a, b) => (b.real?.envios ?? 0) - (a.real?.envios ?? 0));
 
-  // Fotos reales: la que subió el proveedor (bucket privado, enlaces de una hora) o, si no, la «Foto real del producto» de la compra.
-  const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
-  const fotosReales: Record<string, string> = {};
-  for (const p of activos) if (realDeCompra[p.id]) fotosReales[p.id] = realDeCompra[p.id];
-  if (rutas.length) {
-    const { data: firmadas } = await supabase.storage.from("proveedor-portal").createSignedUrls(rutas, 3600);
-    const porRuta = new Map((firmadas ?? []).map((f) => [f.path, f.signedUrl]));
-    for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
-  }
-
   const { data: filasNovedades } = await supabase
     .from("proveedor_novedades")
     .select("id, pedido_id, tipo, texto, detalle, autor_nombre, leida_en, creado_en")
@@ -124,6 +115,37 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     if (host) entrada = `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}/login`;
   }
 
+  // «Tablero de Chin»: su portal tal como lo ve (lo nuevo que Ecomfive le dejó y él aún no abre, los avisos de pago por confirmar).
+  const [{ data: nuevasParaChin }, { data: cuentaChin }] = await Promise.all([
+    supabase.from("proveedor_novedades").select("id, texto, creado_en").eq("proveedor_id", espejo.proveedor.id).eq("lado", "ecomfive").is("leida_en", null).order("creado_en", { ascending: false }).limit(20),
+    supabase.from("proveedor_usuarios").select("nombre").eq("proveedor_id", espejo.proveedor.id).order("creado_en").limit(1).maybeSingle(),
+  ]);
+  // Lo que escribe Chin (comentarios de cotización, novedades, notas al confirmar un pago), traducido al español.
+  const traducciones = await traducirTextos(
+    supabase,
+    [...activos.map((p) => p.comentarioProveedor), ...novedades.map((n) => n.detalle), ...(pagos ? pagos.avisos.map((a) => a.nota) : [])],
+    "es",
+  );
+  // El tablero muestra las fotos reales como las ve Chin en «Cotizado»: la que subió él (enlaces de una hora) o la de la compra.
+  // («Por decidir», de este lado, sigue solo con la foto de referencia.)
+  const fotosReales: Record<string, string> = {};
+  for (const p of activos) if (realDeCompra[p.id]) fotosReales[p.id] = realDeCompra[p.id];
+  const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
+  if (rutas.length) {
+    const { data: firmadas } = await supabase.storage.from("proveedor-portal").createSignedUrls(rutas, 3600);
+    const porRuta = new Map((firmadas ?? []).map((f) => [f.path, f.signedUrl]));
+    for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
+  }
+  const tablero = {
+    cuenta: { nombre: (cuentaChin?.nombre as string | undefined) ?? espejo.proveedor.nombre, proveedor: espejo.proveedor.nombre, diasAnticipo: espejo.proveedor.diasAnticipo },
+    pedidos: activos,
+    plazos: espejo.plazos,
+    fotosReales,
+    avisos: (nuevasParaChin ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string })),
+    pagos: pagos ? { resumen: pagos.resumen, avisos: pagos.avisos.filter((a) => a.estado === "avisado"), plazos: pagos.plazos } : null,
+    traducciones,
+  };
+
   const tabInicial = typeof tab === "string" && (TABS as readonly string[]).includes(tab) ? (tab as (typeof TABS)[number]) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -134,11 +156,12 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
         plazos={espejo.plazos}
         resumen={resumen}
         novedades={novedades}
-        fotosReales={fotosReales}
         puedeEscribir={!usuario.modulosSoloLectura.includes("portal-proveedor")}
         tabInicial={tabInicial === "cuenta" && !admin ? null : tabInicial}
         cuentaPortal={admin ? { cuenta, entrada } : null}
         pagos={pagos}
+        tablero={tablero}
+        traducciones={traducciones}
       />
     </Pagina>
   );

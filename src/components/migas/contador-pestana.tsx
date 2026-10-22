@@ -21,9 +21,13 @@ function suscribir(avisar: () => void) {
   };
 }
 
+/** En el servidor no hay contadores. Tiene que ser siempre el mismo objeto: si cada lectura devolviera uno nuevo (`() => ({})`), React
+ * lo toma como un cambio sin fin al hidratar y la página se queda cargando. */
+const SIN_CONTADORES: Record<string, number> = {};
+
 /** Lo pendiente de cada pestaña (por su `href`) que alguna página ya dijo; la franja de pestañas lo dibuja. */
 export function useContadoresPestanas(): Record<string, number> {
-  return useSyncExternalStore(suscribir, () => contadores, () => ({}));
+  return useSyncExternalStore(suscribir, () => contadores, () => SIN_CONTADORES);
 }
 
 /**

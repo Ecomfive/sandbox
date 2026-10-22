@@ -1,6 +1,7 @@
-// Lo que viene en camino de un producto: las unidades de sus compras que ya salieron y todavía no llegan, sumadas por país.
-// Es la misma regla de «En tránsito» de Compras (`enTransito`, `calculos-compras.ts`): la orden sigue abierta, tiene fecha de envío
-// y no tiene fecha de llegada. Una orden anulada no cuenta. Sin base ni React, para poder probarlo.
+// Lo que viene en camino de un producto: las unidades de sus compras que ya se pidieron y todavía no llegan, sumadas por país.
+// Cuenta una orden abierta, sin fecha de llegada, que **ya salió** (tiene fecha de envío) o **ya está en marcha** (En Producción,
+// Tracking o Arribo Mercancía: pedida y pagada aunque todavía no se envíe). Una orden en Cotizar, Cotizado o Backlog es solo una
+// cotización: no cuenta. Una orden anulada tampoco. Sin base ni React, para poder probarlo.
 
 import { estimarPlanificacion, type TiemposTransito } from "./planificacion";
 
@@ -25,8 +26,12 @@ export interface EnCaminoPais {
   compras: number;
 }
 
-/** Una línea está en camino: orden abierta, ya salió y no ha llegado. */
-export const lineaEnCamino = (l: LineaEnCamino): boolean => !l.anulada && !ETAPAS_CERRADAS.includes(l.etapa) && !!l.fechaEnvio && !l.fechaLlegada;
+/** Las etapas en que la mercancía ya está pedida (se produce, viaja o llegó al puerto) aunque todavía no tenga fecha de envío. */
+export const ETAPAS_EN_MARCHA = ["produccion", "tracking", "arribo_mercancia"];
+
+/** Una línea está en camino: orden abierta, sin llegar, que ya salió o ya está en producción, tracking o arribo. */
+export const lineaEnCamino = (l: LineaEnCamino): boolean =>
+  !l.anulada && !ETAPAS_CERRADAS.includes(l.etapa) && !l.fechaLlegada && (!!l.fechaEnvio || ETAPAS_EN_MARCHA.includes(l.etapa));
 
 /**
  * Las unidades en camino por país, el país con más unidades primero. Con `codigoPais` solo las de ese país (el que está marcado en
@@ -83,20 +88,28 @@ export interface ResumenLlegada {
   llegada: string | null;
   /** Las unidades de órdenes que todavía no tienen fecha de llegada. */
   sinFecha: number;
+  /** De esas, las de órdenes que aún no tienen fecha de envío (en producción, sin enviar): es lo que falta para saber cuándo llegan. */
+  sinEnvio: number;
 }
 
 /** Junta las órdenes en camino de un producto: sus unidades, la llegada más próxima y cuántas unidades no tienen fecha. */
-export function resumenLlegada(ordenes: { unidades: number; llegada: string | null }[]): ResumenLlegada {
+export function resumenLlegada(ordenes: { unidades: number; llegada: string | null; sinEnvio?: boolean }[]): ResumenLlegada {
   let llegada: string | null = null;
   let sinFecha = 0;
+  let sinEnvio = 0;
   let unidades = 0;
   for (const o of ordenes) {
     unidades += o.unidades;
-    if (o.llegada === null) sinFecha += o.unidades;
-    else if (llegada === null || o.llegada < llegada) llegada = o.llegada;
+    if (o.llegada === null) {
+      sinFecha += o.unidades;
+      if (o.sinEnvio) sinEnvio += o.unidades;
+    } else if (llegada === null || o.llegada < llegada) llegada = o.llegada;
   }
-  return { unidades, llegada, sinFecha };
+  return { unidades, llegada, sinFecha, sinEnvio };
 }
+
+/** Qué falta para saber cuándo llega una orden sin fecha de llegada: su fecha de envío, o (ya enviada) su vía de envío o su fecha límite. */
+export const faltaParaLlegada = (c: { fechaEnvio: string | null }): "envio" | "via" => (c.fechaEnvio ? "via" : "envio");
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
