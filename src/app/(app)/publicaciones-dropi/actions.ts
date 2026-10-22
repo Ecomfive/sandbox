@@ -114,6 +114,8 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
+  // El nombre viene de Dropi: la ficha no lo cambia (ni aunque llegue otro en el formulario).
+  delete datos.nombre;
 
   const { error } = await createServiceClient()
     .from("dropi_publicaciones")
@@ -122,6 +124,7 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   if (error) return { error: "No se pudo guardar la publicación." };
 
   const cambios = VISTA.filter(([k]) => {
+    if (k === "nombre") return false;
     const a = antes[k] === null || antes[k] === undefined ? null : typeof datos[k] === "number" ? Number(antes[k]) : antes[k];
     return a !== datos[k];
   });

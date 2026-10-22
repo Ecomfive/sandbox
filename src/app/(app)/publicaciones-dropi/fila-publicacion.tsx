@@ -10,6 +10,7 @@ import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publ
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
+import { InsigniaConectado } from "./insignia-conectado";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
@@ -116,6 +117,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
             <span className="tabular-nums">{f.dropiId ? `ID ${f.dropiId}` : "Sin ID de Dropi"}</span>
+            {f.dropiId.trim() !== "" && <InsigniaConectado />}
             {f.sku ? (
               <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>
             ) : (

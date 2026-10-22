@@ -24,6 +24,7 @@ import { VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
+import { InsigniaConectado } from "./insignia-conectado";
 import { VinculoSku } from "./vinculo-sku";
 
 interface Formulario {
@@ -319,16 +320,14 @@ function ContenidoFicha({
               {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nombre} className="h-24 w-24 shrink-0 rounded-lg border border-border object-cover" /> : <span aria-hidden="true" className="h-24 w-24 shrink-0 rounded-lg border border-dashed border-border-control" />}
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Nombre en Dropi</span>
-                  <input value={d.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} required maxLength={300} className={`${fieldClass} w-full`} />
+                  <span className={labelClassSm}>Nombre en Dropi</span>
+                  {/* Viene de Dropi: no se edita. Cambia solo cuando Dropi trae otro nombre para el mismo ID (al volver a vincular). */}
+                  <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
                 </label>
                 <div className="flex min-w-0 flex-col gap-1.5">
                   {conectado && (
                     <div className="flex">
-                      <Badge tone="success">
-                        <CheckIcon aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
-                        Conectado
-                      </Badge>
+                      <InsigniaConectado />
                     </div>
                   )}
                   <label className="flex min-w-0 flex-col gap-1">
