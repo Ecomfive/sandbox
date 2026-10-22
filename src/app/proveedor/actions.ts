@@ -85,7 +85,7 @@ export async function confirmarAvisoPago(avisoId: string, nota: string): Promise
   await Promise.all([
     supabase.from("proveedor_novedades").insert({ proveedor_id: cuenta.proveedor.id, lado: "proveedor", tipo: "pago", texto: titulo, detalle, autor_nombre: cuenta.nombre }),
     cuenta.proveedor.notificarA
-      ? supabase.from("notificaciones_usuario").insert({ usuario_id: cuenta.proveedor.notificarA, tipo: "proveedor", titulo, texto: detalle, href: "/portal-proveedor?tab=pagos", autor_nombre: `${cuenta.proveedor.nombre} (proveedor)` })
+      ? supabase.from("notificaciones_usuario").insert({ usuario_id: cuenta.proveedor.notificarA, tipo: "proveedor", titulo, texto: detalle, href: "/compras/tablero-chin?ver=pagos", autor_nombre: `${cuenta.proveedor.nombre} (proveedor)` })
       : Promise.resolve(),
     supabase.from("historial_auditoria").insert({ usuario_id: null, usuario_nombre: `${cuenta.proveedor.nombre} (proveedor)`, accion: "editar_campo_compra", entidad: "proveedor_avisos_pago", entidad_id: avisoId, detalle: `${titulo}. ${detalle}` }),
   ]);

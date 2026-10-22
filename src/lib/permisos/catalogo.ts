@@ -74,7 +74,6 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "wms-bodegas", etiqueta: "Bodegas" },
       { clave: "wms-ubicaciones", etiqueta: "Ubicaciones" },
       { clave: "compras", etiqueta: "Compras" },
-      { clave: "portal-proveedor", etiqueta: "Portal del proveedor" },
       { clave: "producto", etiqueta: "Producto" },
       { clave: "wms-productos", etiqueta: "Ficha producto Shopify" },
       { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi" },
@@ -173,6 +172,7 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
   etiqueta: "Compras",
   pestanas: [
     { clave: "lista", etiqueta: "Compras", href: "/compras/lista" },
+    { clave: "tablero-chin", etiqueta: "Tablero de Chin", href: "/compras/tablero-chin" },
     { clave: "informe", etiqueta: "Informe", href: "/compras/informe" },
     { clave: "dashboard", etiqueta: "Dashboard", href: "/compras/dashboard" },
     { clave: "tiempos", etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },

@@ -540,9 +540,17 @@ convenciones técnicas del código.
   `gemini-3.5-flash-lite`, tandas de 60, máximo 4 por carga, nunca lanza) y se guarda en `traducciones` (huella sha256 + destino): a
   chino los productos, las notas, «Lo nuevo» y los productos de pagos; a español lo que escribe Chin (comentario de cotización, detalle de
   novedad, nota al confirmar un pago). Las pantallas reciben las traducciones por `IdiomaProveedor` (`useIdioma`: `t`, `tr`, `fecha`,
-  `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)». **«Tablero de Chin»** (`?tab=tablero`
-  en `/portal-proveedor`): el mismo `PortalChin` en español con `soloLectura` (sin botones, sin selector ni «Salir» y sin marcar
-  «Lo nuevo» como visto).
+  `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)».
+  **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Chin**
+  (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
+  sigue el Tablero). Trae «Lo que ve Chin» (el mismo `PortalChin` en español con `soloLectura`: sin botones, sin selector ni «Salir» y sin
+  marcar «Lo nuevo» como visto), «Pagos a Chin» (`compras/tablero-chin/pagos-ecomfive.tsx` + `pagos-actions.ts`: modificar Compras y ver
+  sus montos) y, para un administrador, el botón «Cuenta de Chin» (`cuenta-proveedor.tsx` + `cuenta-actions.ts` en una `Ventana`). Se
+  quitaron Novedades, Por decidir, En cotización y Tránsito: decidir una cotización y marcar una llegada se hacen cambiando la etapa de la
+  compra, y la **nota para Chin** (`wms_compras.nota_proveedor`) es el campo «Nota para Chin» de la ficha de una compra de Chin
+  (`leerCambios` solo la guarda si viaja en el formulario). Los avisos de Chin en la campana llevan a la compra
+  (`/compras/lista?ver=todos&abrir=<id>`) y los de pagos a `/compras/tablero-chin?ver=pagos`; `/portal-proveedor` solo redirige ahí. El
+  módulo de permisos `portal-proveedor` ya no está en el menú, la matriz ni el Centro de ayuda (sus filas viejas en `permisos_rol` no se usan).
 - **Actividad con comentarios, común a todos los módulos** (22 oct 2026). La Actividad de Compras se separó en una pieza común:
   `Actividad` (`src/components/actividad/actividad.tsx`: un solo bloque con comentarios, cambios y archivos, filtro, «Ver anteriores»,
   campo con @menciones, pegar o arrastrar archivos), `TarjetaComentario` (`tarjeta-comentario.tsx`: respuestas de un nivel,

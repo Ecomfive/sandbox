@@ -57,10 +57,12 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Competidores", href: "/analisis-competencia" },
     { etiqueta: "Resumen", href: "/analisis-competencia/resumen" },
   ],
+  // Compras primero y luego el Tablero de Chin (pedido de Hernán, 22 oct 2026).
   "/compras": [
+    { etiqueta: "Compras", href: "/compras/lista" },
+    { etiqueta: "Tablero de Chin", href: "/compras/tablero-chin" },
     { etiqueta: "Dashboard", href: "/compras/dashboard" },
     { etiqueta: "Informe", href: "/compras/informe" },
-    { etiqueta: "Compras", href: "/compras/lista" },
     { etiqueta: "Planificación", href: "/compras/planificacion" },
     { etiqueta: "Reponer", href: "/compras/reponer" },
     { etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },

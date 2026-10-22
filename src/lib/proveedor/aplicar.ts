@@ -47,12 +47,12 @@ async function pedidoDe(supabase: Supabase, cuenta: CuentaProveedor, pedidoId: s
 
 const autorDe = (cuenta: CuentaProveedor) => `${cuenta.proveedor.nombre} (proveedor)`;
 
-/** Novedad para «Novedades del proveedor», aviso en la campana y línea en la auditoría. */
-async function avisarAEcomfive(supabase: Supabase, cuenta: CuentaProveedor, p: Pedido, tipo: "cotizacion" | "envio", texto: string, detalle: string, pestana: string) {
+/** Novedad del proveedor, aviso en la campana (lleva a la compra) y línea en la auditoría. */
+async function avisarAEcomfive(supabase: Supabase, cuenta: CuentaProveedor, p: Pedido, tipo: "cotizacion" | "envio", texto: string, detalle: string) {
   await Promise.all([
     supabase.from("proveedor_novedades").insert({ proveedor_id: cuenta.proveedor.id, pedido_id: p.id, lado: "proveedor", tipo, texto, detalle, autor_nombre: cuenta.nombre }),
     cuenta.proveedor.notificarA
-      ? supabase.from("notificaciones_usuario").insert({ usuario_id: cuenta.proveedor.notificarA, tipo: "proveedor", titulo: texto, texto: detalle, href: `/portal-proveedor?tab=${pestana}`, autor_nombre: autorDe(cuenta) })
+      ? supabase.from("notificaciones_usuario").insert({ usuario_id: cuenta.proveedor.notificarA, tipo: "proveedor", titulo: texto, texto: detalle, href: `/compras/lista?ver=todos&abrir=${p.compra_id}`, autor_nombre: autorDe(cuenta) })
       : Promise.resolve(),
     supabase.from("historial_auditoria").insert({ usuario_id: null, usuario_nombre: autorDe(cuenta), accion: "editar_campo_compra", entidad: "wms_compras", entidad_id: p.compra_id, detalle: `${texto}. ${detalle}` }),
   ]);
@@ -141,7 +141,6 @@ export async function aplicarCotizacion(
     "cotizacion",
     `${cuenta.proveedor.nombre} ${corrigio ? "corrigió la cotización de" : "cotizó"} ${p.producto}`,
     `${resumen}${foto ? " · subió la foto real" : ""}${comentario ? ` · «${comentario}»` : ""}`,
-    "decidir",
   );
   return {};
 }
@@ -171,6 +170,6 @@ export async function aplicarEnvio(cuenta: CuentaProveedor, pedidoId: string, fe
   await supabase.from("proveedor_pedidos").update({ enviado_marcado_en: new Date().toISOString() }).eq("id", p.id);
 
   const vence = new Date(Date.parse(f) + cuenta.proveedor.diasAnticipo * 864e5).toISOString().slice(0, 10);
-  await avisarAEcomfive(supabase, cuenta, p, "envio", `${cuenta.proveedor.nombre} marcó ${p.producto} como enviado el ${fechaCorta(f)}`, `El anticipo vence el ${fechaCorta(vence)}`, "transito");
+  await avisarAEcomfive(supabase, cuenta, p, "envio", `${cuenta.proveedor.nombre} marcó ${p.producto} como enviado el ${fechaCorta(f)}`, `El anticipo vence el ${fechaCorta(vence)}`);
   return { fechaEnvio: f };
 }

@@ -9,7 +9,7 @@ import type { PedidoPortal } from "@/lib/proveedor/datos";
 import { TEXTOS, fechaCorta, type Idioma } from "@/lib/proveedor/textos";
 import { useIdioma } from "./idioma-contexto";
 
-// Piezas que comparten las dos vistas del portal del proveedor (la de Ecomfive en /portal-proveedor y la de Chin en /proveedor):
+// Piezas que comparten las dos vistas del portal del proveedor (la de Ecomfive en Compras › Tablero de Chin y la de Chin en /proveedor):
 // la interfaz del prototipo aprobado, con los tokens del sistema.
 
 export const TONO: Record<TonoCuota, Tone> = { exito: "success", aviso: "warning", peligro: "destructive", info: "azul", neutro: "neutral" };
@@ -82,7 +82,7 @@ export const Vacio = ({ children }: { children: ReactNode }) => <p className="m-
 /** La franja de pestañas con su contador (el rosado es lo nuevo). */
 export function Pestanas<T extends string>({ etiqueta, tabs, valor, alCambiar }: { etiqueta: string; tabs: { clave: T; titulo: string; cuenta: number; viva?: boolean }[]; valor: T; alCambiar: (t: T) => void }) {
   return (
-    <div role="tablist" aria-label={etiqueta} className="flex gap-0.5 overflow-x-auto border-b border-border">
+    <div role="tablist" aria-label={etiqueta} className="flex gap-0.5 overflow-x-auto overflow-y-hidden border-b border-border">
       {tabs.map((t) => (
         <button
           key={t.clave}
