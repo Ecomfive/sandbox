@@ -43,9 +43,9 @@ type Tab = "novedades" | "decidir" | "cotizacion" | "transito" | "pagos" | "tabl
 
 /**
  * Operación › Portal del proveedor: el lado de Ecomfive del portal de Chin (fase 2 de PORTAL-PROVEEDOR.md, la interfaz del
- * prototipo aprobado). Novedades (lo que cambió Chin), Por decidir (cotizaciones con la foto de referencia y la real), En cotización
- * y Tránsito contra el plazo prometido, Pagos y «Tablero de Chin» (su portal tal como lo ve, en español y solo para ver). Lo que escribe
- * Chin (en chino) llega traducido al español con el original a un clic (`traducciones`).
+ * prototipo aprobado). Novedades (lo que cambió Chin), Por decidir (cotizaciones con la foto de referencia; la real se agrega después),
+ * En cotización, Tránsito contra el plazo prometido, Pagos y «Tablero de Chin» (su portal tal como lo ve, en español y solo para ver). Lo
+ * que escribe Chin (en chino) llega traducido al español con el original a un clic (`traducciones`).
  */
 export function PortalProveedor({
   proveedor,
@@ -53,7 +53,6 @@ export function PortalProveedor({
   plazos,
   resumen,
   novedades,
-  fotosReales,
   puedeEscribir,
   tabInicial,
   cuentaPortal,
@@ -66,7 +65,6 @@ export function PortalProveedor({
   plazos: Record<string, Plazo>;
   resumen: ResumenPais[];
   novedades: Novedad[];
-  fotosReales: Record<string, string>;
   puedeEscribir: boolean;
   tabInicial: Tab | null;
   /** Solo para un administrador: la cuenta con la que el proveedor entra a su portal. */
@@ -122,7 +120,7 @@ export function PortalProveedor({
           }}
         />
       )}
-      {tab === "decidir" && <PorDecidir pedidos={de("cotizado")} fotosReales={fotosReales} nombre={nombre} puedeEscribir={puedeEscribir} alDecidir={(id, etapa) => cambiar(id, { etapa })} />}
+      {tab === "decidir" && <PorDecidir pedidos={de("cotizado")} nombre={nombre} puedeEscribir={puedeEscribir} alDecidir={(id, etapa) => cambiar(id, { etapa })} />}
       {tab === "cotizacion" && (
         <EnCotizacion
           pedidos={de("por_cotizar")}
@@ -218,13 +216,11 @@ function Novedades({ novedades, nombre, puedeEscribir, alLeer }: { novedades: No
 // ── Por decidir ──
 function PorDecidir({
   pedidos,
-  fotosReales,
   nombre,
   puedeEscribir,
   alDecidir,
 }: {
   pedidos: PedidoPortal[];
-  fotosReales: Record<string, string>;
   nombre: string;
   puedeEscribir: boolean;
   alDecidir: (id: string, etapa: "produccion" | "descartado") => void;
@@ -236,7 +232,7 @@ function PorDecidir({
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(17rem,100%),1fr))] gap-3 p-3">
           {pedidos.map((p) => (
-            <TarjetaCotizacion key={p.id} p={p} fotoReal={fotosReales[p.id] ?? null} nombre={nombre} puedeEscribir={puedeEscribir} alDecidir={alDecidir} />
+            <TarjetaCotizacion key={p.id} p={p} nombre={nombre} puedeEscribir={puedeEscribir} alDecidir={alDecidir} />
           ))}
         </div>
       )}
@@ -244,7 +240,7 @@ function PorDecidir({
   );
 }
 
-function TarjetaCotizacion({ p, fotoReal, nombre, puedeEscribir, alDecidir }: { p: PedidoPortal; fotoReal: string | null; nombre: string; puedeEscribir: boolean; alDecidir: (id: string, etapa: "produccion" | "descartado") => void }) {
+function TarjetaCotizacion({ p, nombre, puedeEscribir, alDecidir }: { p: PedidoPortal; nombre: string; puedeEscribir: boolean; alDecidir: (id: string, etapa: "produccion" | "descartado") => void }) {
   const { mostrarToast } = useToast();
   const [ocupado, setOcupado] = useState(false);
   const [confirmarDescarte, setConfirmarDescarte] = useState(false);
@@ -267,7 +263,8 @@ function TarjetaCotizacion({ p, fotoReal, nombre, puedeEscribir, alDecidir }: { 
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Foto url={p.fotoReferencia} nombre={p.producto} grande />
-        <Foto url={fotoReal} nombre={p.producto} real grande />
+        {/* Por decidir solo lleva la foto de referencia: la real se agrega después (pedido de Hernán, 22 oct 2026). */}
+        <Foto url={null} nombre={p.producto} real grande enBlanco />
       </div>
       <dl className="m-0 grid grid-cols-3 gap-1.5 text-xs text-muted-foreground">
         <div>

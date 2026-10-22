@@ -26,10 +26,17 @@ export const botonNormal = `${claseBoton} border-border-control bg-card hover:bg
 export const botonPeligro = `${claseBoton} border-destructive/50 bg-card text-destructive hover:bg-destructive-soft`;
 
 /** Foto de referencia (la de la compra) o la real (la que sube el proveedor). Sin foto, un recuadro con las iniciales o vacío. */
-export function Foto({ url, nombre, real = false, grande = false }: { url: string | null; nombre: string; real?: boolean; grande?: boolean }) {
+export function Foto({ url, nombre, real = false, grande = false, enBlanco = false }: { url: string | null; nombre: string; real?: boolean; grande?: boolean; enBlanco?: boolean }) {
   const { t } = useIdioma();
   const tamano = grande ? "aspect-square w-full rounded-lg" : "h-10 w-10 shrink-0 rounded-md";
   const etiqueta = grande && <span className="absolute bottom-1.5 left-1.5 rounded bg-black/60 px-1.5 py-px text-[10.5px] font-medium text-white">{real ? t.real : t.referencia}</span>;
+  // Un espacio que todavía no lleva foto (la real de una cotización por decidir se agrega después): solo el marco y su etiqueta.
+  if (enBlanco)
+    return (
+      <span role="img" aria-label={`${nombre}: ${t.fotoRealDespues}`} className={`relative block border border-dashed border-border-control bg-card ${tamano}`}>
+        {etiqueta}
+      </span>
+    );
   if (url)
     return (
       <span className={`relative block overflow-hidden border border-border bg-muted ${tamano}`}>
