@@ -27,6 +27,7 @@ import {
   type TipoIA,
 } from "@/lib/publicaciones/ia/asistente";
 import { chequearTitulo, reglasParaIA, type ChequeoTitulo, type Ejemplos, type ReglasIA } from "@/lib/publicaciones/ia/criterios";
+import { cargarEstilos } from "@/lib/publicaciones/ia/estilos-datos";
 import { cargarIndicaciones } from "@/lib/publicaciones/ia/indicaciones-datos";
 import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/proveedor";
 import { notaOptimizacion, revisarPublicacion, type Revision } from "@/lib/publicaciones/optimizacion";
@@ -157,7 +158,7 @@ async function cargarEjemplos(): Promise<Ejemplos> {
 async function cargarBase(pub: Pub) {
   const supabase = createServiceClient();
   const ids = idsDropi(pub.dropi_id);
-  const [{ data: pais }, enDropi, { reglas }, sku, competidores, ventas, { indicaciones }, ejemplos, { data: numero }] = await Promise.all([
+  const [{ data: pais }, enDropi, { reglas }, sku, competidores, ventas, { indicaciones }, ejemplos, { data: numero }, { estilos }] = await Promise.all([
     supabase.from("paises").select("nombre").eq("id", pub.pais_id).maybeSingle(),
     cargarNuestrosEnDropi(supabase, pub.pais_id),
     cargarReglas(supabase),
@@ -167,6 +168,7 @@ async function cargarBase(pub: Pub) {
     cargarIndicaciones(supabase),
     cargarEjemplos(),
     supabase.from("dropi_publicaciones").select("numero").eq("id", pub.id).maybeSingle(),
+    cargarEstilos(supabase),
   ]);
   const cat = ids.map((n) => enDropi.get(n)).find((x) => !!x) ?? null;
   const precio = pub.precio_venta === null ? null : Number(pub.precio_venta);
@@ -199,7 +201,7 @@ async function cargarBase(pub: Pub) {
     margen: pub.margen === null ? null : Number(pub.margen),
     ventas30: v ? v.netas30 : null,
   };
-  const contexto: ContextoIA = { reglas: reglasIA, indicaciones, ejemplos };
+  const contexto: ContextoIA = { reglas: reglasIA, indicaciones, ejemplos, estilos: estilos.filter((e) => e.activo) };
   const vista: ContextoVista = {
     nombre: pub.nombre,
     numero: numeroPublicacion((numero?.numero as number | null | undefined) ?? null),
@@ -436,7 +438,8 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
   }
   if (!referencias.length) return { error: "No se pudo leer la foto del producto." };
 
-  const prompt = promptFoto({ nombre: pub.nombre }, foto, referencias.length);
+  const { estilos } = await cargarEstilos(supabase);
+  const prompt = promptFoto({ nombre: pub.nombre }, foto, referencias.length, estilos);
   const r = await generarImagen(prompt, referencias, "1:1", consumoDe("foto", usuario, pub));
   if ("error" in r) {
     await marcarError(iaId, indice, r.error);
