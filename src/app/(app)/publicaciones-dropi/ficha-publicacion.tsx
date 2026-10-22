@@ -73,6 +73,7 @@ const desde = (p: FilaPublicacion): Formulario => ({
 });
 
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
+const fechaLarga = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 const usd = (v: number | null) => (v === null || !Number.isFinite(v) ? "—" : `$${v.toFixed(2)}`);
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
@@ -377,8 +378,21 @@ function ContenidoFicha({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Último cambio de precio</dt>
-                <dd>
-                  <input type="date" aria-label="Último cambio de precio" value={d.ultimo_cambio_precio} onChange={(e) => cambiar({ ultimo_cambio_precio: e.target.value })} className={`${fieldClass} w-full !px-2 !py-1 text-xs`} />
+                {/* Lo detecta la lectura del catálogo de Dropi (Análisis de competencia): ya no se anota a mano. */}
+                <dd className="text-xs">
+                  {p.cambioPrecioDropi ? (
+                    <>
+                      <span className="block font-semibold">{fechaLarga(p.cambioPrecioDropi.fecha)}</span>
+                      <span className="block text-muted-foreground">
+                        de {usd(p.cambioPrecioDropi.antes)} a {usd(p.cambioPrecioDropi.despues)} en Dropi
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="block">{p.lecturaDropiDesde ? `Sin cambios en Dropi desde el ${fechaLarga(p.lecturaDropiDesde)}` : "Sin datos de Dropi"}</span>
+                      {p.ultimoCambioPrecio && <span className="block text-muted-foreground">Antes: {fechaLarga(p.ultimoCambioPrecio)}</span>}
+                    </>
+                  )}
                 </dd>
               </div>
             </dl>

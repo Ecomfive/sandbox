@@ -66,7 +66,7 @@ function leerDatos(f: FormData): Datos | { error: string } {
     // «Reposición» y «Competencia» ya no se editan aquí (la reposición se hace desde Compras y la competencia se ve en la del
     // producto): no van, así guardar la ficha no borra lo que quedó en la base.
     fecha_publicacion: fecha(f, "fecha_publicacion"),
-    ultimo_cambio_precio: fecha(f, "ultimo_cambio_precio"),
+    // «Último cambio de precio» ya no se anota (21 oct 2026): lo detecta la lectura del catálogo de Dropi.
     notas: texto(f, "notas", 5000) || null,
     responsable_id: UUID.test(resp) ? resp : null,
   };
@@ -91,7 +91,7 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
   if ("error" in datos) return datos;
   const { data, error } = await supabase
     .from("dropi_publicaciones")
-    .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), ultimo_cambio_precio: datos.ultimo_cambio_precio ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
+    .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
     .select("id")
     .single();
   if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0116." : "No se pudo crear la publicación." };
@@ -119,8 +119,6 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
-  const precioAntes = antes.precio_venta === null ? null : Number(antes.precio_venta);
-  if (datos.precio_venta !== precioAntes && datos.ultimo_cambio_precio === (antes.ultimo_cambio_precio ?? null)) datos.ultimo_cambio_precio = hoy();
 
   const { error } = await createServiceClient()
     .from("dropi_publicaciones")
