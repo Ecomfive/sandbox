@@ -37,6 +37,8 @@ import {
   resumenLineas,
   tituloCompra,
   valorUnitario,
+  colorAgente,
+  colorProveedor,
   type FilaCompra,
 } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
@@ -91,6 +93,12 @@ const sumar = (filas: FilaCompra[], dato: (c: FilaCompra) => number | null, form
 const fecha = (v: string | null) => (v ? formatearFecha(v) : "—");
 const siNo = (v: boolean) => (v ? "Sí" : <span className="text-muted-foreground">No</span>);
 const lista = (v: string[], f: (x: string) => string = (x) => x) => (v.length ? v.map(f).join(", ") : "—");
+/** Un valor de lista con su insignia de color (proveedor, agente); uno fuera de la lista, como texto. */
+const conColor = (v: string | null, color: (x: string) => string | undefined) => {
+  if (!v) return "—";
+  const c = color(v);
+  return c ? <Badge color={c}>{v}</Badge> : v;
+};
 
 /** Filtros de un toque sobre las abiertas (las cerradas se ven con el botón «Cerrados» de la barra). */
 const RAPIDOS: { valor: Grupo; etiqueta: string }[] = [
@@ -212,34 +220,37 @@ function columnas(
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("foto", "Foto", {
       ...resto,
-      render: (c) =>
-        c.fotoUrl ? (
+      // La foto comercial (la de Producto); sin ella, la foto real que subió el proveedor.
+      render: (c) => {
+        const foto = c.fotoComercial ?? c.fotoUrl;
+        return foto ? (
           <TarjetaEmergente
             clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
             contenido={
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={c.fotoUrl} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
+              <img src={foto} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
             }
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.fotoUrl} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+            <img src={foto} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
           </TarjetaEmergente>
         ) : (
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
             <AdjuntoIcon className="h-3.5 w-3.5" />
           </div>
-        ),
+        );
+      },
     }),
     col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
     col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
-    col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", c.proveedor || "—") }),
+    col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", conColor(c.proveedor, colorProveedor)) }),
     col("ventaImportacion", "Tipo de venta", {
       ...resto,
       clase: "whitespace-nowrap",
       render: (c) => ed(c, "ventaImportacion", c.ventaImportacion ? <Badge tone="info">🌍 Venta de importación</Badge> : <span className="text-muted-foreground">Proveeduría</span>),
     }),
-    col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", c.agenteEnvio || "—") }),
+    col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", conColor(c.agenteEnvio, colorAgente)) }),
     col("tienda", "Tienda", {
       ...resto,
       clase: "text-muted-foreground",
@@ -294,6 +305,7 @@ export function TablaCompras({
   abrirInicial = null,
   comentarioInicial = null,
   reponerInicial = null,
+  proveedorInicial = null,
   coloresEtiquetas = {},
   coloresTiendas: coloresTiendasServidor = {},
   restricciones = SIN_RESTRICCIONES,
@@ -315,6 +327,8 @@ export function TablaCompras({
   comentarioInicial?: string | null;
   /** Desde Compras › Reponer: abre la compra nueva con ese producto y esa cantidad elegidos. */
   reponerInicial?: { skuId: string; cantidad: number } | null;
+  /** `?proveedor=Chin` (desde el Portal del proveedor): abre la compra nueva con ese proveedor. */
+  proveedorInicial?: string | null;
   /** El color elegido de cada etiqueta (por su nombre). */
   coloresEtiquetas?: Record<string, string>;
   /** El color elegido de cada tienda (por su nombre). */
@@ -622,7 +636,7 @@ export function TablaCompras({
           accionPrincipal={
             <div className="flex items-center gap-2">
               <SelectorVista vista={vista} paises={paises} />
-              {puedeEscribir && accionPermitidaEnCompras(restricciones, "crear") && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} inicial={reponerInicial} />}
+              {puedeEscribir && accionPermitidaEnCompras(restricciones, "crear") && <CrearCompraPanel vista={vista} paises={paises} tiendas={todasTiendas} etiquetas={todasEtiquetas} colores={colores} puedeAgregarPais={puedeAgregarPais} inicial={reponerInicial} proveedorInicial={proveedorInicial} />}
             </div>
           }
           ariaLabel="Tablero de compras"

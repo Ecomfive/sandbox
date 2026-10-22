@@ -12,6 +12,8 @@ export interface PendientesHoy {
   lotesPorVencer: number;
   /** Competidores que entraron a Dropi del país (alertas de Análisis de competencia sin marcar como vistas). */
   competidoresNuevos: number;
+  /** Recomendaciones aceptadas en Gestión de IDs Dropi que pasaron su plazo sin hacerse (migración 0128). */
+  tareasAtrasadas: number;
 }
 
 async function contarNovedades(supabase: SupabaseClient, paisId: string): Promise<{ count: number | null }> {
@@ -49,6 +51,7 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     { count: retirosDropiSinVincular },
     lotes,
     { count: competidoresNuevos },
+    { count: tareasAtrasadas },
   ] = await Promise.all([
     supabase
       .from("alertas_inventario_no_retornado")
@@ -63,6 +66,14 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     contarLotes(supabase, paisId),
     // Sin la migración 0108 la consulta falla y cuenta cero: el aviso no rompe la página.
     supabase.from("competencia_alertas").select("*", { count: "exact", head: true }).eq("pais_id", paisId).eq("tipo", "competidor_nuevo").eq("vista", false),
+    // Sin la migración 0128 la consulta falla y cuenta cero.
+    supabase
+      .from("dropi_publicaciones_decisiones")
+      .select("id, dropi_publicaciones!inner(pais_id)", { count: "exact", head: true })
+      .eq("dropi_publicaciones.pais_id", paisId)
+      .eq("decision", "aceptada")
+      .is("hecha_en", null)
+      .lt("plazo", new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" })),
   ]);
 
   const plataformasConSaldo = new Set((saldos ?? []).map((s) => s.plataforma_id));
@@ -78,5 +89,6 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     lotesVencidos: lotes.vencidos,
     lotesPorVencer: lotes.porVencer,
     competidoresNuevos: competidoresNuevos ?? 0,
+    tareasAtrasadas: tareasAtrasadas ?? 0,
   };
 }

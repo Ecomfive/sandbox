@@ -1,7 +1,8 @@
 "use client";
 
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -105,17 +106,37 @@ export function TablaProducto({
   productos,
   opcionesSimples,
   codigoPais,
+  abrirInicial = null,
   puedeEscribir,
+  puedeEliminar,
   referenciasTest,
 }: {
   productos: FilaProducto[];
   opcionesSimples: OpcionSkuMaestro[];
   codigoPais: string;
+  /** El producto que se abre al cargar (`?abrir=`, desde la ficha de una publicación de Dropi); si no existe, nada. */
+  abrirInicial?: string | null;
   puedeEscribir: boolean;
+  /** Solo un administrador: elimina el producto de verdad (si nada depende de él). */
+  puedeEliminar: boolean;
   referenciasTest: ReferenciasTest;
 }) {
   // Qué producto está abierto y en qué orden se veían las filas al abrirlo (para las flechas de anterior y siguiente).
-  const [abierto, setAbierto] = useState<{ id: string; orden: string[] } | null>(null);
+  const [abierto, setAbierto] = useState<{ id: string; orden: string[] } | null>(() =>
+    abrirInicial && productos.some((p) => p.id === abrirInicial) ? { id: abrirInicial, orden: productos.map((p) => p.id) } : null,
+  );
+  // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
+  const enNavegador = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  // Ya abierta, el parámetro sobra: se quita de la dirección para que cerrar y recargar no la abra otra vez.
+  const router = useRouter();
+  const ruta = usePathname();
+  useEffect(() => {
+    if (abrirInicial) router.replace(ruta, { scroll: false });
+  }, [abrirInicial, router, ruta]);
   const producto = abierto ? productos.find((p) => p.id === abierto.id) : undefined;
 
   return (
@@ -136,15 +157,18 @@ export function TablaProducto({
         ariaLabel="Productos"
         vacio="Todavía no hay productos. Usa «Agregar» para crear el primero."
       />
-      <FichaProducto
-        producto={producto}
-        orden={abierto?.orden ?? []}
-        codigoPais={codigoPais}
-        puedeEscribir={puedeEscribir}
-        referenciasTest={referenciasTest}
-        alIr={(id) => setAbierto((a) => (a ? { ...a, id } : a))}
-        alCerrar={() => setAbierto(null)}
-      />
+      {enNavegador && (
+        <FichaProducto
+          producto={producto}
+          orden={abierto?.orden ?? []}
+          codigoPais={codigoPais}
+          puedeEscribir={puedeEscribir}
+          puedeEliminar={puedeEliminar}
+          referenciasTest={referenciasTest}
+          alIr={(id) => setAbierto((a) => (a ? { ...a, id } : a))}
+          alCerrar={() => setAbierto(null)}
+        />
+      )}
     </>
   );
 }

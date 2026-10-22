@@ -2,7 +2,7 @@
 
 import { startTransition, useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CompetenciaDesplegable } from "@/components/competencia/piezas-competencia";
+import { CompetenciaDesplegable, FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -87,7 +87,9 @@ function FilaItem({
   return (
     <li className="flex flex-col gap-2 rounded-lg border border-border p-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-start gap-3">
+          <FotoAmpliable url={item.foto} nombre={item.nombre} />
+          <div className="min-w-0">
           <p className="m-0 text-sm font-medium">
             <span className="mr-1.5 text-muted-foreground">{item.codigo}</span>
             {item.nombre}
@@ -97,6 +99,7 @@ function FilaItem({
             {item.origen === "clickup" ? " · de ClickUp" : ""}
             {recibido ? ` · recibido ${item.cantidadRecibida} u.${item.fechaRecepcion ? ` el ${formatearFecha(item.fechaRecepcion)}` : ""}` : ""}
           </p>
+          </div>
         </div>
         <span className="flex shrink-0 items-center gap-3">
           {pendiente ? (
@@ -161,7 +164,7 @@ export function ProductosCompra({
   sugerido?: { skuId: string; cantidad: number } | null;
 }) {
   const borrador = compraId === null;
-  const [lineasBorrador, setLineasBorrador] = useState<{ skuId: string; codigo: string; nombre: string; cantidad: number; costoUnitario: number | null }[]>([]);
+  const [lineasBorrador, setLineasBorrador] = useState<{ skuId: string; codigo: string; nombre: string; foto: string | null; cantidad: number; costoUnitario: number | null }[]>([]);
   useEffect(() => {
     alCambiarBorrador?.(lineasBorrador.length);
   }, [lineasBorrador.length, alCambiarBorrador]);
@@ -233,7 +236,7 @@ export function ProductosCompra({
     const unitario = costoNuevo.valorUnitario === null ? null : redondear(costoNuevo.valorUnitario, DECIMALES_UNITARIO);
     for (const [p] of pares) if (!(await confirmar(p))) return;
     if (borrador) {
-      setLineasBorrador((x) => [...x, ...pares.map(([p, n]) => ({ skuId: p.id, codigo: p.codigo, nombre: p.nombre, cantidad: n, costoUnitario: unitario }))]);
+      setLineasBorrador((x) => [...x, ...pares.map(([p, n]) => ({ skuId: p.id, codigo: p.codigo, nombre: p.nombre, foto: p.foto, cantidad: n, costoUnitario: unitario }))]);
       limpiar();
       return;
     }
@@ -289,7 +292,9 @@ export function ProductosCompra({
             {lineasBorrador.map((l) => (
               <li key={l.skuId} className="flex flex-col gap-2 rounded-lg border border-border p-3">
                 <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 text-sm">
+                <div className="flex min-w-0 items-start gap-3 text-sm">
+                <FotoAmpliable url={l.foto} nombre={l.nombre} />
+                <div className="min-w-0">
                   <p className="m-0 font-medium">
                     <span className="mr-1.5 text-muted-foreground">{l.codigo}</span>
                     {l.nombre}
@@ -298,6 +303,7 @@ export function ProductosCompra({
                     {l.cantidad.toLocaleString("es-PA")} u.
                     {verCostos ? (l.costoUnitario !== null ? ` · ${usd(l.costoUnitario)} c/u · ${usd(subtotalBorrador(l) ?? 0)}` : " · sin costo") : ""}
                   </p>
+                </div>
                 </div>
                 <button
                   type="button"

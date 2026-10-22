@@ -7,11 +7,12 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
+import { PagosProveedorCompraBloque } from "./pagos-proveedor-compra";
+import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { CopiarCotizacionBoton } from "./copiar-cotizacion";
 import { AnularCompraBoton, AvisoAnulada } from "./eliminar-compra-boton";
 import { FormularioCompra } from "./formulario-compra";
@@ -57,22 +58,18 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
 function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPais: string }) {
   const dinero = (valor: number | null) => (valor !== null ? formatearMoneda(valor, codigoPais) : SIN_DATO);
   const fecha = (valor: string | null) => (valor ? formatearFecha(valor) : SIN_DATO);
-  const [ampliada, setAmpliada] = useState(false);
+  const nombre = compra.lineas[0]?.nombre ?? "el producto";
   return (
     <div className="flex flex-col divide-y divide-border border-t border-border p-5">
       <Seccion icono={ComprasIcon} titulo="Compra">
-        {compra.fotoUrl && (
-          <button
-            type="button"
-            onClick={() => setAmpliada(true)}
-            className="h-32 w-32 overflow-hidden rounded-md border border-border"
-            aria-label="Ver la foto más grande"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={compra.fotoUrl} alt="" className="h-full w-full object-cover" />
-          </button>
-        )}
-        {ampliada && <VisorImagen src={compra.fotoUrl} onClose={() => setAmpliada(false)} />}
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Dato etiqueta="Foto comercial">
+            <FotoAmpliable url={compra.fotoComercial} nombre={nombre} tam="h-32 w-32" />
+          </Dato>
+          <Dato etiqueta="Foto real del producto">
+            <FotoAmpliable url={compra.fotoUrl} nombre={nombre} tam="h-32 w-32" />
+          </Dato>
+        </dl>
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Dato etiqueta="Estado">
             <Badge color={colorEstado(compra.estado)}>{etiquetaEstado(compra.estado)}</Badge>
@@ -252,6 +249,7 @@ export function FichaCompra({
           )}
           {/* A solo lectura no hay formulario: los productos se ven al final, como antes. */}
           {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} />}
+          <PagosProveedorCompraBloque key={`pagos-${compra.id}`} compraId={compra.id} />
           <ActividadCompra key={compra.id} id={compra.id} puedeComentar={puedeEscribir && puedeComentar} comentarioResaltado={comentarioResaltado} />
         </div>
       )}

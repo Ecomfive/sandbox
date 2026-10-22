@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { FormularioCompra } from "./formulario-compra";
 import { ProductosCompra } from "./productos-compra";
 import { ComentariosNuevaCompra, publicarComentarios, type ComentarioBorrador } from "./comentarios-nueva-compra";
 import { useToast } from "@/components/ui/toast";
 import { BotonAgregar } from "@/components/ui/boton-agregar";
 import { Ventana } from "@/components/ui/ventana";
+
+const sinSuscripcion = () => () => {};
 
 /**
  * Botón «Agregar» y la ficha para crear una compra: un panel que sale por la derecha, igual que «Nueva
@@ -20,6 +22,7 @@ export function CrearCompraPanel({
   colores,
   puedeAgregarPais = false,
   inicial = null,
+  proveedorInicial,
 }: {
   vista: string;
   paises: { id: string; codigo: string; nombre: string }[];
@@ -31,8 +34,12 @@ export function CrearCompraPanel({
   puedeAgregarPais?: boolean;
   /** Desde Compras › Reponer: la ficha abre sola con este producto y esta cantidad elegidos (falta pulsar «Agregar»). */
   inicial?: { skuId: string; cantidad: number } | null;
+  /** Desde el Portal del proveedor («Nueva compra en Cotizar»): la ficha abre sola con este proveedor y agente. */
+  proveedorInicial?: string | null;
 }) {
-  const [abierto, setAbierto] = useState(!!inicial);
+  const [abierto, setAbierto] = useState(!!inicial || !!proveedorInicial);
+  // La ventana se dibuja en <body>: abierta de entrada, se muestra recién en el navegador (en el servidor no hay `document`).
+  const enNavegador = useSyncExternalStore(sinSuscripcion, () => true, () => false);
   // El producto sugerido se usa solo la primera vez que se abre.
   const [sugerido, setSugerido] = useState(inicial);
   const [guardando, setGuardando] = useState(false);
@@ -59,7 +66,7 @@ export function CrearCompraPanel({
     <>
       <BotonAgregar ref={botonAbrirRef} onClick={() => setAbierto(true)} />
 
-      <Ventana abierto={abierto} alCerrar={cerrarVentana} lado="derecha" ancho="lg" titulo={<span className="text-lg font-semibold">Nueva orden de compra</span>}>
+      <Ventana abierto={abierto && enNavegador} alCerrar={cerrarVentana} lado="derecha" ancho="lg" titulo={<span className="text-lg font-semibold">Nueva orden de compra</span>}>
         <FormularioCompra
           vista={vista}
           paises={paises}
@@ -67,6 +74,7 @@ export function CrearCompraPanel({
           etiquetas={etiquetas}
           colores={colores}
           puedeAgregarPais={puedeAgregarPais}
+          proveedorInicial={proveedorInicial ?? undefined}
           alGuardar={cerrar}
           alCambiarGuardando={setGuardando}
           conProductos={lineas > 0}

@@ -24,8 +24,10 @@ const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atr
 /** Compras › Compras: el tablero (todas las columnas, agrupar, filtros de un toque) con la ficha de resumen a la derecha. */
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requirePestana("compras", "lista");
-  const { ver, grupo, etapa, abrir, comentario, reponer } = await searchParams;
+  const { ver, grupo, etapa, abrir, comentario, reponer, proveedor } = await searchParams;
   const reponerInicial = leerReponer(reponer);
+  // Solo letras, números y espacios (lo pone el enlace del Portal del proveedor).
+  const proveedorInicial = typeof proveedor === "string" && /^[\p{L}\p{N} .-]{1,60}$/u.test(proveedor) ? proveedor : null;
   const [{ compras, paises, vista, error, restricciones }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
@@ -37,7 +39,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
         </p>
       ) : (
         <TablaCompras
-          key={`${vista}-${grupoInicial ?? ""}-${typeof etapa === "string" ? etapa : ""}-${typeof abrir === "string" ? abrir : ""}-${typeof comentario === "string" ? comentario : ""}-${reponerInicial ? `${reponerInicial.skuId}.${reponerInicial.cantidad}` : ""}`}
+          key={`${vista}-${grupoInicial ?? ""}-${typeof etapa === "string" ? etapa : ""}-${typeof abrir === "string" ? abrir : ""}-${typeof comentario === "string" ? comentario : ""}-${reponerInicial ? `${reponerInicial.skuId}.${reponerInicial.cantidad}` : ""}-${proveedorInicial ?? ""}`}
           compras={compras}
           vista={vista}
          
@@ -52,6 +54,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
           coloresTiendas={coloresTiendas}
           comentarioInicial={typeof comentario === "string" ? comentario : null}
           reponerInicial={reponerInicial}
+          proveedorInicial={proveedorInicial}
         />
       )}
     </Pagina>

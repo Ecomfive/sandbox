@@ -6,14 +6,17 @@ import { numeroOC } from "./def-compras";
 import { SelectorPais } from "./selector-pais";
 import { PastillaTienda, useTiendas } from "./tiendas";
 import { useRouter } from "next/navigation";
+import { EstimacionEnvio } from "./estimacion-envio";
 import { PlanificacionAutomatica } from "./planificacion-automatica";
+import { PrediccionFechaLimite } from "./prediccion-fecha-limite";
 import { useToast } from "@/components/ui/toast";
-import { conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
+import { AGENTES_ENVIO, conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, PROVEEDORES_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { CampoFoto } from "@/components/ui/campo-foto";
+import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { Campo } from "@/components/ui/campo-ficha";
-import { fieldClass } from "@/components/ui/field";
+import { fieldClass, labelClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { CampoLista } from "./campo-lista";
@@ -65,6 +68,7 @@ export function FormularioCompra({
   comentarios,
   alCreada,
   puedeAgregarPais = false,
+  proveedorInicial,
 }: {
   /** Desde qué vista se crea: un país la deja elegida; «importacion» crea una compra de Importadora (sin país). */
   vista: string;
@@ -85,6 +89,8 @@ export function FormularioCompra({
   conProductos?: boolean;
   /** Puede modificar Configuración: «Agregar país» al final de la lista de países. */
   puedeAgregarPais?: boolean;
+  /** Compra nueva desde el Portal del proveedor: el proveedor y el agente de envío ya puestos. */
+  proveedorInicial?: string;
   /** Compra nueva: el bloque de comentarios en borrador (va al final, como la actividad de la ficha). */
   comentarios?: ReactNode;
   /** Compra nueva: lo que se hace con la compra recién creada antes de cerrar (publicar los comentarios en borrador). */
@@ -245,6 +251,26 @@ export function FormularioCompra({
               </Campo>
             </CampoGobernado>
           </div>
+          {/* La foto comercial (la del producto en Producto, solo se ve) al lado de la foto real que manda el proveedor. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {editando && (
+              <div className="flex flex-col gap-1">
+                <span className={labelClass}>Foto comercial</span>
+                <FotoAmpliable url={compra?.fotoComercial ?? null} nombre={compra?.lineas[0]?.nombre ?? "el producto"} tam="h-16 w-16" />
+              </div>
+            )}
+            <CampoFoto
+              nombreCampo="foto_url"
+              etiqueta="Foto real del producto"
+              valorInicial={compra?.fotoUrl ?? null}
+              alCambiarSubiendo={setSubiendoFoto}
+              prepararSubida={prepararSubidaFotoCompra}
+              subirDesdeUrl={subirFotoCompraDesdeUrl}
+              // Al crear, la imagen se suelta en cualquier parte del panel; en la ficha, sobre el cuadro (los comentarios
+              // también reciben archivos).
+              soltarEnTodo={!editando}
+            />
+          </div>
           {productos && (
             // Los productos viven dentro del formulario solo en el espacio: guardan solos (cada campo, al salir de él), así que
             // lo que se escribe aquí no cuenta como «cambios sin guardar» de la compra y Enter no la envía.
@@ -291,17 +317,6 @@ export function FormularioCompra({
           <Campo etiqueta="Descripción" id="campo-descripcion-compra">
             <textarea id="campo-descripcion-compra" name="descripcion" rows={4} defaultValue={compra?.descripcion ?? ""} className={`${fieldClass} resize-y`} />
           </Campo>
-          <CampoFoto
-            nombreCampo="foto_url"
-            etiqueta="Foto real del producto"
-            valorInicial={compra?.fotoUrl ?? null}
-            alCambiarSubiendo={setSubiendoFoto}
-            prepararSubida={prepararSubidaFotoCompra}
-            subirDesdeUrl={subirFotoCompraDesdeUrl}
-            // Al crear, la imagen se suelta en cualquier parte del panel; en la ficha, sobre el cuadro (los comentarios
-            // también reciben archivos).
-            soltarEnTodo={!editando}
-          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CampoGobernado clave="etapa">
               <Campo etiqueta={conEmoji("etapa", "Etapa")} id="campo-etapa" obligatorio faltante={faltante}>
@@ -346,16 +361,12 @@ export function FormularioCompra({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CampoGobernado clave="proveedor">
               <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
-                <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? ""} placeholder="Ej: Chin" className={fieldClass} />
+                <SelectorDeLista id="campo-proveedor" nombre="proveedor" opciones={PROVEEDORES_COMPRA} vacio="Sin proveedor" valor={compra?.proveedor ?? proveedorInicial ?? ""} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="agente">
               <Campo etiqueta={conEmoji("agenteEnvio", "Agente de envío")} id="campo-agente-envio">
-                <input id="campo-agente-envio" type="text" name="agente_envio" list="agentes-envio" defaultValue={compra?.agenteEnvio ?? ""} placeholder="Ej: Chin" className={fieldClass} />
-                <datalist id="agentes-envio">
-                  <option value="Chin" />
-                  <option value="Avery" />
-                </datalist>
+                <SelectorDeLista id="campo-agente-envio" nombre="agente_envio" opciones={AGENTES_ENVIO} vacio="Sin agente" valor={compra?.agenteEnvio ?? proveedorInicial ?? ""} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="tienda">
@@ -424,30 +435,33 @@ export function FormularioCompra({
         </Seccion>
 
         <Seccion icono={CalendarioIcon} titulo="Fechas">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <CampoGobernado clave="limite">
-              <Campo etiqueta={conEmoji("fechaLimite", "Fecha límite")} id="campo-fecha-limite">
-                <input id="campo-fecha-limite" type="date" name="fecha_limite" defaultValue={compra?.fechaLimite ?? ""} className={fieldClass} />
+          <EstimacionEnvio fechaEnvio={compra?.fechaEnvio ?? null}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <CampoGobernado clave="limite">
+                <Campo etiqueta={conEmoji("fechaLimite", "Fecha límite")} id="campo-fecha-limite">
+                  <input id="campo-fecha-limite" type="date" name="fecha_limite" defaultValue={compra?.fechaLimite ?? ""} className={fieldClass} />
+                  <PrediccionFechaLimite fechaLimite={compra?.fechaLimite ?? null} />
+                </Campo>
+              </CampoGobernado>
+              <Campo etiqueta={conEmoji("fechaLlegada", "Fecha de llegada")} id="campo-fecha-llegada">
+                <input id="campo-fecha-llegada" type="date" name="fecha_llegada" defaultValue={compra?.fechaLlegada ?? ""} className={fieldClass} />
               </Campo>
-            </CampoGobernado>
-            <Campo etiqueta={conEmoji("fechaLlegada", "Fecha de llegada")} id="campo-fecha-llegada">
-              <input id="campo-fecha-llegada" type="date" name="fecha_llegada" defaultValue={compra?.fechaLlegada ?? ""} className={fieldClass} />
-            </Campo>
-            <CampoGobernado clave="pago1">
-              <Campo etiqueta={conEmoji("fechaPago1", "Fecha de Pago (1)")} id="campo-fecha-pago-1">
-                <input id="campo-fecha-pago-1" type="date" name="fecha_pago_1" defaultValue={compra?.fechaPago1 ?? ""} className={fieldClass} />
+              <CampoGobernado clave="pago1">
+                <Campo etiqueta={conEmoji("fechaPago1", "Fecha de Pago (1)")} id="campo-fecha-pago-1">
+                  <input id="campo-fecha-pago-1" type="date" name="fecha_pago_1" defaultValue={compra?.fechaPago1 ?? ""} className={fieldClass} />
+                </Campo>
+              </CampoGobernado>
+              <CampoGobernado clave="pago2">
+                <Campo etiqueta={conEmoji("fechaPago2", "Fecha de Pago (2)")} id="campo-fecha-pago-2">
+                  <input id="campo-fecha-pago-2" type="date" name="fecha_pago_2" defaultValue={compra?.fechaPago2 ?? ""} className={fieldClass} />
+                </Campo>
+              </CampoGobernado>
+              <Campo etiqueta={conEmoji("fechaEnvio", "Fecha de Envío")} id="campo-fecha-envio">
+                <input id="campo-fecha-envio" type="date" name="fecha_envio" defaultValue={compra?.fechaEnvio ?? ""} className={fieldClass} />
               </Campo>
-            </CampoGobernado>
-            <CampoGobernado clave="pago2">
-              <Campo etiqueta={conEmoji("fechaPago2", "Fecha de Pago (2)")} id="campo-fecha-pago-2">
-                <input id="campo-fecha-pago-2" type="date" name="fecha_pago_2" defaultValue={compra?.fechaPago2 ?? ""} className={fieldClass} />
-              </Campo>
-            </CampoGobernado>
-            <Campo etiqueta={conEmoji("fechaEnvio", "Fecha de Envío")} id="campo-fecha-envio">
-              <input id="campo-fecha-envio" type="date" name="fecha_envio" defaultValue={compra?.fechaEnvio ?? ""} className={fieldClass} />
-            </Campo>
-            <PlanificacionAutomatica planificacion={compra?.planificacion ?? null} fechaEnvio={compra?.fechaEnvio ?? null} />
-          </div>
+              <PlanificacionAutomatica planificacion={compra?.planificacion ?? null} fechaEnvio={compra?.fechaEnvio ?? null} />
+            </div>
+          </EstimacionEnvio>
         </Seccion>
 
         {comentarios}
@@ -470,5 +484,22 @@ export function FormularioCompra({
         </div>
       )}
     </form>
+  );
+}
+
+/** Un dato de la compra que se elige de una lista (el proveedor, el agente de envío). Una compra vieja con otro valor lo sigue
+ * mostrando como opción, para que guardar la ficha no lo borre. */
+function SelectorDeLista({ id, nombre, opciones, vacio, valor }: { id: string; nombre: string; opciones: readonly { valor: string; etiqueta: string }[]; vacio: string; valor: string }) {
+  const fuera = valor && !opciones.some((p) => p.valor === valor) ? valor : null;
+  return (
+    <select id={id} name={nombre} defaultValue={valor} className={fieldClass}>
+      <option value="">{vacio}</option>
+      {opciones.map((p) => (
+        <option key={p.valor} value={p.valor}>
+          {p.etiqueta}
+        </option>
+      ))}
+      {fuera && <option value={fuera}>{fuera}</option>}
+    </select>
   );
 }

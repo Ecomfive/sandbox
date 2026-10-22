@@ -93,6 +93,8 @@ export async function guardarCompetencia(
     const r = comparar(guardados, [...unicos.values()].map((v) => ({ ...v, privado: false })));
     const ahora = new Date().toISOString();
 
+    // Fotos, videos y descripción (migración 0129): solo si la base ya tiene esas columnas.
+    const conFotos = !(await supabase.from("competencia_productos").select("fotos").limit(1)).error;
     // 2. Todo lo visto queda activo con su último precio y stock.
     const idPorDropi = new Map(antes.map((g) => [Number(g.dropi_producto_id), g.id]));
     await enTrozos([...unicos.values()], 500, async (trozo) => {
@@ -116,6 +118,7 @@ export async function guardarCompetencia(
               es_nuestro: v.esNuestro,
               estado: "activo",
               ultima_vez: ahora,
+              ...(conFotos ? { fotos: v.fotos ?? null, videos: v.videos ?? null, descripcion_largo: v.descripcionLargo ?? null } : {}),
             })),
             { onConflict: "pais_id,dropi_producto_id" },
           )

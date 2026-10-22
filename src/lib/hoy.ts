@@ -86,6 +86,15 @@ const PENDIENTES: {
     href: "/analisis-competencia",
     accion: "Revisar",
   },
+  {
+    clave: "tareas-publicaciones",
+    modulo: "publicaciones-dropi",
+    campo: "tareasAtrasadas",
+    titulo: "Tareas de Gestión de IDs Dropi atrasadas",
+    descripcion: "Recomendaciones aceptadas que pasaron su plazo sin hacerse",
+    href: "/publicaciones-dropi/recomendaciones?ver=por_hacer",
+    accion: "Revisar",
+  },
 ];
 
 /**

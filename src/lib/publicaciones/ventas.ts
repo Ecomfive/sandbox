@@ -189,6 +189,12 @@ export interface VentasPublicacion {
   stock: number;
   diasInventario: number | null;
   ultimaVenta: string | null;
+  /** La primera venta de cualquiera de sus IDs (para saber si es nuevo). */
+  primeraVenta: string | null;
+  /** Si Dropi tiene activo alguno de sus IDs (si no, todos están archivados). */
+  activoEnDropi: boolean;
+  /** Si en Dropi todos sus IDs son privados. */
+  privadoEnDropi: boolean;
   /** Netas por mes (YYYY-MM). */
   porMes: Record<string, number>;
   /** El estado de venta que dicen los datos (valores de `ESTADOS_VENTA`). */
@@ -229,6 +235,7 @@ export function ventasDePublicacion(ids: number[], resumen: Map<number, ResumenP
   const porDia = Math.max(v.netas30, 0) / 30;
   const diasInventario = porDia > 0 ? Math.round(v.stock / porDia) : null;
   const ultimaVenta = rs.reduce<string | null>((a, r) => (r.ultimaVenta && (!a || r.ultimaVenta > a) ? r.ultimaVenta : a), null);
+  const primeraVenta = rs.reduce<string | null>((a, r) => (r.primeraVenta && (!a || r.primeraVenta < a) ? r.primeraVenta : a), null);
   return {
     ids: rs.map((r) => r.id),
     ...v,
@@ -237,6 +244,9 @@ export function ventasDePublicacion(ids: number[], resumen: Map<number, ResumenP
     pctDevolucion: v.pedidas ? (v.devueltas + v.rechazadas) / v.pedidas : null,
     diasInventario,
     ultimaVenta,
+    primeraVenta,
+    activoEnDropi: rs.some((r) => r.lista === "activo"),
+    privadoEnDropi: rs.every((r) => r.privado),
     porMes,
     estadoSugerido: estadoVentaSugerido(v.netas30, v.stock),
     stockEstado: v.netas30 <= 0 ? "sin_ventas" : v.stock <= 0 ? "sin_stock_vende" : diasInventario !== null && diasInventario < DIAS_REPONER ? "se_acaba" : "alcanza",

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:seguridad": "tsx --test src/lib/seguridad/*.test.ts src/lib/crm/*.test.ts src/lib/nav-data.test.ts src/lib/wms/*.test.ts src/lib/compras/*.test.ts src/lib/scraping/*.test.ts src/lib/instagram/*.test.ts src/lib/competencia/*.test.ts src/lib/sugerencias/*.test.ts src/lib/puestos/*.test.ts src/lib/landings/*.test.ts src/lib/publicaciones/*.test.ts src/lib/categorias/*.test.ts src/lib/permisos/*.test.ts"
+    "test:seguridad": "tsx --test src/lib/seguridad/*.test.ts src/lib/crm/*.test.ts src/lib/nav-data.test.ts src/lib/wms/*.test.ts src/lib/compras/*.test.ts src/lib/scraping/*.test.ts src/lib/instagram/*.test.ts src/lib/competencia/*.test.ts src/lib/sugerencias/*.test.ts src/lib/puestos/*.test.ts src/lib/landings/*.test.ts src/lib/publicaciones/*.test.ts src/lib/categorias/*.test.ts src/lib/permisos/*.test.ts src/lib/proveedor/*.test.ts src/lib/supabase/paginar.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

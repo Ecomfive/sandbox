@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- foto de Storage */
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
@@ -11,30 +11,22 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
-  DIAS_REVISION,
-  ESTADOS,
-  ESTADOS_PUBLICACION,
-  ESTADOS_REPOSICION,
-  ESTADOS_VENTA,
-  MARGEN_BAJO,
-  TIPOS,
   UBICACIONES,
   numeroPublicacion,
-  opcion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { actualizarPublicacion, eliminarPublicacion, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
+import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
+import { OptimizacionFicha } from "./optimizacion-publicacion";
+import { RecomendacionesFicha } from "./recomendacion-publicacion";
+import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
+import { InsigniaConectado } from "./insignia-conectado";
 import { VinculoSku } from "./vinculo-sku";
-
-export interface Persona {
-  id: string;
-  nombre: string;
-}
 
 interface Formulario {
   nombre: string;
@@ -84,12 +76,8 @@ const desde = (p: FilaPublicacion): Formulario => ({
 });
 
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
+const fechaLarga = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 const usd = (v: number | null) => (v === null || !Number.isFinite(v) ? "—" : `$${v.toFixed(2)}`);
-const masDias = (f: string, dias: number) => {
-  const d = new Date(`${f}T12:00:00`);
-  d.setDate(d.getDate() + dias);
-  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" });
-};
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -123,23 +111,23 @@ function Selector({ valor, lista, cambiar, nombre, vacio = "—" }: { valor: str
 
 /**
  * Ficha de una publicación: el panel a la derecha que se abre al pulsar su fila. **La ficha ya es el formulario**: se cambia
- * un dato y arriba aparecen «Guardar cambios» y «Cancelar»; al guardar, la ficha sigue abierta. Utilidad,
- * margen y próxima revisión se calculan solos. Con cambios sin guardar, cerrar o pasar a otra pide confirmación.
+ * un dato y arriba aparecen «Guardar cambios» y «Cancelar»; al guardar, la ficha sigue abierta. Utilidad y
+ * margen se calculan solos. Con cambios sin guardar, cerrar o pasar a otra pide confirmación.
  */
 export function FichaPublicacion({
   publicacion,
-  personas,
   codigoPais,
   nombrePais,
   puedeEscribir,
   puedeEliminar,
   corteVentas = null,
+  margenMinimo,
+  decisionesDisponibles,
   anterior,
   siguiente,
   alCerrar,
 }: {
   publicacion: FilaPublicacion | undefined;
-  personas: Persona[];
   codigoPais: string;
   nombrePais: string;
   puedeEscribir: boolean;
@@ -147,6 +135,10 @@ export function FichaPublicacion({
   puedeEliminar: boolean;
   /** Hasta qué día llegan las ventas de Dropi (solo un administrador las ve); `null` si no se muestran. */
   corteVentas?: string | null;
+  /** El margen mínimo de las reglas: por debajo, el punto rojo. */
+  margenMinimo: number;
+  /** false si falta la migración 0127: las recomendaciones se ven pero no se pueden decidir. */
+  decisionesDisponibles: boolean;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -156,12 +148,13 @@ export function FichaPublicacion({
     <ContenidoFicha
       key={publicacion.id}
       p={publicacion}
-      personas={personas}
       codigoPais={codigoPais}
       nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
       puedeEliminar={puedeEliminar}
       corteVentas={corteVentas}
+      margenMinimo={margenMinimo}
+      decisionesDisponibles={decisionesDisponibles}
       anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
@@ -171,23 +164,25 @@ export function FichaPublicacion({
 
 function ContenidoFicha({
   p,
-  personas,
   codigoPais,
   nombrePais,
   puedeEscribir,
   puedeEliminar,
   corteVentas,
+  margenMinimo,
+  decisionesDisponibles,
   anterior,
   siguiente,
   alCerrar,
 }: {
   p: FilaPublicacion;
-  personas: Persona[];
   codigoPais: string;
   nombrePais: string;
   puedeEscribir: boolean;
   puedeEliminar: boolean;
   corteVentas: string | null;
+  margenMinimo: number;
+  decisionesDisponibles: boolean;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -197,11 +192,15 @@ function ContenidoFicha({
   // Lo último guardado (o lo que llegó del servidor): con eso se compara para saber si hay cambios sin guardar. Al guardar no se
   // rearma la ficha (antes cambiaba su clave y parecía que se cerraba): cuando llegan los datos nuevos, el formulario los toma
   // solo si no hay cambios a medio escribir.
+  // Con un ID de Dropi guardado la publicación está conectada y el ID queda bloqueado hasta pulsar el lápiz; al llegar los datos
+  // guardados vuelve a quedar bloqueado.
+  const [editandoId, setEditandoId] = useState(false);
   const actual = JSON.stringify(desde(p));
   const [base, setBase] = useState(actual);
   const [recibido, setRecibido] = useState(actual);
   if (actual !== recibido) {
     setRecibido(actual);
+    setEditandoId(false);
     if (JSON.stringify(d) === base) setD(desde(p));
     setBase(actual);
   }
@@ -210,9 +209,17 @@ function ContenidoFicha({
   const [eliminando, setEliminando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  // La ficha del producto vinculado, abierta encima de esta (no lleva al módulo Producto).
+  const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
+  const conectado = p.dropiId.trim() !== "";
+  const idBloqueado = conectado && !editandoId;
+  const campoId = useRef<HTMLInputElement>(null);
+  // Al desbloquear con el lápiz, el cursor entra en el campo.
+  useEffect(() => {
+    if (editandoId) campoId.current?.focus();
+  }, [editandoId]);
   const sinGuardar = JSON.stringify(d) !== base;
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
-  const estado = opcion(ESTADOS, p.estado);
 
   const precio = n(d.precio_venta);
   const utilidad = precio === null ? null : precio - (n(d.costo_mercancia) ?? 0) - (n(d.fulfillment) ?? 0);
@@ -266,7 +273,18 @@ function ContenidoFicha({
         <>
           <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroPublicacion(p.numero)}</span>
           <span className="text-lg font-semibold">{p.nombre}</span>
-          {estado && <Badge color={estado.color}>{estado.etiqueta}</Badge>}
+          {p.archivada ? (
+            <Badge color="#8d8d8d">Archivada</Badge>
+          ) : (
+            (p.acciones.length ? p.acciones : (["al_dia"] as const)).map((v) => {
+              const o = ACCIONES.find((x) => x.valor === v);
+              return o ? (
+                <Badge key={v} color={o.color}>
+                  {o.etiqueta}
+                </Badge>
+              ) : null;
+            })
+          )}
         </>
       }
       navegacion={
@@ -308,9 +326,12 @@ function ContenidoFicha({
 
         <div className="border-b border-border px-5 py-5">
           <Seccion icono={InventarioIcon} titulo="Producto vinculado (SKU)">
-            <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} />
+            <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} alAbrirProducto={setProductoAbierto} />
           </Seccion>
         </div>
+
+        <RecomendacionesFicha p={p} puedeEscribir={puedeEscribir} disponible={decisionesDisponibles} />
+        {!p.archivada && <OptimizacionFicha p={p} />}
 
         <fieldset disabled={!puedeEscribir} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-5">
           <Seccion icono={ProductoIcon} titulo="Producto">
@@ -318,43 +339,95 @@ function ContenidoFicha({
               {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nombre} className="h-24 w-24 shrink-0 rounded-lg border border-border object-cover" /> : <span aria-hidden="true" className="h-24 w-24 shrink-0 rounded-lg border border-dashed border-border-control" />}
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Nombre en Dropi</span>
-                  <input value={d.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} required maxLength={300} className={`${fieldClass} w-full`} />
+                  <span className={labelClassSm}>Nombre en Dropi</span>
+                  {/* Viene de Dropi: no se edita. Cambia solo cuando Dropi trae otro nombre para el mismo ID (al volver a vincular). */}
+                  <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
                 </label>
-                <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>ID en Dropi</span>
-                  <input value={d.dropi_id} onChange={(e) => cambiar({ dropi_id: e.target.value })} maxLength={60} placeholder="Ej: 11144" className={`${fieldClass} w-full tabular-nums`} />
-                </label>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  {conectado && (
+                    <div className="flex">
+                      <InsigniaConectado />
+                    </div>
+                  )}
+                  <label className="flex min-w-0 flex-col gap-1">
+                    <span className={labelClassSm}>ID en Dropi</span>
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        ref={campoId}
+                        value={d.dropi_id}
+                        onChange={(e) => cambiar({ dropi_id: e.target.value })}
+                        readOnly={idBloqueado}
+                        maxLength={60}
+                        placeholder="Ej: 11144"
+                        className={`${fieldClass} min-w-0 flex-1 tabular-nums ${idBloqueado ? "cursor-default bg-muted text-muted-foreground" : ""}`}
+                      />
+                      {idBloqueado && (
+                        <Tooltip texto="Corregir el ID">
+                          <button
+                            type="button"
+                            aria-label="Corregir el ID de Dropi"
+                            onClick={() => setEditandoId(true)}
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-muted ${anilloFoco}`}
+                          >
+                            <LapizIcon className="h-4 w-4" />
+                          </button>
+                        </Tooltip>
+                      )}
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
             {p.relacionados.length > 0 && <p className="text-sm text-muted-foreground">Relacionado con: {p.relacionados.join(" · ")}</p>}
           </Seccion>
 
           <Seccion icono={EstadoIcon} titulo="Estado">
+            {!p.archivada && (
+              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
+                {(p.acciones.length ? p.acciones : (["al_dia"] as const)).map((v) => {
+                  const o = ACCIONES.find((x) => x.valor === v);
+                  return o ? (
+                    <li key={v} className="flex flex-wrap items-center gap-2">
+                      <Badge color={o.color}>{o.etiqueta}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {v === "bajar_precio" && p.competidorMasBarato ? `${p.competidorMasBarato.proveedor} lo vende a ${usd(p.competidorMasBarato.precio)}` : o.detalle}
+                      </span>
+                    </li>
+                  ) : null;
+                })}
+              </ul>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Estado</span>
-                <select value={d.estado} onChange={(e) => cambiar({ estado: e.target.value })} className={`${fieldClass} w-full`}>
-                  {ESTADOS.map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.etiqueta}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Ya no se marcan a mano (21 oct 2026): salen de lo que reporta Dropi. */}
               <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>En Dropi</span>
-                <Selector nombre="En Dropi" valor={d.estado_publicacion} lista={ESTADOS_PUBLICACION} cambiar={(v) => cambiar({ estado_publicacion: v })} />
+                <span className={labelClassSm}>En Dropi</span>
+                <span className="text-sm">{EN_DROPI.find((e) => e.valor === p.enDropi)?.etiqueta ?? "—"}</span>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Tipo</span>
-                <Selector nombre="Tipo" valor={d.tipo_publicacion} lista={TIPOS} cambiar={(v) => cambiar({ tipo_publicacion: v })} />
+                <span className={labelClassSm}>Tipo</span>
+                <span className="text-sm">{p.tipoDropi === "privado" ? "Privado" : p.tipoDropi === "publico" ? "Público" : "—"}</span>
               </div>
-              <label className="flex min-w-0 flex-col gap-1">
+              {/* Ya no se anota (21 oct 2026): sale de Dropi. Por ahora, la primera venta de la carga de Ventas Dropi; sin ventas,
+                  la fecha que estaba anotada. */}
+              <div className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fecha de publicación</span>
-                <input type="date" value={d.fecha_publicacion} onChange={(e) => cambiar({ fecha_publicacion: e.target.value })} className={`${fieldClass} w-full`} />
-              </label>
-              {d.tipo_publicacion === "privado" && (
+                <span className="text-sm">
+                  {p.ventas?.primeraVenta ? (
+                    <>
+                      Se vende desde el {fechaLarga(p.ventas.primeraVenta)}
+                      <span className="block text-xs text-muted-foreground">primera venta en Dropi</span>
+                    </>
+                  ) : p.fechaPublicacion ? (
+                    <>
+                      {fechaLarga(p.fechaPublicacion)}
+                      <span className="block text-xs text-muted-foreground">anotada · todavía sin ventas en Dropi</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+              </div>
+              {(p.tipoDropi === "privado" || !!d.privatizado_a) && (
                 <>
                   <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Privatizado a</span>
@@ -376,16 +449,12 @@ function ContenidoFicha({
                 <input type="number" min={0} step="0.01" value={d.precio_venta} onChange={(e) => cambiar({ precio_venta: e.target.value })} placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
               </label>
               <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Costo mercancía</span>
+                <span className={labelClassSm}>Costo de producto</span>
                 <input type="number" min={0} step="0.01" value={d.costo_mercancia} onChange={(e) => cambiar({ costo_mercancia: e.target.value })} placeholder="Ej: 1.16" className={`${fieldClass} w-full tabular-nums`} />
               </label>
               <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fulfillment</span>
                 <input type="number" min={0} step="0.01" value={d.fulfillment} onChange={(e) => cambiar({ fulfillment: e.target.value })} placeholder="Ej: 1.50" className={`${fieldClass} w-full tabular-nums`} />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Coste real (última compra)</span>
-                <input type="number" min={0} step="0.01" value={d.coste_real} onChange={(e) => cambiar({ coste_real: e.target.value })} placeholder="Ej: 0.97" className={`${fieldClass} w-full tabular-nums`} />
               </label>
             </div>
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
@@ -396,14 +465,27 @@ function ContenidoFicha({
               <div>
                 <dt className="text-xs text-muted-foreground">Margen bruto</dt>
                 <dd className="flex items-center gap-1.5 font-semibold">
-                  {margen !== null && margen < MARGEN_BAJO && <span role="img" aria-label="Margen bajo" className="h-2 w-2 rounded-full bg-destructive" />}
+                  {margen !== null && margen < margenMinimo && <span role="img" aria-label="Margen bajo" className="h-2 w-2 rounded-full bg-destructive" />}
                   {margen === null ? "—" : `${Math.round(margen * 100)} %`}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Último cambio de precio</dt>
-                <dd>
-                  <input type="date" aria-label="Último cambio de precio" value={d.ultimo_cambio_precio} onChange={(e) => cambiar({ ultimo_cambio_precio: e.target.value })} className={`${fieldClass} w-full !px-2 !py-1 text-xs`} />
+                {/* Lo detecta la lectura del catálogo de Dropi (Análisis de competencia): ya no se anota a mano. */}
+                <dd className="text-xs">
+                  {p.cambioPrecioDropi ? (
+                    <>
+                      <span className="block font-semibold">{fechaLarga(p.cambioPrecioDropi.fecha)}</span>
+                      <span className="block text-muted-foreground">
+                        de {usd(p.cambioPrecioDropi.antes)} a {usd(p.cambioPrecioDropi.despues)} en Dropi
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="block">{p.lecturaDropiDesde ? `Sin cambios en Dropi desde el ${fechaLarga(p.lecturaDropiDesde)}` : "Sin datos de Dropi"}</span>
+                      {p.ultimoCambioPrecio && <span className="block text-muted-foreground">Antes: {fechaLarga(p.ultimoCambioPrecio)}</span>}
+                    </>
+                  )}
                 </dd>
               </div>
             </dl>
@@ -411,42 +493,16 @@ function ContenidoFicha({
 
           {p.ventas && corteVentas && (
             <Seccion icono={MargenIcon} titulo="Ventas en Dropi">
-              <VentasEnDropi v={p.ventas} corte={corteVentas} />
+              <VentasEnDropi v={p.ventas} corte={corteVentas} enCamino={p.enCamino} />
             </Seccion>
           )}
 
-          <Seccion icono={InventarioIcon} titulo="Venta y stock">
+          <Seccion icono={InventarioIcon} titulo="Stock">
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Estado de venta</span>
-                <Selector nombre="Estado de venta" valor={d.estado_venta} lista={ESTADOS_VENTA} cambiar={(v) => cambiar({ estado_venta: v })} />
-                {p.ventas && (
-                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    Según Dropi: <b className="font-medium text-foreground">{opcion(ESTADOS_VENTA, p.ventas.estadoSugerido)?.etiqueta}</b>
-                    {puedeEscribir && d.estado_venta !== p.ventas.estadoSugerido && (
-                      <button type="button" onClick={() => p.ventas && cambiar({ estado_venta: p.ventas.estadoSugerido })} className={`rounded border border-primario/40 bg-primario-suave px-1.5 py-0.5 font-medium text-primario hover:border-primario ${anilloFoco}`}>
-                        Usar
-                      </button>
-                    )}
-                  </span>
-                )}
-              </div>
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />
               </div>
-              <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Reposición</span>
-                <Selector nombre="Reposición" valor={d.estado_reposicion} lista={ESTADOS_REPOSICION} cambiar={(v) => cambiar({ estado_reposicion: v })} />
-              </div>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Competencia en Dropi</span>
-                <select value={d.competencia} onChange={(e) => cambiar({ competencia: e.target.value })} className={`${fieldClass} w-full`}>
-                  <option value="">Sin revisar</option>
-                  <option value="si">Sí</option>
-                  <option value="no">No</option>
-                </select>
-              </label>
             </div>
           </Seccion>
 
@@ -464,33 +520,9 @@ function ContenidoFicha({
             </Seccion>
           )}
 
-          <Seccion icono={PersonaIcon} titulo="Revisión">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Última revisión</span>
-                <input type="date" value={d.ultima_revision} onChange={(e) => cambiar({ ultima_revision: e.target.value })} className={`${fieldClass} w-full`} />
-              </label>
-              <div className="flex flex-col gap-1">
-                <span className={labelClassSm}>Próxima revisión</span>
-                <span className="flex items-center gap-1.5 py-2 text-sm tabular-nums">
-                  {p.revisionVencida && d.ultima_revision === (p.ultimaRevision ?? "") && <span role="img" aria-label="Revisión vencida" className="h-2 w-2 rounded-full bg-warning" />}
-                  {d.ultima_revision ? masDias(d.ultima_revision, DIAS_REVISION) : "Sin revisar"}
-                </span>
-              </div>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Responsable</span>
-                <select value={d.responsable_id} onChange={(e) => cambiar({ responsable_id: e.target.value })} className={`${fieldClass} w-full`}>
-                  <option value="">Sin responsable</option>
-                  {personas.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+          <Seccion icono={ComprasIcon} titulo="Notas">
             <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Notas</span>
+              <span className={labelClassSm}>Notas</span>
               <textarea value={d.notas} onChange={(e) => cambiar({ notas: e.target.value })} rows={4} maxLength={5000} placeholder="Ej: competencia en Dropi, por qué se bajó el precio…" className={`${fieldClass} w-full resize-y`} />
             </label>
           </Seccion>
@@ -498,6 +530,8 @@ function ContenidoFicha({
 
         <HistorialGenerico id={p.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialPublicacion} />
       </form>
+      {/* Fuera del formulario: los eventos de un portal suben por el árbol de React y enviarían o ensuciarían este formulario. */}
+      <FichaProductoEmbebida productoId={productoAbierto} alCerrar={() => setProductoAbierto(null)} />
     </Ventana>
   );
 }

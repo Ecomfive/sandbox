@@ -6,6 +6,7 @@ import { aAccesoPlano, nivelesEfectivos, type PermisoPropio } from "@/lib/permis
 import { accionPermitida, contarAjustes, pestanaVisible, resolverAfinado, type Afinado, type FilaAfinada } from "@/lib/permisos/afinado";
 import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
 import { paginaInicialDe } from "@/lib/nav-data";
+import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
  * navegador de quien la prende (ver `src/lib/vista-previa-actions.ts`), nunca en la base. */
@@ -213,10 +214,20 @@ export function irAlInicio(usuario: Pick<UsuarioActual, "modulos">, excluirModul
   redirect(paginaInicialDe(usuario.modulos, excluirModulo) ?? "/sin-acceso");
 }
 
+/**
+ * Sin perfil del equipo: una cuenta del portal del proveedor (Chin) vuelve a su portal, que es lo único que puede abrir; sin
+ * sesión, a entrar.
+ */
+async function irSinPerfil(): Promise<never> {
+  const usuarioId = await getUsuarioIdSesion();
+  if (usuarioId && (await cuentaDeProveedor(usuarioId))) redirect(RUTA_PORTAL_PROVEEDOR);
+  redirect("/login");
+}
+
 /** Exige sesión activa y acceso al módulo dado; si no lo tiene, la lleva a lo suyo. */
 export async function requireModulo(clave: string): Promise<UsuarioActual> {
   const usuario = await getUsuarioActual();
-  if (!usuario) redirect("/login");
+  if (!usuario) return irSinPerfil();
   if (!usuario.modulos.includes(clave)) irAlInicio(usuario, clave);
   return usuario;
 }

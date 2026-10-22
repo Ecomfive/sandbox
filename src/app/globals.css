@@ -218,6 +218,22 @@ html {
   animation: entrar-derecha 220ms ease-out;
 }
 
+/* La ventana grande al centro (la ficha de un producto, como la vista de una tarea de ClickUp). */
+@keyframes entrar-centro {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-entrar-centro {
+  animation: entrar-centro 200ms ease-out;
+}
+
 /* Botón principal: el degradado neón con un brillo al pasar el cursor. */
 .boton-neon {
   background-image: var(--neon);
@@ -269,7 +285,8 @@ html {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
-  .animate-entrar-derecha {
+  .animate-entrar-derecha,
+  .animate-entrar-centro {
     animation: none;
   }
 }

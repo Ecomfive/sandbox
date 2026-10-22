@@ -12,7 +12,7 @@ import { paisesDelMundo } from "@/lib/paises-mundo";
 
 /** Poder modificar Compras y que su pestaña Envíos no esté oculta para la persona (Usuarios y roles › Afinar). */
 async function exigirEscrituraEnEnvios() {
-  const usuario = await requireModuloEscritura("compras");await exigirEscrituraEnEnvios();
+  const usuario = await requireModuloEscritura("compras");
   if (!pestanaVisible(usuario.afinado.compras, "envios")) throw new Error(MENSAJE_ACCION_BLOQUEADA);
   return usuario;
 }

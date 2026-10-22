@@ -83,7 +83,7 @@ export interface FilaProducto {
   creado: string;
   asociaciones: Asociacion[];
   /** Cómo se llama en Dropi: el nombre de cada publicación de Dropi vinculada (en los países que la persona ve), con su país y su ID. */
-  nombresDropi: { nombre: string; pais: string; dropiId: string }[];
+  nombresDropi: { id: string; nombre: string; pais: string; dropiId: string; archivada: boolean }[];
   /** Sus tests en Test productos (los vinculados a este producto), el más reciente primero. */
   tests: TestProducto[];
   /** Si es una variante: su producto padre y sus valores ({ Color: "Beige", Talla: "S" }). */

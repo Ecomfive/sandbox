@@ -26,7 +26,7 @@ export async function cargarSugerencias(
   supabase: SupabaseClient,
   paisId: string,
   publicaciones: { id: string; nombre: string; dropiId: string; skuId: string | null }[],
-): Promise<{ skus: Map<string, SkuResumen>; sugerencias: Map<string, SugerenciaVista> }> {
+): Promise<{ skus: Map<string, SkuResumen>; sugerencias: Map<string, SugerenciaVista>; combosX2: Map<string, { id: string; codigo: string }> }> {
   const [skusR, comps, catalogoR, huellasR] = await Promise.all([
     traerTodasLasFilas<{ id: string; codigo: string; nombre: string; tipo: string; foto_url: string | null; foto_huella: string | null }>((d, h) =>
       supabase.from("skus_maestros").select("id, codigo, nombre, tipo, foto_url, foto_huella").is("padre_id", null).order("id").range(d, h),
@@ -52,5 +52,13 @@ export async function cargarSugerencias(
     const { skuId, alternativas, ...resto } = s;
     sugerencias.set(p.id, { ...resto, sku: skuId ? (skus.get(skuId) ?? null) : null, alternativas: alternativas.map((a) => skus.get(a)).filter((x): x is SkuResumen => !!x) });
   }
-  return { skus, sugerencias };
+  // El compuesto de 2 unidades de cada producto simple (un solo componente con cantidad 2), para las recomendaciones de combo.
+  const porCombo = new Map<string, { componenteId: string; cantidad: number }[]>();
+  for (const c of comps) porCombo.set(c.combo_id, [...(porCombo.get(c.combo_id) ?? []), { componenteId: c.componente_id, cantidad: Number(c.cantidad) }]);
+  const combosX2 = new Map<string, { id: string; codigo: string }>();
+  for (const [comboId, cs] of porCombo) {
+    const combo = skus.get(comboId);
+    if (combo && cs.length === 1 && cs[0].cantidad === 2 && !combosX2.has(cs[0].componenteId)) combosX2.set(cs[0].componenteId, { id: comboId, codigo: combo.codigo });
+  }
+  return { skus, sugerencias, combosX2 };
 }

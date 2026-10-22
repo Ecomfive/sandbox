@@ -1,114 +1,73 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
-import { BotonBarra, CabeceraTarjeta, Indicador, Punto, Segmentado } from "@/components/panel/piezas-panel";
-import { Bandera } from "@/components/paises/bandera";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { BotonBarra, BotonDescargar, CabeceraTarjeta, Indicador, Pastilla, Segmentado } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
-import { useToast } from "@/components/ui/toast";
 import { almacen } from "@/components/tabla/almacen";
-import { etiquetaVia, prometidoJunto, textoPrometido, type ResumenesReales } from "@/lib/compras/rutas-envio";
+import { estadoRuta, realQueManda } from "@/lib/compras/estado-ruta";
+import { etiquetaVia, prometidoJunto, textoPrometido } from "@/lib/compras/rutas-envio";
 import { normalPais } from "@/lib/paises-mundo";
 import { MasIcon } from "@/lib/nav-icons";
-import { cambiarActivoRuta } from "./actions";
-import { BarraTiempos, hoyPanama, porVia, realJunto } from "./barra-tiempos";
+import { hoyPanama, realJunto } from "./barra-tiempos";
 import { CrearRutaPanel } from "./crear-ruta-panel";
-import { tarifasVigentes, textoTarifa, type FilaRuta } from "./def-envios";
+import { DEF_ENVIOS, medidaRuta, plazoCorto, type FilaRuta } from "./def-envios";
 import { FichaRuta } from "./ficha-ruta";
-import { TablaEnvios } from "./tabla-envios";
+import { TrianguloIcon, VistoIcon } from "./iconos-envios";
+import { ListaRutas, type Agrupar } from "./lista-rutas";
 
-// El color de cada agente (los de ClickUp para Chin y Avery; los demás, uno fijo por su nombre).
-const COLOR_AGENTE: Record<string, string> = { chin: "#30A46C", avery: "#D6409F" };
-const PALETA = ["#5f43d1", "#0090FF", "#F76B15", "#12A594", "#8a35c9", "#E5484D"];
-export function colorAgente(agente: string | null) {
-  if (!agente) return "#8D8D8D";
-  const fijo = COLOR_AGENTE[agente.toLowerCase()];
-  if (fijo) return fijo;
-  let h = 0;
-  for (const ch of agente.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return PALETA[h % PALETA.length];
-}
-
-function PastillaAgente({ agente }: { agente: string | null }) {
-  const color = colorAgente(agente);
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium" style={{ borderColor: `${color}66`, backgroundColor: `${color}14`, color }}>
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-      {agente ?? "Sin agente"}
-    </span>
-  );
-}
-
-const ICONO_VIA: Record<string, string> = { mar: "🚢", aire: "✈️", tierra: "🚚" };
-const dias = (n: number | null) => (n === null ? "—" : `${n} d`);
-/** El real que manda en una tarjeta: el de los últimos 12 meses o, si no hay, el histórico. */
-const realActual = (r: ResumenesReales) => (r.ultimos12.promedio !== null ? r.ultimos12 : r.historico);
-const prometidoDe = (r: FilaRuta) => (r.diasMin !== null && r.diasMax !== null ? { min: r.diasMin, max: r.diasMax } : null);
-
-const VISTA = almacen("compras-envios-vista-v1", "local");
+const AGRUPAR = almacen("compras-envios-agrupar-v1", "local");
 type Via = "todas" | "mar" | "aire" | "tierra";
 
+const dias = (n: number | null) => (n === null ? "—" : `${n} d`);
+const tituloRuta = (r: FilaRuta) => `${r.paisNombre} · ${r.agente ?? "Sin agente"} · ${etiquetaVia(r.via)}`;
+
 /**
- * Compras › Envíos, como el Dashboard: arriba los indicadores, el tiempo por vía de todos los países y el ranking de agentes
- * (cada uno con su barra «prometido vs. real»), y una tarjeta por país con sus rutas: agente, vía, la barra, lo real de los
- * últimos 12 meses, la tarifa y el interruptor de activa. Cada tarjeta agrega una ruta para su país; «Agregar ruta» de arriba
- * sirve para un país nuevo. Pulsar una ruta abre su ficha. La tabla de siempre queda en «Tabla».
+ * Compras › Envíos: arriba los filtros y los indicadores, a la izquierda una sola lista de rutas (agrupada por país, agente o vía,
+ * siempre con las mismas columnas: plazo prometido, real, estado y una barra que los compara) y a la derecha lo que hay que atender:
+ * las rutas fuera de plazo, las que no tienen plazo definido y el cumplimiento de cada agente. Pulsar una ruta abre su ficha.
  */
 export function PanelEnvios({ rutas, agentes, tipos, puedeEscribir }: { rutas: FilaRuta[]; agentes: string[]; tipos: string[]; puedeEscribir: boolean }) {
-  const vistaGuardada = useSyncExternalStore(VISTA.suscribir, VISTA.leer, () => "");
-  const vista = vistaGuardada === "tabla" ? "tabla" : "tarjetas";
+  const guardado = useSyncExternalStore(AGRUPAR.suscribir, AGRUPAR.leer, () => "");
+  const agrupar: Agrupar = guardado === "agente" || guardado === "via" ? guardado : "pais";
   const [via, setVia] = useState<Via>("todas");
   const [agente, setAgente] = useState("");
   const [soloActivas, setSoloActivas] = useState(false);
+  const [soloTarde, setSoloTarde] = useState(false);
   const [buscar, setBuscar] = useState("");
   const [abierta, setAbierta] = useState<string | null>(null);
   const hoy = hoyPanama();
 
-  const filtradas = useMemo(
-    () =>
-      rutas.filter(
-        (r) =>
-          (via === "todas" || r.via === via) &&
-          (!agente || (r.agente ?? "") === agente) &&
-          (!soloActivas || r.activo) &&
-          (!buscar.trim() || normalPais(r.paisNombre).includes(normalPais(buscar))),
-      ),
-    [rutas, via, agente, soloActivas, buscar],
+  // Lo que dejan ver los filtros de la barra; los indicadores y las prioridades se calculan sobre esto (sin «Fuera de plazo», que solo
+  // recorta la lista) y el cumplimiento de los agentes sin el filtro de agente, para poder cambiar de uno a otro.
+  const sinAgente = useMemo(
+    () => rutas.filter((r) => (via === "todas" || r.via === via) && (!soloActivas || r.activo) && (!buscar.trim() || normalPais(r.paisNombre).includes(normalPais(buscar)))),
+    [rutas, via, soloActivas, buscar],
   );
+  const filtradas = useMemo(() => sinAgente.filter((r) => !agente || (r.agente ?? "") === agente), [sinAgente, agente]);
   const activas = filtradas.filter((r) => r.activo);
+  const lista = soloTarde ? filtradas.filter((r) => medidaRuta(r).estado === "tarde") : filtradas;
 
-  // Una tarjeta por país: los que tienen envíos medidos primero, luego por nombre.
-  const paises = useMemo(() => {
-    const m = new Map<string, FilaRuta[]>();
-    for (const r of filtradas) m.set(r.paisCodigo, [...(m.get(r.paisCodigo) ?? []), r]);
-    return [...m.values()].sort((a, b) => {
-      const na = a.reduce((s, r) => s + r.real.historico.n, 0);
-      const nb = b.reduce((s, r) => s + r.real.historico.n, 0);
-      return nb - na || a[0].paisNombre.localeCompare(b[0].paisNombre, "es");
-    });
-  }, [filtradas]);
+  const medidas = activas.filter((r) => ["tarde", "ok"].includes(medidaRuta(r).estado));
+  const tardes = activas.filter((r) => medidaRuta(r).estado === "tarde").sort((a, b) => (medidaRuta(b).delta ?? 0) - (medidaRuta(a).delta ?? 0));
+  const sinPlazo = activas.filter((r) => r.diasMax === null);
 
-  // Los agentes, de mejor a peor cumplimiento (lo real de 12 meses contra lo prometido, en sus rutas con las dos cosas).
+  // El cumplimiento de cada agente: de sus rutas con plazo y envíos, cuántas están dentro del plazo.
   const ranking = useMemo(() => {
     const m = new Map<string, FilaRuta[]>();
-    for (const r of activas) if (r.agente) m.set(r.agente, [...(m.get(r.agente) ?? []), r]);
+    for (const r of sinAgente.filter((x) => x.activo && x.agente)) m.set(r.agente!, [...(m.get(r.agente!) ?? []), r]);
     return [...m.entries()]
       .map(([nombre, filas]) => {
-        const medidas = filas.filter((r) => r.real.historico.n > 0 && r.diasMax !== null);
-        const cumplen = medidas.filter((r) => !r.incumple).length;
-        return { nombre, filas, paises: new Set(filas.map((r) => r.paisCodigo)).size, medidas: medidas.length, cumplimiento: medidas.length ? Math.round((cumplen / medidas.length) * 100) : null };
+        const med = filas.filter((r) => ["tarde", "ok"].includes(medidaRuta(r).estado));
+        const cumplen = med.filter((r) => medidaRuta(r).estado === "ok").length;
+        return { nombre, filas, paises: new Set(filas.map((r) => r.paisCodigo)).size, medidas: med.length, cumplen, pct: med.length ? Math.round((cumplen / med.length) * 100) : null };
       })
-      .sort((a, b) => (b.cumplimiento ?? -1) - (a.cumplimiento ?? -1) || b.filas.length - a.filas.length);
-  }, [activas]);
+      .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || b.filas.length - a.filas.length);
+  }, [sinAgente]);
 
-  const mar = realJunto(activas.filter((r) => r.via === "mar"), hoy);
-  const aire = realJunto(activas.filter((r) => r.via === "aire"), hoy);
-  const promMar = prometidoJunto(activas.filter((r) => r.via === "mar"));
-  const promAire = prometidoJunto(activas.filter((r) => r.via === "aire"));
-  const incumplen = activas.filter((r) => r.incumple).length;
   const agentesUsados = [...new Set(rutas.map((r) => r.agente).filter((a): a is string => !!a))].sort((a, b) => a.localeCompare(b, "es"));
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <Segmentado<Via>
           etiqueta="Vía"
@@ -116,9 +75,9 @@ export function PanelEnvios({ rutas, agentes, tipos, puedeEscribir }: { rutas: F
           alCambiar={setVia}
           opciones={[
             { valor: "todas", etiqueta: "Todas las vías" },
-            { valor: "mar", etiqueta: "🚢 Marítimo" },
-            { valor: "aire", etiqueta: "✈️ Aéreo" },
-            { valor: "tierra", etiqueta: "🚚 Terrestre" },
+            { valor: "mar", etiqueta: "Marítimo" },
+            { valor: "aire", etiqueta: "Aéreo" },
+            { valor: "tierra", etiqueta: "Terrestre" },
           ]}
         />
         <select aria-label="Agente" value={agente} onChange={(e) => setAgente(e.target.value)} className={`h-[34px] rounded-lg border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`}>
@@ -138,16 +97,21 @@ export function PanelEnvios({ rutas, agentes, tipos, puedeEscribir }: { rutas: F
         <BotonBarra activo={soloActivas} onClick={() => setSoloActivas((v) => !v)}>
           Solo activas
         </BotonBarra>
-        <div className="ml-auto flex items-center gap-2">
-          <Segmentado
-            etiqueta="Vista"
-            valor={vista}
-            alCambiar={(v) => VISTA.guardar(v)}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            Agrupar por
+          </span>
+          <Segmentado<Agrupar>
+            etiqueta="Agrupar por"
+            valor={agrupar}
+            alCambiar={(v) => AGRUPAR.guardar(v)}
             opciones={[
-              { valor: "tarjetas", etiqueta: "Tarjetas" },
-              { valor: "tabla", etiqueta: "Tabla" },
+              { valor: "pais", etiqueta: "País" },
+              { valor: "agente", etiqueta: "Agente" },
+              { valor: "via", etiqueta: "Vía" },
             ]}
           />
+          <BotonDescargar def={DEF_ENVIOS} filas={lista} />
           {puedeEscribir && (
             <CrearRutaPanel
               agentes={agentes}
@@ -162,195 +126,162 @@ export function PanelEnvios({ rutas, agentes, tipos, puedeEscribir }: { rutas: F
         </div>
       </div>
 
-      <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
-        <div className="flex flex-wrap">
-          <Indicador titulo="Países" valor={String(new Set(activas.map((r) => r.paisCodigo)).size)} detalle={`${new Set(filtradas.map((r) => r.paisCodigo)).size} con rutas`} />
-          <Indicador titulo="Rutas activas" valor={String(activas.length)} detalle={`de ${filtradas.length} rutas`} />
-          <Indicador titulo="Agentes" valor={String(ranking.length)} detalle={ranking.map((a) => a.nombre).join(" · ") || "—"} />
-          <Indicador
-            titulo="🚢 Marítimo"
-            punto={promMar && realActual(mar).promedio !== null ? (realActual(mar).promedio! > promMar.max ? "peligro" : "exito") : undefined}
-            valor={dias(realActual(mar).promedio)}
-            detalle={`prometido ${promMar ? textoPrometido(promMar.min, promMar.max) : "—"} · ${realActual(mar).n} envíos`}
-          />
-          <Indicador
-            titulo="✈️ Aéreo"
-            punto={promAire && realActual(aire).promedio !== null ? (realActual(aire).promedio! > promAire.max ? "peligro" : "exito") : undefined}
-            valor={dias(realActual(aire).promedio)}
-            detalle={`prometido ${promAire ? textoPrometido(promAire.min, promAire.max) : "—"} · ${realActual(aire).n} envíos`}
-          />
-          <Indicador titulo="Tardan más de lo prometido" punto={incumplen ? "peligro" : "exito"} valor={String(incumplen)} detalle={incumplen === 1 ? "ruta activa" : "rutas activas"} />
+      <Indicadores activas={activas} medidas={medidas.length} tardes={tardes.length} cumplen={medidas.length - tardes.length} soloTarde={soloTarde} alAlternarTarde={() => setSoloTarde((v) => !v)} hoy={hoy} />
+
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-[999_1_44rem]">
+          <ListaRutas rutas={lista} modo={agrupar} abierta={abierta} alAbrir={setAbierta} totalRutas={rutas.length} />
         </div>
-      </section>
 
-      {vista === "tabla" ? (
-        <TablaEnvios rutas={filtradas} agentes={agentes} tipos={tipos} puedeEscribir={puedeEscribir} sinResumen />
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <section aria-labelledby="e-vias" className="min-w-0 rounded-[10px] border border-border bg-card">
-              <CabeceraTarjeta id="e-vias" titulo="Prometido vs. real · todos los países" />
-              <div className="flex flex-col gap-5 p-4">
-                {porVia(activas).map(({ via: v, filas }) => (
-                  <div key={v} className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-medium">
-                      {ICONO_VIA[v]} {etiquetaVia(v)}
-                    </span>
-                    <BarraTiempos prometido={prometidoJunto(filas)} real={realJunto(filas, hoy)} />
-                  </div>
-                ))}
-                {activas.length === 0 && <p className="m-0 text-sm text-muted-foreground">No hay rutas activas con estos filtros.</p>}
-              </div>
-            </section>
-            <section aria-labelledby="e-agentes" className="min-w-0 rounded-[10px] border border-border bg-card">
-              <CabeceraTarjeta id="e-agentes" titulo="Agentes" />
-              <ul className="m-0 flex list-none flex-col gap-3 p-4">
-                {ranking.map((a) => (
-                  <li key={a.nombre}>
-                    <button
-                      type="button"
-                      aria-pressed={agente === a.nombre}
-                      onClick={() => setAgente((x) => (x === a.nombre ? "" : a.nombre))}
-                      className={`flex w-full flex-col gap-1.5 rounded-lg px-2 py-1.5 text-left hover:bg-muted aria-[pressed=true]:bg-primario-suave ${anilloFoco}`}
-                    >
-                      <span className="flex items-center justify-between gap-2">
-                        <PastillaAgente agente={a.nombre} />
-                        <span className="text-xs text-muted-foreground">
-                          {a.paises} {a.paises === 1 ? "país" : "países"} · {a.filas.length} {a.filas.length === 1 ? "ruta" : "rutas"}
-                        </span>
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className="h-1.5 flex-1 rounded-full bg-muted">
-                          <span className="barra-neon block h-1.5 rounded-full" style={{ width: `${a.cumplimiento ?? 0}%` }} />
-                        </span>
-                        <b className="w-24 text-right text-xs font-medium tabular-nums">{a.cumplimiento === null ? "sin medir" : `${a.cumplimiento} % cumple`}</b>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-                {ranking.length === 0 && <li className="text-sm text-muted-foreground">Sin agentes.</li>}
+        <aside aria-label="Prioridades" className="flex min-w-0 flex-[1_1_19rem] flex-col gap-4">
+          <section aria-labelledby="e-atender" className="rounded-[10px] border border-border bg-card">
+            <CabeceraTarjeta id="e-atender" titulo="Para atender">
+              <span className="text-xs text-muted-foreground tabular-nums">{tardes.length}</span>
+            </CabeceraTarjeta>
+            {tardes.length === 0 ? (
+              <p className="m-0 flex items-center gap-2 px-4 py-3.5 text-sm text-muted-foreground">
+                <VistoIcon className="text-success" />
+                Todo lo medido está en plazo.
+              </p>
+            ) : (
+              <ul className="m-0 list-none p-0">
+                {tardes.map((r) => {
+                  const { real, delta } = medidaRuta(r);
+                  return (
+                    <li key={r.id} className="border-t border-border first:border-t-0">
+                      <ItemPrioridad titulo={tituloRuta(r)} detalle={`${real} d real · plazo ${plazoCorto(r)}`} alPulsar={() => setAbierta(r.id)} marca={<Pastilla tono="peligro">+{delta} d</Pastilla>} />
+                    </li>
+                  );
+                })}
               </ul>
-            </section>
-          </div>
+            )}
+          </section>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 min-[1400px]:grid-cols-3">
-            {paises.map((filas) => (
-              <TarjetaPais key={filas[0].paisCodigo} filas={filas} hoy={hoy} agentes={agentes} puedeEscribir={puedeEscribir} alAbrir={setAbierta} />
-            ))}
-            {paises.length === 0 && <p className="m-0 text-sm text-muted-foreground">No hay rutas con estos filtros.</p>}
-          </div>
-        </>
-      )}
+          <section aria-labelledby="e-sin-plazo" className="rounded-[10px] border border-border bg-card">
+            <CabeceraTarjeta id="e-sin-plazo" titulo="Falta definir el plazo">
+              <span className="text-xs text-muted-foreground tabular-nums">{sinPlazo.length}</span>
+            </CabeceraTarjeta>
+            {sinPlazo.length === 0 ? (
+              <p className="m-0 flex items-center gap-2 px-4 py-3.5 text-sm text-muted-foreground">
+                <VistoIcon className="text-success" />
+                Todas las rutas dicen cuánto prometen.
+              </p>
+            ) : (
+              <ul className="m-0 list-none p-0">
+                {sinPlazo.map((r) => {
+                  const { real, envios } = medidaRuta(r);
+                  return (
+                    <li key={r.id} className="border-t border-border first:border-t-0">
+                      <ItemPrioridad
+                        titulo={tituloRuta(r)}
+                        detalle={`${real !== null ? `${real} d real · ` : ""}${envios} ${envios === 1 ? "envío medido" : "envíos medidos"}`}
+                        alPulsar={() => setAbierta(r.id)}
+                        marca={<Pastilla tono="aviso">Sin plazo</Pastilla>}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section aria-labelledby="e-agentes" className="rounded-[10px] border border-border bg-card">
+            <CabeceraTarjeta id="e-agentes" titulo="Agentes" />
+            <ul className="m-0 list-none p-0">
+              {ranking.map((a) => (
+                <li key={a.nombre} className="border-t border-border first:border-t-0">
+                  <button
+                    type="button"
+                    aria-pressed={agente === a.nombre}
+                    onClick={() => setAgente((x) => (x === a.nombre ? "" : a.nombre))}
+                    className={`flex w-full flex-col gap-1.5 px-4 py-3 text-left hover:bg-muted aria-[pressed=true]:bg-primario-suave ${anilloFoco} focus-visible:-outline-offset-2`}
+                  >
+                    <span className="flex items-baseline justify-between gap-2">
+                      <b className="font-semibold">{a.nombre}</b>
+                      <span className="text-xs text-muted-foreground">
+                        {a.paises} {a.paises === 1 ? "país" : "países"} · {a.filas.length} {a.filas.length === 1 ? "ruta" : "rutas"}
+                      </span>
+                    </span>
+                    <span aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-border">
+                      <span className="block h-full rounded-full bg-success" style={{ width: `${a.pct ?? 0}%` }} />
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {a.pct === null ? "Sin envíos medidos todavía" : `${a.cumplen} de ${a.medidas} ${a.medidas === 1 ? "ruta medida cumple" : "rutas medidas cumplen"} el plazo (${a.pct} %)`}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {ranking.length === 0 && <li className="px-4 py-3.5 text-sm text-muted-foreground">Sin agentes.</li>}
+            </ul>
+          </section>
+        </aside>
+      </div>
 
       <FichaRuta ruta={rutas.find((r) => r.id === abierta)} agentes={agentes} tipos={tipos} puedeEscribir={puedeEscribir} alCerrar={() => setAbierta(null)} />
     </div>
   );
 }
 
-/** La tarjeta de un país: cuánto tarda cada vía (todos sus agentes juntos) y una fila por ruta. */
-function TarjetaPais({ filas, hoy, agentes, puedeEscribir, alAbrir }: { filas: FilaRuta[]; hoy: string; agentes: string[]; puedeEscribir: boolean; alAbrir: (id: string) => void }) {
-  const pais = filas[0];
-  const ordenadas = [...filas].sort((a, b) => Number(b.activo) - Number(a.activo) || a.via.localeCompare(b.via) || (a.agente ?? "").localeCompare(b.agente ?? ""));
-  const tituloId = `pais-${pais.paisCodigo}`;
+/** Una fila del panel de prioridades: la ruta, su dato y una marca a la derecha; pulsarla abre su ficha. */
+function ItemPrioridad({ titulo, detalle, marca, alPulsar }: { titulo: string; detalle: string; marca: ReactNode; alPulsar: () => void }) {
   return (
-    <section aria-labelledby={tituloId} className="flex min-w-0 flex-col rounded-[10px] border border-border bg-card">
-      <header className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 id={tituloId} className="m-0 flex items-center gap-2 text-[15px] font-semibold">
-            <Bandera codigo={pais.paisCodigo} className="!h-4 !w-6" />
-            {pais.paisNombre}
-          </h2>
-          <div className="flex flex-wrap gap-1.5">
-            {porVia(filas.filter((r) => r.activo)).map(({ via, filas: deVia }) => {
-              const real = realActual(realJunto(deVia, hoy));
-              const prom = prometidoJunto(deVia);
-              const tarde = prom && real.promedio !== null && real.promedio > prom.max;
-              return (
-                <span key={via} className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs">
-                  {ICONO_VIA[via]}
-                  <b className={`font-semibold tabular-nums ${tarde ? "text-destructive" : ""}`}>{dias(real.promedio)}</b>
-                  <span className="text-muted-foreground">real</span>
-                </span>
-              );
-            })}
-          </div>
-        </div>
-        {puedeEscribir && (
-          <CrearRutaPanel
-            agentes={agentes}
-            paisInicial={pais.paisCodigo}
-            boton={(abrir) => (
-              <button
-                type="button"
-                onClick={abrir}
-                aria-haspopup="dialog"
-                aria-label={`Agregar una ruta a ${pais.paisNombre}`}
-                className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-              >
-                <MasIcon className="h-3 w-3" />
-                Ruta
-              </button>
-            )}
-          />
-        )}
-      </header>
-      <ul className="m-0 flex list-none flex-col p-1.5">
-        {ordenadas.map((r) => (
-          <FilaRutaTarjeta key={r.id} ruta={r} puedeEscribir={puedeEscribir} alAbrir={() => alAbrir(r.id)} />
-        ))}
-      </ul>
-    </section>
+    <button type="button" onClick={alPulsar} className={`flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-muted ${anilloFoco} focus-visible:-outline-offset-2`}>
+      <span className="flex min-w-0 flex-col">
+        <span className="font-semibold">{titulo}</span>
+        <span className="text-xs text-muted-foreground">{detalle}</span>
+      </span>
+      {marca}
+    </button>
   );
 }
 
-function FilaRutaTarjeta({ ruta, puedeEscribir, alAbrir }: { ruta: FilaRuta; puedeEscribir: boolean; alAbrir: () => void }) {
-  const { mostrarToast } = useToast();
-  const [pendiente, empezar] = useTransition();
-  const real = realActual(ruta.real);
-  const tarifa = tarifasVigentes(ruta.tarifas)[0];
-  const etiqueta = `${ruta.agente ?? "Sin agente"} · ${etiquetaVia(ruta.via)}`;
-  return (
-    <li className={`flex items-center gap-2 rounded-lg px-1 ${ruta.activo ? "" : "opacity-55"}`}>
-      <button type="button" onClick={alAbrir} aria-label={`Abrir la ruta ${etiqueta} a ${ruta.paisNombre}`} className={`flex min-w-0 flex-1 flex-col gap-1.5 rounded-lg px-2 py-2 text-left hover:bg-muted ${anilloFoco}`}>
-        <span className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-2">
-            <PastillaAgente agente={ruta.agente} />
-            <span className="truncate text-[13px]">
-              {ICONO_VIA[ruta.via]} {etiquetaVia(ruta.via)}
-              <span className="text-muted-foreground">{[ruta.modalidad, ruta.courier].filter(Boolean).length ? ` · ${[ruta.modalidad, ruta.courier].filter(Boolean).join(" ")}` : ""}</span>
-            </span>
-          </span>
-          <span className="flex shrink-0 items-baseline gap-1.5 text-right">
-            {ruta.incumple && <Punto tono="peligro" />}
-            <b className={`text-[15px] font-semibold tabular-nums ${ruta.incumple ? "text-destructive" : ""}`}>{dias(real.promedio)}</b>
-            <span className="text-xs text-muted-foreground">/ {textoPrometido(ruta.diasMin, ruta.diasMax).replace(" días", " d")}</span>
-          </span>
-        </span>
-        <BarraTiempos compacta prometido={prometidoDe(ruta)} real={ruta.real} />
-        <span className="flex justify-between gap-2 text-xs text-muted-foreground">
-          <span>{real.n ? `${real.n} envío${real.n === 1 ? "" : "s"}${ruta.real.ultimos2.promedio !== null ? ` · últimos 2 meses ${ruta.real.ultimos2.promedio} d` : ""}` : "sin envíos medidos"}</span>
-          {tarifa && <span className="tabular-nums">{textoTarifa(tarifa)}</span>}
-        </span>
-      </button>
-      {puedeEscribir && (
-        <button
-          type="button"
-          role="switch"
-          aria-checked={ruta.activo}
-          aria-label={`Ruta ${etiqueta} activa`}
-          disabled={pendiente}
-          onClick={() =>
-            empezar(async () => {
-              const r = await cambiarActivoRuta(ruta.id, !ruta.activo).catch(() => ({ error: "No se pudo cambiar." }));
-              if (r.error) mostrarToast(r.error, "destructive");
-              else mostrarToast(ruta.activo ? "Ruta desactivada" : "Ruta activada");
-            })
-          }
-          className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${anilloFoco} ${ruta.activo ? "border-primario bg-primario" : "border-border-control bg-muted"}`}
-        >
-          <span aria-hidden="true" className={`absolute top-0.5 h-3.5 w-3.5 rounded-full transition-all ${ruta.activo ? "left-[1.1rem] bg-background" : "left-0.5 bg-muted-foreground"}`} />
-        </button>
+/** Los indicadores en una sola barra; «Fuera de plazo» es un botón que recorta la lista a esas rutas. */
+function Indicadores({ activas, medidas, tardes, cumplen, soloTarde, alAlternarTarde, hoy }: { activas: FilaRuta[]; medidas: number; tardes: number; cumplen: number; soloTarde: boolean; alAlternarTarde: () => void; hoy: string }) {
+  const agentes = new Set(activas.map((r) => r.agente).filter(Boolean)).size;
+  const paises = new Set(activas.map((r) => r.paisCodigo)).size;
+  const vistaVia = (v: "mar" | "aire") => {
+    const filas = activas.filter((r) => r.via === v);
+    const real = realQueManda(realJunto(filas, hoy));
+    const prom = prometidoJunto(filas);
+    const { estado, delta } = estadoRuta(prom?.max ?? null, real.promedio);
+    return { real, prom, estado, delta };
+  };
+  const mar = vistaVia("mar");
+  const aire = vistaVia("aire");
+  const detalleVia = (v: ReturnType<typeof vistaVia>) => (
+    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      {v.estado === "tarde" && (
+        <Pastilla tono="peligro">
+          <TrianguloIcon />+{v.delta} d
+        </Pastilla>
       )}
-    </li>
+      {v.estado === "ok" && (
+        <Pastilla tono="exito">
+          <VistoIcon />
+          En plazo
+        </Pastilla>
+      )}
+      <span>
+        plazo {v.prom ? textoPrometido(v.prom.min, v.prom.max).replace(" días", " d") : "—"} · {v.real.n} {v.real.n === 1 ? "envío" : "envíos"}
+      </span>
+    </span>
+  );
+  return (
+    <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
+      <div className="flex flex-wrap">
+        <Indicador titulo="Rutas activas" valor={String(activas.length)} detalle={`${paises} ${paises === 1 ? "país" : "países"} · ${agentes} ${agentes === 1 ? "agente" : "agentes"}`} />
+        <Indicador titulo="Marítimo · real 12 meses" valor={dias(mar.real.promedio)} detalle={detalleVia(mar)} />
+        <Indicador titulo="Aéreo · real 12 meses" valor={dias(aire.real.promedio)} detalle={detalleVia(aire)} />
+        <Indicador titulo="Cumplen el plazo" valor={`${cumplen} de ${medidas}`} detalle="rutas con plazo y envíos medidos" />
+        <Indicador
+          titulo="Fuera de plazo"
+          punto={tardes ? "peligro" : "exito"}
+          valor={String(tardes)}
+          detalle={soloTarde ? "Mostrando solo estas · pulsa para ver todas" : tardes ? "Pulsa para ver solo estas" : "Todo en plazo"}
+          alPulsar={alAlternarTarde}
+          activo={soloTarde}
+        />
+      </div>
+    </section>
   );
 }

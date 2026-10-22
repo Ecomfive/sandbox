@@ -11,12 +11,14 @@ import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } 
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
-import { estimarPlanificacion, nuevaPlanificacion, tiemposDeTransito, type Estimacion, type TiemposTransito } from "@/lib/compras/planificacion";
+import { estimarPlanificacion, nuevaPlanificacion, type Estimacion, type TiemposTransito } from "@/lib/compras/planificacion";
+import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
-import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
+import { agenteDeLista, ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, proveedorDeLista, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, dentroDelAlcance, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
+import { fotoDeProducto, fotosPorNombre } from "@/lib/compras/foto-producto";
 import { leerMetricasDescripcion, metricasDeTest, precioUnidad, textoLogistica, type Cotizacion, type TestParaCotizacion } from "@/lib/compras/cotizacion";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
@@ -135,8 +137,9 @@ const fechaOptativa = (formData: FormData, campo: string): string | null => (for
 function leerCambios(formData: FormData) {
   return {
     foto_url: textoOptativo(formData, "foto_url"),
-    proveedor: textoOptativo(formData, "proveedor"),
-    agente_envio: textoOptativo(formData, "agente_envio"),
+    // De la lista (`PROVEEDORES_COMPRA`); una compra vieja con otro proveedor lo conserva tal cual.
+    proveedor: proveedorDeLista(textoOptativo(formData, "proveedor")),
+    agente_envio: agenteDeLista(textoOptativo(formData, "agente_envio")),
     venta_importacion: formData.get("venta_importacion") === "si",
     // Una sola tienda por orden (se guarda como lista por las de antes).
     tiendas: listaDeTexto(textoOptativo(formData, "tiendas")).slice(0, 1),
@@ -183,28 +186,7 @@ async function leerTipoYPais(formData: FormData): Promise<{ tipo: string; pais_i
 // No se escribe: es el mes de la llegada estimada (fecha de envío + lo que tardaron los envíos anteriores de su país por su
 // vía). Se calcula al crear la compra y cada vez que cambia su fecha de envío, su vía, su país o su tipo.
 
-/** De qué país es una compra para medir sus envíos: su país, o Importadora. */
-const claveTransito = (tipo: string, paisId: string | null) => (tipo === "importacion" ? "importacion" : (paisId ?? ""));
-
-/** Lo que tardaron los envíos que ya llegaron (fecha de envío → fecha de llegada), por país y vía. */
-async function cargarTiempos(): Promise<TiemposTransito> {
-  const filas = await traerTodasLasFilas<{ tipo: string; pais_id: string | null; via_envio: string[] | null; fecha_envio: string; fecha_llegada: string }>((desde, hasta) =>
-    createServiceClient()
-      .from("wms_compras")
-      .select("tipo, pais_id, via_envio, fecha_envio, fecha_llegada")
-      .not("fecha_envio", "is", null)
-      .not("fecha_llegada", "is", null)
-      .is("anulada_en", null)
-      .order("id")
-      .range(desde, hasta),
-  );
-  // Una compra que viajó por dos vías no dice cuánto tarda cada una: no se mide.
-  return tiemposDeTransito(
-    filas
-      .filter((f) => (f.via_envio ?? []).length === 1)
-      .map((f) => ({ clave: claveTransito(f.tipo, f.pais_id), via: f.via_envio![0], dias: Math.round((Date.parse(f.fecha_llegada) - Date.parse(f.fecha_envio)) / 864e5) })),
-  );
-}
+// `claveTransito` y `cargarTiempos` viven en src/lib/compras/tiempos-datos.ts (también los usa el portal del proveedor).
 
 /** La planificación que tendría una compra con estos datos (para verla en la ficha antes de guardar). */
 export async function estimarPlanificacionCompra(tipo: string, pais: string, vias: string[], fechaEnvio: string): Promise<Estimacion | null> {
@@ -1267,6 +1249,8 @@ export interface ItemCompra {
   cantidadRecibida: number | null;
   fechaRecepcion: string | null;
   origen: string;
+  /** La foto comercial del producto (la de Producto o la de otro con el mismo nombre). */
+  foto: string | null;
 }
 
 /** Un producto de la ficha que se puede agregar a una compra (los compuestos no: no se compran, salen de sus componentes). */
@@ -1314,15 +1298,17 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
   const [items, productos] = await Promise.all([
     supabase
       .from("wms_compra_items")
-      .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre)")
+      .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre, foto_url)")
       .eq("compra_id", compraId)
       .order("creado_en"),
     cargarProductosComprables(supabase),
   ]);
   if (items.error || !productos) return { error: "No se pudieron cargar los productos." };
+  // La foto comercial de cada línea: la de su producto o, si no tiene, la de otro producto con el mismo nombre.
+  const porNombre = fotosPorNombre(productos.map((p) => ({ nombre: p.nombre, foto: p.foto_url ?? null })));
   return {
     items: (items.data ?? []).map((i) => {
-      const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string } | null;
+      const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string; foto_url: string | null } | null;
       return {
         id: i.id,
         skuId: i.sku_maestro_id,
@@ -1334,6 +1320,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
         cantidadRecibida: i.cantidad_recibida,
         fechaRecepcion: i.fecha_recepcion,
         origen: i.origen,
+        foto: sku ? fotoDeProducto({ nombre: sku.nombre, foto: sku.foto_url }, porNombre) : null,
       };
     }),
     productos: productos.map(aProductoComprable),
@@ -1345,7 +1332,9 @@ const ES_COSTO = (n: number | null) => n === null || (Number.isFinite(n) && n >=
 
 /**
  * El total de una compra con productos: la QTY Total es la suma de lo pedido y el Monto Total la de cada línea (cantidad ×
- * costo unitario, en centavos) de las que tienen costo. Sin ninguna línea con costo, el Monto Total no se toca.
+ * costo unitario, en centavos). Una línea sin costo suma $0: si ninguna tiene costo, el Monto Total queda en $0 (pedido de
+ * Hernán, 22 oct 2026; antes se dejaba el monto que traía la compra y afuera salía un valor que la ficha no tenía). Sin
+ * productos, el Monto Total es el que se escribe a mano y no se toca.
  */
 async function sincronizarCantidad(compraId: string) {
   const supabase = createServiceClient();
@@ -1358,7 +1347,7 @@ async function sincronizarCantidad(compraId: string) {
     .from("wms_compras")
     .update({
       qty_total: lineas.length ? unidades : null,
-      ...(conCosto.length ? { monto_total: Math.round(monto * 100) / 100 } : {}),
+      ...(lineas.length ? { monto_total: Math.round(monto * 100) / 100 } : {}),
       actualizado_en: new Date().toISOString(),
     })
     .eq("id", compraId);
