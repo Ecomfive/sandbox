@@ -21,7 +21,7 @@ export default async function RecomendacionesPage({ searchParams }: { searchPara
   const usuario = await requireModulo("publicaciones-dropi");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await cargarPublicaciones(supabase, pais.id);
+  const datos = await cargarPublicaciones(supabase, pais.id, usuario);
   if (!datos) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
