@@ -78,3 +78,14 @@ test("una publicación con dos IDs de Dropi suma los dos", () => {
   assert.equal(v.porMes["2026-08"], 3);
   assert.equal(ventasDePublicacion([99], resumen), null);
 });
+
+test("el stock de la última lectura de Dropi manda sobre el de la carga de ventas", () => {
+  // La antena 8684: la carga decía 0 (sin stock y se vende) y Dropi ya tenía 2.
+  const resumen = new Map(resumirProductos([prod(8684, 0)], [dia(8684, CORTE, 90)], CORTE).map((r) => [r.id, r]));
+  assert.equal(ventasDePublicacion([8684], resumen)!.stockEstado, "sin_stock_vende");
+  const v = ventasDePublicacion([8684], resumen, new Map([[8684, 2]]))!;
+  assert.equal(v.stock, 2);
+  assert.equal(v.stockEstado, "se_acaba");
+  // Un ID que la lectura no trae se queda con el de la carga.
+  assert.equal(ventasDePublicacion([8684], resumen, new Map([[1, 5]]))!.stock, 0);
+});

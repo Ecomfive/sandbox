@@ -498,6 +498,10 @@ convenciones técnicas del código.
   (B280 = Bodega Dropi Panama, B81 = Proveedor Ecomfive); va junto al ID en la fila, en la ficha y en el filtro, con las bodegas
   ordenadas por stock (`bodegasEnOrden`). Encima de la lista, «Última actualización desde Dropi» con fecha y hora
   (`DatosPublicaciones.leidoProveedor`, escrita en el servidor con `fechaHoraLectura` para que no cambie al hidratar).
+  **El stock manda la lectura de «Mis productos»**: `ventasDePublicacion(ids, resumen, stockActual)` usa el stock de esa lectura por
+  ID antes que el de la carga de Ventas Dropi (que puede tener días), así «Stock», días de inventario, «Sin stock» y «Se acaba» salen
+  con lo último de Dropi (la antena 8684 salía «Sin stock» con la carga del 21 oct y Dropi ya tenía 2). Compras › Reponer y
+  Desempeño › Ventas Dropi siguen con el stock de la carga. El MCP de Dropi ve el catálogo como dropshipper: no trae los privados.
   **Todas con bodega** (pedido de Hernán): **Dropi solo lista la bodega de un producto con stock** (sin stock, `warehouses` y hasta
   `warehouse_product` de `api/products/<id>` vienen vacíos), así que `FilaPublicacion.bodega` = `bodegaDePublicacion`: la de Dropi;
   si no, la que corresponde a `ubicacion` (la última conocida: la sincronización no la borra al llegar a 0) entre las bodegas del

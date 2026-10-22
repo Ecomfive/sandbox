@@ -37,9 +37,11 @@ function automatico(
   hoy: string,
   reglas: Reglas,
   prov: ProductoProveedor | null,
+  /** El stock por ID de la última lectura de «Mis productos»: manda sobre el de la carga de ventas, que puede tener días. */
+  stockActual: Map<number, number> | undefined,
 ): Pick<FilaPublicacion, "ventas" | "enDropi" | "archivada" | "tipoDropi" | "acciones" | "competidorMasBarato" | "competidorMinimo"> {
   const ids = idsDropi(d);
-  const v = ventas ? ventasDePublicacion(ids, ventas.resumen) : null;
+  const v = ventas ? ventasDePublicacion(ids, ventas.resumen, stockActual) : null;
   const estadoDropi = prov
     ? prov.archivado
       ? "archivado"
@@ -257,6 +259,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   };
   // Las bodegas del país (las que aparecen en «Mis productos»): para deducir la de un producto que hoy no tiene stock.
   const bodegasPais = proveedor ? bodegasDelPais(proveedor.productos.values()) : [];
+  const stockActual = proveedor ? new Map([...proveedor.productos.values()].map((p) => [p.id, p.stock])) : undefined;
   const decisionesDe = new Map<string, DecisionVista[]>();
   for (const d of decisiones) decisionesDe.set(d.publicacionId, [...(decisionesDe.get(d.publicacionId) ?? []), d]);
 
@@ -312,7 +315,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       leidoProveedor: proveedor?.leidoEn ?? null,
       bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),
       ...revisionDe(d),
-      ...automatico(d, ventas, competidores, hoy, r, prov),
+      ...automatico(d, ventas, competidores, hoy, r, prov, stockActual),
     };
   });
 

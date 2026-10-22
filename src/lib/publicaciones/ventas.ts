@@ -215,8 +215,12 @@ export function estadoVentaSugerido(netas30: number, stock: number): VentasPubli
   return "estancado";
 }
 
-/** Suma las ventas de los IDs de Dropi de una publicación («7231-7679» son dos). `null` si ninguno tiene datos. */
-export function ventasDePublicacion(ids: number[], resumen: Map<number, ResumenProducto>): VentasPublicacion | null {
+/**
+ * Suma las ventas de los IDs de Dropi de una publicación («7231-7679» son dos). `null` si ninguno tiene datos. `stockActual`: el
+ * stock de la última lectura de «Mis productos» de Dropi por ID, que manda sobre el de la carga de ventas (puede tener días; la
+ * antena 8684 decía 0 en la carga y Dropi ya tenía 2).
+ */
+export function ventasDePublicacion(ids: number[], resumen: Map<number, ResumenProducto>, stockActual?: Map<number, number>): VentasPublicacion | null {
   const rs = [...new Set(ids)].map((id) => resumen.get(id)).filter((r): r is ResumenProducto => !!r);
   if (!rs.length) return null;
   const suma = (f: (r: ResumenProducto) => number) => rs.reduce((a, r) => a + f(r), 0);
@@ -228,7 +232,7 @@ export function ventasDePublicacion(ids: number[], resumen: Map<number, ResumenP
     canceladas: suma((r) => r.canceladas),
     rechazadas: suma((r) => r.rechazadas),
     devueltas: suma((r) => r.devueltas),
-    stock: suma((r) => Math.max(r.stock, 0)),
+    stock: suma((r) => Math.max(stockActual?.get(r.id) ?? r.stock, 0)),
   };
   const porMes: Record<string, number> = {};
   for (const r of rs) for (const [m, n] of Object.entries(r.porMes)) porMes[m] = (porMes[m] ?? 0) + n;
