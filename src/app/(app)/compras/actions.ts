@@ -1332,7 +1332,9 @@ const ES_COSTO = (n: number | null) => n === null || (Number.isFinite(n) && n >=
 
 /**
  * El total de una compra con productos: la QTY Total es la suma de lo pedido y el Monto Total la de cada línea (cantidad ×
- * costo unitario, en centavos) de las que tienen costo. Sin ninguna línea con costo, el Monto Total no se toca.
+ * costo unitario, en centavos). Una línea sin costo suma $0: si ninguna tiene costo, el Monto Total queda en $0 (pedido de
+ * Hernán, 22 oct 2026; antes se dejaba el monto que traía la compra y afuera salía un valor que la ficha no tenía). Sin
+ * productos, el Monto Total es el que se escribe a mano y no se toca.
  */
 async function sincronizarCantidad(compraId: string) {
   const supabase = createServiceClient();
@@ -1345,7 +1347,7 @@ async function sincronizarCantidad(compraId: string) {
     .from("wms_compras")
     .update({
       qty_total: lineas.length ? unidades : null,
-      ...(conCosto.length ? { monto_total: Math.round(monto * 100) / 100 } : {}),
+      ...(lineas.length ? { monto_total: Math.round(monto * 100) / 100 } : {}),
       actualizado_en: new Date().toISOString(),
     })
     .eq("id", compraId);
