@@ -6,7 +6,6 @@ import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
-import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -18,7 +17,8 @@ import {
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
-import { actualizarPublicacion, eliminarPublicacion, obtenerHistorialPublicacion } from "./actions";
+import { actualizarPublicacion, eliminarPublicacion } from "./actions";
+import { ActividadPublicacion } from "./actividad-publicacion";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
@@ -528,8 +528,10 @@ function ContenidoFicha({
           </Seccion>
         </fieldset>
 
-        <HistorialGenerico id={p.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialPublicacion} />
       </form>
+      {/* Fuera del formulario: escribir un comentario no debe enviar ni ensuciar la publicación. Se vuelve a pedir al guardar y
+          al decidir una recomendación (cambia la cantidad de decisiones o de tareas hechas). */}
+      <ActividadPublicacion id={p.id} puedeComentar={puedeEscribir} version={version + p.decisiones.length + p.decisiones.filter((x) => x.hechaEn).length} />
       {/* Fuera del formulario: los eventos de un portal suben por el árbol de React y enviarían o ensuciarían este formulario. */}
       <FichaProductoEmbebida productoId={productoAbierto} alCerrar={() => setProductoAbierto(null)} />
     </Ventana>

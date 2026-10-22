@@ -368,6 +368,14 @@ export const GUIAS: GuiaModulo[] = [
         ],
       },
       {
+        titulo: "Actividad",
+        pasos: [
+          "Al final de la ficha de cada publicación está la Actividad, igual que en Compras: en un solo bloque, los comentarios y los cambios (precio, vínculo con Producto, decisiones de las recomendaciones, tareas hechas), del más viejo al más nuevo. Se filtra por Todo, Comentarios o Cambios.",
+          "Para comentar, escribe abajo y pulsa «Comentar». Con @ etiquetas a alguien y le llega un aviso. Puedes adjuntar imágenes, PDF, Excel o Word con «Adjuntar», pegando una captura (Ctrl+V) o arrastrando el archivo.",
+          "En cada comentario se puede responder, reaccionar con un emoji y, si es tuyo, editarlo o eliminarlo.",
+        ],
+      },
+      {
         titulo: "Recomendaciones",
         pasos: [
           "Además de marcar lo que necesita cada publicación, el sistema recomienda qué hacer, como una tarea: «Crear combo x2» (margen bajo, producto simple que vende y sin combo de 2 publicado: dos unidades en un pedido reparten el fulfillment y suben el margen), «Subir precio» (margen bajo y nadie lo vende más barato; sin pasar del precio más bajo de la competencia) y «Bajar precio frente a la competencia» (alguien lo vende más barato con stock y bajar no deja el margen en crítico). Cada una dice por qué, con los números, y qué resultado se espera.",
@@ -575,6 +583,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-22", titulo: "Comentarios en Gestión de IDs Dropi", texto: "La Actividad de cada publicación ahora es como la de Compras: comentarios con archivos, @menciones, respuestas y reacciones, junto con los cambios y las decisiones de las recomendaciones.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-22", titulo: "Chin ve su portal en chino", texto: "El portal de Chin ahora está en chino simplificado (puede cambiarlo a español con «中文 / Español»): los nombres de los productos y tus notas se traducen solos con IA. Lo que Chin escribe en chino te llega en español, con «(ver original)» al lado. Y la nueva pestaña «Tablero de Chin» muestra su portal tal como lo ve él, en español y solo para ver.", modulo: "portal-proveedor", href: "/portal-proveedor?tab=tablero" },
   { fecha: "2026-10-22", titulo: "Por decidir, solo con la foto de referencia", texto: "En el Portal del proveedor, las cotizaciones de «Por decidir» muestran solo la foto de referencia; el espacio de la foto real queda en blanco porque se agrega después.", modulo: "portal-proveedor", href: "/portal-proveedor?tab=decidir" },
   { fecha: "2026-10-22", titulo: "Ventas Dropi con utilidad", texto: "Ventas Dropi muestra ahora la plata, del Excel de la oficina desde marzo de 2026: utilidad y margen del último mes completo, la utilidad por mes (ganancia, coste real y comisión) y las columnas «Utilidad» y «Margen» de cada producto.", modulo: "ventas-dropi", href: "/ventas-dropi" },

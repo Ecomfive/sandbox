@@ -523,6 +523,19 @@ convenciones técnicas del código.
   `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)». **«Tablero de Chin»** (`?tab=tablero`
   en `/portal-proveedor`): el mismo `PortalChin` en español con `soloLectura` (sin botones, sin selector ni «Salir» y sin marcar
   «Lo nuevo» como visto).
+- **Actividad con comentarios, común a todos los módulos** (22 oct 2026). La Actividad de Compras se separó en una pieza común:
+  `Actividad` (`src/components/actividad/actividad.tsx`: un solo bloque con comentarios, cambios y archivos, filtro, «Ver anteriores»,
+  campo con @menciones, pegar o arrastrar archivos), `TarjetaComentario` (`tarjeta-comentario.tsx`: respuestas de un nivel,
+  reacciones, editar y eliminar el propio) y `adjuntos.tsx` (subida directa a Storage con URL firmada, galería). Cada módulo le pasa
+  `obtener` (su lectura) y `acciones` (`AccionesActividad`, `src/lib/comentarios/tipos.ts`: comentar, editar, eliminar, reaccionar,
+  prepararSubida, descartarSubida y su bucket) y, si quiere, `renderCambio` y `arriba`; `version` la vuelve a pedir. Compras la usa
+  con sus acciones de siempre (`actividad-compra.tsx` es ahora un envoltorio: etapa/estado en color y subtareas). Para un módulo nuevo
+  el servidor es `src/lib/comentarios/servidor.ts` (`ConfigComentarios`: tablas, columna de unión y bucket): no revisa permisos, así
+  que su archivo "use server" comprueba el módulo y el acceso al registro ANTES de llamarlo, como
+  `publicaciones-dropi/actividad-actions.ts`. Los archivos se revisan por su contenido (`detectarAdjunto`) y solo se borran los de
+  `comentarios/<registro>/`. **Gestión de IDs Dropi** ya la tiene (migración 0131: `dropi_publicacion_comentarios`, `_adjuntos`,
+  `_comentario_reacciones`, bucket privado `publicaciones-dropi`); sus cambios salen de `historial_auditoria` (también las decisiones
+  de recomendaciones y las tareas hechas), y la ficha la vuelve a pedir al guardar o decidir.
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,
@@ -1026,7 +1039,7 @@ convenciones técnicas del código.
   comentario** (`GaleriaAdjuntos`: miniaturas que se amplían con `VisorImagen`, PDF como enlace firmado de una hora); la
   sección «Adjuntos» del final solo trae los sueltos (ClickUp, foto, documentos). Sin la columna, la actividad sigue cargando
   y el comentario con archivos avisa que falta la migración.
-  **Actividad como ClickUp** (8 oct 2026; `actividad-compra.tsx` + `comentario-compra.tsx`): un solo bloque con comentarios,
+  **Actividad como ClickUp** (8 oct 2026; `actividad-compra.tsx` + la pieza común `src/components/actividad/`, ver «Actividad con comentarios»): un solo bloque con comentarios,
   cambios y archivos en orden de tiempo (filtro Todo / Comentarios / Cambios, «Ver anteriores», campo abajo). Cada comentario
   tiene **respuestas** de un nivel (`respuesta_a`; avisa a quien lo escribió por `autor_id`) y **reacciones**
   (`wms_compra_comentario_reacciones`, emojis fijos de `src/lib/compras/reacciones.ts`, `alternarReaccion`), migración 0095;
