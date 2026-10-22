@@ -1,7 +1,7 @@
 -- Gestión de IDs Dropi › Actividad con comentarios (22 oct 2026), como la de Compras: comentarios con archivos, respuestas (un
 -- nivel), reacciones y @menciones en cada publicación. Los cambios siguen saliendo de historial_auditoria.
 -- Archivos en el bucket privado `publicaciones-dropi` (comentarios/<publicación>/…), con enlaces firmados de una hora.
--- RLS activado y sin políticas (solo el servidor). Reversa: supabase/rollbacks/0131_rollback.sql
+-- RLS activado y sin políticas (solo el servidor). Reversa: supabase/rollbacks/0132_rollback.sql
 
 create table if not exists dropi_publicacion_comentarios (
   id uuid primary key default uuid_v7(),

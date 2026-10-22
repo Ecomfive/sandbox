@@ -533,7 +533,7 @@ convenciones técnicas del código.
   el servidor es `src/lib/comentarios/servidor.ts` (`ConfigComentarios`: tablas, columna de unión y bucket): no revisa permisos, así
   que su archivo "use server" comprueba el módulo y el acceso al registro ANTES de llamarlo, como
   `publicaciones-dropi/actividad-actions.ts`. Los archivos se revisan por su contenido (`detectarAdjunto`) y solo se borran los de
-  `comentarios/<registro>/`. **Gestión de IDs Dropi** ya la tiene (migración 0131: `dropi_publicacion_comentarios`, `_adjuntos`,
+  `comentarios/<registro>/`. **Gestión de IDs Dropi** ya la tiene (migración 0132: `dropi_publicacion_comentarios`, `_adjuntos`,
   `_comentario_reacciones`, bucket privado `publicaciones-dropi`); sus cambios salen de `historial_auditoria` (también las decisiones
   de recomendaciones y las tareas hechas), y la ficha la vuelve a pedir al guardar o decidir.
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración

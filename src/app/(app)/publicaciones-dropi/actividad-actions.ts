@@ -9,7 +9,7 @@ import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
-// La Actividad de una publicación de Gestión de IDs Dropi (migración 0131): comentarios con archivos, respuestas, reacciones y
+// La Actividad de una publicación de Gestión de IDs Dropi (migración 0132): comentarios con archivos, respuestas, reacciones y
 // @menciones, y los cambios de la auditoría. Cada acción revisa el permiso del módulo y que la publicación sea de un país que la
 // persona ve ANTES de llamar al motor común (`@/lib/comentarios/servidor`). Devuelven el error como valor.
 
@@ -22,7 +22,7 @@ const CFG: motor.ConfigComentarios = {
   bucket: "publicaciones-dropi",
 };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const faltaMigracion = "Falta correr en Supabase la migración 0131 para comentar en las publicaciones.";
+const faltaMigracion = "Falta correr en Supabase la migración 0132 para comentar en las publicaciones.";
 
 async function permitida(id: string, permitidos: string[] | null): Promise<{ id: string; nombre: string; numero: number | null } | null> {
   if (typeof id !== "string" || !UUID.test(id)) return null;
@@ -68,7 +68,7 @@ export async function obtenerActividadPublicacion(id: string): Promise<DatosActi
       origen: "sistema",
       texto: formatearEventoAuditoria({ ...e, usuario_nombre: null } as never),
     }));
-  // Sin la migración 0131 la actividad se ve igual, solo con los cambios.
+  // Sin la migración 0132 la actividad se ve igual, solo con los cambios.
   return { comentarios: "error" in comentarios ? [] : comentarios.comentarios, adjuntos: [], eventos };
 }
 

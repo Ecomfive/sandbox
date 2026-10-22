@@ -1,6 +1,6 @@
 // La Actividad con comentarios (como la de Compras y ClickUp), compartida entre módulos: los datos que la pantalla recibe y las
 // acciones que cada módulo le da. Compras la usa con sus tablas `wms_compra_*` y Gestión de IDs Dropi con `dropi_publicacion_*`
-// (migración 0131). Solo tipos: sirven al servidor y al navegador.
+// (migración 0132). Solo tipos: sirven al servidor y al navegador.
 
 /** Un archivo de la actividad: con su enlace firmado de una hora (o null si no se pudo firmar). */
 export interface AdjuntoActividad {
