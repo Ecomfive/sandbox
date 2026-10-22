@@ -10,6 +10,7 @@ import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { NivelMargen } from "@/lib/publicaciones/reglas";
+import type { Revision } from "@/lib/publicaciones/optimizacion";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
@@ -106,6 +107,11 @@ export interface FilaPublicacion {
   recomendaciones: Recomendacion[];
   /** Las decisiones sobre sus recomendaciones, de la más nueva a la más vieja. */
   decisiones: DecisionVista[];
+  /** La revisión de optimización (título, fotos, video, descripción, precio sugerido) y su nota. */
+  revisiones: Revision[];
+  nota: { cumple: number; total: number };
+  /** El título tal como se ve en Dropi (la última lectura del catálogo), o null si no se leyó. */
+  tituloDropi: string | null;
 }
 
 /** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */
@@ -177,6 +183,21 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       ordenGrupos: TIPOS_RECOMENDACION.map((t) => t.valor),
       colorValor: (v) => TIPOS_RECOMENDACION.find((t) => t.valor === v)?.color,
     },
+    {
+      id: "optimizacion",
+      etiqueta: "Optimización",
+      tipo: "seleccion",
+      valores: (f) => [f.nota.total === 0 ? SIN_VALOR : f.nota.cumple === f.nota.total ? "completa" : f.nota.cumple / f.nota.total >= 0.5 ? "a_medias" : "baja"],
+      opciones: () => [
+        { valor: "baja", etiqueta: "Le falta mucho (menos de la mitad)" },
+        { valor: "a_medias", etiqueta: "Le falta algo" },
+        { valor: "completa", etiqueta: "Completa" },
+      ],
+      etiquetaSinValor: "Sin revisar",
+      agrupable: true,
+      ordenGrupos: ["baja", "a_medias", "completa"],
+    },
+    { id: "notaOptimizacion", etiqueta: "Nota de optimización (%)", tipo: "numero", valor: (f) => (f.nota.total ? Math.round((f.nota.cumple / f.nota.total) * 100) : null) },
     { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },
     // Las ventas de Dropi (21 oct 2026): reemplazan el «Estado de venta» que se marcaba a mano. Las ve todo el que abre el módulo.
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },

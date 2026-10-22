@@ -4,14 +4,23 @@
 // decisiones quedan guardadas (`dropi_publicaciones_decisiones`) y son lo que en la fase 2 leerá la IA para aprender. Sin base
 // ni React, con prueba.
 
+import type { Revision } from "./optimizacion";
 import type { Reglas } from "./reglas";
 
-export type TipoRecomendacion = "combo_x2" | "subir_precio" | "igualar_precio";
+export type TipoRecomendacion = "combo_x2" | "subir_precio" | "igualar_precio" | "optimizar_titulo" | "mas_fotos" | "agregar_video" | "mejorar_descripcion" | "precio_sugerido";
 
-export const TIPOS_RECOMENDACION: { valor: TipoRecomendacion; etiqueta: string; color: string }[] = [
-  { valor: "combo_x2", etiqueta: "Crear combo x2", color: "#8e4ec6" },
-  { valor: "subir_precio", etiqueta: "Subir precio", color: "#30a46c" },
-  { valor: "igualar_precio", etiqueta: "Bajar precio frente a la competencia", color: "#f76808" },
+/** Precio y combo (cuánto se gana) u optimización de la publicación (cómo se ve en Dropi). */
+export type GrupoRecomendacion = "precio" | "optimizacion";
+
+export const TIPOS_RECOMENDACION: { valor: TipoRecomendacion; etiqueta: string; color: string; grupo: GrupoRecomendacion }[] = [
+  { valor: "combo_x2", etiqueta: "Crear combo x2", color: "#8e4ec6", grupo: "precio" },
+  { valor: "subir_precio", etiqueta: "Subir precio", color: "#30a46c", grupo: "precio" },
+  { valor: "igualar_precio", etiqueta: "Bajar precio frente a la competencia", color: "#f76808", grupo: "precio" },
+  { valor: "optimizar_titulo", etiqueta: "Optimizar el título", color: "#0090ff", grupo: "optimizacion" },
+  { valor: "mas_fotos", etiqueta: "Agregar fotos", color: "#12a594", grupo: "optimizacion" },
+  { valor: "agregar_video", etiqueta: "Agregar video", color: "#d6409f", grupo: "optimizacion" },
+  { valor: "mejorar_descripcion", etiqueta: "Mejorar la descripción", color: "#a18072", grupo: "optimizacion" },
+  { valor: "precio_sugerido", etiqueta: "Ajustar el precio sugerido", color: "#d9a200", grupo: "optimizacion" },
 ];
 
 export const etiquetaRecomendacion = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.etiqueta ?? t;
@@ -117,6 +126,52 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
   return out;
 }
 
+/** Qué puntos de la revisión resuelve cada recomendación de optimización. */
+const PUNTOS: Partial<Record<TipoRecomendacion, Revision["clave"][]>> = {
+  optimizar_titulo: ["titulo_espanol", "titulo_cantidad", "titulo_angulo", "titulo_formato"],
+  mas_fotos: ["fotos"],
+  agregar_video: ["video"],
+  mejorar_descripcion: ["descripcion"],
+  precio_sugerido: ["precio_sugerido"],
+};
+
+const RESULTADO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
+  optimizar_titulo: "Un título en español, con la cantidad y para qué sirve, se encuentra mejor en Dropi y el dropshipper entiende qué vende.",
+  mas_fotos: "Más fotos (producto, uso, tamaño, empaque) dan al dropshipper material para sus anuncios.",
+  agregar_video: "Un video del producto en uso es lo que más usa el dropshipper para anunciar.",
+  mejorar_descripcion: "Una descripción completa (beneficios, uso, contenido) ayuda a vender y evita devoluciones.",
+  precio_sugerido: "Un precio sugerido por encima del nuestro le muestra al dropshipper cuánto puede ganar.",
+};
+
+const TITULO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
+  optimizar_titulo: "Optimizar el título en Dropi",
+  mas_fotos: "Agregar fotos en Dropi",
+  agregar_video: "Agregar un video en Dropi",
+  mejorar_descripcion: "Mejorar la descripción en Dropi",
+  precio_sugerido: "Ajustar el precio sugerido en Dropi",
+};
+
+/**
+ * Las recomendaciones de optimización a partir de la revisión: una por cosa que arreglar en Dropi (el título junta sus cuatro
+ * puntos). «Para qué sirve» sin confirmar cuenta para el título; «Sin datos» y «No aplica» no.
+ */
+export function recomendarOptimizacion(revs: Revision[], archivada: boolean): Recomendacion[] {
+  if (archivada) return [];
+  const out: Recomendacion[] = [];
+  for (const [tipo, claves] of Object.entries(PUNTOS) as [TipoRecomendacion, Revision["clave"][]][]) {
+    const fallas = revs.filter((r) => claves.includes(r.clave) && (r.estado === "falta" || r.estado === "revisar"));
+    if (!fallas.length) continue;
+    out.push({
+      tipo,
+      titulo: TITULO_OPTIMIZACION[tipo]!,
+      motivo: fallas.map((f) => `${f.etiqueta}: ${f.detalle}`).join(". ") + ".",
+      resultado: RESULTADO_OPTIMIZACION[tipo]!,
+      datos: Object.fromEntries(fallas.map((f) => [f.clave, f.estado])),
+    });
+  }
+  return out;
+}
+
 export type Decision = "aceptada" | "rechazada" | "pospuesta";
 
 export const DECISIONES: { valor: Decision; etiqueta: string; color: string }[] = [
@@ -174,8 +229,15 @@ export interface Cumplimiento {
  */
 export function tareaCumplida(
   t: { tipo: string; fecha: string; precioAntes: number | null },
-  actual: { cambioPrecio: { fecha: string; antes: number | null; despues: number | null } | null; comboPublicado: boolean },
+  actual: { cambioPrecio: { fecha: string; antes: number | null; despues: number | null } | null; comboPublicado: boolean; revisiones?: Revision[] },
 ): Cumplimiento | null {
+  // Optimización: hecha cuando la lectura de Dropi ya no ve lo que faltaba (lo «sin datos» no cuenta como hecho).
+  const puntos = PUNTOS[t.tipo as TipoRecomendacion];
+  if (puntos) {
+    const revs = (actual.revisiones ?? []).filter((r) => puntos.includes(r.clave));
+    if (!revs.length || revs.some((r) => r.estado !== "ok" && r.estado !== "no_aplica")) return null;
+    return { como: "dropi", fecha: null, detalle: `Dropi ya lo muestra: ${revs.map((r) => r.detalle).join(" · ")}` };
+  }
   if (t.tipo === "combo_x2") return actual.comboPublicado ? { como: "producto", fecha: null, detalle: "El combo x2 ya está publicado" } : null;
   const c = actual.cambioPrecio;
   if (!c || c.despues === null || t.precioAntes === null || c.fecha.slice(0, 10) < t.fecha.slice(0, 10)) return null;

@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
-import { DECISIONES, TIPOS_RECOMENDACION, type Recomendacion, type TipoRecomendacion } from "@/lib/publicaciones/recomendaciones";
+import { DECISIONES, TIPOS_RECOMENDACION, type GrupoRecomendacion, type Recomendacion, type TipoRecomendacion } from "@/lib/publicaciones/recomendaciones";
+
+const GRUPOS: { id: GrupoRecomendacion; etiqueta: string }[] = [
+  { id: "precio", etiqueta: "Precio y combo" },
+  { id: "optimizacion", etiqueta: "Optimización en Dropi" },
+];
+const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 import type { DecisionVista } from "../def-publicaciones";
 import { LineaDecision, ProveedorTareas, TareaRecomendacion, TarjetaRecomendacion } from "../recomendacion-publicacion";
 
@@ -71,14 +77,16 @@ export function PanelRecomendaciones({
 }) {
   const [vista, setVista] = useState<Vista>(verInicial);
   const [tipo, setTipo] = useState<TipoRecomendacion | null>(null);
+  const [grupo, setGrupo] = useState<GrupoRecomendacion | null>(null);
   const [soloMias, setSoloMias] = useState(false);
   const abiertas = decisiones
     .filter((d) => d.estado === "por_hacer" || d.estado === "atrasada")
     .sort((a, b) => (a.estado === b.estado ? (a.plazo ?? "").localeCompare(b.plazo ?? "") : a.estado === "atrasada" ? -1 : 1));
   const hechas = decisiones.filter((d) => d.estado === "hecha").sort((a, b) => (b.hechaEn ?? "").localeCompare(a.hechaEn ?? ""));
   const atrasadas = abiertas.filter((d) => d.estado === "atrasada").length;
-  const delTipo = <T extends { tipo: string }>(l: T[]) => (tipo ? l.filter((x) => x.tipo === tipo) : l);
-  const pendientesVisibles = tipo ? sugeridas.filter((t) => t.rec.tipo === tipo) : sugeridas;
+  const pasa = (t: string) => (tipo ? t === tipo : grupo ? grupoDe(t) === grupo : true);
+  const delTipo = <T extends { tipo: string }>(l: T[]) => l.filter((x) => pasa(x.tipo));
+  const pendientesVisibles = sugeridas.filter((t) => pasa(t.rec.tipo));
   const abiertasVisibles = delTipo(abiertas).filter((d) => !soloMias || d.responsableId === contexto.yo);
   const VISTAS: { id: Vista; etiqueta: string; n: number }[] = [
     { id: "pendientes", etiqueta: "Pendientes", n: sugeridas.length },
@@ -108,11 +116,18 @@ export function PanelRecomendaciones({
             ))}
           </div>
 
-          <div role="group" aria-label="Filtrar por tipo" className="flex flex-wrap gap-2">
-            <button type="button" aria-pressed={tipo === null} className={chip(tipo === null)} onClick={() => setTipo(null)}>
+          <div role="group" aria-label="Filtrar por grupo" className="flex flex-wrap gap-2">
+            <button type="button" aria-pressed={grupo === null && tipo === null} className={chip(grupo === null && tipo === null)} onClick={() => (setGrupo(null), setTipo(null))}>
               Todas
             </button>
-            {TIPOS_RECOMENDACION.map((t) => (
+            {GRUPOS.map((g) => (
+              <button key={g.id} type="button" aria-pressed={grupo === g.id} className={chip(grupo === g.id)} onClick={() => (setGrupo(grupo === g.id ? null : g.id), setTipo(null))}>
+                {g.etiqueta}
+              </button>
+            ))}
+          </div>
+          <div role="group" aria-label="Filtrar por tipo" className="flex flex-wrap gap-2">
+            {TIPOS_RECOMENDACION.filter((t) => !grupo || t.grupo === grupo).map((t) => (
               <button key={t.valor} type="button" aria-pressed={tipo === t.valor} className={chip(tipo === t.valor)} onClick={() => setTipo(tipo === t.valor ? null : t.valor)}>
                 <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />
                 {t.etiqueta}

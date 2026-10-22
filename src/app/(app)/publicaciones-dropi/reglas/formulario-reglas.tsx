@@ -12,6 +12,7 @@ const GRUPOS: { id: DefRegla["grupo"]; titulo: string }[] = [
   { id: "margen", titulo: "Margen" },
   { id: "ventas", titulo: "Ventas" },
   { id: "combo", titulo: "Combo x2" },
+  { id: "optimizacion", titulo: "Optimización en Dropi" },
   { id: "tareas", titulo: "Tareas" },
 ];
 const SUFIJO: Record<DefRegla["unidad"], string> = { porcentaje: "%", unidades: "unidades", dias: "días" };
