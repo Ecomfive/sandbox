@@ -7,7 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_REPOSICION, UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS, UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
@@ -96,7 +96,6 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
 export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; alEliminar?: () => void }) {
   const estado = opcion(ESTADOS, f.estado);
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
-  const reposicion = opcion(ESTADOS_REPOSICION, f.estadoReposicion);
   const sugerida = !f.sku && f.sugerencia && f.sugerencia.tipo !== "ninguno" ? f.sugerencia : null;
   const fila = (
     <button
@@ -151,9 +150,8 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
         <Celda nombre="Estado" principal={estado ? <Badge color={estado.color}>{estado.etiqueta}</Badge> : <span className="text-muted-foreground">—</span>} />
         <CeldaVentas f={f} />
         <Celda
-          nombre="Dónde está y reposición"
+          nombre="Dónde está"
           principal={ubicacion ? <ConPunto color={ubicacion.color} texto={ubicacion.etiqueta} /> : <span className="text-muted-foreground">—</span>}
-          apoyo={reposicion ? <ConPunto color={reposicion.color} texto={reposicion.etiqueta} /> : "Sin reposición"}
         />
         <Celda
           nombre="Próxima revisión"

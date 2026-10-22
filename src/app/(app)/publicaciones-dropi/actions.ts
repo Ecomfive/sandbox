@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, TIPOS, UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS, ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -48,7 +48,6 @@ function leerDatos(f: FormData): Datos | { error: string } {
   const fulfillment = numero(f, "fulfillment");
   const real = numero(f, "coste_real");
   if ([precio, costo, fulfillment, real].includes(undefined)) return { error: "Un precio o costo no es válido." };
-  const comp = texto(f, "competencia", 3);
   const email = texto(f, "privatizado_email", 200).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "El correo del dropshipper no es válido." };
   const resp = texto(f, "responsable_id", 64);
@@ -67,8 +66,8 @@ function leerDatos(f: FormData): Datos | { error: string } {
     // «Estado de venta» ya no se edita (lo reemplazan las ventas de Dropi de 30 días): no va aquí, así guardar la ficha no
     // borra el dato que quedó en la base.
     ubicacion: deLista(f, "ubicacion", UBICACIONES),
-    estado_reposicion: deLista(f, "estado_reposicion", ESTADOS_REPOSICION),
-    competencia: comp === "si" ? true : comp === "no" ? false : null,
+    // «Reposición» y «Competencia» ya no se editan aquí (la reposición se hace desde Compras y la competencia se ve en la del
+    // producto): no van, así guardar la ficha no borra lo que quedó en la base.
     fecha_publicacion: fecha(f, "fecha_publicacion"),
     ultima_revision: fecha(f, "ultima_revision"),
     ultimo_cambio_precio: fecha(f, "ultimo_cambio_precio"),
@@ -118,8 +117,6 @@ const VISTA: [string, string, (v: unknown) => string][] = [
   ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["coste_real", "Coste real", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
-  ["estado_reposicion", "Reposición", (v) => etiqueta(ESTADOS_REPOSICION, v as string)],
-  ["competencia", "Competencia", (v) => (v === null ? "—" : v ? "Sí" : "No")],
   ["ultima_revision", "Última revisión", (v) => String(v ?? "—")],
 ];
 
