@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { PortalChin, type DatosPortalChin } from "@/app/proveedor/portal-chin";
+import { IdiomaProveedor, Traducido } from "@/components/proveedor/idioma-contexto";
 import { Foto, Pestanas, Producto, TONO, Tarjeta, Vacio, VIA, botonNormal, botonPeligro, botonPrincipal, dinero, ent, fecha } from "@/components/proveedor/piezas-proveedor";
 import { Indicador, Punto, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
 import { Badge, type Tone } from "@/components/ui/badge";
@@ -37,12 +39,13 @@ export interface ResumenPais {
   real: { envios: number; mediana: number; min: number; max: number } | null;
 }
 
-type Tab = "novedades" | "decidir" | "cotizacion" | "transito" | "pagos" | "cuenta";
+type Tab = "novedades" | "decidir" | "cotizacion" | "transito" | "pagos" | "tablero" | "cuenta";
 
 /**
  * Operación › Portal del proveedor: el lado de Ecomfive del portal de Chin (fase 2 de PORTAL-PROVEEDOR.md, la interfaz del
  * prototipo aprobado). Novedades (lo que cambió Chin), Por decidir (cotizaciones con la foto de referencia y la real), En cotización
- * y Tránsito contra el plazo prometido. Pagos llega en la fase 4.
+ * y Tránsito contra el plazo prometido, Pagos y «Tablero de Chin» (su portal tal como lo ve, en español y solo para ver). Lo que escribe
+ * Chin (en chino) llega traducido al español con el original a un clic (`traducciones`).
  */
 export function PortalProveedor({
   proveedor,
@@ -55,6 +58,8 @@ export function PortalProveedor({
   tabInicial,
   cuentaPortal,
   pagos,
+  tablero,
+  traducciones,
 }: {
   proveedor: { id: string; nombre: string };
   pedidos: PedidoPortal[];
@@ -68,6 +73,10 @@ export function PortalProveedor({
   cuentaPortal: { cuenta: CuentaPortal | null; entrada: string } | null;
   /** Pagos (fase 4); null si falta la migración 0127. */
   pagos: { resumen: ResumenPagos; porPagar: CuotaPorPagar[]; avisos: AvisoVista[]; plazos: FilaPlazo[] } | null;
+  /** El portal de Chin tal como lo ve él, para la pestaña «Tablero de …» (solo ver). */
+  tablero: DatosPortalChin;
+  /** Lo escrito por Chin traducido al español (texto original → traducción). */
+  traducciones: Record<string, string>;
 }) {
   const [lista, setLista] = useState(pedidos);
   const [novs, setNovs] = useState(novedades);
@@ -92,10 +101,12 @@ export function PortalProveedor({
     { clave: "cotizacion", titulo: "En cotización", cuenta: de("por_cotizar").length },
     { clave: "transito", titulo: "Tránsito", cuenta: de("enviado").length },
     { clave: "pagos" as const, titulo: "Pagos", cuenta: pagos ? pagos.porPagar.filter((c) => !c.avisada && c.estado.tono === "peligro").length : 0, viva: true },
+    { clave: "tablero" as const, titulo: `Tablero de ${proveedor.nombre}`, cuenta: 0 },
     ...(cuentaPortal ? [{ clave: "cuenta" as const, titulo: `Cuenta de ${proveedor.nombre}`, cuenta: 0 }] : []),
   ];
 
   return (
+    <IdiomaProveedor idioma="es" traducciones={traducciones}>
     <div className="flex flex-col gap-5">
       <Pestanas etiqueta={`Portal de ${nombre}`} tabs={tabs} valor={tab} alCambiar={setTab} />
 
@@ -130,11 +141,13 @@ export function PortalProveedor({
             Falta correr en Supabase la migración 0127 (pagos del proveedor).
           </p>
         ))}
+      {tab === "tablero" && <PortalChin {...tablero} idioma="es" soloLectura />}
       {tab === "cuenta" && cuentaPortal && <CuentaProveedor proveedor={proveedor} cuenta={cuentaPortal.cuenta} entrada={cuentaPortal.entrada} />}
       {tab === "transito" && (
         <Transito pedidos={de("enviado")} plazos={plazos} resumen={resumen} hoy={hoy} nombre={nombre} puedeEscribir={puedeEscribir} alLlegar={(id, f) => cambiar(id, { etapa: "llegado", fechaLlegada: f })} />
       )}
     </div>
+    </IdiomaProveedor>
   );
 }
 
@@ -188,7 +201,7 @@ function Novedades({ novedades, nombre, puedeEscribir, alLeer }: { novedades: No
                     {!n.leida && <span className="sr-only">Sin leer: </span>}
                     {n.texto}
                   </span>
-                  {n.detalle && <span className="block text-xs text-muted-foreground">{n.detalle}</span>}
+                  {n.detalle && <Traducido texto={n.detalle} className="block text-xs text-muted-foreground" />}
                 </span>
                 <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
                   {fecha(n.creadoEn.slice(0, 10))} · {new Date(n.creadoEn).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" })}
@@ -280,7 +293,13 @@ function TarjetaCotizacion({ p, fotoReal, nombre, puedeEscribir, alDecidir }: { 
         {p.modalidad ? ` ${p.modalidad}` : ""}
         {p.referencia ? ` · ${p.referencia}` : ""}
         {p.cotizadoEn ? ` · cotizada el ${fecha(p.cotizadoEn.slice(0, 10))}` : ""}
-        {p.comentarioProveedor ? ` · «${p.comentarioProveedor}»` : ""}
+        {p.comentarioProveedor && (
+          <>
+            {" · «"}
+            <Traducido texto={p.comentarioProveedor} />
+            {"»"}
+          </>
+        )}
       </p>
       {puedeEscribir && (
         <div className="mt-auto flex flex-wrap justify-end gap-1.5">

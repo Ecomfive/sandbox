@@ -512,6 +512,17 @@ convenciones técnicas del código.
   UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto
   (un pedido viejo sin hoja saldría vencido sin estarlo). La ficha de compra muestra «Pagos a Chin» (solo lectura,
   `pagos-proveedor-compra.tsx`, oculto si el rol no ve el monto).
+  **Idioma** (migración 0130, 22 oct 2026): Chin ve su portal en **chino simplificado** (`proveedor_usuarios.idioma`, 'zh' por defecto;
+  «中文 / Español» arriba, `cambiarIdiomaProveedor`; `idiomaDeCuenta` cae a chino sin la migración). Los textos de la pantalla están en
+  `src/lib/proveedor/textos.ts` (`TEXTOS.es` / `TEXTOS.zh`, fechas, estados de cuota y tránsito por `clave` + `n`, y `errorEn` para los
+  errores de las acciones; **un texto nuevo del portal va en los dos idiomas**, lo comprueba `idioma.test.ts`). Lo escrito por personas se
+  traduce con Gemini (`traducirTextos`, `src/lib/proveedor/traducir.ts`: `GEMINI_API_KEY`, modelo `GEMINI_TEXT_MODEL` o
+  `gemini-3.5-flash-lite`, tandas de 60, máximo 4 por carga, nunca lanza) y se guarda en `traducciones` (huella sha256 + destino): a
+  chino los productos, las notas, «Lo nuevo» y los productos de pagos; a español lo que escribe Chin (comentario de cotización, detalle de
+  novedad, nota al confirmar un pago). Las pantallas reciben las traducciones por `IdiomaProveedor` (`useIdioma`: `t`, `tr`, `fecha`,
+  `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)». **«Tablero de Chin»** (`?tab=tablero`
+  en `/portal-proveedor`): el mismo `PortalChin` en español con `soloLectura` (sin botones, sin selector ni «Salir» y sin marcar
+  «Lo nuevo» como visto).
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,
