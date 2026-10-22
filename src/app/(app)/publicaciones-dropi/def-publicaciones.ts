@@ -13,7 +13,7 @@ import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { Revision } from "@/lib/publicaciones/optimizacion";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
-import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
+import { codigoBodega, type BodegaAsignada } from "@/lib/publicaciones/sincronizar-dropi";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 /** Una decisión sobre una recomendación (aceptada, rechazada o pospuesta), con su porqué. */
@@ -126,6 +126,8 @@ export interface FilaPublicacion {
   stockPrivadoProveedor: number | null;
   /** Cuándo se leyó «Mis productos» por última vez (lo mismo en todas las filas del país). */
   leidoProveedor: string | null;
+  /** A qué bodega de Dropi pertenece (B280, B81): la que muestra Dropi o, sin stock, la de «Dónde está» o la del nombre. */
+  bodega: BodegaAsignada | null;
 }
 
 /** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */
@@ -223,7 +225,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       id: "bodega",
       etiqueta: "Bodega en Dropi",
       tipo: "seleccion",
-      valores: (f) => (f.bodegasDropi?.length ? f.bodegasDropi.map((b) => `${codigoBodega(b.id)} · ${b.nombre}`) : [SIN_VALOR]),
+      valores: (f) => [f.bodega ? `${codigoBodega(f.bodega.id)} · ${f.bodega.nombre}` : SIN_VALOR],
       etiquetaSinValor: "Sin bodega en Dropi",
       agrupable: true,
     },
@@ -255,7 +257,8 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { etiqueta: "SKU", valor: (f) => f.sku?.codigo ?? "" },
     { etiqueta: "Ventas 30 días (Dropi)", valor: (f) => (f.ventas ? String(f.ventas.netas30) : "") },
     { etiqueta: "Stock en Dropi", valor: (f) => (f.stockProveedor !== null ? String(f.stockProveedor) : f.ventas ? String(f.ventas.stock) : "") },
-    { etiqueta: "Bodegas en Dropi", valor: (f) => (f.bodegasDropi ?? []).map((b) => `${codigoBodega(b.id)} ${b.nombre}: ${b.stock}`).join(" | ") },
+    { etiqueta: "Bodega", valor: (f) => (f.bodega ? `${codigoBodega(f.bodega.id)} ${f.bodega.nombre}` : "") },
+    { etiqueta: "Stock por bodega en Dropi", valor: (f) => (f.bodegasDropi ?? []).map((b) => `${codigoBodega(b.id)} ${b.nombre}: ${b.stock}`).join(" | ") },
   ],
 };
 

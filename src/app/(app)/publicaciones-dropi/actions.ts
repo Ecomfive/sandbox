@@ -6,6 +6,9 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
+import type { SugerenciaTitulo } from "@/lib/publicaciones/titulos-ia";
+import { pedirTitulosIA } from "@/lib/publicaciones/titulos-ia-api";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -153,6 +156,20 @@ export async function obtenerHistorialPublicacion(id: string): Promise<{ eventos
     .limit(30);
   if (error) return { error: "No se pudo cargar la actividad." };
   return { eventos: (data ?? []).map((e) => ({ id: e.id, evento: formatearEventoAuditoria(e), creadoEn: e.creado_en })) };
+}
+
+/**
+ * «Sugerir títulos con IA»: pide a ChatGPT títulos nuevos con las reglas de la revisión de optimización (40 caracteres, español,
+ * para qué sirve…). No guarda nada: el título se cambia en Dropi. Solo quien puede editar el módulo (cada pedido cuesta en OpenAI).
+ * `tituloDropi` es el que se ve en Dropi (la ficha lo tiene de la lectura del catálogo); sin él, el nombre de la publicación.
+ */
+export async function sugerirTitulosIA(id: string, tituloDropi: string | null): Promise<{ sugerencias: SugerenciaTitulo[] } | { error: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const fila = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!fila) return { error: "La publicación ya no existe o no es de tus países." };
+  const titulo = (typeof tituloDropi === "string" && tituloDropi.trim().slice(0, 300)) || fila.nombre;
+  const { reglas } = await cargarReglas(createServiceClient());
+  return pedirTitulosIA({ titulo, nombre: fila.nombre }, reglas);
 }
 
 /**
