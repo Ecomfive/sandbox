@@ -1,7 +1,7 @@
 // Qué datos de una compra se editan directo en su celda de la lista y cómo se validan. Es lógica pura (sin base ni React): la
 // usan la celda (para mostrar el cambio al instante) y la acción del servidor (que vuelve a validar, es la que manda).
 
-import { colorEstado, colorEtapa, ESTADOS_COMPRA, ETAPAS_COMPRA, PROVEEDORES_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
+import { AGENTES_ENVIO, colorEstado, colorEtapa, ESTADOS_COMPRA, ETAPAS_COMPRA, PROVEEDORES_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 
 export type TipoCampoEditable = "texto" | "entero" | "dinero" | "fecha" | "seleccion" | "multiple" | "booleano" | "lista";
 
@@ -36,7 +36,7 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   estado: { etiqueta: "Estado", prop: "estado", columna: "estado", tipo: "seleccion", opciones: ESTADOS_COMPRA, color: colorEstado },
   viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO, unica: true, admiteVacio: true },
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "seleccion", opciones: PROVEEDORES_COMPRA, admiteVacio: true },
-  agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "texto" },
+  agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "seleccion", opciones: AGENTES_ENVIO, admiteVacio: true },
   ventaImportacion: {
     etiqueta: "Tipo de venta",
     prop: "ventaImportacion",

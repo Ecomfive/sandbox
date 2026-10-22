@@ -10,7 +10,7 @@ import { EstimacionEnvio } from "./estimacion-envio";
 import { PlanificacionAutomatica } from "./planificacion-automatica";
 import { PrediccionFechaLimite } from "./prediccion-fecha-limite";
 import { useToast } from "@/components/ui/toast";
-import { conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, PROVEEDORES_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
+import { AGENTES_ENVIO, conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, PROVEEDORES_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { CampoFoto } from "@/components/ui/campo-foto";
@@ -361,16 +361,12 @@ export function FormularioCompra({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CampoGobernado clave="proveedor">
               <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
-                <SelectorProveedor valor={compra?.proveedor ?? proveedorInicial ?? ""} />
+                <SelectorDeLista id="campo-proveedor" nombre="proveedor" opciones={PROVEEDORES_COMPRA} vacio="Sin proveedor" valor={compra?.proveedor ?? proveedorInicial ?? ""} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="agente">
               <Campo etiqueta={conEmoji("agenteEnvio", "Agente de envío")} id="campo-agente-envio">
-                <input id="campo-agente-envio" type="text" name="agente_envio" list="agentes-envio" defaultValue={compra?.agenteEnvio ?? proveedorInicial ?? ""} placeholder="Ej: Chin" className={fieldClass} />
-                <datalist id="agentes-envio">
-                  <option value="Chin" />
-                  <option value="Avery" />
-                </datalist>
+                <SelectorDeLista id="campo-agente-envio" nombre="agente_envio" opciones={AGENTES_ENVIO} vacio="Sin agente" valor={compra?.agenteEnvio ?? proveedorInicial ?? ""} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="tienda">
@@ -491,14 +487,14 @@ export function FormularioCompra({
   );
 }
 
-/** El proveedor de la compra: se elige de `PROVEEDORES_COMPRA`. Una compra vieja con otro proveedor lo sigue mostrando como
- * opción, para que guardar la ficha no lo borre. */
-function SelectorProveedor({ valor }: { valor: string }) {
-  const fuera = valor && !PROVEEDORES_COMPRA.some((p) => p.valor === valor) ? valor : null;
+/** Un dato de la compra que se elige de una lista (el proveedor, el agente de envío). Una compra vieja con otro valor lo sigue
+ * mostrando como opción, para que guardar la ficha no lo borre. */
+function SelectorDeLista({ id, nombre, opciones, vacio, valor }: { id: string; nombre: string; opciones: readonly { valor: string; etiqueta: string }[]; vacio: string; valor: string }) {
+  const fuera = valor && !opciones.some((p) => p.valor === valor) ? valor : null;
   return (
-    <select id="campo-proveedor" name="proveedor" defaultValue={valor} className={fieldClass}>
-      <option value="">Sin proveedor</option>
-      {PROVEEDORES_COMPRA.map((p) => (
+    <select id={id} name={nombre} defaultValue={valor} className={fieldClass}>
+      <option value="">{vacio}</option>
+      {opciones.map((p) => (
         <option key={p.valor} value={p.valor}>
           {p.etiqueta}
         </option>

@@ -121,12 +121,22 @@ export const PROVEEDORES_COMPRA = [
   { valor: "Alibaba", etiqueta: "Alibaba" },
 ] as const;
 
-/** El proveedor con su nombre de la lista si coincide sin importar mayúsculas («CHIN» → «Chin»); si no, como viene. */
-export function proveedorDeLista(texto: string | null): string | null {
+/** Los agentes de envío que se eligen en una compra (21 oct 2026; antes era texto libre). Con el mismo nombre que en Compras ›
+ * Envíos (`wms_rutas_envio.agente`), que cruza los tiempos reales con las compras por ese nombre. */
+export const AGENTES_ENVIO = [
+  { valor: "Chin", etiqueta: "Chin" },
+  { valor: "Avery", etiqueta: "Avery" },
+] as const;
+
+/** El valor con su nombre de la lista si coincide sin importar mayúsculas («CHIN» → «Chin»); si no, como viene. */
+export function deLista(lista: readonly { valor: string }[], texto: string | null): string | null {
   const t = texto?.trim();
   if (!t) return null;
-  return PROVEEDORES_COMPRA.find((p) => p.valor.toLowerCase() === t.toLowerCase())?.valor ?? t;
+  return lista.find((p) => p.valor.toLowerCase() === t.toLowerCase())?.valor ?? t;
 }
+
+export const proveedorDeLista = (texto: string | null) => deLista(PROVEEDORES_COMPRA, texto);
+export const agenteDeLista = (texto: string | null) => deLista(AGENTES_ENVIO, texto);
 
 
 /** Días que lleva (o llevó, si ya cerró) una compra desde que se creó. */
