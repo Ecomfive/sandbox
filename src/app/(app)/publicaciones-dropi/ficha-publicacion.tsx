@@ -504,6 +504,29 @@ function ContenidoFicha({
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />
               </div>
             </div>
+            {/* Lo que dice «Mis productos» de Dropi (22 oct 2026): cada lectura pone «Dónde está» con la bodega de más stock. */}
+            {p.bodegasDropi && (
+              <div className="flex flex-col gap-1.5">
+                <span className={labelClassSm}>Bodegas en Dropi</span>
+                {p.bodegasDropi.length ? (
+                  <ul className="flex flex-col divide-y divide-border rounded-lg bg-muted px-4 text-sm">
+                    {p.bodegasDropi.map((b) => (
+                      <li key={b.nombre} className="flex items-center justify-between gap-3 py-2">
+                        <span className="min-w-0 truncate">{b.nombre}</span>
+                        <span className="font-semibold tabular-nums">{b.stock.toLocaleString("es-PA")} u.</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Dropi no la tiene en ninguna bodega.</span>
+                )}
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {p.bodegasDropi.length > 1 && `Total ${(p.stockProveedor ?? 0).toLocaleString("es-PA")} u. · `}
+                  {p.stockPrivadoProveedor ? `${p.stockPrivadoProveedor.toLocaleString("es-PA")} reservadas a privados · ` : ""}
+                  {p.leidoProveedor && `Leído de Dropi el ${fechaLarga(p.leidoProveedor)}`}
+                </span>
+              </div>
+            )}
           </Seccion>
 
           {/* Lo que viene en camino del producto vinculado: solo unidades, del país seleccionado (las órdenes que ya salieron y no han llegado). */}

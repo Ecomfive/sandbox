@@ -151,3 +151,57 @@ async function scrapingCompetencia(puente) {
   setTimeout(() => location.assign(`${puente}#${datos}`), 50);
   return { enviados: cuerpo.productos.length, paginas: paginas.length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
 }
+
+// Gestión de IDs Dropi › Bodegas: NUESTROS productos (activos y archivados) con la bodega y el stock de cada uno, como los ve
+// ECOMFIVE en «Mis productos». Se corre en app.dropi.<país> con la sesión del PROVEEDOR (la consulta es la de esa pantalla:
+// api-v2 `bff/catalog/products/produit/<usuario>/owner`; `archive: true` trae la pestaña Archivados). El receptor la guarda con
+// scripts/publicaciones-sincronizar-dropi.ts y pone en cada publicación la ubicación, el precio, el tipo y el estado de Dropi.
+//   await leerNuestrosProductos("http://127.0.0.1:4322/puente/<código>")
+// Panamá, 22 oct 2026: 218 activos y 196 archivados en unos 10 s.
+async function leerNuestrosProductos(puente) {
+  const inicio = new Date();
+  const t0 = performance.now();
+  const token = JSON.parse(localStorage.getItem("DROPI_token") || "null");
+  const usuario = JSON.parse(localStorage.getItem("DROPI_LoginResult") || "{}")?.objects;
+  if (!token || !usuario?.id) throw new Error("No hay sesión de Dropi en esta página.");
+  if (usuario.type_user !== "SUPPLIER") throw new Error("Esta sesión no es de proveedor: entra con la cuenta de ECOMFIVE.");
+  const pais = location.hostname.split(".").pop();
+  const apiV2 = location.hostname.replace(/^app\./, "api-v2.");
+  const productos = [];
+  for (const archivo of [false, true]) {
+    for (let page = 1; page <= 100; page++) {
+      let r;
+      for (let intento = 0; intento < 5; intento++) {
+        r = await fetch(`https://${apiV2}/bff/catalog/products/produit/${usuario.id}/owner`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, "X-Authorization": "Bearer " + token, "X-Host": pais },
+          body: JSON.stringify({ keywords: "", pageSize: 100, page, warehouse_id: null, get_stock: true, user_id: usuario.id, ...(archivo ? { archive: true } : {}) }),
+        });
+        if (r.status !== 429) break;
+        await new Promise((ok) => setTimeout(ok, 30000));
+      }
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.is_successful) throw new Error(`Dropi respondió ${r.status} en la página ${page}${archivo ? " de archivados" : ""}`);
+      const lista = j.data?.record || [];
+      for (const o of lista) {
+        productos.push({
+          id: o.id, name: o.name, type: o.type, sale_price: o.sale_price, suggested_price: o.suggested_price, total_stock: o.total_stock,
+          private_stock: o.private_stock, private_product: o.private_product, created_at: o.created_at,
+          warehouses: (o.warehouses || []).map((w) => ({ id: w.id, name: w.name, stock: w.stock })),
+          variation_warehouses: (o.variation_warehouses || []).map((w) => ({ id: w.id, name: w.name, stock: w.stock })),
+          gallery: (o.gallery || []).map(() => ({})), categories: (o.categories || []).map((c) => ({ name: c.name })), archivado: archivo,
+        });
+      }
+      if (lista.length < 100) break;
+      await new Promise((ok) => setTimeout(ok, 1300));
+    }
+  }
+  const cuerpo = { tipo: "nuestros", pais, inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), productos };
+  const gz = new Blob([JSON.stringify(cuerpo)]).stream().pipeThrough(new CompressionStream("gzip"));
+  const bytes = new Uint8Array(await new Response(gz).arrayBuffer());
+  let binario = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const datos = btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  setTimeout(() => location.assign(`${puente}#${datos}`), 50);
+  return { enviados: productos.length, activos: productos.filter((p) => !p.archivado).length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
+}

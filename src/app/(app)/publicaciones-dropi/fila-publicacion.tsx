@@ -169,6 +169,14 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
         <Celda
           nombre="Dónde está"
           principal={ubicacion ? <ConPunto color={ubicacion.color} texto={ubicacion.etiqueta} /> : <span className="text-muted-foreground">—</span>}
+          apoyo={
+            f.stockProveedor !== null ? (
+              <span className="tabular-nums">
+                {f.stockProveedor.toLocaleString("es-PA")} u. en Dropi
+                {f.stockPrivadoProveedor ? ` · ${f.stockPrivadoProveedor.toLocaleString("es-PA")} privadas` : ""}
+              </span>
+            ) : undefined
+          }
         />
         <Celda nombre="En Dropi" principal={enDropi ? <ConPunto color={enDropi.color} texto={enDropi.etiqueta} /> : <span className="text-muted-foreground">—</span>} />
       </span>
