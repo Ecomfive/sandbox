@@ -39,6 +39,8 @@ interface Tarjeta {
   detalle: string | ((r: Reglas) => string);
   /** Una línea más, calculada (p. ej. cuántas están en margen crítico). */
   extra?: (abiertas: FilaPublicacion[], r: Reglas) => string | null;
+  /** El color de esa línea: rojo (lo que alarma) o azul (lo que informa, como lo que viene en camino). */
+  extraColor?: "rojo" | "azul";
 }
 
 /** Una tarjeta por cada acción calculada (21 oct 2026): cuenta y filtra por el campo «Acción». */
@@ -110,6 +112,12 @@ const TARJETAS: Tarjeta[] = [
     color: "rojo",
     detalle: "Se vende y no tiene stock en Dropi",
     cuenta: (f) => f.ventas?.stockEstado === "sin_stock_vende",
+    // De los que no tienen stock, cuántos ya tienen mercancía en camino (las órdenes de Compras que salieron y no han llegado).
+    extra: (abiertas) => {
+      const n = abiertas.filter((f) => f.ventas?.stockEstado === "sin_stock_vende" && f.enCamino > 0).length;
+      return n ? `${n} con mercancía en camino` : null;
+    },
+    extraColor: "azul",
     atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: sin stock en Dropi y con ventas", filtro: seleccion("stockDropi", "sin_stock_vende") },
   },
 ];
@@ -141,7 +149,7 @@ function TarjetaAccion({ t, valor, total, extra, detalle, def }: { t: Tarjeta; v
       </span>
       <span className="text-xs text-muted-foreground">
         {detalle}
-        {extra && <span className="mt-0.5 block font-medium text-destructive">{extra}</span>}
+        {extra && <span className={`mt-0.5 block font-medium ${t.extraColor === "azul" ? "text-azul" : "text-destructive"}`}>{extra}</span>}
         <span className="sr-only">. {activa ? "Filtrando la lista." : t.atajo.ayuda}</span>
       </span>
     </button>

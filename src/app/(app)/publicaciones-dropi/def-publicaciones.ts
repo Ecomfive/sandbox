@@ -85,6 +85,8 @@ export interface FilaPublicacion {
   deClickup: boolean;
   /** El producto de Producto vinculado. */
   sku: SkuResumen | null;
+  /** Unidades de su producto vinculado que vienen en camino (órdenes que ya salieron y no han llegado) en este país; 0 si no hay. */
+  enCamino: number;
   /** Si no está vinculada: el producto sugerido y cómo se encontró. */
   sugerencia: SugerenciaVista | null;
   /** Sus ventas en Dropi (Desempeño › Ventas Dropi); `null` si no tiene datos. */
@@ -200,6 +202,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     // Las ventas de Dropi (21 oct 2026): reemplazan el «Estado de venta» que se marcaba a mano. Las ve todo el que abre el módulo.
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },
     { id: "stockDropi", etiqueta: "Stock en Dropi", tipo: "seleccion", valores: (f) => uno(f.ventas?.stockEstado ?? null), opciones: () => STOCK_DROPI, etiquetaSinValor: "Sin datos de Dropi", agrupable: true, ordenGrupos: STOCK_DROPI.map((s) => s.valor) },
+    { id: "enCamino", etiqueta: "Mercancía en camino (unidades)", tipo: "numero", valor: (f) => f.enCamino },
     { id: "stockDropiNum", etiqueta: "Stock en Dropi (unidades)", tipo: "numero", valor: (f) => f.ventas?.stock ?? null },
     { id: "diasInventario", etiqueta: "Días de inventario", tipo: "numero", valor: (f) => f.ventas?.diasInventario ?? null },
     { id: "ubicacion", etiqueta: "Dónde está", tipo: "seleccion", valores: (f) => uno(f.ubicacion), opciones: opciones(UBICACIONES), agrupable: true, colorValor: color(UBICACIONES) },
