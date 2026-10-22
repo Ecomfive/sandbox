@@ -10,6 +10,9 @@ import { CerrarIcon } from "@/lib/nav-icons";
 const ENFOCABLES =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+// Las ventanas abiertas, de la más vieja a la más nueva: con una ficha abierta encima de otra, Escape y Tab solo los atiende la de arriba.
+const PILA: symbol[] = [];
+
 /**
  * Ventana modal: al centro (ayuda, avisos) o como panel pegado a la derecha (vista rápida de un registro). **Una ficha** (el panel
  * a la derecha o la ventana grande al centro) se abre como la persona prefiera —barra lateral, cuadro de diálogo al centro o pantalla
@@ -70,7 +73,11 @@ export function Ventana({
     const panel = panelRef.current;
     (panel?.querySelector<HTMLElement>("[data-enfocar]") ?? panel?.querySelector<HTMLElement>(ENFOCABLES))?.focus();
 
+    const yo = Symbol("ventana");
+    PILA.push(yo);
+
     function alPresionarTecla(e: KeyboardEvent) {
+      if (PILA[PILA.length - 1] !== yo) return;
       if (e.key === "Escape") {
         e.preventDefault();
         cerrarRef.current();
@@ -92,6 +99,7 @@ export function Ventana({
     document.addEventListener("keydown", alPresionarTecla);
     return () => {
       document.removeEventListener("keydown", alPresionarTecla);
+      PILA.splice(PILA.indexOf(yo), 1);
       // Si lo que abrió la ventana ya no está (la fila cambió), el foco se queda donde esté.
       if (anterior && document.contains(anterior)) anterior.focus();
     };

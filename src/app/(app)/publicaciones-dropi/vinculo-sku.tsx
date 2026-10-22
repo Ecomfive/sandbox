@@ -34,7 +34,18 @@ const COMO: Record<string, string> = { codigo: "el SKU es igual al nombre en Dro
  * El bloque «Producto vinculado» de la ficha: el producto de Producto de esta publicación, o la sugerencia (con «Vincular» y
  * «Vincular y pasar a la siguiente») y un buscador para elegir otro. Guarda al instante, aparte del formulario de la ficha.
  */
-export function VinculoSku({ p, puedeEscribir, siguiente }: { p: FilaPublicacion; puedeEscribir: boolean; siguiente?: () => void }) {
+export function VinculoSku({
+  p,
+  puedeEscribir,
+  siguiente,
+  alAbrirProducto,
+}: {
+  p: FilaPublicacion;
+  puedeEscribir: boolean;
+  siguiente?: () => void;
+  /** «Abrir en Producto»: la ficha abre la del producto encima de esta (no lleva al módulo). */
+  alAbrirProducto: (id: string) => void;
+}) {
   const { mostrarToast } = useToast();
   const puedeCrearProducto = usePuedeAbrir("producto");
   const [pendiente, empezar] = useTransition();
@@ -67,9 +78,20 @@ export function VinculoSku({ p, puedeEscribir, siguiente }: { p: FilaPublicacion
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Producto sku={p.sku} />
           <span className="flex gap-1.5">
-            <Link href={`/producto?abrir=${p.sku.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-              Abrir en Producto
-            </Link>
+            {puedeCrearProducto && (
+              <Link
+                href={`/producto?abrir=${p.sku.id}`}
+                onClick={(e) => {
+                  // Con Ctrl, Cmd, Mayús o clic central sigue siendo un enlace: abre la ficha exacta en otra pestaña.
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                  e.preventDefault();
+                  alAbrirProducto(p.sku!.id);
+                }}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                Abrir en Producto
+              </Link>
+            )}
             {puedeEscribir && (
               <>
                 <Button type="button" variant="secondary" className="!px-3 !py-1.5 text-xs" disabled={pendiente} onClick={() => setCambiando(true)}>
