@@ -32,17 +32,24 @@ export function estaArchivada(estado: EnDropi, manualArchivada: boolean): boolea
 }
 
 /** Lo que necesita cada publicación (puede ser más de una). Sin ninguna, está al día. */
-export type Accion = "revisar_precio" | "bajar_precio" | "verificar_dropshipper";
+export type Accion = "margen_bajo" | "ventas_caida" | "bajar_precio" | "verificar_dropshipper";
 
 export const ACCIONES: { valor: Accion | "al_dia"; etiqueta: string; color: string; detalle: string }[] = [
-  { valor: "revisar_precio", etiqueta: "Revisar precio y venta", color: "#d9a200", detalle: "Margen bruto bajo o ventas a menos de la mitad que el mes anterior" },
+  { valor: "margen_bajo", etiqueta: "Margen bajo", color: "#e5484d", detalle: "Margen bruto menor a 30 %" },
+  { valor: "ventas_caida", etiqueta: "Ventas en caída", color: "#d9a200", detalle: "Este mes vende menos de la mitad que el anterior" },
   { valor: "bajar_precio", etiqueta: "Competidor más barato", color: "#f76808", detalle: "Alguien vende lo mismo más barato y tiene stock" },
   { valor: "verificar_dropshipper", etiqueta: "Verificar con dropshipper", color: "#e5484d", detalle: "Privatizado a un dropshipper y sin ventas en 30 días" },
   { valor: "al_dia", etiqueta: "Al día", color: "#30a46c", detalle: "Nada que revisar" },
 ];
 
 export const DIAS_NUEVO = 30;
+/**
+ * Margen bruto mínimo sano para un proveedor en Dropi: 30 %. Del margen bruto todavía salen las devoluciones y los rechazos (10 %
+ * de lo pedido en Panamá, jul–oct 2026), las cancelaciones y los costos fijos. Por debajo de 20 % es crítico (casi seguro se
+ * pierde); lo saludable es 40 % o más.
+ */
 export const MARGEN_MINIMO = 0.3;
+export const MARGEN_CRITICO = 0.2;
 /** Las ventas cayeron si este mes es menos de la mitad del anterior (y el anterior vendió algo que contar). */
 export const CAIDA = 0.5;
 export const MIN_VENTAS_ANTES = 10;
@@ -69,7 +76,9 @@ export function accionesPublicacion(
   // «Producto nuevo» ya no es una acción (no interesa como tarjeta), pero uno recién publicado todavía no se verifica.
   const margenBajo = p.margen !== null && p.margen < MARGEN_MINIMO;
   const cayo = p.netas30 !== null && p.netas30Antes !== null && p.netas30Antes >= MIN_VENTAS_ANTES && p.netas30 < p.netas30Antes * CAIDA;
-  if (margenBajo || cayo) out.push("revisar_precio");
+  // Separadas (21 oct 2026): el margen bajo es un problema de precio o costo; la caída de ventas, de demanda o competencia.
+  if (margenBajo) out.push("margen_bajo");
+  if (cayo) out.push("ventas_caida");
   if (p.competidorMasBarato) out.push("bajar_precio");
   if (!nuevo && p.privatizadaA && p.netas30 !== null && p.netas30 <= 0) out.push("verificar_dropshipper");
   return out;

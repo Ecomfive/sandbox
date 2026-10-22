@@ -9,7 +9,7 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
-import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
+import { ACCIONES, EN_DROPI, MARGEN_CRITICO, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
@@ -116,13 +116,17 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       id: "margenBajo",
       etiqueta: "Margen",
       tipo: "seleccion",
-      valores: (f) => [f.margen === null ? SIN_VALOR : margenBajo(f.margen) ? "bajo" : "sano"],
+      // Crítico bajo 20 %, bajo entre 20 y 30 %, aceptable entre 30 y 40 % y saludable desde 40 % (ver MARGEN_MINIMO).
+      valores: (f) => [f.margen === null ? SIN_VALOR : f.margen < MARGEN_CRITICO ? "critico" : margenBajo(f.margen) ? "bajo" : f.margen < 0.4 ? "aceptable" : "sano"],
       opciones: () => [
-        { valor: "bajo", etiqueta: `Margen bajo (menos de ${Math.round(MARGEN_BAJO * 100)} %)` },
-        { valor: "sano", etiqueta: "Margen sano" },
+        { valor: "critico", etiqueta: `Crítico (menos de ${Math.round(MARGEN_CRITICO * 100)} %)` },
+        { valor: "bajo", etiqueta: `Bajo (${Math.round(MARGEN_CRITICO * 100)} a ${Math.round(MARGEN_BAJO * 100)} %)` },
+        { valor: "aceptable", etiqueta: `Aceptable (${Math.round(MARGEN_BAJO * 100)} a 40 %)` },
+        { valor: "sano", etiqueta: "Saludable (40 % o más)" },
       ],
       etiquetaSinValor: "Sin margen",
       agrupable: true,
+      ordenGrupos: ["critico", "bajo", "aceptable", "sano"],
     },
     { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },
     // Las ventas de Dropi (21 oct 2026): reemplazan el «Estado de venta» que se marcaba a mano. Las ve todo el que abre el módulo.
