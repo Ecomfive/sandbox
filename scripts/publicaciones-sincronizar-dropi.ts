@@ -64,6 +64,10 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   const previos = revisar(await supabase.from("dropi_productos_proveedor").select("dropi_producto_id").eq("pais_id", pais.id), "Lectura anterior") as { dropi_producto_id: number }[];
   const anteriores = previos.length ? new Set(previos.map((p) => Number(p.dropi_producto_id))) : null;
 
+  // Las publicaciones con un nombre nuestro esperando «Aplicar en Dropi» (migración 0137): ese nombre no se pisa.
+  const pendientes = await supabase.from("dropi_cambios_pendientes").select("publicacion_id").eq("pais_id", pais.id).in("estado", ["pendiente", "error"]);
+  const conNombrePendiente = new Set(((pendientes.data ?? []) as { publicacion_id: string }[]).map((x) => x.publicacion_id));
+
   const usados = new Set<number>();
   const cambios: { id: string; nombre: string; dropiId: number; cambios: ReturnType<typeof cambiosDesdeDropi>["cambios"]; detalle: string[] }[] = [];
   const noEstan: string[] = [];
@@ -77,7 +81,7 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
       continue;
     }
     const r = cambiosDesdeDropi(
-      { ubicacion: pub.ubicacion, precioVenta: pub.precio_venta === null ? null : Number(pub.precio_venta), tipo: pub.tipo_publicacion, estadoPublicacion: pub.estado_publicacion },
+      { ubicacion: pub.ubicacion, precioVenta: pub.precio_venta === null ? null : Number(pub.precio_venta), tipo: pub.tipo_publicacion, estadoPublicacion: pub.estado_publicacion, nombre: pub.nombre, nombrePendiente: conNombrePendiente.has(pub.id) },
       p,
       hoy,
     );
@@ -98,6 +102,7 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     precio: cuenta("precio_venta"),
     tipo: cuenta("tipo_publicacion"),
     estado: cuenta("estado_publicacion"),
+    nombre: cuenta("nombre"),
     idNoEstaEnDropi: noEstan,
     creadas: nuevos.map((p) => `${p.id} ${p.nombre} (${p.bodegas.length ? codigoBodega(bodegasEnOrden(p.bodegas)[0].id) : "sin bodega"})`),
     enDropiSinPublicacion: sinPublicacion,

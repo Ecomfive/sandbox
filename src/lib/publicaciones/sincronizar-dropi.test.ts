@@ -100,3 +100,12 @@ test("cambios: nada si ya coincide, y un archivado sin bodegas no borra la ubica
   const r = cambiosDesdeDropi({ ubicacion: "bodega_dropi", precioVenta: 9.99, tipo: "publico", estadoPublicacion: "activo" }, prod(1, { archivado: true, bodegas: [], stock: 0 }), HOY);
   assert.deepEqual(r.cambios, { estado_publicacion: "archivado" });
 });
+
+test("cambios: el nombre lo manda Dropi, salvo un cambio nuestro pendiente", () => {
+  const base = { ubicacion: "bodega_ecomfive", precioVenta: 9.99, tipo: "publico", estadoPublicacion: "activo" };
+  const p = prod(1);
+  assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: `"${p.nombre} viejo de ClickUp` }, p, HOY).cambios, { nombre: p.nombre });
+  assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: "otro", nombrePendiente: true }, p, HOY).cambios, {});
+  assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: p.nombre }, p, HOY).cambios, {});
+  assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: "Cinturón lumbar" }, prod(1, { nombre: "CINTURON/LUMBAR" }), HOY).cambios, {}, "un nombre con forma de SKU no se copia");
+});
