@@ -331,7 +331,7 @@ function ContenidoFicha({
         </div>
 
         <RecomendacionesFicha p={p} puedeEscribir={puedeEscribir} disponible={decisionesDisponibles} />
-        {!p.archivada && <OptimizacionFicha p={p} />}
+        {!p.archivada && <OptimizacionFicha p={p} puedeEscribir={puedeEscribir} />}
 
         <fieldset disabled={!puedeEscribir} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-5">
           <Seccion icono={ProductoIcon} titulo="Producto">

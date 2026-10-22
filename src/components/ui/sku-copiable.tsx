@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 
 /** Copia un texto al portapapeles; si el navegador no deja usar la API moderna, cae al método antiguo. */
-async function copiar(texto: string): Promise<boolean> {
+export async function copiar(texto: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(texto);
     return true;
