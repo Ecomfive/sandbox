@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- foto de Storage */
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
@@ -11,7 +11,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
   UBICACIONES,
   numeroPublicacion,
@@ -23,6 +23,8 @@ import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
+import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
+import { InsigniaConectado } from "./insignia-conectado";
 import { VinculoSku } from "./vinculo-sku";
 
 interface Formulario {
@@ -189,6 +191,18 @@ function ContenidoFicha({
   const [pendiente, empezar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  // La ficha del producto vinculado, abierta encima de esta (no lleva al módulo Producto).
+  const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
+  // Con un ID de Dropi guardado la publicación está conectada y el ID queda bloqueado hasta pulsar el lápiz (al guardar, la ficha se
+  // vuelve a montar y vuelve a quedar bloqueado).
+  const [editandoId, setEditandoId] = useState(false);
+  const conectado = p.dropiId.trim() !== "";
+  const idBloqueado = conectado && !editandoId;
+  const campoId = useRef<HTMLInputElement>(null);
+  // Al desbloquear con el lápiz, el cursor entra en el campo.
+  useEffect(() => {
+    if (editandoId) campoId.current?.focus();
+  }, [editandoId]);
   const sinGuardar = JSON.stringify(d) !== JSON.stringify(desde(p));
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
 
@@ -294,7 +308,7 @@ function ContenidoFicha({
 
         <div className="border-b border-border px-5 py-5">
           <Seccion icono={InventarioIcon} titulo="Producto vinculado (SKU)">
-            <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} />
+            <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} alAbrirProducto={setProductoAbierto} />
           </Seccion>
         </div>
 
@@ -306,13 +320,43 @@ function ContenidoFicha({
               {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nombre} className="h-24 w-24 shrink-0 rounded-lg border border-border object-cover" /> : <span aria-hidden="true" className="h-24 w-24 shrink-0 rounded-lg border border-dashed border-border-control" />}
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Nombre en Dropi</span>
-                  <input value={d.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} required maxLength={300} className={`${fieldClass} w-full`} />
+                  <span className={labelClassSm}>Nombre en Dropi</span>
+                  {/* Viene de Dropi: no se edita. Cambia solo cuando Dropi trae otro nombre para el mismo ID (al volver a vincular). */}
+                  <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
                 </label>
-                <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>ID en Dropi</span>
-                  <input value={d.dropi_id} onChange={(e) => cambiar({ dropi_id: e.target.value })} maxLength={60} placeholder="Ej: 11144" className={`${fieldClass} w-full tabular-nums`} />
-                </label>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  {conectado && (
+                    <div className="flex">
+                      <InsigniaConectado />
+                    </div>
+                  )}
+                  <label className="flex min-w-0 flex-col gap-1">
+                    <span className={labelClassSm}>ID en Dropi</span>
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        ref={campoId}
+                        value={d.dropi_id}
+                        onChange={(e) => cambiar({ dropi_id: e.target.value })}
+                        readOnly={idBloqueado}
+                        maxLength={60}
+                        placeholder="Ej: 11144"
+                        className={`${fieldClass} min-w-0 flex-1 tabular-nums ${idBloqueado ? "cursor-default bg-muted text-muted-foreground" : ""}`}
+                      />
+                      {idBloqueado && (
+                        <Tooltip texto="Corregir el ID">
+                          <button
+                            type="button"
+                            aria-label="Corregir el ID de Dropi"
+                            onClick={() => setEditandoId(true)}
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-muted ${anilloFoco}`}
+                          >
+                            <LapizIcon className="h-4 w-4" />
+                          </button>
+                        </Tooltip>
+                      )}
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
             {p.relacionados.length > 0 && <p className="text-sm text-muted-foreground">Relacionado con: {p.relacionados.join(" · ")}</p>}
@@ -467,6 +511,8 @@ function ContenidoFicha({
 
         <HistorialGenerico id={p.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialPublicacion} />
       </form>
+      {/* Fuera del formulario: los eventos de un portal suben por el árbol de React y enviarían o ensuciarían este formulario. */}
+      <FichaProductoEmbebida productoId={productoAbierto} alCerrar={() => setProductoAbierto(null)} />
     </Ventana>
   );
 }
