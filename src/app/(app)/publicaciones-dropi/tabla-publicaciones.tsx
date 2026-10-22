@@ -16,6 +16,7 @@ import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { TIPOS_RECOMENDACION } from "@/lib/publicaciones/recomendaciones";
 import { FichaPublicacion } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
+import { ProveedorTareas } from "./recomendacion-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 
 const NOMBRE: NombreFilas = { singular: "publicación", plural: "publicaciones" };
@@ -62,6 +63,7 @@ export function TablaPublicaciones({
   corteVentas,
   reglas,
   decisionesDisponibles,
+  tareas,
   abrirInicial = null,
 }: {
   publicaciones: FilaPublicacion[];
@@ -75,6 +77,8 @@ export function TablaPublicaciones({
   corteVentas: string | null;
   reglas: Reglas;
   decisionesDisponibles: boolean;
+  /** A quién se asignan las tareas, quién es la persona y si existe la migración 0128. */
+  tareas: { personas: { id: string; nombre: string }[]; yo: string; conTareas: boolean };
   /** La publicación que se abre al cargar (`?abrir=`, desde la ficha de un producto); si no es de este país, nada. */
   abrirInicial?: string | null;
 }) {
@@ -91,6 +95,7 @@ export function TablaPublicaciones({
     () => false,
   );
   return (
+    <ProveedorTareas {...tareas}>
     <ProveedorSkusMaestros opciones={opcionesSku}>
       <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
       <ListaDatos
@@ -132,5 +137,6 @@ export function TablaPublicaciones({
         alCerrar={() => setAbierta(null)}
       />
     </ProveedorSkusMaestros>
+    </ProveedorTareas>
   );
 }

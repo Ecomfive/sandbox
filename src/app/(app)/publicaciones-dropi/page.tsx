@@ -51,6 +51,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         corteVentas={datos.corteVentas}
         reglas={datos.reglas.reglas}
         decisionesDisponibles={datos.reglas.disponible}
+        tareas={{ personas: datos.personas, yo: usuario.id, conTareas: datos.conTareas }}
         abrirInicial={typeof abrir === "string" ? abrir : null}
       />
     </Pagina>

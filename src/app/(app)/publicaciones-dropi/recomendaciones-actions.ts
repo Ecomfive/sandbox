@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
-import { DECISIONES, TIPOS_RECOMENDACION, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { DECISIONES, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { REGLAS, leerValorRegla, mostrarRegla, revisarReglas, type ClaveRegla, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
@@ -34,7 +34,7 @@ function limpiarRecomendacion(r: unknown) {
  * `dropi_publicaciones_decisiones` con lo que decía la recomendación y el precio y margen de ese momento, y en la actividad de la
  * publicación. La recomendación deja de verse hasta `vigente_hasta`.
  */
-export async function decidirRecomendacion(entrada: { publicacionId: string; recomendacion: unknown; decision: string; nota: string; dias?: number }): Promise<{ error?: string }> {
+export async function decidirRecomendacion(entrada: { publicacionId: string; recomendacion: unknown; decision: string; nota: string; dias?: number; responsableId?: string | null }): Promise<{ error?: string }> {
   let usuario;
   try {
     usuario = await requireModuloEscritura(MODULO);
@@ -57,7 +57,19 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
 
   const dia = hoy();
   const hasta = vigenteHasta(decision, dia, entrada.dias);
-  const { error } = await supabase.from("dropi_publicaciones_decisiones").insert({
+
+  // Aceptada = una tarea (migración 0128): con responsable (el elegido, o quien acepta) y un plazo según las reglas.
+  let tarea: Record<string, unknown> = {};
+  let responsable: { id: string; nombre: string } | null = null;
+  if (decision === "aceptada") {
+    const pedido = typeof entrada.responsableId === "string" && UUID.test(entrada.responsableId) ? entrada.responsableId : usuario.id;
+    const { data: perfil } = await supabase.from("perfiles").select("id, nombre, email, activo").eq("id", pedido).maybeSingle();
+    if (!perfil || perfil.activo === false) return { error: "La persona elegida no está activa." };
+    responsable = { id: perfil.id as string, nombre: ((perfil.nombre as string | null) || (perfil.email as string | null) || "").trim() };
+    const { reglas } = await cargarReglas(supabase);
+    tarea = { responsable_id: responsable.id, responsable_nombre: responsable.nombre, plazo: sumarDias(dia, reglas.dias_plazo) };
+  }
+  const fila = {
     publicacion_id: publicacionId,
     tipo,
     decision,
@@ -66,7 +78,10 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
     vigente_hasta: hasta,
     usuario_id: usuario.id,
     usuario_nombre: usuario.nombre ?? usuario.email ?? null,
-  });
+  };
+  let { error } = await supabase.from("dropi_publicaciones_decisiones").insert({ ...fila, ...tarea });
+  // Sin la migración 0128 no hay columnas de tarea: se guarda la decisión igual.
+  if (error && Object.keys(tarea).length && faltaMigracion(error.message)) ({ error } = await supabase.from("dropi_publicaciones_decisiones").insert(fila));
   if (error) return { error: faltaMigracion(error.message) ? "Falta correr en Supabase la migración 0127." : `No se pudo guardar: ${error.message}` };
 
   const etiqueta = DECISIONES.find((d) => d.valor === decision)!.etiqueta;
@@ -74,8 +89,52 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
     accion: "decidir_recomendacion_publicacion",
     entidad: "dropi_publicaciones",
     entidadId: publicacionId,
-    detalle: `Recomendación ${etiqueta.toLowerCase()}: ${rec.titulo || tipo}${decision === "pospuesta" ? ` (hasta el ${hasta})` : ""}${nota ? ` · «${nota}»` : ""}`,
+    detalle: `Recomendación ${etiqueta.toLowerCase()}: ${rec.titulo || tipo}${decision === "pospuesta" ? ` (hasta el ${hasta})` : ""}${responsable ? ` · la hace ${responsable.nombre}` : ""}${nota ? ` · «${nota}»` : ""}`,
   });
+  // Un aviso «Para ti» a quien la tiene que hacer (si no es quien la aceptó). Si falla, la decisión ya quedó.
+  if (responsable && responsable.id !== usuario.id && tarea.plazo)
+    await supabase.from("notificaciones_usuario").insert({
+      usuario_id: responsable.id,
+      tipo: "tarea",
+      titulo: `Tarea en Gestión de IDs Dropi: ${rec.titulo || etiquetaRecomendacion(tipo)}`.slice(0, 300),
+      texto: `${pub.nombre} · para el ${tarea.plazo}${nota ? ` · «${nota}»` : ""}`.slice(0, 600),
+      href: "/publicaciones-dropi/recomendaciones?ver=por_hacer",
+      autor_id: usuario.id,
+      autor_nombre: usuario.nombre ?? usuario.email ?? null,
+    });
+  revalidatePath("/publicaciones-dropi");
+  revalidatePath("/publicaciones-dropi/recomendaciones");
+  return {};
+}
+
+/** Marca como hecha una tarea (una recomendación aceptada) que el sistema todavía no detectó, con una nota opcional. */
+export async function marcarTareaHecha(decisionId: string, nota: string): Promise<{ error?: string }> {
+  let usuario;
+  try {
+    usuario = await requireModuloEscritura(MODULO);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Sin permiso." };
+  }
+  if (typeof decisionId !== "string" || !UUID.test(decisionId)) return { error: "Tarea no válida." };
+  const supabase = createServiceClient();
+  const { data: d, error: e1 } = await supabase
+    .from("dropi_publicaciones_decisiones")
+    .select("id, publicacion_id, tipo, decision, hecha_en, recomendacion, dropi_publicaciones!inner(pais_id)")
+    .eq("id", decisionId)
+    .maybeSingle();
+  if (e1) return { error: faltaMigracion(e1.message) ? "Falta correr en Supabase la migración 0128." : e1.message };
+  const pais = (d?.dropi_publicaciones as unknown as { pais_id: string } | null)?.pais_id;
+  if (!d || d.decision !== "aceptada" || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pais))) return { error: "No se encontró la tarea." };
+  if (d.hecha_en) return {};
+  const texto = corto(nota, 600);
+  const { error } = await supabase
+    .from("dropi_publicaciones_decisiones")
+    .update({ hecha_en: new Date().toISOString(), hecha_por_nombre: usuario.nombre ?? usuario.email ?? null, hecha_como: "manual", hecha_nota: texto || null })
+    .eq("id", decisionId)
+    .is("hecha_en", null);
+  if (error) return { error: faltaMigracion(error.message) ? "Falta correr en Supabase la migración 0128." : `No se pudo guardar: ${error.message}` };
+  const titulo = (d.recomendacion as { titulo?: string } | null)?.titulo || etiquetaRecomendacion(d.tipo as string);
+  await registrarAuditoria({ accion: "tarea_hecha_publicacion", entidad: "dropi_publicaciones", entidadId: d.publicacion_id as string, detalle: `Tarea hecha: ${titulo}${texto ? ` · «${texto}»` : ""}` });
   revalidatePath("/publicaciones-dropi");
   revalidatePath("/publicaciones-dropi/recomendaciones");
   return {};

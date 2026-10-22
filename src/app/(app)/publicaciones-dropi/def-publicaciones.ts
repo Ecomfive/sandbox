@@ -8,7 +8,7 @@ import {
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
-import { TIPOS_RECOMENDACION, type Decision, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
+import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
@@ -26,6 +26,18 @@ export interface DecisionVista {
   vigenteHasta: string;
   usuario: string;
   fecha: string;
+  /** El precio de la publicación al decidir (para saber si después se subió o se bajó). */
+  precioAntes: number | null;
+  /** La tarea (migración 0128): quién la hace, hasta cuándo, y si ya se hizo (a mano o detectado por el sistema). */
+  responsableId: string | null;
+  responsable: string;
+  plazo: string | null;
+  hechaEn: string | null;
+  hechaComo: "manual" | "dropi" | "producto" | null;
+  hechaPor: string;
+  hechaNota: string;
+  /** Solo una aceptada es una tarea; null en las demás (o sin la migración 0128). */
+  estado: EstadoTarea | null;
 }
 
 /** Una publicación de ECOMFIVE en Dropi (una fila de `dropi_publicaciones`), lista para la tabla y la ficha. */

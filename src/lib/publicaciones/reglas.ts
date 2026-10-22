@@ -14,7 +14,7 @@ export interface DefRegla {
   defecto: number;
   min: number;
   max: number;
-  grupo: "margen" | "ventas" | "combo";
+  grupo: "margen" | "ventas" | "combo" | "tareas";
 }
 
 export type ClaveRegla =
@@ -25,7 +25,8 @@ export type ClaveRegla =
   | "min_ventas_antes"
   | "dias_nuevo"
   | "combo_min_ventas"
-  | "combo_descuento";
+  | "combo_descuento"
+  | "dias_plazo";
 
 export const REGLAS: DefRegla[] = [
   { clave: "margen_minimo", grupo: "margen", etiqueta: "Margen bruto mínimo", descripcion: "Por debajo, la publicación sale en «Margen bajo» y recibe recomendaciones de precio o combo.", unidad: "porcentaje", defecto: 0.3, min: 0.05, max: 0.8 },
@@ -35,6 +36,7 @@ export const REGLAS: DefRegla[] = [
   { clave: "min_ventas_antes", grupo: "ventas", etiqueta: "Ventas mínimas para comparar", descripcion: "La caída solo se mide si en los 30 días anteriores vendió al menos esto.", unidad: "unidades", defecto: 10, min: 1, max: 1000 },
   { clave: "dias_nuevo", grupo: "ventas", etiqueta: "Días de producto nuevo", descripcion: "Un producto publicado hace menos de estos días todavía no se verifica con su dropshipper.", unidad: "dias", defecto: 30, min: 1, max: 365 },
   { clave: "combo_min_ventas", grupo: "combo", etiqueta: "Ventas mínimas para sugerir un combo", descripcion: "Solo se sugiere un combo x2 si vendió al menos esto en 30 días.", unidad: "unidades", defecto: 5, min: 0, max: 1000 },
+  { clave: "dias_plazo", grupo: "tareas", etiqueta: "Plazo para hacer una recomendación aceptada", descripcion: "Pasado este plazo sin hacerse, la tarea sale como atrasada.", unidad: "dias", defecto: 7, min: 1, max: 90 },
   { clave: "combo_descuento", grupo: "combo", etiqueta: "Descuento del combo x2", descripcion: "El precio sugerido del combo es el de dos unidades menos este descuento.", unidad: "porcentaje", defecto: 0.1, min: 0, max: 0.5 },
 ];
 
