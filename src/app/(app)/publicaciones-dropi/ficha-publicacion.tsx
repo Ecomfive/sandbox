@@ -111,7 +111,7 @@ function Selector({ valor, lista, cambiar, nombre, vacio = "—" }: { valor: str
 
 /**
  * Ficha de una publicación: el panel a la derecha que se abre al pulsar su fila. **La ficha ya es el formulario**: se cambia
- * un dato y arriba aparecen «Guardar cambios» y «Cancelar». Utilidad y
+ * un dato y arriba aparecen «Guardar cambios» y «Cancelar»; al guardar, la ficha sigue abierta. Utilidad y
  * margen se calculan solos. Con cambios sin guardar, cerrar o pasar a otra pide confirmación.
  */
 export function FichaPublicacion({
@@ -146,7 +146,7 @@ export function FichaPublicacion({
   if (!publicacion) return null;
   return (
     <ContenidoFicha
-      key={JSON.stringify(desde(publicacion)) + publicacion.id}
+      key={publicacion.id}
       p={publicacion}
       codigoPais={codigoPais}
       nombrePais={nombrePais}
@@ -189,14 +189,28 @@ function ContenidoFicha({
 }) {
   const { mostrarToast } = useToast();
   const [d, setD] = useState<Formulario>(desde(p));
+  // Lo último guardado (o lo que llegó del servidor): con eso se compara para saber si hay cambios sin guardar. Al guardar no se
+  // rearma la ficha (antes cambiaba su clave y parecía que se cerraba): cuando llegan los datos nuevos, el formulario los toma
+  // solo si no hay cambios a medio escribir.
+  // Con un ID de Dropi guardado la publicación está conectada y el ID queda bloqueado hasta pulsar el lápiz; al llegar los datos
+  // guardados vuelve a quedar bloqueado.
+  const [editandoId, setEditandoId] = useState(false);
+  const actual = JSON.stringify(desde(p));
+  const [base, setBase] = useState(actual);
+  const [recibido, setRecibido] = useState(actual);
+  if (actual !== recibido) {
+    setRecibido(actual);
+    setEditandoId(false);
+    if (JSON.stringify(d) === base) setD(desde(p));
+    setBase(actual);
+  }
   const [pendiente, empezar] = useTransition();
+  // Eliminar va aparte: así, mientras termina de guardar, el botón no dice «Eliminando...».
+  const [eliminando, setEliminando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   // La ficha del producto vinculado, abierta encima de esta (no lleva al módulo Producto).
   const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
-  // Con un ID de Dropi guardado la publicación está conectada y el ID queda bloqueado hasta pulsar el lápiz (al guardar, la ficha se
-  // vuelve a montar y vuelve a quedar bloqueado).
-  const [editandoId, setEditandoId] = useState(false);
   const conectado = p.dropiId.trim() !== "";
   const idBloqueado = conectado && !editandoId;
   const campoId = useRef<HTMLInputElement>(null);
@@ -204,7 +218,7 @@ function ContenidoFicha({
   useEffect(() => {
     if (editandoId) campoId.current?.focus();
   }, [editandoId]);
-  const sinGuardar = JSON.stringify(d) !== JSON.stringify(desde(p));
+  const sinGuardar = JSON.stringify(d) !== base;
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
 
   const precio = n(d.precio_venta);
@@ -227,6 +241,7 @@ function ContenidoFicha({
       const r = await actualizarPublicacion(formData).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
       if (r.error) setError(r.error);
       else {
+        setBase(JSON.stringify(d));
         mostrarToast("Cambios guardados");
         setVersion((v) => v + 1);
       }
@@ -236,8 +251,10 @@ function ContenidoFicha({
   function eliminar() {
     if (!confirm(`¿Eliminar "${p.nombre}"? No se puede deshacer.`)) return;
     setError(null);
+    setEliminando(true);
     empezar(async () => {
       const r = await eliminarPublicacion(p.id).catch(() => ({ error: "No se pudo eliminar. Inténtalo de nuevo." }));
+      setEliminando(false);
       if (r.error) setError(r.error);
       else {
         mostrarToast("Publicación eliminada");
@@ -287,7 +304,7 @@ function ContenidoFicha({
                     <CheckIcon className="h-4 w-4" />
                     {pendiente ? "Guardando..." : "Guardar cambios"}
                   </button>
-                  <button type="button" onClick={() => setD(desde(p))} disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
+                  <button type="button" onClick={() => setD(JSON.parse(base) as Formulario)} disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
                     <CerrarIcon className="h-4 w-4" />
                     Cancelar
                   </button>
@@ -295,7 +312,7 @@ function ContenidoFicha({
               )}
               {!sinGuardar && puedeEliminar && (
                 <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
-                  {pendiente ? "Eliminando..." : "Eliminar"}
+                  {eliminando ? "Eliminando..." : "Eliminar"}
                 </BotonAccion>
               )}
             </div>

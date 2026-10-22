@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -85,6 +85,13 @@ export function TablaPublicaciones({
   const verVentas = corteVentas !== null;
   const def = DEF_PUBLICACIONES;
   const [abierta, setAbierta] = useState<string | null>(() => (abrirInicial && publicaciones.some((p) => p.id === abrirInicial) ? abrirInicial : null));
+  // La ficha abierta también queda en la dirección (`?abrir=<id>`): si la lista se vuelve a cargar (al guardar), sigue abierta.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (abierta) url.searchParams.set("abrir", abierta);
+    else url.searchParams.delete("abrir");
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
+  }, [abierta]);
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador (en el
