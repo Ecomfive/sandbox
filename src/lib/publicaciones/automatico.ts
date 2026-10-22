@@ -32,10 +32,9 @@ export function estaArchivada(estado: EnDropi, manualArchivada: boolean): boolea
 }
 
 /** Lo que necesita cada publicación (puede ser más de una). Sin ninguna, está al día. */
-export type Accion = "nuevo" | "revisar_precio" | "bajar_precio" | "verificar_dropshipper";
+export type Accion = "revisar_precio" | "bajar_precio" | "verificar_dropshipper";
 
 export const ACCIONES: { valor: Accion | "al_dia"; etiqueta: string; color: string; detalle: string }[] = [
-  { valor: "nuevo", etiqueta: "Producto nuevo", color: "#12a594", detalle: "Publicado hace menos de 30 días" },
   { valor: "revisar_precio", etiqueta: "Revisar precio y venta", color: "#d9a200", detalle: "Margen bruto bajo o ventas a menos de la mitad que el mes anterior" },
   { valor: "bajar_precio", etiqueta: "Competidor más barato", color: "#f76808", detalle: "Alguien vende lo mismo más barato y tiene stock" },
   { valor: "verificar_dropshipper", etiqueta: "Verificar con dropshipper", color: "#e5484d", detalle: "Privatizado a un dropshipper y sin ventas en 30 días" },
@@ -67,7 +66,7 @@ export function accionesPublicacion(
   const out: Accion[] = [];
   const desde = p.fechaPublicacion ?? p.primeraVenta;
   const nuevo = !!desde && dias(desde, hoy) < DIAS_NUEVO;
-  if (nuevo) out.push("nuevo");
+  // «Producto nuevo» ya no es una acción (no interesa como tarjeta), pero uno recién publicado todavía no se verifica.
   const margenBajo = p.margen !== null && p.margen < MARGEN_MINIMO;
   const cayo = p.netas30 !== null && p.netas30Antes !== null && p.netas30Antes >= MIN_VENTAS_ANTES && p.netas30 < p.netas30Antes * CAIDA;
   if (margenBajo || cayo) out.push("revisar_precio");

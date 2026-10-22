@@ -2,13 +2,12 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import { useTransition, type ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
-import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
+import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
@@ -34,7 +33,7 @@ function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: st
     <span className={`flex min-w-0 flex-col gap-0.5 ${alinear === "derecha" ? "lg:items-end lg:text-right" : ""}`}>
       <span className="sr-only">{nombre}: </span>
       <span className="min-w-0 text-sm">{principal}</span>
-      {apoyo && <span className="min-w-0 truncate text-xs text-muted-foreground">{apoyo}</span>}
+      {apoyo && <span className="min-w-0 max-w-full truncate text-xs text-muted-foreground">{apoyo}</span>}
     </span>
   );
 }
@@ -89,31 +88,8 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
   );
 }
 
-/** Lo que necesita la publicación (calculado): hasta dos etiquetas, o «Al día»; si hay un competidor más barato, quién y a cuánto. */
-function CeldaAcciones({ f }: { f: FilaPublicacion }) {
-  if (f.archivada) return <Celda nombre="Acción" principal={<span className="text-muted-foreground">Archivada</span>} />;
-  const lista = f.acciones.length ? f.acciones : (["al_dia"] as const);
-  const opciones = lista.map((v) => ACCIONES.find((a) => a.valor === v)!).filter(Boolean);
-  return (
-    <Celda
-      nombre="Acción"
-      principal={
-        <span className="flex flex-wrap gap-1">
-          {opciones.slice(0, 2).map((o) => (
-            <Badge key={o.valor} color={o.color}>
-              {o.etiqueta}
-            </Badge>
-          ))}
-          {opciones.length > 2 && <span className="text-xs text-muted-foreground">+{opciones.length - 2}</span>}
-        </span>
-      }
-      apoyo={f.competidorMasBarato ? `${f.competidorMasBarato.proveedor} a ${usd(f.competidorMasBarato.precio)}` : undefined}
-    />
-  );
-}
-
 /**
- * Una publicación como fila de la lista: foto, nombre con su ID y su SKU, precio, utilidad y margen, lo que necesita, sus ventas,
+ * Una publicación como fila de la lista: foto, nombre con su ID y su SKU, precio, utilidad y margen, sus ventas,
  * dónde está y cómo está en Dropi,
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
  */
@@ -126,7 +102,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
       type="button"
       onClick={alAbrir}
       aria-label={`Abrir la ficha de ${f.nombre}`}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_1rem]" : "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(0,1fr)_1rem]"} ${anilloFoco}`}
+      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_1rem]" : "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_1rem]"} ${anilloFoco}`}
     >
       {/* Producto */}
       <span className="flex min-w-0 items-center gap-3">
@@ -155,7 +131,12 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
 
       {/* Los datos: en pantalla ancha una columna cada uno; en angosta, debajo del producto en una fila que envuelve. */}
       <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:order-none lg:contents">
-        <Celda nombre="Precio" alinear="derecha" principal={<span className="font-semibold tabular-nums">{usd(f.precioVenta)}</span>} apoyo={`Costo de producto ${usd(f.costoMercancia)} · Fulfillment ${usd(f.fulfillment)}`} />
+        <Celda nombre="Precio" alinear="derecha" principal={<span className="font-semibold tabular-nums">{usd(f.precioVenta)}</span>} apoyo={
+            <span className="flex flex-col lg:items-end">
+              <span className="max-w-full truncate">Costo de producto {usd(f.costoMercancia)}</span>
+              <span className="max-w-full truncate">Fulfillment {usd(f.fulfillment)}</span>
+            </span>
+          } />
         <Celda
           nombre="Utilidad bruta y margen bruto"
           alinear="derecha"
@@ -171,7 +152,6 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
             )
           }
         />
-        <CeldaAcciones f={f} />
         <CeldaVentas f={f} />
         <Celda
           nombre="Dónde está"
