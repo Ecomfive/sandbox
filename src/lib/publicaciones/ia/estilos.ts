@@ -3,6 +3,7 @@
 // Gemini, así las fotos se parecen al estilo de Ecomfive sin guardar ni copiar las imágenes. Sin base ni red, con prueba.
 
 import { detectarImagen } from "@/lib/seguridad/imagen";
+import { conTexto } from "./fotos-base";
 import { extraerJson } from "./openai";
 
 /** Una guía de estilo guardada. `tipo` es «general» (vale para toda foto) o un tipo de foto del plan (beneficios, uso…). */
@@ -91,7 +92,11 @@ export function textoEstilos(estilos: EstiloImagen[] | undefined, tipo?: string)
   const elegidos = elegirEstilos(estilos ?? [], tipo);
   if (!elegidos.length) return "";
   return [
-    "Estilo visual del equipo (sacado de imágenes modelo que aprobó): imítalo en composición, colores, luz y elementos gráficos, sin copiar sus textos, logos ni productos. La imagen que generes no lleva letras: si el estilo las usa, deja ese espacio limpio.",
+    `Estilo visual del equipo (sacado de imágenes modelo que aprobó): imítalo en composición, colores, luz y elementos gráficos, sin copiar sus textos, logos ni productos. ${
+      tipo !== undefined && conTexto(tipo)
+        ? "Imita también cómo se reparte y se ve el texto (jerarquía, íconos, espacios), pero escribe solo el texto que se te indica."
+        : "La imagen que generes no lleva letras: si el estilo las usa, deja ese espacio limpio."
+    }`,
     ...elegidos.map((e) => `«${e.nombre}»\n${e.guia.trim()}`),
   ].join("\n\n");
 }

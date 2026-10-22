@@ -60,11 +60,14 @@ test("a una foto le valen las guías generales y las de su tipo, activas y las m
   assert.equal(textoEstilos(undefined), "");
 });
 
-test("la guía llega al pedido de la foto y deja claro que la imagen no lleva letras", () => {
-  const p = promptFoto({ nombre: "Gomitas" }, { tipo: "beneficios", instruccion: "Escena de energía" }, 1, [estilo({ tipo: "beneficios" })]);
+test("la guía llega al pedido de la foto; en una foto sin texto deja claro que no lleva letras y en una informativa imita el reparto del texto", () => {
+  const p = promptFoto({ nombre: "Gomitas" }, { tipo: "uso", instruccion: "Escena de energía" }, 1, [estilo({ tipo: "general" })]);
   assert.match(p, /Estilo visual del equipo/);
   assert.match(p, /«Fondo crema»\nFondo crema, luz suave/);
   assert.match(p, /no lleva letras/);
+  const info = promptFoto({ nombre: "Gomitas" }, { tipo: "beneficios", instruccion: "Escena de energía", textos: ["Más energía"] }, 1, [estilo({ tipo: "beneficios" })]);
+  assert.match(info, /Imita también cómo se reparte y se ve el texto/);
+  assert.doesNotMatch(info, /no lleva letras/);
   assert.doesNotMatch(promptFoto({ nombre: "Gomitas" }, { tipo: "uso", instruccion: "x" }, 1, [estilo({ tipo: "beneficios" })]), /Estilo visual del equipo/);
   assert.doesNotMatch(promptFoto({ nombre: "Gomitas" }, { tipo: "uso", instruccion: "x" }, 1), /Estilo visual del equipo/);
 });

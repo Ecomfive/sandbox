@@ -8,10 +8,10 @@ import { esSuplemento } from "../optimizacion";
 /** Los tipos de foto que puede planear la IA. `guia` es la frase corta que acompaña al tipo en cada pedido. */
 export const TIPOS_FOTO = [
   { valor: "principal", etiqueta: "Principal", guia: "el producto solo, completo y centrado, sobre fondo claro liso y bien iluminado" },
-  { valor: "ingredientes", etiqueta: "Ingredientes", guia: "el producto junto a sus ingredientes reales en su forma natural, ordenados y limpios" },
-  { valor: "beneficios", etiqueta: "Beneficios", guia: "el producto con una escena que haga evidente su beneficio principal, sin texto" },
+  { valor: "ingredientes", etiqueta: "Ingredientes", guia: "el producto junto a sus ingredientes reales en su forma natural, cada uno con su nombre escrito" },
+  { valor: "beneficios", etiqueta: "Beneficios", guia: "el producto con sus beneficios más importantes escritos como etiquetas cortas con un ícono" },
   { valor: "uso", etiqueta: "En uso", guia: "una persona parecida al comprador usando el producto en su ambiente real" },
-  { valor: "como_usar", etiqueta: "Cómo se usa", guia: "el momento claro de usar o tomar el producto, paso a paso, con lo que se necesita" },
+  { valor: "como_usar", etiqueta: "Cómo se usa", guia: "los pasos de uso numerados, cada uno con una ilustración sencilla y su texto corto" },
   { valor: "escala", etiqueta: "Tamaño", guia: "el producto junto a un objeto de tamaño conocido (una mano, una taza, un celular) para ver qué tan grande es" },
   { valor: "detalle", etiqueta: "Detalle", guia: "un primer plano de material, textura, acabado o etiqueta" },
   { valor: "contenido", etiqueta: "Qué incluye", guia: "todo lo que trae el pedido, ordenado y separado" },
@@ -39,13 +39,13 @@ export const FICHA_FOTO: Record<TipoFoto, FichaFoto> = {
   },
   ingredientes: {
     para: "Qué lleva por dentro y por qué confiar en él: los compradores de suplementos y de cuidado personal buscan los ingredientes en la galería.",
-    como: "El frasco o empaque al fondo y, delante y alrededor, los ingredientes reales en su forma natural (raíz, hojas, frutos, semillas, polvo) ordenados en un semicírculo limpio sobre una superficie clara. Luz suave y lateral, macro nítido de cada ingrediente, fondo liso. Cinco o seis ingredientes como máximo, los más importantes.",
+    como: "El frasco o empaque al fondo y, delante, los ingredientes reales en su forma natural (raíz, hojas, frutos, semillas o polvo), los más importantes, cada uno con su nombre escrito debajo, en una fila o un semicírculo ordenado sobre una superficie clara. Luz suave y lateral, macro nítido de cada ingrediente, fondo liso. Cinco o seis ingredientes como máximo, los más importantes.",
     cuida: "Solo ingredientes que aparecen en los datos o en la etiqueta; sin cifras, dosis, sellos ni certificaciones.",
   },
   beneficios: {
-    para: "Qué gana la persona con el producto, mostrado de forma visual.",
-    como: "El producto en primer plano con una escena que sugiera su beneficio principal mediante elementos simbólicos (energía: luz de amanecer y movimiento; cabello: melena sana y brillante; descanso: habitación tranquila). Composición limpia con espacio libre a un lado, paleta de dos o tres colores tomados del empaque, luz suave.",
-    cuida: "Sin resultados médicos, transformaciones ni antes y después; sin cuerpos ni rostros irreales.",
+    para: "Qué gana la persona con el producto: sus beneficios más importantes, dichos de forma clara.",
+    como: "El producto en primer plano, limpio y reconocible, con los tres o cuatro beneficios más importantes escritos como etiquetas cortas, cada una con un ícono simple, repartidas con orden alrededor del producto y sin saturar. Fondo liso o con un degradado suave de dos o tres colores tomados del empaque, luz de estudio suave.",
+    cuida: "Solo beneficios reales del producto, dichos como apoyo o bienestar; sin resultados médicos, cifras inventadas ni antes y después.",
   },
   uso: {
     para: "Cómo se ve en la vida real, con alguien parecido al cliente.",
@@ -54,7 +54,7 @@ export const FICHA_FOTO: Record<TipoFoto, FichaFoto> = {
   },
   como_usar: {
     para: "Cómo se usa o se toma, para quitar la duda antes de comprar.",
-    como: "Un momento claro del uso: una mano toma una cápsula con un vaso de agua, aplica la crema en la piel, enciende el aparato. Vista cenital o a 45 grados sobre una superficie clara, con el producto y lo necesario (vaso, cuchara, toalla) bien visibles y ordenados, luz suave.",
+    como: "Los pasos de uso en orden, numerados, cada uno con una ilustración o foto sencilla de la mano o la persona haciendo el paso (tomar la cápsula con un vaso de agua, aplicar la crema en la piel, encender el aparato) y su texto corto; el producto visible; fondo claro y luz suave.",
     cuida: "Solo el modo de uso que dice la etiqueta o la descripción; sin inventar dosis ni indicaciones médicas.",
   },
   escala: {
@@ -82,6 +82,27 @@ export const FICHA_FOTO: Record<TipoFoto, FichaFoto> = {
     como: "Una foto casual de teléfono: el producto en la mano o sobre una mesa de casa, luz natural, encuadre un poco imperfecto, fondo de hogar real con algo de desorden natural y sin retoques excesivos.",
     cuida: "Sin reseñas, estrellas, texto ni personas reconocibles.",
   },
+};
+
+/**
+ * Las fotos **informativas**: son las únicas que llevan texto escrito en la imagen (es lo que informa); las demás son solo visuales. El
+ * texto no lo inventa Gemini: lo escribe el plan (o el equipo) y se le pide tal cual. `max` líneas, de a lo más `largo` caracteres.
+ */
+export const TIPOS_CON_TEXTO = ["beneficios", "ingredientes", "como_usar"] as const;
+export type TipoConTexto = (typeof TIPOS_CON_TEXTO)[number];
+export const conTexto = (tipo: string): tipo is TipoConTexto => (TIPOS_CON_TEXTO as readonly string[]).includes(tipo);
+
+export const LIMITES_TEXTO: Record<TipoConTexto, { max: number; largo: number; titulo: string; ejemplo: string }> = {
+  beneficios: { max: 4, largo: 40, titulo: "Beneficios", ejemplo: "Hidrata en profundidad" },
+  ingredientes: { max: 6, largo: 30, titulo: "Ingredientes", ejemplo: "Ácido hialurónico" },
+  como_usar: { max: 4, largo: 60, titulo: "Cómo se usa", ejemplo: "Aplica una capa fina sobre la piel limpia" },
+};
+
+/** Cómo se reparte el texto en la imagen, según el tipo. */
+export const DISTRIBUCION_TEXTO: Record<TipoConTexto, string> = {
+  beneficios: "El producto al centro y cada beneficio como una etiqueta corta con un ícono simple a su lado, repartidos con orden alrededor del producto.",
+  ingredientes: "El producto al fondo y cada ingrediente con su foto natural y su nombre escrito debajo, en una fila o un semicírculo ordenado.",
+  como_usar: "Los pasos numerados 1, 2, 3… en orden de izquierda a derecha o de arriba hacia abajo, cada uno con una ilustración sencilla del paso y su texto; el producto visible.",
 };
 
 /** Cómo se agrupan los productos para elegir el juego de fotos. */
