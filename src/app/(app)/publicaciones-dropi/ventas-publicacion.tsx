@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { mesesEntre, restarDias, DIAS_REPONER, type VentasPublicacion } from "@/lib/publicaciones/ventas";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -21,7 +22,7 @@ function Dato({ titulo, valor, detalle, tono }: { titulo: string; valor: string;
  * Las ventas en Dropi de una publicación: netas de 30 días contra los 30 anteriores, stock y para
  * cuántos días alcanza, cancelaciones y devoluciones, última venta y las netas de los últimos 12 meses en barras.
  */
-export function VentasEnDropi({ v, corte, enCamino = 0 }: { v: VentasPublicacion; corte: string; /** Unidades del producto vinculado que vienen en camino. */ enCamino?: number }) {
+export function VentasEnDropi({ v, corte, enCamino = 0, llegada = null, sinFecha = 0 }: { v: VentasPublicacion; corte: string; /** Unidades del producto vinculado que vienen en camino, la llegada más próxima y las unidades sin fecha. */ enCamino?: number; llegada?: string | null; sinFecha?: number }) {
   const meses = mesesEntre(restarDias(`${corte.slice(0, 7)}-15`, 335), corte);
   const valores = meses.map((m) => ({ mes: m, netas: v.porMes[m] ?? 0 }));
   const max = Math.max(1, ...valores.map((x) => x.netas));
@@ -39,7 +40,15 @@ export function VentasEnDropi({ v, corte, enCamino = 0 }: { v: VentasPublicacion
         <Dato titulo="Devueltas o rechazadas" valor={pct(v.pctDevolucion)} tono={v.pedidas >= 30 && (v.pctDevolucion ?? 0) > 0.2 ? "aviso" : undefined} detalle={`última venta: ${fecha(v.ultimaVenta)}`} />
       </dl>
       {v.stockEstado === "sin_stock_vende" && <p className="text-sm font-medium text-destructive">Se está vendiendo y no tiene stock en Dropi.</p>}
-      {v.stock <= 0 && enCamino > 0 && <p className="text-sm font-medium text-azul">Viene mercancía en camino: {entero(enCamino)} {enCamino === 1 ? "unidad" : "unidades"}.</p>}
+      {v.stock <= 0 && enCamino > 0 && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-azul">
+          <span>
+            Viene mercancía en camino: {entero(enCamino)} {enCamino === 1 ? "unidad" : "unidades"}
+            {llegada && <> · llega aprox. {fecha(llegada)}</>}
+          </span>
+          {sinFecha > 0 && <Badge tone="warning">{llegada ? "Parte sin fecha de llegada" : "Aún sin fecha de llegada"}</Badge>}
+        </p>
+      )}
       {v.stockEstado === "se_acaba" && <p className="text-sm font-medium text-warning">Al ritmo de los últimos 30 días, el stock alcanza para menos de {DIAS_REPONER} días.</p>}
       <figure className="m-0 flex flex-col gap-1.5">
         <figcaption className="text-xs text-muted-foreground">Unidades netas por mes</figcaption>

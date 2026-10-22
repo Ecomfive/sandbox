@@ -87,6 +87,10 @@ export interface FilaPublicacion {
   sku: SkuResumen | null;
   /** Unidades de su producto vinculado que vienen en camino (órdenes que ya salieron y no han llegado) en este país; 0 si no hay. */
   enCamino: number;
+  /** La llegada más próxima de lo que viene en camino («2026-11-12»): la fecha límite de la compra o la estimada; null si ninguna tiene. */
+  llegadaCamino: string | null;
+  /** Unidades en camino de órdenes que todavía no tienen fecha de llegada (faltan datos en Compras). */
+  sinFechaCamino: number;
   /** Si no está vinculada: el producto sugerido y cómo se encontró. */
   sugerencia: SugerenciaVista | null;
   /** Sus ventas en Dropi (Desempeño › Ventas Dropi); `null` si no tiene datos. */

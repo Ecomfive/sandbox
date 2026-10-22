@@ -493,7 +493,7 @@ function ContenidoFicha({
 
           {p.ventas && corteVentas && (
             <Seccion icono={MargenIcon} titulo="Ventas en Dropi">
-              <VentasEnDropi v={p.ventas} corte={corteVentas} enCamino={p.enCamino} />
+              <VentasEnDropi v={p.ventas} corte={corteVentas} enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} />
             </Seccion>
           )}
 
