@@ -10,6 +10,8 @@ import { PanelRecomendaciones, type Sugerida } from "./panel-recomendaciones";
 export const metadata = { title: "Recomendaciones · Gestión de IDs Dropi" };
 
 export const dynamic = "force-dynamic";
+// El asistente de IA (investigar con OpenAI, generar fotos con Gemini) corre como acción de esta página y tarda hasta unos minutos.
+export const maxDuration = 300;
 
 /**
  * Gestión de IDs Dropi › Recomendaciones: todo lo que el sistema sugiere hacer en las publicaciones del país, como una lista de

@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { requireModuloEscritura } from "@/lib/auth";
+import { campoOculto, restriccionesDe } from "../permisos-compras";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { detectarAdjunto } from "@/lib/compras/adjuntos";
 import { puedeVerPais } from "@/lib/paises-permitidos";
@@ -12,12 +13,18 @@ import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 
-// Pagos a Chin, del lado de Ecomfive (fase 4 de PORTAL-PROVEEDOR.md): se avisa el pago (fecha, referencia, comprobante y a qué cuotas
+// Pagos a Chin, del lado de Ecomfive (Compras › Tablero de Chin): se avisa el pago (fecha, referencia, comprobante y a qué cuotas
 // va) y el proveedor lo confirma en su portal; recién ahí cuenta como pagado. Lo pagado vive en `proveedor_pagos`, no en la compra.
 
 const MAX_COMPROBANTE = 10 * 1024 * 1024;
 const DIAS_ATRAS = 120;
 const EXTENSIONES = new Set(["jpg", "jpeg", "png", "webp", "pdf"]);
+
+/** Avisar pagos pide modificar Compras y ver sus montos (quien no ve el monto de una compra tampoco ve los pagos). */
+async function exigirPagos() {
+  const usuario = await requireModuloEscritura("compras");
+  return campoOculto(restriccionesDe(usuario.afinado.compras), "monto") ? null : usuario;
+}
 
 async function proveedorActivo() {
   const { data } = await createServiceClient().from("proveedores").select("id, nombre").eq("activo", true).order("creado_en").limit(1).maybeSingle();
@@ -26,7 +33,7 @@ async function proveedorActivo() {
 
 /** Dirección firmada para subir el comprobante de un pago (imagen o PDF) directo al almacenamiento privado. */
 export async function prepararSubidaComprobante(nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
-  await requireModuloEscritura("portal-proveedor");
+  if (!(await exigirPagos())) return { error: "No tienes acceso a los pagos a Chin." };
   const prov = await proveedorActivo();
   if (!prov) return { error: "No hay proveedor con portal." };
   const ext = (String(nombreArchivo ?? "").split(".").pop() ?? "").toLowerCase();
@@ -41,7 +48,8 @@ export async function prepararSubidaComprobante(nombreArchivo: string): Promise<
  * pago, su referencia y, si hay, el comprobante (revisado por su contenido). Chin lo ve en su portal para confirmarlo.
  */
 export async function crearAvisoPago(datos: { fecha: string; referencia: string; claves: string[]; comprobanteRuta?: string | null }): Promise<{ error?: string; avisoId?: string }> {
-  const usuario = await requireModuloEscritura("portal-proveedor");
+  const usuario = await exigirPagos();
+  if (!usuario) return { error: "No tienes acceso a los pagos a Chin." };
   if (!datos || !Array.isArray(datos.claves) || datos.claves.length === 0 || datos.claves.length > 200) return { error: "Marca las cuotas que pagaste." };
   const hoy = hoyPanama();
   const fecha = typeof datos.fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(datos.fecha) ? datos.fecha : null;
@@ -95,7 +103,8 @@ export async function crearAvisoPago(datos: { fecha: string; referencia: string;
 
 /** Cancela un aviso que el proveedor todavía no confirmó (se equivocaron de monto o de cuotas). */
 export async function cancelarAvisoPago(avisoId: string): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("portal-proveedor");
+  const usuario = await exigirPagos();
+  if (!usuario) return { error: "No tienes acceso a los pagos a Chin." };
   if (!esUuid(avisoId)) return { error: "Aviso no válido." };
   const supabase = createServiceClient();
   const { data } = await supabase.from("proveedor_avisos_pago").select("id, estado, comprobante_ruta, monto, referencia").eq("id", avisoId).maybeSingle();

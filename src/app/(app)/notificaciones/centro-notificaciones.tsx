@@ -179,6 +179,13 @@ function PorCorregir({ pendientes }: { pendientes: PendientesHoy }) {
       href: "/analisis-competencia",
       Icono: InteligenciaIcon,
     },
+    {
+      clave: "creditos-ia",
+      cantidad: pendientes.creditosIA,
+      titulo: "Crédito de IA por acabarse",
+      href: "/publicaciones-dropi/consumo",
+      Icono: InteligenciaIcon,
+    },
   ].filter((t) => t.cantidad > 0);
 
   if (tarjetas.length === 0) {
