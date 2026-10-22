@@ -28,6 +28,7 @@ import {
   type TipoIA,
 } from "@/lib/publicaciones/ia/asistente";
 import { chequearTitulo, reglasParaIA, type ChequeoTitulo, type Ejemplos, type ReglasIA } from "@/lib/publicaciones/ia/criterios";
+import { avisoDeReintento, compararTexto, lineaRiesgosa, normalizarTextos, pedidoLeerTexto, textoLeido } from "@/lib/publicaciones/ia/texto-imagen";
 import { cargarEstilos } from "@/lib/publicaciones/ia/estilos-datos";
 import { cargarIndicaciones } from "@/lib/publicaciones/ia/indicaciones-datos";
 import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/proveedor";
@@ -458,11 +459,22 @@ export async function planearFotosIA(publicacionId: string): Promise<{ error?: s
   return { guardado: { ...ahora(g.id, usuario, modelo), resultado: conUrls(plan) } };
 }
 
+/** Lee la imagen con la IA de texto y comprueba que trae las líneas pedidas bien escritas. null si no se pudo comprobar (sin IA de texto o con error). */
+async function textoBienEscrito(imagen: string, esperados: string[], consumo: ReturnType<typeof consumoDe>): Promise<{ ok: boolean; faltantes: string[] } | null> {
+  if (!proveedorTexto()) return null;
+  const r = await pedirIA({ ...pedidoLeerTexto(), imagenes: [imagen] }, false, consumo);
+  if ("error" in r) return null;
+  return compararTexto(esperados, textoLeido(r.texto));
+}
+
 /**
  * Genera con Gemini la foto `indice` de un plan (la reemplaza si ya tenía). Manda la foto del producto como referencia para que
  * salga igual. Se guarda en Storage (wms-productos/publicaciones/<id>/ia/). Tarda de 10 a 60 segundos.
+ * Las fotos informativas (beneficios, ingredientes y cómo se usa) llevan el texto del plan o el que la persona dejó en `textosEditados`
+ * (una línea cada uno): se limpia, se rechaza lo que promete curar o tratar algo, y la imagen generada se lee con la IA de texto para
+ * comprobar que quedó bien escrita; si no, se genera una vez más avisando qué línea falló. `textoOk` dice cómo quedó (null: no se pudo comprobar).
  */
-export async function generarFotoIA(iaId: string, indice: number): Promise<{ error?: string; url?: string }> {
+export async function generarFotoIA(iaId: string, indice: number, textosEditados?: string[]): Promise<{ error?: string; url?: string; textos?: string[]; textoOk?: boolean | null }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (typeof iaId !== "string" || !UUID.test(iaId) || !Number.isInteger(indice) || indice < 0 || indice >= MAX_FOTOS) return { error: "Foto no válida." };
   if (!geminiConectado()) return { error: "Falta conectar Gemini (la clave GEMINI_API_KEY en Vercel)." };
@@ -476,6 +488,11 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
   if (!foto) return { error: "Esa foto ya no está en el plan." };
   if (!pub.foto_url) return { error: "La publicación no tiene foto del producto: agrégala primero en su ficha." };
 
+  // El texto de una foto informativa: el que dejó la persona o, si no, el del plan.
+  const textos = normalizarTextos(foto.tipo, Array.isArray(textosEditados) ? textosEditados : (foto.textos ?? []));
+  const riesgosa = lineaRiesgosa(textos);
+  if (riesgosa) return { error: `«${riesgosa}» promete curar, tratar o garantizar algo: escríbelo como apoyo o bienestar.` };
+
   // La foto del producto como referencia.
   const referencias: { mime: string; base64: string }[] = [];
   const d = await descargarPublico(pub.foto_url, 10 * 1024 * 1024);
@@ -486,15 +503,38 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
   if (!referencias.length) return { error: "No se pudo leer la foto del producto." };
 
   const { estilos } = await cargarEstilos(supabase);
-  const prompt = promptFoto({ nombre: pub.nombre }, foto, referencias.length, estilos);
-  const r = await generarImagen(prompt, referencias, "1:1", consumoDe("foto", usuario, pub));
-  if ("error" in r) {
-    await marcarError(iaId, indice, r.error);
-    return { error: r.error };
+  const prompt = promptFoto({ nombre: pub.nombre }, { ...foto, textos }, referencias.length, estilos);
+  const consumo = consumoDe("foto", usuario, pub);
+  const primera = await generarImagen(prompt, referencias, "1:1", consumo);
+  if ("error" in primera) {
+    await marcarError(iaId, indice, primera.error);
+    return { error: primera.error };
   }
-  const bytes = new Uint8Array(Buffer.from(r.base64, "base64"));
-  const tipoImg = detectarImagen(bytes.slice(0, 64));
+  const aBytes = (base64: string) => new Uint8Array(Buffer.from(base64, "base64"));
+  let bytes = aBytes(primera.base64);
+  let tipoImg = detectarImagen(bytes.slice(0, 64));
   if (!tipoImg) return { error: "Gemini devolvió algo que no es una imagen." };
+
+  // Con texto: se lee la imagen y se compara con lo pedido; si salió mal escrito, un segundo intento avisando qué línea falló.
+  let textoOk: boolean | null = null;
+  if (textos.length) {
+    const leer = (base64: string, mime: string) => textoBienEscrito(`data:${mime};base64,${base64}`, textos, consumoDe("foto_texto", usuario, pub));
+    let veredicto = await leer(primera.base64, tipoImg.tipo);
+    if (veredicto && !veredicto.ok) {
+      const segunda = await generarImagen(`${prompt}\n${avisoDeReintento(veredicto.faltantes)}`, referencias, "1:1", consumo);
+      if (!("error" in segunda)) {
+        const bytes2 = aBytes(segunda.base64);
+        const tipo2 = detectarImagen(bytes2.slice(0, 64));
+        if (tipo2) {
+          bytes = bytes2;
+          tipoImg = tipo2;
+          veredicto = await leer(segunda.base64, tipo2.tipo);
+        }
+      }
+    }
+    textoOk = veredicto ? veredicto.ok : null;
+  }
+
   const ruta = `publicaciones/${pub.id}/ia/${Date.now()}-${foto.tipo}.${tipoImg.extension}`;
   const { error: errorSubida } = await supabase.storage.from(BUCKET).upload(ruta, bytes, { contentType: tipoImg.tipo });
   if (errorSubida) return { error: "No se pudo guardar la imagen generada." };
@@ -503,7 +543,7 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
   const { data: fresca } = await supabase.from("dropi_publicaciones_ia").select("resultado").eq("id", iaId).maybeSingle();
   const actual = (fresca?.resultado ?? plan) as PlanFotos;
   const anterior = actual.fotos[indice]?.ruta ?? null;
-  actual.fotos[indice] = { ...actual.fotos[indice], ruta, error: null };
+  actual.fotos[indice] = { ...actual.fotos[indice], textos, textoOk, ruta, error: null };
   const { error } = await supabase.from("dropi_publicaciones_ia").update({ resultado: actual, actualizado_en: new Date().toISOString() }).eq("id", iaId);
   if (error) {
     await supabase.storage.from(BUCKET).remove([ruta]);
@@ -511,8 +551,8 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
   }
   // La imagen reemplazada ya no la usa nadie (solo vivía en este plan): se borra, y solo si es de esta carpeta.
   if (anterior && anterior.startsWith(`publicaciones/${pub.id}/ia/`)) await supabase.storage.from(BUCKET).remove([anterior]);
-  await registrarAuditoria({ accion: "ia_foto_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: foto «${foto.titulo}» (${modeloImagen()})` });
-  return { url: urlPublica(ruta) };
+  await registrarAuditoria({ accion: "ia_foto_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: foto «${foto.titulo}» (${modeloImagen()})${textos.length ? ` con texto ${textoOk === true ? "verificado" : textoOk === false ? "por revisar" : "sin verificar"}` : ""}` });
+  return { url: urlPublica(ruta), textos, textoOk };
 }
 
 /** Anota en el plan por qué falló una foto, para verlo sin volver a pedirla. */

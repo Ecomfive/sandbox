@@ -3,13 +3,14 @@
 /* eslint-disable @next/next/no-img-element -- imágenes de Storage */
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { anilloFoco, fieldClass } from "@/components/ui/field";
+import { anilloFoco, fieldClass, fieldClassSm } from "@/components/ui/field";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { CheckIcon, CopiarIcon, EstadoIcon, EtiquetaIcon, InteligenciaIcon, ListaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { etiquetaTipoFoto, type AccionAnalisis, type Impacto, type TipoIA } from "@/lib/publicaciones/ia/asistente";
 import { chequearTitulo } from "@/lib/publicaciones/ia/criterios";
+import { conTexto, LIMITES_TEXTO } from "@/lib/publicaciones/ia/fotos-base";
 import type { EstadoRevision } from "@/lib/publicaciones/optimizacion";
 import {
   analizarPublicacionIA,
@@ -762,17 +763,25 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
   const [planeando, setPlaneando] = useState(false);
   const [generando, setGenerando] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Lo que la persona escribió en el cuadro de textos de cada foto informativa (sin guardar todavía).
+  const [textosEditados, setTextosEditados] = useState<Record<number, string>>({});
   const ocupado = planeando || generando !== null;
   const revFotos = vista.contexto.revisiones.find((r) => r.clave === "fotos");
 
-  async function generarUna(iaId: string, i: number) {
+  async function generarUna(iaId: string, i: number, textos?: string) {
     setGenerando(i);
-    const r = await generarFotoIA(iaId, i).catch(() => ({ error: "No se pudo generar la foto. Inténtalo de nuevo." }) as { error: string; url?: undefined });
+    const r = await generarFotoIA(iaId, i, textos === undefined ? undefined : textos.split("\n")).catch(() => ({ error: "No se pudo generar la foto. Inténtalo de nuevo." }) as { error: string; url?: undefined; textos?: undefined; textoOk?: undefined });
     setGenerando(null);
     setPlan((p) => {
       if (!p) return p;
-      const fotos = p.resultado.fotos.map((f, k) => (k === i ? { ...f, url: r.url ?? f.url, error: r.error ?? null } : f));
+      const fotos = p.resultado.fotos.map((f, k) => (k === i ? { ...f, url: r.url ?? f.url, error: r.error ?? null, ...(r.url ? { textos: r.textos ?? f.textos, textoOk: r.textoOk ?? null } : {}) } : f));
       return { ...p, resultado: { ...p.resultado, fotos } };
+    });
+    // Lo que quedó escrito en la imagen es lo que ahora muestra el cuadro.
+    if (r.url) setTextosEditados((t) => {
+      const resto = { ...t };
+      delete resto[i];
+      return resto;
     });
   }
 
@@ -783,6 +792,7 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
     setPlaneando(false);
     if (r.error || !r.guardado) return setError(r.error ?? "No se pudo analizar.");
     setPlan(r.guardado);
+    setTextosEditados({});
     // Se generan una por una (cada una tarda): si una falla, sigue con las demás y queda anotado en su tarjeta.
     for (let i = 0; i < r.guardado.resultado.fotos.length; i++) await generarUna(r.guardado.id, i);
   }
@@ -832,6 +842,25 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
                 </div>
                 <div className="flex flex-col gap-2 p-3">
                   <span className="truncate text-sm font-medium">{f.titulo}</span>
+                  {conTexto(f.tipo) && (
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-medium">Textos de la imagen</span>
+                      <textarea
+                        rows={3}
+                        value={textosEditados[i] ?? (f.textos ?? []).join("\n")}
+                        onChange={(e) => setTextosEditados((t) => ({ ...t, [i]: e.target.value }))}
+                        disabled={ocupado}
+                        placeholder={`Una línea por texto. Ej: ${LIMITES_TEXTO[f.tipo].ejemplo}`}
+                        className={`${fieldClassSm} w-full resize-y`}
+                      />
+                    </label>
+                  )}
+                  {f.url && f.textoOk != null && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${f.textoOk ? "bg-success" : "bg-warning"}`} />
+                      {f.textoOk ? "Texto verificado" : "Revisar el texto"}
+                    </span>
+                  )}
                   {f.error && !f.url && (
                     <p role="alert" className="m-0 text-xs text-destructive">
                       {f.error}
@@ -843,7 +872,7 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
                         Descargar
                       </a>
                     )}
-                    <button type="button" className={`${botonChico} flex-1 justify-center`} disabled={!estado.gemini || ocupado} onClick={() => generarUna(plan.id, i)}>
+                    <button type="button" className={`${botonChico} flex-1 justify-center`} disabled={!estado.gemini || ocupado} onClick={() => generarUna(plan.id, i, conTexto(f.tipo) ? (textosEditados[i] ?? (f.textos ?? []).join("\n")) : undefined)}>
                       {f.url ? "Rehacer" : "Generar"}
                     </button>
                   </div>
