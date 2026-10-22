@@ -1,7 +1,7 @@
 "use server";
 
 import { getUsuarioActual } from "@/lib/auth";
-import { enCaminoPorPais, lineaEnCamino, llegadaDeCompra, type EnCaminoPais, type LineaEnCamino } from "@/lib/compras/en-camino";
+import { enCaminoPorPais, faltaParaLlegada, lineaEnCamino, llegadaDeCompra, type EnCaminoPais, type LineaEnCamino } from "@/lib/compras/en-camino";
 import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -22,6 +22,8 @@ export interface OrdenEnCamino {
   origen: "limite" | "estimada" | null;
   /** La etapa de la orden en Compras («produccion», «tracking»…). */
   etapa: string;
+  /** Si no tiene llegada, qué falta: su fecha de envío (aún no se envía) o su vía de envío / fecha límite (ya se envió). */
+  falta: "envio" | "via" | null;
 }
 
 export async function obtenerEnCaminoProducto(id: string, codigoPais?: string | null): Promise<{ enCamino: EnCaminoPais[]; ordenes: OrdenEnCamino[] } | { error: string }> {
@@ -55,7 +57,7 @@ export async function obtenerEnCaminoProducto(id: string, codigoPais?: string | 
     // El detalle por orden, solo de las que cuentan (las del país marcado, si se pidió uno).
     if (!lineaEnCamino(linea) || !(linea.unidades > 0) || (filtro && (delPais?.codigo ?? "").toUpperCase() !== filtro)) continue;
     const llegada = llegadaDeCompra(tiempos, { fechaLimite: c.fecha_limite, fechaEnvio: c.fecha_envio, vias: c.via_envio ?? [], clave: claveTransito(c.tipo, c.pais_id) });
-    ordenes.push({ numero: Number(c.numero), unidades: linea.unidades, llegada: llegada?.fecha ?? null, origen: llegada?.origen ?? null, etapa: c.etapa });
+    ordenes.push({ numero: Number(c.numero), unidades: linea.unidades, llegada: llegada?.fecha ?? null, origen: llegada?.origen ?? null, etapa: c.etapa, falta: llegada ? null : faltaParaLlegada({ fechaEnvio: c.fecha_envio }) });
   }
   ordenes.sort((x, y) => (x.llegada ?? "9999").localeCompare(y.llegada ?? "9999") || x.numero - y.numero);
   return { enCamino: enCaminoPorPais(lineas, filtro), ordenes };

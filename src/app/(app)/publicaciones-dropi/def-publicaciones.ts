@@ -91,6 +91,8 @@ export interface FilaPublicacion {
   llegadaCamino: string | null;
   /** Unidades en camino de órdenes que todavía no tienen fecha de llegada (faltan datos en Compras). */
   sinFechaCamino: number;
+  /** De esas, las unidades de órdenes que aún no tienen fecha de envío (en producción, sin enviar). */
+  sinEnvioCamino: number;
   /** Si no está vinculada: el producto sugerido y cómo se encontró. */
   sugerencia: SugerenciaVista | null;
   /** Sus ventas en Dropi (Desempeño › Ventas Dropi); `null` si no tiene datos. */

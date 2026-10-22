@@ -66,7 +66,7 @@ export function EnCaminoProducto({ id, pais, nombrePais }: { id: string; pais?: 
             <span className="tabular-nums">
               OC-{String(o.numero).padStart(4, "0")} · {entero(o.unidades)} u. · {(ETAPA_ETIQUETA[o.etapa] ?? o.etapa).replace(/^\d+ - /, "")}
             </span>
-            {o.llegada ? <span className="tabular-nums">llega aprox. {llegadaCorta(o.llegada, hoy)}</span> : <Badge tone="warning">Sin fecha de llegada</Badge>}
+            {o.llegada ? <span className="tabular-nums">llega aprox. {llegadaCorta(o.llegada, hoy)}</span> : <Badge tone="warning">{o.falta === "envio" ? "Sin fecha de envío" : "Sin fecha de llegada"}</Badge>}
           </li>
         ))}
       </ul>

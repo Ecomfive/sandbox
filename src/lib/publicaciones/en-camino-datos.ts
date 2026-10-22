@@ -48,11 +48,12 @@ export async function cargarEnCamino(supabase: SupabaseClient, paisId: string, u
   }
   const tiempos = await cargarTiempos();
   const llegadaDe = new Map(enCamino.map((c) => [c.id, llegadaDeCompra(tiempos, { fechaLimite: c.fecha_limite, fechaEnvio: c.fecha_envio, vias: c.via_envio ?? [], clave: paisId })?.fecha ?? null]));
-  const ordenes = new Map<string, { unidades: number; llegada: string | null }[]>();
+  const sinEnvioDe = new Map(enCamino.map((c) => [c.id, !c.fecha_envio]));
+  const ordenes = new Map<string, { unidades: number; llegada: string | null; sinEnvio: boolean }[]>();
   for (const l of lineas) {
     const n = Number(l.cantidad_pedida);
     if (!l.sku_maestro_id || !(n > 0)) continue;
-    for (const id of new Set([l.sku_maestro_id, padres.get(l.sku_maestro_id)].filter((x): x is string => !!x))) ordenes.set(id, [...(ordenes.get(id) ?? []), { unidades: n, llegada: llegadaDe.get(l.compra_id) ?? null }]);
+    for (const id of new Set([l.sku_maestro_id, padres.get(l.sku_maestro_id)].filter((x): x is string => !!x))) ordenes.set(id, [...(ordenes.get(id) ?? []), { unidades: n, llegada: llegadaDe.get(l.compra_id) ?? null, sinEnvio: sinEnvioDe.get(l.compra_id) ?? false }]);
   }
   for (const [id, o] of ordenes) resumen.set(id, resumenLlegada(o));
   return resumen;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { enCaminoPorPais, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
+import { enCaminoPorPais, faltaParaLlegada, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
 
 const l = (extra: Partial<LineaEnCamino>): LineaEnCamino => ({ pais: "Panamá", unidades: 100, etapa: "tracking", fechaEnvio: "2026-10-01", fechaLlegada: null, anulada: false, ...extra });
 
@@ -56,9 +56,13 @@ test("sin fecha límite y sin fecha de envío o sin vía, no hay fecha de llegad
 });
 
 test("el resumen toma la llegada más próxima y cuenta lo que no tiene fecha", () => {
-  assert.deepEqual(resumenLlegada([{ unidades: 100, llegada: "2026-12-01" }, { unidades: 50, llegada: "2026-11-05" }, { unidades: 30, llegada: null }]), { unidades: 180, llegada: "2026-11-05", sinFecha: 30 });
-  assert.deepEqual(resumenLlegada([{ unidades: 40, llegada: null }]), { unidades: 40, llegada: null, sinFecha: 40 });
-  assert.deepEqual(resumenLlegada([]), { unidades: 0, llegada: null, sinFecha: 0 });
+  assert.deepEqual(resumenLlegada([{ unidades: 100, llegada: "2026-12-01" }, { unidades: 50, llegada: "2026-11-05" }, { unidades: 30, llegada: null }]), { unidades: 180, llegada: "2026-11-05", sinFecha: 30, sinEnvio: 0 });
+  assert.deepEqual(resumenLlegada([{ unidades: 40, llegada: null }]), { unidades: 40, llegada: null, sinFecha: 40, sinEnvio: 0 });
+  assert.deepEqual(resumenLlegada([]), { unidades: 0, llegada: null, sinFecha: 0, sinEnvio: 0 });
+  // En producción, sin enviar: las unidades vienen en camino y lo que falta es la fecha de envío.
+  assert.deepEqual(resumenLlegada([{ unidades: 500, llegada: null, sinEnvio: true }, { unidades: 20, llegada: null, sinEnvio: false }]), { unidades: 520, llegada: null, sinFecha: 520, sinEnvio: 500 });
+  assert.equal(faltaParaLlegada({ fechaEnvio: null }), "envio");
+  assert.equal(faltaParaLlegada({ fechaEnvio: "2026-10-01" }), "via");
 });
 
 test("la fecha corta lleva el año solo si no es el actual", () => {

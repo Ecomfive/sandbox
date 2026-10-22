@@ -88,20 +88,28 @@ export interface ResumenLlegada {
   llegada: string | null;
   /** Las unidades de órdenes que todavía no tienen fecha de llegada. */
   sinFecha: number;
+  /** De esas, las de órdenes que aún no tienen fecha de envío (en producción, sin enviar): es lo que falta para saber cuándo llegan. */
+  sinEnvio: number;
 }
 
 /** Junta las órdenes en camino de un producto: sus unidades, la llegada más próxima y cuántas unidades no tienen fecha. */
-export function resumenLlegada(ordenes: { unidades: number; llegada: string | null }[]): ResumenLlegada {
+export function resumenLlegada(ordenes: { unidades: number; llegada: string | null; sinEnvio?: boolean }[]): ResumenLlegada {
   let llegada: string | null = null;
   let sinFecha = 0;
+  let sinEnvio = 0;
   let unidades = 0;
   for (const o of ordenes) {
     unidades += o.unidades;
-    if (o.llegada === null) sinFecha += o.unidades;
-    else if (llegada === null || o.llegada < llegada) llegada = o.llegada;
+    if (o.llegada === null) {
+      sinFecha += o.unidades;
+      if (o.sinEnvio) sinEnvio += o.unidades;
+    } else if (llegada === null || o.llegada < llegada) llegada = o.llegada;
   }
-  return { unidades, llegada, sinFecha };
+  return { unidades, llegada, sinFecha, sinEnvio };
 }
+
+/** Qué falta para saber cuándo llega una orden sin fecha de llegada: su fecha de envío, o (ya enviada) su vía de envío o su fecha límite. */
+export const faltaParaLlegada = (c: { fechaEnvio: string | null }): "envio" | "via" => (c.fechaEnvio ? "via" : "envio");
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 

@@ -281,6 +281,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       enCamino: camino?.unidades ?? 0,
       llegadaCamino: camino?.llegada ?? null,
       sinFechaCamino: camino?.sinFecha ?? 0,
+      sinEnvioCamino: camino?.sinEnvio ?? 0,
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
       ...revisionDe(d),
