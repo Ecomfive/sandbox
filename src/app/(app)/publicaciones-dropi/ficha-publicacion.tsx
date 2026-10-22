@@ -341,8 +341,9 @@ function ContenidoFicha({
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
                   <span className={labelClassSm}>Nombre en Dropi</span>
-                  {/* Viene de Dropi: no se edita. Cambia solo cuando Dropi trae otro nombre para el mismo ID (al volver a vincular). */}
+                  {/* Viene de Dropi: no se edita aquí. La única excepción es «Usar este título» del Asistente de IA (elegirTituloIA). */}
                   <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
+                  <span className="text-xs text-muted-foreground">Solo cambia con «Usar este título» del Asistente de IA.</span>
                 </label>
                 <div className="flex min-w-0 flex-col gap-1.5">
                   {conectado && (

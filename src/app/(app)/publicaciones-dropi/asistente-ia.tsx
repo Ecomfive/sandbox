@@ -515,7 +515,7 @@ function OpcionTitulo({ indice, inicial, porque, categoria, reglas, iaId, elegid
       alElegir(texto.replace(/\s+/g, " ").trim());
     }
     navigator.clipboard.writeText(texto.trim()).then(
-      () => mostrarToast(guardarComoElegido ? "Título guardado y copiado: pégalo en Dropi" : "Copiado"),
+      () => mostrarToast(guardarComoElegido ? "Nombre en Dropi cambiado en el sistema y copiado: pégalo en Dropi" : "Copiado"),
       () => mostrarToast("No se pudo copiar", "destructive"),
     );
   }

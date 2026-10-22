@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { creditosPorAcabarse } from "@/lib/ia/consumo";
@@ -44,6 +45,8 @@ const BUCKET = "wms-productos";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const faltaMigracion = (m: string) => /does not exist|schema cache|relation/i.test(m);
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0134.";
+/** Lo más largo que Dropi acepta en «Nombre del producto» (y en el nombre de la guía de envío). */
+const MAX_NOMBRE_DROPI = 40;
 const urlPublica = (ruta: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${ruta}`;
 const idsDropi = (dropiId: string | null) => (String(dropiId ?? "").match(/\d{3,6}/g) ?? []).map(Number);
 /** Lo que acompaña a cada pedido para anotar el consumo: qué es, quién lo pidió y de qué publicación. */
@@ -339,9 +342,22 @@ export async function elegirTituloIA(iaId: string, titulo: string): Promise<{ er
   const r = fila.resultado as PropuestaTitulos;
   const editado = !r.titulos?.some((t) => t.titulo === limpio);
   const resultado: PropuestaTitulos = { ...r, elegido: { titulo: limpio, editado, por: usuario.nombre || usuario.email, en: new Date().toISOString() } };
+  // La única excepción a «el nombre viene de Dropi» (pedido de Hernán, 22 oct 2026): el título de la IA que se elige con «Usar
+  // este título» pasa a ser el Nombre en Dropi de la publicación (y después se pone en Dropi). Dropi admite 40 caracteres.
+  if (limpio.length > MAX_NOMBRE_DROPI) return { error: `Dropi admite ${MAX_NOMBRE_DROPI} caracteres en el nombre: este tiene ${limpio.length}.` };
   const { error } = await supabase.from("dropi_publicaciones_ia").update({ resultado, actualizado_en: new Date().toISOString() }).eq("id", iaId);
   if (error) return { error: "No se pudo guardar el título elegido." };
-  await registrarAuditoria({ accion: "ia_titulo_elegido", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: «${limpio}»${editado ? " (corregido)" : ""}` });
+  const cambio = await supabase.from("dropi_publicaciones").update({ nombre: limpio, actualizado_en: new Date().toISOString() }).eq("id", pub.id);
+  if (cambio.error) return { error: "Se guardó el título, pero no se pudo cambiar el Nombre en Dropi." };
+  await registrarAuditoria({
+    accion: "ia_titulo_elegido",
+    entidad: "dropi_publicaciones",
+    entidadId: pub.id,
+    detalle: `«${limpio}»${editado ? " (corregido)" : ""}`,
+    antes: { "Nombre en Dropi": pub.nombre },
+    despues: { "Nombre en Dropi": limpio },
+  });
+  revalidatePath("/publicaciones-dropi");
   const c = chequearTitulo(limpio, categoria, contexto.reglas);
   return { chequeos: c.chequeos, cumple: c.cumple };
 }
