@@ -85,9 +85,9 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
         </span>
       }
       apoyo={
-        <span className="tabular-nums">
-          {v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}
-          {v.stock <= 0 && f.enCamino > 0 && <span className="font-medium text-azul"> · {entero(f.enCamino)} en camino</span>}
+        <span className="flex flex-col tabular-nums lg:items-end">
+          <span className="max-w-full truncate">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>
+          {v.stock <= 0 && f.enCamino > 0 && <span className="max-w-full truncate font-medium text-azul">{entero(f.enCamino)} en camino</span>}
         </span>
       }
     />
