@@ -41,10 +41,12 @@ export interface PedidoPortal {
   comentarioProveedor: string | null;
   cotizadoEn: string | null;
   actualizadoEn: string;
+  /** Anticipo distinto del de siempre (lo dice la hoja de pagos de Chin; migración 0127). */
+  anticipoMonto: number | null;
 }
 
 const COLUMNAS =
-  "id, compra_id, referencia, producto, foto_referencia, pais_codigo, via, modalidad, etapa, unidades_pedidas, unidades, monto_total, costo_unitario, nota_para_proveedor, fecha_envio, fecha_llegada, primer_pago, fecha_pago_1, segundo_pago, fecha_pago_2, pagado_a_proveedor, foto_real_ruta, comentario_proveedor, cotizado_en, actualizado_en";
+  "id, compra_id, referencia, producto, foto_referencia, pais_codigo, via, modalidad, etapa, unidades_pedidas, unidades, monto_total, costo_unitario, nota_para_proveedor, fecha_envio, fecha_llegada, primer_pago, fecha_pago_1, segundo_pago, fecha_pago_2, pagado_a_proveedor, foto_real_ruta, comentario_proveedor, cotizado_en, actualizado_en, anticipo_monto";
 
 type Fila = Record<string, unknown>;
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -77,6 +79,7 @@ export function pedidoDesdeFila(f: Fila): PedidoPortal {
     comentarioProveedor: txt(f.comentario_proveedor),
     cotizadoEn: txt(f.cotizado_en),
     actualizadoEn: String(f.actualizado_en),
+    anticipoMonto: num(f.anticipo_monto),
   };
 }
 
@@ -107,12 +110,16 @@ export async function cargarEspejo(supabase: SupabaseClient, proveedorId: string
     diasAnticipo: Number(p.dias_anticipo),
     porcentajeAnticipo: Number(p.porcentaje_anticipo),
   };
-  const [pedidos, rutas] = await Promise.all([
+  const leerPedidos = (columnas: string) =>
     traerTodasConError<Fila>((desde, hasta) =>
-      supabase.from("proveedor_pedidos").select(COLUMNAS).eq("proveedor_id", proveedorId).eq("visible", true).order("actualizado_en", { ascending: false }).range(desde, hasta),
-    ),
+      supabase.from("proveedor_pedidos").select(columnas).eq("proveedor_id", proveedorId).eq("visible", true).order("actualizado_en", { ascending: false }).range(desde, hasta) as unknown as PromiseLike<{ data: Fila[] | null; error: unknown }>,
+    );
+  const [primeros, rutas] = await Promise.all([
+    leerPedidos(COLUMNAS),
     supabase.from("wms_rutas_envio").select("agente, pais_codigo, via, dias_min, dias_max").eq("activo", true).ilike("agente", proveedor.nombreEnCompras).order("actualizado_en"),
   ]);
+  // Sin la migración 0127 (anticipo distinto) el portal sigue funcionando sin ese dato.
+  const pedidos = primeros.error ? await leerPedidos(COLUMNAS.replace(", anticipo_monto", "")) : primeros;
   if (pedidos.error) return { error: "No se pudieron cargar los pedidos del proveedor." };
   // Si un país y vía tienen dos rutas activas, manda la que se cambió por último (van en orden).
   const plazos: Record<string, Plazo> = {};
