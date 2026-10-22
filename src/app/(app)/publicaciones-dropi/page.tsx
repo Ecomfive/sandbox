@@ -11,6 +11,8 @@ import { TablaPublicaciones } from "./tabla-publicaciones";
 export const metadata = { title: "Gestión de IDs Dropi" };
 
 export const dynamic = "force-dynamic";
+// El asistente de IA (investigar con OpenAI, generar fotos con Gemini) corre como acción de esta página y tarda hasta unos minutos.
+export const maxDuration = 300;
 
 /**
  * Operación › Fulfillment: los productos que ECOMFIVE tiene publicados en Dropi como proveedor (del país de la barra), con su
