@@ -15,7 +15,6 @@ import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, Flecha
 import {
   ESTADOS,
   ESTADOS_PUBLICACION,
-  ESTADOS_REPOSICION,
   MARGEN_BAJO,
   TIPOS,
   UBICACIONES,
@@ -382,24 +381,12 @@ function ContenidoFicha({
             </Seccion>
           )}
 
-          <Seccion icono={InventarioIcon} titulo="Stock y reposición">
+          <Seccion icono={InventarioIcon} titulo="Stock">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />
               </div>
-              <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Reposición</span>
-                <Selector nombre="Reposición" valor={d.estado_reposicion} lista={ESTADOS_REPOSICION} cambiar={(v) => cambiar({ estado_reposicion: v })} />
-              </div>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Competencia en Dropi</span>
-                <select value={d.competencia} onChange={(e) => cambiar({ competencia: e.target.value })} className={`${fieldClass} w-full`}>
-                  <option value="">Sin revisar</option>
-                  <option value="si">Sí</option>
-                  <option value="no">No</option>
-                </select>
-              </label>
             </div>
           </Seccion>
 

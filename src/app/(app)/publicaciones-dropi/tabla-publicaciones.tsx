@@ -6,7 +6,7 @@ import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/se
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS, ESTADOS_PUBLICACION, TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
@@ -21,11 +21,9 @@ const ICONOS: Record<string, IconoComp> = {
   revision: CalendarioIcon,
   venta: MargenIcon,
   ubicacion: InventarioIcon,
-  reposicion: InventarioIcon,
   tipo: EstadoIcon,
   publicacion: EstadoIcon,
   privatizado: PersonaIcon,
-  competencia: EstadoIcon,
   vinculo: ProductoIcon,
   nombre: ProductoIcon,
   precio: MargenIcon,
@@ -42,7 +40,7 @@ const ICONOS: Record<string, IconoComp> = {
   diasInventario: CalendarioIcon,
 };
 
-const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS,  ubicacion: UBICACIONES, reposicion: ESTADOS_REPOSICION, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
+const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS,  ubicacion: UBICACIONES, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
 
 /**
  * Las publicaciones del país: el tablero de acciones arriba y, debajo, la lista de filas con la barra de herramientas común y
