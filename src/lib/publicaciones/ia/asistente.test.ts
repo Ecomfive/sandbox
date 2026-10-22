@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalizarAnalisis, normalizarPlanFotos, normalizarPropuestaTexto, normalizarTitulos, pedidoAnalisis, pedidoFotos, pedidoTexto, pedidoTitulos, promptFoto, tipoIADeRecomendacion, type ContextoIA, type DatosPublicacionIA } from "./asistente";
+import { normalizarAnalisis, normalizarPlanFotos, normalizarPropuestaTexto, normalizarTitulos, pedidoAnalisis, pedidoCorregirTitulos, pedidoFotos, pedidoTexto, pedidoTitulos, promptFoto, tipoIADeRecomendacion, type ContextoIA, type DatosPublicacionIA } from "./asistente";
 import { cuerpoMensaje, extraerMensaje, mensajeErrorClaude } from "./anthropic";
 import { chequearTitulo, reglasParaIA, textoCriterios, textoEjemplos, textoIndicaciones } from "./criterios";
 import { cuerpoRespuesta, extraerJson, extraerRespuesta, mensajeErrorOpenAI } from "./openai";
@@ -246,4 +246,11 @@ test("cada recomendación de optimización tiene su asistente; las de precio no"
   assert.equal(tipoIADeRecomendacion("mas_fotos"), "fotos");
   assert.equal(tipoIADeRecomendacion("subir_precio"), null);
   assert.equal(tipoIADeRecomendacion("agregar_video"), null);
+});
+
+test("pedidoCorregirTitulos devuelve cada título con su largo real y el rango", () => {
+  const p = pedidoCorregirTitulos([{ titulo: "Cápsulas para fortalecer y crecer cabello sano", porque: "dice el beneficio" }], contexto);
+  assert.match(p.texto, /«Cápsulas para fortalecer y crecer cabello sano» \(46 caracteres/);
+  assert.match(p.texto, /idea: dice el beneficio/);
+  assert.match(p.instrucciones, new RegExp(`entre ${contexto.reglas.minTitulo} y ${contexto.reglas.maxTitulo} caracteres`));
 });
