@@ -128,7 +128,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
 
 /** Qué puntos de la revisión resuelve cada recomendación de optimización. */
 const PUNTOS: Partial<Record<TipoRecomendacion, Revision["clave"][]>> = {
-  optimizar_titulo: ["titulo_espanol", "titulo_cantidad", "titulo_angulo", "titulo_formato"],
+  optimizar_titulo: ["titulo_espanol", "titulo_largo", "titulo_cantidad", "titulo_angulo", "titulo_formato"],
   mas_fotos: ["fotos"],
   agregar_video: ["video"],
   mejorar_descripcion: ["descripcion"],
@@ -136,7 +136,7 @@ const PUNTOS: Partial<Record<TipoRecomendacion, Revision["clave"][]>> = {
 };
 
 const RESULTADO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
-  optimizar_titulo: "Un título en español, con la cantidad y para qué sirve, se encuentra mejor en Dropi y el dropshipper entiende qué vende.",
+  optimizar_titulo: "Un título en español, de 30 caracteres como máximo, con la cantidad y para qué sirve, se encuentra mejor en Dropi y el dropshipper entiende qué vende.",
   mas_fotos: "Más fotos (producto, uso, tamaño, empaque) dan al dropshipper material para sus anuncios.",
   agregar_video: "Un video del producto en uso es lo que más usa el dropshipper para anunciar.",
   mejorar_descripcion: "Una descripción completa (beneficios, uso, contenido) ayuda a vender y evita devoluciones.",
