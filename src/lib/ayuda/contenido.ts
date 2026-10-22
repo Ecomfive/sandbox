@@ -156,6 +156,44 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "wms-productos",
+    titulo: "Ficha producto Shopify",
+    ruta: "/wms-productos",
+    resumen: "La ficha de un producto como en el admin de Shopify: título, descripción, imágenes, precio, variantes e inventario por sucursal.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "La lista muestra los productos de Shopify; pulsa una fila para abrir su ficha. «Agregar» abre una ficha vacía; desde Producto, «Crear ficha Shopify» abre una con el producto ya elegido.",
+          "La ficha es una página de dos columnas: a la izquierda el título, la descripción (con su editor), las imágenes, la categoría, el precio, el inventario, el envío, las variantes, los metacampos y la vista previa en buscadores; a la derecha el estado, la publicación, la organización y la plantilla.",
+          "«Guardar» y «Descartar» solo aparecen cuando cambias algo. Sin permiso de modificar, la ficha se ve pero no se edita.",
+          "Un producto siempre tiene al menos una variante (sin opciones, es la única): ahí viven el precio, el SKU, el peso y el inventario por sucursal. El SKU de cada variante se elige de Producto; así la venta encuentra el producto para descontar inventario.",
+          "Las imágenes se suben directo desde tu equipo; al guardar solo se guarda su ruta. La descripción se limpia al guardar: solo queda formato permitido.",
+          "No incluye las ventas de los últimos 90 días ni el precio unitario de Shopify.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "wms-productos-dropi",
+    titulo: "Ficha producto Dropi",
+    ruta: "/wms-productos-dropi",
+    resumen: "Los productos de Dropi con sus datos, stock por bodega, imágenes, videos y garantías, en una sola ficha.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Pulsa una fila para abrir la ficha al lado; «Agregar» abre la misma ficha vacía. «Archivados» muestra los productos archivados.",
+          "La ficha junta en bloques lo que Dropi reparte en pestañas: General, Stock (o Variables y stock), Imagen del producto, Videos, Recursos adicionales, Productos privados y Garantías.",
+          "Arriba están las opciones de la fila: Historial de existencia (los ajustes de stock quedan en la actividad), Duplicar, Archivar o Restaurar, y Eliminar.",
+          "Al guardar se piden las reglas de Dropi: peso y medidas (peso en gramos, medidas en centímetros), precio y precio sugerido, categoría, una descripción de al menos 200 caracteres y, si el producto es público, una bodega con 100 unidades y 3 imágenes.",
+          "Las bodegas salen de Bodegas por país y se agregan desde la sección Stock. El producto se enlaza con su producto de Producto por el SKU.",
+          "No incluye crear órdenes, el formato de órdenes masivas, la carga ni la actualización masiva, ni las descargas en Excel de Dropi.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "inventario",
     titulo: "Inventario",
     ruta: "/inventario",
