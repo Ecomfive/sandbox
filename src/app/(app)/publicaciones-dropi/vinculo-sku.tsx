@@ -67,7 +67,7 @@ export function VinculoSku({ p, puedeEscribir, siguiente }: { p: FilaPublicacion
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Producto sku={p.sku} />
           <span className="flex gap-1.5">
-            <Link href={`/producto?buscar=${encodeURIComponent(p.sku.codigo)}`} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+            <Link href={`/producto?abrir=${p.sku.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
               Abrir en Producto
             </Link>
             {puedeEscribir && (
