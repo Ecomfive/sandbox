@@ -163,6 +163,7 @@ export interface CambiosPublicacion {
   ultimo_cambio_precio?: string;
   tipo_publicacion?: "publico" | "privado";
   estado_publicacion?: "activo" | "archivado";
+  nombre?: string;
 }
 
 const ETIQUETA_UBICACION: Record<string, string> = {
@@ -181,7 +182,11 @@ const nombreUbicacion = (u: string | null) => (u ? (ETIQUETA_UBICACION[u] ?? u) 
  * producto archivado sin bodegas no cambia la ubicación (Dropi ya no la dice). Si cambia el precio, el último cambio de precio pasa a hoy.
  */
 export function cambiosDesdeDropi(
-  pub: { ubicacion: string | null; precioVenta: number | null; tipo: string | null; estadoPublicacion: string | null },
+  /**
+   * `nombre` (22 oct 2026): el nombre también lo manda Dropi, salvo que haya un cambio nuestro esperando «Aplicar en Dropi»
+   * (`nombrePendiente`), que no se pisa antes de llegar. Sin `nombre`, no se compara.
+   */
+  pub: { ubicacion: string | null; precioVenta: number | null; tipo: string | null; estadoPublicacion: string | null; nombre?: string; nombrePendiente?: boolean },
   p: ProductoProveedor,
   hoy: string,
 ): { cambios: CambiosPublicacion; detalle: string[] } {
@@ -206,6 +211,12 @@ export function cambiosDesdeDropi(
   if (estado !== pub.estadoPublicacion) {
     cambios.estado_publicacion = estado;
     detalle.push(`En Dropi: ${pub.estadoPublicacion ?? "sin anotar"} → ${estado}`);
+  }
+  const nombre = p.nombre.trim();
+  // Un nombre con forma de código de SKU («CINTURON/LUMBAR») quedó así en Dropi por error (22 oct 2026): no se copia al sistema.
+  if (pub.nombre !== undefined && !pub.nombrePendiente && nombre && !nombre.includes("/") && nombre !== pub.nombre.trim()) {
+    cambios.nombre = nombre;
+    detalle.push(`Nombre: ${pub.nombre.trim()} → ${nombre}`);
   }
   return { cambios, detalle };
 }
