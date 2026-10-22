@@ -1,7 +1,5 @@
 import {
   numeroPublicacion,
-  MARGEN_BAJO,
-  margenBajo,
   TIPOS,
   UBICACIONES,
   opcion,
@@ -9,10 +7,26 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
-import { ACCIONES, EN_DROPI, MARGEN_CRITICO, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
+import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
+import { TIPOS_RECOMENDACION, type Decision, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
+import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
+
+/** Una decisión sobre una recomendación (aceptada, rechazada o pospuesta), con su porqué. */
+export interface DecisionVista {
+  id: string;
+  publicacionId: string;
+  tipo: string;
+  decision: Decision;
+  nota: string;
+  titulo: string;
+  motivo: string;
+  vigenteHasta: string;
+  usuario: string;
+  fecha: string;
+}
 
 /** Una publicación de ECOMFIVE en Dropi (una fila de `dropi_publicaciones`), lista para la tabla y la ficha. */
 export interface FilaPublicacion {
@@ -32,6 +46,8 @@ export interface FilaPublicacion {
   costeReal: number | null;
   utilidad: number | null;
   margen: number | null;
+  /** Crítico, bajo, aceptable o saludable según las reglas (pantalla Reglas). */
+  nivelMargen: NivelMargen | null;
   estadoVenta: string | null;
   ubicacion: string | null;
   estadoReposicion: string | null;
@@ -70,6 +86,12 @@ export interface FilaPublicacion {
   acciones: Accion[];
   /** El competidor que vende lo mismo más barato (precio equivalente), si hay. */
   competidorMasBarato: CompetidorBarato | null;
+  /** El precio equivalente más bajo de la competencia con stock, aunque sea más caro que el nuestro. */
+  competidorMinimo: CompetidorBarato | null;
+  /** Lo que el sistema recomienda hacer y nadie ha decidido todavía (o cuya decisión ya venció). */
+  recomendaciones: Recomendacion[];
+  /** Las decisiones sobre sus recomendaciones, de la más nueva a la más vieja. */
+  decisiones: DecisionVista[];
 }
 
 /** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */
@@ -86,6 +108,13 @@ export const VINCULOS = [
 const opciones = (lista: OpcionPublicacion[]) => () => lista.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }));
 const color = (lista: OpcionPublicacion[]) => (v: string) => opcion(lista, v)?.color;
 const uno = (v: string | null) => [v ?? SIN_VALOR];
+
+export const NIVELES_MARGEN: { valor: NivelMargen; etiqueta: string }[] = [
+  { valor: "critico", etiqueta: "Crítico" },
+  { valor: "bajo", etiqueta: "Bajo" },
+  { valor: "aceptable", etiqueta: "Aceptable" },
+  { valor: "sano", etiqueta: "Saludable" },
+];
 
 /** Cómo anda el stock de una publicación según sus ventas en Dropi. */
 export const STOCK_DROPI = [
@@ -116,17 +145,23 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       id: "margenBajo",
       etiqueta: "Margen",
       tipo: "seleccion",
-      // Crítico bajo 20 %, bajo entre 20 y 30 %, aceptable entre 30 y 40 % y saludable desde 40 % (ver MARGEN_MINIMO).
-      valores: (f) => [f.margen === null ? SIN_VALOR : f.margen < MARGEN_CRITICO ? "critico" : margenBajo(f.margen) ? "bajo" : f.margen < 0.4 ? "aceptable" : "sano"],
-      opciones: () => [
-        { valor: "critico", etiqueta: `Crítico (menos de ${Math.round(MARGEN_CRITICO * 100)} %)` },
-        { valor: "bajo", etiqueta: `Bajo (${Math.round(MARGEN_CRITICO * 100)} a ${Math.round(MARGEN_BAJO * 100)} %)` },
-        { valor: "aceptable", etiqueta: `Aceptable (${Math.round(MARGEN_BAJO * 100)} a 40 %)` },
-        { valor: "sano", etiqueta: "Saludable (40 % o más)" },
-      ],
+      // Crítico, bajo, aceptable y saludable según los umbrales de la pantalla Reglas (lo calcula el servidor).
+      valores: (f) => [f.nivelMargen ?? SIN_VALOR],
+      opciones: () => NIVELES_MARGEN,
       etiquetaSinValor: "Sin margen",
       agrupable: true,
-      ordenGrupos: ["critico", "bajo", "aceptable", "sano"],
+      ordenGrupos: NIVELES_MARGEN.map((n) => n.valor),
+    },
+    {
+      id: "recomendacion",
+      etiqueta: "Recomendación",
+      tipo: "seleccion",
+      valores: (f) => (f.recomendaciones.length ? f.recomendaciones.map((r) => r.tipo) : [SIN_VALOR]),
+      opciones: () => TIPOS_RECOMENDACION.map((t) => ({ valor: t.valor, etiqueta: t.etiqueta })),
+      etiquetaSinValor: "Sin recomendaciones",
+      agrupable: true,
+      ordenGrupos: TIPOS_RECOMENDACION.map((t) => t.valor),
+      colorValor: (v) => TIPOS_RECOMENDACION.find((t) => t.valor === v)?.color,
     },
     { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },
     // Las ventas de Dropi (21 oct 2026): reemplazan el «Estado de venta» que se marcaba a mano. Las ve todo el que abre el módulo.

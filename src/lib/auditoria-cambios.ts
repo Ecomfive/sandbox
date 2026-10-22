@@ -42,6 +42,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_landing: "Creó la landing",
   crear_publicacion_dropi: "Creó la publicación",
   editar_publicacion_dropi: "Editó la publicación",
+  decidir_recomendacion_publicacion: "Decidió una recomendación",
+  editar_reglas_publicaciones: "Cambió las reglas de Gestión de IDs Dropi",
   revisar_publicacion_dropi: "Marcó la publicación como revisada",
   eliminar_publicacion_dropi: "Eliminó la publicación",
   vincular_sku_publicacion: "Vinculó el producto",

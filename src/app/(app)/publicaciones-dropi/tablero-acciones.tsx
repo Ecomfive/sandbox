@@ -3,10 +3,12 @@
 import type { ComponentType } from "react";
 import { useFiltros } from "@/components/tabla/ganchos";
 import { anilloFoco } from "@/components/ui/field";
-import { ACCIONES as ACCIONES_CALCULADAS, MARGEN_CRITICO, type Accion as AccionCalculada } from "@/lib/publicaciones/automatico";
+import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCalculada } from "@/lib/publicaciones/automatico";
+import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { AnalisisCompetenciaIcon, DropshipperIcon, EnlaceIcon, InventarioIcon, MargenIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { AnalisisCompetenciaIcon, DropshipperIcon, EnlaceIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { TIPOS_RECOMENDACION } from "@/lib/publicaciones/recomendaciones";
 import { DEF_PUBLICACIONES, estadoVinculo, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
@@ -30,9 +32,10 @@ interface Tarjeta {
   cuenta: (f: FilaPublicacion) => boolean;
   atajo: AtajoFiltro;
   /** Lo que cuenta la tarjeta, en pocas palabras. */
-  detalle: string;
+  /** Lo que cuenta la tarjeta, con los umbrales de las reglas. */
+  detalle: string | ((r: Reglas) => string);
   /** Una línea más, calculada (p. ej. cuántas están en margen crítico). */
-  extra?: (abiertas: FilaPublicacion[]) => string | null;
+  extra?: (abiertas: FilaPublicacion[], r: Reglas) => string | null;
 }
 
 /** Una tarjeta por cada acción calculada (21 oct 2026): cuenta y filtra por el campo «Acción». */
@@ -43,7 +46,7 @@ const porAccion = (valor: AccionCalculada, icono: Tarjeta["icono"], color: Color
     titulo: a.etiqueta,
     icono,
     color,
-    detalle: a.detalle,
+    detalle: (r) => detalleAccion(valor, r),
     cuenta: (f) => f.acciones.includes(valor),
     atajo: { id: valor, etiqueta: a.etiqueta, ayuda: `Filtrar la lista: ${a.etiqueta.toLowerCase()}`, filtro: seleccion("accion", valor), suma: true },
   };
@@ -62,13 +65,27 @@ const TARJETAS: Tarjeta[] = [
     cuenta: (f) => f.enDropi === "activo",
     atajo: { id: "activas", etiqueta: "Activas en Dropi", ayuda: "Filtrar la lista: activas en Dropi", filtro: seleccion("publicacion", "activo") },
   },
-  { ...porAccion("margen_bajo", MargenIcon, "rojo"), extra: (abiertas) => {
-      const n = abiertas.filter((f) => f.margen !== null && f.margen < MARGEN_CRITICO).length;
-      return n ? `${n} en crítico (menos de ${Math.round(MARGEN_CRITICO * 100)} %)` : null;
+  { ...porAccion("margen_bajo", MargenIcon, "rojo"), extra: (abiertas, r) => {
+      const n = abiertas.filter((f) => f.nivelMargen === "critico").length;
+      return n ? `${n} en crítico (menos de ${Math.round(r.margen_critico * 100)} %)` : null;
     } },
   porAccion("ventas_caida", VentasIcon, "ambar"),
   porAccion("bajar_precio", AnalisisCompetenciaIcon, "rojo"),
   porAccion("verificar_dropshipper", DropshipperIcon, "azul"),
+  {
+    id: "recomendaciones",
+    titulo: "Recomendaciones",
+    icono: SugerenciaIcon,
+    color: "violeta",
+    detalle: "Con algo que el sistema sugiere hacer",
+    cuenta: (f) => f.recomendaciones.length > 0,
+    atajo: {
+      id: "recomendaciones",
+      etiqueta: "Recomendaciones",
+      ayuda: "Filtrar la lista: con recomendaciones",
+      filtro: { campo: "recomendacion", valor: { tipo: "seleccion" as const, valores: TIPOS_RECOMENDACION.map((t) => t.valor) } },
+    },
+  },
   {
     id: "sin-vincular",
     titulo: "Sin vincular",
@@ -91,7 +108,7 @@ const TARJETAS: Tarjeta[] = [
 ];
 
 /** Una tarjeta del tablero: ícono de color, título y el número grande. Es un botón que pone o quita su filtro en la lista. */
-function TarjetaAccion({ t, valor, total, extra, def }: { t: Tarjeta; valor: number; total: number; extra: string | null; def: DefTabla<FilaPublicacion> }) {
+function TarjetaAccion({ t, valor, total, extra, detalle, def }: { t: Tarjeta; valor: number; total: number; extra: string | null; detalle: string; def: DefTabla<FilaPublicacion> }) {
   const [filtros, cambiarFiltros] = useFiltros(def);
   const activa = atajoActivo(filtros, t.atajo);
   const c = COLORES[t.color];
@@ -116,7 +133,7 @@ function TarjetaAccion({ t, valor, total, extra, def }: { t: Tarjeta; valor: num
         {t.id === "activas" && <span className="text-sm text-muted-foreground tabular-nums">/ {total.toLocaleString("es-PA")}</span>}
       </span>
       <span className="text-xs text-muted-foreground">
-        {t.detalle}
+        {detalle}
         {extra && <span className="mt-0.5 block font-medium text-destructive">{extra}</span>}
         <span className="sr-only">. {activa ? "Filtrando la lista." : t.atajo.ayuda}</span>
       </span>
@@ -129,12 +146,12 @@ function TarjetaAccion({ t, valor, total, extra, def }: { t: Tarjeta; valor: num
  * (las acciones calculadas, lo que falta vincular y lo que no tiene stock). Cada tarjeta cuenta las publicaciones abiertas y, al
  * pulsarla, filtra la lista de abajo; pulsarla otra vez quita el filtro.
  */
-export function TableroAcciones({ publicaciones, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; def?: DefTabla<FilaPublicacion> }) {
+export function TableroAcciones({ publicaciones, reglas, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; def?: DefTabla<FilaPublicacion> }) {
   const abiertas = publicaciones.filter((f) => !f.archivada);
   return (
-    <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-4 2xl:grid-cols-7">
+    <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-4 2xl:grid-cols-8">
       {TARJETAS.map((t) => (
-        <TarjetaAccion key={t.id} t={t} valor={abiertas.filter(t.cuenta).length} total={abiertas.length} extra={t.extra ? t.extra(abiertas) : null} def={def} />
+        <TarjetaAccion key={t.id} t={t} valor={abiertas.filter(t.cuenta).length} total={abiertas.length} extra={t.extra ? t.extra(abiertas, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas) : t.detalle} def={def} />
       ))}
     </section>
   );

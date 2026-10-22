@@ -449,7 +449,19 @@ convenciones técnicas del código.
   (`sku_maestro_componentes`); si no existe, «Falta el compuesto» (nunca al simple: descontaría mal). Un «combo» solo busca entre
   compuestos. La página calcula las sugerencias al cargar (`cargarSugerencias`, `src/lib/publicaciones/sugerencias.ts`); la ficha las
   confirma con `vincularSkuPublicacion` («Vincular y siguiente»), con `CampoSkuMaestro` para elegir otro. Las exactas se vinculan con
-  `npx tsx scripts/vincular-skus-publicaciones.ts --aplicar` (también calcula las huellas que falten; actividad «Vínculo automático»).
+  `npx tsx scripts/vincular-skus-publicaciones.ts --aplicar` (también calcula las huellas que falten; actividad «Vínculo automático»). **Reglas y recomendaciones** (fase 1 de las automatizaciones, migración 0127, 21 oct 2026; pestañas Publicaciones ·
+  Recomendaciones · Reglas). Los umbrales (margen mínimo/crítico/saludable, caída de ventas, días de nuevo, combo) viven en
+  `dropi_publicaciones_reglas` y se editan en `/publicaciones-dropi/reglas`; `REGLAS` y sus valores de siempre en
+  `src/lib/publicaciones/reglas.ts` (con prueba), y `accionesPublicacion` y `nivelMargen` los reciben (nada de umbrales fijos en la
+  pantalla: el nivel del margen lo calcula el servidor). `recomendar` (`src/lib/publicaciones/recomendaciones.ts`, con prueba) propone
+  **Crear combo x2** (margen bajo, simple vinculado, ventas ≥ regla, sin compuesto x2 publicado; asume que el fulfillment se paga una vez
+  por pedido), **Subir precio** (sin competidor más barato, tope = el más barato de la competencia) y **Bajar precio frente a la
+  competencia** (sin quedar en crítico). La persona acepta, rechaza (con porqué obligatorio) o pospone (`decidirRecomendacion`,
+  `recomendaciones-actions.ts`): queda en `dropi_publicaciones_decisiones` con la foto de la recomendación, el precio y margen de ese
+  momento y `vigente_hasta` (aceptada 30 días, rechazada 90, pospuesta 7/14/30), y en la actividad. Se calcula al cargar
+  (`cargarPublicaciones`, `datos-publicaciones.ts`, compartido por la lista y la pestaña Recomendaciones); no se escribe nada al abrir.
+  **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
+  justifique, con bitácora y deshacer.
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin
   cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
   llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de

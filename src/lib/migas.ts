@@ -41,6 +41,8 @@ const SUBPAGINAS: Record<string, string> = {
   "/usuarios/auditoria": "Historial de auditoría",
   "/usuarios/roles": "Roles",
   "/puestos/organigrama": "Organigrama",
+  "/publicaciones-dropi/recomendaciones": "Recomendaciones",
+  "/publicaciones-dropi/reglas": "Reglas",
   "/extractos/patrones": "Diccionario de patrones bancarios",
   "/compras/dashboard": "Dashboard",
   "/compras/informe": "Informe",

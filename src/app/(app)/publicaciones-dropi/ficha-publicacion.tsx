@@ -13,7 +13,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
-  MARGEN_BAJO,
   UBICACIONES,
   numeroPublicacion,
   type OpcionPublicacion,
@@ -23,6 +22,7 @@ import { actualizarPublicacion, eliminarPublicacion, obtenerHistorialPublicacion
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
+import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { VinculoSku } from "./vinculo-sku";
 
 interface Formulario {
@@ -118,6 +118,8 @@ export function FichaPublicacion({
   puedeEscribir,
   puedeEliminar,
   corteVentas = null,
+  margenMinimo,
+  decisionesDisponibles,
   anterior,
   siguiente,
   alCerrar,
@@ -130,6 +132,10 @@ export function FichaPublicacion({
   puedeEliminar: boolean;
   /** Hasta qué día llegan las ventas de Dropi (solo un administrador las ve); `null` si no se muestran. */
   corteVentas?: string | null;
+  /** El margen mínimo de las reglas: por debajo, el punto rojo. */
+  margenMinimo: number;
+  /** false si falta la migración 0127: las recomendaciones se ven pero no se pueden decidir. */
+  decisionesDisponibles: boolean;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -144,6 +150,8 @@ export function FichaPublicacion({
       puedeEscribir={puedeEscribir}
       puedeEliminar={puedeEliminar}
       corteVentas={corteVentas}
+      margenMinimo={margenMinimo}
+      decisionesDisponibles={decisionesDisponibles}
       anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
@@ -158,6 +166,8 @@ function ContenidoFicha({
   puedeEscribir,
   puedeEliminar,
   corteVentas,
+  margenMinimo,
+  decisionesDisponibles,
   anterior,
   siguiente,
   alCerrar,
@@ -168,6 +178,8 @@ function ContenidoFicha({
   puedeEscribir: boolean;
   puedeEliminar: boolean;
   corteVentas: string | null;
+  margenMinimo: number;
+  decisionesDisponibles: boolean;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -286,6 +298,8 @@ function ContenidoFicha({
           </Seccion>
         </div>
 
+        <RecomendacionesFicha p={p} puedeEscribir={puedeEscribir} disponible={decisionesDisponibles} />
+
         <fieldset disabled={!puedeEscribir} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-5">
           <Seccion icono={ProductoIcon} titulo="Producto">
             <div className="flex gap-4">
@@ -388,7 +402,7 @@ function ContenidoFicha({
               <div>
                 <dt className="text-xs text-muted-foreground">Margen bruto</dt>
                 <dd className="flex items-center gap-1.5 font-semibold">
-                  {margen !== null && margen < MARGEN_BAJO && <span role="img" aria-label="Margen bajo" className="h-2 w-2 rounded-full bg-destructive" />}
+                  {margen !== null && margen < margenMinimo && <span role="img" aria-label="Margen bajo" className="h-2 w-2 rounded-full bg-destructive" />}
                   {margen === null ? "—" : `${Math.round(margen * 100)} %`}
                 </dd>
               </div>

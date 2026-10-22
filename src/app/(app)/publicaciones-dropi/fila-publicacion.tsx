@@ -6,7 +6,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
-import { UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
+import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
@@ -146,7 +146,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
               "Sin margen"
             ) : (
               <span className="inline-flex items-center gap-1.5 tabular-nums">
-                {margenBajo(f.margen) && <Punto clase="bg-destructive" texto="Margen bajo" />}
+                {(f.nivelMargen === "critico" || f.nivelMargen === "bajo") && <Punto clase="bg-destructive" texto="Margen bajo" />}
                 {Math.round(f.margen * 100)} % de margen bruto
               </span>
             )
