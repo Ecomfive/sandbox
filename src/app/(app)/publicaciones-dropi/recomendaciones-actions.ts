@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { requireModuloEscritura } from "@/lib/auth";
+import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { getPaisActual } from "@/lib/pais";
 import { DECISIONES, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { REGLAS, leerValorRegla, mostrarRegla, revisarReglas, type ClaveRegla, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
+import { cargarPublicaciones } from "./datos-publicaciones";
 
 const MODULO = "publicaciones-dropi";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -179,4 +181,16 @@ export async function guardarReglas(_previo: { error?: string; ok?: boolean } | 
   });
   revalidatePath("/publicaciones-dropi", "layout");
   return { ok: true };
+}
+
+/**
+ * Cuántas recomendaciones siguen pendientes en las publicaciones del país de la barra (el globo de la pestaña «Recomendaciones»). Es una
+ * lectura: basta poder abrir el módulo. `null` si falta la migración 0116.
+ */
+export async function contarRecomendacionesPendientes(): Promise<number | null> {
+  await requireModulo(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const datos = await cargarPublicaciones(supabase, pais.id);
+  return datos ? datos.filas.reduce((n, f) => n + f.recomendaciones.length, 0) : null;
 }
