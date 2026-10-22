@@ -35,7 +35,7 @@ import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/
 import { notaOptimizacion, revisarPublicacion, type Revision } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
-import { aplicarCambiosDropi, encolarCambioNombre } from "@/lib/publicaciones/cambios-dropi";
+import { encolarCambioNombre } from "@/lib/publicaciones/cambios-dropi";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
@@ -335,7 +335,7 @@ export async function proponerTitulosIA(publicacionId: string): Promise<{ error?
 export async function elegirTituloIA(
   iaId: string,
   titulo: string,
-): Promise<{ error?: string; chequeos?: ChequeoTitulo[]; cumple?: boolean; dropi?: { estado: "aplicado" | "pendiente" | "error"; detalle: string } }> {
+): Promise<{ error?: string; chequeos?: ChequeoTitulo[]; cumple?: boolean; dropi?: { estado: "pendiente" | "error"; detalle: string } }> {
   const usuario = await requireModuloEscritura(MODULO);
   const limpio = typeof titulo === "string" ? titulo.replace(/\s+/g, " ").trim().slice(0, 200) : "";
   if (typeof iaId !== "string" || !UUID.test(iaId) || limpio.length < 8) return { error: "Escribe el título." };
@@ -370,30 +370,22 @@ export async function elegirTituloIA(
 }
 
 /**
- * El título elegido, también en Dropi (pedido de Hernán, 22 oct 2026): «Nombre del producto» = el título y «Nombre del producto en
- * la guía de envío» = el código del SKU vinculado (lo que ve despacho, que no cambia). Con «Conectar Dropi» vigente se aplica al
- * instante; si no, queda pendiente y se aplica al conectar (src/lib/publicaciones/cambios-dropi.ts).
+ * El título elegido, también para Dropi (pedido de Hernán, 22 oct 2026): «Nombre del producto» = el título y «Nombre del producto
+ * en la guía de envío» = el código del SKU vinculado (lo que ve despacho, que no cambia). Queda pendiente y lo aplica el favorito
+ * «Aplicar en Dropi» desde la pestaña de Dropi: Dropi rechaza las llamadas del servidor (src/lib/publicaciones/cambios-dropi.ts).
  */
 async function enviarNombreADropi(
   supabase: ReturnType<typeof createServiceClient>,
   pub: Pub,
   nombre: string,
   usuario: UsuarioActual,
-): Promise<{ estado: "aplicado" | "pendiente" | "error"; detalle: string }> {
-  const [{ data: pais }, { data: sku }] = await Promise.all([
-    supabase.from("paises").select("id, codigo").eq("id", pub.pais_id).maybeSingle(),
-    pub.sku_maestro_id ? supabase.from("skus_maestros").select("codigo").eq("id", pub.sku_maestro_id).maybeSingle() : Promise.resolve({ data: null }),
-  ]);
+): Promise<{ estado: "pendiente" | "error"; detalle: string }> {
+  const { data: sku } = pub.sku_maestro_id ? await supabase.from("skus_maestros").select("codigo").eq("id", pub.sku_maestro_id).maybeSingle() : { data: null };
   const codigo = (sku?.codigo as string | undefined)?.trim() || null;
   const nombreGuia = codigo && codigo.length <= MAX_NOMBRE_DROPI ? codigo : null;
   const encolado = await encolarCambioNombre(supabase, pub, { nombre, nombreGuia }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
   if ("error" in encolado) return { estado: "error", detalle: encolado.error };
-  if (!pais) return { estado: "pendiente", detalle: "Queda pendiente en Dropi." };
-  const r = await aplicarCambiosDropi(supabase, { id: pais.id as string, codigo: pais.codigo as string }, [encolado.id]);
-  const res = r.resultados.get(encolado.id);
-  if (res?.ok) return { estado: "aplicado", detalle: `Cambiado en Dropi${nombreGuia ? ` (guía: ${nombreGuia})` : ""}.` };
-  if (!r.conSesion) return { estado: "pendiente", detalle: "Queda pendiente en Dropi: se aplica al pulsar «Conectar Dropi»." };
-  return { estado: "error", detalle: res?.error ?? "No se pudo cambiar en Dropi." };
+  return { estado: "pendiente", detalle: `Para Dropi${nombreGuia ? ` (guía: ${nombreGuia})` : ""}: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }
 
 /** «Me sirvió» o «no me sirvió» (con el porqué): queda en lo generado y sirve de ejemplo para la IA. */

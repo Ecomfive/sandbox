@@ -346,7 +346,7 @@ function ContenidoFicha({
                   <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
                   <span className="text-xs text-muted-foreground">Solo cambia con «Usar este título» del Asistente de IA (y así también en Dropi).</span>
                 </label>
-                {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} puedeEscribir={puedeEscribir} />}
+                {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} />}
                 <div className="flex min-w-0 flex-col gap-1.5">
                   {conectado && (
                     <div className="flex">

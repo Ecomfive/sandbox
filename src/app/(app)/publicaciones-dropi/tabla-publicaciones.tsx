@@ -85,7 +85,7 @@ export function TablaPublicaciones({
   abrirInicial?: string | null;
   /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá (se escribe en el servidor: así no cambia al hidratar). */
   actualizadoDropi?: string | null;
-  /** La conexión con Dropi para cambiar nombres al instante (`BarraConexionDropi`, la arma la página). */
+  /** Lo que espera para Dropi y el favorito «Aplicar en Dropi» (`BarraAplicarDropi`, la arma la página). */
   barraDropi?: ReactNode;
 }) {
   const verVentas = corteVentas !== null;

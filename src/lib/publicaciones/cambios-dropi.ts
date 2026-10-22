@@ -1,10 +1,9 @@
 // La cola de cambios del sistema en Dropi (migración 0137): hoy, el nombre de un producto y el de su guía de envío, que deja «Usar
-// este título» del Asistente de IA. Con una sesión de «Conectar Dropi» vigente se aplica al instante; sin ella queda pendiente y se
-// aplica al conectar. Cada resultado queda en la actividad de la publicación a nombre de «Sistema».
+// este título» del Asistente de IA. Dropi rechaza (403) las llamadas que salen de un servidor, así que no se aplican desde aquí: los
+// aplica el favorito «Aplicar en Dropi» desde la pestaña de Dropi (marcador-aplicar-dropi.ts) y la ventana que abre guarda el
+// resultado (aplicar-actions.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cambiarNombreEnDropi } from "@/lib/dropi/cliente-proveedor";
-import { borrarSesionDropi, sesionVigenteDropi } from "@/lib/dropi/sesion";
 import { idsDeDropi } from "./sincronizar-dropi";
 
 export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazado";
@@ -40,54 +39,6 @@ export async function encolarCambioNombre(
     .single();
   if (error || !data) return { error: /does not exist|schema cache/i.test(error?.message ?? "") ? "Falta correr en Supabase la migración 0137." : "No se pudo dejar el cambio para Dropi." };
   return { id: data.id as string };
-}
-
-type Fila = { id: string; publicacion_id: string; dropi_producto_id: number; nombre: string; nombre_guia: string | null; intentos: number };
-
-/**
- * Aplica en Dropi los cambios pendientes de un país (o solo `ids`), uno por uno, con la sesión vigente. Si la sesión venció a mitad
- * de camino, la borra y deja el resto pendiente. Devuelve cuántos se aplicaron, cuántos fallaron y si hay sesión.
- */
-export async function aplicarCambiosDropi(
-  supabase: SupabaseClient,
-  pais: { id: string; codigo: string },
-  ids?: string[],
-): Promise<{ conSesion: boolean; aplicados: number; errores: number; pendientes: number; resultados: Map<string, { ok: boolean; error?: string }> }> {
-  const resultados = new Map<string, { ok: boolean; error?: string }>();
-  let q = supabase.from("dropi_cambios_pendientes").select("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, intentos").eq("pais_id", pais.id).order("creado_en").limit(50);
-  q = ids?.length ? q.in("id", ids).in("estado", ["pendiente", "error"]) : q.eq("estado", "pendiente");
-  const { data } = await q;
-  const filas = (data ?? []) as Fila[];
-  const sesion = await sesionVigenteDropi(supabase, pais.id);
-  if (!sesion) return { conSesion: false, aplicados: 0, errores: 0, pendientes: filas.length, resultados };
-  let aplicados = 0;
-  let errores = 0;
-  for (const [i, f] of filas.entries()) {
-    const r = await cambiarNombreEnDropi(sesion.token, pais.codigo, sesion.usuarioId, Number(f.dropi_producto_id), { nombre: f.nombre, nombreGuia: f.nombre_guia });
-    if (!r.ok && r.vencida) {
-      // La sesión ya no sirve: se borra y lo que queda sigue pendiente (se aplica al volver a conectar).
-      await borrarSesionDropi(supabase, pais.id);
-      resultados.set(f.id, { ok: false, error: r.error });
-      return { conSesion: false, aplicados, errores, pendientes: filas.length - i, resultados };
-    }
-    const ahora = new Date().toISOString();
-    await supabase
-      .from("dropi_cambios_pendientes")
-      .update(r.ok ? { estado: "aplicado", aplicado_en: ahora, error: null, intentos: f.intentos + 1 } : { estado: "error", error: r.error, intentos: f.intentos + 1 })
-      .eq("id", f.id);
-    await supabase.from("historial_auditoria").insert({
-      usuario_id: null,
-      usuario_nombre: "Sistema",
-      accion: r.ok ? "dropi_nombre_aplicado" : "dropi_nombre_error",
-      entidad: "dropi_publicaciones",
-      entidad_id: f.publicacion_id,
-      detalle: r.ok ? `ID ${f.dropi_producto_id} · «${f.nombre}»${f.nombre_guia ? ` · guía «${f.nombre_guia}»` : ""}` : `ID ${f.dropi_producto_id} · ${r.error}`,
-    });
-    resultados.set(f.id, r.ok ? { ok: true } : { ok: false, error: r.error });
-    if (r.ok) aplicados++;
-    else errores++;
-  }
-  return { conSesion: true, aplicados, errores, pendientes: 0, resultados };
 }
 
 /** El último cambio en Dropi de cada publicación del país y cuántos siguen pendientes. Sin la migración 0137, vacío. */

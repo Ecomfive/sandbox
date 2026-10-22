@@ -519,9 +519,8 @@ function OpcionTitulo({ indice, inicial, porque, categoria, reglas, iaId, elegid
     setGuardando(false);
     if (res.error) return mostrarToast(res.error, "destructive");
     alElegir(texto.replace(/\s+/g, " ").trim());
-    // Con «Conectar Dropi» vigente ya cambió en Dropi; si no, queda pendiente (o falló) y lo dice la ficha.
+    // Para Dropi queda pendiente: lo aplica el favorito «Aplicar en Dropi» desde la pestaña de Dropi (lo dice la ficha).
     const d = res.dropi;
-    if (d?.estado === "aplicado") return mostrarToast(`Nombre cambiado en el sistema y en Dropi. ${d.detalle}`);
     mostrarToast(`Nombre cambiado en el sistema. ${d?.detalle ?? ""}`, d?.estado === "error" ? "destructive" : "info");
   }
 
