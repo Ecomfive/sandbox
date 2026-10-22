@@ -137,7 +137,51 @@ export function vigenteHasta(decision: Decision, hoy: string, diasPosponer?: num
   return sumarDias(hoy, DIAS_OCULTA[decision]);
 }
 
-/** Las que siguen pendientes: sin una decisión de su tipo que todavía esté vigente. */
-export function pendientes<T extends { tipo: string }>(recs: T[], decisiones: { tipo: string; vigenteHasta: string }[], hoy: string): T[] {
-  return recs.filter((r) => !decisiones.some((d) => d.tipo === r.tipo && d.vigenteHasta >= hoy));
+/**
+ * Las que siguen pendientes: sin una decisión de su tipo que todavía esté vigente, ni una tarea de su tipo abierta (aceptada y sin
+ * hacer: mientras alguien la tenga pendiente, no se vuelve a sugerir).
+ */
+export function pendientes<T extends { tipo: string }>(recs: T[], decisiones: { tipo: string; vigenteHasta: string; decision?: Decision; hechaEn?: string | null }[], hoy: string): T[] {
+  return recs.filter((r) => !decisiones.some((d) => d.tipo === r.tipo && (d.vigenteHasta >= hoy || (d.decision === "aceptada" && !d.hechaEn))));
+}
+
+// Tareas (migración 0128): una recomendación aceptada se vuelve una tarea con responsable y plazo.
+
+export type EstadoTarea = "por_hacer" | "atrasada" | "hecha";
+
+export const ESTADOS_TAREA: { valor: EstadoTarea; etiqueta: string; color: string }[] = [
+  { valor: "por_hacer", etiqueta: "Por hacer", color: "#0090ff" },
+  { valor: "atrasada", etiqueta: "Atrasada", color: "#e5484d" },
+  { valor: "hecha", etiqueta: "Hecha", color: "#30a46c" },
+];
+
+/** Cómo va una tarea: hecha si tiene fecha de hecha; si no, atrasada cuando ya pasó su plazo. */
+export function estadoTarea(t: { hechaEn: string | null; plazo: string | null }, hoy: string): EstadoTarea {
+  if (t.hechaEn) return "hecha";
+  return t.plazo && t.plazo < hoy ? "atrasada" : "por_hacer";
+}
+
+export interface Cumplimiento {
+  como: "dropi" | "producto";
+  /** Cuándo se vio (el cambio de precio en Dropi); null si no se sabe. */
+  fecha: string | null;
+  detalle: string;
+}
+
+/**
+ * Si una tarea abierta ya se hizo, según los datos: un cambio de precio en Dropi después de aceptarla y hacia donde se pidió
+ * (subir o bajar; no hace falta que sea el precio exacto sugerido), o el combo x2 ya publicado. Si no se puede saber, null.
+ */
+export function tareaCumplida(
+  t: { tipo: string; fecha: string; precioAntes: number | null },
+  actual: { cambioPrecio: { fecha: string; antes: number | null; despues: number | null } | null; comboPublicado: boolean },
+): Cumplimiento | null {
+  if (t.tipo === "combo_x2") return actual.comboPublicado ? { como: "producto", fecha: null, detalle: "El combo x2 ya está publicado" } : null;
+  const c = actual.cambioPrecio;
+  if (!c || c.despues === null || t.precioAntes === null || c.fecha.slice(0, 10) < t.fecha.slice(0, 10)) return null;
+  const subio = c.despues > t.precioAntes + 0.004;
+  const bajo = c.despues < t.precioAntes - 0.004;
+  if ((t.tipo === "subir_precio" && subio) || (t.tipo === "igualar_precio" && bajo))
+    return { como: "dropi", fecha: c.fecha, detalle: `Dropi muestra $${c.despues.toFixed(2)} (antes $${t.precioAntes.toFixed(2)})` };
+  return null;
 }

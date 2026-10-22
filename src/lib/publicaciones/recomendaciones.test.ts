@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { REGLAS_DEFECTO, leerValorRegla, nivelMargen, reglasDesde, revisarReglas } from "./reglas";
-import { margenA, pendientes, precioAbajo, precioArriba, recomendar, vigenteHasta, type EntradaRecomendacion } from "./recomendaciones";
+import { estadoTarea, margenA, pendientes, tareaCumplida, precioAbajo, precioArriba, recomendar, vigenteHasta, type EntradaRecomendacion } from "./recomendaciones";
 
 // El cinturón lumbar ciática (21 oct 2026): $4.99, costo $2.26, fulfillment $1.50 → margen 24,6 %.
 const cinturon: EntradaRecomendacion = {
@@ -91,4 +91,25 @@ test("reglas: valores guardados, lectura de la pantalla y coherencia", () => {
   assert.equal(revisarReglas(REGLAS_DEFECTO), null);
   assert.equal(nivelMargen(0.25, REGLAS_DEFECTO), "bajo");
   assert.equal(nivelMargen(0.45, REGLAS_DEFECTO), "sano");
+});
+
+test("una tarea abierta no deja que se vuelva a sugerir, aunque su decisión ya haya vencido", () => {
+  const recs = [{ tipo: "subir_precio" }];
+  assert.equal(pendientes(recs, [{ tipo: "subir_precio", vigenteHasta: "2026-01-01", decision: "aceptada", hechaEn: null }], "2026-10-21").length, 0);
+  assert.equal(pendientes(recs, [{ tipo: "subir_precio", vigenteHasta: "2026-01-01", decision: "aceptada", hechaEn: "2026-02-01" }], "2026-10-21").length, 1);
+});
+
+test("estado de una tarea: por hacer, atrasada y hecha", () => {
+  assert.equal(estadoTarea({ hechaEn: null, plazo: "2026-10-28" }, "2026-10-21"), "por_hacer");
+  assert.equal(estadoTarea({ hechaEn: null, plazo: "2026-10-20" }, "2026-10-21"), "atrasada");
+  assert.equal(estadoTarea({ hechaEn: "2026-10-22T10:00:00Z", plazo: "2026-10-20" }, "2026-10-23"), "hecha");
+});
+
+test("el sistema detecta que se hizo: precio en Dropi hacia donde se pidió, o el combo publicado", () => {
+  const subir = { tipo: "subir_precio", fecha: "2026-10-21T15:00:00Z", precioAntes: 4.99 };
+  assert.equal(tareaCumplida(subir, { cambioPrecio: { fecha: "2026-10-24", antes: 4.99, despues: 5.49 }, comboPublicado: false })?.como, "dropi");
+  assert.equal(tareaCumplida(subir, { cambioPrecio: { fecha: "2026-10-10", antes: 4.5, despues: 4.99 }, comboPublicado: false }), null);
+  assert.equal(tareaCumplida(subir, { cambioPrecio: { fecha: "2026-10-24", antes: 4.99, despues: 4.49 }, comboPublicado: false }), null);
+  assert.equal(tareaCumplida({ ...subir, tipo: "igualar_precio" }, { cambioPrecio: { fecha: "2026-10-24", antes: 4.99, despues: 4.49 }, comboPublicado: false })?.como, "dropi");
+  assert.equal(tareaCumplida({ ...subir, tipo: "combo_x2" }, { cambioPrecio: null, comboPublicado: true })?.como, "producto");
 });

@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import { accionesPublicacion, enDropi, estaArchivada } from "@/lib/publicaciones/automatico";
 import { cargarCambiosPrecio, cargarCompetidores, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { revisionVencida } from "@/lib/publicaciones/publicacion";
-import { pendientes, recomendar, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { estadoTarea, etiquetaRecomendacion, pendientes, recomendar, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
@@ -69,34 +70,94 @@ interface FilaDecision {
   tipo: string;
   decision: Decision;
   nota: string | null;
-  recomendacion: { titulo?: string; motivo?: string } | null;
+  recomendacion: { titulo?: string; motivo?: string; datos?: { precio?: number | null }; actual?: { precio?: number | null } } | null;
   vigente_hasta: string;
   usuario_nombre: string | null;
   creado_en: string;
+  responsable_id?: string | null;
+  responsable_nombre?: string | null;
+  plazo?: string | null;
+  hecha_en?: string | null;
+  hecha_por_nombre?: string | null;
+  hecha_como?: "manual" | "dropi" | "producto" | null;
+  hecha_nota?: string | null;
 }
 
-/** Las decisiones de las recomendaciones de un país (migración 0127), de la más nueva a la más vieja; sin la tabla, ninguna. */
-async function cargarDecisiones(supabase: SupabaseClient, paisId: string): Promise<DecisionVista[]> {
-  const r = await traerTodasConError<FilaDecision>((desde, hasta) =>
-    supabase
+const COLUMNAS_DECISION = "id, publicacion_id, tipo, decision, nota, recomendacion, vigente_hasta, usuario_nombre, creado_en";
+// Las de la tarea (migración 0128) van aparte: sin ella, las decisiones se leen igual, sin responsable ni plazo.
+const COLUMNAS_TAREA = "responsable_id, responsable_nombre, plazo, hecha_en, hecha_por_nombre, hecha_como, hecha_nota";
+
+/** Las decisiones de las recomendaciones de un país (migraciones 0127 y 0128), de la más nueva a la más vieja; sin la tabla, ninguna. */
+async function cargarDecisiones(supabase: SupabaseClient, paisId: string, hoy: string): Promise<{ decisiones: DecisionVista[]; conTareas: boolean }> {
+  const leer = (columnas: string) =>
+    traerTodasConError<FilaDecision>((desde, hasta) =>
+      supabase
+        .from("dropi_publicaciones_decisiones")
+        .select(`${columnas}, dropi_publicaciones!inner(pais_id)` as "*")
+        .eq("dropi_publicaciones.pais_id", paisId)
+        .order("creado_en", { ascending: false })
+        .range(desde, hasta) as unknown as PromiseLike<{ data: FilaDecision[] | null; error: unknown }>,
+    );
+  let r = await leer(`${COLUMNAS_DECISION}, ${COLUMNAS_TAREA}`);
+  const conTareas = !r.error;
+  if (r.error) r = await leer(COLUMNAS_DECISION);
+  const decisiones = (r.error ? [] : (r.data ?? [])).map<DecisionVista>((d) => {
+    const hechaEn = d.hecha_en ?? null;
+    const plazo = d.plazo ?? null;
+    return {
+      id: d.id,
+      publicacionId: d.publicacion_id,
+      tipo: d.tipo,
+      decision: d.decision,
+      nota: d.nota ?? "",
+      titulo: d.recomendacion?.titulo ?? "",
+      motivo: d.recomendacion?.motivo ?? "",
+      vigenteHasta: d.vigente_hasta,
+      usuario: d.usuario_nombre ?? "",
+      fecha: d.creado_en,
+      precioAntes: d.recomendacion?.actual?.precio ?? d.recomendacion?.datos?.precio ?? null,
+      responsableId: d.responsable_id ?? null,
+      responsable: d.responsable_nombre ?? "",
+      plazo,
+      hechaEn,
+      hechaComo: d.hecha_como ?? null,
+      hechaPor: d.hecha_por_nombre ?? "",
+      hechaNota: d.hecha_nota ?? "",
+      // Solo una aceptada con la migración 0128 es una tarea.
+      estado: conTareas && d.decision === "aceptada" ? estadoTarea({ hechaEn, plazo }, hoy) : null,
+    };
+  });
+  return { decisiones, conTareas };
+}
+
+/**
+ * Guarda como hechas las tareas que el sistema detectó (Dropi ya muestra el precio, o el combo ya está publicado), después de
+ * responder la página: solo las que siguen abiertas, y con su línea en la actividad a nombre del sistema.
+ */
+async function guardarCumplidas(supabase: SupabaseClient, cumplidas: { d: DecisionVista; nombre: string }[]) {
+  for (const { d } of cumplidas) {
+    await supabase
       .from("dropi_publicaciones_decisiones")
-      .select("id, publicacion_id, tipo, decision, nota, recomendacion, vigente_hasta, usuario_nombre, creado_en, dropi_publicaciones!inner(pais_id)")
-      .eq("dropi_publicaciones.pais_id", paisId)
-      .order("creado_en", { ascending: false })
-      .range(desde, hasta),
+      .update({ hecha_en: d.hechaEn, hecha_por_nombre: "Sistema", hecha_como: d.hechaComo, hecha_nota: d.hechaNota })
+      .eq("id", d.id)
+      .is("hecha_en", null);
+  }
+  await supabase.from("historial_auditoria").insert(
+    cumplidas.map(({ d }) => ({
+      usuario_id: null,
+      usuario_nombre: "Sistema",
+      accion: "tarea_hecha_publicacion",
+      entidad: "dropi_publicaciones",
+      entidad_id: d.publicacionId,
+      detalle: `Tarea hecha: ${d.titulo || etiquetaRecomendacion(d.tipo)} · ${d.hechaNota}`,
+    })),
   );
-  return (r.error ? [] : (r.data ?? [])).map((d) => ({
-    id: d.id,
-    publicacionId: d.publicacion_id,
-    tipo: d.tipo,
-    decision: d.decision,
-    nota: d.nota ?? "",
-    titulo: d.recomendacion?.titulo ?? "",
-    motivo: d.recomendacion?.motivo ?? "",
-    vigenteHasta: d.vigente_hasta,
-    usuario: d.usuario_nombre ?? "",
-    fecha: d.creado_en,
-  }));
+}
+
+/** Las personas activas del sistema, para elegir quién hace una tarea. */
+async function cargarPersonas(supabase: SupabaseClient): Promise<{ id: string; nombre: string }[]> {
+  const { data } = await supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre");
+  return (data ?? []).map((p) => ({ id: p.id as string, nombre: ((p.nombre as string | null) || (p.email as string | null) || "Sin nombre").trim() }));
 }
 
 export interface DatosPublicaciones {
@@ -106,6 +167,10 @@ export interface DatosPublicaciones {
   reglas: ReglasGuardadas;
   /** Todas las decisiones del país (la más nueva primero), para la pestaña Recomendaciones. */
   decisiones: DecisionVista[];
+  /** false si falta la migración 0128: se decide igual, pero sin responsable ni plazo. */
+  conTareas: boolean;
+  /** A quién se le puede asignar una tarea. */
+  personas: { id: string; nombre: string }[];
 }
 
 /**
@@ -113,7 +178,8 @@ export interface DatosPublicaciones {
  * competencia, reglas y recomendaciones pendientes). `null` si falta la migración 0116.
  */
 export async function cargarPublicaciones(supabase: SupabaseClient, paisId: string): Promise<DatosPublicaciones | null> {
-  const [filasR, numerosR, reglas, decisiones] = await Promise.all([
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const [filasR, numerosR, reglas, { decisiones, conTareas }, personas] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
         .from("dropi_publicaciones")
@@ -127,14 +193,14 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     // El correlativo va aparte: sin la migración 0123 la columna no existe y la lista se carga igual, sin números.
     traerTodasConError<{ id: string; numero: number }>((desde, hasta) => supabase.from("dropi_publicaciones").select("id, numero").eq("pais_id", paisId).order("id").range(desde, hasta)),
     cargarReglas(supabase),
-    cargarDecisiones(supabase, paisId),
+    cargarDecisiones(supabase, paisId, hoy),
+    cargarPersonas(supabase),
   ]);
   if (filasR.error) return null;
   const numeroPorId = new Map(numerosR.error ? [] : (numerosR.data ?? []).map((n) => [n.id, Number(n.numero)]));
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
-  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
   const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios] = await Promise.all([
     cargarSugerencias(
       supabase,
@@ -196,8 +262,22 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
 
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.
   const publicados = new Set(filas.filter((f) => !f.archivada && f.sku).map((f) => f.sku!.id));
+  const cumplidas: { d: DecisionVista; nombre: string }[] = [];
   for (const f of filas) {
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
+    const comboPublicado = !!combo && publicados.has(combo.id);
+    // Las tareas abiertas que los datos ya muestran hechas.
+    for (const d of f.decisiones) {
+      if (d.estado !== "por_hacer" && d.estado !== "atrasada") continue;
+      const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado });
+      if (!c) continue;
+      d.hechaEn = c.fecha ? `${c.fecha.slice(0, 10)}T12:00:00Z` : new Date().toISOString();
+      d.hechaComo = c.como;
+      d.hechaPor = "Sistema";
+      d.hechaNota = c.detalle;
+      d.estado = "hecha";
+      cumplidas.push({ d, nombre: f.nombre });
+    }
     const pack = detectarPack(f.nombre);
     const recs = recomendar(
       {
@@ -209,7 +289,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         margen: f.margen,
         netas30: f.ventas?.netas30 ?? null,
         sku: f.sku ? { tipo: f.sku.tipo } : null,
-        combo: combo ? { codigo: combo.codigo, publicado: publicados.has(combo.id) } : null,
+        combo: combo ? { codigo: combo.codigo, publicado: comboPublicado } : null,
         competidorMasBarato: f.competidorMasBarato,
         competidorMinimo: f.competidorMinimo,
       },
@@ -217,6 +297,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     );
     f.recomendaciones = pendientes(recs, f.decisiones, hoy);
   }
+  if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
-  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, reglas, decisiones };
+  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, reglas, decisiones, conTareas, personas };
 }

@@ -460,6 +460,11 @@ convenciones técnicas del código.
   `recomendaciones-actions.ts`): queda en `dropi_publicaciones_decisiones` con la foto de la recomendación, el precio y margen de ese
   momento y `vigente_hasta` (aceptada 30 días, rechazada 90, pospuesta 7/14/30), y en la actividad. Se calcula al cargar
   (`cargarPublicaciones`, `datos-publicaciones.ts`, compartido por la lista y la pestaña Recomendaciones); no se escribe nada al abrir.
+  **Tareas** (migración 0128): una aceptada es una tarea con `responsable_id`, `plazo` (regla `dias_plazo`, 7) y aviso «Para ti»
+  (`notificaciones_usuario` tipo `tarea`); mientras está abierta no se vuelve a sugerir (`pendientes`). `tareaCumplida` la da por hecha
+  si Dropi muestra un precio nuevo después de aceptarla y en la dirección pedida, o si el combo x2 ya está publicado; `cargarPublicaciones`
+  lo guarda con `after()` (a nombre de «Sistema», con su línea en la auditoría) y si no, «Ya lo hice» (`marcarTareaHecha`). Las
+  atrasadas cuentan en `PendientesHoy.tareasAtrasadas` (Hoy y menú). Vistas Pendientes · Por hacer · Hechas (`?ver=`).
   **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
   justifique, con bitácora y deshacer.
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin

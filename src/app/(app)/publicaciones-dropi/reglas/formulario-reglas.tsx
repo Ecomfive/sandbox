@@ -12,6 +12,7 @@ const GRUPOS: { id: DefRegla["grupo"]; titulo: string }[] = [
   { id: "margen", titulo: "Margen" },
   { id: "ventas", titulo: "Ventas" },
   { id: "combo", titulo: "Combo x2" },
+  { id: "tareas", titulo: "Tareas" },
 ];
 const SUFIJO: Record<DefRegla["unidad"], string> = { porcentaje: "%", unidades: "unidades", dias: "días" };
 const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
