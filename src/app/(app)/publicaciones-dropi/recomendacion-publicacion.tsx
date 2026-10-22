@@ -9,6 +9,8 @@ import { useToast } from "@/components/ui/toast";
 import { SugerenciaIcon } from "@/lib/nav-icons";
 import { DECISIONES, DIAS_POSPONER, ESTADOS_TAREA, TIPOS_RECOMENDACION, etiquetaRecomendacion, type Decision, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { DecisionVista, FilaPublicacion } from "./def-publicaciones";
+import { tipoIADeRecomendacion } from "@/lib/publicaciones/ia/asistente";
+import { BotonAsistenteIA } from "./asistente-ia";
 import { decidirRecomendacion, marcarTareaHecha } from "./recomendaciones-actions";
 
 /** A quién se le puede asignar una tarea, quién es la persona y si ya existe la migración 0128 (sin ella, no hay tareas). */
@@ -78,6 +80,7 @@ export function TarjetaRecomendacion({ publicacionId, rec, puedeDecidir, respons
 
       {puedeDecidir && !eligiendo && (
         <div className="flex flex-wrap gap-2 pt-1">
+          {tipoIADeRecomendacion(rec.tipo) && <BotonAsistenteIA publicacionId={publicacionId} tipo={tipoIADeRecomendacion(rec.tipo)!} />}
           <button type="button" className={botonOscuro} onClick={() => setEligiendo("aceptada")}>
             Aceptar
           </button>
@@ -204,7 +207,8 @@ export function TareaRecomendacion({ d, producto, puedeMarcar }: { d: DecisionVi
         </p>
       )}
       {abierta && puedeMarcar && !abierto && (
-        <div className="pt-1">
+        <div className="flex flex-wrap gap-2 pt-1">
+          {tipoIADeRecomendacion(d.tipo) && <BotonAsistenteIA publicacionId={d.publicacionId} tipo={tipoIADeRecomendacion(d.tipo)!} />}
           <button type="button" className={botonClaro} onClick={() => setAbierto(true)}>
             Ya lo hice
           </button>

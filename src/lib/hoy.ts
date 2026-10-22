@@ -95,6 +95,15 @@ const PENDIENTES: {
     href: "/publicaciones-dropi/recomendaciones?ver=por_hacer",
     accion: "Revisar",
   },
+  {
+    clave: "creditos-ia",
+    modulo: "publicaciones-dropi",
+    campo: "creditosIA",
+    titulo: "Crédito de IA por acabarse",
+    descripcion: "OpenAI o Gemini bajó del monto de aviso (Consumo de IA)",
+    href: "/publicaciones-dropi/consumo",
+    accion: "Revisar",
+  },
 ];
 
 /**

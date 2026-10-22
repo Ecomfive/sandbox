@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { creditosPorAcabarse } from "@/lib/ia/consumo";
 import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
 
 export interface PendientesHoy {
@@ -14,6 +15,8 @@ export interface PendientesHoy {
   competidoresNuevos: number;
   /** Recomendaciones aceptadas en Gestión de IDs Dropi que pasaron su plazo sin hacerse (migración 0128). */
   tareasAtrasadas: number;
+  /** Proveedores de IA (OpenAI, Gemini) cuyo crédito estimado bajó del monto de aviso o se agotó (migración 0134). */
+  creditosIA: number;
 }
 
 async function contarNovedades(supabase: SupabaseClient, paisId: string): Promise<{ count: number | null }> {
@@ -52,6 +55,7 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     lotes,
     { count: competidoresNuevos },
     { count: tareasAtrasadas },
+    creditosIA,
   ] = await Promise.all([
     supabase
       .from("alertas_inventario_no_retornado")
@@ -74,6 +78,8 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
       .eq("decision", "aceptada")
       .is("hecha_en", null)
       .lt("plazo", new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" })),
+    // Sin la migración 0134 no hay crédito registrado y cuenta cero.
+    creditosPorAcabarse(supabase).catch(() => []),
   ]);
 
   const plataformasConSaldo = new Set((saldos ?? []).map((s) => s.plataforma_id));
@@ -90,5 +96,6 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     lotesPorVencer: lotes.porVencer,
     competidoresNuevos: competidoresNuevos ?? 0,
     tareasAtrasadas: tareasAtrasadas ?? 0,
+    creditosIA: creditosIA.length,
   };
 }
