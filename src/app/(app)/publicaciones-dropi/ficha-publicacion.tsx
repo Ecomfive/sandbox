@@ -16,6 +16,7 @@ import {
   numeroPublicacion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
+import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { actualizarPublicacion, eliminarPublicacion } from "./actions";
 import { ActividadPublicacion } from "./actividad-publicacion";
@@ -240,11 +241,11 @@ function ContenidoFicha({
     formData.set("id", p.id);
     for (const [k, v] of Object.entries(d)) formData.set(k, v);
     empezar(async () => {
-      const r = await actualizarPublicacion(formData).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
+      const r: { error?: string; dropi?: string } = await actualizarPublicacion(formData).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
       if (r.error) setError(r.error);
       else {
         setBase(JSON.stringify(d));
-        mostrarToast("Cambios guardados");
+        mostrarToast(r.dropi ? `Cambios guardados. ${r.dropi}` : "Cambios guardados");
         setVersion((v) => v + 1);
       }
     });
@@ -342,9 +343,19 @@ function ContenidoFicha({
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
                   <span className={labelClassSm}>Nombre en Dropi</span>
-                  {/* Viene de Dropi: no se edita aquí. La única excepción es «Usar este título» del Asistente de IA (elegirTituloIA). */}
-                  <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
-                  <span className="text-xs text-muted-foreground">Solo cambia con «Usar este título» del Asistente de IA (y así también en Dropi).</span>
+                  {/* Se edita aquí (22 oct 2026): al guardar queda pendiente para Dropi, como «Usar este título» del Asistente de IA. */}
+                  <input
+                    value={d.nombre}
+                    onChange={(e) => cambiar({ nombre: e.target.value })}
+                    required
+                    maxLength={MAX_NOMBRE_DROPI}
+                    aria-describedby={`largo-nombre-${p.id}`}
+                    className={`${fieldClass} w-full`}
+                  />
+                  <span id={`largo-nombre-${p.id}`} className="text-xs text-muted-foreground tabular-nums">
+                    {d.nombre.trim().length} de {MAX_NOMBRE_DROPI} caracteres
+                    {d.nombre.trim() !== p.nombre.trim() && " · al guardar se cambia también en Dropi"}
+                  </span>
                 </label>
                 {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} />}
                 <div className="flex min-w-0 flex-col gap-1.5">

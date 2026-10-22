@@ -6,6 +6,8 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { enviarNombreADropi } from "@/lib/publicaciones/cambios-dropi";
+import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -106,16 +108,24 @@ const VISTA: [string, string, (v: unknown) => string][] = [
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
 ];
 
-/** Guarda la ficha. Si cambia el precio, «Último cambio de precio» pasa a hoy (salvo que se haya escrito otra fecha). */
-export async function actualizarPublicacion(f: FormData): Promise<{ error?: string }> {
+/**
+ * Guarda la ficha. Si cambia el precio, «Último cambio de precio» pasa a hoy (salvo que se haya escrito otra fecha). Si cambia el
+ * nombre (hasta 40 caracteres, lo que admite Dropi), se guarda y queda pendiente para Dropi, como «Usar este título» del Asistente
+ * de IA: lo aplica «Aplicar en Dropi». `dropi` dice cómo quedó ese envío.
+ */
+export async function actualizarPublicacion(f: FormData): Promise<{ error?: string; dropi?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   const id = texto(f, "id", 64);
   const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
-  // El nombre viene de Dropi: la ficha no lo cambia (ni aunque llegue otro en el formulario).
-  delete datos.nombre;
+  // El nombre se edita aquí y viaja a Dropi (22 oct 2026); la sincronización con Dropi no lo pisa.
+  const nombreNuevo = String(datos.nombre ?? "").trim();
+  const cambiaNombre = !!nombreNuevo && nombreNuevo !== String(antes.nombre ?? "").trim();
+  if (cambiaNombre && nombreNuevo.length > MAX_NOMBRE_DROPI) return { error: `Dropi admite ${MAX_NOMBRE_DROPI} caracteres en el nombre: este tiene ${nombreNuevo.length}.` };
+  if (cambiaNombre) datos.nombre = nombreNuevo;
+  else delete datos.nombre;
 
   const { error } = await createServiceClient()
     .from("dropi_publicaciones")
@@ -124,7 +134,7 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   if (error) return { error: "No se pudo guardar la publicación." };
 
   const cambios = VISTA.filter(([k]) => {
-    if (k === "nombre") return false;
+    if (k === "nombre") return cambiaNombre;
     const a = antes[k] === null || antes[k] === undefined ? null : typeof datos[k] === "number" ? Number(antes[k]) : antes[k];
     return a !== datos[k];
   });
@@ -136,8 +146,13 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
       antes: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(antes[k] ?? null)])),
       despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k])])),
     });
+  let dropi: string | undefined;
+  if (cambiaNombre) {
+    const r = await enviarNombreADropi(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null, sku_maestro_id: (antes.sku_maestro_id as string | null) ?? null }, nombreNuevo, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+    dropi = r.estado === "pendiente" ? r.detalle : `El nombre se guardó, pero no quedó para Dropi: ${r.detalle}`;
+  }
   revalidatePath(RUTA);
-  return {};
+  return { dropi };
 }
 
 /** La actividad de una publicación para su ficha. Es una lectura: basta poder abrir el módulo. */
