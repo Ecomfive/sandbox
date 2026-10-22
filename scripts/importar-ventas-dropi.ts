@@ -2,6 +2,7 @@
 // datos-privados/dropi-historial-movimientos.json (cada movimiento de stock de cada producto) y dropi-historial-resumen.json (el
 // nombre, la lista y si es privado de cada producto). Agrupa por producto y día en hora de Panamá, y por dropshipper (lo
 // cancelado o devuelto se le carga a quien creó la orden). Cada carga reemplaza la anterior del país.
+// Cada día lo corre `scripts/ventas-dropi.ts cargar` (tarea «ventas-dropi-diario»), después de bajar la lectura del navegador.
 //
 //   npx tsx scripts/importar-ventas-dropi.ts            → informe (no escribe)
 //   npx tsx scripts/importar-ventas-dropi.ts --aplicar  → carga
@@ -98,7 +99,9 @@ async function main() {
       lista: p[col("lista")] === "archivado" ? "archivado" : "activo",
       privado: !!p[col("privado")],
       variable: p[col("tipo")] === "V",
-      stock: [...ultBodega.values()].reduce((a, m) => a + m[7], 0),
+      // El stock que da Dropi en la lista de productos (lecturas de ventas-dropi-navegador.js); si no viene, el de después del
+      // último movimiento de cada bodega.
+      stock: col("stock") >= 0 && p[col("stock")] !== null ? Number(p[col("stock")]) : [...ultBodega.values()].reduce((a, m) => a + m[7], 0),
       primera_venta: primera,
       ultima_venta: ultima,
       actualizado_en: R.generado,

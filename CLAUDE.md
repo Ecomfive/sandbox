@@ -520,6 +520,14 @@ convenciones técnicas del código.
   existía sin publicación (envíos y seguros de Dropi, «P-MA Aceite de semilla de calabaza» 11178) no se crea solo.
   **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
   justifique, con bitácora y deshacer.
+- **Ventas de Dropi cada día** (21 oct 2026). Desempeño › Ventas Dropi, las ventas de cada publicación en Gestión de IDs Dropi,
+  Reponer y la ficha del dropshipper leen `dropi_ventas_*` (migraciones 0120 y 0122), que se llena desde el Historial de Existencia
+  de Dropi. La tarea programada «ventas-dropi-diario» (Claude, navegador integrado) corre `npx tsx scripts/ventas-dropi.ts subida`
+  (dos direcciones firmadas de subida a `wms-compras/tmp-dropi/`), la función de `scripts/ventas-dropi-navegador.js` en
+  `app.dropi.pa` con la sesión de **ECOMFIVE** (lista todos sus productos con `api-v2…/bff/catalog/products/produit/<id>/owner`,
+  activos y archivados, y baja `api/inventories/history` de cada uno, de a tres; si falla uno no sube nada) y `… cargar` (baja a
+  `datos-privados/`, borra los temporales y corre `importar-ventas-dropi.ts --aplicar`, que reemplaza la carga del país). El stock
+  es el `total_stock` de Dropi. Corre desde la copia `C:/Users/herna/ecomfive-tareas` (main al día), como «dropi-diario».
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin
   cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
   llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de
