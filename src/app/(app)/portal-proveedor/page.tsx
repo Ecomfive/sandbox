@@ -47,7 +47,7 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
   }
 
   // Las fotos como en Compras: la comercial de referencia y la real de la compra si Chin no subió la suya.
-  const { pedidos, realDeCompra } = await conFotosDeCompras(
+  const { pedidos } = await conFotosDeCompras(
     supabase,
     espejo.pedidos.filter((p) => puedeVerPais(usuario.paisesPermitidos, p.paisCodigo)),
   );
@@ -72,16 +72,6 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     })
     .filter((r) => puedeVerPais(usuario.paisesPermitidos, r.pais))
     .sort((a, b) => (b.real?.envios ?? 0) - (a.real?.envios ?? 0));
-
-  // Fotos reales: la que subió el proveedor (bucket privado, enlaces de una hora) o, si no, la «Foto real del producto» de la compra.
-  const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
-  const fotosReales: Record<string, string> = {};
-  for (const p of activos) if (realDeCompra[p.id]) fotosReales[p.id] = realDeCompra[p.id];
-  if (rutas.length) {
-    const { data: firmadas } = await supabase.storage.from("proveedor-portal").createSignedUrls(rutas, 3600);
-    const porRuta = new Map((firmadas ?? []).map((f) => [f.path, f.signedUrl]));
-    for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
-  }
 
   const { data: filasNovedades } = await supabase
     .from("proveedor_novedades")
@@ -134,7 +124,6 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
         plazos={espejo.plazos}
         resumen={resumen}
         novedades={novedades}
-        fotosReales={fotosReales}
         puedeEscribir={!usuario.modulosSoloLectura.includes("portal-proveedor")}
         tabInicial={tabInicial === "cuenta" && !admin ? null : tabInicial}
         cuentaPortal={admin ? { cuenta, entrada } : null}

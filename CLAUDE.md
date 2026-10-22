@@ -487,7 +487,7 @@ convenciones técnicas del código.
   Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`.
   **Fase 2** (migración 0125: módulo `portal-proveedor` para quien tiene Compras y `proveedores.notificar_a` = Francis): página
   `/portal-proveedor` debajo de Compras (`portal-proveedor.tsx`, la interfaz del prototipo con los tokens del sistema), pestañas
-  Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
+  Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Por decidir» muestra solo la foto de referencia: el espacio de la real va en blanco (`Foto enBlanco`), porque la real se agrega después (22 oct 2026). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
   **con `actualizarCampoCompra`** (mismos permisos de Compras, evento, Actividad y auditoría) y dejan una novedad para el proveedor;
   la nota para el proveedor se escribe en «En cotización». «Nueva compra en Cotizar» lleva a `/compras/lista?proveedor=Chin`, que
   abre la compra nueva con proveedor y agente puestos (`CrearCompraPanel` se abre sola después de montarse: `Ventana` no se puede
