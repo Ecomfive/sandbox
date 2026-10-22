@@ -8,6 +8,8 @@ import { estadoTarea, etiquetaRecomendacion, pendientes, recomendar, recomendarO
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
+import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
+import { productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
@@ -25,7 +27,8 @@ type Fila = Record<string, unknown> & { id: string };
 
 /**
  * Lo que ya no se marca a mano (21 oct 2026): cómo está en Dropi, si va a Archivados, el Tipo y qué necesita, a partir de las
- * ventas de Dropi del país (`ventas`, null si no hay carga), de la competencia y de las reglas.
+ * ventas de Dropi del país (`ventas`, null si no hay carga), de la competencia y de las reglas. Si la publicación está en la
+ * lectura de «Mis productos» (`prov`, 22 oct 2026), el estado y el tipo salen de ahí: es lo más reciente que dice Dropi.
  */
 function automatico(
   d: Fila,
@@ -33,13 +36,26 @@ function automatico(
   competidores: Awaited<ReturnType<typeof cargarCompetidores>>,
   hoy: string,
   reglas: Reglas,
+  prov: ProductoProveedor | null,
 ): Pick<FilaPublicacion, "ventas" | "enDropi" | "archivada" | "tipoDropi" | "acciones" | "competidorMasBarato" | "competidorMinimo"> {
   const ids = idsDropi(d);
   const v = ventas ? ventasDePublicacion(ids, ventas.resumen) : null;
-  const estadoDropi = enDropi({ hayCarga: !!ventas, tieneId: ids.length > 0, dropi: v ? { activo: v.activoEnDropi } : null });
+  const estadoDropi = prov
+    ? prov.archivado
+      ? "archivado"
+      : "activo"
+    : enDropi({ hayCarga: !!ventas, tieneId: ids.length > 0, dropi: v ? { activo: v.activoEnDropi } : null });
   const manualArchivada = d.estado === "archivado" || d.estado_publicacion === "archivado";
   const archivada = estaArchivada(estadoDropi, manualArchivada);
-  const tipo: "publico" | "privado" | null = v ? (v.privadoEnDropi ? "privado" : "publico") : ((d.tipo_publicacion as "publico" | "privado" | null) ?? null);
+  const tipo: "publico" | "privado" | null = prov
+    ? prov.privado
+      ? "privado"
+      : "publico"
+    : v
+      ? v.privadoEnDropi
+        ? "privado"
+        : "publico"
+      : ((d.tipo_publicacion as "publico" | "privado" | null) ?? null);
   const barato = competidorMasBarato({ nombre: d.nombre as string, precio: num(d.precio_venta), idsDropi: ids }, competidores);
   return {
     ventas: v,
@@ -204,7 +220,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo, proveedor] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -216,6 +232,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarCambiosPrecio(supabase, paisId),
     cargarEnCamino(supabase, paisId, usuario),
     cargarNuestrosEnDropi(supabase, paisId),
+    cargarProductosProveedor(supabase, paisId),
   ]);
   const r = reglas.reglas;
   // La revisión de optimización: con lo que muestra Dropi (el primer ID que esté en el catálogo); si no se leyó, el título guardado.
@@ -243,6 +260,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     const estado = d.estado as string;
     const proxima = (d.proxima_revision as string | null) ?? null;
     const camino = d.sku_maestro_id ? enCaminoPorSku.get(d.sku_maestro_id as string) : undefined;
+    const prov = proveedor ? productoPrincipal(idsDropi(d), proveedor.productos) : null;
     return {
       id: d.id,
       numero: numeroPorId.get(d.id) ?? null,
@@ -284,8 +302,12 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       sinEnvioCamino: camino?.sinEnvio ?? 0,
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
+      bodegasDropi: prov ? prov.bodegas.map((b) => ({ nombre: b.nombre, stock: b.stock })) : null,
+      stockProveedor: prov?.stock ?? null,
+      stockPrivadoProveedor: prov?.stockPrivado ?? null,
+      leidoProveedor: proveedor?.leidoEn ?? null,
       ...revisionDe(d),
-      ...automatico(d, ventas, competidores, hoy, r),
+      ...automatico(d, ventas, competidores, hoy, r, prov),
     };
   });
 

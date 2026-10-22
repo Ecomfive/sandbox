@@ -473,6 +473,23 @@ convenciones técnicas del código.
   largo de la descripción los guarda la lectura del catálogo desde la migración 0129 (`fotos`, `videos`, `descripcion_largo`; el
   video cuenta cualquier campo de Dropi que diga «video» y queda null si no viene). Bloque «Optimización en Dropi» en la ficha,
   tarjeta «Por optimizar» y filtro «Optimización».
+  **Bodegas y «Dropi manda»** (22 oct 2026, pedido de Hernán, migración 0131): la cuenta de ECOMFIVE en `app.dropi.pa` es de
+  **proveedor** (`type_user: SUPPLIER`, usuario 2094) y su pantalla «Mis productos» lee api-v2 `bff/catalog/products/produit/<usuario>/owner`
+  (POST, `pageSize` 100, `page` desde 1, `get_stock: true`; `archive: true` = pestaña Archivados): trae por producto `warehouses`
+  `[{id, name, stock}]` (las variables en `variation_warehouses`, una por variación), `total_stock`, `private_stock`, `private_product`,
+  precio y sugerido. Panamá: bodega 81 «Proveedor Ecomfive» y 280 «Bodega Dropi Panama» (los «(B280)»); 218 activos y 196 archivados.
+  La lee `leerNuestrosProductos` de `scripts/scraping-proveedores-navegador.js` (en la pestaña de Dropi con esa sesión, mismo
+  receptor y puente que el scraping, `tipo: "nuestros"`) y la guarda `scripts/publicaciones-sincronizar-dropi.ts`
+  (`guardarNuestrosProductos`; también a mano con un JSON guardado, por defecto solo informa, `--aplicar` escribe): reemplaza
+  `dropi_productos_proveedor` (una fila por producto y país, `bodegas` jsonb) y anota `dropi_productos_proveedor_lecturas`. **Dropi
+  manda:** `cambiosDesdeDropi` (`src/lib/publicaciones/sincronizar-dropi.ts`, con prueba) pone en la publicación `ubicacion` (la
+  bodega de más stock, por nombre: `ubicacionDeBodega`; un archivado sin bodegas no la cambia), `precio_venta` (y
+  `ultimo_cambio_precio` = hoy), `tipo_publicacion` y `estado_publicacion`; con dos IDs manda el activo de más stock
+  (`productoPrincipal`). Cada cambio va a la actividad como «Sistema» (`sincronizar_dropi_publicacion`). La lista lee la tabla con
+  `cargarProductosProveedor` (`proveedor-datos.ts`; sin la migración, null y todo sigue igual): `bodegasDropi`, `stockProveedor`,
+  `stockPrivadoProveedor` y `leidoProveedor` en `FilaPublicacion`; «En Dropi» y el Tipo prefieren esta lectura a la carga de Ventas
+  Dropi; la fila pone las unidades bajo «Dónde está», la ficha lista las bodegas en «Stock», y hay filtro «Bodega en Dropi» y
+  columna en el CSV.
   **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
   justifique, con bitácora y deshacer.
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin
