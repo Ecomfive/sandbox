@@ -244,6 +244,12 @@ export async function obtenerAsistenteIA(publicacionId: string): Promise<Asisten
   };
 }
 
+/** Antes de pagarle a la IA se comprueba que se podrá guardar lo que devuelva: sin la migración 0134 se avisa sin gastar nada. */
+async function migracionLista(): Promise<string | null> {
+  const { error } = await createServiceClient().from("dropi_publicaciones_ia").select("id").limit(1);
+  return error && faltaMigracion(error.message) ? SIN_MIGRACION : null;
+}
+
 async function guardar(publicacionId: string, tipo: TipoIA, resultado: unknown, modelo: string | null, usuario: UsuarioActual): Promise<{ id: string } | { error: string }> {
   const { data, error } = await createServiceClient()
     .from("dropi_publicaciones_ia")
@@ -265,6 +271,8 @@ export async function analizarPublicacionIA(publicacionId: string): Promise<{ er
   const pub = await publicacionPermitida(publicacionId, usuario);
   if (!pub) return { error: "No se encontró la publicación." };
   if (!proveedorTexto()) return { error: SIN_IA };
+  const sinMigracion = await migracionLista();
+  if (sinMigracion) return { error: sinMigracion };
   const { datos, contexto } = await cargarBase(pub);
   const r = await pedirIA({ ...pedidoAnalisis(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true, consumoDe("analisis", usuario, pub));
   if ("error" in r) return { error: r.error };
@@ -286,6 +294,8 @@ export async function proponerTitulosIA(publicacionId: string): Promise<{ error?
   const pub = await publicacionPermitida(publicacionId, usuario);
   if (!pub) return { error: "No se encontró la publicación." };
   if (!proveedorTexto()) return { error: SIN_IA };
+  const sinMigracion = await migracionLista();
+  if (sinMigracion) return { error: sinMigracion };
   const { datos, contexto, categoria } = await cargarBase(pub);
   const r = await pedirIA({ ...pedidoTitulos(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, false, consumoDe("titulos", usuario, pub));
   if ("error" in r) return { error: r.error };
@@ -346,6 +356,8 @@ export async function proponerTextoIA(publicacionId: string): Promise<{ error?: 
   const pub = await publicacionPermitida(publicacionId, usuario);
   if (!pub) return { error: "No se encontró la publicación." };
   if (!proveedorTexto()) return { error: SIN_IA };
+  const sinMigracion = await migracionLista();
+  if (sinMigracion) return { error: sinMigracion };
   const { datos, contexto } = await cargarBase(pub);
   const r = await pedirIA({ ...pedidoTexto(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true, consumoDe("texto", usuario, pub));
   if ("error" in r) return { error: r.error };
@@ -367,6 +379,8 @@ export async function planearFotosIA(publicacionId: string): Promise<{ error?: s
   const pub = await publicacionPermitida(publicacionId, usuario);
   if (!pub) return { error: "No se encontró la publicación." };
   if (!proveedorTexto()) return { error: SIN_IA };
+  const sinMigracion = await migracionLista();
+  if (sinMigracion) return { error: sinMigracion };
   if (!pub.foto_url) return { error: "La publicación no tiene foto del producto: agrégala primero en su ficha." };
   const { datos, contexto, fotosFaltan } = await cargarBase(pub);
   const cantidad = Math.max(1, Math.min(MAX_FOTOS, fotosFaltan));
