@@ -135,6 +135,13 @@ export function deLista(lista: readonly { valor: string }[], texto: string | nul
   return lista.find((p) => p.valor.toLowerCase() === t.toLowerCase())?.valor ?? t;
 }
 
+/** El color de cada proveedor y de cada agente: los tonos del neón del sistema (el borde de los paneles y el brillo del menú),
+ * distintos entre sí y de los de Etapa y Estado (que son los de ClickUp). Un valor fuera de la lista va sin color. */
+const PROVEEDOR_COLOR: Record<string, string> = { Chin: "#c22f6a", Zion: "#9b2fa8", Alibaba: "#e07a3a" };
+const AGENTE_COLOR: Record<string, string> = { Chin: "#5f43d1", Avery: "#325bba" };
+export const colorProveedor = (valor: string): string | undefined => PROVEEDOR_COLOR[valor];
+export const colorAgente = (valor: string): string | undefined => AGENTE_COLOR[valor];
+
 export const proveedorDeLista = (texto: string | null) => deLista(PROVEEDORES_COMPRA, texto);
 export const agenteDeLista = (texto: string | null) => deLista(AGENTES_ENVIO, texto);
 
@@ -315,6 +322,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       valores: (c) => [c.proveedor ?? SIN_VALOR],
       etiquetaSinValor: "Sin proveedor",
       agrupable: true,
+      colorValor: (v) => colorProveedor(v),
     },
     {
       id: "ventaImportacion",
