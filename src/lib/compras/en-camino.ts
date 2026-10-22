@@ -1,6 +1,7 @@
-// Lo que viene en camino de un producto: las unidades de sus compras que ya salieron y todavía no llegan, sumadas por país.
-// Es la misma regla de «En tránsito» de Compras (`enTransito`, `calculos-compras.ts`): la orden sigue abierta, tiene fecha de envío
-// y no tiene fecha de llegada. Una orden anulada no cuenta. Sin base ni React, para poder probarlo.
+// Lo que viene en camino de un producto: las unidades de sus compras que ya se pidieron y todavía no llegan, sumadas por país.
+// Cuenta una orden abierta, sin fecha de llegada, que **ya salió** (tiene fecha de envío) o **ya está en marcha** (En Producción,
+// Tracking o Arribo Mercancía: pedida y pagada aunque todavía no se envíe). Una orden en Cotizar, Cotizado o Backlog es solo una
+// cotización: no cuenta. Una orden anulada tampoco. Sin base ni React, para poder probarlo.
 
 import { estimarPlanificacion, type TiemposTransito } from "./planificacion";
 
@@ -25,8 +26,12 @@ export interface EnCaminoPais {
   compras: number;
 }
 
-/** Una línea está en camino: orden abierta, ya salió y no ha llegado. */
-export const lineaEnCamino = (l: LineaEnCamino): boolean => !l.anulada && !ETAPAS_CERRADAS.includes(l.etapa) && !!l.fechaEnvio && !l.fechaLlegada;
+/** Las etapas en que la mercancía ya está pedida (se produce, viaja o llegó al puerto) aunque todavía no tenga fecha de envío. */
+export const ETAPAS_EN_MARCHA = ["produccion", "tracking", "arribo_mercancia"];
+
+/** Una línea está en camino: orden abierta, sin llegar, que ya salió o ya está en producción, tracking o arribo. */
+export const lineaEnCamino = (l: LineaEnCamino): boolean =>
+  !l.anulada && !ETAPAS_CERRADAS.includes(l.etapa) && !l.fechaLlegada && (!!l.fechaEnvio || ETAPAS_EN_MARCHA.includes(l.etapa));
 
 /**
  * Las unidades en camino por país, el país con más unidades primero. Con `codigoPais` solo las de ese país (el que está marcado en

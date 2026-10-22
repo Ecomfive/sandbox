@@ -10,8 +10,7 @@ import { dentroDelAlcance, restriccionesDe } from "../compras/permisos-compras";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
 /**
- * Lo que viene en camino de un producto: las unidades de las órdenes que ya salieron y todavía no llegan, por país (la misma regla de
- * «En tránsito» de Compras); con `codigoPais`, solo el de ese país (el que está marcado en Compras). Un producto con variantes suma las de sus variantes. Solo unidades: no trae costos. Lo pueden ver quienes abren
+ * Lo que viene en camino de un producto: las unidades de las órdenes ya pedidas que todavía no llegan (ya salieron o están en producción, tracking o arribo), por país; con `codigoPais`, solo el de ese país (el que está marcado en Compras). Un producto con variantes suma las de sus variantes. Solo unidades: no trae costos. Lo pueden ver quienes abren
  * Producto, Inventario, Compras o Gestión de publicaciones Dropi, y cada uno solo los países que tiene permitidos y las compras que
  * su rol alcanza (Usuarios y roles › Afinar). Devuelve el error como valor.
  */
@@ -21,6 +20,8 @@ export interface OrdenEnCamino {
   unidades: number;
   llegada: string | null;
   origen: "limite" | "estimada" | null;
+  /** La etapa de la orden en Compras («produccion», «tracking»…). */
+  etapa: string;
 }
 
 export async function obtenerEnCaminoProducto(id: string, codigoPais?: string | null): Promise<{ enCamino: EnCaminoPais[]; ordenes: OrdenEnCamino[] } | { error: string }> {
@@ -54,7 +55,7 @@ export async function obtenerEnCaminoProducto(id: string, codigoPais?: string | 
     // El detalle por orden, solo de las que cuentan (las del país marcado, si se pidió uno).
     if (!lineaEnCamino(linea) || !(linea.unidades > 0) || (filtro && (delPais?.codigo ?? "").toUpperCase() !== filtro)) continue;
     const llegada = llegadaDeCompra(tiempos, { fechaLimite: c.fecha_limite, fechaEnvio: c.fecha_envio, vias: c.via_envio ?? [], clave: claveTransito(c.tipo, c.pais_id) });
-    ordenes.push({ numero: Number(c.numero), unidades: linea.unidades, llegada: llegada?.fecha ?? null, origen: llegada?.origen ?? null });
+    ordenes.push({ numero: Number(c.numero), unidades: linea.unidades, llegada: llegada?.fecha ?? null, origen: llegada?.origen ?? null, etapa: c.etapa });
   }
   ordenes.sort((x, y) => (x.llegada ?? "9999").localeCompare(y.llegada ?? "9999") || x.numero - y.numero);
   return { enCamino: enCaminoPorPais(lineas, filtro), ordenes };

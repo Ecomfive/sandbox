@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import type { EnCaminoPais } from "@/lib/compras/en-camino";
 import { Badge } from "@/components/ui/badge";
+import { ETAPA_ETIQUETA } from "../compras/def-compras";
 import { llegadaCorta } from "@/lib/compras/en-camino";
 import { obtenerEnCaminoProducto, type OrdenEnCamino } from "./en-camino-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
 
 /**
- * Lo que viene en camino de un producto, solo unidades (sin el detalle de cada compra): las órdenes que ya salieron y todavía no
- * llegan, la misma regla de «En tránsito» de Compras. Con `pais` (el país seleccionado en la barra), solo las de ese país; sin él, por país.
+ * Lo que viene en camino de un producto, solo unidades: las órdenes ya pedidas que todavía no llegan (ya salieron o están en
+ * producción, tracking o arribo), cada una con su etapa y su llegada. Con `pais` (el país seleccionado en la barra), solo las de ese país; sin él, por país.
  * Se pide al abrir la ficha.
  */
 export function EnCaminoProducto({ id, pais, nombrePais }: { id: string; pais?: string | null; nombrePais?: string }) {
@@ -63,7 +64,7 @@ export function EnCaminoProducto({ id, pais, nombrePais }: { id: string; pais?: 
         {ordenes.map((o) => (
           <li key={o.numero} className="flex items-center justify-between gap-3">
             <span className="tabular-nums">
-              OC-{String(o.numero).padStart(4, "0")} · {entero(o.unidades)} u.
+              OC-{String(o.numero).padStart(4, "0")} · {entero(o.unidades)} u. · {(ETAPA_ETIQUETA[o.etapa] ?? o.etapa).replace(/^\d+ - /, "")}
             </span>
             {o.llegada ? <span className="tabular-nums">llega aprox. {llegadaCorta(o.llegada, hoy)}</span> : <Badge tone="warning">Sin fecha de llegada</Badge>}
           </li>

@@ -9,8 +9,8 @@ type Compra = { id: string; etapa: string; fecha_limite: string | null; via_envi
 const trozos = <T,>(lista: T[], n: number): T[][] => Array.from({ length: Math.ceil(lista.length / n) }, (_, i) => lista.slice(i * n, i * n + n));
 
 /**
- * Lo que viene en camino de cada producto de un país: las unidades de las órdenes que ya salieron y todavía no llegan (la misma regla
- * de «En tránsito» de Compras, `lineaEnCamino`), cuándo llegan (la más próxima, `llegadaDeCompra`: la fecha límite de la compra o la
+ * Lo que viene en camino de cada producto de un país: las unidades de las órdenes ya pedidas que todavía no llegan (ya salieron o están
+ * en producción, tracking o arribo: `lineaEnCamino`), cuándo llegan (la más próxima, `llegadaDeCompra`: la fecha límite de la compra o la
  * estimada con su fecha y vía de envío) y cuántas unidades no tienen fecha todavía, por id de producto. Un producto con variantes
  * suma las de sus variantes. Respeta el alcance de Compras de la persona (Usuarios y roles › Afinar). Solo unidades y fechas: no
  * trae costos. Si algo falla, un mapa vacío.
@@ -23,7 +23,9 @@ export async function cargarEnCamino(supabase: SupabaseClient, paisId: string, u
     .eq("pais_id", paisId)
     .is("anulada_en", null)
     .is("fecha_llegada", null)
-    .not("fecha_envio", "is", null);
+    .not("etapa", "in", "(completado,descartado)")
+    // Ya salió, o ya está en producción, tracking o arribo (pedida aunque todavía no tenga fecha de envío).
+    .or("fecha_envio.not.is.null,etapa.in.(produccion,tracking,arribo_mercancia)");
   if (error || !compras?.length) return resumen;
   const limites = restriccionesDe(usuario.afinado.compras);
   const enCamino = (compras as Compra[]).filter(
