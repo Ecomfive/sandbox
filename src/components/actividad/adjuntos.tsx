@@ -8,9 +8,8 @@ import { VisorImagen } from "@/components/ui/visor-imagen";
 import { ACEPTAR_ADJUNTOS, iconoArchivo, MAX_ADJUNTOS_COMENTARIO, motivoDeRechazo } from "@/lib/compras/adjuntos";
 import { AdjuntoIcon, CerrarIcon } from "@/lib/nav-icons";
 import { supabase } from "@/lib/supabase/client";
-import { descartarAdjuntoSubido, prepararSubidaAdjuntoComentario, type AdjuntoCompra, type AdjuntoSubido } from "./actions";
-
-const BUCKET = "wms-compras";
+import type { AdjuntoActividad, AdjuntoSubido } from "@/lib/comentarios/tipos";
+import { useAccionesActividad } from "./contexto";
 
 /** Un archivo que se está adjuntando al comentario que se escribe: sube apenas se elige, sin esperar a «Comentar». */
 export interface Pendiente {
@@ -29,8 +28,9 @@ export interface Pendiente {
  * almacenamiento privado y se pueden quitar antes de comentar. `listos` es lo que viaja con el comentario. Un archivo que
  * se subió pero no se envió (se quitó o se cerró la ficha) se borra.
  */
-export function useAdjuntosPendientes(compraId: string) {
+export function useAdjuntosPendientes(entidadId: string) {
   const { mostrarToast } = useToast();
+  const { bucket, prepararSubida, descartarSubida } = useAccionesActividad();
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const actuales = useRef<Pendiente[]>([]);
   useEffect(() => {
@@ -42,10 +42,10 @@ export function useAdjuntosPendientes(compraId: string) {
     () => () => {
       for (const p of actuales.current) {
         if (p.vista) URL.revokeObjectURL(p.vista);
-        if (p.ruta) void descartarAdjuntoSubido(compraId, p.ruta);
+        if (p.ruta) void descartarSubida(entidadId, p.ruta);
       }
     },
-    [compraId],
+    [entidadId, descartarSubida],
   );
 
   const actualizar = useCallback((id: string, cambios: Partial<Pendiente>) => setPendientes((l) => l.map((p) => (p.id === id ? { ...p, ...cambios } : p))), []);
@@ -71,9 +71,9 @@ export function useAdjuntosPendientes(compraId: string) {
         setPendientes((l) => [...l, nuevo]);
         void (async () => {
           try {
-            const permiso = await prepararSubidaAdjuntoComentario(compraId, nombre);
+            const permiso = await prepararSubida(entidadId, nombre);
             if ("error" in permiso) return actualizar(id, { estado: "error", error: permiso.error });
-            const { error } = await supabase.storage.from(BUCKET).uploadToSignedUrl(permiso.ruta, permiso.token, archivo, { contentType: archivo.type });
+            const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(permiso.ruta, permiso.token, archivo, { contentType: archivo.type });
             if (error) return actualizar(id, { estado: "error", error: "No se pudo subir el archivo." });
             actualizar(id, { estado: "listo", ruta: permiso.ruta });
           } catch {
@@ -82,18 +82,18 @@ export function useAdjuntosPendientes(compraId: string) {
         })();
       }
     },
-    [compraId, mostrarToast, actualizar],
+    [entidadId, mostrarToast, actualizar, prepararSubida, bucket],
   );
 
   const quitar = useCallback(
     (id: string) => {
       const p = actuales.current.find((x) => x.id === id);
       if (p?.vista) URL.revokeObjectURL(p.vista);
-      if (p?.ruta) void descartarAdjuntoSubido(compraId, p.ruta);
+      if (p?.ruta) void descartarSubida(entidadId, p.ruta);
       actuales.current = actuales.current.filter((x) => x.id !== id);
       setPendientes((l) => l.filter((x) => x.id !== id));
     },
-    [compraId],
+    [entidadId, descartarSubida],
   );
 
   /** Después de comentar: los archivos ya son del comentario, así que solo se sueltan las vistas previas (no se borra nada). */
@@ -201,7 +201,7 @@ export function TiraPendientes({ pendientes, alQuitar }: { pendientes: Pendiente
 }
 
 /** Los archivos que ya tiene un comentario, al editarlo: como las miniaturas por enviar, cada una con su ✕ para quitarla al guardar. */
-export function TiraExistentes({ adjuntos, alQuitar }: { adjuntos: AdjuntoCompra[]; alQuitar: (id: string) => void }) {
+export function TiraExistentes({ adjuntos, alQuitar }: { adjuntos: AdjuntoActividad[]; alQuitar: (id: string) => void }) {
   if (adjuntos.length === 0) return null;
   return (
     <ul aria-label="Archivos del comentario" className="m-0 flex list-none flex-wrap gap-2 p-0">
@@ -232,8 +232,8 @@ export function TiraExistentes({ adjuntos, alQuitar }: { adjuntos: AdjuntoCompra
 }
 
 /** Los archivos de un comentario ya enviado, debajo de su texto: las imágenes como miniaturas de 40 × 40 (se amplían al pulsarlas) y los documentos (PDF, Excel, Word…) como enlace con su ícono. */
-export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoCompra[] }) {
-  const [ampliada, setAmpliada] = useState<AdjuntoCompra | null>(null);
+export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoActividad[] }) {
+  const [ampliada, setAmpliada] = useState<AdjuntoActividad | null>(null);
   if (adjuntos.length === 0) return null;
   const imagenes = adjuntos.filter((a) => a.clase === "foto" && a.url);
   const otros = adjuntos.filter((a) => !(a.clase === "foto" && a.url));
