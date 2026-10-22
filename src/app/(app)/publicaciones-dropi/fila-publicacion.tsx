@@ -5,7 +5,7 @@ import { useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
+import { ChevronRightIcon, DropiIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
@@ -23,18 +23,34 @@ const Punto = ({ clase, texto }: { clase: string; texto: string }) => (
 
 /** Un dato que lleva el color de su opción (venta, dónde está, reposición): punto de color y su nombre. */
 const ConPunto = ({ color, texto }: { color: string | undefined; texto: string }) => (
-  <span className="inline-flex min-w-0 items-center gap-1.5">
+  <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
     <span aria-hidden="true" style={{ backgroundColor: color }} className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground" />
     <span className="truncate">{texto}</span>
   </span>
 );
+
+/**
+ * Cómo está en Dropi, en poco espacio: el logo de Dropi con un punto del color del estado (verde = activo). El nombre del estado
+ * sale al pasar el cursor y lo leen los lectores de pantalla; sin ID o sin datos de Dropi, el logo se ve apagado.
+ */
+function IconoEnDropi({ estado }: { estado: { valor: string; etiqueta: string; color: string } }) {
+  const apagado = estado.valor === "sin_id" || estado.valor === "sin_datos";
+  return (
+    <Tooltip texto={estado.etiqueta}>
+      <span role="img" aria-label={estado.etiqueta} className="relative inline-flex h-7 w-7 items-center justify-center">
+        <DropiIcon className={`h-6 w-6 ${apagado ? "text-muted-foreground/60" : "text-foreground"}`} />
+        <span aria-hidden="true" style={{ backgroundColor: estado.color }} className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card" />
+      </span>
+    </Tooltip>
+  );
+}
 
 /** Una celda de la fila: lo principal arriba y lo de apoyo abajo; el nombre del dato solo se lee con lector de pantalla. */
 function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: string; principal: ReactNode; apoyo?: ReactNode; alinear?: "izquierda" | "derecha" }) {
   return (
     <span className={`flex min-w-0 flex-col gap-0.5 ${alinear === "derecha" ? "lg:items-end lg:text-right" : ""}`}>
       <span className="sr-only">{nombre}: </span>
-      <span className="min-w-0 text-sm">{principal}</span>
+      <span className="min-w-0 max-w-full overflow-hidden text-sm">{principal}</span>
       {apoyo && <span className="min-w-0 max-w-full truncate text-xs text-muted-foreground">{apoyo}</span>}
     </span>
   );
@@ -114,7 +130,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
       type="button"
       onClick={alAbrir}
       aria-label={`Abrir la ficha de ${f.nombre}`}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)_1rem]" : "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_1rem]"} ${anilloFoco}`}
+      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_2rem_1rem]" : "lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_2rem_1rem]"} ${anilloFoco}`}
     >
       {/* Producto */}
       <span className="flex min-w-0 items-center gap-3">
@@ -178,7 +194,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
             ) : undefined
           }
         />
-        <Celda nombre="En Dropi" principal={enDropi ? <ConPunto color={enDropi.color} texto={enDropi.etiqueta} /> : <span className="text-muted-foreground">—</span>} />
+        <Celda nombre="En Dropi" principal={enDropi ? <IconoEnDropi estado={enDropi} /> : <span className="text-muted-foreground">—</span>} />
       </span>
 
       <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />
