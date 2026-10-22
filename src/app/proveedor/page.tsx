@@ -1,4 +1,5 @@
 import { cargarEspejo } from "@/lib/proveedor/datos";
+import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
 import { hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
@@ -26,10 +27,14 @@ export default async function PortalProveedorPage() {
       </main>
     );
   }
-  const activos = espejo.pedidos.filter((p) => p.etapa === "por_cotizar" || p.etapa === "cotizado" || p.etapa === "produccion" || p.etapa === "enviado");
+  // Las fotos como en Compras: la comercial de referencia y la real de la compra si todavía no subió la suya.
+  const { pedidos: activos, realDeCompra } = await conFotosDeCompras(
+    supabase,
+    espejo.pedidos.filter((p) => p.etapa === "por_cotizar" || p.etapa === "cotizado" || p.etapa === "produccion" || p.etapa === "enviado"),
+  );
 
   const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
-  const fotosReales: Record<string, string> = {};
+  const fotosReales: Record<string, string> = { ...realDeCompra };
   if (rutas.length) {
     const { data } = await supabase.storage.from(BUCKET_PROVEEDOR).createSignedUrls(rutas, 3600);
     const porRuta = new Map((data ?? []).map((f) => [f.path, f.signedUrl]));

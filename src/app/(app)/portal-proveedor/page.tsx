@@ -5,6 +5,7 @@ import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { cargarEspejo, clavePlazo } from "@/lib/proveedor/datos";
+import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
 import { diasEntre, hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
@@ -45,7 +46,11 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     );
   }
 
-  const pedidos = espejo.pedidos.filter((p) => puedeVerPais(usuario.paisesPermitidos, p.paisCodigo));
+  // Las fotos como en Compras: la comercial de referencia y la real de la compra si Chin no subió la suya.
+  const { pedidos, realDeCompra } = await conFotosDeCompras(
+    supabase,
+    espejo.pedidos.filter((p) => puedeVerPais(usuario.paisesPermitidos, p.paisCodigo)),
+  );
   const activos = pedidos.filter((p) => p.etapa === "por_cotizar" || p.etapa === "cotizado" || p.etapa === "produccion" || p.etapa === "enviado");
 
   // Tránsito real de cada país y vía con lo que ya llegó este año.
@@ -68,9 +73,10 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     .filter((r) => puedeVerPais(usuario.paisesPermitidos, r.pais))
     .sort((a, b) => (b.real?.envios ?? 0) - (a.real?.envios ?? 0));
 
-  // Fotos reales que subió el proveedor (bucket privado, enlaces de una hora).
+  // Fotos reales: la que subió el proveedor (bucket privado, enlaces de una hora) o, si no, la «Foto real del producto» de la compra.
   const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
   const fotosReales: Record<string, string> = {};
+  for (const p of activos) if (realDeCompra[p.id]) fotosReales[p.id] = realDeCompra[p.id];
   if (rutas.length) {
     const { data: firmadas } = await supabase.storage.from("proveedor-portal").createSignedUrls(rutas, 3600);
     const porRuta = new Map((firmadas ?? []).map((f) => [f.path, f.signedUrl]));
