@@ -39,7 +39,7 @@ export function PanelRecomendaciones({
   const cuenta = (t: TipoRecomendacion) => tareas.filter((x) => x.rec.tipo === t).length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-labelledby="pendientes-t" className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="pendientes-t" className="m-0 text-base font-semibold">
@@ -71,7 +71,7 @@ export function PanelRecomendaciones({
               <li key={`${t.publicacion.id}-${t.rec.tipo}`} className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-start sm:gap-4">
                 <Link
                   href={`/publicaciones-dropi?abrir=${t.publicacion.id}`}
-                  className={`flex min-w-0 items-center gap-3 rounded-lg sm:w-56 sm:shrink-0 sm:flex-col sm:items-start ${anilloFoco}`}
+                  className={`flex min-w-0 items-center gap-3 rounded-lg sm:w-44 sm:shrink-0 sm:flex-col sm:items-start ${anilloFoco}`}
                 >
                   {t.publicacion.fotoUrl ? (
                     <img src={t.publicacion.fotoUrl} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-border object-cover" />
