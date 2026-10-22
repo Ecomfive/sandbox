@@ -466,7 +466,7 @@ convenciones técnicas del código.
   lo guarda con `after()` (a nombre de «Sistema», con su línea en la auditoría) y si no, «Ya lo hice» (`marcarTareaHecha`). Las
   atrasadas cuentan en `PendientesHoy.tareasAtrasadas` (Hoy y menú). Vistas Pendientes · Por hacer · Hechas (`?ver=`).
   **Optimización en Dropi** (22 oct 2026, `src/lib/publicaciones/optimizacion.ts`, con prueba): `revisarPublicacion` revisa, con el
-  título y los datos que muestra Dropi (`cargarNuestrosEnDropi`, de `competencia_productos`), título en español (`palabrasEnIngles`), de `max_titulo` caracteres como máximo (40, lo que admite Dropi),
+  título y los datos que muestra Dropi (`cargarNuestrosEnDropi`, de `competencia_productos`), título en español (`palabrasEnIngles`), de `min_titulo` a `max_titulo` caracteres (35 a 40; 40 es lo que admite Dropi),
   cantidad si es suplemento, para qué sirve («revisar» si no dice «para…»), formato, fotos (`min_fotos`, 7), video, descripción
   (`min_descripcion`, 200) y precio sugerido (> nuestro precio). `recomendarOptimizacion` vuelve lo que falta recomendaciones del grupo
   «optimizacion» (`TIPOS_RECOMENDACION[].grupo`), y `tareaCumplida` las da por hechas cuando la revisión ya está bien. Fotos, videos y
