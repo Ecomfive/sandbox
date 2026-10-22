@@ -33,7 +33,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "SOP", definicion: "Procedimiento estándar de operación: el paso a paso de una tarea. En el sistema son los Manuales de proceso del Centro de ayuda, enlazados a cada puesto." },
   { termino: "Onboarding 30/60/90", definicion: "Lo que una persona nueva aprende en sus primeros 30, 60 y 90 días: los manuales y cursos de su puesto por etapa. Cuenta como hecho un curso aprobado o un manual marcado como leído." },
   { termino: "Puesto principal", definicion: "Si una persona ocupa varios puestos, el principal es el que decide su jefe en el organigrama y el que sale primero en «Mi puesto»." },
-  { termino: "Ficha", definicion: "La ventana que se abre al pulsar una fila (un panel a la derecha; en Producto, una ventana grande al centro, como una tarea de ClickUp): muestra todo de ese registro y, si tienes permiso, ahí mismo se edita." },
+  { termino: "Ficha", definicion: "La ventana que se abre al pulsar una fila: muestra todo de ese registro y, si tienes permiso, ahí mismo se edita. Tú eliges cómo se abre —en una barra lateral, en un cuadro de diálogo al centro o a pantalla completa— con el ícono «Cambiar diseño» de su cabecera (junto a «Cerrar»); vale para todas las fichas." },
   { termino: "Vista guardada", definicion: "Una combinación de filtros, agrupación y columnas que guardas con nombre en una tabla para volver a ella con un clic." },
   { termino: "Cerrados", definicion: "El botón de la barra de una tabla que muestra lo que ya terminó (compras completadas, retiros conciliados). Por defecto se ocultan." },
   { termino: "Mención (@)", definicion: "Escribir @ y el nombre de alguien en un comentario o nota: le llega un aviso en «Para ti» con el enlace al comentario." },
@@ -154,6 +154,44 @@ export const GUIAS: GuiaModulo[] = [
       { titulo: "Copiar el SKU y ver sus publicaciones en Dropi", pasos: ["Pulsa un SKU, en la lista o en la ficha, y se copia al portapapeles (sale el aviso «SKU copiado»); el clic en la lista no abre la ficha. También funciona en el producto vinculado de la ficha de una publicación de Dropi.", "En el bloque «Asociaciones» de la ficha, «Publicaciones en Dropi» dice cómo se llama el producto en Dropi (el nombre de su publicación vinculada, con el país y el ID); pulsa el nombre para abrir la publicación en Gestión de IDs Dropi. No sale si no tiene publicación vinculada."] },
       { titulo: "Eliminar un producto", pasos: ["Solo un administrador ve «Eliminar» en la ficha del producto, arriba a la derecha junto a la fecha. Pide confirmación y borra el producto de verdad, con su foto.", "Solo se puede eliminar un producto que nada usa: sin compras, publicaciones de Dropi, tests, Filtro de productos, fichas de Shopify o de Dropi, variantes, movimientos de inventario, lotes ni stock, y que no sea componente de un compuesto. Si algo lo usa, no se borra nada y el aviso dice qué lo bloquea y cuántos son.", "Un producto que ya se compró o se vendió no se elimina: pásalo a Inactivo o Descontinuado. Dos productos repetidos se unen, no se borran."] },
       { titulo: "Histórico de compras", pasos: ["El bloque «Compras» muestra las unidades compradas desde la primera vez, lo invertido y cada compra.", "Si el producto se compró en varios países, las compras salen agrupadas por país: cada país con sus compras juntas (y su total de compras y unidades), empezando por el que más compró; dentro, de la más nueva a la más vieja.", "Solo cuenta las compras donde el producto está vinculado."] },
+    ],
+  },
+  {
+    modulo: "wms-productos",
+    titulo: "Ficha producto Shopify",
+    ruta: "/wms-productos",
+    resumen: "La ficha de un producto como en el admin de Shopify: título, descripción, imágenes, precio, variantes e inventario por sucursal.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "La lista muestra los productos de Shopify; pulsa una fila para abrir su ficha. «Agregar» abre una ficha vacía; desde Producto, «Crear ficha Shopify» abre una con el producto ya elegido.",
+          "La ficha es una página de dos columnas: a la izquierda el título, la descripción (con su editor), las imágenes, la categoría, el precio, el inventario, el envío, las variantes, los metacampos y la vista previa en buscadores; a la derecha el estado, la publicación, la organización y la plantilla.",
+          "«Guardar» y «Descartar» solo aparecen cuando cambias algo. Sin permiso de modificar, la ficha se ve pero no se edita.",
+          "Un producto siempre tiene al menos una variante (sin opciones, es la única): ahí viven el precio, el SKU, el peso y el inventario por sucursal. El SKU de cada variante se elige de Producto; así la venta encuentra el producto para descontar inventario.",
+          "Las imágenes se suben directo desde tu equipo; al guardar solo se guarda su ruta. La descripción se limpia al guardar: solo queda formato permitido.",
+          "No incluye las ventas de los últimos 90 días ni el precio unitario de Shopify.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "wms-productos-dropi",
+    titulo: "Ficha producto Dropi",
+    ruta: "/wms-productos-dropi",
+    resumen: "Los productos de Dropi con sus datos, stock por bodega, imágenes, videos y garantías, en una sola ficha.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Pulsa una fila para abrir la ficha al lado; «Agregar» abre la misma ficha vacía. «Archivados» muestra los productos archivados.",
+          "La ficha junta en bloques lo que Dropi reparte en pestañas: General, Stock (o Variables y stock), Imagen del producto, Videos, Recursos adicionales, Productos privados y Garantías.",
+          "Arriba están las opciones de la fila: Historial de existencia (los ajustes de stock quedan en la actividad), Duplicar, Archivar o Restaurar, y Eliminar.",
+          "Al guardar se piden las reglas de Dropi: peso y medidas (peso en gramos, medidas en centímetros), precio y precio sugerido, categoría, una descripción de al menos 200 caracteres y, si el producto es público, una bodega con 100 unidades y 3 imágenes.",
+          "Las bodegas salen de Bodegas por país y se agregan desde la sección Stock. El producto se enlaza con su producto de Producto por el SKU.",
+          "No incluye crear órdenes, el formato de órdenes masivas, la carga ni la actualización masiva, ni las descargas en Excel de Dropi.",
+        ],
+      },
     ],
   },
   {
@@ -516,6 +554,7 @@ export interface Novedad {
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
   { fecha: "2026-10-21", titulo: "Pagos a Chin en el portal", texto: "Portal del proveedor tiene la pestaña «Pagos»: el cumplimiento de los anticipos y los saldos, lo que vence y el aviso de pago a Chin con su comprobante y a qué productos va. Chin lo confirma en su portal y queda pagado. Ya está cargado lo pagado según las hojas de pagos de Chin, y la ficha de cada compra de Chin muestra sus pagos.", modulo: "portal-proveedor", href: "/portal-proveedor?tab=pagos" },
+  { fecha: "2026-10-22", titulo: "Elige cómo se abren las fichas", texto: "Como en ClickUp, el ícono «Cambiar diseño» de la cabecera de cualquier ficha (junto a «Cerrar»; al pasar el cursor por encima muestra las tres opciones y se repliega al elegir una) deja elegir si se abre en una barra lateral, en un cuadro de diálogo al centro o a pantalla completa. Tu elección vale para todas las fichas del sistema y se guarda en tu navegador; mientras no elijas, cada ficha se abre como siempre (la de Producto, al centro).", href: "/" },
   { fecha: "2026-10-22", titulo: "«Abrir en Producto» abre la ficha del producto", texto: "En la ficha de una publicación de Gestión de IDs Dropi, «Abrir en Producto» ahora abre directo la ficha de ese producto, en vez de la lista completa de Producto.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-22", titulo: "Globo de recomendaciones pendientes", texto: "En Gestión de IDs Dropi, la pestaña «Recomendaciones» muestra un globo rojo con cuántas recomendaciones hay pendientes (como el de la campana de notificaciones), también desde «Publicaciones» y «Reglas». Baja cuando decides una y desaparece al llegar a cero.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/recomendaciones" },
   { fecha: "2026-10-21", titulo: "Recomendaciones aceptadas, como tareas", texto: "En Gestión de IDs Dropi, aceptar una recomendación la vuelve una tarea con responsable (le llega un aviso) y plazo. El sistema la marca hecha solo cuando Dropi muestra el precio nuevo o el combo x2 ya está publicado; si no, «Ya lo hice». Las atrasadas salen en Hoy. Nuevas vistas Por hacer y Hechas en la pestaña Recomendaciones.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/recomendaciones?ver=por_hacer" },
