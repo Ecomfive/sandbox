@@ -972,6 +972,10 @@ convenciones técnicas del código.
   (modernos por su carpeta interna del ZIP; viejos por el contenedor OLE + extensión), CSV y texto (sin bytes nulos ni HTML), hasta
   25 MB (`detectarAdjunto(bytes, nombre)`); el servidor vuelve a guardar el archivo con el tipo de su contenido (un texto se sirve
   como `text/plain`, nunca como página).
+  **Proveedor de una lista** (21 oct 2026): se elige de `PROVEEDORES_COMPRA` (`def-compras.ts`: Chin, Zion, Alibaba; guardados
+  con el nombre que ya tenían, el Portal del proveedor reconoce a Chin por él) en la celda (`seleccion` en `CAMPOS_EDITABLES`), la
+  ficha y la compra nueva (`SelectorProveedor`). Una compra vieja con otro proveedor («Local») lo conserva: la ficha lo muestra como
+  opción y `proveedorDeLista` lo deja pasar. Para sumar un proveedor, agrégalo a `PROVEEDORES_COMPRA`.
   **Foto comercial y foto real** (21 oct 2026): la foto comercial es la del producto en Producto; la foto real (`foto_url`,
   «Foto real del producto») es la que manda el proveedor. `FilaCompra.fotoComercial` = la de su primer producto con foto o, sin
   productos, la del producto con su mismo nombre (`productoDeCompra`); cada línea trae la suya (`lineas[].foto`, `ItemCompra.foto`:

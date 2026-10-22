@@ -112,6 +112,22 @@ export const VIAS_ENVIO = [
 ] as const;
 export const etiquetaVia = (v: string) => VIAS_ENVIO.find((x) => x.valor === v)?.etiqueta ?? v;
 
+/** Los proveedores que se eligen en una compra (21 oct 2026; antes era texto libre). Se guardan con el mismo nombre que ya
+ * tenían las compras: el Portal del proveedor reconoce las de Chin por ese nombre. Una compra vieja con otro proveedor lo
+ * conserva hasta que se cambie. */
+export const PROVEEDORES_COMPRA = [
+  { valor: "Chin", etiqueta: "Chin" },
+  { valor: "Zion", etiqueta: "Zion" },
+  { valor: "Alibaba", etiqueta: "Alibaba" },
+] as const;
+
+/** El proveedor con su nombre de la lista si coincide sin importar mayúsculas («CHIN» → «Chin»); si no, como viene. */
+export function proveedorDeLista(texto: string | null): string | null {
+  const t = texto?.trim();
+  if (!t) return null;
+  return PROVEEDORES_COMPRA.find((p) => p.valor.toLowerCase() === t.toLowerCase())?.valor ?? t;
+}
+
 
 /** Días que lleva (o llevó, si ya cerró) una compra desde que se creó. */
 export function diasDeCompra(c: Pick<FilaCompra, "creadoEn" | "cerradoEn">, ahora: number = Date.now()): number {

@@ -10,7 +10,7 @@ import { EstimacionEnvio } from "./estimacion-envio";
 import { PlanificacionAutomatica } from "./planificacion-automatica";
 import { PrediccionFechaLimite } from "./prediccion-fecha-limite";
 import { useToast } from "@/components/ui/toast";
-import { conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
+import { conEmoji, ESTADOS_COMPRA, etiquetaEtapa, ETAPAS_COMPRA, PROVEEDORES_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { BotonCrear } from "@/components/ui/boton-crear";
 import { CampoFoto } from "@/components/ui/campo-foto";
@@ -361,7 +361,7 @@ export function FormularioCompra({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CampoGobernado clave="proveedor">
               <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
-                <input id="campo-proveedor" type="text" name="proveedor" defaultValue={compra?.proveedor ?? proveedorInicial ?? ""} placeholder="Ej: Chin" className={fieldClass} />
+                <SelectorProveedor valor={compra?.proveedor ?? proveedorInicial ?? ""} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="agente">
@@ -488,5 +488,22 @@ export function FormularioCompra({
         </div>
       )}
     </form>
+  );
+}
+
+/** El proveedor de la compra: se elige de `PROVEEDORES_COMPRA`. Una compra vieja con otro proveedor lo sigue mostrando como
+ * opción, para que guardar la ficha no lo borre. */
+function SelectorProveedor({ valor }: { valor: string }) {
+  const fuera = valor && !PROVEEDORES_COMPRA.some((p) => p.valor === valor) ? valor : null;
+  return (
+    <select id="campo-proveedor" name="proveedor" defaultValue={valor} className={fieldClass}>
+      <option value="">Sin proveedor</option>
+      {PROVEEDORES_COMPRA.map((p) => (
+        <option key={p.valor} value={p.valor}>
+          {p.etiqueta}
+        </option>
+      ))}
+      {fuera && <option value={fuera}>{fuera}</option>}
+    </select>
   );
 }
