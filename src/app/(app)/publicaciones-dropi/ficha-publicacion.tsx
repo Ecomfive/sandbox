@@ -330,10 +330,26 @@ function ContenidoFicha({
                 <span className={labelClassSm}>Tipo</span>
                 <span className="text-sm">{p.tipoDropi === "privado" ? "Privado" : p.tipoDropi === "publico" ? "Público" : "—"}</span>
               </div>
-              <label className="flex min-w-0 flex-col gap-1">
+              {/* Ya no se anota (21 oct 2026): sale de Dropi. Por ahora, la primera venta de la carga de Ventas Dropi; sin ventas,
+                  la fecha que estaba anotada. */}
+              <div className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fecha de publicación</span>
-                <input type="date" value={d.fecha_publicacion} onChange={(e) => cambiar({ fecha_publicacion: e.target.value })} className={`${fieldClass} w-full`} />
-              </label>
+                <span className="text-sm">
+                  {p.ventas?.primeraVenta ? (
+                    <>
+                      Se vende desde el {fechaLarga(p.ventas.primeraVenta)}
+                      <span className="block text-xs text-muted-foreground">primera venta en Dropi</span>
+                    </>
+                  ) : p.fechaPublicacion ? (
+                    <>
+                      {fechaLarga(p.fechaPublicacion)}
+                      <span className="block text-xs text-muted-foreground">anotada · todavía sin ventas en Dropi</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+              </div>
               {(p.tipoDropi === "privado" || !!d.privatizado_a) && (
                 <>
                   <label className="flex min-w-0 flex-col gap-1">

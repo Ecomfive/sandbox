@@ -15,7 +15,6 @@ const RUTA = "/publicaciones-dropi";
 const BUCKET_FOTOS = "wms-productos";
 const PREFIJO_URL_PUBLICA = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 const hoy = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 const texto = (f: FormData, k: string, max: number) => {
@@ -31,10 +30,6 @@ const numero = (f: FormData, k: string): number | null | undefined => {
   if (!t) return null;
   const n = Number(t.replace(",", "."));
   return Number.isFinite(n) && n >= 0 && n < 1e9 ? Math.round(n * 100) / 100 : undefined;
-};
-const fecha = (f: FormData, k: string) => {
-  const t = texto(f, k, 10);
-  return FECHA.test(t) ? t : null;
 };
 
 type Datos = Record<string, string | number | boolean | null>;
@@ -65,7 +60,7 @@ function leerDatos(f: FormData): Datos | { error: string } {
     ubicacion: deLista(f, "ubicacion", UBICACIONES),
     // «Reposición» y «Competencia» ya no se editan aquí (la reposición se hace desde Compras y la competencia se ve en la del
     // producto): no van, así guardar la ficha no borra lo que quedó en la base.
-    fecha_publicacion: fecha(f, "fecha_publicacion"),
+    // «Fecha de publicación» ya no se anota (21 oct 2026): sale de Dropi (la primera venta). Al crear una se pone la de hoy.
     // «Último cambio de precio» ya no se anota (21 oct 2026): lo detecta la lectura del catálogo de Dropi.
     notas: texto(f, "notas", 5000) || null,
     responsable_id: UUID.test(resp) ? resp : null,

@@ -53,7 +53,8 @@ function automatico(
     acciones: accionesPublicacion(
       {
         archivada,
-        fechaPublicacion: (d.fecha_publicacion as string | null) ?? null,
+        // Primero la de Dropi (la primera venta); la anotada, solo si todavía no vendió.
+        fechaPublicacion: v?.primeraVenta ?? ((d.fecha_publicacion as string | null) ?? null),
         primeraVenta: v?.primeraVenta ?? null,
         margen: num(d.margen),
         netas30: v ? v.netas30 : null,
