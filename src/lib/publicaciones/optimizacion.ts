@@ -7,7 +7,7 @@
 import { medidaEnNombre } from "@/lib/competencia/analisis";
 import type { Reglas } from "./reglas";
 
-export type ClaveRevision = "titulo_espanol" | "titulo_cantidad" | "titulo_angulo" | "titulo_formato" | "fotos" | "video" | "descripcion" | "precio_sugerido";
+export type ClaveRevision = "titulo_espanol" | "titulo_largo" | "titulo_cantidad" | "titulo_angulo" | "titulo_formato" | "fotos" | "video" | "descripcion" | "precio_sugerido";
 
 export type EstadoRevision = "ok" | "falta" | "revisar" | "sin_datos" | "no_aplica";
 
@@ -74,6 +74,7 @@ export function tieneCantidad(titulo: string): boolean {
 
 export const ETIQUETA_REVISION: Record<ClaveRevision, string> = {
   titulo_espanol: "Título en español",
+  titulo_largo: "Largo del título",
   titulo_cantidad: "Cantidad en el título",
   titulo_angulo: "Para qué sirve, en el título",
   titulo_formato: "Título claro",
@@ -84,7 +85,7 @@ export const ETIQUETA_REVISION: Record<ClaveRevision, string> = {
 };
 
 /** La revisión completa de una publicación, en el orden en que se muestra. */
-export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min_fotos" | "min_descripcion">): Revision[] {
+export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "max_titulo" | "min_fotos" | "min_descripcion">): Revision[] {
   const r = (clave: ClaveRevision, estado: EstadoRevision, detalle: string): Revision => ({ clave, etiqueta: ETIQUETA_REVISION[clave], estado, detalle });
   const t = p.titulo.trim();
   const ingles = palabrasEnIngles(t);
@@ -96,6 +97,8 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
 
   return [
     r("titulo_espanol", ingles.length ? "falta" : "ok", ingles.length ? `Palabras en inglés: ${ingles.join(", ")}` : "En español"),
+    // Dropi no deja títulos largos: más de `max_titulo` caracteres (40) no se admiten.
+    r("titulo_largo", t.length > reglas.max_titulo ? "falta" : "ok", `${t.length} de ${reglas.max_titulo} caracteres como máximo`),
     suple
       ? r("titulo_cantidad", tieneCantidad(t) ? "ok" : "falta", tieneCantidad(t) ? "Dice la cantidad" : "Es un suplemento y no dice cuántas cápsulas, gomitas o tabletas trae")
       : r("titulo_cantidad", tieneCantidad(t) ? "ok" : "no_aplica", tieneCantidad(t) ? "Dice la cantidad" : "No es un suplemento"),
