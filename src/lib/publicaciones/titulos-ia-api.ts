@@ -13,7 +13,7 @@ const claveOpenAI = () => (process.env.OPENAI_API_KEY?.trim() || process.env.CHA
 export async function pedirTitulosIA(d: DatosTitulo, reglas: Reglas): Promise<{ sugerencias: SugerenciaTitulo[] } | { error: string }> {
   const clave = claveOpenAI();
   if (!clave) return { error: "Falta la clave de ChatGPT en el servidor (OPENAI_API_KEY en Vercel)." };
-  const { sistema, usuario } = promptTitulos(d, reglas.max_titulo);
+  const { sistema, usuario } = promptTitulos(d, reglas);
   let r: Response;
   try {
     r = await fetch("https://api.openai.com/v1/chat/completions", {

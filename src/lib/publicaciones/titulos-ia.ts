@@ -1,5 +1,5 @@
 // Gestión de IDs Dropi › Títulos con IA (22 oct 2026): el botón «Sugerir títulos con IA» de la ficha pide a ChatGPT títulos nuevos
-// para la publicación con las mismas reglas de la revisión de optimización (español, 40 caracteres como máximo, la cantidad si es un
+// para la publicación con las mismas reglas de la revisión de optimización (español, entre 35 y 40 caracteres, la cantidad si es un
 // suplemento, para qué sirve, sin mayúsculas sostenidas). Aquí van el pedido (prompt) y la lectura de la respuesta: cada sugerencia
 // se vuelve a revisar con `revisarPublicacion` y la que no entra en Dropi (más larga que el máximo o muy corta) se descarta. Sin base
 // ni React, con prueba; la llamada a OpenAI está en `titulos-ia-api.ts`.
@@ -29,13 +29,13 @@ const CLAVES_TITULO: ClaveRevision[] = ["titulo_espanol", "titulo_largo", "titul
 export const OPCIONES_PEDIDAS = 5;
 
 /** Los puntos de título de la revisión de optimización para un título suelto (lo demás de la publicación no cuenta aquí). */
-export function revisarTitulo(titulo: string, reglas: Pick<Reglas, "max_titulo" | "min_fotos" | "min_descripcion">): Revision[] {
+export function revisarTitulo(titulo: string, reglas: Pick<Reglas, "min_titulo" | "max_titulo" | "min_fotos" | "min_descripcion">): Revision[] {
   const revs = revisarPublicacion({ titulo, categoria: null, precio: null, precioSugerido: null, fotos: null, videos: null, descripcionLargo: null, leidoEnDropi: false }, reglas);
   return revs.filter((r) => CLAVES_TITULO.includes(r.clave));
 }
 
 /** El pedido a ChatGPT: las reglas de la revisión de optimización dichas en palabras, y los datos de la publicación. */
-export function promptTitulos(d: DatosTitulo, maxTitulo: number): { sistema: string; usuario: string } {
+export function promptTitulos(d: DatosTitulo, reglas: Pick<Reglas, "min_titulo" | "max_titulo">): { sistema: string; usuario: string } {
   const sistema =
     "Eres especialista en catálogos de dropshipping en Latinoamérica (Dropi, Panamá). Escribes títulos de producto que venden: en español neutro, claros, que dicen qué es el producto y para qué sirve. Respondes solo con JSON.";
   const datos = [`Título actual en Dropi: «${d.titulo.trim()}»`];
@@ -46,7 +46,7 @@ export function promptTitulos(d: DatosTitulo, maxTitulo: number): { sistema: str
     ...datos,
     "",
     "Reglas (todas obligatorias):",
-    `- Máximo ${maxTitulo} caracteres contando espacios: Dropi no acepta más. Cuéntalos bien.`,
+    `- Entre ${reglas.min_titulo} y ${reglas.max_titulo} caracteres contando espacios: Dropi no acepta más de ${reglas.max_titulo} y con menos se desaprovecha espacio. Cuéntalos bien.`,
     "- Todo en español: traduce lo que venga en inglés del proveedor (hair, growth, cream, pain relief…).",
     "- Primero qué es el producto; después para qué sirve («para…», «contra…», «alivio de…»).",
     "- Si es un suplemento, di cuántas cápsulas, gomitas o tabletas trae, solo si la cantidad aparece en los datos: no inventes cantidades.",
@@ -71,7 +71,7 @@ const limpiar = (t: string) =>
  * repetir, distintas del título actual, de `max_titulo` caracteres o menos y con 3 palabras o más. Cada una lleva su revisión, y van
  * primero las que cumplen más puntos. `null` si la respuesta no se entiende.
  */
-export function leerSugerencias(respuesta: unknown, d: DatosTitulo, reglas: Pick<Reglas, "max_titulo" | "min_fotos" | "min_descripcion">): SugerenciaTitulo[] | null {
+export function leerSugerencias(respuesta: unknown, d: DatosTitulo, reglas: Pick<Reglas, "min_titulo" | "max_titulo" | "min_fotos" | "min_descripcion">): SugerenciaTitulo[] | null {
   const contenido = (respuesta as { choices?: { message?: { content?: unknown } }[] } | null)?.choices?.[0]?.message?.content;
   if (typeof contenido !== "string") return null;
   let json: unknown;

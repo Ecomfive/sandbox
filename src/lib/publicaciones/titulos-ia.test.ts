@@ -6,12 +6,12 @@ import { errorOpenAI, leerSugerencias, promptTitulos, revisarTitulo } from "./ti
 const datos = { titulo: "DHT Blocker Hair Growth", nombre: "Biotina 60 cápsulas" };
 const respuesta = (contenido: unknown) => ({ choices: [{ message: { content: typeof contenido === "string" ? contenido : JSON.stringify(contenido) } }] });
 
-test("el pedido lleva el máximo de Dropi y los dos nombres", () => {
-  const { usuario } = promptTitulos(datos, 40);
-  assert.match(usuario, /Máximo 40 caracteres/);
+test("el pedido lleva el largo de Dropi y los dos nombres", () => {
+  const { usuario } = promptTitulos(datos, REGLAS_DEFECTO);
+  assert.match(usuario, /Entre 35 y 40 caracteres/);
   assert.match(usuario, /«DHT Blocker Hair Growth»/);
   assert.match(usuario, /«Biotina 60 cápsulas»/);
-  assert.doesNotMatch(promptTitulos({ titulo: "Faja", nombre: "Faja" }, 40).usuario, /Nombre interno/);
+  assert.doesNotMatch(promptTitulos({ titulo: "Faja", nombre: "Faja" }, REGLAS_DEFECTO).usuario, /Nombre interno/);
 });
 
 test("se descartan los largos, los cortos, los repetidos y el título actual; se limpian comillas y punto final", () => {
