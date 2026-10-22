@@ -5,18 +5,8 @@
 -- los cambios quedan pendientes y se aplican al conectar. Código: src/lib/dropi/sesion.ts, src/lib/publicaciones/cambios-dropi.ts.
 -- Reversa: supabase/rollbacks/0137_rollback.sql
 
--- La sesión de proveedor de Dropi por país, CIFRADA (AES-256-GCM con una clave que solo tiene el servidor): sin esa clave, la fila
--- no sirve. Una por país; conectar de nuevo la reemplaza.
-create table if not exists dropi_sesiones (
-  pais_id uuid primary key references paises(id),
-  token_cifrado text not null,
-  dropi_usuario_id integer not null,
-  dropi_usuario text,
-  vence_en timestamptz not null,
-  conectado_por uuid references perfiles(id) on delete set null,
-  conectado_por_nombre text,
-  conectado_en timestamptz not null default now()
-);
+-- La sesión de proveedor guardada va en `dropi_conexiones` (migración 0138): aquí se pensó como `dropi_sesiones`, pero ese nombre ya
+-- era de la 0028 y la tabla no se tocó.
 
 -- Los cambios que el sistema tiene que hacer en Dropi: hoy, el nombre del producto y el nombre en la guía de envío.
 create table if not exists dropi_cambios_pendientes (
@@ -42,5 +32,4 @@ create index if not exists dropi_cambios_pendientes_estado_idx on dropi_cambios_
 create index if not exists dropi_cambios_pendientes_pub_idx on dropi_cambios_pendientes (publicacion_id, creado_en desc);
 
 -- Solo el servidor (clave de servicio) toca los datos: RLS sin políticas.
-alter table dropi_sesiones enable row level security;
 alter table dropi_cambios_pendientes enable row level security;

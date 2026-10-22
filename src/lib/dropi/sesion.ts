@@ -43,7 +43,7 @@ export interface ConexionDropi {
 
 /** Cómo está la conexión con Dropi de un país, para mostrarla (sin el token). Sin la migración 0137, desconectada. */
 export async function estadoConexionDropi(supabase: SupabaseClient, paisId: string): Promise<ConexionDropi> {
-  const { data } = await supabase.from("dropi_sesiones").select("vence_en, conectado_por_nombre, conectado_en, dropi_usuario").eq("pais_id", paisId).maybeSingle();
+  const { data } = await supabase.from("dropi_conexiones").select("vence_en, conectado_por_nombre, conectado_en, dropi_usuario").eq("pais_id", paisId).maybeSingle();
   if (!data) return { conectada: false, venceEn: null, conectadoPor: null, conectadoEn: null, dropiUsuario: null };
   return {
     conectada: Date.parse(data.vence_en as string) - MARGEN_MS > Date.now(),
@@ -56,7 +56,7 @@ export async function estadoConexionDropi(supabase: SupabaseClient, paisId: stri
 
 /** La sesión vigente de un país (token y usuario de Dropi), o null si no hay, venció o no se puede descifrar. Solo en el servidor. */
 export async function sesionVigenteDropi(supabase: SupabaseClient, paisId: string): Promise<{ token: string; usuarioId: number } | null> {
-  const { data } = await supabase.from("dropi_sesiones").select("token_cifrado, dropi_usuario_id, vence_en").eq("pais_id", paisId).maybeSingle();
+  const { data } = await supabase.from("dropi_conexiones").select("token_cifrado, dropi_usuario_id, vence_en").eq("pais_id", paisId).maybeSingle();
   if (!data || Date.parse(data.vence_en as string) - MARGEN_MS <= Date.now()) return null;
   const token = descifrarToken(data.token_cifrado as string);
   return token ? { token, usuarioId: Number(data.dropi_usuario_id) } : null;
@@ -66,7 +66,7 @@ export async function guardarSesionDropi(
   supabase: SupabaseClient,
   s: { paisId: string; token: string; usuarioId: number; usuario: string | null; venceEn: Date; por: { id: string; nombre: string } },
 ): Promise<string | null> {
-  const { error } = await supabase.from("dropi_sesiones").upsert({
+  const { error } = await supabase.from("dropi_conexiones").upsert({
     pais_id: s.paisId,
     token_cifrado: cifrarToken(s.token),
     dropi_usuario_id: s.usuarioId,
@@ -80,5 +80,5 @@ export async function guardarSesionDropi(
 }
 
 export async function borrarSesionDropi(supabase: SupabaseClient, paisId: string) {
-  await supabase.from("dropi_sesiones").delete().eq("pais_id", paisId);
+  await supabase.from("dropi_conexiones").delete().eq("pais_id", paisId);
 }

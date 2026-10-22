@@ -49,8 +49,8 @@ export async function conectarDropi(codigoPais: string, token: string): Promise<
     venceEn: datos.venceEn,
     por: { id: usuario.id, nombre: usuario.nombre || usuario.email },
   });
-  if (error) return { error: /does not exist|schema cache/i.test(error) ? "Falta correr en Supabase la migración 0137." : "No se pudo guardar la conexión." };
-  await registrarAuditoria({ accion: "conectar_dropi", entidad: "dropi_sesiones", entidadId: pais.id as string, detalle: `${pais.nombre}: ${u.nombre} (usuario ${datos.usuarioId}), vence ${datos.venceEn.toISOString()}` });
+  if (error) return { error: /does not exist|schema cache/i.test(error) ? "Falta correr en Supabase la migración 0138." : "No se pudo guardar la conexión." };
+  await registrarAuditoria({ accion: "conectar_dropi", entidad: "dropi_conexiones", entidadId: pais.id as string, detalle: `${pais.nombre}: ${u.nombre} (usuario ${datos.usuarioId}), vence ${datos.venceEn.toISOString()}` });
   const r = await aplicarCambiosDropi(supabase, { id: pais.id as string, codigo: pais.codigo as string });
   revalidatePath("/publicaciones-dropi");
   return { pais: pais.nombre as string, venceEn: datos.venceEn.toISOString(), dropiUsuario: u.nombre, aplicados: r.aplicados, errores: r.errores, pendientes: r.pendientes };
@@ -64,7 +64,7 @@ export async function desconectarDropi(paisId: string): Promise<{ error?: string
   const supabase = createServiceClient();
   if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, paisId))) return { error: "País no válido." };
   await borrarSesionDropi(supabase, paisId);
-  await registrarAuditoria({ accion: "conectar_dropi", entidad: "dropi_sesiones", entidadId: paisId, detalle: "Desconectó Dropi" });
+  await registrarAuditoria({ accion: "conectar_dropi", entidad: "dropi_conexiones", entidadId: paisId, detalle: "Desconectó Dropi" });
   revalidatePath("/publicaciones-dropi");
   return {};
 }
