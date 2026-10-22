@@ -107,16 +107,25 @@ export function pedidoAnalisis(d: DatosPublicacionIA, c: ContextoIA): { instrucc
 export function pedidoTitulos(d: DatosPublicacionIA, c: ContextoIA): { instrucciones: string; texto: string } {
   const { minTitulo, maxTitulo } = c.reglas;
   const instrucciones = bloques(
-    "Eres especialista en títulos de productos para Dropi.",
+    "Eres especialista en catálogos de dropshipping en Latinoamérica (Dropi). Escribes títulos de producto que venden: en español neutro, claros, que dicen qué es el producto y para qué sirve.",
     `Propón 6 títulos distintos para esta publicación. Cada uno debe tener entre ${minTitulo} y ${maxTitulo} caracteres contando los espacios: cuenta los caracteres de cada uno antes de responder. Dropi no admite más de ${maxTitulo}.`,
     `Reglas del sistema:\n- ${textoCriterios(c.reglas)}`,
+    [
+      "Reglas del título (todas obligatorias):",
+      "- Todo en español: traduce lo que venga en inglés del proveedor (hair, growth, cream, pain relief…).",
+      "- Primero qué es el producto; después para qué sirve («para…», «contra…», «alivio de…»).",
+      "- Si es un suplemento, di cuántas cápsulas, gomitas o tabletas trae, solo si la cantidad aparece en los datos: no inventes cantidades.",
+      "- Mínimo 3 palabras. Sin MAYÚSCULAS sostenidas, emojis, signos de exclamación ni punto final.",
+      "- Que las opciones sean distintas entre sí (otro enfoque o beneficio), no la misma frase reordenada.",
+    ].join("\n"),
     `Reglas:\n- ${REGLAS_COMUNES}`,
     textoIndicaciones(c.indicaciones, "titulo"),
-    'Responde SOLO con un JSON, sin texto antes ni después: {"enfoque":"…","titulos":["…","…","…","…","…","…"]}. enfoque: 1 frase con el ángulo que elegiste y por qué.',
+    'Responde SOLO con un JSON, sin texto antes ni después: {"enfoque":"…","titulos":[{"titulo":"…","porque":"una frase corta de por qué ese título vende mejor"}]}. enfoque: 1 frase con lo que privilegiaste.',
   );
   const texto = bloques(
     datosBase(d).join("\n"),
-    `Título actual en Dropi: ${d.tituloDropi ?? d.nombre} (${(d.tituloDropi ?? d.nombre).trim().length} caracteres).`,
+    `Título actual en Dropi: «${(d.tituloDropi ?? d.nombre).trim()}» (${(d.tituloDropi ?? d.nombre).trim().length} caracteres).`,
+    d.tituloDropi && d.tituloDropi.trim() !== d.nombre.trim() ? `Nombre interno del producto (a veces trae la cantidad o el uso que el título de Dropi no dice): «${d.nombre.trim()}».` : "",
     resumenFaltas(d).length ? `Lo que le falta hoy: ${resumenFaltas(d).join("; ")}.` : "",
     d.competidores.length ? `Así titulan este producto otros vendedores en Dropi (referencia, no copies):\n- ${d.competidores.slice(0, 10).map((x) => x.nombre).join("\n- ")}` : "",
     textoEjemplos(c.ejemplos),
@@ -218,6 +227,8 @@ export function normalizarAnalisis(texto: string): AnalisisIA | null {
 
 export interface TituloSugerido {
   titulo: string;
+  /** Una frase de la IA: por qué ese título vende mejor. */
+  porque: string;
   chequeos: ChequeoTitulo[];
   cumple: boolean;
 }
@@ -231,23 +242,34 @@ export interface PropuestaTitulos {
   elegido?: { titulo: string; editado: boolean; por: string; en: string };
 }
 
+/** Sin espacios de más, comillas alrededor ni punto o exclamación al final (en cualquier orden: «Título».). */
+const limpiarTitulo = (t: string) =>
+  t
+    .replace(/\s+/g, " ")
+    .replace(/^[\s"«“'`]+|[\s"»”'`.!¡]+$/g, "")
+    .trim();
+
 /**
- * Valida los títulos de la IA con las reglas del sistema: se queda con los que cumplen (hasta 3) y cuenta los descartados. Si ninguno
- * cumple, devuelve los 3 más cercanos marcados para que el equipo los ajuste. null si no hay ningún título.
+ * Valida los títulos de la IA con las reglas del sistema: limpia cada uno, descarta los repetidos, el actual y los de menos de 3
+ * palabras, se queda con los que cumplen (hasta 3) y cuenta los descartados. Si ninguno cumple, devuelve los 3 más cercanos marcados
+ * para que el equipo los ajuste. null si no hay ningún título. Cada título puede venir solo o con su «porque».
  */
-export function normalizarTitulos(texto: string, categoria: string | null, reglas: Pick<ReglasIA, "minTitulo" | "maxTitulo">): PropuestaTitulos | null {
+export function normalizarTitulos(texto: string, categoria: string | null, reglas: Pick<ReglasIA, "minTitulo" | "maxTitulo">, tituloActual?: string): PropuestaTitulos | null {
   const j = extraerJson(texto);
   if (!j || typeof j !== "object") return null;
   const o = j as Record<string, unknown>;
-  const vistos = new Set<string>();
+  const vistos = new Set<string>(tituloActual ? [tituloActual.trim().toLowerCase()] : []);
   const todos: TituloSugerido[] = [];
   for (const t of Array.isArray(o.titulos) ? o.titulos : []) {
-    const titulo = cortar(t, 200);
+    const crudo = typeof t === "string" ? t : (t as { titulo?: unknown } | null)?.titulo;
+    if (typeof crudo !== "string") continue;
+    const titulo = limpiarTitulo(crudo).slice(0, 200);
     const clave = titulo.toLowerCase();
-    if (titulo.length < 8 || vistos.has(clave)) continue;
+    if (titulo.length < 8 || titulo.split(" ").length < 3 || vistos.has(clave)) continue;
     vistos.add(clave);
+    const porque = typeof t === "object" && t && typeof (t as { porque?: unknown }).porque === "string" ? limpiarTitulo((t as { porque: string }).porque).slice(0, 200) : "";
     const r = chequearTitulo(titulo, categoria, reglas);
-    todos.push({ titulo, chequeos: r.chequeos, cumple: r.cumple });
+    todos.push({ titulo, porque, chequeos: r.chequeos, cumple: r.cumple });
   }
   if (!todos.length) return null;
   const buenos = todos.filter((t) => t.cumple);

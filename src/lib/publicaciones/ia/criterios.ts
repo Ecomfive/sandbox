@@ -19,7 +19,7 @@ export function reglasParaIA(r: Pick<Reglas, "max_titulo" | "min_fotos" | "min_d
 }
 
 export interface ChequeoTitulo {
-  clave: "largo" | "espanol" | "cantidad" | "angulo";
+  clave: "largo" | "espanol" | "formato" | "cantidad" | "angulo";
   ok: boolean;
   /** Qué se vio («38 caracteres», «Palabras en inglés: hair»). */
   texto: string;
@@ -51,6 +51,10 @@ export function chequearTitulo(titulo: string, categoria: string | null, r: Pick
     },
     { clave: "espanol", ok: ingles.length === 0, texto: ingles.length ? `Palabras en inglés: ${ingles.join(", ")}` : "En español", obligatorio: true },
   ];
+  const letras = t.replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ]/g, "");
+  const mayusculas = letras.length >= 8 && letras === letras.toUpperCase();
+  const palabras = t.split(/\s+/).filter(Boolean).length;
+  chequeos.push({ clave: "formato", ok: !mayusculas && palabras >= 3, texto: mayusculas ? "Todo en mayúsculas" : palabras < 3 ? "Muy corto" : "Claro", obligatorio: true });
   if (suple) chequeos.push({ clave: "cantidad", ok: tieneCantidad(t), texto: tieneCantidad(t) ? "Dice la cantidad" : "Falta la cantidad (cápsulas, gomitas, tabletas)", obligatorio: true });
   chequeos.push({ clave: "angulo", ok: tieneAngulo(t), texto: tieneAngulo(t) ? "Dice para qué sirve" : "No dice para qué sirve", obligatorio: false });
   return { chequeos, cumple: chequeos.every((c) => !c.obligatorio || c.ok) };

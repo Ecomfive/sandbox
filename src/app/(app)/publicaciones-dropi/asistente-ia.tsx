@@ -214,6 +214,15 @@ function ContenidoAsistente({ publicacionId, inicial, estado, vista }: { publica
   return (
     <div className="@container flex flex-col">
       <Encabezado vista={vista} estado={estado} />
+      {estado.avisos.map((a) => (
+        <p key={a.proveedor} role="alert" className={`m-0 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 px-6 py-2.5 text-sm font-medium ${a.agotado ? "bg-destructive-soft text-destructive" : "bg-warning-soft text-warning"}`}>
+          <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${a.agotado ? "bg-destructive" : "bg-warning"}`} />
+          {a.agotado ? `El crédito de ${a.proveedor} se agotó.` : `El crédito de ${a.proveedor} está por acabarse${a.saldoUsd !== null ? `: quedan unos $${a.saldoUsd.toFixed(2)}` : ""}.`}
+          <a href="/publicaciones-dropi/consumo" className={`underline underline-offset-2 ${anilloFoco}`}>
+            Ver consumo
+          </a>
+        </p>
+      ))}
       <div role="tablist" aria-label="Qué mejorar" onKeyDown={teclas} className="sticky top-[var(--alto-cabecera,3.8rem)] z-[5] flex shrink-0 gap-0.5 overflow-x-auto border-b border-border bg-card px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {PESTANAS.map((p) => {
           const activa = pestana === p.id;
@@ -489,7 +498,7 @@ function MedidorLargo({ largo, min, max }: { largo: number; min: number; max: nu
   );
 }
 
-function OpcionTitulo({ indice, inicial, categoria, reglas, iaId, elegido, alElegir }: { indice: number; inicial: string; categoria: string | null; reglas: { minTitulo: number; maxTitulo: number }; iaId: string; elegido: string | null; alElegir: (t: string) => void }) {
+function OpcionTitulo({ indice, inicial, porque, categoria, reglas, iaId, elegido, alElegir }: { indice: number; inicial: string; porque: string; categoria: string | null; reglas: { minTitulo: number; maxTitulo: number }; iaId: string; elegido: string | null; alElegir: (t: string) => void }) {
   const { mostrarToast } = useToast();
   const [texto, setTexto] = useState(inicial);
   const [guardando, setGuardando] = useState(false);
@@ -519,6 +528,7 @@ function OpcionTitulo({ indice, inicial, categoria, reglas, iaId, elegido, alEle
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <input value={texto} maxLength={200} onChange={(e) => setTexto(e.target.value)} aria-label={`Título propuesto ${indice + 1}`} className={`${fieldClass} w-full text-sm font-medium`} />
+          {porque && <p className="m-0 text-xs text-muted-foreground">{porque}</p>}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${largo.ok ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>{largo.texto}</span>
             {r.chequeos
@@ -617,7 +627,7 @@ function PanelTitulos({ publicacionId, estado, vista }: { publicacionId: string;
             {t.enfoque && <p className="m-0 text-sm text-muted-foreground">{t.enfoque}</p>}
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {t.titulos.map((x, i) => (
-                <OpcionTitulo key={`${actual.id}-${i}`} indice={i} inicial={x.titulo} categoria={c.categoria} reglas={c.reglas} iaId={actual.id} elegido={elegido} alElegir={setElegido} />
+                <OpcionTitulo key={`${actual.id}-${i}`} indice={i} inicial={x.titulo} porque={x.porque} categoria={c.categoria} reglas={c.reglas} iaId={actual.id} elegido={elegido} alElegir={setElegido} />
               ))}
             </ul>
             {t.descartados > 0 && (

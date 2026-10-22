@@ -153,8 +153,30 @@ test("los títulos de la IA se revisan: se quedan los que cumplen, se cuentan lo
   assert.equal(p?.enfoque, "Cantidad y beneficio");
 });
 
+test("los títulos se limpian y se piden con su porqué, sin repetir ni el actual ni los de menos de 3 palabras", () => {
+  const p = normalizarTitulos(
+    JSON.stringify({
+      titulos: [
+        { titulo: "«Biotina para el cabello 60 cápsulas».", porque: "Dice la cantidad y para qué sirve." },
+        { titulo: "Biotina para el cabello 60 cápsulas", porque: "repetido" },
+        "BIOTINA PARA EL CABELLO 60 CAPSULAS",
+        { titulo: "Biotina fuerte para tu pelo 90 cápsulas!", porque: "Más cantidad." },
+        "Cabello fuerte",
+      ],
+    }),
+    "Salud",
+    reglas,
+    "Biotina fuerte para tu pelo 90 cápsulas",
+  );
+  assert.deepEqual(p?.titulos.map((x) => x.titulo), ["Biotina para el cabello 60 cápsulas"]);
+  assert.equal(p?.titulos[0].porque, "Dice la cantidad y para qué sirve");
+  assert.equal(p?.descartados, 1); // el que venía todo en mayúsculas
+  assert.match(pedidoTitulos(datos, contexto).instrucciones, /no inventes cantidades/);
+  assert.match(pedidoTitulos(datos, contexto).instrucciones, /Sin MAYÚSCULAS sostenidas/);
+});
+
 test("si ningún título cumple, salen los más cercanos marcados para ajustarlos a mano", () => {
-  const p = normalizarTitulos(JSON.stringify({ titulos: ["Biotina 60 cápsulas", "Biotina capsulas", "Biotina capsulas x60"] }), "Salud", reglas);
+  const p = normalizarTitulos(JSON.stringify({ titulos: ["Biotina 60 cápsulas", "Biotina capsulas fuertes", "Biotina capsulas x60"] }), "Salud", reglas);
   assert.equal(p?.titulos.length, 3);
   assert.ok(p?.titulos.every((t) => !t.cumple));
   assert.equal(normalizarTitulos("nada", "Salud", reglas), null);

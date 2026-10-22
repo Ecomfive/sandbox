@@ -1,6 +1,8 @@
 // Solo se importa desde acciones del servidor: usa las claves OPENAI_API_KEY o ANTHROPIC_API_KEY (nunca NEXT_PUBLIC_).
 // Elige con qué IA de texto se trabaja: la que tenga clave (`AI_PROVEEDOR=openai|anthropic` fuerza una si hay las dos).
-import { cuerpoMensaje, extraerMensaje, mensajeErrorClaude, MODELO_CLAUDE } from "./anthropic";
+import { registrarConsumo, type ContextoConsumo } from "@/lib/ia/consumo";
+import { costoTexto } from "@/lib/ia/precios";
+import { cuerpoMensaje, extraerMensaje, mensajeErrorClaude, MODELO_CLAUDE, usoDeMensaje } from "./anthropic";
 import { openaiConectado, modeloTexto, pedirTexto } from "./openai-api";
 import type { EntradaTexto, RespuestaTexto } from "./openai";
 
@@ -26,20 +28,26 @@ export function modeloDeTexto(): string {
   return p === "anthropic" ? process.env.ANTHROPIC_MODEL?.trim() || MODELO_CLAUDE : modeloTexto();
 }
 
-async function pedirClaude(entrada: EntradaTexto, buscar: boolean): Promise<RespuestaTexto> {
+async function pedirClaude(entrada: EntradaTexto, buscar: boolean, consumo?: ContextoConsumo): Promise<RespuestaTexto> {
   const clave = process.env.ANTHROPIC_API_KEY?.trim();
   if (!clave) return { error: "Falta conectar Claude (la clave ANTHROPIC_API_KEY)." };
+  const modelo = modeloDeTexto();
+  const anotar = (uso: { tokensEntrada: number; tokensSalida: number; busquedas: number }, ok: boolean, error?: string) =>
+    consumo ? registrarConsumo(consumo, { proveedor: "anthropic", modelo, ...uso, costoUsd: costoTexto(modelo, uso), ok, error }) : Promise.resolve();
+  const sinUso = { tokensEntrada: 0, tokensSalida: 0, busquedas: 0 };
   let r: Response;
   try {
     r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": clave, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify(cuerpoMensaje(modeloDeTexto(), entrada, buscar)),
+      body: JSON.stringify(cuerpoMensaje(modelo, entrada, buscar)),
       signal: AbortSignal.timeout(170_000),
       cache: "no-store",
     });
   } catch (e) {
-    return { error: (e as Error)?.name === "TimeoutError" ? "Claude tardó demasiado. Vuelve a intentar." : "No se pudo conectar con Claude." };
+    const error = (e as Error)?.name === "TimeoutError" ? "Claude tardó demasiado. Vuelve a intentar." : "No se pudo conectar con Claude.";
+    await anotar(sinUso, false, error);
+    return { error };
   }
   let json: unknown = null;
   try {
@@ -47,13 +55,19 @@ async function pedirClaude(entrada: EntradaTexto, buscar: boolean): Promise<Resp
   } catch {
     // Sin JSON: se informa por el código.
   }
-  if (!r.ok) return { error: mensajeErrorClaude(r.status, (json as { error?: { message?: string } } | null)?.error?.message ?? "") };
-  return extraerMensaje(json);
+  if (!r.ok) {
+    const error = mensajeErrorClaude(r.status, (json as { error?: { message?: string } } | null)?.error?.message ?? "");
+    await anotar(sinUso, false, error);
+    return { error };
+  }
+  const respuesta = extraerMensaje(json);
+  await anotar(usoDeMensaje(json), !("error" in respuesta), "error" in respuesta ? respuesta.error : undefined);
+  return respuesta;
 }
 
 /** Pide un texto a la IA conectada (con búsqueda en internet). Devuelve el texto y las fuentes, o el error en palabras claras. Nunca lanza. */
-export async function pedirIA(entrada: EntradaTexto, buscar = true): Promise<RespuestaTexto> {
+export async function pedirIA(entrada: EntradaTexto, buscar = true, consumo?: ContextoConsumo): Promise<RespuestaTexto> {
   const p = proveedorTexto();
   if (!p) return { error: "Falta conectar una IA de texto (la clave OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel)." };
-  return p === "anthropic" ? pedirClaude(entrada, buscar) : pedirTexto(entrada, buscar);
+  return p === "anthropic" ? pedirClaude(entrada, buscar, consumo) : pedirTexto(entrada, buscar, consumo);
 }

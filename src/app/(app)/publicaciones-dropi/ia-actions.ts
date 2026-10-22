@@ -2,6 +2,8 @@
 
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
+import { creditosPorAcabarse } from "@/lib/ia/consumo";
+import { ETIQUETA_PROVEEDOR } from "@/lib/ia/precios";
 import { geminiConectado, generarImagen, modeloImagen } from "@/lib/landings/gemini-api";
 import { cargarCompetidores, cargarNuestrosEnDropi } from "@/lib/publicaciones/competencia-publicaciones";
 import {
@@ -43,6 +45,8 @@ const faltaMigracion = (m: string) => /does not exist|schema cache|relation/i.te
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0134.";
 const urlPublica = (ruta: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${ruta}`;
 const idsDropi = (dropiId: string | null) => (String(dropiId ?? "").match(/\d{3,6}/g) ?? []).map(Number);
+/** Lo que acompaña a cada pedido para anotar el consumo: qué es, quién lo pidió y de qué publicación. */
+const consumoDe = (operacion: string, usuario: UsuarioActual, pub: Pub) => ({ operacion, modulo: MODULO, usuario, publicacionId: pub.id });
 const SIN_IA = "Falta conectar una IA de texto (OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel).";
 
 export interface EstadoIA {
@@ -52,13 +56,22 @@ export interface EstadoIA {
   proveedor: string | null;
   modelo: string | null;
   gemini: boolean;
+  /** Avisos de crédito: el proveedor cuyo crédito estimado ya bajó del monto de aviso o se agotó (Consumo de IA). */
+  avisos: { proveedor: string; agotado: boolean; saldoUsd: number | null }[];
 }
 
 /** Qué está conectado: sin una IA de texto no se analiza ni se redacta; sin la clave de Gemini no se generan fotos. */
 export async function estadoAsistenteIA(): Promise<EstadoIA> {
   await requireModulo(MODULO);
   const p = proveedorTexto();
-  return { texto: p !== null, proveedor: p ? NOMBRE_PROVEEDOR[p] : null, modelo: p ? modeloDeTexto() : null, gemini: geminiConectado() };
+  const bajos = await creditosPorAcabarse(createServiceClient()).catch(() => []);
+  return {
+    texto: p !== null,
+    proveedor: p ? NOMBRE_PROVEEDOR[p] : null,
+    modelo: p ? modeloDeTexto() : null,
+    gemini: geminiConectado(),
+    avisos: bajos.map((b) => ({ proveedor: ETIQUETA_PROVEEDOR[b.proveedor], agotado: b.estado === "agotado", saldoUsd: b.saldo.saldoUsd })),
+  };
 }
 
 /** Un resultado guardado (lo último que se generó para esa publicación y tipo). */
@@ -253,7 +266,7 @@ export async function analizarPublicacionIA(publicacionId: string): Promise<{ er
   if (!pub) return { error: "No se encontró la publicación." };
   if (!proveedorTexto()) return { error: SIN_IA };
   const { datos, contexto } = await cargarBase(pub);
-  const r = await pedirIA({ ...pedidoAnalisis(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true);
+  const r = await pedirIA({ ...pedidoAnalisis(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true, consumoDe("analisis", usuario, pub));
   if ("error" in r) return { error: r.error };
   const analisis = normalizarAnalisis(r.texto);
   if (!analisis) return { error: "La IA no devolvió algo que se pueda usar. Vuelve a intentar." };
@@ -274,9 +287,9 @@ export async function proponerTitulosIA(publicacionId: string): Promise<{ error?
   if (!pub) return { error: "No se encontró la publicación." };
   if (!proveedorTexto()) return { error: SIN_IA };
   const { datos, contexto, categoria } = await cargarBase(pub);
-  const r = await pedirIA({ ...pedidoTitulos(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, false);
+  const r = await pedirIA({ ...pedidoTitulos(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, false, consumoDe("titulos", usuario, pub));
   if ("error" in r) return { error: r.error };
-  const propuesta = normalizarTitulos(r.texto, categoria, contexto.reglas);
+  const propuesta = normalizarTitulos(r.texto, categoria, contexto.reglas, datos.tituloDropi ?? datos.nombre);
   if (!propuesta) return { error: "La IA no devolvió títulos que se puedan usar. Vuelve a intentar." };
   const modelo = modeloDeTexto();
   const g = await guardar(pub.id, "titulos", propuesta, modelo, usuario);
@@ -334,7 +347,7 @@ export async function proponerTextoIA(publicacionId: string): Promise<{ error?: 
   if (!pub) return { error: "No se encontró la publicación." };
   if (!proveedorTexto()) return { error: SIN_IA };
   const { datos, contexto } = await cargarBase(pub);
-  const r = await pedirIA({ ...pedidoTexto(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true);
+  const r = await pedirIA({ ...pedidoTexto(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true, consumoDe("texto", usuario, pub));
   if ("error" in r) return { error: r.error };
   const propuesta = normalizarPropuestaTexto(r.texto, r.fuentes);
   if (!propuesta) return { error: "La IA no devolvió algo que se pueda usar. Vuelve a intentar." };
@@ -357,7 +370,7 @@ export async function planearFotosIA(publicacionId: string): Promise<{ error?: s
   if (!pub.foto_url) return { error: "La publicación no tiene foto del producto: agrégala primero en su ficha." };
   const { datos, contexto, fotosFaltan } = await cargarBase(pub);
   const cantidad = Math.max(1, Math.min(MAX_FOTOS, fotosFaltan));
-  const r = await pedirIA({ ...pedidoFotos(datos, contexto, cantidad), imagenes: [pub.foto_url] }, true);
+  const r = await pedirIA({ ...pedidoFotos(datos, contexto, cantidad), imagenes: [pub.foto_url] }, true, consumoDe("fotos_plan", usuario, pub));
   if ("error" in r) return { error: r.error };
   const plan = normalizarPlanFotos(r.texto, cantidad);
   if (!plan) return { error: "La IA no devolvió un plan que se pueda usar. Vuelve a intentar." };
@@ -396,7 +409,7 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
   if (!referencias.length) return { error: "No se pudo leer la foto del producto." };
 
   const prompt = promptFoto({ nombre: pub.nombre }, foto, referencias.length);
-  const r = await generarImagen(prompt, referencias, "1:1");
+  const r = await generarImagen(prompt, referencias, "1:1", consumoDe("foto", usuario, pub));
   if ("error" in r) {
     await marcarError(iaId, indice, r.error);
     return { error: r.error };

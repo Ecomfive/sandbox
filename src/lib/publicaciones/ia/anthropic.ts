@@ -2,7 +2,7 @@
 // en vez de la de OpenAI. Cómo se arma el pedido a la API de Messages (con búsqueda en internet y fotos) y cómo se lee la respuesta, sin
 // red para poder probarlo. La llamada vive en `proveedor.ts` (solo servidor, clave `ANTHROPIC_API_KEY`).
 
-import type { EntradaTexto, Fuente, RespuestaTexto } from "./openai";
+import type { EntradaTexto, Fuente, RespuestaTexto, UsoTexto } from "./openai";
 
 /** El modelo por defecto (se cambia con `ANTHROPIC_MODEL`). */
 export const MODELO_CLAUDE = "claude-sonnet-5-5";
@@ -36,6 +36,16 @@ export function extraerMensaje(json: unknown): RespuestaTexto {
   const texto = partes.join("\n").trim();
   if (!texto) return { error: raiz.stop_reason === "max_tokens" ? "La IA no alcanzó a terminar. Vuelve a intentar." : "La IA no devolvió ninguna respuesta." };
   return { texto, fuentes: [...fuentes.values()].slice(0, 10) };
+}
+
+const entero = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
+
+/** El uso de una respuesta de Messages de Claude (`usage` y las búsquedas que hizo). Sin datos, ceros. */
+export function usoDeMensaje(json: unknown): UsoTexto {
+  const raiz = (json && typeof json === "object" ? json : {}) as Record<string, unknown>;
+  const u = (raiz.usage && typeof raiz.usage === "object" ? raiz.usage : {}) as Record<string, unknown>;
+  const herramientas = (u.server_tool_use && typeof u.server_tool_use === "object" ? u.server_tool_use : {}) as Record<string, unknown>;
+  return { tokensEntrada: entero(u.input_tokens), tokensSalida: entero(u.output_tokens), busquedas: entero(herramientas.web_search_requests) };
 }
 
 /** Un error de la API en palabras de quien usa el sistema. */

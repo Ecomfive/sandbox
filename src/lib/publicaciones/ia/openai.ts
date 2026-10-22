@@ -2,8 +2,8 @@
 // internet y fotos del producto) y cómo se lee la respuesta, sin red para poder probarlo. La llamada vive en `openai-api.ts`
 // (solo servidor, clave `OPENAI_API_KEY`).
 
-/** El modelo por defecto (se cambia con `OPENAI_MODEL`). */
-export const MODELO_TEXTO = "gpt-5";
+/** El modelo por defecto: el mismo que usaba «Sugerir títulos con IA», rápido y barato (se cambia con `OPENAI_MODEL`). */
+export const MODELO_TEXTO = "gpt-4.1-mini";
 
 export interface EntradaTexto {
   /** Las reglas fijas (rol, formato de la respuesta, qué no hacer). */
@@ -34,6 +34,23 @@ export interface Fuente {
 }
 
 export type RespuestaTexto = { texto: string; fuentes: Fuente[] } | { error: string };
+
+/** Lo que gastó un pedido de texto, para anotar el consumo: tokens que devuelve la API y búsquedas en internet que hizo. */
+export interface UsoTexto {
+  tokensEntrada: number;
+  tokensSalida: number;
+  busquedas: number;
+}
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
+
+/** El uso de una respuesta de la API de Responses de OpenAI (`usage` y las búsquedas de `output`). Sin datos, ceros. */
+export function usoDeRespuesta(json: unknown): UsoTexto {
+  const raiz = (json && typeof json === "object" ? json : {}) as Record<string, unknown>;
+  const u = (raiz.usage && typeof raiz.usage === "object" ? raiz.usage : {}) as Record<string, unknown>;
+  const busquedas = (Array.isArray(raiz.output) ? raiz.output : []).filter((i) => (i as { type?: unknown } | null)?.type === "web_search_call").length;
+  return { tokensEntrada: num(u.input_tokens), tokensSalida: num(u.output_tokens), busquedas };
+}
 
 /** Solo direcciones http(s): lo que cita la IA se muestra como enlace. */
 const esWeb = (u: unknown): u is string => typeof u === "string" && /^https?:\/\//i.test(u);
