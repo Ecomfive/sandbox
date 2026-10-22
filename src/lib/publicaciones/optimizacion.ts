@@ -85,7 +85,7 @@ export const ETIQUETA_REVISION: Record<ClaveRevision, string> = {
 };
 
 /** La revisión completa de una publicación, en el orden en que se muestra. */
-export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "max_titulo" | "min_fotos" | "min_descripcion">): Revision[] {
+export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min_titulo" | "max_titulo" | "min_fotos" | "min_descripcion">): Revision[] {
   const r = (clave: ClaveRevision, estado: EstadoRevision, detalle: string): Revision => ({ clave, etiqueta: ETIQUETA_REVISION[clave], estado, detalle });
   const t = p.titulo.trim();
   const ingles = palabrasEnIngles(t);
@@ -98,7 +98,16 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "max
   return [
     r("titulo_espanol", ingles.length ? "falta" : "ok", ingles.length ? `Palabras en inglés: ${ingles.join(", ")}` : "En español"),
     // Dropi no deja títulos largos: más de `max_titulo` caracteres (40) no se admiten.
-    r("titulo_largo", t.length > reglas.max_titulo ? "falta" : "ok", `${t.length} de ${reglas.max_titulo} caracteres como máximo`),
+    // Lo ideal: entre `min_titulo` (35) y `max_titulo` (40) caracteres. Más largo, Dropi no lo admite; más corto, desaprovecha espacio.
+    r(
+      "titulo_largo",
+      t.length > reglas.max_titulo || t.length < reglas.min_titulo ? "falta" : "ok",
+      t.length > reglas.max_titulo
+        ? `${t.length} caracteres: pasa del máximo de ${reglas.max_titulo}`
+        : t.length < reglas.min_titulo
+          ? `${t.length} caracteres: se pueden usar entre ${reglas.min_titulo} y ${reglas.max_titulo}`
+          : `${t.length} caracteres (entre ${reglas.min_titulo} y ${reglas.max_titulo})`,
+    ),
     suple
       ? r("titulo_cantidad", tieneCantidad(t) ? "ok" : "falta", tieneCantidad(t) ? "Dice la cantidad" : "Es un suplemento y no dice cuántas cápsulas, gomitas o tabletas trae")
       : r("titulo_cantidad", tieneCantidad(t) ? "ok" : "no_aplica", tieneCantidad(t) ? "Dice la cantidad" : "No es un suplemento"),

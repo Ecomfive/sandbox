@@ -9,10 +9,11 @@ import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { MAX_ADJUNTOS_COMENTARIO } from "@/lib/compras/adjuntos";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
-import { alternarReaccion, comentarCompra, editarComentarioCompra, eliminarComentarioCompra, type ActividadCompra, type ReaccionComentario } from "./actions";
-import { archivosDe, BotonAdjuntar, GaleriaAdjuntos, TiraExistentes, TiraPendientes, useAdjuntosPendientes } from "./adjuntos-comentario";
+import type { ComentarioActividad, ReaccionComentario } from "@/lib/comentarios/tipos";
+import { archivosDe, BotonAdjuntar, GaleriaAdjuntos, TiraExistentes, TiraPendientes, useAdjuntosPendientes } from "./adjuntos";
+import { useAccionesActividad } from "./contexto";
 
-type Comentario = ActividadCompra["comentarios"][number];
+type Comentario = ComentarioActividad;
 
 const fechaHora = (iso: string) =>
   `${formatearFecha(iso)} ${new Date(iso).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" })}`;
@@ -25,14 +26,14 @@ const claseAccion = `inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-x
  * nivel. Una respuesta le avisa a quien escribió el comentario.
  */
 export function TarjetaComentario({
-  compraId,
+  entidadId,
   comentario,
   respuestas,
   resaltado,
   puedeComentar,
   alResponder,
 }: {
-  compraId: string;
+  entidadId: string;
   comentario: Comentario;
   respuestas: Comentario[];
   resaltado: string | null | undefined;
@@ -48,7 +49,7 @@ export function TarjetaComentario({
       ref={comentario.id === resaltado ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
       className={`my-1.5 flex flex-col gap-2 rounded-lg border p-3 text-sm ${comentario.id === resaltado ? "border-primario bg-primario-suave ring-2 ring-primario" : "border-border bg-card"}`}
     >
-      <Cuerpo compraId={compraId} comentario={comentario} numRespuestas={respuestas.length} puedeComentar={puedeComentar} alResponder={() => setRespondiendo((v) => !v)} alEditar={alResponder} />
+      <Cuerpo entidadId={entidadId} comentario={comentario} numRespuestas={respuestas.length} puedeComentar={puedeComentar} alResponder={() => setRespondiendo((v) => !v)} alEditar={alResponder} />
       {(respuestas.length > 0 || respondiendo) && (
         <div className="ml-4 flex flex-col gap-2 border-l-2 border-border pl-3">
           {respuestas.map((r) => (
@@ -58,12 +59,12 @@ export function TarjetaComentario({
               ref={r.id === resaltado && enHilo ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
               className={r.id === resaltado ? "-mx-1 rounded-md bg-primario-suave px-1 py-1 ring-2 ring-primario" : ""}
             >
-              <Cuerpo compraId={compraId} comentario={r} numRespuestas={0} puedeComentar={puedeComentar} pequeno alResponder={() => setRespondiendo(true)} alEditar={alResponder} />
+              <Cuerpo entidadId={entidadId} comentario={r} numRespuestas={0} puedeComentar={puedeComentar} pequeno alResponder={() => setRespondiendo(true)} alEditar={alResponder} />
             </div>
           ))}
           {respondiendo && puedeComentar && (
             <Respuesta
-              compraId={compraId}
+              entidadId={entidadId}
               respuestaA={comentario.id}
               alCancelar={() => setRespondiendo(false)}
               alEnviar={() => {
@@ -80,7 +81,7 @@ export function TarjetaComentario({
 
 /** Lo de un comentario (o una respuesta): autor, hora, texto, archivos, reacciones, «Responder» y, si es suyo, «Editar» y «Eliminar». */
 function Cuerpo({
-  compraId,
+  entidadId,
   comentario,
   numRespuestas,
   puedeComentar,
@@ -88,7 +89,7 @@ function Cuerpo({
   alResponder,
   alEditar,
 }: {
-  compraId: string;
+  entidadId: string;
   comentario: Comentario;
   /** Cuántas respuestas tiene (para avisarlo al eliminar). */
   numRespuestas: number;
@@ -98,13 +99,14 @@ function Cuerpo({
   /** Después de editar o eliminar: la actividad se vuelve a pedir. */
   alEditar: () => void;
 }) {
+  const acciones = useAccionesActividad();
   const { mostrarToast } = useToast();
   const [editando, setEditando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [eliminando, empezarEliminar] = useTransition();
   function eliminar() {
     empezarEliminar(async () => {
-      const r = await eliminarComentarioCompra(comentario.id).catch(() => ({ error: "No se pudo eliminar el comentario." }));
+      const r = await acciones.eliminar(comentario.id).catch(() => ({ error: "No se pudo eliminar el comentario." }));
       if (r.error) {
         setConfirmando(false);
         return mostrarToast(r.error, "destructive");
@@ -132,7 +134,7 @@ function Cuerpo({
         </span>
         {editando ? (
           <EditarTexto
-            compraId={compraId}
+            entidadId={entidadId}
             comentario={comentario}
             alCancelar={() => setEditando(false)}
             alGuardar={() => {
@@ -198,6 +200,7 @@ function Reacciones({
   alEditar?: () => void;
   alEliminar?: () => void;
 }) {
+  const acciones = useAccionesActividad();
   const { mostrarToast } = useToast();
   const [reacciones, setReacciones] = useState(iniciales);
   const [eligiendo, setEligiendo] = useState(false);
@@ -215,7 +218,7 @@ function Reacciones({
       return lista.map((r) => (r.emoji === emoji ? { ...r, n: r.n + 1, mia: true, nombres: [...r.nombres, "Tú"] } : r));
     });
     empezar(async () => {
-      const r = await alternarReaccion(comentarioId, emoji).catch(() => ({ error: "No se pudo guardar la reacción." }) as { error?: string; reacciones?: ReaccionComentario[] });
+      const r = await acciones.reaccionar(comentarioId, emoji).catch(() => ({ error: "No se pudo guardar la reacción." }) as { error?: string; reacciones?: ReaccionComentario[] });
       if (r.error) {
         setReacciones(antes);
         mostrarToast(r.error, "destructive");
@@ -284,16 +287,17 @@ function Reacciones({
 }
 
 /** El campo para responder un comentario: texto con @menciones y archivos, como un comentario nuevo. */
-function Respuesta({ compraId, respuestaA, alCancelar, alEnviar }: { compraId: string; respuestaA: string; alCancelar: () => void; alEnviar: () => void }) {
+function Respuesta({ entidadId, respuestaA, alCancelar, alEnviar }: { entidadId: string; respuestaA: string; alCancelar: () => void; alEnviar: () => void }) {
+  const acciones = useAccionesActividad();
   const { mostrarToast } = useToast();
   const [texto, setTexto] = useState("");
   const [menciones, setMenciones] = useState<string[]>([]);
   const [pendiente, empezar] = useTransition();
-  const adjuntos = useAdjuntosPendientes(compraId);
+  const adjuntos = useAdjuntosPendientes(entidadId);
 
   function enviar() {
     empezar(async () => {
-      const r = await comentarCompra(compraId, texto, menciones, adjuntos.listos, respuestaA).catch(() => ({ error: "No se pudo guardar la respuesta." }));
+      const r = await acciones.comentar(entidadId, texto, menciones, adjuntos.listos, respuestaA).catch(() => ({ error: "No se pudo guardar la respuesta." }));
       if (r.error) return mostrarToast(r.error, "destructive");
       adjuntos.vaciar();
       alEnviar();
@@ -335,19 +339,20 @@ function Respuesta({ compraId, respuestaA, alCancelar, alEnviar }: { compraId: s
  * Un comentario propio, para corregirlo ahí mismo: su texto (con @menciones) y sus archivos (quitar los que ya tiene, que se
  * borran al guardar, y agregar otros). Escape cancela; un comentario no puede quedar sin texto ni archivos.
  */
-function EditarTexto({ compraId, comentario, alCancelar, alGuardar }: { compraId: string; comentario: Comentario; alCancelar: () => void; alGuardar: () => void }) {
+function EditarTexto({ entidadId, comentario, alCancelar, alGuardar }: { entidadId: string; comentario: Comentario; alCancelar: () => void; alGuardar: () => void }) {
+  const acciones = useAccionesActividad();
   const { mostrarToast } = useToast();
   const [texto, setTexto] = useState(comentario.texto);
   const [menciones, setMenciones] = useState<string[]>([]);
   const [quitados, setQuitados] = useState<string[]>([]);
   const [pendiente, empezar] = useTransition();
-  const adjuntos = useAdjuntosPendientes(compraId);
+  const adjuntos = useAdjuntosPendientes(entidadId);
   const quedan = comentario.adjuntos.filter((a) => !quitados.includes(a.id));
   const hayCambios = texto.trim() !== comentario.texto.trim() || quitados.length > 0 || adjuntos.listos.length > 0;
   const vacio = !texto.trim() && quedan.length === 0 && adjuntos.listos.length === 0;
   function guardar() {
     empezar(async () => {
-      const r = await editarComentarioCompra(comentario.id, texto, menciones, { quitar: quitados, agregar: adjuntos.listos }).catch(() => ({ error: "No se pudo guardar el cambio." }));
+      const r = await acciones.editar(comentario.id, texto, menciones, { quitar: quitados, agregar: adjuntos.listos }).catch(() => ({ error: "No se pudo guardar el cambio." }));
       if (r.error) return mostrarToast(r.error, "destructive");
       adjuntos.vaciar();
       mostrarToast("Comentario editado");
