@@ -3,6 +3,7 @@
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CheckIcon, EstadoIcon } from "@/lib/nav-icons";
 import type { EstadoRevision } from "@/lib/publicaciones/optimizacion";
+import { BotonAsistenteIA } from "./asistente-ia";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 /** Cómo se marca cada punto: no solo con color (ícono o punto + texto). */
@@ -18,7 +19,7 @@ const MARCA: Record<EstadoRevision, { texto: string; clase: string }> = {
  * El bloque «Optimización» de la ficha: cada punto de lo que se publica en Dropi (título, fotos, video, descripción, precio
  * sugerido) con si cumple, y la nota. Lo que falta sale también como recomendación arriba.
  */
-export function OptimizacionFicha({ p }: { p: FilaPublicacion }) {
+export function OptimizacionFicha({ p, puedeEscribir = false }: { p: FilaPublicacion; puedeEscribir?: boolean }) {
   return (
     <div className="border-b border-border px-5 py-5">
       <Seccion icono={EstadoIcon} titulo="Optimización en Dropi">
@@ -29,6 +30,11 @@ export function OptimizacionFicha({ p }: { p: FilaPublicacion }) {
           puntos cumplidos
           {p.tituloDropi && p.tituloDropi !== p.nombre && <span className="block text-xs text-muted-foreground">En Dropi se ve como «{p.tituloDropi}»</span>}
         </p>
+        {puedeEscribir && (
+          <div>
+            <BotonAsistenteIA publicacionId={p.id} principal />
+          </div>
+        )}
         <ul className="m-0 grid list-none gap-x-6 gap-y-2 p-0 sm:grid-cols-2">
           {p.revisiones.map((r) => {
             const m = MARCA[r.estado];

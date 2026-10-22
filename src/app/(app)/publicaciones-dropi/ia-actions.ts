@@ -2,16 +2,39 @@
 
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
-import { cargarNuestrosEnDropi } from "@/lib/publicaciones/competencia-publicaciones";
-import { normalizarPlanFotos, normalizarPropuestaTexto, pedidoFotos, pedidoTexto, promptFoto, MAX_FOTOS, type DatosPublicacionIA, type PlanFotos, type PropuestaTexto, type TipoIA } from "@/lib/publicaciones/ia/asistente";
-import { openaiConectado, modeloTexto, pedirTexto } from "@/lib/publicaciones/ia/openai-api";
-import { revisarPublicacion } from "@/lib/publicaciones/optimizacion";
+import { geminiConectado, generarImagen, modeloImagen } from "@/lib/landings/gemini-api";
+import { cargarCompetidores, cargarNuestrosEnDropi } from "@/lib/publicaciones/competencia-publicaciones";
+import {
+  MAX_FOTOS,
+  normalizarAnalisis,
+  normalizarPlanFotos,
+  normalizarPropuestaTexto,
+  normalizarTitulos,
+  pedidoAnalisis,
+  pedidoFotos,
+  pedidoTexto,
+  pedidoTitulos,
+  promptFoto,
+  type AnalisisIA,
+  type ContextoIA,
+  type DatosPublicacionIA,
+  type PlanFotos,
+  type PropuestaTexto,
+  type PropuestaTitulos,
+  type TipoIA,
+} from "@/lib/publicaciones/ia/asistente";
+import { chequearTitulo, reglasParaIA, type ChequeoTitulo, type Ejemplos, type ReglasIA } from "@/lib/publicaciones/ia/criterios";
+import { cargarIndicaciones } from "@/lib/publicaciones/ia/indicaciones-datos";
+import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/proveedor";
+import { notaOptimizacion, revisarPublicacion, type Revision } from "@/lib/publicaciones/optimizacion";
+import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
+import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
+import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
-import { geminiConectado, generarImagen, modeloImagen } from "@/lib/landings/gemini-api";
 
 const MODULO = "publicaciones-dropi";
 const BUCKET = "wms-productos";
@@ -20,16 +43,22 @@ const faltaMigracion = (m: string) => /does not exist|schema cache|relation/i.te
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0131.";
 const urlPublica = (ruta: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${ruta}`;
 const idsDropi = (dropiId: string | null) => (String(dropiId ?? "").match(/\d{3,6}/g) ?? []).map(Number);
+const SIN_IA = "Falta conectar una IA de texto (OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel).";
 
 export interface EstadoIA {
-  openai: boolean;
+  /** Hay una IA de texto conectada (OpenAI o Claude). */
+  texto: boolean;
+  /** Cuál se usa («OpenAI», «Claude») y con qué modelo. */
+  proveedor: string | null;
+  modelo: string | null;
   gemini: boolean;
 }
 
-/** Qué está conectado: sin la clave de OpenAI no se investiga el texto; sin la de Gemini no se generan fotos. */
+/** Qué está conectado: sin una IA de texto no se analiza ni se redacta; sin la clave de Gemini no se generan fotos. */
 export async function estadoAsistenteIA(): Promise<EstadoIA> {
   await requireModulo(MODULO);
-  return { openai: openaiConectado(), gemini: geminiConectado() };
+  const p = proveedorTexto();
+  return { texto: p !== null, proveedor: p ? NOMBRE_PROVEEDOR[p] : null, modelo: p ? modeloDeTexto() : null, gemini: geminiConectado() };
 }
 
 /** Un resultado guardado (lo último que se generó para esa publicación y tipo). */
@@ -39,6 +68,8 @@ export interface GuardadoIA<T> {
   por: string;
   modelo: string | null;
   resultado: T;
+  /** La valoración del equipo: sirvió o no, y por qué. */
+  feedback: { util: boolean; nota: string } | null;
 }
 
 /** El plan de fotos con la dirección pública de cada imagen ya generada. */
@@ -46,7 +77,30 @@ export interface PlanFotosVista extends Omit<PlanFotos, "fotos"> {
   fotos: (PlanFotos["fotos"][number] & { url: string | null })[];
 }
 
+/** Lo que la publicación tiene hoy y las reglas con que se revisa: lo primero que se ve en el asistente. */
+export interface ContextoVista {
+  nombre: string;
+  numero: string;
+  fotoUrl: string | null;
+  tituloActual: string;
+  categoria: string | null;
+  /** De dónde sale el título: lo que muestra Dropi o, si no se leyó, el nombre guardado. */
+  tituloDeDropi: boolean;
+  reglas: ReglasIA;
+  revisiones: Revision[];
+  nota: { cumple: number; total: number };
+  /** Los títulos con que otros venden lo mismo en Dropi. */
+  competidores: string[];
+  /** Cuántas indicaciones del equipo hay escritas. */
+  indicaciones: number;
+  /** Cuántos títulos aprobados por el equipo se usan de ejemplo. */
+  ejemplos: number;
+}
+
 export interface AsistenteVista {
+  contexto: ContextoVista;
+  analisis: GuardadoIA<AnalisisIA> | null;
+  titulos: GuardadoIA<PropuestaTitulos> | null;
   texto: GuardadoIA<PropuestaTexto> | null;
   fotos: GuardadoIA<PlanFotosVista> | null;
 }
@@ -54,53 +108,60 @@ export interface AsistenteVista {
 const conUrls = (p: PlanFotos): PlanFotosVista => ({ ...p, fotos: p.fotos.map((f) => ({ ...f, url: f.ruta ? urlPublica(f.ruta) : null })) });
 
 type FilaIA = { id: string; tipo: string; resultado: unknown; modelo: string | null; creado_por_nombre: string | null; creado_en: string };
+type Pub = { id: string; nombre: string; dropi_id: string | null; pais_id: string; precio_venta: number | null; margen: number | null; foto_url: string | null; sku_maestro_id: string | null };
 
 /** La publicación, si existe y es de un país que la persona puede ver. */
-async function publicacionPermitida(id: string, usuario: UsuarioActual) {
+async function publicacionPermitida(id: string, usuario: UsuarioActual): Promise<Pub | null> {
   if (typeof id !== "string" || !UUID.test(id)) return null;
   const supabase = createServiceClient();
-  const { data } = await supabase.from("dropi_publicaciones").select("id, nombre, dropi_id, pais_id, precio_venta, foto_url, sku_maestro_id").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("dropi_publicaciones").select("id, nombre, dropi_id, pais_id, precio_venta, margen, foto_url, sku_maestro_id").eq("id", id).maybeSingle();
   if (!data || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, data.pais_id as string))) return null;
-  return data as { id: string; nombre: string; dropi_id: string | null; pais_id: string; precio_venta: number | null; foto_url: string | null; sku_maestro_id: string | null };
+  return data as Pub;
 }
 
-/** Lo último que se generó para una publicación (texto y fotos). Basta poder abrir el módulo. */
-export async function obtenerAsistenteIA(publicacionId: string): Promise<AsistenteVista | { error: string }> {
-  const usuario = await requireModulo(MODULO);
-  if (!(await publicacionPermitida(publicacionId, usuario))) return { error: "No se encontró la publicación." };
-  const { data, error } = await createServiceClient()
-    .from("dropi_publicaciones_ia")
-    .select("id, tipo, resultado, modelo, creado_por_nombre, creado_en")
-    .eq("publicacion_id", publicacionId)
-    .order("creado_en", { ascending: false })
-    .limit(20);
-  if (error) return { error: faltaMigracion(error.message) ? SIN_MIGRACION : "No se pudo cargar lo que generó la IA." };
-  const filas = (data ?? []) as FilaIA[];
-  const ultimo = (tipo: TipoIA) => filas.find((f) => f.tipo === tipo);
-  const guardado = <T,>(f: FilaIA | undefined, resultado: T | null): GuardadoIA<T> | null => (f && resultado ? { id: f.id, creadoEn: f.creado_en, por: f.creado_por_nombre ?? "", modelo: f.modelo, resultado } : null);
-  const t = ultimo("texto");
-  const f = ultimo("fotos");
-  return {
-    texto: guardado(t, t ? (t.resultado as PropuestaTexto) : null),
-    fotos: guardado(f, f ? conUrls(f.resultado as PlanFotos) : null),
-  };
-}
-
-/** Los datos de la publicación para el pedido: lo que se ve en Dropi y lo que le falta (la misma revisión de «Optimización»). */
-async function datosParaIA(pub: NonNullable<Awaited<ReturnType<typeof publicacionPermitida>>>): Promise<{ datos: DatosPublicacionIA; fotoUrl: string | null; fotosFaltan: number }> {
+/**
+ * Lo que la IA aprende del equipo: los títulos que eligió (o corrigió y usó) en otras publicaciones, y por qué rechazó recomendaciones de
+ * título o dijo que una sugerencia no le sirvió. Sin la tabla, nada.
+ */
+async function cargarEjemplos(): Promise<Ejemplos> {
   const supabase = createServiceClient();
-  const [{ data: pais }, enDropi, { reglas }, sku] = await Promise.all([
+  const out: Ejemplos = { titulos: [], rechazos: [] };
+  const { data } = await supabase.from("dropi_publicaciones_ia").select("resultado").eq("tipo", "titulos").order("creado_en", { ascending: false }).limit(80);
+  for (const f of data ?? []) {
+    const r = f.resultado as PropuestaTitulos & { feedback?: { util: boolean; nota: string } };
+    if (r?.elegido?.titulo && !out.titulos.includes(r.elegido.titulo)) out.titulos.push(r.elegido.titulo);
+    if (r?.feedback && r.feedback.util === false && r.feedback.nota) out.rechazos.push(r.feedback.nota);
+  }
+  const { data: rechazadas } = await supabase.from("dropi_publicaciones_decisiones").select("nota").eq("tipo", "optimizar_titulo").eq("decision", "rechazada").not("nota", "is", null).order("creado_en", { ascending: false }).limit(6);
+  for (const d of rechazadas ?? []) if (d.nota) out.rechazos.push(String(d.nota));
+  out.titulos = out.titulos.slice(0, 8);
+  out.rechazos = out.rechazos.slice(0, 6);
+  return out;
+}
+
+/** Todo lo que se necesita para pedirle algo a la IA y para mostrar el contexto: los datos de la publicación, la revisión y las reglas. */
+async function cargarBase(pub: Pub) {
+  const supabase = createServiceClient();
+  const ids = idsDropi(pub.dropi_id);
+  const [{ data: pais }, enDropi, { reglas }, sku, competidores, ventas, { indicaciones }, ejemplos, { data: numero }] = await Promise.all([
     supabase.from("paises").select("nombre").eq("id", pub.pais_id).maybeSingle(),
     cargarNuestrosEnDropi(supabase, pub.pais_id),
     cargarReglas(supabase),
     pub.sku_maestro_id ? supabase.from("skus_maestros").select("codigo, nombre").eq("id", pub.sku_maestro_id).maybeSingle() : Promise.resolve({ data: null }),
+    cargarCompetidores(supabase, pub.pais_id),
+    cargarResumenVentas(supabase, pub.pais_id),
+    cargarIndicaciones(supabase),
+    cargarEjemplos(),
+    supabase.from("dropi_publicaciones").select("numero").eq("id", pub.id).maybeSingle(),
   ]);
-  const cat = idsDropi(pub.dropi_id).map((n) => enDropi.get(n)).find((x) => !!x) ?? null;
+  const cat = ids.map((n) => enDropi.get(n)).find((x) => !!x) ?? null;
+  const precio = pub.precio_venta === null ? null : Number(pub.precio_venta);
+  const reglasIA = reglasParaIA(reglas as Parameters<typeof reglasParaIA>[0]);
   const revisiones = revisarPublicacion(
     {
       titulo: cat?.nombre ?? pub.nombre,
       categoria: cat?.categoria ?? null,
-      precio: cat?.precio ?? (pub.precio_venta === null ? null : Number(pub.precio_venta)),
+      precio: cat?.precio ?? precio,
       precioSugerido: cat?.precioSugerido ?? null,
       fotos: cat?.fotos ?? null,
       videos: cat?.videos ?? null,
@@ -110,20 +171,63 @@ async function datosParaIA(pub: NonNullable<Awaited<ReturnType<typeof publicacio
     reglas,
   );
   const s = sku.data as { codigo: string; nombre: string } | null;
-  return {
-    datos: {
-      nombre: pub.nombre,
-      tituloDropi: cat?.nombre ?? null,
-      categoria: cat?.categoria ?? null,
-      pais: (pais?.nombre as string | undefined) ?? "",
-      precio: pub.precio_venta === null ? null : Number(pub.precio_venta),
-      producto: s ? `${s.codigo} · ${s.nombre}` : null,
-      faltas: revisiones.filter((x) => x.estado === "falta" || x.estado === "revisar").map((x) => `${x.etiqueta}: ${x.detalle}`),
-      minDescripcion: reglas.min_descripcion,
-    },
+  const delProducto = ids.flatMap((n) => competidores.get(n) ?? []);
+  const v = ventas ? ventasDePublicacion(ids, ventas.resumen) : null;
+  const datos: DatosPublicacionIA = {
+    nombre: pub.nombre,
+    tituloDropi: cat?.nombre ?? null,
+    categoria: cat?.categoria ?? null,
+    pais: (pais?.nombre as string | undefined) ?? "",
+    precio,
+    producto: s ? `${s.codigo} · ${s.nombre}` : null,
+    revisiones: revisiones.map((r) => ({ etiqueta: r.etiqueta, estado: r.estado, detalle: r.detalle })),
+    competidores: delProducto.slice(0, 10).map((c) => ({ nombre: c.nombre, proveedor: c.proveedor, precio: c.precio })),
+    margen: pub.margen === null ? null : Number(pub.margen),
+    ventas30: v ? v.netas30 : null,
+  };
+  const contexto: ContextoIA = { reglas: reglasIA, indicaciones, ejemplos };
+  const vista: ContextoVista = {
+    nombre: pub.nombre,
+    numero: numeroPublicacion((numero?.numero as number | null | undefined) ?? null),
     fotoUrl: pub.foto_url,
-    // Cuántas fotos faltan para el mínimo de las reglas (si se leyó el catálogo); sin dato, 4.
-    fotosFaltan: cat?.fotos == null ? 4 : Math.max(1, reglas.min_fotos - cat.fotos),
+    tituloActual: cat?.nombre ?? pub.nombre,
+    categoria: cat?.categoria ?? null,
+    tituloDeDropi: !!cat,
+    reglas: reglasIA,
+    revisiones,
+    nota: notaOptimizacion(revisiones),
+    competidores: [...new Set(delProducto.map((c) => c.nombre))].slice(0, 8),
+    indicaciones: Object.values(indicaciones).filter((t) => (t ?? "").trim()).length,
+    ejemplos: ejemplos.titulos.length,
+  };
+  // Cuántas fotos faltan para el mínimo de las reglas (si se leyó el catálogo); sin dato, 4.
+  const fotosFaltan = cat?.fotos == null ? 4 : Math.max(1, reglas.min_fotos - cat.fotos);
+  return { datos, contexto, vista, fotosFaltan, categoria: cat?.categoria ?? null };
+}
+
+/** Lo último que se generó para una publicación y el contexto con que se revisa. Basta poder abrir el módulo. */
+export async function obtenerAsistenteIA(publicacionId: string): Promise<AsistenteVista | { error: string }> {
+  const usuario = await requireModulo(MODULO);
+  const pub = await publicacionPermitida(publicacionId, usuario);
+  if (!pub) return { error: "No se encontró la publicación." };
+  const [{ data, error }, base] = await Promise.all([
+    createServiceClient().from("dropi_publicaciones_ia").select("id, tipo, resultado, modelo, creado_por_nombre, creado_en").eq("publicacion_id", publicacionId).order("creado_en", { ascending: false }).limit(40),
+    cargarBase(pub),
+  ]);
+  if (error) return { error: faltaMigracion(error.message) ? SIN_MIGRACION : "No se pudo cargar lo que generó la IA." };
+  const filas = (data ?? []) as FilaIA[];
+  const ultimo = <T,>(tipo: TipoIA, mapa: (r: unknown) => T): GuardadoIA<T> | null => {
+    const f = filas.find((x) => x.tipo === tipo);
+    if (!f) return null;
+    const r = f.resultado as { feedback?: { util: boolean; nota: string } };
+    return { id: f.id, creadoEn: f.creado_en, por: f.creado_por_nombre ?? "", modelo: f.modelo, resultado: mapa(f.resultado), feedback: r?.feedback ?? null };
+  };
+  return {
+    contexto: base.vista,
+    analisis: ultimo("analisis", (r) => r as AnalisisIA),
+    titulos: ultimo("titulos", (r) => r as PropuestaTitulos),
+    texto: ultimo("texto", (r) => r as PropuestaTexto),
+    fotos: ultimo("fotos", (r) => conUrls(r as PlanFotos)),
   };
 }
 
@@ -137,25 +241,108 @@ async function guardar(publicacionId: string, tipo: TipoIA, resultado: unknown, 
   return { id: data.id as string };
 }
 
+const ahora = (id: string, usuario: UsuarioActual, modelo: string | null) => ({ id, creadoEn: new Date().toISOString(), por: usuario.nombre || usuario.email, modelo, feedback: null });
+
 /**
- * «Mejorar el título / la descripción / ángulos de venta»: la IA investiga el producto en internet (Alibaba, Amazon, tiendas), mira
- * su foto y propone 3 títulos, una descripción y 4 ángulos de venta. Queda guardado en la publicación; subirlo a Dropi es a mano.
- * Tarda de 30 a 120 segundos. Devuelve el error como valor.
+ * «Analizar con IA»: la IA revisa la publicación con las reglas del sistema, las ventas, el margen y la competencia, y dice qué mejorar,
+ * en qué orden y qué cambiaría el equipo en su forma de trabajar. Tarda de 20 a 90 segundos. Devuelve el error como valor.
+ */
+export async function analizarPublicacionIA(publicacionId: string): Promise<{ error?: string; guardado?: GuardadoIA<AnalisisIA> }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const pub = await publicacionPermitida(publicacionId, usuario);
+  if (!pub) return { error: "No se encontró la publicación." };
+  if (!proveedorTexto()) return { error: SIN_IA };
+  const { datos, contexto } = await cargarBase(pub);
+  const r = await pedirIA({ ...pedidoAnalisis(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true);
+  if ("error" in r) return { error: r.error };
+  const analisis = normalizarAnalisis(r.texto);
+  if (!analisis) return { error: "La IA no devolvió algo que se pueda usar. Vuelve a intentar." };
+  const modelo = modeloDeTexto();
+  const g = await guardar(pub.id, "analisis", analisis, modelo, usuario);
+  if ("error" in g) return g;
+  await registrarAuditoria({ accion: "ia_analisis_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: análisis y sugerencias (${modelo})` });
+  return { guardado: { ...ahora(g.id, usuario, modelo), resultado: analisis } };
+}
+
+/**
+ * «Sugerir títulos»: la IA propone 6 títulos con las reglas del sistema (largo, español, cantidad), el estilo que el equipo aprobó antes y
+ * lo que dicen los competidores; el sistema revisa cada uno y se queda con los que cumplen. Tarda de 10 a 60 segundos.
+ */
+export async function proponerTitulosIA(publicacionId: string): Promise<{ error?: string; guardado?: GuardadoIA<PropuestaTitulos> }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const pub = await publicacionPermitida(publicacionId, usuario);
+  if (!pub) return { error: "No se encontró la publicación." };
+  if (!proveedorTexto()) return { error: SIN_IA };
+  const { datos, contexto, categoria } = await cargarBase(pub);
+  const r = await pedirIA({ ...pedidoTitulos(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, false);
+  if ("error" in r) return { error: r.error };
+  const propuesta = normalizarTitulos(r.texto, categoria, contexto.reglas);
+  if (!propuesta) return { error: "La IA no devolvió títulos que se puedan usar. Vuelve a intentar." };
+  const modelo = modeloDeTexto();
+  const g = await guardar(pub.id, "titulos", propuesta, modelo, usuario);
+  if ("error" in g) return g;
+  await registrarAuditoria({ accion: "ia_titulos_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: ${propuesta.titulos.length} títulos propuestos, ${propuesta.descartados} descartados (${modelo})` });
+  return { guardado: { ...ahora(g.id, usuario, modelo), resultado: propuesta } };
+}
+
+/**
+ * El equipo usa un título (tal cual o corregido): queda guardado como el elegido y desde entonces es un ejemplo del estilo de Ecomfive
+ * para las siguientes sugerencias. Devuelve cómo queda el título final frente a las reglas.
+ */
+export async function elegirTituloIA(iaId: string, titulo: string): Promise<{ error?: string; chequeos?: ChequeoTitulo[]; cumple?: boolean }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const limpio = typeof titulo === "string" ? titulo.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+  if (typeof iaId !== "string" || !UUID.test(iaId) || limpio.length < 8) return { error: "Escribe el título." };
+  const supabase = createServiceClient();
+  const { data: fila } = await supabase.from("dropi_publicaciones_ia").select("id, publicacion_id, tipo, resultado").eq("id", iaId).maybeSingle();
+  if (!fila || fila.tipo !== "titulos") return { error: "No se encontró la propuesta." };
+  const pub = await publicacionPermitida(fila.publicacion_id as string, usuario);
+  if (!pub) return { error: "No se encontró la publicación." };
+  const { contexto, categoria } = await cargarBase(pub);
+  const r = fila.resultado as PropuestaTitulos;
+  const editado = !r.titulos?.some((t) => t.titulo === limpio);
+  const resultado: PropuestaTitulos = { ...r, elegido: { titulo: limpio, editado, por: usuario.nombre || usuario.email, en: new Date().toISOString() } };
+  const { error } = await supabase.from("dropi_publicaciones_ia").update({ resultado, actualizado_en: new Date().toISOString() }).eq("id", iaId);
+  if (error) return { error: "No se pudo guardar el título elegido." };
+  await registrarAuditoria({ accion: "ia_titulo_elegido", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: «${limpio}»${editado ? " (corregido)" : ""}` });
+  const c = chequearTitulo(limpio, categoria, contexto.reglas);
+  return { chequeos: c.chequeos, cumple: c.cumple };
+}
+
+/** «Me sirvió» o «no me sirvió» (con el porqué): queda en lo generado y sirve de ejemplo para la IA. */
+export async function valorarIA(iaId: string, util: boolean, nota: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (typeof iaId !== "string" || !UUID.test(iaId)) return { error: "Resultado no válido." };
+  const supabase = createServiceClient();
+  const { data: fila } = await supabase.from("dropi_publicaciones_ia").select("id, publicacion_id, tipo, resultado").eq("id", iaId).maybeSingle();
+  if (!fila) return { error: "No se encontró lo generado." };
+  const pub = await publicacionPermitida(fila.publicacion_id as string, usuario);
+  if (!pub) return { error: "No se encontró la publicación." };
+  const resultado = { ...(fila.resultado as object), feedback: { util: !!util, nota: String(nota ?? "").trim().slice(0, 400) } };
+  const { error } = await supabase.from("dropi_publicaciones_ia").update({ resultado, actualizado_en: new Date().toISOString() }).eq("id", iaId);
+  if (error) return { error: "No se pudo guardar la valoración." };
+  return {};
+}
+
+/**
+ * «Investigar descripción y ángulos»: la IA investiga el producto en internet (Alibaba, Amazon, tiendas), mira su foto y propone una
+ * descripción (con el mínimo de las reglas) y 4 ángulos de venta. Tarda de 30 a 120 segundos. Devuelve el error como valor.
  */
 export async function proponerTextoIA(publicacionId: string): Promise<{ error?: string; guardado?: GuardadoIA<PropuestaTexto> }> {
   const usuario = await requireModuloEscritura(MODULO);
   const pub = await publicacionPermitida(publicacionId, usuario);
   if (!pub) return { error: "No se encontró la publicación." };
-  if (!openaiConectado()) return { error: "Falta conectar OpenAI (la clave OPENAI_API_KEY en Vercel)." };
-  const { datos, fotoUrl } = await datosParaIA(pub);
-  const r = await pedirTexto({ ...pedidoTexto(datos), imagenes: fotoUrl ? [fotoUrl] : [] }, true);
+  if (!proveedorTexto()) return { error: SIN_IA };
+  const { datos, contexto } = await cargarBase(pub);
+  const r = await pedirIA({ ...pedidoTexto(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, true);
   if ("error" in r) return { error: r.error };
   const propuesta = normalizarPropuestaTexto(r.texto, r.fuentes);
   if (!propuesta) return { error: "La IA no devolvió algo que se pueda usar. Vuelve a intentar." };
-  const g = await guardar(pub.id, "texto", propuesta, modeloTexto(), usuario);
+  const modelo = modeloDeTexto();
+  const g = await guardar(pub.id, "texto", propuesta, modelo, usuario);
   if ("error" in g) return g;
-  await registrarAuditoria({ accion: "ia_texto_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: títulos, descripción y ángulos (${modeloTexto()})` });
-  return { guardado: { id: g.id, creadoEn: new Date().toISOString(), por: usuario.nombre || usuario.email, modelo: modeloTexto(), resultado: propuesta } };
+  await registrarAuditoria({ accion: "ia_texto_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: descripción y ángulos (${modelo})` });
+  return { guardado: { ...ahora(g.id, usuario, modelo), resultado: propuesta } };
 }
 
 /**
@@ -166,18 +353,19 @@ export async function planearFotosIA(publicacionId: string): Promise<{ error?: s
   const usuario = await requireModuloEscritura(MODULO);
   const pub = await publicacionPermitida(publicacionId, usuario);
   if (!pub) return { error: "No se encontró la publicación." };
-  if (!openaiConectado()) return { error: "Falta conectar OpenAI (la clave OPENAI_API_KEY en Vercel)." };
+  if (!proveedorTexto()) return { error: SIN_IA };
   if (!pub.foto_url) return { error: "La publicación no tiene foto del producto: agrégala primero en su ficha." };
-  const { datos, fotosFaltan } = await datosParaIA(pub);
+  const { datos, contexto, fotosFaltan } = await cargarBase(pub);
   const cantidad = Math.max(1, Math.min(MAX_FOTOS, fotosFaltan));
-  const r = await pedirTexto({ ...pedidoFotos(datos, cantidad), imagenes: [pub.foto_url] }, true);
+  const r = await pedirIA({ ...pedidoFotos(datos, contexto, cantidad), imagenes: [pub.foto_url] }, true);
   if ("error" in r) return { error: r.error };
   const plan = normalizarPlanFotos(r.texto, cantidad);
   if (!plan) return { error: "La IA no devolvió un plan que se pueda usar. Vuelve a intentar." };
-  const g = await guardar(pub.id, "fotos", plan, modeloTexto(), usuario);
+  const modelo = modeloDeTexto();
+  const g = await guardar(pub.id, "fotos", plan, modelo, usuario);
   if ("error" in g) return g;
   await registrarAuditoria({ accion: "ia_plan_fotos_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: ${plan.fotos.length} fotos por generar (${plan.fotos.map((f) => f.tipo).join(", ")})` });
-  return { guardado: { id: g.id, creadoEn: new Date().toISOString(), por: usuario.nombre || usuario.email, modelo: modeloTexto(), resultado: conUrls(plan) } };
+  return { guardado: { ...ahora(g.id, usuario, modelo), resultado: conUrls(plan) } };
 }
 
 /**
@@ -198,7 +386,7 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
   if (!foto) return { error: "Esa foto ya no está en el plan." };
   if (!pub.foto_url) return { error: "La publicación no tiene foto del producto: agrégala primero en su ficha." };
 
-  // La foto del producto como referencia (y, si ya hay otras generadas, hasta completar las que acepta el modelo).
+  // La foto del producto como referencia.
   const referencias: { mime: string; base64: string }[] = [];
   const d = await descargarPublico(pub.foto_url, 10 * 1024 * 1024);
   if ("bytes" in d) {
@@ -222,7 +410,7 @@ export async function generarFotoIA(iaId: string, indice: number): Promise<{ err
 
   // Se vuelve a leer el plan: mientras Gemini trabajaba pudo generarse otra foto del mismo plan.
   const { data: fresca } = await supabase.from("dropi_publicaciones_ia").select("resultado").eq("id", iaId).maybeSingle();
-  const actual = ((fresca?.resultado ?? plan) as PlanFotos);
+  const actual = (fresca?.resultado ?? plan) as PlanFotos;
   const anterior = actual.fotos[indice]?.ruta ?? null;
   actual.fotos[indice] = { ...actual.fotos[indice], ruta, error: null };
   const { error } = await supabase.from("dropi_publicaciones_ia").update({ resultado: actual, actualizado_en: new Date().toISOString() }).eq("id", iaId);
