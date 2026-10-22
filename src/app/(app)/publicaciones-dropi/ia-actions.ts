@@ -15,6 +15,7 @@ import {
   pedidoAnalisis,
   pedidoFotos,
   pedidoTexto,
+  pedidoCorregirTitulos,
   pedidoTitulos,
   promptFoto,
   type AnalisisIA,
@@ -299,8 +300,21 @@ export async function proponerTitulosIA(publicacionId: string): Promise<{ error?
   const { datos, contexto, categoria } = await cargarBase(pub);
   const r = await pedirIA({ ...pedidoTitulos(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, false, consumoDe("titulos", usuario, pub));
   if ("error" in r) return { error: r.error };
-  const propuesta = normalizarTitulos(r.texto, categoria, contexto.reglas, datos.tituloDropi ?? datos.nombre);
+  const actual = datos.tituloDropi ?? datos.nombre;
+  let propuesta = normalizarTitulos(r.texto, categoria, contexto.reglas, actual);
   if (!propuesta) return { error: "La IA no devolvió títulos que se puedan usar. Vuelve a intentar." };
+  // La IA cuenta mal los caracteres: lo que no cumple el largo se le devuelve una vez con su largo real para que lo ajuste.
+  const fallidos = propuesta.titulos.filter((t) => !t.cumple);
+  if (fallidos.length) {
+    const r2 = await pedirIA({ ...pedidoCorregirTitulos(fallidos, contexto), imagenes: [] }, false, consumoDe("titulos", usuario, pub));
+    const corregida = "error" in r2 ? null : normalizarTitulos(r2.texto, categoria, contexto.reglas, actual);
+    if (corregida) {
+      const buenos = [...propuesta.titulos.filter((t) => t.cumple), ...corregida.titulos.filter((t) => t.cumple)].filter((t, i, a) => a.findIndex((x) => x.titulo.toLowerCase() === t.titulo.toLowerCase()) === i);
+      propuesta = buenos.length
+        ? { enfoque: propuesta.enfoque, titulos: buenos.slice(0, 3), descartados: propuesta.descartados }
+        : { ...corregida, enfoque: propuesta.enfoque };
+    }
+  }
   const modelo = modeloDeTexto();
   const g = await guardar(pub.id, "titulos", propuesta, modelo, usuario);
   if ("error" in g) return g;

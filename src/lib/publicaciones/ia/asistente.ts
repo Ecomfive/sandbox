@@ -133,6 +133,22 @@ export function pedidoTitulos(d: DatosPublicacionIA, c: ContextoIA): { instrucci
   return { instrucciones, texto };
 }
 
+/**
+ * Segunda pasada: la IA cuenta mal los caracteres, así que los títulos que se pasan o se quedan cortos se le devuelven con su largo
+ * real y lo que hay que ajustar. Conservan la idea; solo se acortan o se alargan.
+ */
+export function pedidoCorregirTitulos(titulos: Pick<TituloSugerido, "titulo" | "porque">[], c: ContextoIA): { instrucciones: string; texto: string } {
+  const { minTitulo, maxTitulo } = c.reglas;
+  const instrucciones = bloques(
+    "Eres especialista en catálogos de dropshipping en Latinoamérica (Dropi). Ajustas el largo de títulos de producto sin cambiar su idea.",
+    `Cada título debe medir entre ${minTitulo} y ${maxTitulo} caracteres contando los espacios. Te paso cada uno con su largo actual: reescríbelo para que quede dentro del rango (si se pasa, quita palabras de relleno; si se queda corto, agrega el beneficio o la cantidad que ya aparece en el título). Cuenta los caracteres antes de responder.`,
+    "Mantén el español, que diga qué es y para qué sirve, sin mayúsculas sostenidas, emojis, exclamaciones ni punto final, y no inventes cantidades.",
+    'Responde SOLO con un JSON, sin texto antes ni después: {"titulos":[{"titulo":"…","porque":"una frase corta de por qué ese título vende mejor"}]}.',
+  );
+  const texto = titulos.map((t, i) => `${i + 1}. «${t.titulo}» (${t.titulo.length} caracteres; objetivo ${minTitulo}-${maxTitulo})${t.porque ? ` · idea: ${t.porque}` : ""}`).join("\n");
+  return { instrucciones, texto };
+}
+
 /** El pedido para proponer la descripción y los ángulos de venta (con investigación en internet). */
 export function pedidoTexto(d: DatosPublicacionIA, c: ContextoIA): { instrucciones: string; texto: string } {
   const instrucciones = bloques(

@@ -27,7 +27,8 @@ export interface Credito {
   creadoEn: string;
 }
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
+/** Se redondea a 4 decimales: una foto de Gemini cuesta 0,034 y a centavos cada suma perdía lo que no llegaba al centavo. */
+const r2 = (n: number) => Math.round(n * 10000) / 10000;
 const t = (iso: string) => Date.parse(iso);
 
 export interface SaldoEstimado {

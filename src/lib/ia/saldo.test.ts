@@ -39,7 +39,7 @@ test("el resumen, el gasto por día y el desglose", () => {
   assert.deepEqual(r, { proveedor: "openai", costoUsd: 0.01, llamadas: 1, errores: 0, tokens: 1200, imagenes: 0 });
   const dias = gastoPorDia(consumo, "2026-10-22", 3);
   assert.deepEqual(dias.map((d) => d.dia), ["2026-10-20", "2026-10-21", "2026-10-22"]);
-  assert.equal(dias[0].porProveedor.gemini, 0.03);
+  assert.equal(dias[0].porProveedor.gemini, 0.034);
   assert.equal(dias[1].total, 0.01);
   assert.equal(dias[2].total, 0);
   const porPersona = desglosar(consumo, (c) => c.usuarioNombre ?? "—");
@@ -52,4 +52,10 @@ test("un monto en dólares: con coma o punto, con o sin símbolo, hasta dos deci
   assert.equal(leerMonto("$ 7.5"), 7.5);
   assert.equal(leerMonto("0"), 0);
   for (const malo of ["", "abc", "-5", "1,234", "12.345", "1000000"]) assert.equal(leerMonto(malo), null);
+});
+
+test("las sumas conservan los centavos de fracción: 10 fotos de 0,034 son 0,34", () => {
+  const filas = Array.from({ length: 10 }, (_, i) => ({ ...uso({ creadoEn: `2026-10-22T15:${10 + i}:00-05:00` }) }));
+  assert.equal(desglosar(filas, () => "Foto").at(0)?.costoUsd, 0.34);
+  assert.equal(gastoPorDia(filas, "2026-10-22", 1)[0].total, 0.34);
 });
