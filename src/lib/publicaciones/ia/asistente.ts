@@ -7,23 +7,15 @@
 // que vuelve de la IA se vuelve a validar aquí (largos, tipos permitidos, solo enlaces http): nunca se guarda tal cual.
 // Sin base, red ni React, con prueba.
 
+import { textoEstilos, type EstiloImagen } from "./estilos";
+import { etiquetaTipoFoto, familiaDeProducto, textoFichaFoto, textoJuegoBase, TIPOS_FOTO, type TipoFoto } from "./fotos-base";
 import { chequearTitulo, textoCriterios, textoEjemplos, textoIndicaciones, type ChequeoTitulo, type Ejemplos, type Indicaciones, type ReglasIA } from "./criterios";
 import { extraerJson, type Fuente } from "./openai";
 
 export type TipoIA = "analisis" | "titulos" | "texto" | "fotos";
 
 /** Lo que puede generarse como foto de una publicación. Un «testimonio» no inventa reseñas ni personas reales: es una foto de uso. */
-export const TIPOS_FOTO = [
-  { valor: "principal", etiqueta: "Principal", guia: "el producto solo, centrado, sobre fondo limpio y bien iluminado" },
-  { valor: "beneficios", etiqueta: "Beneficios", guia: "el producto con una escena que haga evidente su beneficio principal, sin texto" },
-  { valor: "uso", etiqueta: "En uso", guia: "una persona usando el producto en su ambiente real" },
-  { valor: "comparacion", etiqueta: "Comparación", guia: "el producto junto a un objeto de referencia (tamaño, cantidad, contenido) o frente a una alternativa genérica sin marca" },
-  { valor: "estilo_cliente", etiqueta: "Estilo cliente", guia: "una foto casual, como la tomaría un cliente en casa, con el producto en la mano o en uso (sin texto ni reseña)" },
-  { valor: "contenido", etiqueta: "Qué incluye", guia: "todo lo que trae la caja o el empaque, ordenado" },
-  { valor: "detalle", etiqueta: "Detalle", guia: "un primer plano de material, textura o acabado" },
-] as const;
-export type TipoFoto = (typeof TIPOS_FOTO)[number]["valor"];
-export const etiquetaTipoFoto = (t: string) => TIPOS_FOTO.find((x) => x.valor === t)?.etiqueta ?? t;
+export { TIPOS_FOTO, etiquetaTipoFoto, type TipoFoto } from "./fotos-base";
 
 /** Qué trabajo de la IA resuelve cada recomendación de optimización (null: esa recomendación no tiene asistente). */
 export function tipoIADeRecomendacion(tipo: string): TipoIA | null {
@@ -67,6 +59,8 @@ export interface ContextoIA {
   reglas: ReglasIA;
   indicaciones: Indicaciones;
   ejemplos: Ejemplos;
+  /** Guías de estilo sacadas de las imágenes modelo del equipo (solo las activas). */
+  estilos?: EstiloImagen[];
 }
 
 const bloques = (...b: string[]) => b.filter(Boolean).join("\n\n");
@@ -180,6 +174,9 @@ export function pedidoFotos(d: DatosPublicacionIA, c: ContextoIA, cantidad: numb
     `Reglas del sistema:\n- ${textoCriterios(c.reglas)}`,
     `Reglas:\n- ${REGLAS_COMUNES}\n- Las fotos no llevan texto, letras, logos, precios ni sellos.\n- Un «testimonio» no existe: la foto estilo cliente es solo una foto casual de uso, sin reseña ni persona real identificable.\n- Cada foto debe mostrar exactamente el mismo producto de la foto adjunta.`,
     textoIndicaciones(c.indicaciones, "fotos"),
+    textoEstilos(c.estilos),
+    textoJuegoBase(familiaDeProducto(d.tituloDropi ?? d.nombre, d.categoria)),
+    "Ingredientes: nombra solo los que aparecen en los datos o se leen en la etiqueta de la foto; si no los sabes, no pidas esa foto. Cuántas unidades, dosis o modo de uso: solo lo que diga la etiqueta o la descripción.",
     `Tipos permitidos: ${TIPOS_FOTO.map((t) => `${t.valor} (${t.guia})`).join("; ")}.`,
     `Responde SOLO con un JSON, sin texto antes ni después: {"analisis":"…","fotos":[{"tipo":"…","titulo":"…","instruccion":"…"}]}. Exactamente ${n} fotos, de tipos distintos, de la que más hace falta a la que menos.`,
     "analisis: 1 o 2 frases con lo que le falta. titulo: 2 a 5 palabras. instruccion: la escena completa que debe generar el modelo de imágenes, en español, con composición, ambiente, luz y qué se ve (sin texto en la imagen).",
@@ -368,7 +365,7 @@ export function normalizarPlanFotos(texto: string, cantidad: number): PlanFotos 
 }
 
 /** El pedido final a Gemini de una foto del plan: la instrucción más lo que no se negocia. */
-export function promptFoto(d: Pick<DatosPublicacionIA, "nombre">, f: Pick<FotoPlan, "tipo" | "instruccion">, referencias: number): string {
+export function promptFoto(d: Pick<DatosPublicacionIA, "nombre">, f: Pick<FotoPlan, "tipo" | "instruccion">, referencias: number, estilos?: EstiloImagen[]): string {
   const guia = TIPOS_FOTO.find((t) => t.valor === f.tipo)?.guia ?? "";
   const lineas = [
     `Foto para la publicación de un producto en un marketplace. Producto: ${d.nombre.trim()}.`,
@@ -377,6 +374,10 @@ export function promptFoto(d: Pick<DatosPublicacionIA, "nombre">, f: Pick<FotoPl
   ];
   if (referencias)
     lineas.push(`${referencias === 1 ? "La imagen adjunta es una foto real" : `Las ${referencias} imágenes adjuntas son fotos reales`} del producto: respeta exactamente su forma, colores, materiales, proporciones y detalles. No inventes otro producto ni cambies su diseño.`);
+  const ficha = textoFichaFoto(f.tipo);
+  if (ficha) lineas.push(ficha);
+  const estilo = textoEstilos(estilos, f.tipo);
+  if (estilo) lineas.push(estilo);
   lineas.push("Fotografía realista de calidad comercial, bien iluminada. Sin textos, letras, logos, marcas de agua, precios ni sellos sobre la imagen.");
   return lineas.join("\n");
 }

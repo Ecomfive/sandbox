@@ -7,13 +7,19 @@ import type { EntradaTexto, Fuente, RespuestaTexto, UsoTexto } from "./openai";
 /** El modelo por defecto (se cambia con `ANTHROPIC_MODEL`). */
 export const MODELO_CLAUDE = "claude-sonnet-5-5";
 
+/** Una imagen para Claude: una dirección pública va por URL; una `data:` (imagen modelo que no se guarda) va como base64. */
+export function imagenParaClaude(url: string) {
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(url);
+  return { type: "image", source: m ? { type: "base64", media_type: m[1], data: m[2] } : { type: "url", url } };
+}
+
 /** El cuerpo del pedido. Con `buscar` Claude puede consultar internet. */
 export function cuerpoMensaje(modelo: string, e: EntradaTexto, buscar: boolean) {
   return {
     model: modelo,
     max_tokens: 8000,
     system: e.instrucciones,
-    messages: [{ role: "user", content: [{ type: "text", text: e.texto }, ...e.imagenes.map((url) => ({ type: "image", source: { type: "url", url } }))] }],
+    messages: [{ role: "user", content: [{ type: "text", text: e.texto }, ...e.imagenes.map(imagenParaClaude)] }],
     ...(buscar ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] } : {}),
   };
 }

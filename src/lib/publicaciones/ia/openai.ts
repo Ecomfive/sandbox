@@ -10,7 +10,7 @@ export interface EntradaTexto {
   instrucciones: string;
   /** Lo que se pide, con los datos de la publicación. */
   texto: string;
-  /** Direcciones públicas de fotos del producto (la IA las ve). */
+  /** Direcciones públicas de fotos del producto (la IA las ve), o `data:image/...;base64,...` si la imagen no se guarda. */
   imagenes: string[];
 }
 
