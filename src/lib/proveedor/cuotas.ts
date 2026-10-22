@@ -29,33 +29,53 @@ export interface EstadoCuota {
 /** Margen para dar por pagada una cuota (redondeos de centavos). */
 const TOLERANCIA = 0.5;
 
-export interface PedidoParaCuotas {
+/** Un pago recibido de una cuota (`proveedor_pagos`: confirmado por el proveedor o de su hoja de pagos). */
+export interface Pago {
+  monto: number;
+  fecha: string;
+}
+
+export interface BaseCuotas {
   montoTotal: number | null;
   fechaEnvio: string | null;
   fechaLlegada: string | null;
-  primerPago: number | null;
-  fechaPago1: string | null;
-  segundoPago: number | null;
-  fechaPago2: string | null;
+  /** Cuando el anticipo no es el porcentaje de siempre (un envío por UPS se paga completo por adelantado). */
+  anticipoMonto?: number | null;
+  pagosAnticipo: Pago[];
+  pagosSaldo: Pago[];
 }
 
-/** Las cuotas de un pedido; vacío si todavía no se envió o no tiene total. */
-export function cuotasDe(p: PedidoParaCuotas, porcentajeAnticipo = 50, diasAnticipo = 10): Cuota[] {
-  if (!p.fechaEnvio || !p.montoTotal || p.montoTotal <= 0) return [];
-  const anticipo = redondear((p.montoTotal * porcentajeAnticipo) / 100);
-  const saldo = redondear(p.montoTotal - anticipo);
-  const cuota = (tipo: TipoCuota, monto: number, vence: string | null, pagado: number | null, fecha: string | null): Cuota => ({
-    cuota: tipo,
-    monto,
-    vence,
-    pagado: pagado ?? 0,
-    fechaPago: fecha,
-    pendiente: Math.max(0, redondear(monto - (pagado ?? 0))),
-  });
-  return [
-    cuota("anticipo", anticipo, sumarDias(p.fechaEnvio, diasAnticipo), p.primerPago, p.fechaPago1),
-    cuota("saldo", saldo, p.fechaLlegada, p.segundoPago, p.fechaPago2),
-  ];
+/** Las cuotas de un pedido; vacío si todavía no se envió o no tiene total. Si el anticipo es el total, no hay saldo. */
+export function cuotasDe(b: BaseCuotas, porcentajeAnticipo = 50, diasAnticipo = 10): Cuota[] {
+  if (!b.fechaEnvio || !b.montoTotal || b.montoTotal <= 0) return [];
+  const anticipo = redondear(Math.min(b.montoTotal, b.anticipoMonto ?? (b.montoTotal * porcentajeAnticipo) / 100));
+  const saldo = redondear(b.montoTotal - anticipo);
+  const cuota = (tipo: TipoCuota, monto: number, vence: string | null, pagos: Pago[]): Cuota => {
+    const pagado = redondear(pagos.reduce((s, x) => s + x.monto, 0));
+    return {
+      cuota: tipo,
+      monto,
+      vence,
+      pagado,
+      // La fecha del último pago: la cuota queda pagada cuando se completa.
+      fechaPago: pagos.length ? pagos.map((x) => x.fecha).sort().at(-1)! : null,
+      pendiente: Math.max(0, redondear(monto - pagado)),
+    };
+  };
+  const cuotas = [cuota("anticipo", anticipo, sumarDias(b.fechaEnvio, diasAnticipo), b.pagosAnticipo)];
+  if (saldo > 0) cuotas.push(cuota("saldo", saldo, b.fechaLlegada, b.pagosSaldo));
+  return cuotas;
+}
+
+/** Días promedio entre la llegada y el pago del saldo, y cuántos se pagaron dentro de `dias` días. */
+export function saldoTrasLlegada(cuotas: Cuota[], dias = 7) {
+  const medibles = cuotas.filter((c) => c.cuota === "saldo" && estaPagada(c) && c.vence && c.fechaPago);
+  const atrasos = medibles.map((c) => diasEntre(c.vence!, c.fechaPago!));
+  return {
+    total: medibles.length,
+    promedio: atrasos.length ? Math.round((atrasos.reduce((s, d) => s + d, 0) / atrasos.length) * 10) / 10 : 0,
+    dentro: atrasos.filter((d) => d <= dias).length,
+  };
 }
 
 export const estaPagada = (c: Pick<Cuota, "pendiente">) => c.pendiente <= TOLERANCIA;

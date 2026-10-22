@@ -11,6 +11,7 @@ import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
+import { PagosProveedorCompraBloque } from "./pagos-proveedor-compra";
 import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { CopiarCotizacionBoton } from "./copiar-cotizacion";
 import { AnularCompraBoton, AvisoAnulada } from "./eliminar-compra-boton";
@@ -248,6 +249,7 @@ export function FichaCompra({
           )}
           {/* A solo lectura no hay formulario: los productos se ven al final, como antes. */}
           {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} />}
+          <PagosProveedorCompraBloque key={`pagos-${compra.id}`} compraId={compra.id} />
           <ActividadCompra key={compra.id} id={compra.id} puedeComentar={puedeEscribir && puedeComentar} comentarioResaltado={comentarioResaltado} />
         </div>
       )}
