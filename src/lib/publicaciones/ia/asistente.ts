@@ -8,7 +8,8 @@
 // Sin base, red ni React, con prueba.
 
 import { textoEstilos, type EstiloImagen } from "./estilos";
-import { etiquetaTipoFoto, familiaDeProducto, textoFichaFoto, textoJuegoBase, TIPOS_FOTO, type TipoFoto } from "./fotos-base";
+import { etiquetaTipoFoto, familiaDeProducto, LIMITES_TEXTO, textoFichaFoto, textoJuegoBase, TIPOS_FOTO, type TipoFoto } from "./fotos-base";
+import { lineaRiesgosa, normalizarTextos, textoDeFoto } from "./texto-imagen";
 import { chequearTitulo, textoCriterios, textoEjemplos, textoIndicaciones, type ChequeoTitulo, type Ejemplos, type Indicaciones, type ReglasIA } from "./criterios";
 import { extraerJson, type Fuente } from "./openai";
 
@@ -172,14 +173,20 @@ export function pedidoFotos(d: DatosPublicacionIA, c: ContextoIA, cantidad: numb
     "Eres director de arte de publicaciones de productos en Dropi.",
     "Mira la foto adjunta del producto y decide qué fotos le faltan a la publicación para venderse mejor. Si hace falta, consulta en internet cómo muestran el producto los mejores vendedores.",
     `Reglas del sistema:\n- ${textoCriterios(c.reglas)}`,
-    `Reglas:\n- ${REGLAS_COMUNES}\n- Las fotos no llevan texto, letras, logos, precios ni sellos.\n- Un «testimonio» no existe: la foto estilo cliente es solo una foto casual de uso, sin reseña ni persona real identificable.\n- Cada foto debe mostrar exactamente el mismo producto de la foto adjunta.`,
+    `Reglas:\n- ${REGLAS_COMUNES}\n- Solo las fotos de beneficios, ingredientes y cómo se usa llevan texto, y es el que tú escribes en «textos»; las demás fotos no llevan texto. Ninguna lleva logos, precios ni sellos.\n- Un «testimonio» no existe: la foto estilo cliente es solo una foto casual de uso, sin reseña ni persona real identificable.\n- Cada foto debe mostrar exactamente el mismo producto de la foto adjunta.`,
     textoIndicaciones(c.indicaciones, "fotos"),
     textoEstilos(c.estilos),
     textoJuegoBase(familiaDeProducto(d.tituloDropi ?? d.nombre, d.categoria)),
-    "Ingredientes: nombra solo los que aparecen en los datos o se leen en la etiqueta de la foto; si no los sabes, no pidas esa foto. Cuántas unidades, dosis o modo de uso: solo lo que diga la etiqueta o la descripción.",
+    [
+      "Textos de las fotos informativas (en español, cortos, con sus tildes y bien escritos; se escriben tal cual en la imagen):",
+      `- beneficios: de 3 a ${LIMITES_TEXTO.beneficios.max} beneficios, los más importantes y reales del producto, de a lo más ${LIMITES_TEXTO.beneficios.largo} caracteres cada uno (ej. «${LIMITES_TEXTO.beneficios.ejemplo}»), dichos como apoyo o bienestar: nunca curar, tratar ni garantizar nada.`,
+      `- ingredientes: los ingredientes principales, hasta ${LIMITES_TEXTO.ingredientes.max}, de a lo más ${LIMITES_TEXTO.ingredientes.largo} caracteres cada uno (ej. «${LIMITES_TEXTO.ingredientes.ejemplo}»). Solo los que se leen en la etiqueta de la foto o aparecen en los datos o en una fuente confiable de ese mismo producto: si no los puedes confirmar, no pidas esa foto.`,
+      `- como_usar: de 2 a ${LIMITES_TEXTO.como_usar.max} pasos de uso, en orden, de a lo más ${LIMITES_TEXTO.como_usar.largo} caracteres cada uno, en infinitivo o imperativo (ej. «${LIMITES_TEXTO.como_usar.ejemplo}»). Solo el modo de uso que diga la etiqueta o la descripción, sin inventar dosis ni indicaciones médicas.`,
+      "Una foto de otro tipo lleva «textos» vacío.",
+    ].join("\n"),
     `Tipos permitidos: ${TIPOS_FOTO.map((t) => `${t.valor} (${t.guia})`).join("; ")}.`,
-    `Responde SOLO con un JSON, sin texto antes ni después: {"analisis":"…","fotos":[{"tipo":"…","titulo":"…","instruccion":"…"}]}. Exactamente ${n} fotos, de tipos distintos, de la que más hace falta a la que menos.`,
-    "analisis: 1 o 2 frases con lo que le falta. titulo: 2 a 5 palabras. instruccion: la escena completa que debe generar el modelo de imágenes, en español, con composición, ambiente, luz y qué se ve (sin texto en la imagen).",
+    `Responde SOLO con un JSON, sin texto antes ni después: {"analisis":"…","fotos":[{"tipo":"…","titulo":"…","instruccion":"…","textos":["…"]}]}. Exactamente ${n} fotos, de tipos distintos, de la que más hace falta a la que menos.`,
+    "analisis: 1 o 2 frases con lo que le falta. titulo: 2 a 5 palabras. instruccion: la escena completa que debe generar el modelo de imágenes, en español, con composición, ambiente, luz y qué se ve (el texto de las fotos informativas va en «textos», no en la instrucción).",
   );
   const texto = bloques(datosBase(d).join("\n"), resumenFaltas(d).length ? `Lo que le falta hoy: ${resumenFaltas(d).join("; ")}.` : "", `Genera el plan de ${n} fotos.`);
   return { instrucciones, texto };
@@ -334,6 +341,10 @@ export interface FotoPlan {
   tipo: TipoFoto;
   titulo: string;
   instruccion: string;
+  /** El texto que lleva la imagen (solo beneficios, ingredientes y cómo se usa), una línea cada uno; el equipo lo puede corregir antes de generarla. */
+  textos?: string[];
+  /** Si la imagen generada se leyó y trae el texto bien escrito (true), mal escrito (false) o no se pudo comprobar (null). */
+  textoOk?: boolean | null;
   /** Dónde quedó la imagen generada en Storage (null si todavía no se generó). */
   ruta: string | null;
   /** El motivo si la última generación falló. */
@@ -358,14 +369,16 @@ export function normalizarPlanFotos(texto: string, cantidad: number): PlanFotos 
     const instruccion = cortar(x.instruccion, 900);
     if (!tipo || vistos.has(tipo) || instruccion.length < 20) continue;
     vistos.add(tipo);
-    fotos.push({ tipo, titulo: cortar(x.titulo, 60) || etiquetaTipoFoto(tipo), instruccion, ruta: null, error: null });
+    // El texto del plan se limpia y se descarta lo que promete curar o tratar una enfermedad.
+    const textos = normalizarTextos(tipo, x.textos).filter((t) => !lineaRiesgosa([t]));
+    fotos.push({ tipo, titulo: cortar(x.titulo, 60) || etiquetaTipoFoto(tipo), instruccion, textos, textoOk: null, ruta: null, error: null });
   }
   if (!fotos.length) return null;
   return { analisis: cortar(o.analisis, 500), fotos: fotos.slice(0, Math.max(1, Math.min(MAX_FOTOS, Math.round(cantidad)))) };
 }
 
 /** El pedido final a Gemini de una foto del plan: la instrucción más lo que no se negocia. */
-export function promptFoto(d: Pick<DatosPublicacionIA, "nombre">, f: Pick<FotoPlan, "tipo" | "instruccion">, referencias: number, estilos?: EstiloImagen[]): string {
+export function promptFoto(d: Pick<DatosPublicacionIA, "nombre">, f: Pick<FotoPlan, "tipo" | "instruccion" | "textos">, referencias: number, estilos?: EstiloImagen[]): string {
   const guia = TIPOS_FOTO.find((t) => t.valor === f.tipo)?.guia ?? "";
   const lineas = [
     `Foto para la publicación de un producto en un marketplace. Producto: ${d.nombre.trim()}.`,
@@ -378,6 +391,13 @@ export function promptFoto(d: Pick<DatosPublicacionIA, "nombre">, f: Pick<FotoPl
   if (ficha) lineas.push(ficha);
   const estilo = textoEstilos(estilos, f.tipo);
   if (estilo) lineas.push(estilo);
-  lineas.push("Fotografía realista de calidad comercial, bien iluminada. Sin textos, letras, logos, marcas de agua, precios ni sellos sobre la imagen.");
+  // Las fotos informativas llevan solo el texto que se les da; las demás, ninguno.
+  const texto = textoDeFoto(f.tipo, f.textos ?? []);
+  if (texto) {
+    lineas.push(texto);
+    lineas.push("Fotografía realista de calidad comercial, bien iluminada. Sin logos, marcas de agua, precios, sellos ni más texto que el indicado.");
+  } else {
+    lineas.push("Fotografía realista de calidad comercial, bien iluminada. Sin textos, letras, logos, marcas de agua, precios ni sellos sobre la imagen.");
+  }
   return lineas.join("\n");
 }

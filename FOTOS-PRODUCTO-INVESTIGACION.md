@@ -50,9 +50,10 @@ estudio con «tres softboxes»; lente 85 mm para retrato con fondo desenfocado, 
 aparecer** en vez de lo que no (mejor «una calle vacía» que «sin autos»); ser específico con materiales y colores; y, con fotos de referencia, decir
 explícitamente **qué debe quedar exactamente igual**. Por eso cada ficha de `FICHA_FOTO` está escrita en positivo y con cámara y luz.
 
-**Texto dentro de la imagen.** Esa misma guía dice que los modelos actuales escriben texto legible si se le da el texto exacto entre comillas, se nombra la
-tipografía y se piden primero los textos; no documenta cuántas veces falla. El sistema hoy **no pide texto** en las fotos generadas. Si se quiere
-infografía con beneficios o ingredientes escritos, conviene probarlo con textos cortos y verificados y revisarlos a ojo antes de usarlos.
+**Texto dentro de la imagen.** Esa misma guía dice que los modelos actuales escriben texto legible si se les da el texto exacto entre comillas, se nombra
+la tipografía y se piden primero los textos; no documenta cuántas veces falla. Tras la prueba con la crema Perfect (22 oct 2026), donde las imágenes de
+beneficios, ingredientes y uso salían solo visuales, **las fotos informativas llevan texto** (beneficios, ingredientes y cómo se usa) y las demás no. El
+texto no lo inventa Gemini: lo escribe el plan o el equipo, se le pide tal cual y después se lee la imagen para comprobarlo.
 
 ## Cómo quedó en el sistema
 
@@ -62,6 +63,9 @@ infografía con beneficios o ingredientes escritos, conviene probarlo con textos
   tamaño › detalle…). Un suplemento manda sobre belleza («cápsulas para el cabello»).
 - **Ficha de cada foto** (`FICHA_FOTO`): qué duda resuelve, cómo hacerla (composición, luz, cámara) y qué cuidar. El plan de fotos recibe el juego y
   lo que resuelve cada tipo; cada foto recibe su ficha en el pedido a Gemini.
+- **Texto en las fotos informativas** (`TIPOS_CON_TEXTO`, `texto-imagen.ts`): beneficios (hasta 4), ingredientes (hasta 6) y cómo se usa (hasta 4 pasos) llevan
+  texto escrito; cuadro editable «Textos de la imagen»; se rechaza lo que promete curar o tratar; la imagen generada se lee con la IA de texto y, si el
+  texto quedó mal escrito (tildes incluidas), se genera una vez más. La foto dice «Texto verificado» o «Revisar el texto».
 - **Lo que no se genera** (`NO_SE_GENERA`): se le dice a la IA para que lo avise en el análisis y el equipo use la foto real.
 
 ## Fuentes
