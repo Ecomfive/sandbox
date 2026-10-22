@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { enCaminoPorPais, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
+import { enCaminoPorPais, faltaParaLlegada, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
 
 const l = (extra: Partial<LineaEnCamino>): LineaEnCamino => ({ pais: "Panamá", unidades: 100, etapa: "tracking", fechaEnvio: "2026-10-01", fechaLlegada: null, anulada: false, ...extra });
 
-test("en camino: abierta, con fecha de envío y sin llegada", () => {
+test("en camino: abierta, sin llegar, y ya salió o ya está en producción, tracking o arribo", () => {
   assert.equal(lineaEnCamino(l({})), true);
-  assert.equal(lineaEnCamino(l({ fechaEnvio: null })), false); // todavía no salió
+  assert.equal(lineaEnCamino(l({ fechaEnvio: null })), true); // en tracking sin fecha de envío: ya está pedida
+  assert.equal(lineaEnCamino(l({ fechaEnvio: null, etapa: "produccion" })), true); // en producción: viene mercancía, sin fecha de envío todavía
+  assert.equal(lineaEnCamino(l({ fechaEnvio: null, etapa: "cotizar" })), false); // solo una cotización
+  assert.equal(lineaEnCamino(l({ fechaEnvio: null, etapa: "cotizado" })), false);
+  assert.equal(lineaEnCamino(l({ fechaEnvio: null, etapa: "backlog" })), false);
+  assert.equal(lineaEnCamino(l({ fechaEnvio: "2026-10-01", etapa: "cotizado" })), true); // aunque la etapa quedara atrás, ya salió
   assert.equal(lineaEnCamino(l({ fechaLlegada: "2026-10-20" })), false); // ya llegó
   assert.equal(lineaEnCamino(l({ etapa: "completado" })), false);
   assert.equal(lineaEnCamino(l({ etapa: "descartado" })), false);
@@ -14,7 +19,7 @@ test("en camino: abierta, con fecha de envío y sin llegada", () => {
 });
 
 test("suma las unidades por país, el que más trae primero, y cuenta las compras", () => {
-  const r = enCaminoPorPais([l({ unidades: 300 }), l({ unidades: 200, pais: "México" }), l({ unidades: 400, pais: "México" }), l({ unidades: 50, etapa: "arribo_mercancia" }), l({ unidades: 999, fechaEnvio: null })]);
+  const r = enCaminoPorPais([l({ unidades: 300 }), l({ unidades: 200, pais: "México" }), l({ unidades: 400, pais: "México" }), l({ unidades: 50, etapa: "arribo_mercancia" }), l({ unidades: 999, fechaEnvio: null, etapa: "cotizado" })]);
   assert.deepEqual(r, [
     { pais: "México", unidades: 600, compras: 2 },
     { pais: "Panamá", unidades: 350, compras: 2 },
@@ -23,7 +28,7 @@ test("suma las unidades por país, el que más trae primero, y cuenta las compra
 
 test("sin nada en camino, lista vacía; una línea sin país va a «—»; las cantidades en cero no cuentan", () => {
   assert.deepEqual(enCaminoPorPais([]), []);
-  assert.deepEqual(enCaminoPorPais([l({ fechaEnvio: null })]), []);
+  assert.deepEqual(enCaminoPorPais([l({ fechaEnvio: null, etapa: "cotizar" })]), []); // una cotización no viene en camino
   assert.deepEqual(enCaminoPorPais([l({ pais: null, unidades: 10 }), l({ unidades: 0 })]), [{ pais: "—", unidades: 10, compras: 1 }]);
 });
 
@@ -51,9 +56,13 @@ test("sin fecha límite y sin fecha de envío o sin vía, no hay fecha de llegad
 });
 
 test("el resumen toma la llegada más próxima y cuenta lo que no tiene fecha", () => {
-  assert.deepEqual(resumenLlegada([{ unidades: 100, llegada: "2026-12-01" }, { unidades: 50, llegada: "2026-11-05" }, { unidades: 30, llegada: null }]), { unidades: 180, llegada: "2026-11-05", sinFecha: 30 });
-  assert.deepEqual(resumenLlegada([{ unidades: 40, llegada: null }]), { unidades: 40, llegada: null, sinFecha: 40 });
-  assert.deepEqual(resumenLlegada([]), { unidades: 0, llegada: null, sinFecha: 0 });
+  assert.deepEqual(resumenLlegada([{ unidades: 100, llegada: "2026-12-01" }, { unidades: 50, llegada: "2026-11-05" }, { unidades: 30, llegada: null }]), { unidades: 180, llegada: "2026-11-05", sinFecha: 30, sinEnvio: 0 });
+  assert.deepEqual(resumenLlegada([{ unidades: 40, llegada: null }]), { unidades: 40, llegada: null, sinFecha: 40, sinEnvio: 0 });
+  assert.deepEqual(resumenLlegada([]), { unidades: 0, llegada: null, sinFecha: 0, sinEnvio: 0 });
+  // En producción, sin enviar: las unidades vienen en camino y lo que falta es la fecha de envío.
+  assert.deepEqual(resumenLlegada([{ unidades: 500, llegada: null, sinEnvio: true }, { unidades: 20, llegada: null, sinEnvio: false }]), { unidades: 520, llegada: null, sinFecha: 520, sinEnvio: 500 });
+  assert.equal(faltaParaLlegada({ fechaEnvio: null }), "envio");
+  assert.equal(faltaParaLlegada({ fechaEnvio: "2026-10-01" }), "via");
 });
 
 test("la fecha corta lleva el año solo si no es el actual", () => {

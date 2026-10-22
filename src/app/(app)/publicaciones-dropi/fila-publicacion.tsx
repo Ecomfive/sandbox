@@ -91,7 +91,7 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
           {v.stock <= 0 && f.enCamino > 0 && (
             <span className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-azul lg:justify-end">
               <span className="whitespace-nowrap">{entero(f.enCamino)} en camino</span>
-              <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} />
+              <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} />
             </span>
           )}
         </span>

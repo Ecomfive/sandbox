@@ -6,7 +6,7 @@
 --    wms-productos/publicaciones/<publicación>/ia/).
 -- Subir lo propuesto a Dropi se hace a mano por ahora; esta tabla solo guarda lo generado.
 --
--- Reversa: supabase/rollbacks/0130_rollback.sql
+-- Reversa: supabase/rollbacks/0131_rollback.sql
 
 create table if not exists dropi_publicaciones_ia (
   id uuid primary key default uuid_v7(),
