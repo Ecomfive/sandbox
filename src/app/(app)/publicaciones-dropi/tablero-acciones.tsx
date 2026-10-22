@@ -3,7 +3,7 @@
 import { KpiFiltro } from "@/components/ui/kpi-filtro";
 import { KpiGroup, type Tono } from "@/components/ui/kpi-card";
 import type { AtajoFiltro } from "@/lib/tabla/atajos";
-import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
+import { ACCIONES as ACCIONES_CALCULADAS, type Accion as AccionCalculada } from "@/lib/publicaciones/automatico";
 import type { DefTabla } from "@/lib/tabla/motor";
 import { DEF_PUBLICACIONES, estadoVinculo, type FilaPublicacion } from "./def-publicaciones";
 
@@ -19,37 +19,27 @@ interface Accion {
   subtexto?: string;
 }
 
-const porEstado = (valor: string, titulo: string, tono: Tono): Accion => ({
-  id: valor,
-  titulo,
-  cuenta: (f) => f.estado === valor,
-  atajo: { id: valor, etiqueta: titulo, ayuda: `Filtrar la lista: ${titulo.toLowerCase()}`, filtro: seleccion("estado", valor), suma: true },
-  tono,
-});
+/** Una tarjeta por cada acción calculada (21 oct 2026): cuenta y filtra por el campo «Acción». */
+const porAccion = (valor: AccionCalculada, tono: Tono): Accion => {
+  const a = ACCIONES_CALCULADAS.find((x) => x.valor === valor)!;
+  return {
+    id: valor,
+    titulo: a.etiqueta,
+    subtexto: a.detalle.toLowerCase(),
+    cuenta: (f) => f.acciones.includes(valor),
+    atajo: { id: valor, etiqueta: a.etiqueta, ayuda: `Filtrar la lista: ${a.etiqueta.toLowerCase()}`, filtro: seleccion("accion", valor), suma: true },
+    tono,
+  };
+};
 
 const VINCULOS_SIN_VINCULAR = ["seguro", "sugerido", "varios", "falta_compuesto", "ninguno"];
 
-/** Lo que hay que hacer hoy, en el orden del flujo de trabajo: cada tarjeta cuenta y filtra la lista de abajo. */
+/** Lo que hay que hacer hoy (calculado de Dropi, el margen y la competencia): cada tarjeta cuenta y filtra la lista de abajo. */
 const ACCIONES: Accion[] = [
-  porEstado("revisar_precio", "Revisar precio y venta", "warning"),
-  porEstado("verificar_dropshipper", "Verificar con dropshipper", "destructive"),
-  porEstado("validar_bajar_precio", "Validar bajar precio", "warning"),
-  porEstado("bajar_precio", "Bajar precio", "info"),
-  {
-    id: "revision-vencida",
-    titulo: "Revisión vencida",
-    cuenta: (f) => f.revisionVencida,
-    atajo: { id: "revision-vencida", etiqueta: "Revisión vencida", ayuda: "Filtrar la lista: revisión vencida", filtro: seleccion("revision", "vencida") },
-    tono: "warning",
-  },
-  {
-    id: "margen-bajo",
-    titulo: "Margen bajo",
-    subtexto: `menos de ${Math.round(MARGEN_BAJO * 100)} %`,
-    cuenta: (f) => f.margen !== null && f.margen < MARGEN_BAJO,
-    atajo: { id: "margen-bajo", etiqueta: "Margen bajo", ayuda: "Filtrar la lista: margen bajo", filtro: seleccion("margenBajo", "bajo") },
-    tono: "destructive",
-  },
+  porAccion("nuevo", "info"),
+  porAccion("revisar_precio", "warning"),
+  porAccion("bajar_precio", "warning"),
+  porAccion("verificar_dropshipper", "destructive"),
   {
     id: "sin-vincular",
     titulo: "Sin vincular a Producto",
@@ -68,16 +58,16 @@ const ACCIONES: Accion[] = [
 ];
 
 /**
- * El tablero de acciones de arriba: lo que está esperando una decisión (los estados del flujo de trabajo, las revisiones
- * vencidas, el margen bajo, lo que falta vincular y lo que no tiene stock). Cada tarjeta cuenta las publicaciones abiertas y,
- * al pulsarla, filtra la lista de abajo; pulsarla otra vez quita el filtro. Los estados del flujo se pueden juntar (uno u otro).
+ * El tablero de acciones de arriba: lo que está esperando una decisión (las acciones calculadas, lo que falta vincular y lo
+ * que no tiene stock). Cada tarjeta cuenta las publicaciones abiertas y, al pulsarla, filtra la lista de abajo; pulsarla otra
+ * vez quita el filtro. Las acciones se pueden juntar (una u otra).
  */
 export function TableroAcciones({ publicaciones, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; def?: DefTabla<FilaPublicacion> }) {
-  const abiertas = publicaciones.filter((f) => f.estado !== "archivado");
+  const abiertas = publicaciones.filter((f) => !f.archivada);
   return (
     <KpiGroup titulo="Tablero de acciones" accion={<span className="tabular-nums">{abiertas.length} publicaciones abiertas</span>}>
-      {/* Ocho tarjetas: 2 por fila en el celular, 4 en tablet y las ocho juntas en una pantalla ancha. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8 [&>*]:min-w-0">
+      {/* Seis tarjetas: 2 por fila en el celular, 3 en tablet y las seis juntas en una pantalla ancha. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 [&>*]:min-w-0">
         {ACCIONES.map((a) => {
           const n = abiertas.filter(a.cuenta).length;
           return <KpiFiltro key={a.id} def={def} atajo={a.atajo} titulo={a.titulo} valor={n} subtexto={a.subtexto} tono={n > 0 ? a.tono : "neutral"} compacta />;

@@ -7,14 +7,14 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
-import { ESTADOS, UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
+import { UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
+import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
-const fechaCorta = (f: string | null) => (f ? new Date(`${f}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "short" }) : "—");
 
 const Punto = ({ clase, texto }: { clase: string; texto: string }) => (
   <span role="img" aria-label={texto} className={`inline-block h-2 w-2 shrink-0 rounded-full ${clase}`} />
@@ -89,12 +89,36 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
   );
 }
 
+/** Lo que necesita la publicación (calculado): hasta dos etiquetas, o «Al día»; si hay un competidor más barato, quién y a cuánto. */
+function CeldaAcciones({ f }: { f: FilaPublicacion }) {
+  if (f.archivada) return <Celda nombre="Acción" principal={<span className="text-muted-foreground">Archivada</span>} />;
+  const lista = f.acciones.length ? f.acciones : (["al_dia"] as const);
+  const opciones = lista.map((v) => ACCIONES.find((a) => a.valor === v)!).filter(Boolean);
+  return (
+    <Celda
+      nombre="Acción"
+      principal={
+        <span className="flex flex-wrap gap-1">
+          {opciones.slice(0, 2).map((o) => (
+            <Badge key={o.valor} color={o.color}>
+              {o.etiqueta}
+            </Badge>
+          ))}
+          {opciones.length > 2 && <span className="text-xs text-muted-foreground">+{opciones.length - 2}</span>}
+        </span>
+      }
+      apoyo={f.competidorMasBarato ? `${f.competidorMasBarato.proveedor} a ${usd(f.competidorMasBarato.precio)}` : undefined}
+    />
+  );
+}
+
 /**
- * Una publicación como fila de la lista: foto, nombre con su ID y su SKU, estado, precio, utilidad y margen, dónde está,
+ * Una publicación como fila de la lista: foto, nombre con su ID y su SKU, precio, utilidad y margen, lo que necesita, sus ventas,
+ * dónde está y cómo está en Dropi,
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
  */
 export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; alEliminar?: () => void }) {
-  const estado = opcion(ESTADOS, f.estado);
+  const enDropi = EN_DROPI.find((e) => e.valor === (f.archivada && f.enDropi !== "archivado" ? "archivado" : f.enDropi));
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
   const sugerida = !f.sku && f.sugerencia && f.sugerencia.tipo !== "ninguno" ? f.sugerencia : null;
   const fila = (
@@ -124,7 +148,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
                 {sugerida ? `${ETIQUETA_SUGERENCIA[sugerida.tipo]}${sugerida.sku ? ` · ${sugerida.sku.codigo}` : ""}` : "Sin SKU"}
               </span>
             )}
-            {f.tipo === "privado" && <span>Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>}
+            {f.tipoDropi === "privado" && <span>Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>}
           </span>
         </span>
       </span>
@@ -147,21 +171,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
             )
           }
         />
-        <Celda nombre="Estado" principal={estado ? <Badge color={estado.color}>{estado.etiqueta}</Badge> : <span className="text-muted-foreground">—</span>} />
+        <CeldaAcciones f={f} />
         <CeldaVentas f={f} />
         <Celda
           nombre="Dónde está"
           principal={ubicacion ? <ConPunto color={ubicacion.color} texto={ubicacion.etiqueta} /> : <span className="text-muted-foreground">—</span>}
         />
-        <Celda
-          nombre="Próxima revisión"
-          principal={
-            <span className="inline-flex items-center gap-1.5 tabular-nums">
-              {f.revisionVencida && <Punto clase="bg-warning" texto="Revisión vencida" />}
-              {fechaCorta(f.proximaRevision)}
-            </span>
-          }
-        />
+        <Celda nombre="En Dropi" principal={enDropi ? <ConPunto color={enDropi.color} texto={enDropi.etiqueta} /> : <span className="text-muted-foreground">—</span>} />
       </span>
 
       <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />
