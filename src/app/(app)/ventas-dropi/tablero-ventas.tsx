@@ -9,6 +9,17 @@ import { CATEGORIAS, DIAS_REPONER, hayQueReponer, type Categoria, type ResumenPr
 export interface ProductoVentas extends ResumenProducto {
   /** El SKU del sistema, si alguna publicación de Gestión de IDs Dropi lo vincula. */
   sku: string | null;
+  /** La plata del producto en todo lo cargado del Excel de la oficina (migración 0130); null si no tiene órdenes ahí. */
+  dinero: { ganancia: number; utilidad: number; margen: number | null; porMes: Record<string, number> } | null;
+}
+
+/** La plata por mes de todos los productos, del Excel de la oficina (migración 0130). */
+export interface DineroVentas {
+  /** La fecha de la orden más nueva cargada. */
+  hasta: string;
+  ordenes: number;
+  fuente: string;
+  meses: { mes: string; entregadas: number; unidades: number; ganancia: number; comision: number; coste: number; descuentos: number; utilidad: number }[];
 }
 
 export interface DropshipperVentas {
@@ -40,6 +51,8 @@ const fecha = (d: string | null) => (d ? `${Number(d.slice(8, 10))} ${MESES[Numb
 /** «+12.4 %» en verde si sube y en rojo si baja; sin dato anterior, nada. */
 const Cambio = ({ valor }: { valor: number | null }) =>
   valor === null ? null : <b className={`font-medium ${valor > 0 ? "text-success" : valor < 0 ? "text-destructive" : ""}`}>{`${valor > 0 ? "+" : valor < 0 ? "−" : ""}${Math.abs(valor).toLocaleString("es-PA", { maximumFractionDigits: 1 })} %`}</b>;
+const usd = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const usdExacto = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fechaCorta = (d: string) => `${Number(d.slice(8, 10))} ${MESES[Number(d.slice(5, 7)) - 1]}`;
 
 const ejes = { tick: { fontSize: 11, fill: "var(--muted-foreground)" }, axisLine: false, tickLine: false } as const;
@@ -186,15 +199,27 @@ const colDias: Columna<ProductoVentas> = {
   numero: true,
 };
 
+const colUtilidad: Columna<ProductoVentas> = {
+  id: "utilidad",
+  titulo: "Utilidad",
+  valor: (p) => p.dinero?.utilidad ?? null,
+  ver: (p) => (p.dinero ? <span className={p.dinero.utilidad < 0 ? "font-semibold text-destructive" : ""}>{usd(p.dinero.utilidad)}</span> : "—"),
+  numero: true,
+};
+const colMargen: Columna<ProductoVentas> = { id: "margen", titulo: "Margen", valor: (p) => p.dinero?.margen ?? null, ver: (p) => pct(p.dinero?.margen ?? null), numero: true };
+
 /** Las barras por mes de un producto (al elegirlo en la tabla). */
 function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
   const datos = meses.map((m) => ({ mes: nombreMes(m), netas: p.porMes[m] ?? 0 }));
+  const dinero = p.dinero;
+  const datosDinero = dinero ? Object.keys(dinero.porMes).sort().map((m) => ({ mes: nombreMes(m), utilidad: Math.round(dinero.porMes[m] * 100) / 100 })) : [];
   return (
     <Tarjeta id="vd-detalle" titulo={`${p.nombre} · ID ${p.id}`}>
       <Nota>
         Unidades netas por mes. {CATEGORIAS.find((c) => c.valor === p.categoria)?.etiqueta}. Stock {entero(p.stock)}
         {p.diasInventario !== null ? `, para ${entero(p.diasInventario)} días` : ""}. Pedidas en total {entero(p.pedidas)}: {pct(p.pctCancelacion)} canceladas y {pct(p.pctDevolucion)} devueltas o rechazadas. Última venta: {fecha(p.ultimaVenta)}.
         {p.alertas.length > 0 && <span className="font-medium text-foreground"> {p.alertas.join(" · ")}.</span>}
+        {dinero && ` Utilidad desde marzo: ${usdExacto(dinero.utilidad)} de ${usdExacto(dinero.ganancia)} de ganancia (margen ${pct(dinero.margen)}).`}
       </Nota>
       <div className="h-[220px] p-2">
         <ResponsiveContainer width="100%" height="100%">
@@ -212,6 +237,27 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      {datosDinero.length > 0 && (
+        <>
+          <p className="px-3.5 text-xs font-semibold tracking-[0.04em] text-muted-foreground uppercase">Utilidad por mes</p>
+          <div className="h-[200px] p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={datosDinero} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+                <DegradadosNeon />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
+                <XAxis dataKey="mes" {...ejes} interval="preserveStartEnd" />
+                <YAxis {...ejes} width={52} tickFormatter={(v) => usd(Number(v))} />
+                <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v) => [usdExacto(Number(v)), "Utilidad"]} />
+                <Bar dataKey="utilidad" name="Utilidad" radius={[4, 4, 0, 0]}>
+                  {datosDinero.map((d) => (
+                    <Cell key={d.mes} fill={d.utilidad < 0 ? NEON.rosa : "url(#vd-violeta)"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
     </Tarjeta>
   );
 }
@@ -220,7 +266,7 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
  * El tablero de Ventas Dropi: las cifras de arriba, la tendencia por mes y por día, lo que hay que reponer, lo que crece y cae,
  * el stock quieto, todos los productos (con búsqueda, categoría y su detalle por mes), los SKU del sistema y los dropshippers.
  */
-export function TableroVentas({ corte, movimientos, productos, meses, dias, dropshippers }: { corte: string; movimientos: number; productos: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[] }) {
+export function TableroVentas({ corte, movimientos, productos, meses, dias, dropshippers, dinero }: { corte: string; movimientos: number; productos: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
   const [categoria, setCategoria] = useState<Categoria | "todas">("todas");
   const [busqueda, setBusqueda] = useState("");
   const [buscaDs, setBuscaDs] = useState("");
@@ -276,6 +322,26 @@ export function TableroVentas({ corte, movimientos, productos, meses, dias, drop
   }, [dropshippers, buscaDs]);
   const detalle = elegido ? productos.find((p) => String(p.id) === elegido) : null;
 
+  // La plata: el último mes completo frente al anterior (el mes en curso todavía tiene órdenes sin entregar).
+  const plata = useMemo(() => {
+    if (!dinero) return null;
+    const completos = dinero.meses.filter((m) => m.mes < dinero.hasta.slice(0, 7));
+    const ultimo = completos.at(-1) ?? null;
+    const anterior = completos.at(-2) ?? null;
+    return {
+      ultimo,
+      anterior,
+      cambio: ultimo && anterior && anterior.utilidad ? ((ultimo.utilidad - anterior.utilidad) / Math.abs(anterior.utilidad)) * 100 : null,
+      margen: ultimo && ultimo.ganancia ? ultimo.utilidad / ultimo.ganancia : null,
+      datos: dinero.meses.map((m) => ({
+        mes: nombreMes(m.mes) + (m.mes === dinero.hasta.slice(0, 7) ? "*" : ""),
+        utilidad: Math.round(m.utilidad * 100) / 100,
+        coste: Math.round(m.coste * 100) / 100,
+        cargos: Math.round((m.comision + m.descuentos) * 100) / 100,
+      })),
+    };
+  }, [dinero]);
+
   const datosMes = meses.map((m) => ({ mes: nombreMes(m.mes) + (m.mes === corte.slice(0, 7) ? "*" : ""), netas: m.netas, canceladas: m.canceladas, devrech: m.devueltas + m.rechazadas, pedidas: m.pedidas }));
   const datosDia = dias.map((d) => ({ dia: fechaCorta(d.dia), netas: d.netas, pedidas: d.pedidas }));
 
@@ -289,6 +355,7 @@ export function TableroVentas({ corte, movimientos, productos, meses, dias, drop
         </p>
         <p className="text-xs text-muted-foreground">
           Del Historial de Existencia de Dropi hasta el {fecha(corte)} · {entero(productos.length)} productos y {entero(movimientos)} movimientos. Netas = pedidas − canceladas − rechazadas − devueltas.
+          {dinero && ` La plata sale del Excel de la oficina (${dinero.fuente}), ${entero(dinero.ordenes)} órdenes hasta el ${fecha(dinero.hasta)}: utilidad = ganancia − comisión B280 − coste real − descuentos por garantía.`}
         </p>
       </header>
 
@@ -300,6 +367,18 @@ export function TableroVentas({ corte, movimientos, productos, meses, dias, drop
           <Indicador titulo="Devueltas o rechazadas" punto={k.dev !== null && k.dev > 0.15 ? "aviso" : undefined} valor={pct(k.dev)} detalle="de lo pedido, todo el historial" />
           <Indicador titulo="Sin ventas en 30 días" valor={entero(k.sinVentas)} detalle={`de ${entero(productos.length)} productos · ${k.nunca} nunca vendieron`} />
           <Indicador titulo="Dropshippers que pidieron" valor={entero(k.dsActivos)} detalle={`en 30 días, de ${entero(dropshippers.length)}`} />
+          {plata?.ultimo && (
+            <Indicador
+              titulo={`Utilidad · ${nombreMes(plata.ultimo.mes)}`}
+              valor={usd(plata.ultimo.utilidad)}
+              detalle={
+                <>
+                  <Cambio valor={plata.cambio} /> vs. {plata.anterior ? `${nombreMes(plata.anterior.mes)} (${usd(plata.anterior.utilidad)})` : "el mes anterior"}
+                </>
+              }
+            />
+          )}
+          {plata?.ultimo && <Indicador titulo={`Margen · ${nombreMes(plata.ultimo.mes)}`} valor={pct(plata.margen)} detalle={`de ${usd(plata.ultimo.ganancia)} de ganancia`} />}
         </div>
       </section>
 
@@ -340,6 +419,27 @@ export function TableroVentas({ corte, movimientos, productos, meses, dias, drop
           </div>
         </Tarjeta>
       </div>
+
+      {plata && (
+        <Tarjeta id="vd-plata" titulo="Utilidad por mes" extra={<span className="text-xs text-muted-foreground">* mes en curso, con órdenes sin entregar</span>}>
+          <Nota>Cada barra es la ganancia del mes: lo que queda de utilidad, el coste real de lo entregado y la comisión B280 con los descuentos por garantía.</Nota>
+          <div className="h-[260px] p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={plata.datos} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+                <DegradadosNeon />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
+                <XAxis dataKey="mes" {...ejes} interval="preserveStartEnd" />
+                <YAxis {...ejes} width={60} tickFormatter={(v) => usd(Number(v))} />
+                <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v, n) => [usdExacto(Number(v)), n]} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="utilidad" name="Utilidad" stackId="g" fill="url(#vd-violeta)" />
+                <Bar dataKey="coste" name="Coste real" stackId="g" fill="url(#vd-suave)" />
+                <Bar dataKey="cargos" name="Comisión y descuentos" stackId="g" fill="url(#vd-rosa)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Tarjeta>
+      )}
 
       <Tarjeta id="vd-reponer" titulo={`Reponer ya (${reponer.length})`}>
         <Nota>Se vendieron en los últimos 30 días y no tienen stock, o les alcanza para menos de {DIAS_REPONER} días al ritmo actual.</Nota>
@@ -403,6 +503,7 @@ export function TableroVentas({ corte, movimientos, productos, meses, dias, drop
             colStock,
             colDias,
             { id: "total", titulo: "Netas en total", valor: (p) => p.netasTotal, ver: (p) => entero(p.netasTotal), numero: true },
+            ...(dinero ? [colUtilidad, colMargen] : []),
             { id: "cancel", titulo: "Canceladas", valor: (p) => p.pctCancelacion, ver: (p) => pct(p.pctCancelacion), numero: true },
             { id: "dev", titulo: "Devueltas", valor: (p) => p.pctDevolucion, ver: (p) => <span className={p.pedidas >= 30 && (p.pctDevolucion ?? 0) > 0.2 ? "font-semibold text-destructive" : ""}>{pct(p.pctDevolucion)}</span>, numero: true },
             { id: "ultima", titulo: "Última venta", valor: (p) => p.ultimaVenta, ver: (p) => fecha(p.ultimaVenta) },

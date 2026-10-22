@@ -597,6 +597,15 @@ convenciones técnicas del código.
   `BloqueCompetencia` / `CompetenciaDesplegable` (`src/components/competencia/piezas-competencia.tsx`, con `FotoAmpliable` y
   `HistorialCompetencia`). **Competidor nuevo** = `PendientesHoy.competidoresNuevos` (alertas `competidor_nuevo` sin ver): sale
   en la cola de Hoy, en Avisos y como contador de `/analisis-competencia`.
+- **Ventas Dropi: la utilidad** (22 oct 2026, migración 0130). `dropi_ventas_dinero` guarda por producto de Dropi y día (fecha de la
+  orden) las entregadas, unidades, ganancia, comisión B280, coste real y descuentos por garantía, con `utilidad` **generada** (ganancia −
+  comisión − coste − descuentos: las reglas de la hoja RESUMEN del Excel «ECOMFIVE DROPI 2026 DIARIO» de la oficina; los fletes los paga
+  el dropshipper y no entran). Lo carga `scripts/importar-dinero-ventas-dropi.ts "<Excel>" [--aplicar]` (hojas ÓRDENES y COSTOS; cada carga
+  reemplaza la anterior de Panamá y deja una fila en `dropi_ventas_dinero_cargas`); el informe comprueba que lo repartido suma lo mismo que
+  el Excel. Una orden de varios productos («7854 | 7652») se reparte con `dineroPorDia` (`src/lib/publicaciones/dinero.ts`, con prueba):
+  ganancia, comisión y descuentos por precio de proveedor de la publicación × unidades; coste por el costo unitario del mes de COSTOS ×
+  unidades. La página (`ventas-dropi/page.tsx`) lo junta sin la migración (sigue solo con unidades): indicadores «Utilidad» y «Margen» del
+  último mes completo, tarjeta «Utilidad por mes» y columnas «Utilidad»/«Margen» de cada producto, con su utilidad por mes en el detalle.
 - **Pantalla «Hoy»** (`/`, antes «Dashboard operativo»; el módulo de permisos sigue siendo `dashboard`). Arriba, en dos
   tarjetas lado a lado (apiladas en pantallas angostas): **«Necesita tu atención»** (`ColaAtencion`), la cola de trabajo
   con lo que cuenta `obtenerPendientesHoy` (pedidos de Dropi en Novedad, plataformas sin saldo de wallet, retiros de
