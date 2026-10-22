@@ -97,7 +97,7 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "max
 
   return [
     r("titulo_espanol", ingles.length ? "falta" : "ok", ingles.length ? `Palabras en inglés: ${ingles.join(", ")}` : "En español"),
-    // Dropi no deja títulos largos: más de `max_titulo` caracteres (30) se cortan.
+    // Dropi no deja títulos largos: más de `max_titulo` caracteres (40) no se admiten.
     r("titulo_largo", t.length > reglas.max_titulo ? "falta" : "ok", `${t.length} de ${reglas.max_titulo} caracteres como máximo`),
     suple
       ? r("titulo_cantidad", tieneCantidad(t) ? "ok" : "falta", tieneCantidad(t) ? "Dice la cantidad" : "Es un suplemento y no dice cuántas cápsulas, gomitas o tabletas trae")

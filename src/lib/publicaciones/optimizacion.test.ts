@@ -55,9 +55,9 @@ test("recomendaciones de optimización y su cumplimiento", () => {
   assert.equal(tareaCumplida({ ...t, tipo: "agregar_video" }, { cambioPrecio: null, comboPublicado: false, revisiones: arreglado }), null);
 });
 
-test("largo del título: 30 caracteres como máximo (regla editable)", () => {
-  assert.equal(estado({ titulo: "Cinturón lumbar para la ciática" }, "titulo_largo"), "falta");
+test("largo del título: 40 caracteres como máximo (regla editable)", () => {
+  assert.equal(estado({ titulo: "Suero de ácido niacinamida al 10 % de 30 ml" }, "titulo_largo"), "falta");
   assert.equal(estado({ titulo: "Cinturón lumbar ciática" }, "titulo_largo"), "ok");
-  const r = revisarPublicacion({ ...base, titulo: "Cinturón lumbar para la ciática" }, { ...REGLAS_DEFECTO, max_titulo: 40 }).find((x) => x.clave === "titulo_largo")!;
-  assert.equal(r.estado, "ok");
+  const r = revisarPublicacion({ ...base, titulo: "Cinturón lumbar para la ciática" }, { ...REGLAS_DEFECTO, max_titulo: 30 }).find((x) => x.clave === "titulo_largo")!;
+  assert.equal(r.estado, "falta");
 });
