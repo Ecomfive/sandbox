@@ -25,6 +25,7 @@ const NOMBRE_CAMPO: Record<string, string> = {
   nombre: "Nombre",
   descripcion: "Descripción",
   urlProducto: "URL del producto",
+  notaProveedor: "Nota para Chin",
   documentos: "Documentos",
   planificacion: "Planificación",
   agenteEnvio: "Agente de envío",

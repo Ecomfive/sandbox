@@ -160,6 +160,8 @@ function leerCambios(formData: FormData) {
     etiquetas: listaDeTexto(textoOptativo(formData, "etiquetas")),
     url_producto: textoOptativo(formData, "url_producto"),
     descripcion: textoOptativo(formData, "descripcion"),
+    // La nota para Chin solo viaja en la ficha de una compra de Chin: si no viene, no se toca.
+    ...(formData.has("nota_proveedor") ? { nota_proveedor: textoOptativo(formData, "nota_proveedor")?.slice(0, 600) ?? null } : {}),
   };
 }
 
@@ -263,6 +265,7 @@ const OTROS_CAMPOS: { campo: string; columna: string }[] = [
   { campo: "nombre", columna: "nombre" },
   { campo: "descripcion", columna: "descripcion" },
   { campo: "urlProducto", columna: "url_producto" },
+  { campo: "notaProveedor", columna: "nota_proveedor" },
   { campo: "planificacion", columna: "planificacion" },
   { campo: "foto", columna: "foto_url" },
   { campo: "paisesDestino", columna: "paises_destino" },
