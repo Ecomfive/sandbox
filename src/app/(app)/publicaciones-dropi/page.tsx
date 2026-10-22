@@ -4,6 +4,7 @@ import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
+import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPublicaciones } from "./datos-publicaciones";
 import { TablaPublicaciones } from "./tabla-publicaciones";
@@ -57,6 +58,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         decisionesDisponibles={datos.reglas.disponible}
         tareas={{ personas: datos.personas, yo: usuario.id, conTareas: datos.conTareas }}
         abrirInicial={typeof abrir === "string" ? abrir : null}
+        actualizadoDropi={datos.leidoProveedor ? fechaHoraLectura(datos.leidoProveedor) : null}
       />
     </Pagina>
   );

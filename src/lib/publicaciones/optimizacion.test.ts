@@ -39,7 +39,7 @@ test("para qué sirve, formato, fotos, video, descripción y precio sugerido", (
 });
 
 test("la nota cuenta solo lo que se puede revisar", () => {
-  const revs = revisarPublicacion({ ...base, titulo: "Faja lumbar para la ciática" }, REGLAS_DEFECTO);
+  const revs = revisarPublicacion({ ...base, titulo: "Faja lumbar para aliviar la ciática" }, REGLAS_DEFECTO);
   assert.deepEqual(notaOptimizacion(revs), { cumple: 5, total: 5 });
 });
 
@@ -50,14 +50,15 @@ test("recomendaciones de optimización y su cumplimiento", () => {
   assert.deepEqual(recomendarOptimizacion(revs, true), []);
   const t = { tipo: "optimizar_titulo", fecha: "2026-10-22", precioAntes: 4.99 };
   assert.equal(tareaCumplida(t, { cambioPrecio: null, comboPublicado: false, revisiones: revs }), null);
-  const arreglado = revisarPublicacion({ ...base, titulo: "Faja lumbar para la ciática", fotos: 3 }, REGLAS_DEFECTO);
+  const arreglado = revisarPublicacion({ ...base, titulo: "Faja lumbar para aliviar la ciática", fotos: 3 }, REGLAS_DEFECTO);
   assert.equal(tareaCumplida(t, { cambioPrecio: null, comboPublicado: false, revisiones: arreglado })?.como, "dropi");
   assert.equal(tareaCumplida({ ...t, tipo: "agregar_video" }, { cambioPrecio: null, comboPublicado: false, revisiones: arreglado }), null);
 });
 
-test("largo del título: 40 caracteres como máximo (regla editable)", () => {
+test("largo del título: entre 35 y 40 caracteres (reglas editables)", () => {
   assert.equal(estado({ titulo: "Suero de ácido niacinamida al 10 % de 30 ml" }, "titulo_largo"), "falta");
-  assert.equal(estado({ titulo: "Cinturón lumbar ciática" }, "titulo_largo"), "ok");
-  const r = revisarPublicacion({ ...base, titulo: "Cinturón lumbar para la ciática" }, { ...REGLAS_DEFECTO, max_titulo: 30 }).find((x) => x.clave === "titulo_largo")!;
+  assert.equal(estado({ titulo: "Cinturón lumbar ciática" }, "titulo_largo"), "falta");
+  assert.equal(estado({ titulo: "Cinturón lumbar para aliviar la ciática" }, "titulo_largo"), "ok");
+  const r = revisarPublicacion({ ...base, titulo: "Cinturón lumbar para aliviar la ciática" }, { ...REGLAS_DEFECTO, max_titulo: 30 }).find((x) => x.clave === "titulo_largo")!;
   assert.equal(r.estado, "falta");
 });

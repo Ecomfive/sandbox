@@ -19,6 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { huellaFoto } from "../src/lib/wms/huella-foto";
 import { guardarCompetencia } from "./competencia-guardar";
+import { guardarNuestrosProductos, type LecturaNuestros } from "./publicaciones-sincronizar-dropi";
 import { comparar, mejorPareja, normalizarDropi, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -28,8 +29,9 @@ const TOKEN = randomBytes(24).toString("hex");
 const ORIGENES = /^https:\/\/app\.dropi\.(mx|co|cr|pa|cl|ec|pe|gt|py|ar)$/;
 
 interface Lectura {
-  /** «competencia»: todo el catálogo de un país para Análisis de competencia; sin él, un proveedor de Scraping. */
-  tipo?: "competencia";
+  /** «competencia»: todo el catálogo de un país para Análisis de competencia; «nuestros»: nuestros productos con sus bodegas
+   * (Gestión de IDs Dropi, publicaciones-sincronizar-dropi.ts); sin él, un proveedor de Scraping. */
+  tipo?: "competencia" | "nuestros";
   dropiId: number;
   pais: string;
   url: string;
@@ -223,7 +225,7 @@ export async function calcularHuellas(filtro: string, tabla = "scraping_producto
 
 function guardarCopia(l: Lectura) {
   mkdirSync("datos-privados/scraping", { recursive: true });
-  const ruta = `datos-privados/scraping/${l.pais}-${l.tipo === "competencia" ? "competencia" : l.dropiId}-${l.inicio.slice(0, 19).replace(/:/g, "")}.json`;
+  const ruta = `datos-privados/scraping/${l.pais}-${l.tipo ?? l.dropiId}-${l.inicio.slice(0, 19).replace(/:/g, "")}.json`;
   writeFileSync(ruta, JSON.stringify(l));
   return ruta;
 }
@@ -232,6 +234,12 @@ function tokenValido(valor: string): boolean {
   const a = Buffer.from(valor);
   const b = Buffer.from(TOKEN);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function guardarSegunTipo(l: Lectura) {
+  if (l.tipo === "competencia") return guardarCompetencia(supabase, l, calcularHuellas);
+  if (l.tipo === "nuestros") return guardarNuestrosProductos(supabase, l as unknown as LecturaNuestros);
+  return guardarLectura(l);
 }
 
 function recibir() {
@@ -284,8 +292,8 @@ function recibir() {
       try {
         const l = JSON.parse(cuerpo) as Lectura;
         const copia = guardarCopia(l);
-        console.log(`Recibidos ${l.productos.length} productos del proveedor ${l.dropiId} (${copia}). Guardando…`);
-        const resultado = l.tipo === "competencia" ? await guardarCompetencia(supabase, l, calcularHuellas) : await guardarLectura(l);
+        console.log(`Recibidos ${l.productos.length} productos (${l.tipo ?? `proveedor ${l.dropiId}`}, ${copia}). Guardando…`);
+        const resultado = await guardarSegunTipo(l);
         console.log(resultado);
         res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(resultado));
       } catch (e) {
@@ -322,7 +330,7 @@ else if (modo === "huellas") lista().then(async () => {
 });
 else if (modo === "archivo" && arg) {
   const l = JSON.parse(readFileSync(arg, "utf8")) as Lectura;
-  (l.tipo === "competencia" ? guardarCompetencia(supabase, l, calcularHuellas) : guardarLectura(l)).then((r) => console.log(r));
+  guardarSegunTipo(l).then((r) => console.log(r));
 }
 else if (modo === "pendientes") pendientes();
 else console.log("Uso: npx tsx scripts/scraping-proveedores.ts recibir | archivo <json> | pendientes | lista");

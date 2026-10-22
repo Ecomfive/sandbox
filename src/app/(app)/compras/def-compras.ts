@@ -56,6 +56,8 @@ export interface FilaCompra {
   creadorNombre: string | null;
   descripcion: string | null;
   urlProducto: string | null;
+  /** La nota que Chin lee junto al pedido en su portal (`nota_proveedor`; se escribe en la ficha de una compra de Chin). */
+  notaProveedor: string | null;
   paisesDestino: string[];
   fechaInicio: string | null;
   cerradoEn: string | null;
@@ -89,6 +91,7 @@ export const EMOJI_CAMPO: Record<string, string> = {
   fechaEnvio: "🚚",
   planificacion: "🗓️",
   urlProducto: "🔗",
+  notaProveedor: "💬",
   documentos: "📎",
   foto: "📸",
   asignado: "🙋",

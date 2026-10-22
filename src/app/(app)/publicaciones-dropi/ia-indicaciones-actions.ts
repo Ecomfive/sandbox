@@ -17,7 +17,7 @@ export async function guardarIndicacionesIA(entrada: Record<string, string>): Pr
   const usuario = await requireModuloEscritura(MODULO);
   const supabase = createServiceClient();
   const { data: previas, error: errorLectura } = await supabase.from("dropi_ia_indicaciones").select("clave, texto");
-  if (errorLectura) return { error: "Falta correr en Supabase la migración 0131." };
+  if (errorLectura) return { error: "Falta correr en Supabase la migración 0134." };
   const antes = new Map((previas ?? []).map((f) => [f.clave as string, String(f.texto ?? "")]));
   const filas: { clave: string; texto: string; actualizado_en: string; actualizado_por: string; actualizado_por_nombre: string }[] = [];
   const cambios: string[] = [];

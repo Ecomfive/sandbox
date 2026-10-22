@@ -50,7 +50,7 @@ export function IndicacionesIA({ indicaciones, disponible, puedeEscribir }: { in
         </h2>
         {!disponible && (
           <p role="alert" className="m-0 border-b border-border px-4 py-3 text-sm text-destructive">
-            Para guardarlas falta correr en Supabase la migración 0131.
+            Para guardarlas falta correr en Supabase la migración 0134.
           </p>
         )}
         <fieldset disabled={!editable} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-0">

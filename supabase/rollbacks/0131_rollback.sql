@@ -1,3 +1,4 @@
--- Quita lo que agregó 0131_publicaciones_ia.sql. Las imágenes generadas quedan en Storage (wms-productos/publicaciones/<id>/ia/).
-drop table if exists dropi_ia_indicaciones;
-drop table if exists dropi_publicaciones_ia;
+-- Reversa de 0131_dropi_productos_proveedor.sql. Las publicaciones conservan la ubicación, el precio, el tipo y el estado que
+-- dejó la última sincronización.
+drop table if exists dropi_productos_proveedor_lecturas;
+drop table if exists dropi_productos_proveedor;

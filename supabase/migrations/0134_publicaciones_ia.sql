@@ -12,7 +12,7 @@
 -- Además, `dropi_ia_indicaciones`: lo que el equipo le dice a la IA (Reglas › Indicaciones para la IA), por parte: para todo, títulos,
 -- descripción y ángulos, fotos, análisis. Se agrega a cada pedido.
 --
--- Reversa: supabase/rollbacks/0131_rollback.sql
+-- Reversa: supabase/rollbacks/0134_rollback.sql
 
 create table if not exists dropi_publicaciones_ia (
   id uuid primary key default uuid_v7(),

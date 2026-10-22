@@ -9,7 +9,7 @@ import { MAX_ADJUNTOS_COMENTARIO, motivoDeRechazo } from "@/lib/compras/adjuntos
 import { AdjuntoIcon, CerrarIcon, HistorialIcon } from "@/lib/nav-icons";
 import { supabase } from "@/lib/supabase/client";
 import { comentarCompra, prepararSubidaAdjuntoComentario } from "./actions";
-import { archivosDe, BotonAdjuntar } from "./adjuntos-comentario";
+import { archivosDe, BotonAdjuntar } from "@/components/actividad/adjuntos";
 
 /** Un comentario escrito antes de crear la compra: su texto, a quién menciona y sus archivos (todavía en el navegador). */
 export interface ComentarioBorrador {

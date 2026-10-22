@@ -19,9 +19,14 @@ export interface Cuota {
   pendiente: number;
 }
 
+/** Qué dice el estado, para escribirlo en el idioma de quien lo ve (`textos.ts`); `n` son los días. */
+export type ClaveEstadoCuota = "pagado" | "pagado_a_tiempo" | "pagado_tarde" | "al_llegar" | "vencido" | "vence_hoy" | "vence_en";
+
 export interface EstadoCuota {
   tono: TonoCuota;
   texto: string;
+  clave: ClaveEstadoCuota;
+  n: number;
   /** Días de atraso (pagada tarde o vencida); 0 si va a tiempo. */
   atraso: number;
 }
@@ -83,15 +88,15 @@ export const estaPagada = (c: Pick<Cuota, "pendiente">) => c.pendiente <= TOLERA
 /** En qué va una cuota hoy: pagada a tiempo o tarde, vence en N días, vence hoy, vencida, o (el saldo) se paga al llegar. */
 export function estadoCuota(c: Cuota, hoy: string): EstadoCuota {
   if (estaPagada(c)) {
-    if (!c.vence || !c.fechaPago) return { tono: "exito", texto: "Pagado", atraso: 0 };
+    if (!c.vence || !c.fechaPago) return { tono: "exito", texto: "Pagado", atraso: 0, clave: "pagado", n: 0 };
     const tarde = diasEntre(c.vence, c.fechaPago);
-    return tarde > 0 ? { tono: "aviso", texto: `Pagado ${tarde} d tarde`, atraso: tarde } : { tono: "exito", texto: "Pagado a tiempo", atraso: 0 };
+    return tarde > 0 ? { tono: "aviso", texto: `Pagado ${tarde} d tarde`, atraso: tarde, clave: "pagado_tarde", n: tarde } : { tono: "exito", texto: "Pagado a tiempo", atraso: 0, clave: "pagado_a_tiempo", n: 0 };
   }
-  if (!c.vence) return { tono: "neutro", texto: "Al llegar", atraso: 0 };
+  if (!c.vence) return { tono: "neutro", texto: "Al llegar", atraso: 0, clave: "al_llegar", n: 0 };
   const faltan = diasEntre(hoy, c.vence);
-  if (faltan < 0) return { tono: "peligro", texto: `Vencido ${-faltan} d`, atraso: -faltan };
-  if (faltan === 0) return { tono: "aviso", texto: "Vence hoy", atraso: 0 };
-  return { tono: faltan <= 3 ? "aviso" : "info", texto: `Vence en ${faltan} d`, atraso: 0 };
+  if (faltan < 0) return { tono: "peligro", texto: `Vencido ${-faltan} d`, atraso: -faltan, clave: "vencido", n: -faltan };
+  if (faltan === 0) return { tono: "aviso", texto: "Vence hoy", atraso: 0, clave: "vence_hoy", n: 0 };
+  return { tono: faltan <= 3 ? "aviso" : "info", texto: `Vence en ${faltan} d`, atraso: 0, clave: "vence_en", n: faltan };
 }
 
 /** Cumplimiento de un grupo de cuotas ya pagadas que tienen fecha de pago: cuántas a tiempo, atraso promedio y el peor. */

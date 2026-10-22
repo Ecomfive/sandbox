@@ -9,6 +9,7 @@ import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { eliminarPublicacion } from "./actions";
 import { InsigniaConectado } from "./insignia-conectado";
 import { LlegadaCamino } from "./llegada-camino";
@@ -129,6 +130,18 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
             <span className="tabular-nums">{f.dropiId ? `ID ${f.dropiId}` : "Sin ID de Dropi"}</span>
             {f.dropiId.trim() !== "" && <InsigniaConectado />}
+            {/* A qué bodega de Dropi pertenece («B280»): la que muestra Dropi o, si hoy no tiene stock, la última que se conoció. */}
+            {f.bodega ? (
+              <span className="rounded border border-border-control px-1 font-mono font-semibold text-foreground">
+                <span className="sr-only">Bodega {f.bodega.nombre}: </span>
+                {codigoBodega(f.bodega.id)}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5">
+                <Punto clase="bg-warning" texto="Sin bodega" />
+                Sin bodega
+              </span>
+            )}
             {f.sku ? (
               <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>
             ) : (
@@ -169,6 +182,14 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
         <Celda
           nombre="Dónde está"
           principal={ubicacion ? <ConPunto color={ubicacion.color} texto={ubicacion.etiqueta} /> : <span className="text-muted-foreground">—</span>}
+          apoyo={
+            f.stockProveedor !== null ? (
+              <span className="tabular-nums">
+                {f.stockProveedor.toLocaleString("es-PA")} u. en Dropi
+                {f.stockPrivadoProveedor ? ` · ${f.stockPrivadoProveedor.toLocaleString("es-PA")} privadas` : ""}
+              </span>
+            ) : undefined
+          }
         />
         <Celda nombre="En Dropi" principal={enDropi ? <ConPunto color={enDropi.color} texto={enDropi.etiqueta} /> : <span className="text-muted-foreground">—</span>} />
       </span>

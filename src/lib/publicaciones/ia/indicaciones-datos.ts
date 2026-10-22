@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CLAVES_INDICACION, type Indicaciones } from "./criterios";
 
-/** Lo que el equipo le dijo a la IA (Reglas › Indicaciones para la IA). `disponible` es false si falta la migración 0131. */
+/** Lo que el equipo le dijo a la IA (Reglas › Indicaciones para la IA). `disponible` es false si falta la migración 0134. */
 export async function cargarIndicaciones(supabase: SupabaseClient): Promise<{ indicaciones: Indicaciones; disponible: boolean }> {
   const { data, error } = await supabase.from("dropi_ia_indicaciones").select("clave, texto");
   const indicaciones: Indicaciones = {};

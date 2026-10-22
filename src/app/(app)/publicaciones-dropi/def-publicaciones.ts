@@ -13,6 +13,7 @@ import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { Revision } from "@/lib/publicaciones/optimizacion";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
+import { codigoBodega, type BodegaAsignada } from "@/lib/publicaciones/sincronizar-dropi";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 /** Una decisión sobre una recomendación (aceptada, rechazada o pospuesta), con su porqué. */
@@ -118,6 +119,15 @@ export interface FilaPublicacion {
   nota: { cumple: number; total: number };
   /** El título tal como se ve en Dropi (la última lectura del catálogo), o null si no se leyó. */
   tituloDropi: string | null;
+  /** Lo que dice «Mis productos» de Dropi (migración 0131): cada bodega con su stock, el total y lo reservado a privados. null si
+   * la publicación no tiene un ID que esté entre nuestros productos de Dropi o nunca se leyó. */
+  bodegasDropi: { id: number; nombre: string; stock: number }[] | null;
+  stockProveedor: number | null;
+  stockPrivadoProveedor: number | null;
+  /** Cuándo se leyó «Mis productos» por última vez (lo mismo en todas las filas del país). */
+  leidoProveedor: string | null;
+  /** A qué bodega de Dropi pertenece (B280, B81): la que muestra Dropi o, sin stock, la de «Dónde está» o la del nombre. */
+  bodega: BodegaAsignada | null;
 }
 
 /** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */
@@ -209,7 +219,16 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },
     { id: "stockDropi", etiqueta: "Stock en Dropi", tipo: "seleccion", valores: (f) => uno(f.ventas?.stockEstado ?? null), opciones: () => STOCK_DROPI, etiquetaSinValor: "Sin datos de Dropi", agrupable: true, ordenGrupos: STOCK_DROPI.map((s) => s.valor) },
     { id: "enCamino", etiqueta: "Mercancía en camino (unidades)", tipo: "numero", valor: (f) => f.enCamino },
-    { id: "stockDropiNum", etiqueta: "Stock en Dropi (unidades)", tipo: "numero", valor: (f) => f.ventas?.stock ?? null },
+    // Primero la lectura de «Mis productos» (más reciente que la carga de ventas).
+    { id: "stockDropiNum", etiqueta: "Stock en Dropi (unidades)", tipo: "numero", valor: (f) => f.stockProveedor ?? f.ventas?.stock ?? null },
+    {
+      id: "bodega",
+      etiqueta: "Bodega en Dropi",
+      tipo: "seleccion",
+      valores: (f) => [f.bodega ? `${codigoBodega(f.bodega.id)} · ${f.bodega.nombre}` : SIN_VALOR],
+      etiquetaSinValor: "Sin bodega en Dropi",
+      agrupable: true,
+    },
     { id: "diasInventario", etiqueta: "Días de inventario", tipo: "numero", valor: (f) => f.ventas?.diasInventario ?? null },
     { id: "ubicacion", etiqueta: "Dónde está", tipo: "seleccion", valores: (f) => uno(f.ubicacion), opciones: opciones(UBICACIONES), agrupable: true, colorValor: color(UBICACIONES) },
     // Tipo y «En Dropi» salen de lo que reporta Dropi (ya no se marcan a mano).
@@ -237,7 +256,9 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { etiqueta: "ID Dropi", valor: (f) => f.dropiId },
     { etiqueta: "SKU", valor: (f) => f.sku?.codigo ?? "" },
     { etiqueta: "Ventas 30 días (Dropi)", valor: (f) => (f.ventas ? String(f.ventas.netas30) : "") },
-    { etiqueta: "Stock en Dropi", valor: (f) => (f.ventas ? String(f.ventas.stock) : "") },
+    { etiqueta: "Stock en Dropi", valor: (f) => (f.stockProveedor !== null ? String(f.stockProveedor) : f.ventas ? String(f.ventas.stock) : "") },
+    { etiqueta: "Bodega", valor: (f) => (f.bodega ? `${codigoBodega(f.bodega.id)} ${f.bodega.nombre}` : "") },
+    { etiqueta: "Stock por bodega en Dropi", valor: (f) => (f.bodegasDropi ?? []).map((b) => `${codigoBodega(b.id)} ${b.nombre}: ${b.stock}`).join(" | ") },
   ],
 };
 

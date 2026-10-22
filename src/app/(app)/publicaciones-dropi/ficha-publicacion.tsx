@@ -6,7 +6,6 @@ import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
-import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -18,7 +17,8 @@ import {
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
-import { actualizarPublicacion, eliminarPublicacion, obtenerHistorialPublicacion } from "./actions";
+import { actualizarPublicacion, eliminarPublicacion } from "./actions";
+import { ActividadPublicacion } from "./actividad-publicacion";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
@@ -26,6 +26,7 @@ import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { InsigniaConectado } from "./insignia-conectado";
+import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 
 interface Formulario {
@@ -504,6 +505,49 @@ function ContenidoFicha({
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />
               </div>
             </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className={labelClassSm}>Bodega</span>
+              <span className="text-sm">
+                {p.bodega ? (
+                  <>
+                    <span className="font-mono font-semibold">{codigoBodega(p.bodega.id)}</span> · {p.bodega.nombre}
+                    {p.bodega.origen !== "dropi" && (
+                      <span className="block text-xs text-muted-foreground">
+                        La última que se conoció: Dropi no muestra la bodega de un producto sin stock
+                        {p.bodega.origen === "nombre" ? " (sale del nombre)" : ""}.
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Sin bodega: no tiene ID de Dropi con stock ni «Dónde está».</span>
+                )}
+              </span>
+            </div>
+            {/* Lo que dice «Mis productos» de Dropi (22 oct 2026): cada lectura pone «Dónde está» con la bodega de más stock. */}
+            {p.bodegasDropi && p.bodegasDropi.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className={labelClassSm}>Bodegas en Dropi</span>
+                {p.bodegasDropi.length ? (
+                  <ul className="flex flex-col divide-y divide-border rounded-lg bg-muted px-4 text-sm">
+                    {p.bodegasDropi.map((b) => (
+                      <li key={b.id} className="flex items-center justify-between gap-3 py-2">
+                        <span className="min-w-0 truncate">
+                          <span className="font-mono font-semibold">{codigoBodega(b.id)}</span> · {b.nombre}
+                        </span>
+                        <span className="font-semibold tabular-nums">{b.stock.toLocaleString("es-PA")} u.</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Dropi no la tiene en ninguna bodega.</span>
+                )}
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {p.bodegasDropi.length > 1 && `Total ${(p.stockProveedor ?? 0).toLocaleString("es-PA")} u. · `}
+                  {p.stockPrivadoProveedor ? `${p.stockPrivadoProveedor.toLocaleString("es-PA")} reservadas a privados · ` : ""}
+                  {p.leidoProveedor && `Actualizado desde Dropi el ${fechaHoraLectura(p.leidoProveedor)}`}
+                </span>
+              </div>
+            )}
           </Seccion>
 
           {/* Lo que viene en camino del producto vinculado: solo unidades, del país seleccionado (las órdenes que ya salieron y no han llegado). */}
@@ -528,8 +572,10 @@ function ContenidoFicha({
           </Seccion>
         </fieldset>
 
-        <HistorialGenerico id={p.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialPublicacion} />
       </form>
+      {/* Fuera del formulario: escribir un comentario no debe enviar ni ensuciar la publicación. Se vuelve a pedir al guardar y
+          al decidir una recomendación (cambia la cantidad de decisiones o de tareas hechas). */}
+      <ActividadPublicacion id={p.id} puedeComentar={puedeEscribir} version={version + p.decisiones.length + p.decisiones.filter((x) => x.hechaEn).length} />
       {/* Fuera del formulario: los eventos de un portal suben por el árbol de React y enviarían o ensuciarían este formulario. */}
       <FichaProductoEmbebida productoId={productoAbierto} alCerrar={() => setProductoAbierto(null)} />
     </Ventana>

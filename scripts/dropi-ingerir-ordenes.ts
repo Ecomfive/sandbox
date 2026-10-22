@@ -84,13 +84,22 @@ async function main() {
   }
   console.log(`Guardadas ${ordenes.length} filas en staging_ordenes_dropi.`);
 
-  const { data: productosExistentes } = await supabase
-    .from("productos")
-    .select("id, sku")
-    .eq("pais_id", paisId)
-    .eq("plataforma_id", plataformaId);
+  // Por páginas: Supabase devuelve 1.000 filas como máximo, y con más productos los demás parecían nuevos (y chocaba al crearlos).
+  const productosExistentes: { id: string; sku: string }[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase
+      .from("productos")
+      .select("id, sku")
+      .eq("pais_id", paisId)
+      .eq("plataforma_id", plataformaId)
+      .order("id")
+      .range(desde, desde + 999);
+    if (error) throw new Error(`Error leyendo productos: ${error.message}`);
+    productosExistentes.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
 
-  const skuAId = new Map((productosExistentes ?? []).map((p) => [p.sku, p.id as string]));
+  const skuAId = new Map(productosExistentes.map((p) => [p.sku, p.id as string]));
   const skuANombreNuevo = new Map<string, string>();
   let multiProducto = 0;
   let sinProducto = 0;

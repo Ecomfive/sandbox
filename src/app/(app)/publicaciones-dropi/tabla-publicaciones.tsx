@@ -65,6 +65,7 @@ export function TablaPublicaciones({
   decisionesDisponibles,
   tareas,
   abrirInicial = null,
+  actualizadoDropi = null,
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
@@ -81,6 +82,8 @@ export function TablaPublicaciones({
   tareas: { personas: { id: string; nombre: string }[]; yo: string; conTareas: boolean };
   /** La publicación que se abre al cargar (`?abrir=`, desde la ficha de un producto); si no es de este país, nada. */
   abrirInicial?: string | null;
+  /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá (se escribe en el servidor: así no cambia al hidratar). */
+  actualizadoDropi?: string | null;
 }) {
   const verVentas = corteVentas !== null;
   const def = DEF_PUBLICACIONES;
@@ -105,6 +108,11 @@ export function TablaPublicaciones({
     <ProveedorTareas {...tareas}>
     <ProveedorSkusMaestros opciones={opcionesSku}>
       <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
+      <p className="-mb-2 text-xs text-muted-foreground">
+        {actualizadoDropi
+          ? `Última actualización desde Dropi: ${actualizadoDropi} (bodegas, stock, precio, tipo y estado).`
+          : "Todavía no se actualizó desde Dropi: las bodegas aparecen con la primera lectura de «Mis productos»."}
+      </p>
       <ListaDatos
         def={def}
         filas={publicaciones}

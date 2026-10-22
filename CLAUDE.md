@@ -466,15 +466,69 @@ convenciones técnicas del código.
   lo guarda con `after()` (a nombre de «Sistema», con su línea en la auditoría) y si no, «Ya lo hice» (`marcarTareaHecha`). Las
   atrasadas cuentan en `PendientesHoy.tareasAtrasadas` (Hoy y menú). Vistas Pendientes · Por hacer · Hechas (`?ver=`).
   **Optimización en Dropi** (22 oct 2026, `src/lib/publicaciones/optimizacion.ts`, con prueba): `revisarPublicacion` revisa, con el
-  título y los datos que muestra Dropi (`cargarNuestrosEnDropi`, de `competencia_productos`), título en español (`palabrasEnIngles`), de `max_titulo` caracteres como máximo (40, lo que admite Dropi),
+  título y los datos que muestra Dropi (`cargarNuestrosEnDropi`, de `competencia_productos`), título en español (`palabrasEnIngles`), de `min_titulo` a `max_titulo` caracteres (35 a 40; 40 es lo que admite Dropi),
   cantidad si es suplemento, para qué sirve («revisar» si no dice «para…»), formato, fotos (`min_fotos`, 7), video, descripción
   (`min_descripcion`, 200) y precio sugerido (> nuestro precio). `recomendarOptimizacion` vuelve lo que falta recomendaciones del grupo
   «optimizacion» (`TIPOS_RECOMENDACION[].grupo`), y `tareaCumplida` las da por hechas cuando la revisión ya está bien. Fotos, videos y
   largo de la descripción los guarda la lectura del catálogo desde la migración 0129 (`fotos`, `videos`, `descripcion_largo`; el
   video cuenta cualquier campo de Dropi que diga «video» y queda null si no viene). Bloque «Optimización en Dropi» en la ficha,
   tarjeta «Por optimizar» y filtro «Optimización».
-  **Asistente de IA** (22 oct 2026, migración 0131: `dropi_publicaciones_ia` —lo generado por publicación, tipos `analisis`, `titulos`, `texto` y `fotos`— y `dropi_ia_indicaciones`; RLS sin políticas). Un `Ventana` grande con cuatro pestañas (`asistente-ia.tsx`: **Análisis · Título · Descripción · Fotos**, encabezado con la foto, la nota de optimización en un anillo y qué IA está conectada) que se abre con **«Resolver con IA»** en las recomendaciones `optimizar_titulo` (pestaña Título), `mejorar_descripcion` (Descripción) y `mas_fotos` (Fotos) —en la tarjeta y en la tarea aceptada, `tipoIADeRecomendacion`— y con **«Asistente de IA»** en el bloque «Optimización en Dropi» de la ficha (`BotonAsistenteIA`). **La IA trabaja con las reglas que ya tiene el sistema** (`ia/criterios.ts`, con prueba): `reglasParaIA` toma el largo del título (`min_titulo` —35 si todavía no existe en las reglas— a `max_titulo`, 40), `min_fotos` y `min_descripcion` de Reglas; `textoCriterios` las pone en cada pedido y `chequearTitulo` pasa cada título por las mismas reglas de `optimizacion.ts` (largo, español sin `palabrasEnIngles`, cantidad si es suplemento; «para qué sirve» solo orienta). **Qué hace cada pestaña:** *Análisis* (`analizarPublicacionIA`) revisa la publicación con la revisión, el margen, las ventas y la competencia y devuelve un resumen, de 3 a 6 prioridades con su impacto (cada una lleva a su pestaña con «Resolver») y de 2 a 4 sugerencias de proceso «Para el equipo»; *Título* (`proponerTitulosIA`) pide 6 títulos, **el sistema descarta los que no cumplen las reglas** y muestra hasta 3 editables con su contador y sus chequeos (`normalizarTitulos`: si ninguno cumple, los 3 más cercanos marcados), con el medidor del título actual y los títulos de la competencia (`cargarCompetidores`); *Descripción* (`proponerTextoIA`) investiga en internet y propone descripción (con el mínimo) y 4 ángulos de venta con sus fuentes; *Fotos* (`planearFotosIA` y `generarFotoIA`) decide qué fotos faltan (`TIPOS_FOTO`; **no hay «testimonio»**: «estilo cliente» es una foto casual de uso, sin reseña ni persona real: las reseñas son de clientes reales y la IA no las inventa; tope `MAX_FOTOS` = 6, las que faltan para `min_fotos`) y Gemini las genera una por una con la foto del producto de referencia (`GEMINI_API_KEY`, `GEMINI_IMAGE_MODEL`: para Nano Banana Pro se cambia esa variable, que también usan las landings), guardadas en `wms-productos/publicaciones/<id>/ia/`. **Qué IA de texto:** `proveedor.ts` usa la que tenga clave: OpenAI (`OPENAI_API_KEY`, `OPENAI_MODEL` o `gpt-5`, API Responses con `web_search`, `openai.ts`/`openai-api.ts`) o Claude (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` o `claude-sonnet-5-5`, Messages con `web_search_20250305`, `anthropic.ts`); `AI_PROVEEDOR=openai|anthropic` fuerza una si hay las dos. **Cómo mejora con el equipo:** (1) **Reglas › «Indicaciones para la IA»** (`reglas/indicaciones-ia.tsx`, `guardarIndicacionesIA`): un texto por parte —para todo, títulos, descripción y ángulos, fotos, análisis— que se agrega a cada pedido (`textoIndicaciones`); (2) «Usar este título» (`elegirTituloIA`) guarda el título elegido o corregido y los siguientes pedidos lo reciben como ejemplo de estilo (`cargarEjemplos`, `textoEjemplos`); (3) «¿Te sirvió?» (`valorarIA`) guarda sí/no con el porqué y lo que no sirvió se le pasa como «evítalo», igual que las recomendaciones de título rechazadas con su nota. Todo lo que devuelve la IA se vuelve a validar (`normalizar*`: largos, tipos permitidos, enlaces solo http) y lleva la etiqueta «Generado con IA». Todas las acciones piden poder **modificar** el módulo y dejan auditoría (`ia_*`, `editar_indicaciones_ia`). Las páginas de Gestión y de Recomendaciones tienen `maxDuration = 300`. **Subir lo generado a Dropi es a mano** (no hay API de escritura de Dropi). **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
+  **Asistente de IA** (22 oct 2026, migración 0134: `dropi_publicaciones_ia` —lo generado por publicación, tipos `analisis`, `titulos`, `texto` y `fotos`— y `dropi_ia_indicaciones`; RLS sin políticas). Un `Ventana` grande con cuatro pestañas (`asistente-ia.tsx`: **Análisis · Título · Descripción · Fotos**, encabezado con la foto, la nota de optimización en un anillo y qué IA está conectada) que se abre con **«Resolver con IA»** en las recomendaciones `optimizar_titulo` (pestaña Título), `mejorar_descripcion` (Descripción) y `mas_fotos` (Fotos) —en la tarjeta y en la tarea aceptada, `tipoIADeRecomendacion`— y con **«Asistente de IA»** en el bloque «Optimización en Dropi» de la ficha (`BotonAsistenteIA`). **La IA trabaja con las reglas que ya tiene el sistema** (`ia/criterios.ts`, con prueba): `reglasParaIA` toma el largo del título (`min_titulo` —35 si todavía no existe en las reglas— a `max_titulo`, 40), `min_fotos` y `min_descripcion` de Reglas; `textoCriterios` las pone en cada pedido y `chequearTitulo` pasa cada título por las mismas reglas de `optimizacion.ts` (largo, español sin `palabrasEnIngles`, cantidad si es suplemento; «para qué sirve» solo orienta). **Qué hace cada pestaña:** *Análisis* (`analizarPublicacionIA`) revisa la publicación con la revisión, el margen, las ventas y la competencia y devuelve un resumen, de 3 a 6 prioridades con su impacto (cada una lleva a su pestaña con «Resolver») y de 2 a 4 sugerencias de proceso «Para el equipo»; *Título* (`proponerTitulosIA`) pide 6 títulos, **el sistema descarta los que no cumplen las reglas** y muestra hasta 3 editables con su contador y sus chequeos (`normalizarTitulos`: si ninguno cumple, los 3 más cercanos marcados), con el medidor del título actual y los títulos de la competencia (`cargarCompetidores`); *Descripción* (`proponerTextoIA`) investiga en internet y propone descripción (con el mínimo) y 4 ángulos de venta con sus fuentes; *Fotos* (`planearFotosIA` y `generarFotoIA`) decide qué fotos faltan (`TIPOS_FOTO`; **no hay «testimonio»**: «estilo cliente» es una foto casual de uso, sin reseña ni persona real: las reseñas son de clientes reales y la IA no las inventa; tope `MAX_FOTOS` = 6, las que faltan para `min_fotos`) y Gemini las genera una por una con la foto del producto de referencia (`GEMINI_API_KEY`, `GEMINI_IMAGE_MODEL`: para Nano Banana Pro se cambia esa variable, que también usan las landings), guardadas en `wms-productos/publicaciones/<id>/ia/`. **Qué IA de texto:** `proveedor.ts` usa la que tenga clave: OpenAI (`OPENAI_API_KEY`, `OPENAI_MODEL` o `gpt-5`, API Responses con `web_search`, `openai.ts`/`openai-api.ts`) o Claude (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` o `claude-sonnet-5-5`, Messages con `web_search_20250305`, `anthropic.ts`); `AI_PROVEEDOR=openai|anthropic` fuerza una si hay las dos. **Cómo mejora con el equipo:** (1) **Reglas › «Indicaciones para la IA»** (`reglas/indicaciones-ia.tsx`, `guardarIndicacionesIA`): un texto por parte —para todo, títulos, descripción y ángulos, fotos, análisis— que se agrega a cada pedido (`textoIndicaciones`); (2) «Usar este título» (`elegirTituloIA`) guarda el título elegido o corregido y los siguientes pedidos lo reciben como ejemplo de estilo (`cargarEjemplos`, `textoEjemplos`); (3) «¿Te sirvió?» (`valorarIA`) guarda sí/no con el porqué y lo que no sirvió se le pasa como «evítalo», igual que las recomendaciones de título rechazadas con su nota. Todo lo que devuelve la IA se vuelve a validar (`normalizar*`: largos, tipos permitidos, enlaces solo http) y lleva la etiqueta «Generado con IA». Todas las acciones piden poder **modificar** el módulo y dejan auditoría (`ia_*`, `editar_indicaciones_ia`). Las páginas de Gestión y de Recomendaciones tienen `maxDuration = 300`. **Subir lo generado a Dropi es a mano** (no hay API de escritura de Dropi).
+  **Títulos con IA** (22 oct 2026, pedido de Hernán): botón «Sugerir títulos con IA» en el bloque de la ficha (solo con escritura del
+  módulo; `sugerirTitulosIA` en `publicaciones-dropi/actions.ts`). `src/lib/publicaciones/titulos-ia.ts` (con prueba) arma el prompt
+  con las reglas de `revisarPublicacion` y lee la respuesta: descarta las de más de `max_titulo` o menos de 3 palabras y revisa cada una
+  (`revisarTitulo`). La llamada (`titulos-ia-api.ts`, solo servidor) va a Chat Completions de OpenAI con `OPENAI_API_KEY` (o
+  `CHATGPT_API_KEY`) y `OPENAI_MODEL` (por defecto `gpt-4.1-mini`), sin `temperature`. No guarda nada: «Copiar» para pegarlo en Dropi.
+  **Dropi al sistema cada mañana** (22 oct 2026, pedido de Hernán; tarea programada de Claude «dropi-diario», 7:00): en la pestaña
+  de `app.dropi.pa` del navegador integrado con la sesión de ECOMFIVE, `scripts/dropi-diario-navegador.js` lee con el token de la
+  página (`X-Authorization: Bearer <JSON.parse(DROPI_token)>`; el token está guardado entre comillas) pedidos de proveedor de 30
+  días (`api/orders/myorders/v2`, `orderDirection=asc`, `supplier_id`, de 100 en 100, sin captcha), cartera de 7 días
+  (`api/historywallet`, UTC → hora de Panamá con las columnas del Excel), retiros (`api/withdrawal?user_id=`, todo de una vez) y el
+  stock (owner de api-v2, como `leerNuestrosProductos`). Recorta lo que no usan los cargadores (cliente del pedido; del retiro solo
+  saldo y banco: la cuenta trae documento y claves) y sube cuatro JSON a `wms-compras/tmp-dropi-diario/`. `scripts/dropi-diario.ts`
+  `subida | cargar | cuadre <día> | sesion-vencida`: `cargar` los pasa por `dropi-ingerir-ordenes.ts`, `dropi-ingerir-cartera.ts`,
+  `dropi-ingerir-retiros.ts` y `guardarNuestrosProductos`, corre `dropi_staging_ordenes_limpiar()` (migración 0133: deja en
+  `staging_ordenes_dropi` solo la copia más reciente de cada pedido) y marca `dropi_sesiones` PA/proveedor. La tarea cuadra después los
+  pedidos de ayer por estado contra el MCP de Dropi (`list_orders`). Corre desde la copia `C:/Users/herna/ecomfive-tareas` (main al
+  día, con su `.env.local` enlazado), no desde `app/`, que otras sesiones cambian de rama.
+  **Bodegas y «Dropi manda»** (22 oct 2026, pedido de Hernán, migración 0131): la cuenta de ECOMFIVE en `app.dropi.pa` es de
+  **proveedor** (`type_user: SUPPLIER`, usuario 2094) y su pantalla «Mis productos» lee api-v2 `bff/catalog/products/produit/<usuario>/owner`
+  (POST, `pageSize` 100, `page` desde 1, `get_stock: true`; `archive: true` = pestaña Archivados): trae por producto `warehouses`
+  `[{id, name, stock}]` (las variables en `variation_warehouses`, una por variación), `total_stock`, `private_stock`, `private_product`,
+  precio y sugerido. Panamá: bodega 81 «Proveedor Ecomfive» y 280 «Bodega Dropi Panama» (los «(B280)»); 218 activos y 196 archivados.
+  La lee `leerNuestrosProductos` de `scripts/scraping-proveedores-navegador.js` (en la pestaña de Dropi con esa sesión, mismo
+  receptor y puente que el scraping, `tipo: "nuestros"`) y la guarda `scripts/publicaciones-sincronizar-dropi.ts`
+  (`guardarNuestrosProductos`; también a mano con un JSON guardado, por defecto solo informa, `--aplicar` escribe): reemplaza
+  `dropi_productos_proveedor` (una fila por producto y país, `bodegas` jsonb) y anota `dropi_productos_proveedor_lecturas`. **Dropi
+  manda:** `cambiosDesdeDropi` (`src/lib/publicaciones/sincronizar-dropi.ts`, con prueba) pone en la publicación `ubicacion` (la
+  bodega de más stock, por nombre: `ubicacionDeBodega`; un archivado sin bodegas no la cambia), `precio_venta` (y
+  `ultimo_cambio_precio` = hoy), `tipo_publicacion` y `estado_publicacion`; con dos IDs manda el activo de más stock
+  (`productoPrincipal`). Cada cambio va a la actividad como «Sistema» (`sincronizar_dropi_publicacion`). La lista lee la tabla con
+  `cargarProductosProveedor` (`proveedor-datos.ts`; sin la migración, null y todo sigue igual): `bodegasDropi`, `stockProveedor`,
+  `stockPrivadoProveedor` y `leidoProveedor` en `FilaPublicacion`; «En Dropi» y el Tipo prefieren esta lectura a la carga de Ventas
+  Dropi; la fila pone las unidades bajo «Dónde está», la ficha lista las bodegas en «Stock», y hay filtro «Bodega en Dropi» y
+  columna en el CSV. **Código de bodega** (22 oct 2026, pedido de Hernán): `codigoBodega(id)` = «B» + el ID de la bodega en Dropi
+  (B280 = Bodega Dropi Panama, B81 = Proveedor Ecomfive); va junto al ID en la fila, en la ficha y en el filtro, con las bodegas
+  ordenadas por stock (`bodegasEnOrden`). Encima de la lista, «Última actualización desde Dropi» con fecha y hora
+  (`DatosPublicaciones.leidoProveedor`, escrita en el servidor con `fechaHoraLectura` para que no cambie al hidratar).
+  **Todas con bodega** (pedido de Hernán): **Dropi solo lista la bodega de un producto con stock** (sin stock, `warehouses` y hasta
+  `warehouse_product` de `api/products/<id>` vienen vacíos), así que `FilaPublicacion.bodega` = `bodegaDePublicacion`: la de Dropi;
+  si no, la que corresponde a `ubicacion` (la última conocida: la sincronización no la borra al llegar a 0) entre las bodegas del
+  país (`bodegasDelPais`); si no, «(B280)» del nombre; `origen` lo dice y la ficha lo aclara. Panamá, 22 oct 2026: 380 de 387 (las
+  7 sin bodega no tienen ID de Dropi ni ubicación). **Productos nuevos:** la sincronización crea la publicación («Producto nuevo»,
+  con `ubicacion`, precio, tipo y `fecha_publicacion` = creación en Dropi; actividad «Sistema») de cada producto activo sin
+  publicación que **no estaba en la lectura anterior** (`productosNuevos`; en la primera lectura de un país, todos). Así lo que ya
+  existía sin publicación (envíos y seguros de Dropi, «P-MA Aceite de semilla de calabaza» 11178) no se crea solo.
+  **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
   justifique, con bitácora y deshacer.
+- **Ventas de Dropi cada día** (21 oct 2026). Desempeño › Ventas Dropi, las ventas de cada publicación en Gestión de IDs Dropi,
+  Reponer y la ficha del dropshipper leen `dropi_ventas_*` (migraciones 0120 y 0122), que se llena desde el Historial de Existencia
+  de Dropi. La tarea programada «ventas-dropi-diario» (Claude, navegador integrado) corre `npx tsx scripts/ventas-dropi.ts subida`
+  (dos direcciones firmadas de subida a `wms-compras/tmp-dropi/`), la función de `scripts/ventas-dropi-navegador.js` en
+  `app.dropi.pa` con la sesión de **ECOMFIVE** (lista todos sus productos con `api-v2…/bff/catalog/products/produit/<id>/owner`,
+  activos y archivados, y baja `api/inventories/history` de cada uno, de a tres; si falla uno no sube nada) y `… cargar` (baja a
+  `datos-privados/`, borra los temporales y corre `importar-ventas-dropi.ts --aplicar`, que reemplaza la carga del país). El stock
+  es el `total_stock` de Dropi. Corre desde la copia `C:/Users/herna/ecomfive-tareas` (main al día), como «dropi-diario».
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin
   cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
   llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de
@@ -487,7 +541,7 @@ convenciones técnicas del código.
   Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`.
   **Fase 2** (migración 0125: módulo `portal-proveedor` para quien tiene Compras y `proveedores.notificar_a` = Francis): página
   `/portal-proveedor` debajo de Compras (`portal-proveedor.tsx`, la interfaz del prototipo con los tokens del sistema), pestañas
-  Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
+  Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Por decidir» muestra solo la foto de referencia: el espacio de la real va en blanco (`Foto enBlanco`), porque la real se agrega después (22 oct 2026). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
   **con `actualizarCampoCompra`** (mismos permisos de Compras, evento, Actividad y auditoría) y dejan una novedad para el proveedor;
   la nota para el proveedor se escribe en «En cotización». «Nueva compra en Cotizar» lleva a `/compras/lista?proveedor=Chin`, que
   abre la compra nueva con proveedor y agente puestos (`CrearCompraPanel` se abre sola después de montarse: `Ventana` no se puede
@@ -512,6 +566,38 @@ convenciones técnicas del código.
   UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto
   (un pedido viejo sin hoja saldría vencido sin estarlo). La ficha de compra muestra «Pagos a Chin» (solo lectura,
   `pagos-proveedor-compra.tsx`, oculto si el rol no ve el monto).
+  **Idioma** (migración 0130, 22 oct 2026): Chin ve su portal en **chino simplificado** (`proveedor_usuarios.idioma`, 'zh' por defecto;
+  «中文 / Español» arriba, `cambiarIdiomaProveedor`; `idiomaDeCuenta` cae a chino sin la migración). Los textos de la pantalla están en
+  `src/lib/proveedor/textos.ts` (`TEXTOS.es` / `TEXTOS.zh`, fechas, estados de cuota y tránsito por `clave` + `n`, y `errorEn` para los
+  errores de las acciones; **un texto nuevo del portal va en los dos idiomas**, lo comprueba `idioma.test.ts`). Lo escrito por personas se
+  traduce con Gemini (`traducirTextos`, `src/lib/proveedor/traducir.ts`: `GEMINI_API_KEY`, modelo `GEMINI_TEXT_MODEL` o
+  `gemini-3.5-flash-lite`, tandas de 60, máximo 4 por carga, nunca lanza) y se guarda en `traducciones` (huella sha256 + destino): a
+  chino los productos, las notas, «Lo nuevo» y los productos de pagos; a español lo que escribe Chin (comentario de cotización, detalle de
+  novedad, nota al confirmar un pago). Las pantallas reciben las traducciones por `IdiomaProveedor` (`useIdioma`: `t`, `tr`, `fecha`,
+  `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)».
+  **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Chin**
+  (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
+  sigue el Tablero). Trae «Lo que ve Chin» (el mismo `PortalChin` en español con `soloLectura`: sin botones, sin selector ni «Salir» y sin
+  marcar «Lo nuevo» como visto), «Pagos a Chin» (`compras/tablero-chin/pagos-ecomfive.tsx` + `pagos-actions.ts`: modificar Compras y ver
+  sus montos) y, para un administrador, el botón «Cuenta de Chin» (`cuenta-proveedor.tsx` + `cuenta-actions.ts` en una `Ventana`). Se
+  quitaron Novedades, Por decidir, En cotización y Tránsito: decidir una cotización y marcar una llegada se hacen cambiando la etapa de la
+  compra, y la **nota para Chin** (`wms_compras.nota_proveedor`) es el campo «Nota para Chin» de la ficha de una compra de Chin
+  (`leerCambios` solo la guarda si viaja en el formulario). Los avisos de Chin en la campana llevan a la compra
+  (`/compras/lista?ver=todos&abrir=<id>`) y los de pagos a `/compras/tablero-chin?ver=pagos`; `/portal-proveedor` solo redirige ahí. El
+  módulo de permisos `portal-proveedor` ya no está en el menú, la matriz ni el Centro de ayuda (sus filas viejas en `permisos_rol` no se usan).
+- **Actividad con comentarios, común a todos los módulos** (22 oct 2026). La Actividad de Compras se separó en una pieza común:
+  `Actividad` (`src/components/actividad/actividad.tsx`: un solo bloque con comentarios, cambios y archivos, filtro, «Ver anteriores»,
+  campo con @menciones, pegar o arrastrar archivos), `TarjetaComentario` (`tarjeta-comentario.tsx`: respuestas de un nivel,
+  reacciones, editar y eliminar el propio) y `adjuntos.tsx` (subida directa a Storage con URL firmada, galería). Cada módulo le pasa
+  `obtener` (su lectura) y `acciones` (`AccionesActividad`, `src/lib/comentarios/tipos.ts`: comentar, editar, eliminar, reaccionar,
+  prepararSubida, descartarSubida y su bucket) y, si quiere, `renderCambio` y `arriba`; `version` la vuelve a pedir. Compras la usa
+  con sus acciones de siempre (`actividad-compra.tsx` es ahora un envoltorio: etapa/estado en color y subtareas). Para un módulo nuevo
+  el servidor es `src/lib/comentarios/servidor.ts` (`ConfigComentarios`: tablas, columna de unión y bucket): no revisa permisos, así
+  que su archivo "use server" comprueba el módulo y el acceso al registro ANTES de llamarlo, como
+  `publicaciones-dropi/actividad-actions.ts`. Los archivos se revisan por su contenido (`detectarAdjunto`) y solo se borran los de
+  `comentarios/<registro>/`. **Gestión de IDs Dropi** ya la tiene (migración 0132: `dropi_publicacion_comentarios`, `_adjuntos`,
+  `_comentario_reacciones`, bucket privado `publicaciones-dropi`); sus cambios salen de `historial_auditoria` (también las decisiones
+  de recomendaciones y las tareas hechas), y la ficha la vuelve a pedir al guardar o decidir.
 - **Testing Lab › Generador de landings** (`/generador-landings` y `/generador-landings/[id]`, módulo `generador-landings`, migración
   0113, 20 oct 2026; debajo de Creación de ofertas en Producción). Una fila de `landings` por landing (LND-0001, por país, con
   `seleccion_id` opcional): `modo` cero/clonar, `referencia_url` + `referencia` (lo leído de la landing modelo), `angulo`, `notas_ia`,
@@ -1015,7 +1101,7 @@ convenciones técnicas del código.
   comentario** (`GaleriaAdjuntos`: miniaturas que se amplían con `VisorImagen`, PDF como enlace firmado de una hora); la
   sección «Adjuntos» del final solo trae los sueltos (ClickUp, foto, documentos). Sin la columna, la actividad sigue cargando
   y el comentario con archivos avisa que falta la migración.
-  **Actividad como ClickUp** (8 oct 2026; `actividad-compra.tsx` + `comentario-compra.tsx`): un solo bloque con comentarios,
+  **Actividad como ClickUp** (8 oct 2026; `actividad-compra.tsx` + la pieza común `src/components/actividad/`, ver «Actividad con comentarios»): un solo bloque con comentarios,
   cambios y archivos en orden de tiempo (filtro Todo / Comentarios / Cambios, «Ver anteriores», campo abajo). Cada comentario
   tiene **respuestas** de un nivel (`respuesta_a`; avisa a quien lo escribió por `autor_id`) y **reacciones**
   (`wms_compra_comentario_reacciones`, emojis fijos de `src/lib/compras/reacciones.ts`, `alternarReaccion`), migración 0095;

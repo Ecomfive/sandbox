@@ -40,7 +40,7 @@ const MODULO = "publicaciones-dropi";
 const BUCKET = "wms-productos";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const faltaMigracion = (m: string) => /does not exist|schema cache|relation/i.test(m);
-const SIN_MIGRACION = "Falta correr en Supabase la migración 0131.";
+const SIN_MIGRACION = "Falta correr en Supabase la migración 0134.";
 const urlPublica = (ruta: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${ruta}`;
 const idsDropi = (dropiId: string | null) => (String(dropiId ?? "").match(/\d{3,6}/g) ?? []).map(Number);
 const SIN_IA = "Falta conectar una IA de texto (OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel).";
