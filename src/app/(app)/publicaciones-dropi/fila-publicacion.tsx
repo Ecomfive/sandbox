@@ -11,6 +11,7 @@ import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
 import { InsigniaConectado } from "./insignia-conectado";
+import { LlegadaCamino } from "./llegada-camino";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
@@ -87,7 +88,12 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
       apoyo={
         <span className="flex flex-col tabular-nums lg:items-end">
           <span className="max-w-full truncate">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>
-          {v.stock <= 0 && f.enCamino > 0 && <span className="max-w-full truncate font-medium text-azul">{entero(f.enCamino)} en camino</span>}
+          {v.stock <= 0 && f.enCamino > 0 && (
+            <span className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-azul lg:justify-end">
+              <span className="whitespace-nowrap">{entero(f.enCamino)} en camino</span>
+              <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} />
+            </span>
+          )}
         </span>
       }
     />

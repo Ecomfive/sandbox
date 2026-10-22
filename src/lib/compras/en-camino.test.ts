@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { enCaminoPorPais, lineaEnCamino, type LineaEnCamino } from "./en-camino";
+import { enCaminoPorPais, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
 
 const l = (extra: Partial<LineaEnCamino>): LineaEnCamino => ({ pais: "Panamá", unidades: 100, etapa: "tracking", fechaEnvio: "2026-10-01", fechaLlegada: null, anulada: false, ...extra });
 
@@ -33,4 +33,30 @@ test("con un país marcado, solo lo en camino de ese país", () => {
   assert.deepEqual(enCaminoPorPais(lineas, "mx"), [{ pais: "México", unidades: 200, compras: 1 }]);
   assert.deepEqual(enCaminoPorPais(lineas, "CR"), []);
   assert.equal(enCaminoPorPais(lineas).length, 2); // sin país marcado, todos
+});
+
+const SIN_HISTORIAL = new Map();
+
+test("la llegada de una compra: su fecha límite, o la estimada con fecha de envío y vía", () => {
+  const base = { fechaLimite: null, fechaEnvio: "2026-10-01", vias: ["mar"], clave: "pa" };
+  assert.deepEqual(llegadaDeCompra(SIN_HISTORIAL, { ...base, fechaLimite: "2026-11-20" }), { fecha: "2026-11-20", origen: "limite" });
+  // Sin fecha límite: fecha de envío + lo típico de la vía (60 días por mar sin envíos anteriores).
+  assert.deepEqual(llegadaDeCompra(SIN_HISTORIAL, base), { fecha: "2026-11-30", origen: "estimada" });
+});
+
+test("sin fecha límite y sin fecha de envío o sin vía, no hay fecha de llegada", () => {
+  assert.equal(llegadaDeCompra(SIN_HISTORIAL, { fechaLimite: null, fechaEnvio: null, vias: ["mar"], clave: "pa" }), null);
+  assert.equal(llegadaDeCompra(SIN_HISTORIAL, { fechaLimite: null, fechaEnvio: "2026-10-01", vias: [], clave: "pa" }), null);
+  assert.equal(llegadaDeCompra(SIN_HISTORIAL, { fechaLimite: "no es fecha", fechaEnvio: null, vias: [], clave: "pa" }), null);
+});
+
+test("el resumen toma la llegada más próxima y cuenta lo que no tiene fecha", () => {
+  assert.deepEqual(resumenLlegada([{ unidades: 100, llegada: "2026-12-01" }, { unidades: 50, llegada: "2026-11-05" }, { unidades: 30, llegada: null }]), { unidades: 180, llegada: "2026-11-05", sinFecha: 30 });
+  assert.deepEqual(resumenLlegada([{ unidades: 40, llegada: null }]), { unidades: 40, llegada: null, sinFecha: 40 });
+  assert.deepEqual(resumenLlegada([]), { unidades: 0, llegada: null, sinFecha: 0 });
+});
+
+test("la fecha corta lleva el año solo si no es el actual", () => {
+  assert.equal(llegadaCorta("2026-11-05", "2026-10-22"), "5 nov");
+  assert.equal(llegadaCorta("2027-01-09", "2026-10-22"), "9 ene 2027");
 });

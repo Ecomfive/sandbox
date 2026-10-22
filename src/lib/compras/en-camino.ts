@@ -2,6 +2,8 @@
 // Es la misma regla de «En tránsito» de Compras (`enTransito`, `calculos-compras.ts`): la orden sigue abierta, tiene fecha de envío
 // y no tiene fecha de llegada. Una orden anulada no cuenta. Sin base ni React, para poder probarlo.
 
+import { estimarPlanificacion, type TiemposTransito } from "./planificacion";
+
 /** Las etapas con que una orden ya está cerrada (las mismas de `ETAPAS_CERRADAS` en Compras). */
 const ETAPAS_CERRADAS = ["completado", "descartado"];
 
@@ -42,4 +44,64 @@ export function enCaminoPorPais(lineas: LineaEnCamino[], codigoPais?: string | n
     porPais.set(pais, actual);
   }
   return [...porPais.values()].sort((a, b) => b.unidades - a.unidades || a.pais.localeCompare(b.pais, "es"));
+}
+
+/** Lo que hace falta de una compra para saber cuándo llega. */
+export interface CompraParaLlegada {
+  fechaLimite: string | null;
+  fechaEnvio: string | null;
+  /** Aire, mar o tierra. */
+  vias: string[];
+  /** De qué país se miden sus envíos (el id del país, o «importacion»). */
+  clave: string;
+}
+
+export interface Llegada {
+  /** «2026-11-12». */
+  fecha: string;
+  /** La fecha límite que se puso en la compra, o la estimada con su fecha de envío y lo que tarda su vía. */
+  origen: "limite" | "estimada";
+}
+
+const ES_FECHA = /^\d{4}-\d{2}-\d{2}/;
+
+/**
+ * Cuándo llega una compra que ya salió: su **fecha límite** si la tiene puesta; si no, la estimada (fecha de envío más lo que
+ * tardan los envíos de ese país por esa vía, `estimarPlanificacion`), que necesita la fecha de envío **y** la vía de envío. Si no
+ * se puede saber, null: la compra todavía no tiene fecha de llegada y faltan esos datos en Compras.
+ */
+export function llegadaDeCompra(tiempos: TiemposTransito, c: CompraParaLlegada): Llegada | null {
+  if (c.fechaLimite && ES_FECHA.test(c.fechaLimite)) return { fecha: c.fechaLimite.slice(0, 10), origen: "limite" };
+  if (!c.fechaEnvio || c.vias.length === 0) return null;
+  const e = estimarPlanificacion(tiempos, c.clave, c.vias, c.fechaEnvio);
+  return e ? { fecha: e.llegadaEstimada, origen: "estimada" } : null;
+}
+
+export interface ResumenLlegada {
+  unidades: number;
+  /** La llegada más próxima entre las órdenes que la tienen; null si ninguna. */
+  llegada: string | null;
+  /** Las unidades de órdenes que todavía no tienen fecha de llegada. */
+  sinFecha: number;
+}
+
+/** Junta las órdenes en camino de un producto: sus unidades, la llegada más próxima y cuántas unidades no tienen fecha. */
+export function resumenLlegada(ordenes: { unidades: number; llegada: string | null }[]): ResumenLlegada {
+  let llegada: string | null = null;
+  let sinFecha = 0;
+  let unidades = 0;
+  for (const o of ordenes) {
+    unidades += o.unidades;
+    if (o.llegada === null) sinFecha += o.unidades;
+    else if (llegada === null || o.llegada < llegada) llegada = o.llegada;
+  }
+  return { unidades, llegada, sinFecha };
+}
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «2026-11-12» → «12 nov» (con el año si no es el de `hoy`: «12 nov 2027»). Sin pasar por Date. */
+export function llegadaCorta(fecha: string, hoy: string): string {
+  const [a, m, d] = fecha.slice(0, 10).split("-");
+  return `${Number(d)} ${MESES[Number(m) - 1] ?? m}${a !== hoy.slice(0, 4) ? ` ${a}` : ""}`;
 }

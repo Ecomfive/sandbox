@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { EnCaminoPais } from "@/lib/compras/en-camino";
-import { obtenerEnCaminoProducto } from "./en-camino-actions";
+import { Badge } from "@/components/ui/badge";
+import { llegadaCorta } from "@/lib/compras/en-camino";
+import { obtenerEnCaminoProducto, type OrdenEnCamino } from "./en-camino-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
 
@@ -13,11 +15,16 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  */
 export function EnCaminoProducto({ id, pais, nombrePais }: { id: string; pais?: string | null; nombrePais?: string }) {
   const [datos, setDatos] = useState<EnCaminoPais[] | "error" | null>(null);
+  const [ordenes, setOrdenes] = useState<OrdenEnCamino[]>([]);
 
   useEffect(() => {
     let vigente = true;
     obtenerEnCaminoProducto(id, pais ?? null)
-      .then((r) => vigente && setDatos("enCamino" in r ? r.enCamino : "error"))
+      .then((r) => {
+        if (!vigente) return;
+        setDatos("enCamino" in r ? r.enCamino : "error");
+        setOrdenes("ordenes" in r ? r.ordenes : []);
+      })
       .catch(() => vigente && setDatos("error"));
     return () => {
       vigente = false;
@@ -33,7 +40,9 @@ export function EnCaminoProducto({ id, pais, nombrePais }: { id: string; pais?: 
     );
   if (datos.length === 0) return <p className="text-sm text-muted-foreground">Nada en camino{nombrePais ? ` en ${nombrePais}` : ""}.</p>;
   const total = datos.reduce((t, d) => t + d.unidades, 0);
+  const hoy = new Date().toISOString();
   return (
+    <div className="flex flex-col gap-2">
     <dl className="m-0 flex flex-col divide-y divide-border text-sm">
       {datos.map((d) => (
         <div key={d.pais} className="flex items-baseline justify-between gap-3 py-1.5">
@@ -48,5 +57,19 @@ export function EnCaminoProducto({ id, pais, nombrePais }: { id: string; pais?: 
         </div>
       )}
     </dl>
+    {ordenes.length > 0 && (
+      // Cada orden con su llegada aproximada; la que no la tiene se marca en ámbar para completarla en Compras.
+      <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs text-muted-foreground">
+        {ordenes.map((o) => (
+          <li key={o.numero} className="flex items-center justify-between gap-3">
+            <span className="tabular-nums">
+              OC-{String(o.numero).padStart(4, "0")} · {entero(o.unidades)} u.
+            </span>
+            {o.llegada ? <span className="tabular-nums">llega aprox. {llegadaCorta(o.llegada, hoy)}</span> : <Badge tone="warning">Sin fecha de llegada</Badge>}
+          </li>
+        ))}
+      </ul>
+    )}
+    </div>
   );
 }

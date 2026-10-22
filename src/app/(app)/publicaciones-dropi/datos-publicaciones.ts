@@ -242,6 +242,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const filas: FilaPublicacion[] = datos.map((d) => {
     const estado = d.estado as string;
     const proxima = (d.proxima_revision as string | null) ?? null;
+    const camino = d.sku_maestro_id ? enCaminoPorSku.get(d.sku_maestro_id as string) : undefined;
     return {
       id: d.id,
       numero: numeroPorId.get(d.id) ?? null,
@@ -277,7 +278,9 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       deClickup: !!d.clickup_id,
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
       sugerencia: sugerencias.get(d.id) ?? null,
-      enCamino: d.sku_maestro_id ? (enCaminoPorSku.get(d.sku_maestro_id as string) ?? 0) : 0,
+      enCamino: camino?.unidades ?? 0,
+      llegadaCamino: camino?.llegada ?? null,
+      sinFechaCamino: camino?.sinFecha ?? 0,
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
       ...revisionDe(d),
