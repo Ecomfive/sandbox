@@ -9,7 +9,7 @@ import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
-import { bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
+import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
@@ -255,6 +255,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     );
     return { revisiones, nota: notaOptimizacion(revisiones), tituloDropi: cat?.nombre ?? null };
   };
+  // Las bodegas del país (las que aparecen en «Mis productos»): para deducir la de un producto que hoy no tiene stock.
+  const bodegasPais = proveedor ? bodegasDelPais(proveedor.productos.values()) : [];
   const decisionesDe = new Map<string, DecisionVista[]>();
   for (const d of decisiones) decisionesDe.set(d.publicacionId, [...(decisionesDe.get(d.publicacionId) ?? []), d]);
 
@@ -308,6 +310,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
       leidoProveedor: proveedor?.leidoEn ?? null,
+      bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),
       ...revisionDe(d),
       ...automatico(d, ventas, competidores, hoy, r, prov),
     };

@@ -505,8 +505,26 @@ function ContenidoFicha({
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />
               </div>
             </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className={labelClassSm}>Bodega</span>
+              <span className="text-sm">
+                {p.bodega ? (
+                  <>
+                    <span className="font-mono font-semibold">{codigoBodega(p.bodega.id)}</span> · {p.bodega.nombre}
+                    {p.bodega.origen !== "dropi" && (
+                      <span className="block text-xs text-muted-foreground">
+                        La última que se conoció: Dropi no muestra la bodega de un producto sin stock
+                        {p.bodega.origen === "nombre" ? " (sale del nombre)" : ""}.
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Sin bodega: no tiene ID de Dropi con stock ni «Dónde está».</span>
+                )}
+              </span>
+            </div>
             {/* Lo que dice «Mis productos» de Dropi (22 oct 2026): cada lectura pone «Dónde está» con la bodega de más stock. */}
-            {p.bodegasDropi && (
+            {p.bodegasDropi && p.bodegasDropi.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <span className={labelClassSm}>Bodegas en Dropi</span>
                 {p.bodegasDropi.length ? (

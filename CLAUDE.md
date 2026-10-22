@@ -493,6 +493,14 @@ convenciones técnicas del código.
   (B280 = Bodega Dropi Panama, B81 = Proveedor Ecomfive); va junto al ID en la fila, en la ficha y en el filtro, con las bodegas
   ordenadas por stock (`bodegasEnOrden`). Encima de la lista, «Última actualización desde Dropi» con fecha y hora
   (`DatosPublicaciones.leidoProveedor`, escrita en el servidor con `fechaHoraLectura` para que no cambie al hidratar).
+  **Todas con bodega** (pedido de Hernán): **Dropi solo lista la bodega de un producto con stock** (sin stock, `warehouses` y hasta
+  `warehouse_product` de `api/products/<id>` vienen vacíos), así que `FilaPublicacion.bodega` = `bodegaDePublicacion`: la de Dropi;
+  si no, la que corresponde a `ubicacion` (la última conocida: la sincronización no la borra al llegar a 0) entre las bodegas del
+  país (`bodegasDelPais`); si no, «(B280)» del nombre; `origen` lo dice y la ficha lo aclara. Panamá, 22 oct 2026: 380 de 387 (las
+  7 sin bodega no tienen ID de Dropi ni ubicación). **Productos nuevos:** la sincronización crea la publicación («Producto nuevo»,
+  con `ubicacion`, precio, tipo y `fecha_publicacion` = creación en Dropi; actividad «Sistema») de cada producto activo sin
+  publicación que **no estaba en la lectura anterior** (`productosNuevos`; en la primera lectura de un país, todos). Así lo que ya
+  existía sin publicación (envíos y seguros de Dropi, «P-MA Aceite de semilla de calabaza» 11178) no se crea solo.
   **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
   justifique, con bitácora y deshacer.
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin

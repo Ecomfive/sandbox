@@ -79,6 +79,50 @@ export function bodegasEnOrden<T extends { stock: number }>(bodegas: T[]): T[] {
   return [...bodegas].sort((a, b) => b.stock - a.stock);
 }
 
+/** Las bodegas de Dropi que aparecen en una lectura (una por ID), para deducir la de un producto que hoy no la muestra. */
+export function bodegasDelPais(productos: Iterable<Pick<ProductoProveedor, "bodegas">>): { id: number; nombre: string }[] {
+  const m = new Map<number, string>();
+  for (const p of productos) for (const b of p.bodegas) if (!m.has(b.id)) m.set(b.id, b.nombre);
+  return [...m].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.id - b.id);
+}
+
+/** La bodega de una publicación y de dónde salió: «dropi» (Dropi la muestra hoy), «ubicacion» o «nombre» (deducida). */
+export interface BodegaAsignada {
+  id: number;
+  nombre: string;
+  origen: "dropi" | "ubicacion" | "nombre";
+}
+
+/**
+ * La bodega de una publicación, para que todas la tengan. Dropi solo lista la bodega de un producto **con stock** (sin stock, ni
+ * su ficha en Dropi la trae), así que: 1) la de más stock que muestra Dropi; 2) si no, la que corresponde a «Dónde está» (la
+ * última que se conoció: la sincronización la deja puesta y no la borra cuando el stock llega a 0); 3) si no, la que dice el
+ * nombre («… (B280)»). Sin ninguna, null.
+ */
+export function bodegaDePublicacion(
+  pub: { ubicacion: string | null; nombre: string },
+  prov: Pick<ProductoProveedor, "bodegas"> | null,
+  bodegasPais: { id: number; nombre: string }[],
+): BodegaAsignada | null {
+  const enDropi = prov && prov.bodegas.length ? bodegasEnOrden(prov.bodegas)[0] : null;
+  if (enDropi) return { id: enDropi.id, nombre: enDropi.nombre, origen: "dropi" };
+  if (pub.ubicacion) {
+    const candidatas = bodegasPais.filter((b) => ubicacionDeBodega(b.nombre) === pub.ubicacion);
+    if (candidatas.length === 1) return { ...candidatas[0], origen: "ubicacion" };
+  }
+  const delNombre = /\(\s*B(\d{2,5})\s*\)/i.exec(pub.nombre);
+  const porNombre = delNombre ? bodegasPais.find((b) => b.id === Number(delNombre[1])) : undefined;
+  return porNombre ? { ...porNombre, origen: "nombre" } : null;
+}
+
+/**
+ * Los productos nuevos de una lectura, para crearles su publicación: activos en Dropi, sin publicación en el país y que no estaban
+ * en la lectura anterior (`anteriores`; en la primera lectura de un país, null: entran todos los activos sin publicación).
+ */
+export function productosNuevos(productos: Iterable<ProductoProveedor>, conPublicacion: Set<number>, anteriores: Set<number> | null): ProductoProveedor[] {
+  return [...productos].filter((p) => !p.archivado && !conPublicacion.has(p.id) && (!anteriores || !anteriores.has(p.id)));
+}
+
 /** La ubicación de Gestión de IDs que corresponde a una bodega de Dropi, por su nombre («Bodega Dropi Panama» → bodega_dropi). */
 export function ubicacionDeBodega(nombre: string): string | null {
   const n = nombre.toLowerCase();
