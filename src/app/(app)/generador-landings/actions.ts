@@ -356,7 +356,7 @@ export async function generarImagenLanding(id: string, espacio: string, instrucc
   }
 
   const prompt = armarPromptImagen({ espacio, instruccion: texto, nombre: actual.nombre, angulo: actual.angulo, notas: actual.notas_ia, referencias: referencias.length });
-  const r = await generarImagen(prompt, referencias, PROPORCION[espacio]);
+  const r = await generarImagen(prompt, referencias, PROPORCION[espacio], { operacion: "landing_imagen", modulo: MODULO, usuario, referencia: id });
   if ("error" in r) return { error: r.error };
   const bytes = new Uint8Array(Buffer.from(r.base64, "base64"));
   const tipo = detectarImagen(bytes.slice(0, 64));

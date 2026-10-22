@@ -19,6 +19,7 @@ const fecha = (d: string) => `${Number(d.slice(8, 10))} ${MESES[Number(d.slice(5
 export function ReponerCompras({
   pais,
   corte,
+  stockLeido = null,
   resumen,
   skuDe,
   enCamino,
@@ -26,6 +27,8 @@ export function ReponerCompras({
 }: {
   pais: { codigo: string; nombre: string };
   corte: string;
+  /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */
+  stockLeido?: string | null;
   resumen: ResumenProducto[];
   skuDe: [number, { id: string; codigo: string; nombre: string }][];
   enCamino: [string, EnCamino][];
@@ -45,7 +48,10 @@ export function ReponerCompras({
         <p className="max-w-[75ch] text-sm text-muted-foreground">
           Lo que se vende en Dropi {pais.nombre} y no tiene stock o le alcanza para menos de {DIAS_REPONER} días. Lo sugerido cubre {dias} días de venta al ritmo de los últimos 30, menos el stock y lo que ya viene en compras abiertas.
         </p>
-        <p className="text-xs text-muted-foreground">Ventas de Dropi hasta el {fecha(corte)} (Desempeño › Ventas Dropi). Solo lo ven los administradores.</p>
+        <p className="text-xs text-muted-foreground">
+          Ventas de Dropi hasta el {fecha(corte)} (Desempeño › Ventas Dropi)
+          {stockLeido ? `; el stock es el de la última actualización desde Dropi (${stockLeido})` : ""}. Solo lo ven los administradores.
+        </p>
       </header>
 
       <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cambiosDesdeDropi, idsDeDropi, normalizarProductoProveedor, productoPrincipal, ubicacionDeBodega, ubicacionDeProducto, type ProductoProveedor } from "./sincronizar-dropi";
+import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, cambiosDesdeDropi, productosNuevos, codigoBodega, idsDeDropi, normalizarProductoProveedor, productoPrincipal, ubicacionDeBodega, ubicacionDeProducto, type ProductoProveedor } from "./sincronizar-dropi";
 
 const HOY = "2026-10-22";
 const prod = (id: number, extra: Partial<ProductoProveedor> = {}): ProductoProveedor => ({
@@ -35,6 +35,32 @@ test("normalizar: un simple con su bodega y uno variable con las variaciones sum
   assert.deepEqual(variable?.bodegas, [{ id: 81, nombre: "Proveedor Ecomfive", stock: 52 }]);
   assert.equal(variable?.archivado, true);
   assert.equal(normalizarProductoProveedor({ id: 1 }, false), null);
+});
+
+test("código de bodega y orden: B + su ID, la de más stock primero", () => {
+  assert.equal(codigoBodega(280), "B280");
+  assert.equal(codigoBodega(81), "B81");
+  assert.deepEqual(
+    bodegasEnOrden([{ id: 81, stock: 3 }, { id: 280, stock: 40 }]).map((b) => b.id),
+    [280, 81],
+  );
+});
+
+test("bodega de una publicación: la de Dropi; sin stock, la de «Dónde está»; si no, la del nombre", () => {
+  const pais = bodegasDelPais([prod(1), prod(2, { bodegas: [{ id: 280, nombre: "Bodega Dropi Panama", stock: 5 }] })]);
+  assert.deepEqual(pais, [{ id: 81, nombre: "Proveedor Ecomfive" }, { id: 280, nombre: "Bodega Dropi Panama" }]);
+  assert.deepEqual(bodegaDePublicacion({ ubicacion: "bodega_dropi", nombre: "X" }, prod(1), pais), { id: 81, nombre: "Proveedor Ecomfive", origen: "dropi" });
+  // Sin stock Dropi no lista la bodega: queda la de «Dónde está».
+  assert.deepEqual(bodegaDePublicacion({ ubicacion: "bodega_dropi", nombre: "Retinol (B280)" }, prod(3, { bodegas: [], stock: 0 }), pais), { id: 280, nombre: "Bodega Dropi Panama", origen: "ubicacion" });
+  assert.deepEqual(bodegaDePublicacion({ ubicacion: null, nombre: "Collagen (B280)" }, null, pais), { id: 280, nombre: "Bodega Dropi Panama", origen: "nombre" });
+  assert.equal(bodegaDePublicacion({ ubicacion: null, nombre: "Sin datos" }, null, pais), null);
+  assert.equal(bodegaDePublicacion({ ubicacion: "boxful", nombre: "Otra" }, null, pais), null);
+});
+
+test("productos nuevos: activos, sin publicación y que no estaban en la lectura anterior", () => {
+  const lista = [prod(1), prod(2), prod(3, { archivado: true }), prod(4)];
+  assert.deepEqual(productosNuevos(lista, new Set([1]), new Set([1, 2, 3])).map((p) => p.id), [4]);
+  assert.deepEqual(productosNuevos(lista, new Set([1]), null).map((p) => p.id), [2, 4]);
 });
 
 test("ubicación: por el nombre de la bodega, y la de más stock si hay varias", () => {

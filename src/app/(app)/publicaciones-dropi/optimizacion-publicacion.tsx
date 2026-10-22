@@ -3,6 +3,7 @@
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CheckIcon, EstadoIcon } from "@/lib/nav-icons";
 import type { EstadoRevision } from "@/lib/publicaciones/optimizacion";
+import { BotonAsistenteIA } from "./asistente-ia";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 /** Cómo se marca cada punto: no solo con color (ícono o punto + texto). */
@@ -16,9 +17,10 @@ const MARCA: Record<EstadoRevision, { texto: string; clase: string }> = {
 
 /**
  * El bloque «Optimización» de la ficha: cada punto de lo que se publica en Dropi (título, fotos, video, descripción, precio
- * sugerido) con si cumple, y la nota. Lo que falta sale también como recomendación arriba.
+ * sugerido) con si cumple, y la nota. Lo que falta sale también como recomendación arriba. Quien puede editar tiene además el
+ * «Asistente de IA» (títulos, descripción, fotos y análisis).
  */
-export function OptimizacionFicha({ p }: { p: FilaPublicacion }) {
+export function OptimizacionFicha({ p, puedeEscribir }: { p: FilaPublicacion; puedeEscribir: boolean }) {
   return (
     <div className="border-b border-border px-5 py-5">
       <Seccion icono={EstadoIcon} titulo="Optimización en Dropi">
@@ -49,6 +51,11 @@ export function OptimizacionFicha({ p }: { p: FilaPublicacion }) {
             );
           })}
         </ul>
+        {puedeEscribir && (
+          <div className="flex flex-wrap items-center gap-2">
+            <BotonAsistenteIA publicacionId={p.id} principal />
+          </div>
+        )}
       </Seccion>
     </div>
   );

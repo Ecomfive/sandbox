@@ -3,6 +3,8 @@ import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { dineroPorMes, margen, utilidad, type DineroDia } from "@/lib/publicaciones/dinero";
+import { cargarStockProveedor, stockVigente } from "@/lib/publicaciones/proveedor-datos";
+import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { resumirProductos, restarDias, totalesPorDia, totalesPorMes, type ProductoDropi, type VentaDia } from "@/lib/publicaciones/ventas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -38,7 +40,7 @@ export default async function VentasDropiPage() {
   }
 
   const corte = new Date(new Date(carga.corte as string).getTime() - 5 * 3600e3).toISOString().slice(0, 10);
-  const [productosR, diasR, dsR, pubsR, dineroR, cargaDineroR] = await Promise.all([
+  const [productosR, diasR, dsR, pubsR, dineroR, cargaDineroR, stockActual] = await Promise.all([
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_productos").select("dropi_producto_id, nombre, lista, privado, variable, stock, primera_venta, ultima_venta").eq("pais_id", pais.id).order("dropi_producto_id").range(d, h)),
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_diarias").select("dropi_producto_id, dia, pedidas, ordenes, canceladas, rechazadas, devueltas").eq("pais_id", pais.id).order("dropi_producto_id").order("dia").range(d, h)),
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_dropshippers").select("dropi_usuario_id, nombre, pedidas, ordenes, no_efectivas, netas_30d, productos, ultima_orden").eq("pais_id", pais.id).order("dropi_usuario_id").range(d, h)),
@@ -46,6 +48,8 @@ export default async function VentasDropiPage() {
     // La plata (migración 0130): sin la migración o sin carga, la página sigue solo con las unidades.
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_dinero").select("dropi_producto_id, dia, entregadas, unidades, ganancia, comision, coste, descuentos").eq("pais_id", pais.id).order("dropi_producto_id").order("dia").range(d, h)),
     supabase.from("dropi_ventas_dinero_cargas").select("hasta, ordenes, fuente").eq("pais_id", pais.id).order("cargado_en", { ascending: false }).limit(1).maybeSingle(),
+    // El stock de la última lectura de «Mis productos» de Dropi (migración 0131): manda sobre el de la carga, que puede tener días.
+    cargarStockProveedor(supabase, pais.id),
   ]);
   if (productosR.error || diasR.error || dsR.error) {
     return (
@@ -72,7 +76,7 @@ export default async function VentasDropiPage() {
     lista: p.lista === "archivado" ? "archivado" : "activo",
     privado: !!p.privado,
     variable: !!p.variable,
-    stock: Number(p.stock),
+    stock: stockVigente(Number(p.dropi_producto_id), Number(p.stock), stockActual?.stock),
     primeraVenta: (p.primera_venta as string | null) ?? null,
     ultimaVenta: (p.ultima_venta as string | null) ?? null,
   }));
@@ -137,6 +141,7 @@ export default async function VentasDropiPage() {
       <EncabezadoPagina titulo="Ventas Dropi" oculto />
       <TableroVentas
         corte={corte}
+        stockLeido={stockActual ? fechaHoraLectura(stockActual.leidoEn) : null}
         movimientos={Number(carga.movimientos)}
         productos={resumen}
         meses={totalesPorMes(dias, `${desdeMes.slice(0, 7)}-01`, corte)}

@@ -26,6 +26,8 @@ import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { InsigniaConectado } from "./insignia-conectado";
+import { EstadoCambioDropi } from "./estado-cambio-dropi";
+import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 
 interface Formulario {
@@ -331,7 +333,7 @@ function ContenidoFicha({
         </div>
 
         <RecomendacionesFicha p={p} puedeEscribir={puedeEscribir} disponible={decisionesDisponibles} />
-        {!p.archivada && <OptimizacionFicha p={p} />}
+        {!p.archivada && <OptimizacionFicha p={p} puedeEscribir={puedeEscribir} />}
 
         <fieldset disabled={!puedeEscribir} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-5">
           <Seccion icono={ProductoIcon} titulo="Producto">
@@ -340,9 +342,11 @@ function ContenidoFicha({
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
                   <span className={labelClassSm}>Nombre en Dropi</span>
-                  {/* Viene de Dropi: no se edita. Cambia solo cuando Dropi trae otro nombre para el mismo ID (al volver a vincular). */}
+                  {/* Viene de Dropi: no se edita aquí. La única excepción es «Usar este título» del Asistente de IA (elegirTituloIA). */}
                   <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
+                  <span className="text-xs text-muted-foreground">Solo cambia con «Usar este título» del Asistente de IA (y así también en Dropi).</span>
                 </label>
+                {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} puedeEscribir={puedeEscribir} />}
                 <div className="flex min-w-0 flex-col gap-1.5">
                   {conectado && (
                     <div className="flex">
@@ -504,15 +508,35 @@ function ContenidoFicha({
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />
               </div>
             </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className={labelClassSm}>Bodega</span>
+              <span className="text-sm">
+                {p.bodega ? (
+                  <>
+                    <span className="font-mono font-semibold">{codigoBodega(p.bodega.id)}</span> · {p.bodega.nombre}
+                    {p.bodega.origen !== "dropi" && (
+                      <span className="block text-xs text-muted-foreground">
+                        La última que se conoció: Dropi no muestra la bodega de un producto sin stock
+                        {p.bodega.origen === "nombre" ? " (sale del nombre)" : ""}.
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Sin bodega: no tiene ID de Dropi con stock ni «Dónde está».</span>
+                )}
+              </span>
+            </div>
             {/* Lo que dice «Mis productos» de Dropi (22 oct 2026): cada lectura pone «Dónde está» con la bodega de más stock. */}
-            {p.bodegasDropi && (
+            {p.bodegasDropi && p.bodegasDropi.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <span className={labelClassSm}>Bodegas en Dropi</span>
                 {p.bodegasDropi.length ? (
                   <ul className="flex flex-col divide-y divide-border rounded-lg bg-muted px-4 text-sm">
                     {p.bodegasDropi.map((b) => (
-                      <li key={b.nombre} className="flex items-center justify-between gap-3 py-2">
-                        <span className="min-w-0 truncate">{b.nombre}</span>
+                      <li key={b.id} className="flex items-center justify-between gap-3 py-2">
+                        <span className="min-w-0 truncate">
+                          <span className="font-mono font-semibold">{codigoBodega(b.id)}</span> · {b.nombre}
+                        </span>
                         <span className="font-semibold tabular-nums">{b.stock.toLocaleString("es-PA")} u.</span>
                       </li>
                     ))}
@@ -523,7 +547,7 @@ function ContenidoFicha({
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {p.bodegasDropi.length > 1 && `Total ${(p.stockProveedor ?? 0).toLocaleString("es-PA")} u. · `}
                   {p.stockPrivadoProveedor ? `${p.stockPrivadoProveedor.toLocaleString("es-PA")} reservadas a privados · ` : ""}
-                  {p.leidoProveedor && `Leído de Dropi el ${fechaLarga(p.leidoProveedor)}`}
+                  {p.leidoProveedor && `Actualizado desde Dropi el ${fechaHoraLectura(p.leidoProveedor)}`}
                 </span>
               </div>
             )}

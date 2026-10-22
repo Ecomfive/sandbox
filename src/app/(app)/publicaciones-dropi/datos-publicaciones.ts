@@ -9,7 +9,8 @@ import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
-import { productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
+import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
+import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
@@ -37,9 +38,11 @@ function automatico(
   hoy: string,
   reglas: Reglas,
   prov: ProductoProveedor | null,
+  /** El stock por ID de la última lectura de «Mis productos»: manda sobre el de la carga de ventas, que puede tener días. */
+  stockActual: Map<number, number> | undefined,
 ): Pick<FilaPublicacion, "ventas" | "enDropi" | "archivada" | "tipoDropi" | "acciones" | "competidorMasBarato" | "competidorMinimo"> {
   const ids = idsDropi(d);
-  const v = ventas ? ventasDePublicacion(ids, ventas.resumen) : null;
+  const v = ventas ? ventasDePublicacion(ids, ventas.resumen, stockActual) : null;
   const estadoDropi = prov
     ? prov.archivado
       ? "archivado"
@@ -183,6 +186,10 @@ export interface DatosPublicaciones {
   filas: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
   corteVentas: string | null;
+  /** Cuándo se leyó «Mis productos» de Dropi por última vez (bodegas, precio, tipo y estado); null si nunca. */
+  leidoProveedor: string | null;
+  /** Cuántos cambios del sistema esperan para aplicarse en Dropi (migración 0137). */
+  pendientesDropi: number;
   reglas: ReglasGuardadas;
   /** Todas las decisiones del país (la más nueva primero), para la pestaña Recomendaciones. */
   decisiones: DecisionVista[];
@@ -220,7 +227,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo, proveedor] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -233,6 +240,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarEnCamino(supabase, paisId, usuario),
     cargarNuestrosEnDropi(supabase, paisId),
     cargarProductosProveedor(supabase, paisId),
+    cargarCambiosDropi(supabase, paisId),
   ]);
   const r = reglas.reglas;
   // La revisión de optimización: con lo que muestra Dropi (el primer ID que esté en el catálogo); si no se leyó, el título guardado.
@@ -253,6 +261,9 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     );
     return { revisiones, nota: notaOptimizacion(revisiones), tituloDropi: cat?.nombre ?? null };
   };
+  // Las bodegas del país (las que aparecen en «Mis productos»): para deducir la de un producto que hoy no tiene stock.
+  const bodegasPais = proveedor ? bodegasDelPais(proveedor.productos.values()) : [];
+  const stockActual = proveedor ? new Map([...proveedor.productos.values()].map((p) => [p.id, p.stock])) : undefined;
   const decisionesDe = new Map<string, DecisionVista[]>();
   for (const d of decisiones) decisionesDe.set(d.publicacionId, [...(decisionesDe.get(d.publicacionId) ?? []), d]);
 
@@ -302,12 +313,14 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       sinEnvioCamino: camino?.sinEnvio ?? 0,
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
-      bodegasDropi: prov ? prov.bodegas.map((b) => ({ nombre: b.nombre, stock: b.stock })) : null,
+      bodegasDropi: prov ? bodegasEnOrden(prov.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) : null,
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
       leidoProveedor: proveedor?.leidoEn ?? null,
+      cambioDropi: cambiosDropi.porPublicacion.get(d.id) ?? null,
+      bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),
       ...revisionDe(d),
-      ...automatico(d, ventas, competidores, hoy, r, prov),
+      ...automatico(d, ventas, competidores, hoy, r, prov, stockActual),
     };
   });
 
@@ -350,5 +363,5 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
-  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, reglas, decisiones, conTareas, personas };
+  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, pendientesDropi: cambiosDropi.pendientes, reglas, decisiones, conTareas, personas };
 }
