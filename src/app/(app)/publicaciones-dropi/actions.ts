@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ESTADOS, ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -54,9 +54,7 @@ function leerDatos(f: FormData): Datos | { error: string } {
   return {
     nombre,
     dropi_id: texto(f, "dropi_id", 60) || null,
-    estado: deLista(f, "estado", ESTADOS) ?? "producto_nuevo",
-    estado_publicacion: deLista(f, "estado_publicacion", ESTADOS_PUBLICACION),
-    tipo_publicacion: deLista(f, "tipo_publicacion", TIPOS),
+    // Estado, «En Dropi» y Tipo ya no se editan (21 oct 2026): salen de Dropi y de reglas. No van aquí, así guardar no los borra.
     privatizado_a: texto(f, "privatizado_a", 120) || null,
     privatizado_email: email || null,
     precio_venta: precio ?? null,
@@ -69,7 +67,6 @@ function leerDatos(f: FormData): Datos | { error: string } {
     // «Reposición» y «Competencia» ya no se editan aquí (la reposición se hace desde Compras y la competencia se ve en la del
     // producto): no van, así guardar la ficha no borra lo que quedó en la base.
     fecha_publicacion: fecha(f, "fecha_publicacion"),
-    ultima_revision: fecha(f, "ultima_revision"),
     ultimo_cambio_precio: fecha(f, "ultimo_cambio_precio"),
     notas: texto(f, "notas", 5000) || null,
     responsable_id: UUID.test(resp) ? resp : null,
@@ -108,16 +105,12 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
 const VISTA: [string, string, (v: unknown) => string][] = [
   ["nombre", "Producto", (v) => String(v ?? "—")],
   ["dropi_id", "ID Dropi", (v) => String(v ?? "—")],
-  ["estado", "Estado", (v) => etiqueta(ESTADOS, v as string)],
-  ["estado_publicacion", "En Dropi", (v) => etiqueta(ESTADOS_PUBLICACION, v as string)],
-  ["tipo_publicacion", "Tipo", (v) => etiqueta(TIPOS, v as string)],
   ["privatizado_a", "Privatizado a", (v) => String(v ?? "—")],
   ["precio_venta", "Precio de venta", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["costo_mercancia", "Costo mercancía", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["coste_real", "Coste real", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
-  ["ultima_revision", "Última revisión", (v) => String(v ?? "—")],
 ];
 
 /** Guarda la ficha. Si cambia el precio, «Último cambio de precio» pasa a hoy (salvo que se haya escrito otra fecha). */

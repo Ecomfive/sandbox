@@ -6,18 +6,19 @@ import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/se
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_PUBLICACION, TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
 import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
+import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { FichaPublicacion } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 
 const NOMBRE: NombreFilas = { singular: "publicación", plural: "publicaciones" };
 const ICONOS: Record<string, IconoComp> = {
-  estado: EstadoIcon,
+  accion: EstadoIcon,
   revision: CalendarioIcon,
   venta: MargenIcon,
   ubicacion: InventarioIcon,
@@ -30,7 +31,6 @@ const ICONOS: Record<string, IconoComp> = {
   margen: MargenIcon,
   margenBajo: MargenIcon,
   ultimaRevision: CalendarioIcon,
-  proximaRevision: CalendarioIcon,
   fechaPublicacion: CalendarioIcon,
   stockDropi: InventarioIcon,
   ventaDropi: MargenIcon,
@@ -40,7 +40,9 @@ const ICONOS: Record<string, IconoComp> = {
   diasInventario: CalendarioIcon,
 };
 
-const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS,  ubicacion: UBICACIONES, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
+// Los grupos de «Acción» y «En Dropi» se pintan con su color (son calculados, no listas de la publicación).
+const comoOpciones = (l: { valor: string; etiqueta: string; color: string }[]): OpcionPublicacion[] => l.map((o) => ({ ...o, clickup: o.etiqueta }));
+const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { accion: comoOpciones(ACCIONES), publicacion: comoOpciones(EN_DROPI), ubicacion: UBICACIONES, tipo: TIPOS };
 
 /**
  * Las publicaciones del país: el tablero de acciones arriba y, debajo, la lista de filas con la barra de herramientas común y
