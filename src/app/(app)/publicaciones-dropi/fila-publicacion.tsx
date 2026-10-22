@@ -7,7 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS, ESTADOS_REPOSICION, UBICACIONES, margenBajo, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { eliminarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
@@ -69,7 +69,7 @@ function BotonEliminarFila({ f, alEliminar }: { f: FilaPublicacion; alEliminar: 
   );
 }
 
-/** Las ventas en Dropi de la fila (solo un administrador): netas de 30 días, stock y para cuántos días alcanza. */
+/** Las ventas en Dropi de la fila: netas de los últimos 30 días, stock y para cuántos días alcanza. */
 function CeldaVentas({ f }: { f: FilaPublicacion }) {
   const v = f.ventas;
   if (!v) return <Celda nombre="Ventas en Dropi" alinear="derecha" principal={<span className="text-muted-foreground">—</span>} apoyo="Sin datos de Dropi" />;
@@ -81,7 +81,7 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
         <span className="inline-flex items-center gap-1.5 tabular-nums">
           {v.stockEstado === "sin_stock_vende" && <Punto clase="bg-destructive" texto="Sin stock y se vende" />}
           {v.stockEstado === "se_acaba" && <Punto clase="bg-warning" texto="Se acaba el stock" />}
-          {entero(v.netas30)} netas en 30 días
+          {entero(v.netas30)} {v.netas30 === 1 ? "venta" : "ventas"} en 30 días
         </span>
       }
       apoyo={<span className="tabular-nums">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>}
@@ -95,7 +95,6 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
  */
 export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; alEliminar?: () => void }) {
   const estado = opcion(ESTADOS, f.estado);
-  const venta = opcion(ESTADOS_VENTA, f.estadoVenta);
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
   const reposicion = opcion(ESTADOS_REPOSICION, f.estadoReposicion);
   const sugerida = !f.sku && f.sugerencia && f.sugerencia.tipo !== "ninguno" ? f.sugerencia : null;
@@ -149,12 +148,8 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
             )
           }
         />
-        <Celda
-          nombre="Estado y venta"
-          principal={estado ? <Badge color={estado.color}>{estado.etiqueta}</Badge> : <span className="text-muted-foreground">—</span>}
-          apoyo={venta ? <ConPunto color={venta.color} texto={venta.etiqueta} /> : "Sin estado de venta"}
-        />
-        {verVentas && <CeldaVentas f={f} />}
+        <Celda nombre="Estado" principal={estado ? <Badge color={estado.color}>{estado.etiqueta}</Badge> : <span className="text-muted-foreground">—</span>} />
+        <CeldaVentas f={f} />
         <Celda
           nombre="Dónde está y reposición"
           principal={ubicacion ? <ConPunto color={ubicacion.color} texto={ubicacion.etiqueta} /> : <span className="text-muted-foreground">—</span>}

@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, ESTADOS_VENTA, TIPOS, UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, TIPOS, UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -64,7 +64,8 @@ function leerDatos(f: FormData): Datos | { error: string } {
     costo_mercancia: costo ?? null,
     fulfillment: fulfillment ?? null,
     coste_real: real ?? null,
-    estado_venta: deLista(f, "estado_venta", ESTADOS_VENTA),
+    // «Estado de venta» ya no se edita (lo reemplazan las ventas de Dropi de 30 días): no va aquí, así guardar la ficha no
+    // borra el dato que quedó en la base.
     ubicacion: deLista(f, "ubicacion", UBICACIONES),
     estado_reposicion: deLista(f, "estado_reposicion", ESTADOS_REPOSICION),
     competencia: comp === "si" ? true : comp === "no" ? false : null,
@@ -116,7 +117,6 @@ const VISTA: [string, string, (v: unknown) => string][] = [
   ["costo_mercancia", "Costo mercancía", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["coste_real", "Coste real", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["estado_venta", "Estado de venta", (v) => etiqueta(ESTADOS_VENTA, v as string)],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
   ["estado_reposicion", "Reposición", (v) => etiqueta(ESTADOS_REPOSICION, v as string)],
   ["competencia", "Competencia", (v) => (v === null ? "—" : v ? "Sí" : "No")],

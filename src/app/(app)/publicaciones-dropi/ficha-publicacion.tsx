@@ -16,7 +16,6 @@ import {
   ESTADOS,
   ESTADOS_PUBLICACION,
   ESTADOS_REPOSICION,
-  ESTADOS_VENTA,
   MARGEN_BAJO,
   TIPOS,
   UBICACIONES,
@@ -383,22 +382,8 @@ function ContenidoFicha({
             </Seccion>
           )}
 
-          <Seccion icono={InventarioIcon} titulo="Venta y stock">
+          <Seccion icono={InventarioIcon} titulo="Stock y reposición">
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Estado de venta</span>
-                <Selector nombre="Estado de venta" valor={d.estado_venta} lista={ESTADOS_VENTA} cambiar={(v) => cambiar({ estado_venta: v })} />
-                {p.ventas && (
-                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    Según Dropi: <b className="font-medium text-foreground">{opcion(ESTADOS_VENTA, p.ventas.estadoSugerido)?.etiqueta}</b>
-                    {puedeEscribir && d.estado_venta !== p.ventas.estadoSugerido && (
-                      <button type="button" onClick={() => p.ventas && cambiar({ estado_venta: p.ventas.estadoSugerido })} className={`rounded border border-primario/40 bg-primario-suave px-1.5 py-0.5 font-medium text-primario hover:border-primario ${anilloFoco}`}>
-                        Usar
-                      </button>
-                    )}
-                  </span>
-                )}
-              </div>
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />

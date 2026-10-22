@@ -6,11 +6,11 @@ import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/se
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, ESTADOS_VENTA, TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
-import { DEF_PUBLICACIONES, DEF_PUBLICACIONES_ADMIN, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
 import { FichaPublicacion } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
@@ -42,7 +42,7 @@ const ICONOS: Record<string, IconoComp> = {
   diasInventario: CalendarioIcon,
 };
 
-const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS, venta: ESTADOS_VENTA, ventaDropi: ESTADOS_VENTA, ubicacion: UBICACIONES, reposicion: ESTADOS_REPOSICION, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
+const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS,  ubicacion: UBICACIONES, reposicion: ESTADOS_REPOSICION, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
 
 /**
  * Las publicaciones del país: el tablero de acciones arriba y, debajo, la lista de filas con la barra de herramientas común y
@@ -72,7 +72,7 @@ export function TablaPublicaciones({
   abrirInicial?: string | null;
 }) {
   const verVentas = corteVentas !== null;
-  const def = verVentas ? DEF_PUBLICACIONES_ADMIN : DEF_PUBLICACIONES;
+  const def = DEF_PUBLICACIONES;
   const [abierta, setAbierta] = useState<string | null>(() => (abrirInicial && publicaciones.some((p) => p.id === abrirInicial) ? abrirInicial : null));
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
