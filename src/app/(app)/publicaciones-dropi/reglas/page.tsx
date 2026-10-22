@@ -1,8 +1,10 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
+import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { requireModulo } from "@/lib/auth";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
 import { createServiceClient } from "@/lib/supabase/server";
+import { contarRecomendacionesPendientes } from "../recomendaciones-actions";
 import { FormularioReglas } from "./formulario-reglas";
 
 export const metadata = { title: "Reglas · Gestión de IDs Dropi" };
@@ -16,6 +18,7 @@ export default async function ReglasPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Reglas" oculto />
+      <ContadorPestana href="/publicaciones-dropi/recomendaciones" cargar={contarRecomendacionesPendientes} />
       <FormularioReglas reglas={guardadas.reglas} cambios={guardadas.cambios} disponible={guardadas.disponible} puedeEscribir={!usuario.modulosSoloLectura.includes("publicaciones-dropi")} />
     </Pagina>
   );

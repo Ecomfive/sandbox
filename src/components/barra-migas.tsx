@@ -5,12 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { BotonAccesos } from "@/components/accesos/boton-accesos";
 import { FavoritoToggle } from "@/components/favorito-toggle";
+import { useContadoresPestanas } from "@/components/migas/contador-pestana";
 import { useEtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MODULOS_CON_GUIA } from "@/lib/ayuda/guias-indice";
 import { construirMigas } from "@/lib/migas";
 import type { NavSection } from "@/lib/nav-data";
+import { textoContador, textoPendientes } from "@/lib/contadores-menu";
 import { pestanaActiva, pestanasDe } from "@/lib/pestanas";
 import { ChevronRightIcon, FlechaIzquierdaIcon } from "@/lib/nav-icons";
 
@@ -43,6 +45,7 @@ export function BarraMigas({
   const pathname = usePathname();
   const router = useRouter();
   const etiquetaDetalle = useEtiquetaMiga();
+  const contadores = useContadoresPestanas();
   const ruta = rutaActual ?? pathname;
   const { migas, favoritoHref, moduloHref, moduloEtiqueta } = useMemo(
     () => construirMigas(ruta, areas, etiquetaDetalle),
@@ -158,6 +161,17 @@ export function BarraMigas({
                     }`}
                   >
                     {pestana.etiqueta}
+                    {(contadores[pestana.href] ?? 0) > 0 && (
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.6rem] leading-none font-semibold text-background tabular-nums"
+                        >
+                          {textoContador(contadores[pestana.href])}
+                        </span>
+                        <span className="sr-only">, {textoPendientes(contadores[pestana.href])}</span>
+                      </>
+                    )}
                   </Link>
                 </li>
               );
