@@ -46,8 +46,7 @@ function leerDatos(f: FormData): Datos | { error: string } {
   const precio = numero(f, "precio_venta");
   const costo = numero(f, "costo_mercancia");
   const fulfillment = numero(f, "fulfillment");
-  const real = numero(f, "coste_real");
-  if ([precio, costo, fulfillment, real].includes(undefined)) return { error: "Un precio o costo no es válido." };
+  if ([precio, costo, fulfillment].includes(undefined)) return { error: "Un precio o costo no es válido." };
   const email = texto(f, "privatizado_email", 200).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "El correo del dropshipper no es válido." };
   const resp = texto(f, "responsable_id", 64);
@@ -60,7 +59,7 @@ function leerDatos(f: FormData): Datos | { error: string } {
     precio_venta: precio ?? null,
     costo_mercancia: costo ?? null,
     fulfillment: fulfillment ?? null,
-    coste_real: real ?? null,
+    // «Coste real» ya no se usa (21 oct 2026): no va aquí, así guardar la ficha no borra el dato que quedó en la base.
     // «Estado de venta» ya no se edita (lo reemplazan las ventas de Dropi de 30 días): no va aquí, así guardar la ficha no
     // borra el dato que quedó en la base.
     ubicacion: deLista(f, "ubicacion", UBICACIONES),
@@ -107,9 +106,8 @@ const VISTA: [string, string, (v: unknown) => string][] = [
   ["dropi_id", "ID Dropi", (v) => String(v ?? "—")],
   ["privatizado_a", "Privatizado a", (v) => String(v ?? "—")],
   ["precio_venta", "Precio de venta", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["costo_mercancia", "Costo mercancía", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
+  ["costo_mercancia", "Costo de producto", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["coste_real", "Coste real", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
 ];
 

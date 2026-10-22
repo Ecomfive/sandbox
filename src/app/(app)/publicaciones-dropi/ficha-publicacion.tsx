@@ -355,16 +355,12 @@ function ContenidoFicha({
                 <input type="number" min={0} step="0.01" value={d.precio_venta} onChange={(e) => cambiar({ precio_venta: e.target.value })} placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
               </label>
               <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Costo mercancía</span>
+                <span className={labelClassSm}>Costo de producto</span>
                 <input type="number" min={0} step="0.01" value={d.costo_mercancia} onChange={(e) => cambiar({ costo_mercancia: e.target.value })} placeholder="Ej: 1.16" className={`${fieldClass} w-full tabular-nums`} />
               </label>
               <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fulfillment</span>
                 <input type="number" min={0} step="0.01" value={d.fulfillment} onChange={(e) => cambiar({ fulfillment: e.target.value })} placeholder="Ej: 1.50" className={`${fieldClass} w-full tabular-nums`} />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Coste real (última compra)</span>
-                <input type="number" min={0} step="0.01" value={d.coste_real} onChange={(e) => cambiar({ coste_real: e.target.value })} placeholder="Ej: 0.97" className={`${fieldClass} w-full tabular-nums`} />
               </label>
             </div>
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">

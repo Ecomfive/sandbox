@@ -155,7 +155,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
 
       {/* Los datos: en pantalla ancha una columna cada uno; en angosta, debajo del producto en una fila que envuelve. */}
       <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:order-none lg:contents">
-        <Celda nombre="Precio" alinear="derecha" principal={<span className="font-semibold tabular-nums">{usd(f.precioVenta)}</span>} apoyo={`Costo ${usd(f.costoMercancia)} · Fulfillment ${usd(f.fulfillment)}`} />
+        <Celda nombre="Precio" alinear="derecha" principal={<span className="font-semibold tabular-nums">{usd(f.precioVenta)}</span>} apoyo={`Costo de producto ${usd(f.costoMercancia)} · Fulfillment ${usd(f.fulfillment)}`} />
         <Celda
           nombre="Utilidad bruta y margen bruto"
           alinear="derecha"
