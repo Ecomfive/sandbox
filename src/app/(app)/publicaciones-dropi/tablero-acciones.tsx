@@ -59,9 +59,10 @@ const ACCIONES: Accion[] = [
   },
   {
     id: "sin-stock",
+    // Según el stock que reporta Dropi (antes, el «Estado de venta» manual): sin stock y con ventas en los últimos 30 días.
     titulo: "Sin stock",
-    cuenta: (f) => f.estadoVenta === "sin_stock",
-    atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: sin stock", filtro: seleccion("venta", "sin_stock") },
+    cuenta: (f) => f.ventas?.stockEstado === "sin_stock_vende",
+    atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: sin stock en Dropi y con ventas", filtro: seleccion("stockDropi", "sin_stock_vende") },
     tono: "destructive",
   },
 ];

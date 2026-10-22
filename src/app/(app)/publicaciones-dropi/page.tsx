@@ -32,7 +32,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
-  // Las ventas de Dropi (Desempeño › Ventas Dropi) solo las ve un administrador, por ahora.
+  // Eliminar publicaciones: solo un administrador. Las ventas de Dropi (últimos 30 días) las ve todo el que abre el módulo.
   const admin = esAdministrador(usuario);
   const [filasR, numerosR] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
@@ -71,7 +71,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
       datos.map((d) => ({ id: d.id, nombre: d.nombre as string, dropiId: (d.dropi_id as string | null) ?? "", skuId: (d.sku_maestro_id as string | null) ?? null })),
     ),
     obtenerOpcionesSkuMaestro(supabase),
-    admin ? cargarResumenVentas(supabase, pais.id) : Promise.resolve(null),
+    cargarResumenVentas(supabase, pais.id),
   ]);
 
   const filas: FilaPublicacion[] = datos.map((d) => {

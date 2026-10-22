@@ -18,7 +18,7 @@ function Dato({ titulo, valor, detalle, tono }: { titulo: string; valor: string;
 }
 
 /**
- * Las ventas en Dropi de una publicación (solo un administrador): netas de 30 días contra los 30 anteriores, stock y para
+ * Las ventas en Dropi de una publicación: netas de 30 días contra los 30 anteriores, stock y para
  * cuántos días alcanza, cancelaciones y devoluciones, última venta y las netas de los últimos 12 meses en barras.
  */
 export function VentasEnDropi({ v, corte }: { v: VentasPublicacion; corte: string }) {
