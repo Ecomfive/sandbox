@@ -460,6 +460,10 @@ convenciones técnicas del código.
   `recomendaciones-actions.ts`): queda en `dropi_publicaciones_decisiones` con la foto de la recomendación, el precio y margen de ese
   momento y `vigente_hasta` (aceptada 30 días, rechazada 90, pospuesta 7/14/30), y en la actividad. Se calcula al cargar
   (`cargarPublicaciones`, `datos-publicaciones.ts`, compartido por la lista y la pestaña Recomendaciones); no se escribe nada al abrir. **Globo de la pestaña «Recomendaciones»** (22 oct 2026): la franja de pestañas (`BarraMigas`) dibuja un globo rojo como el de la campana con lo pendiente de una pestaña (`useContadoresPestanas`, `src/components/migas/contador-pestana.tsx`: un almacén fuera de React, como la etiqueta de las migas, que se queda al pasar de una pestaña a otra). La página lo pone con `<ContadorPestana href cantidad />`: Publicaciones y Recomendaciones ya tienen la cuenta (suma de `recomendaciones` de cada fila, igual a «Pendientes» del panel) y se actualiza al decidir una; Reglas no carga las publicaciones, así que pasa `cargar={contarRecomendacionesPendientes}` (acción de lectura) que solo se llama si aún no hay un número. Otra pestaña con globo: su página renderiza `ContadorPestana` con su `href`.
+  **Republicar** (22 oct 2026, `necesitaRepublicar` en `automatico.ts`, con prueba): acción y tarjeta para las activas en Dropi, de una
+  bodega que no sea la B280 (`BODEGA_DROPI`: esa publicación es de Dropi y no se republica), con `dias_republicar` (30) sin ninguna venta
+  (o, si nunca vendió, publicadas hace al menos esos días); sin bodega o sin ventas de Dropi no sale. Se agrega en `cargarPublicaciones`
+  después de armar la fila (necesita `f.bodega`).
   **Tareas** (migración 0128): una aceptada es una tarea con `responsable_id`, `plazo` (regla `dias_plazo`, 7) y aviso «Para ti»
   (`notificaciones_usuario` tipo `tarea`); mientras está abierta no se vuelve a sugerir (`pendientes`). `tareaCumplida` la da por hecha
   si Dropi muestra un precio nuevo después de aceptarla y en la dirección pedida, o si el combo x2 ya está publicado; `cargarPublicaciones`

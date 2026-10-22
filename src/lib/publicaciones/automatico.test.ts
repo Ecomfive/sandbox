@@ -36,3 +36,18 @@ test("cada regla", () => {
   assert.deepEqual(accionesPublicacion({ ...base, privatizadaA: "Juan", netas30: 0, netas30Antes: 0, fechaPublicacion: "2026-10-15" }, HOY), [], "uno nuevo todavía no se verifica");
   assert.deepEqual(accionesPublicacion({ ...base, margen: 0.2, competidorMasBarato: true }, HOY), ["margen_bajo", "bajar_precio"]);
 });
+
+test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca la B280)", async () => {
+  const { necesitaRepublicar: r, BODEGA_DROPI: b280 } = await import("./automatico");
+  const base = { archivada: false, enDropi: "activo" as const, bodegaId: 81, hayVentas: true, ultimaVenta: "2026-09-10", publicadaDesde: "2026-05-01" };
+  const hoy = "2026-10-22";
+  assert.equal(r(base, hoy), true);
+  assert.equal(r({ ...base, bodegaId: b280 }, hoy), false, "la B280 es de Dropi: no se republica");
+  assert.equal(r({ ...base, bodegaId: null }, hoy), false, "sin bodega conocida no se sabe");
+  assert.equal(r({ ...base, ultimaVenta: "2026-10-05" }, hoy), false, "vendió hace menos de 30 días");
+  assert.equal(r({ ...base, ultimaVenta: null, publicadaDesde: "2026-10-01" }, hoy), false, "nunca vendió pero es nueva");
+  assert.equal(r({ ...base, ultimaVenta: null, publicadaDesde: "2026-08-01" }, hoy), true, "nunca vendió y lleva más de 30 días");
+  assert.equal(r({ ...base, enDropi: "archivado" }, hoy), false);
+  assert.equal(r({ ...base, hayVentas: false }, hoy), false, "sin datos de Dropi no se sabe");
+  assert.equal(r(base, hoy, { dias_republicar: 60 }), false, "el plazo sale de las reglas");
+});

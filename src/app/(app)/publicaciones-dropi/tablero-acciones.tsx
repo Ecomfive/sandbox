@@ -7,7 +7,7 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { AnalisisCompetenciaIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, AnalisisCompetenciaIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
@@ -77,6 +77,7 @@ const TARJETAS: Tarjeta[] = [
   porAccion("ventas_caida", VentasIcon, "ambar"),
   porAccion("bajar_precio", AnalisisCompetenciaIcon, "rojo"),
   porAccion("verificar_dropshipper", DropshipperIcon, "azul"),
+  porAccion("republicar", ActualizarIcon, "azul"),
   {
     id: "recomendaciones",
     titulo: "Recomendaciones",

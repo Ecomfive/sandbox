@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
-import { accionesPublicacion, enDropi, estaArchivada } from "@/lib/publicaciones/automatico";
+import { accionesPublicacion, enDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { revisionVencida } from "@/lib/publicaciones/publicacion";
@@ -328,6 +328,9 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const publicados = new Set(filas.filter((f) => !f.archivada && f.sku).map((f) => f.sku!.id));
   const cumplidas: { d: DecisionVista; nombre: string }[] = [];
   for (const f of filas) {
+    // Republicar: necesita la bodega de la fila (se conoce después de armarla).
+    if (necesitaRepublicar({ archivada: f.archivada, enDropi: f.enDropi, bodegaId: f.bodega?.id ?? null, hayVentas: !!f.ventas, ultimaVenta: f.ventas?.ultimaVenta ?? null, publicadaDesde: f.ventas?.primeraVenta ?? f.fechaPublicacion }, hoy, r))
+      f.acciones = [...f.acciones, "republicar"];
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
     const comboPublicado = !!combo && publicados.has(combo.id);
     // Las tareas abiertas que los datos ya muestran hechas.
