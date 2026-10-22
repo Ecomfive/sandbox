@@ -28,6 +28,9 @@ test("el juego de cada familia empieza por la principal, solo usa tipos que exis
   // Un suplemento pide ingredientes enseguida; un producto general, no.
   assert.equal(JUEGO_BASE.suplemento[1], "ingredientes");
   assert.notEqual(JUEGO_BASE.general[1], "ingredientes");
+  // Si se aplica o se toma, los pasos escritos (como_usar) van antes que la escena sin texto (uso).
+  for (const f of ["suplemento", "belleza", "general"] as const) assert.ok(JUEGO_BASE[f].indexOf("como_usar") < JUEGO_BASE[f].indexOf("uso") || f === "general", f);
+  assert.ok(JUEGO_BASE.general.indexOf("como_usar") > JUEGO_BASE.general.indexOf("uso"));
 });
 
 test("se reconoce si es un suplemento, belleza o un producto general", () => {

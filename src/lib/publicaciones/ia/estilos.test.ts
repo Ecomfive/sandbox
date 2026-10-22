@@ -32,6 +32,8 @@ test("el pedido no transcribe textos ni describe el producto y dice para qué fo
   const p = pedidoEstiloImagen("Beneficios", 2);
   assert.match(p.instrucciones, /NO lo transcribas/);
   assert.match(p.instrucciones, /No describas el producto concreto/);
+  assert.match(p.instrucciones, /Describe la tipografía sin nombrar la fuente exacta/);
+  assert.match(p.instrucciones, /"tipografia"/);
   assert.match(p.texto, /2 imágenes modelo adjuntas, para fotos de tipo «Beneficios»/);
   assert.match(pedidoEstiloImagen(null, 1).texto, /Imagen modelo adjunta, para cualquier tipo de foto/);
 });
@@ -81,4 +83,9 @@ test("una imagen que no se guarda viaja como base64 a OpenAI y a Claude; una pú
   assert.deepEqual(imagenParaClaude("https://x.test/b.png").source, { type: "url", url: "https://x.test/b.png" });
   const openai = cuerpoRespuesta("gpt-4.1-mini", entrada, false).input[0].content as { type: string; image_url?: string }[];
   assert.equal(openai[1].image_url, dato);
+});
+
+test("la guía de una imagen modelo también guarda la tipografía", () => {
+  const g = normalizarEstilo('{"estilo":"Limpio","tipografia":"Sans-serif geométrica en negrita, título grande y texto de apoyo más pequeño, en gris oscuro"}');
+  assert.equal(g, "Estilo: Limpio\nTipografía: Sans-serif geométrica en negrita, título grande y texto de apoyo más pequeño, en gris oscuro");
 });
