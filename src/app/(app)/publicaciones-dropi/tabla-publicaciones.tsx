@@ -1,38 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, ESTADOS_VENTA, TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
-import { DEF_PUBLICACIONES, DEF_PUBLICACIONES_ADMIN, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
+import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { FichaPublicacion } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 
 const NOMBRE: NombreFilas = { singular: "publicación", plural: "publicaciones" };
 const ICONOS: Record<string, IconoComp> = {
-  estado: EstadoIcon,
+  accion: EstadoIcon,
   revision: CalendarioIcon,
   venta: MargenIcon,
   ubicacion: InventarioIcon,
-  reposicion: InventarioIcon,
   tipo: EstadoIcon,
   publicacion: EstadoIcon,
   privatizado: PersonaIcon,
-  competencia: EstadoIcon,
   vinculo: ProductoIcon,
   nombre: ProductoIcon,
   precio: MargenIcon,
   margen: MargenIcon,
   margenBajo: MargenIcon,
   ultimaRevision: CalendarioIcon,
-  proximaRevision: CalendarioIcon,
   fechaPublicacion: CalendarioIcon,
   stockDropi: InventarioIcon,
   ventaDropi: MargenIcon,
@@ -42,7 +40,9 @@ const ICONOS: Record<string, IconoComp> = {
   diasInventario: CalendarioIcon,
 };
 
-const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS, venta: ESTADOS_VENTA, ventaDropi: ESTADOS_VENTA, ubicacion: UBICACIONES, reposicion: ESTADOS_REPOSICION, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
+// Los grupos de «Acción» y «En Dropi» se pintan con su color (son calculados, no listas de la publicación).
+const comoOpciones = (l: { valor: string; etiqueta: string; color: string }[]): OpcionPublicacion[] => l.map((o) => ({ ...o, clickup: o.etiqueta }));
+const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { accion: comoOpciones(ACCIONES), publicacion: comoOpciones(EN_DROPI), ubicacion: UBICACIONES, tipo: TIPOS };
 
 /**
  * Las publicaciones del país: el tablero de acciones arriba y, debajo, la lista de filas con la barra de herramientas común y
@@ -57,6 +57,7 @@ export function TablaPublicaciones({
   puedeEscribir,
   puedeEliminar,
   corteVentas,
+  abrirInicial = null,
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
@@ -67,12 +68,21 @@ export function TablaPublicaciones({
   puedeEliminar: boolean;
   /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
   corteVentas: string | null;
+  /** La publicación que se abre al cargar (`?abrir=`, desde la ficha de un producto); si no es de este país, nada. */
+  abrirInicial?: string | null;
 }) {
   const verVentas = corteVentas !== null;
-  const def = verVentas ? DEF_PUBLICACIONES_ADMIN : DEF_PUBLICACIONES;
-  const [abierta, setAbierta] = useState<string | null>(null);
+  const def = DEF_PUBLICACIONES;
+  const [abierta, setAbierta] = useState<string | null>(() => (abrirInicial && publicaciones.some((p) => p.id === abrirInicial) ? abrirInicial : null));
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
+  // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador (en el
+  // servidor no hay `document`).
+  const enNavegador = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   return (
     <ProveedorSkusMaestros opciones={opcionesSku}>
       <TableroAcciones publicaciones={publicaciones} def={def} />
@@ -102,7 +112,7 @@ export function TablaPublicaciones({
         vacio="Todavía no hay publicaciones en este país."
       />
       <FichaPublicacion
-        publicacion={publicaciones.find((p) => p.id === abierta)}
+        publicacion={enNavegador ? publicaciones.find((p) => p.id === abierta) : undefined}
         codigoPais={codigoPais}
         nombrePais={nombrePais}
         puedeEscribir={puedeEscribir}

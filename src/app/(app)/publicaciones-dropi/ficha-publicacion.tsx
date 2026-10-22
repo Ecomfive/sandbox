@@ -13,21 +13,16 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
 import {
-  ESTADOS,
-  ESTADOS_PUBLICACION,
-  ESTADOS_REPOSICION,
-  ESTADOS_VENTA,
   MARGEN_BAJO,
-  TIPOS,
   UBICACIONES,
   numeroPublicacion,
-  opcion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { actualizarPublicacion, eliminarPublicacion, obtenerHistorialPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
+import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { VinculoSku } from "./vinculo-sku";
 
 interface Formulario {
@@ -183,7 +178,6 @@ function ContenidoFicha({
   const [version, setVersion] = useState(0);
   const sinGuardar = JSON.stringify(d) !== JSON.stringify(desde(p));
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
-  const estado = opcion(ESTADOS, p.estado);
 
   const precio = n(d.precio_venta);
   const utilidad = precio === null ? null : precio - (n(d.costo_mercancia) ?? 0) - (n(d.fulfillment) ?? 0);
@@ -234,7 +228,18 @@ function ContenidoFicha({
         <>
           <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroPublicacion(p.numero)}</span>
           <span className="text-lg font-semibold">{p.nombre}</span>
-          {estado && <Badge color={estado.color}>{estado.etiqueta}</Badge>}
+          {p.archivada ? (
+            <Badge color="#8d8d8d">Archivada</Badge>
+          ) : (
+            (p.acciones.length ? p.acciones : (["al_dia"] as const)).map((v) => {
+              const o = ACCIONES.find((x) => x.valor === v);
+              return o ? (
+                <Badge key={v} color={o.color}>
+                  {o.etiqueta}
+                </Badge>
+              ) : null;
+            })
+          )}
         </>
       }
       navegacion={
@@ -299,30 +304,36 @@ function ContenidoFicha({
           </Seccion>
 
           <Seccion icono={EstadoIcon} titulo="Estado">
+            {!p.archivada && (
+              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
+                {(p.acciones.length ? p.acciones : (["al_dia"] as const)).map((v) => {
+                  const o = ACCIONES.find((x) => x.valor === v);
+                  return o ? (
+                    <li key={v} className="flex flex-wrap items-center gap-2">
+                      <Badge color={o.color}>{o.etiqueta}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {v === "bajar_precio" && p.competidorMasBarato ? `${p.competidorMasBarato.proveedor} lo vende a ${usd(p.competidorMasBarato.precio)}` : o.detalle}
+                      </span>
+                    </li>
+                  ) : null;
+                })}
+              </ul>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Estado</span>
-                <select value={d.estado} onChange={(e) => cambiar({ estado: e.target.value })} className={`${fieldClass} w-full`}>
-                  {ESTADOS.map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.etiqueta}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Ya no se marcan a mano (21 oct 2026): salen de lo que reporta Dropi. */}
               <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>En Dropi</span>
-                <Selector nombre="En Dropi" valor={d.estado_publicacion} lista={ESTADOS_PUBLICACION} cambiar={(v) => cambiar({ estado_publicacion: v })} />
+                <span className={labelClassSm}>En Dropi</span>
+                <span className="text-sm">{EN_DROPI.find((e) => e.valor === p.enDropi)?.etiqueta ?? "—"}</span>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Tipo</span>
-                <Selector nombre="Tipo" valor={d.tipo_publicacion} lista={TIPOS} cambiar={(v) => cambiar({ tipo_publicacion: v })} />
+                <span className={labelClassSm}>Tipo</span>
+                <span className="text-sm">{p.tipoDropi === "privado" ? "Privado" : p.tipoDropi === "publico" ? "Público" : "—"}</span>
               </div>
               <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fecha de publicación</span>
                 <input type="date" value={d.fecha_publicacion} onChange={(e) => cambiar({ fecha_publicacion: e.target.value })} className={`${fieldClass} w-full`} />
               </label>
-              {d.tipo_publicacion === "privado" && (
+              {(p.tipoDropi === "privado" || !!d.privatizado_a) && (
                 <>
                   <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Privatizado a</span>
@@ -344,16 +355,12 @@ function ContenidoFicha({
                 <input type="number" min={0} step="0.01" value={d.precio_venta} onChange={(e) => cambiar({ precio_venta: e.target.value })} placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
               </label>
               <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Costo mercancía</span>
+                <span className={labelClassSm}>Costo de producto</span>
                 <input type="number" min={0} step="0.01" value={d.costo_mercancia} onChange={(e) => cambiar({ costo_mercancia: e.target.value })} placeholder="Ej: 1.16" className={`${fieldClass} w-full tabular-nums`} />
               </label>
               <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fulfillment</span>
                 <input type="number" min={0} step="0.01" value={d.fulfillment} onChange={(e) => cambiar({ fulfillment: e.target.value })} placeholder="Ej: 1.50" className={`${fieldClass} w-full tabular-nums`} />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Coste real (última compra)</span>
-                <input type="number" min={0} step="0.01" value={d.coste_real} onChange={(e) => cambiar({ coste_real: e.target.value })} placeholder="Ej: 0.97" className={`${fieldClass} w-full tabular-nums`} />
               </label>
             </div>
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
@@ -383,38 +390,12 @@ function ContenidoFicha({
             </Seccion>
           )}
 
-          <Seccion icono={InventarioIcon} titulo="Venta y stock">
+          <Seccion icono={InventarioIcon} titulo="Stock">
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Estado de venta</span>
-                <Selector nombre="Estado de venta" valor={d.estado_venta} lista={ESTADOS_VENTA} cambiar={(v) => cambiar({ estado_venta: v })} />
-                {p.ventas && (
-                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    Según Dropi: <b className="font-medium text-foreground">{opcion(ESTADOS_VENTA, p.ventas.estadoSugerido)?.etiqueta}</b>
-                    {puedeEscribir && d.estado_venta !== p.ventas.estadoSugerido && (
-                      <button type="button" onClick={() => p.ventas && cambiar({ estado_venta: p.ventas.estadoSugerido })} className={`rounded border border-primario/40 bg-primario-suave px-1.5 py-0.5 font-medium text-primario hover:border-primario ${anilloFoco}`}>
-                        Usar
-                      </button>
-                    )}
-                  </span>
-                )}
-              </div>
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>
                 <Selector nombre="Dónde está" valor={d.ubicacion} lista={UBICACIONES} cambiar={(v) => cambiar({ ubicacion: v })} />
               </div>
-              <div className="flex min-w-0 flex-col gap-1">
-                <span aria-hidden="true" className={labelClassSm}>Reposición</span>
-                <Selector nombre="Reposición" valor={d.estado_reposicion} lista={ESTADOS_REPOSICION} cambiar={(v) => cambiar({ estado_reposicion: v })} />
-              </div>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Competencia en Dropi</span>
-                <select value={d.competencia} onChange={(e) => cambiar({ competencia: e.target.value })} className={`${fieldClass} w-full`}>
-                  <option value="">Sin revisar</option>
-                  <option value="si">Sí</option>
-                  <option value="no">No</option>
-                </select>
-              </label>
             </div>
           </Seccion>
 

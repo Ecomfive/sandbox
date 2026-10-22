@@ -108,7 +108,7 @@ export default async function ProductoPage() {
       supabase.from("skus_maestros").select("id, categoria_id, categoria_revisar, categorias_productos(ruta)").not("categoria_id", "is", null).order("id").range(desde, hasta),
     ),
     // El nombre con que está cada producto en Dropi: el de sus publicaciones vinculadas (migración 0116; sin ella, nada).
-    supabase.from("dropi_publicaciones").select("sku_maestro_id, nombre, dropi_id, estado, paises(codigo)").not("sku_maestro_id", "is", null),
+    supabase.from("dropi_publicaciones").select("id, sku_maestro_id, nombre, dropi_id, estado, paises(codigo)").not("sku_maestro_id", "is", null),
   ]);
   const nombresDropiPorSku = new Map<string, FilaProducto["nombresDropi"]>();
   const publicacionesOrdenadas = [...((publicaciones.error ? [] : publicaciones.data) ?? [])].sort((a, b) => Number(a.estado === "archivado") - Number(b.estado === "archivado"));
@@ -119,7 +119,7 @@ export default async function ProductoPage() {
     const nombre = String(pub.nombre ?? "").trim();
     const actuales = nombresDropiPorSku.get(id) ?? [];
     if (!nombre || actuales.some((n) => n.nombre === nombre && n.pais === pais)) continue;
-    nombresDropiPorSku.set(id, [...actuales, { nombre, pais, dropiId: String(pub.dropi_id ?? "") }]);
+    nombresDropiPorSku.set(id, [...actuales, { id: String(pub.id), nombre, pais, dropiId: String(pub.dropi_id ?? ""), archivada: pub.estado === "archivado" }]);
   }
   const categoriaPorId = new Map(
     categorias.error

@@ -7,6 +7,8 @@ import { revisionVencida } from "@/lib/publicaciones/publicacion";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
+import { accionesPublicacion, enDropi, estaArchivada } from "@/lib/publicaciones/automatico";
+import { cargarCompetidores, competidorMasBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -25,12 +27,54 @@ type Fila = Record<string, unknown> & { id: string };
  * Operación › Fulfillment: los productos que ECOMFIVE tiene publicados en Dropi como proveedor (del país de la barra), con su
  * precio, margen, estado de venta, stock, reposición, privatización y revisión. Reemplaza la lista GCC de ClickUp.
  */
-export default async function PublicacionesDropiPage() {
+/**
+ * Lo que ya no se marca a mano (21 oct 2026): cómo está en Dropi, si va a Archivados, el Tipo y qué necesita, a partir de las
+ * ventas de Dropi del país (`ventas`, null si no hay carga) y de la competencia.
+ */
+function automatico(
+  d: Fila,
+  ventas: Awaited<ReturnType<typeof cargarResumenVentas>>,
+  competidores: Awaited<ReturnType<typeof cargarCompetidores>>,
+  hoy: string,
+): Pick<FilaPublicacion, "ventas" | "enDropi" | "archivada" | "tipoDropi" | "acciones" | "competidorMasBarato"> {
+  const ids = (String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? []).map(Number);
+  const v = ventas ? ventasDePublicacion(ids, ventas.resumen) : null;
+  const estadoDropi = enDropi({ hayCarga: !!ventas, tieneId: ids.length > 0, dropi: v ? { activo: v.activoEnDropi } : null });
+  const manualArchivada = d.estado === "archivado" || d.estado_publicacion === "archivado";
+  const archivada = estaArchivada(estadoDropi, manualArchivada);
+  const tipo: "publico" | "privado" | null = v ? (v.privadoEnDropi ? "privado" : "publico") : ((d.tipo_publicacion as "publico" | "privado" | null) ?? null);
+  const barato = competidorMasBarato({ nombre: d.nombre as string, precio: num(d.precio_venta), idsDropi: ids }, competidores);
+  return {
+    ventas: v,
+    enDropi: estadoDropi,
+    archivada,
+    tipoDropi: tipo,
+    competidorMasBarato: barato,
+    acciones: accionesPublicacion(
+      {
+        archivada,
+        fechaPublicacion: (d.fecha_publicacion as string | null) ?? null,
+        primeraVenta: v?.primeraVenta ?? null,
+        margen: num(d.margen),
+        netas30: v ? v.netas30 : null,
+        netas30Antes: v ? v.netas30Antes : null,
+        // Solo si sigue privada: si Dropi ya la reporta pública, el nombre guardado es de antes.
+        privatizadaA: tipo === "publico" ? null : ((d.privatizado_a as string | null) ?? "").trim() || null,
+        competidorMasBarato: !!barato,
+      },
+      hoy,
+    ),
+  };
+}
+
+export default async function PublicacionesDropiPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("publicaciones-dropi");
+  // Desde la ficha de un producto (Asociaciones) se llega con `?abrir=<publicación>`: la abre al cargar.
+  const { abrir } = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
-  // Las ventas de Dropi (Desempeño › Ventas Dropi) solo las ve un administrador, por ahora.
+  // Eliminar publicaciones: solo un administrador. Las ventas de Dropi (últimos 30 días) las ve todo el que abre el módulo.
   const admin = esAdministrador(usuario);
   const [filasR, numerosR] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
@@ -62,14 +106,15 @@ export default async function PublicacionesDropiPage() {
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
-  const [{ skus, sugerencias }, opcionesSku, ventas] = await Promise.all([
+  const [{ skus, sugerencias }, opcionesSku, ventas, competidores] = await Promise.all([
     cargarSugerencias(
       supabase,
       pais.id,
       datos.map((d) => ({ id: d.id, nombre: d.nombre as string, dropiId: (d.dropi_id as string | null) ?? "", skuId: (d.sku_maestro_id as string | null) ?? null })),
     ),
     obtenerOpcionesSkuMaestro(supabase),
-    admin ? cargarResumenVentas(supabase, pais.id) : Promise.resolve(null),
+    cargarResumenVentas(supabase, pais.id),
+    cargarCompetidores(supabase, pais.id),
   ]);
 
   const filas: FilaPublicacion[] = datos.map((d) => {
@@ -107,14 +152,14 @@ export default async function PublicacionesDropiPage() {
       deClickup: !!d.clickup_id,
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
       sugerencia: sugerencias.get(d.id) ?? null,
-      ventas: ventas ? ventasDePublicacion((String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? []).map(Number), ventas.resumen) : null,
+      ...automatico(d, ventas, competidores, hoy),
     };
   });
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
-      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} paisId={pais.id} codigoPais={pais.codigo} nombrePais={pais.nombre} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} />
+      <TablaPublicaciones publicaciones={filas} opcionesSku={opcionesSku} paisId={pais.id} codigoPais={pais.codigo} nombrePais={pais.nombre} puedeEscribir={puedeEscribir} puedeEliminar={puedeEscribir && admin} corteVentas={ventas?.corte ?? null} abrirInicial={typeof abrir === "string" ? abrir : null} />
     </Pagina>
   );
 }
