@@ -8,6 +8,11 @@ export interface Pestana {
  * una es el título de su página. La primera es la página del módulo; las demás cuelgan de ella.
  */
 export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
+  "/publicaciones-dropi": [
+    { etiqueta: "Publicaciones", href: "/publicaciones-dropi" },
+    { etiqueta: "Recomendaciones", href: "/publicaciones-dropi/recomendaciones" },
+    { etiqueta: "Reglas", href: "/publicaciones-dropi/reglas" },
+  ],
   "/retiros": [
     { etiqueta: "Retiros", href: "/retiros" },
     { etiqueta: "Cuentas destino", href: "/retiros/cuentas" },

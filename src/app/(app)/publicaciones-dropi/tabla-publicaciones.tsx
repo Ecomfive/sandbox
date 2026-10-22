@@ -7,11 +7,13 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import { TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import type { Reglas } from "@/lib/publicaciones/reglas";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
 import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
+import { TIPOS_RECOMENDACION } from "@/lib/publicaciones/recomendaciones";
 import { FichaPublicacion } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
@@ -30,6 +32,7 @@ const ICONOS: Record<string, IconoComp> = {
   precio: MargenIcon,
   margen: MargenIcon,
   margenBajo: MargenIcon,
+  recomendacion: EstadoIcon,
   ultimaRevision: CalendarioIcon,
   fechaPublicacion: CalendarioIcon,
   stockDropi: InventarioIcon,
@@ -42,7 +45,7 @@ const ICONOS: Record<string, IconoComp> = {
 
 // Los grupos de «Acción» y «En Dropi» se pintan con su color (son calculados, no listas de la publicación).
 const comoOpciones = (l: { valor: string; etiqueta: string; color: string }[]): OpcionPublicacion[] => l.map((o) => ({ ...o, clickup: o.etiqueta }));
-const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { accion: comoOpciones(ACCIONES), publicacion: comoOpciones(EN_DROPI), ubicacion: UBICACIONES, tipo: TIPOS };
+const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { accion: comoOpciones(ACCIONES), recomendacion: comoOpciones(TIPOS_RECOMENDACION), publicacion: comoOpciones(EN_DROPI), ubicacion: UBICACIONES, tipo: TIPOS };
 
 /**
  * Las publicaciones del país: el tablero de acciones arriba y, debajo, la lista de filas con la barra de herramientas común y
@@ -57,6 +60,8 @@ export function TablaPublicaciones({
   puedeEscribir,
   puedeEliminar,
   corteVentas,
+  reglas,
+  decisionesDisponibles,
   abrirInicial = null,
 }: {
   publicaciones: FilaPublicacion[];
@@ -68,6 +73,8 @@ export function TablaPublicaciones({
   puedeEliminar: boolean;
   /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
   corteVentas: string | null;
+  reglas: Reglas;
+  decisionesDisponibles: boolean;
   /** La publicación que se abre al cargar (`?abrir=`, desde la ficha de un producto); si no es de este país, nada. */
   abrirInicial?: string | null;
 }) {
@@ -85,7 +92,7 @@ export function TablaPublicaciones({
   );
   return (
     <ProveedorSkusMaestros opciones={opcionesSku}>
-      <TableroAcciones publicaciones={publicaciones} def={def} />
+      <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
       <ListaDatos
         def={def}
         filas={publicaciones}
@@ -118,6 +125,8 @@ export function TablaPublicaciones({
         puedeEscribir={puedeEscribir}
         puedeEliminar={puedeEliminar}
         corteVentas={corteVentas}
+        margenMinimo={reglas.margen_minimo}
+        decisionesDisponibles={decisionesDisponibles}
         anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}

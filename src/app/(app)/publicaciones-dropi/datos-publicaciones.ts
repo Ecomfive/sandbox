@@ -1,0 +1,222 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { accionesPublicacion, enDropi, estaArchivada } from "@/lib/publicaciones/automatico";
+import { cargarCambiosPrecio, cargarCompetidores, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
+import { revisionVencida } from "@/lib/publicaciones/publicacion";
+import { pendientes, recomendar, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
+import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
+import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
+import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
+import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
+import { detectarPack } from "@/lib/publicaciones/vincular";
+import { traerTodasConError } from "@/lib/supabase/paginar";
+import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
+import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import type { DecisionVista, FilaPublicacion } from "./def-publicaciones";
+
+const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+const idsDropi = (d: Fila) => (String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? []).map(Number);
+
+type Fila = Record<string, unknown> & { id: string };
+
+/**
+ * Lo que ya no se marca a mano (21 oct 2026): cómo está en Dropi, si va a Archivados, el Tipo y qué necesita, a partir de las
+ * ventas de Dropi del país (`ventas`, null si no hay carga), de la competencia y de las reglas.
+ */
+function automatico(
+  d: Fila,
+  ventas: Awaited<ReturnType<typeof cargarResumenVentas>>,
+  competidores: Awaited<ReturnType<typeof cargarCompetidores>>,
+  hoy: string,
+  reglas: Reglas,
+): Pick<FilaPublicacion, "ventas" | "enDropi" | "archivada" | "tipoDropi" | "acciones" | "competidorMasBarato" | "competidorMinimo"> {
+  const ids = idsDropi(d);
+  const v = ventas ? ventasDePublicacion(ids, ventas.resumen) : null;
+  const estadoDropi = enDropi({ hayCarga: !!ventas, tieneId: ids.length > 0, dropi: v ? { activo: v.activoEnDropi } : null });
+  const manualArchivada = d.estado === "archivado" || d.estado_publicacion === "archivado";
+  const archivada = estaArchivada(estadoDropi, manualArchivada);
+  const tipo: "publico" | "privado" | null = v ? (v.privadoEnDropi ? "privado" : "publico") : ((d.tipo_publicacion as "publico" | "privado" | null) ?? null);
+  const barato = competidorMasBarato({ nombre: d.nombre as string, precio: num(d.precio_venta), idsDropi: ids }, competidores);
+  return {
+    ventas: v,
+    enDropi: estadoDropi,
+    archivada,
+    tipoDropi: tipo,
+    competidorMasBarato: barato,
+    competidorMinimo: competidorMinimo({ nombre: d.nombre as string, idsDropi: ids }, competidores),
+    acciones: accionesPublicacion(
+      {
+        archivada,
+        // Primero la de Dropi (la primera venta); la anotada, solo si todavía no vendió.
+        fechaPublicacion: v?.primeraVenta ?? ((d.fecha_publicacion as string | null) ?? null),
+        primeraVenta: v?.primeraVenta ?? null,
+        margen: num(d.margen),
+        netas30: v ? v.netas30 : null,
+        netas30Antes: v ? v.netas30Antes : null,
+        // Solo si sigue privada: si Dropi ya la reporta pública, el nombre guardado es de antes.
+        privatizadaA: tipo === "publico" ? null : ((d.privatizado_a as string | null) ?? "").trim() || null,
+        competidorMasBarato: !!barato,
+      },
+      hoy,
+      reglas,
+    ),
+  };
+}
+
+interface FilaDecision {
+  id: string;
+  publicacion_id: string;
+  tipo: string;
+  decision: Decision;
+  nota: string | null;
+  recomendacion: { titulo?: string; motivo?: string } | null;
+  vigente_hasta: string;
+  usuario_nombre: string | null;
+  creado_en: string;
+}
+
+/** Las decisiones de las recomendaciones de un país (migración 0127), de la más nueva a la más vieja; sin la tabla, ninguna. */
+async function cargarDecisiones(supabase: SupabaseClient, paisId: string): Promise<DecisionVista[]> {
+  const r = await traerTodasConError<FilaDecision>((desde, hasta) =>
+    supabase
+      .from("dropi_publicaciones_decisiones")
+      .select("id, publicacion_id, tipo, decision, nota, recomendacion, vigente_hasta, usuario_nombre, creado_en, dropi_publicaciones!inner(pais_id)")
+      .eq("dropi_publicaciones.pais_id", paisId)
+      .order("creado_en", { ascending: false })
+      .range(desde, hasta),
+  );
+  return (r.error ? [] : (r.data ?? [])).map((d) => ({
+    id: d.id,
+    publicacionId: d.publicacion_id,
+    tipo: d.tipo,
+    decision: d.decision,
+    nota: d.nota ?? "",
+    titulo: d.recomendacion?.titulo ?? "",
+    motivo: d.recomendacion?.motivo ?? "",
+    vigenteHasta: d.vigente_hasta,
+    usuario: d.usuario_nombre ?? "",
+    fecha: d.creado_en,
+  }));
+}
+
+export interface DatosPublicaciones {
+  filas: FilaPublicacion[];
+  opcionesSku: OpcionSkuMaestro[];
+  corteVentas: string | null;
+  reglas: ReglasGuardadas;
+  /** Todas las decisiones del país (la más nueva primero), para la pestaña Recomendaciones. */
+  decisiones: DecisionVista[];
+}
+
+/**
+ * Las publicaciones de un país listas para la lista, la ficha y la pestaña Recomendaciones: lo guardado más lo calculado (Dropi,
+ * competencia, reglas y recomendaciones pendientes). `null` si falta la migración 0116.
+ */
+export async function cargarPublicaciones(supabase: SupabaseClient, paisId: string): Promise<DatosPublicaciones | null> {
+  const [filasR, numerosR, reglas, decisiones] = await Promise.all([
+    traerTodasConError<Fila>((desde, hasta) =>
+      supabase
+        .from("dropi_publicaciones")
+        .select(
+          "id, nombre, dropi_id, estado, estado_publicacion, tipo_publicacion, privatizado_a, privatizado_email, precio_venta, costo_mercancia, fulfillment, coste_real, utilidad, margen, estado_venta, ubicacion, estado_reposicion, competencia, fecha_publicacion, ultima_revision, proxima_revision, ultimo_cambio_precio, foto_url, notas, responsable_id, relacionados, clickup_id, sku_maestro_id",
+        )
+        .eq("pais_id", paisId)
+        .order("nombre")
+        .range(desde, hasta),
+    ),
+    // El correlativo va aparte: sin la migración 0123 la columna no existe y la lista se carga igual, sin números.
+    traerTodasConError<{ id: string; numero: number }>((desde, hasta) => supabase.from("dropi_publicaciones").select("id, numero").eq("pais_id", paisId).order("id").range(desde, hasta)),
+    cargarReglas(supabase),
+    cargarDecisiones(supabase, paisId),
+  ]);
+  if (filasR.error) return null;
+  const numeroPorId = new Map(numerosR.error ? [] : (numerosR.data ?? []).map((n) => [n.id, Number(n.numero)]));
+
+  const datos = filasR.data ?? [];
+  const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios] = await Promise.all([
+    cargarSugerencias(
+      supabase,
+      paisId,
+      datos.map((d) => ({ id: d.id, nombre: d.nombre as string, dropiId: (d.dropi_id as string | null) ?? "", skuId: (d.sku_maestro_id as string | null) ?? null })),
+    ),
+    obtenerOpcionesSkuMaestro(supabase),
+    cargarResumenVentas(supabase, paisId),
+    cargarCompetidores(supabase, paisId),
+    cargarCambiosPrecio(supabase, paisId),
+  ]);
+  const r = reglas.reglas;
+  const decisionesDe = new Map<string, DecisionVista[]>();
+  for (const d of decisiones) decisionesDe.set(d.publicacionId, [...(decisionesDe.get(d.publicacionId) ?? []), d]);
+
+  const filas: FilaPublicacion[] = datos.map((d) => {
+    const estado = d.estado as string;
+    const proxima = (d.proxima_revision as string | null) ?? null;
+    return {
+      id: d.id,
+      numero: numeroPorId.get(d.id) ?? null,
+      nombre: d.nombre as string,
+      dropiId: (d.dropi_id as string | null) ?? "",
+      estado,
+      estadoPublicacion: (d.estado_publicacion as string | null) ?? null,
+      tipo: (d.tipo_publicacion as string | null) ?? null,
+      privatizadoA: (d.privatizado_a as string | null) ?? "",
+      privatizadoEmail: (d.privatizado_email as string | null) ?? "",
+      precioVenta: num(d.precio_venta),
+      costoMercancia: num(d.costo_mercancia),
+      fulfillment: num(d.fulfillment),
+      costeReal: num(d.coste_real),
+      utilidad: num(d.utilidad),
+      margen: num(d.margen),
+      nivelMargen: nivelMargen(num(d.margen), r),
+      estadoVenta: (d.estado_venta as string | null) ?? null,
+      ubicacion: (d.ubicacion as string | null) ?? null,
+      estadoReposicion: (d.estado_reposicion as string | null) ?? null,
+      competencia: (d.competencia as boolean | null) ?? null,
+      fechaPublicacion: (d.fecha_publicacion as string | null) ?? null,
+      ultimaRevision: (d.ultima_revision as string | null) ?? null,
+      proximaRevision: proxima,
+      ultimoCambioPrecio: (d.ultimo_cambio_precio as string | null) ?? null,
+      cambioPrecioDropi: ultimoCambioDe(idsDropi(d), precios.cambios),
+      lecturaDropiDesde: precios.desde,
+      revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
+      fotoUrl: (d.foto_url as string | null) ?? null,
+      notas: (d.notas as string | null) ?? "",
+      responsableId: (d.responsable_id as string | null) ?? null,
+      relacionados: ((d.relacionados as string[] | null) ?? []).map((x) => nombrePorId.get(x)).filter((x): x is string => !!x),
+      deClickup: !!d.clickup_id,
+      sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
+      sugerencia: sugerencias.get(d.id) ?? null,
+      recomendaciones: [],
+      decisiones: decisionesDe.get(d.id) ?? [],
+      ...automatico(d, ventas, competidores, hoy, r),
+    };
+  });
+
+  // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.
+  const publicados = new Set(filas.filter((f) => !f.archivada && f.sku).map((f) => f.sku!.id));
+  for (const f of filas) {
+    const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
+    const pack = detectarPack(f.nombre);
+    const recs = recomendar(
+      {
+        archivada: f.archivada,
+        esPack: pack.combo || pack.unidades !== null,
+        precio: f.precioVenta,
+        costo: f.costoMercancia,
+        fulfillment: f.fulfillment,
+        margen: f.margen,
+        netas30: f.ventas?.netas30 ?? null,
+        sku: f.sku ? { tipo: f.sku.tipo } : null,
+        combo: combo ? { codigo: combo.codigo, publicado: publicados.has(combo.id) } : null,
+        competidorMasBarato: f.competidorMasBarato,
+        competidorMinimo: f.competidorMinimo,
+      },
+      r,
+    );
+    f.recomendaciones = pendientes(recs, f.decisiones, hoy);
+  }
+
+  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, reglas, decisiones };
+}

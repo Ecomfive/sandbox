@@ -57,6 +57,20 @@ export function competidorMasBarato(
   return mejor;
 }
 
+/** El precio equivalente más bajo de la competencia con stock (aunque sea más caro que el nuestro), o null sin competencia. */
+export function competidorMinimo(
+  nuestro: { nombre: string; idsDropi: number[] },
+  competidores: Map<number, { nombre: string; proveedor: string; precio: number | null }[]>,
+): CompetidorBarato | null {
+  let mejor: CompetidorBarato | null = null;
+  for (const id of nuestro.idsDropi)
+    for (const c of competidores.get(id) ?? []) {
+      const eq = precioEquivalente(nuestro.nombre, c).precio;
+      if (eq !== null && eq > 0 && (!mejor || eq < mejor.precio)) mejor = { proveedor: c.proveedor, precio: eq };
+    }
+  return mejor;
+}
+
 export interface CambioPrecio {
   /** Cuándo se vio el cambio en Dropi (la lectura del catálogo que lo encontró, no el minuto exacto). */
   fecha: string;

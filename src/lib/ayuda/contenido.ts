@@ -52,7 +52,8 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "En camino", definicion: "En la ficha de un producto o de una publicación de Dropi: las unidades de sus compras que ya salieron y todavía no llegan, solo del país elegido arriba. En Compras › Reponer cuenta además las compras abiertas que aún no salen (de 01 - Cotizar a 05 - Arribo Mercancía).", modulos: ["producto", "compras", "publicaciones-dropi"] },
   { termino: "Unidades netas", definicion: "Lo que de verdad se vendió en Dropi: unidades pedidas menos canceladas, rechazadas y devueltas. Una orden que todavía va en camino cuenta como neta hasta que la devuelvan.", modulos: ["ventas-dropi", "publicaciones-dropi", "compras"] },
   { termino: "Días de inventario", definicion: "Para cuántos días alcanza el stock de un producto en Dropi: el stock dividido entre las unidades netas por día de los últimos 30 días. Con menos de 15 días, toca reponer.", modulos: ["ventas-dropi", "publicaciones-dropi", "compras"] },
-  { termino: "Margen bruto", definicion: "En Gestión de IDs Dropi: la utilidad bruta (precio de venta − costo de producto − fulfillment) dividida entre el precio. Por debajo de 30 % se marca con un punto rojo.", modulos: ["publicaciones-dropi"] },
+  { termino: "Margen bruto", definicion: "En Gestión de IDs Dropi: la utilidad bruta (precio de venta − costo de producto − fulfillment) dividida entre el precio. Por debajo del margen mínimo de la pestaña Reglas (30 % de siempre) se marca con un punto rojo.", modulos: ["publicaciones-dropi"] },
+  { termino: "Recomendación", definicion: "En Gestión de IDs Dropi: algo concreto que el sistema sugiere hacer con una publicación (crear un combo x2, subir o bajar el precio), con su porqué y el resultado esperado. Se acepta, se rechaza o se pospone, explicando por qué; esas decisiones quedan guardadas para que el sistema aprenda.", modulos: ["publicaciones-dropi"] },
   { termino: "PUB-0001", definicion: "El número propio que el sistema le pone a cada publicación de Dropi. Es distinto al ID de Dropi y no cambia: sirve para buscarla y nombrarla.", modulos: ["publicaciones-dropi"] },
   { termino: "Portal del proveedor", definicion: "El portal donde Chin (proveedor y agente) ve sus compras sin entrar al sistema: cotiza, sube fotos y marca envíos. Desde Ecomfive se ve en Compras › Portal del proveedor.", modulos: ["portal-proveedor", "compras"] },
   { termino: "Código de barras interno", definicion: "Un EAN-13 que empieza por 20, generado por el sistema para los productos que no traen código del fabricante.", modulos: ["producto"] },
@@ -315,6 +316,22 @@ export const GUIAS: GuiaModulo[] = [
           "Cada publicación muestra sus ventas en Dropi de los últimos 30 días (las netas: pedidas menos canceladas, rechazadas y devueltas; salen de Desempeño › Ventas Dropi y, si tiene dos IDs, se suman): en la fila, «N ventas en 30 días», el stock y para cuántos días alcanza, con un punto rojo si se vende sin stock y naranja si se acaba en menos de 15 días; en la ficha, la sección «Ventas en Dropi» con las netas por mes, cancelaciones y devoluciones. Ya no hay «Estado de venta» manual: las ventas de 30 días lo reemplazan. Los filtros «Ventas 30 días», «Stock en Dropi» y «Días de inventario» encuentran lo que hay que reponer, y la tarjeta «Sin stock» de arriba cuenta lo que se vende y no tiene stock en Dropi.",
         ],
       },
+      {
+        titulo: "Recomendaciones",
+        pasos: [
+          "Además de marcar lo que necesita cada publicación, el sistema recomienda qué hacer, como una tarea: «Crear combo x2» (margen bajo, producto simple que vende y sin combo de 2 publicado: dos unidades en un pedido reparten el fulfillment y suben el margen), «Subir precio» (margen bajo y nadie lo vende más barato; sin pasar del precio más bajo de la competencia) y «Bajar precio frente a la competencia» (alguien lo vende más barato con stock y bajar no deja el margen en crítico). Cada una dice por qué, con los números, y qué resultado se espera.",
+          "Se ven en la tarjeta «Recomendaciones» del tablero (filtra la lista), arriba en la ficha de cada publicación y, todas juntas, en la pestaña «Recomendaciones», que se puede filtrar por tipo.",
+          "En cada una se pulsa Aceptar (la vas a hacer; no vuelve a salir en 30 días), Rechazar (no aplica; hay que escribir por qué y no vuelve a salir en 90 días) o Posponer (7, 14 o 30 días). Escribe siempre el porqué: cada decisión queda guardada con lo que decía la recomendación, quién y cuándo, y es lo que el sistema usará para aprender y, más adelante, hacer solo lo que siempre se acepta.",
+          "Aceptar no cambia nada por sí solo: el precio se cambia en Dropi y el combo se crea en Producto. La pestaña Recomendaciones muestra cuántas se aceptan, rechazan y posponen de cada tipo y las últimas decisiones; en la ficha están en «Decisiones anteriores» y en la actividad.",
+        ],
+      },
+      {
+        titulo: "Reglas",
+        pasos: [
+          "La pestaña «Reglas» tiene los números con que el sistema decide: margen mínimo (30 %), crítico (20 %) y saludable (40 %), la caída de ventas (50 %), las ventas mínimas para comparar (10), los días de producto nuevo (30) y, para el combo x2, las ventas mínimas en 30 días (5) y su descuento (10 %). Entre paréntesis, los valores de siempre.",
+          "Cámbialos y pulsa «Guardar reglas»: las tarjetas, los filtros de margen y las recomendaciones se calculan con los nuevos. Queda quién cambió cada uno y cuándo (también en la auditoría). «Valores de siempre» los devuelve a los del sistema. Solo los cambia quien puede modificar este módulo.",
+        ],
+      },
     ],
   },
   {
@@ -495,6 +512,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-21", titulo: "Recomendaciones y Reglas en Gestión de IDs Dropi", texto: "El sistema ahora recomienda qué hacer con cada publicación (crear un combo x2, subir el precio o bajarlo frente a la competencia), con el porqué y el resultado esperado. Se aceptan, rechazan o posponen explicando por qué, y cada decisión queda guardada. La nueva pestaña Reglas deja cambiar los umbrales (margen mínimo, crítico, caída de ventas, combo…) sin pedirlo a sistemas.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/recomendaciones" },
   { fecha: "2026-10-21", titulo: "Proveedor y agente con color", texto: "En Compras, Chin, Zion y Alibaba (proveedor) y Chin y Avery (agente de envío) se ven cada uno con su propio color, con los tonos del sistema.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-21", titulo: "Agente de envío, de una lista", texto: "En Compras, el Agente de envío ya no se escribe: se elige de la lista (Chin o Avery) en la celda, en la ficha y al crear la compra.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-10-21", titulo: "Proveedor de la compra, de una lista", texto: "En Compras, el Proveedor ya no se escribe: se elige de la lista (Chin, Zion o Alibaba) en la celda, en la ficha y al crear la compra.", modulo: "compras", href: "/compras/lista" },

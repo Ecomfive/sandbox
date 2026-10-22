@@ -28,6 +28,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   wms_seleccion_productos: "seleccion-productos",
   landings: "generador-landings",
   dropi_publicaciones: "publicaciones-dropi",
+  dropi_publicaciones_reglas: "publicaciones-dropi",
   instagram_capturas: "instagram",
   alertas_inventario_no_retornado: "alertas",
   productos: "productos",

@@ -1,6 +1,9 @@
 // Gestión de IDs Dropi sin estados manuales (pedido de Alcides, 21 oct 2026): «En Dropi» y el Tipo salen de lo que reporta Dropi
 // (la carga de Ventas Dropi), y en lugar del flujo de trabajo (Producto nuevo, Revisar precio, Verificar con dropshipper, Validar
-// bajar precio, Al día) el sistema calcula qué atención necesita cada publicación. Sin base ni React, con prueba.
+// bajar precio, Al día) el sistema calcula qué atención necesita cada publicación. Los umbrales salen de la pantalla de Reglas
+// (reglas.ts, migración 0127); las constantes de abajo son sus valores de siempre. Sin base ni React, con prueba.
+
+import { REGLAS_DEFECTO, type Reglas } from "./reglas";
 
 /** Cómo está en Dropi: activo o archivado según Dropi; no aparece (tiene ID pero Dropi no lo reporta: en espera de
  * aprobación si es nuevo, o eliminado); sin ID; o sin datos (el país no tiene ventas de Dropi cargadas). */
@@ -42,6 +45,14 @@ export const ACCIONES: { valor: Accion | "al_dia"; etiqueta: string; color: stri
   { valor: "al_dia", etiqueta: "Al día", color: "#30a46c", detalle: "Nada que revisar" },
 ];
 
+/** El detalle de cada tarjeta con los umbrales de las reglas («Margen bruto menor a 25 %»). */
+export function detalleAccion(valor: Accion | "al_dia", r: Reglas): string {
+  const pct = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString("es-PA")} %`;
+  if (valor === "margen_bajo") return `Margen bruto menor a ${pct(r.margen_minimo)}`;
+  if (valor === "ventas_caida") return `En 30 días vende menos del ${pct(r.caida_ventas)} de los 30 anteriores`;
+  return ACCIONES.find((a) => a.valor === valor)?.detalle ?? "";
+}
+
 export const DIAS_NUEVO = 30;
 /**
  * Margen bruto mínimo sano para un proveedor en Dropi: 30 %. Del margen bruto todavía salen las devoluciones y los rechazos (10 %
@@ -68,14 +79,15 @@ export function accionesPublicacion(
     competidorMasBarato: boolean;
   },
   hoy: string,
+  reglas: Reglas = REGLAS_DEFECTO,
 ): Accion[] {
   if (p.archivada) return [];
   const out: Accion[] = [];
   const desde = p.fechaPublicacion ?? p.primeraVenta;
-  const nuevo = !!desde && dias(desde, hoy) < DIAS_NUEVO;
+  const nuevo = !!desde && dias(desde, hoy) < reglas.dias_nuevo;
   // «Producto nuevo» ya no es una acción (no interesa como tarjeta), pero uno recién publicado todavía no se verifica.
-  const margenBajo = p.margen !== null && p.margen < MARGEN_MINIMO;
-  const cayo = p.netas30 !== null && p.netas30Antes !== null && p.netas30Antes >= MIN_VENTAS_ANTES && p.netas30 < p.netas30Antes * CAIDA;
+  const margenBajo = p.margen !== null && p.margen < reglas.margen_minimo;
+  const cayo = p.netas30 !== null && p.netas30Antes !== null && p.netas30Antes >= reglas.min_ventas_antes && p.netas30 < p.netas30Antes * reglas.caida_ventas;
   // Separadas (21 oct 2026): el margen bajo es un problema de precio o costo; la caída de ventas, de demanda o competencia.
   if (margenBajo) out.push("margen_bajo");
   if (cayo) out.push("ventas_caida");
