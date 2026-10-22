@@ -9,7 +9,7 @@ import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
-import { productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
+import { bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
@@ -183,6 +183,8 @@ export interface DatosPublicaciones {
   filas: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
   corteVentas: string | null;
+  /** Cuándo se leyó «Mis productos» de Dropi por última vez (bodegas, precio, tipo y estado); null si nunca. */
+  leidoProveedor: string | null;
   reglas: ReglasGuardadas;
   /** Todas las decisiones del país (la más nueva primero), para la pestaña Recomendaciones. */
   decisiones: DecisionVista[];
@@ -302,7 +304,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       sinEnvioCamino: camino?.sinEnvio ?? 0,
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
-      bodegasDropi: prov ? prov.bodegas.map((b) => ({ nombre: b.nombre, stock: b.stock })) : null,
+      bodegasDropi: prov ? bodegasEnOrden(prov.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) : null,
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
       leidoProveedor: proveedor?.leidoEn ?? null,
@@ -350,5 +352,5 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
-  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, reglas, decisiones, conTareas, personas };
+  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, reglas, decisiones, conTareas, personas };
 }

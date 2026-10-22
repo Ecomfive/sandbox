@@ -489,7 +489,10 @@ convenciones técnicas del código.
   `cargarProductosProveedor` (`proveedor-datos.ts`; sin la migración, null y todo sigue igual): `bodegasDropi`, `stockProveedor`,
   `stockPrivadoProveedor` y `leidoProveedor` en `FilaPublicacion`; «En Dropi» y el Tipo prefieren esta lectura a la carga de Ventas
   Dropi; la fila pone las unidades bajo «Dónde está», la ficha lista las bodegas en «Stock», y hay filtro «Bodega en Dropi» y
-  columna en el CSV.
+  columna en el CSV. **Código de bodega** (22 oct 2026, pedido de Hernán): `codigoBodega(id)` = «B» + el ID de la bodega en Dropi
+  (B280 = Bodega Dropi Panama, B81 = Proveedor Ecomfive); va junto al ID en la fila, en la ficha y en el filtro, con las bodegas
+  ordenadas por stock (`bodegasEnOrden`). Encima de la lista, «Última actualización desde Dropi» con fecha y hora
+  (`DatosPublicaciones.leidoProveedor`, escrita en el servidor con `fechaHoraLectura` para que no cambie al hidratar).
   **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
   justifique, con bitácora y deshacer.
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin

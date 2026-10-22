@@ -26,6 +26,7 @@ import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { InsigniaConectado } from "./insignia-conectado";
+import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 
 interface Formulario {
@@ -511,8 +512,10 @@ function ContenidoFicha({
                 {p.bodegasDropi.length ? (
                   <ul className="flex flex-col divide-y divide-border rounded-lg bg-muted px-4 text-sm">
                     {p.bodegasDropi.map((b) => (
-                      <li key={b.nombre} className="flex items-center justify-between gap-3 py-2">
-                        <span className="min-w-0 truncate">{b.nombre}</span>
+                      <li key={b.id} className="flex items-center justify-between gap-3 py-2">
+                        <span className="min-w-0 truncate">
+                          <span className="font-mono font-semibold">{codigoBodega(b.id)}</span> · {b.nombre}
+                        </span>
                         <span className="font-semibold tabular-nums">{b.stock.toLocaleString("es-PA")} u.</span>
                       </li>
                     ))}
@@ -523,7 +526,7 @@ function ContenidoFicha({
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {p.bodegasDropi.length > 1 && `Total ${(p.stockProveedor ?? 0).toLocaleString("es-PA")} u. · `}
                   {p.stockPrivadoProveedor ? `${p.stockPrivadoProveedor.toLocaleString("es-PA")} reservadas a privados · ` : ""}
-                  {p.leidoProveedor && `Leído de Dropi el ${fechaLarga(p.leidoProveedor)}`}
+                  {p.leidoProveedor && `Actualizado desde Dropi el ${fechaHoraLectura(p.leidoProveedor)}`}
                 </span>
               </div>
             )}
