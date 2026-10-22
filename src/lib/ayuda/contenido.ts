@@ -54,6 +54,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Utilidad (Ventas Dropi)", definicion: "Lo que de verdad le queda a ECOMFIVE de lo vendido en Dropi: la ganancia que paga Dropi por cada orden, menos la comisión B280 (1,50 por orden de esa bodega), el coste real de los productos entregados y los descuentos por garantía o indemnización. Sale del Excel de la oficina.", modulos: ["ventas-dropi"] },
   { termino: "Margen (Ventas Dropi)", definicion: "La utilidad dividida entre la ganancia: qué parte de lo que paga Dropi queda después de costos y cobros.", modulos: ["ventas-dropi"] },
   { termino: "Títulos con IA", definicion: "Títulos para Dropi que propone ChatGPT desde la ficha de una publicación, con las reglas de la optimización (40 caracteres, español, para qué sirve). Solo se sugieren: el título se cambia en Dropi.", modulos: ["publicaciones-dropi"] },
+  { termino: "Dropi al sistema", definicion: "La actualización diaria (7:00) que trae de Dropi Panamá los pedidos y sus estados, la cartera, los retiros y el stock, y cuadra los pedidos de ayer con el conector de Dropi.", modulos: ["pedidos-dropi", "retiros", "publicaciones-dropi", "crm-dropshippers"] },
   { termino: "Días de inventario", definicion: "Para cuántos días alcanza el stock de un producto en Dropi: el stock dividido entre las unidades netas por día de los últimos 30 días. Con menos de 15 días, toca reponer.", modulos: ["ventas-dropi", "publicaciones-dropi", "compras"] },
   { termino: "Margen bruto", definicion: "En Gestión de IDs Dropi: la utilidad bruta (precio de venta − costo de producto − fulfillment) dividida entre el precio. Por debajo del margen mínimo de la pestaña Reglas (30 % de siempre) se marca con un punto rojo.", modulos: ["publicaciones-dropi"] },
   { termino: "Recomendación", definicion: "En Gestión de IDs Dropi: algo concreto que el sistema sugiere hacer con una publicación (crear un combo x2, subir o bajar el precio), con su porqué y el resultado esperado. Se acepta, se rechaza o se pospone, explicando por qué; esas decisiones quedan guardadas para que el sistema aprenda.", modulos: ["publicaciones-dropi"] },
@@ -225,7 +226,10 @@ export const GUIAS: GuiaModulo[] = [
     titulo: "Pedidos Dropi",
     ruta: "/pedidos-dropi",
     resumen: "Los pedidos que llegan de Dropi con su estado, para seguir entregas y novedades.",
-    secciones: [{ titulo: "Uso", pasos: ["Elige el período y pulsa las tarjetas de estado para filtrar (se pueden combinar).", "«Descargar» baja lo que ves o el período completo."] }],
+    secciones: [
+      { titulo: "Uso", pasos: ["Elige el período y pulsa las tarjetas de estado para filtrar (se pueden combinar).", "«Descargar» baja lo que ves o el período completo."] },
+      { titulo: "Se actualiza solo cada mañana", pasos: ["Cada día a las 7:00 la tarea «Dropi al sistema» lee en Dropi Panamá, con la sesión de ECOMFIVE, los pedidos de los últimos 30 días (los nuevos y los cambios de estado), la cartera de los últimos 7 días, los retiros con el saldo de la billetera y el stock de nuestros productos por bodega.", "Lo guarda aquí, en el CRM de dropshippers, en Conciliación de Retiros y en Gestión de IDs Dropi. Después cuenta con el conector de Dropi los pedidos de ayer por estado y avisa si no coinciden con el sistema.", "Necesita la computadora de la oficina encendida con Claude abierto y la sesión de Dropi iniciada en su navegador integrado. Si la sesión expiró, el Centro de notificaciones lo avisa: hay que volver a iniciar sesión en Dropi."] },
+    ],
   },
   {
     modulo: "retiros",
@@ -575,6 +579,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-22", titulo: "Dropi al sistema cada mañana", texto: "Cada día a las 7:00 se actualizan solos desde Dropi Panamá los pedidos (30 días, con sus estados), la cartera, los retiros con el saldo y el stock por bodega, y se cuadran los pedidos de ayer con el conector de Dropi.", modulo: "pedidos-dropi", href: "/pedidos-dropi" },
   { fecha: "2026-10-22", titulo: "El Tablero de Chin pasa a Compras", texto: "Ya no está «Portal del proveedor» en el menú: su tablero (lo que ve Chin, en español), «Pagos a Chin» y la «Cuenta de Chin» están en Compras › Tablero de Chin, la pestaña que sigue a «Compras», que ahora va primero. La nota para Chin se escribe en la ficha de la compra; decidir una cotización o marcar una llegada se hace cambiando la etapa de la compra.", modulo: "compras", href: "/compras/tablero-chin" },
   { fecha: "2026-10-22", titulo: "Títulos con IA en Gestión de IDs Dropi", texto: "En la ficha de cada publicación, el bloque «Optimización en Dropi» trae el botón «Sugerir títulos con IA»: ChatGPT propone títulos de 40 caracteres o menos, en español y con para qué sirve, cada uno con su revisión y un botón para copiarlo y pegarlo en Dropi.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-22", titulo: "Comentarios en Gestión de IDs Dropi", texto: "La Actividad de cada publicación ahora es como la de Compras: comentarios con archivos, @menciones, respuestas y reacciones, junto con los cambios y las decisiones de las recomendaciones.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },

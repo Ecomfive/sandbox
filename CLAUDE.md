@@ -478,6 +478,18 @@ convenciones técnicas del código.
   con las reglas de `revisarPublicacion` y lee la respuesta: descarta las de más de `max_titulo` o menos de 3 palabras y revisa cada una
   (`revisarTitulo`). La llamada (`titulos-ia-api.ts`, solo servidor) va a Chat Completions de OpenAI con `OPENAI_API_KEY` (o
   `CHATGPT_API_KEY`) y `OPENAI_MODEL` (por defecto `gpt-4.1-mini`), sin `temperature`. No guarda nada: «Copiar» para pegarlo en Dropi.
+  **Dropi al sistema cada mañana** (22 oct 2026, pedido de Hernán; tarea programada de Claude «dropi-diario», 7:00): en la pestaña
+  de `app.dropi.pa` del navegador integrado con la sesión de ECOMFIVE, `scripts/dropi-diario-navegador.js` lee con el token de la
+  página (`X-Authorization: Bearer <JSON.parse(DROPI_token)>`; el token está guardado entre comillas) pedidos de proveedor de 30
+  días (`api/orders/myorders/v2`, `orderDirection=asc`, `supplier_id`, de 100 en 100, sin captcha), cartera de 7 días
+  (`api/historywallet`, UTC → hora de Panamá con las columnas del Excel), retiros (`api/withdrawal?user_id=`, todo de una vez) y el
+  stock (owner de api-v2, como `leerNuestrosProductos`). Recorta lo que no usan los cargadores (cliente del pedido; del retiro solo
+  saldo y banco: la cuenta trae documento y claves) y sube cuatro JSON a `wms-compras/tmp-dropi-diario/`. `scripts/dropi-diario.ts`
+  `subida | cargar | cuadre <día> | sesion-vencida`: `cargar` los pasa por `dropi-ingerir-ordenes.ts`, `dropi-ingerir-cartera.ts`,
+  `dropi-ingerir-retiros.ts` y `guardarNuestrosProductos`, corre `dropi_staging_ordenes_limpiar()` (migración 0133: deja en
+  `staging_ordenes_dropi` solo la copia más reciente de cada pedido) y marca `dropi_sesiones` PA/proveedor. La tarea cuadra después los
+  pedidos de ayer por estado contra el MCP de Dropi (`list_orders`). Corre desde la copia `C:/Users/herna/ecomfive-tareas` (main al
+  día, con su `.env.local` enlazado), no desde `app/`, que otras sesiones cambian de rama.
   **Bodegas y «Dropi manda»** (22 oct 2026, pedido de Hernán, migración 0131): la cuenta de ECOMFIVE en `app.dropi.pa` es de
   **proveedor** (`type_user: SUPPLIER`, usuario 2094) y su pantalla «Mis productos» lee api-v2 `bff/catalog/products/produit/<usuario>/owner`
   (POST, `pageSize` 100, `page` desde 1, `get_stock: true`; `archive: true` = pestaña Archivados): trae por producto `warehouses`
