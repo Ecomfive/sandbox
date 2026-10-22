@@ -35,7 +35,7 @@ import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/
 import { notaOptimizacion, revisarPublicacion, type Revision } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
-import { encolarCambioNombre } from "@/lib/publicaciones/cambios-dropi";
+import { enviarNombreADropi as enviarADropi } from "@/lib/publicaciones/cambios-dropi";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
@@ -363,29 +363,10 @@ export async function elegirTituloIA(
     antes: { "Nombre en Dropi": pub.nombre },
     despues: { "Nombre en Dropi": limpio },
   });
-  const dropi = await enviarNombreADropi(supabase, pub, limpio, usuario);
+  const dropi = await enviarADropi(supabase, pub, limpio, { id: usuario.id, nombre: usuario.nombre || usuario.email });
   revalidatePath("/publicaciones-dropi");
   const c = chequearTitulo(limpio, categoria, contexto.reglas);
   return { chequeos: c.chequeos, cumple: c.cumple, dropi };
-}
-
-/**
- * El título elegido, también para Dropi (pedido de Hernán, 22 oct 2026): «Nombre del producto» = el título y «Nombre del producto
- * en la guía de envío» = el código del SKU vinculado (lo que ve despacho, que no cambia). Queda pendiente y lo aplica el favorito
- * «Aplicar en Dropi» desde la pestaña de Dropi: Dropi rechaza las llamadas del servidor (src/lib/publicaciones/cambios-dropi.ts).
- */
-async function enviarNombreADropi(
-  supabase: ReturnType<typeof createServiceClient>,
-  pub: Pub,
-  nombre: string,
-  usuario: UsuarioActual,
-): Promise<{ estado: "pendiente" | "error"; detalle: string }> {
-  const { data: sku } = pub.sku_maestro_id ? await supabase.from("skus_maestros").select("codigo").eq("id", pub.sku_maestro_id).maybeSingle() : { data: null };
-  const codigo = (sku?.codigo as string | undefined)?.trim() || null;
-  const nombreGuia = codigo && codigo.length <= MAX_NOMBRE_DROPI ? codigo : null;
-  const encolado = await encolarCambioNombre(supabase, pub, { nombre, nombreGuia }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
-  if ("error" in encolado) return { estado: "error", detalle: encolado.error };
-  return { estado: "pendiente", detalle: `Para Dropi${nombreGuia ? ` (guía: ${nombreGuia})` : ""}: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }
 
 /** «Me sirvió» o «no me sirvió» (con el porqué): queda en lo generado y sirve de ejemplo para la IA. */

@@ -4,6 +4,7 @@
 // resultado (aplicar-actions.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
 import { idsDeDropi } from "./sincronizar-dropi";
 
 export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazado";
@@ -39,6 +40,25 @@ export async function encolarCambioNombre(
     .single();
   if (error || !data) return { error: /does not exist|schema cache/i.test(error?.message ?? "") ? "Falta correr en Supabase la migración 0137." : "No se pudo dejar el cambio para Dropi." };
   return { id: data.id as string };
+}
+
+/**
+ * Un nombre nuevo, también para Dropi (pedido de Hernán, 22 oct 2026): «Nombre del producto» = el nombre y «Nombre del producto en
+ * la guía de envío» = el código del SKU vinculado (lo que ve despacho). Queda pendiente y lo aplica el favorito «Aplicar en Dropi».
+ * Lo usan «Usar este título» del Asistente de IA y la edición del nombre en la ficha.
+ */
+export async function enviarNombreADropi(
+  supabase: SupabaseClient,
+  pub: { id: string; pais_id: string; dropi_id: string | null; sku_maestro_id: string | null },
+  nombre: string,
+  por: { id: string; nombre: string },
+): Promise<{ estado: "pendiente" | "error"; detalle: string }> {
+  const { data: sku } = pub.sku_maestro_id ? await supabase.from("skus_maestros").select("codigo").eq("id", pub.sku_maestro_id).maybeSingle() : { data: null };
+  const codigo = (sku?.codigo as string | undefined)?.trim() || null;
+  const nombreGuia = codigo && codigo.length <= MAX_NOMBRE_DROPI ? codigo : null;
+  const encolado = await encolarCambioNombre(supabase, pub, { nombre, nombreGuia }, por);
+  if ("error" in encolado) return { estado: "error", detalle: encolado.error };
+  return { estado: "pendiente", detalle: `Para Dropi${nombreGuia ? ` (guía: ${nombreGuia})` : ""}: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }
 
 /** El último cambio en Dropi de cada publicación del país y cuántos siguen pendientes. Sin la migración 0137, vacío. */
