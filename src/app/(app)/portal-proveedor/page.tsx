@@ -5,7 +5,10 @@ import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { cargarEspejo, clavePlazo } from "@/lib/proveedor/datos";
-import { diasEntre } from "@/lib/proveedor/fechas";
+import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
+import { diasEntre, hoyPanama } from "@/lib/proveedor/fechas";
+import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
+import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
 import { resumenTransito } from "@/lib/proveedor/transito";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CuentaPortal } from "./cuenta-proveedor";
@@ -16,7 +19,7 @@ export const metadata = { title: "Portal del proveedor" };
 export const dynamic = "force-dynamic";
 
 /** Las pestañas que se pueden pedir en la dirección (`?tab=`). */
-const TABS = ["novedades", "decidir", "cotizacion", "transito", "cuenta"] as const;
+const TABS = ["novedades", "decidir", "cotizacion", "transito", "pagos", "cuenta"] as const;
 /** Desde cuándo se cuenta el tránsito real de cada país. */
 const TRANSITO_DESDE = "2026-01-01";
 
@@ -43,7 +46,11 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     );
   }
 
-  const pedidos = espejo.pedidos.filter((p) => puedeVerPais(usuario.paisesPermitidos, p.paisCodigo));
+  // Las fotos como en Compras: la comercial de referencia y la real de la compra si Chin no subió la suya.
+  const { pedidos, realDeCompra } = await conFotosDeCompras(
+    supabase,
+    espejo.pedidos.filter((p) => puedeVerPais(usuario.paisesPermitidos, p.paisCodigo)),
+  );
   const activos = pedidos.filter((p) => p.etapa === "por_cotizar" || p.etapa === "cotizado" || p.etapa === "produccion" || p.etapa === "enviado");
 
   // Tránsito real de cada país y vía con lo que ya llegó este año.
@@ -66,9 +73,10 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     .filter((r) => puedeVerPais(usuario.paisesPermitidos, r.pais))
     .sort((a, b) => (b.real?.envios ?? 0) - (a.real?.envios ?? 0));
 
-  // Fotos reales que subió el proveedor (bucket privado, enlaces de una hora).
+  // Fotos reales: la que subió el proveedor (bucket privado, enlaces de una hora) o, si no, la «Foto real del producto» de la compra.
   const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
   const fotosReales: Record<string, string> = {};
+  for (const p of activos) if (realDeCompra[p.id]) fotosReales[p.id] = realDeCompra[p.id];
   if (rutas.length) {
     const { data: firmadas } = await supabase.storage.from("proveedor-portal").createSignedUrls(rutas, 3600);
     const porRuta = new Map((firmadas ?? []).map((f) => [f.path, f.signedUrl]));
@@ -91,6 +99,18 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
     leida: !!n.leida_en,
     creadoEn: n.creado_en as string,
   }));
+
+  // Pagos (fase 4): lo que falta pagar de los países que la persona ve, los avisos y los plazos de los últimos envíos.
+  const estado = await estadoPagos(supabase, { ...espejo, pedidos });
+  const pagos =
+    "error" in estado
+      ? null
+      : {
+          resumen: estado.resumen,
+          porPagar: estado.porPagar,
+          avisos: await avisosParaVista(supabase, estado.avisos.filter((a) => a.cuotas.every((c) => pedidos.some((p) => p.id === c.pedidoId)))),
+          plazos: filasPlazos(estado.envios.filter((e) => !e.pedidoId || pedidos.some((p) => p.id === e.pedidoId)), hoyPanama()),
+        };
 
   // La cuenta del proveedor solo la ve (y la administra) un administrador.
   const admin = esAdministrador(usuario);
@@ -118,6 +138,7 @@ export default async function PortalProveedorPage({ searchParams }: { searchPara
         puedeEscribir={!usuario.modulosSoloLectura.includes("portal-proveedor")}
         tabInicial={tabInicial === "cuenta" && !admin ? null : tabInicial}
         cuentaPortal={admin ? { cuenta, entrada } : null}
+        pagos={pagos}
       />
     </Pagina>
   );
