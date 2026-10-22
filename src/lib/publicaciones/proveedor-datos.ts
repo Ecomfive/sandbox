@@ -3,6 +3,28 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import type { BodegaDropi, ProductoProveedor } from "./sincronizar-dropi";
 
 /**
+ * Solo el stock de cada producto en la última lectura de «Mis productos» (y cuándo se leyó), para que Ventas Dropi, Compras ›
+ * Reponer y Gestión de IDs no usen el de la carga de ventas, que puede tener días. `null` sin la migración 0131 o sin lectura.
+ */
+export async function cargarStockProveedor(supabase: SupabaseClient, paisId: string): Promise<{ leidoEn: string; stock: Map<number, number> } | null> {
+  try {
+    const filas = await traerTodasLasFilas<{ dropi_producto_id: number; stock: number; leido_en: string }>((d, h) =>
+      supabase.from("dropi_productos_proveedor").select("dropi_producto_id, stock, leido_en").eq("pais_id", paisId).order("dropi_producto_id").range(d, h),
+    );
+    if (!filas.length) return null;
+    return {
+      leidoEn: filas.reduce((a, f) => (f.leido_en > a ? f.leido_en : a), ""),
+      stock: new Map(filas.map((f) => [Number(f.dropi_producto_id), Number(f.stock ?? 0)])),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** El stock de un producto de Dropi: el de la última lectura de «Mis productos» si lo trae; si no, el de la carga de ventas. */
+export const stockVigente = (id: number, deLaCarga: number, actual: Map<number, number> | null | undefined) => actual?.get(id) ?? deLaCarga;
+
+/**
  * Nuestros productos tal como los ve ECOMFIVE en Dropi como proveedor (la última lectura de «Mis productos», migración 0131),
  * por su ID de Dropi, con la bodega y el stock de cada uno, y cuándo se leyó. `null` si falta la migración o nunca se leyó.
  */

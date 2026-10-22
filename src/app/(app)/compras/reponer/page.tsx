@@ -5,6 +5,7 @@ import { requireModulo } from "@/lib/auth";
 import { unidadesEnCamino } from "@/lib/compras/reponer";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -62,6 +63,7 @@ export default async function ReponerComprasPage() {
       <ReponerCompras
         pais={pais}
         corte={ventas.corte}
+        stockLeido={ventas.stockLeidoEn ? fechaHoraLectura(ventas.stockLeidoEn) : null}
         resumen={[...ventas.resumen.values()]}
         skuDe={skuDe}
         enCamino={[...enCamino.entries()]}

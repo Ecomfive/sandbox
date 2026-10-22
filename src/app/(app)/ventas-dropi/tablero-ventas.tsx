@@ -266,7 +266,7 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
  * El tablero de Ventas Dropi: las cifras de arriba, la tendencia por mes y por día, lo que hay que reponer, lo que crece y cae,
  * el stock quieto, todos los productos (con búsqueda, categoría y su detalle por mes), los SKU del sistema y los dropshippers.
  */
-export function TableroVentas({ corte, movimientos, productos, meses, dias, dropshippers, dinero }: { corte: string; movimientos: number; productos: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
+export function TableroVentas({ corte, stockLeido = null, movimientos, productos, meses, dias, dropshippers, dinero }: { corte: string; /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */ stockLeido?: string | null; movimientos: number; productos: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
   const [categoria, setCategoria] = useState<Categoria | "todas">("todas");
   const [busqueda, setBusqueda] = useState("");
   const [buscaDs, setBuscaDs] = useState("");
@@ -355,6 +355,7 @@ export function TableroVentas({ corte, movimientos, productos, meses, dias, drop
         </p>
         <p className="text-xs text-muted-foreground">
           Del Historial de Existencia de Dropi hasta el {fecha(corte)} · {entero(productos.length)} productos y {entero(movimientos)} movimientos. Netas = pedidas − canceladas − rechazadas − devueltas.
+          {stockLeido && ` El stock es el de la última actualización desde Dropi (${stockLeido}).`}
           {dinero && ` La plata sale del Excel de la oficina (${dinero.fuente}), ${entero(dinero.ordenes)} órdenes hasta el ${fecha(dinero.hasta)}: utilidad = ganancia − comisión B280 − coste real − descuentos por garantía.`}
         </p>
       </header>
