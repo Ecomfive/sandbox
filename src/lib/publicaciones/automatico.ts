@@ -35,13 +35,14 @@ export function estaArchivada(estado: EnDropi, manualArchivada: boolean): boolea
 }
 
 /** Lo que necesita cada publicación (puede ser más de una). Sin ninguna, está al día. */
-export type Accion = "margen_bajo" | "ventas_caida" | "bajar_precio" | "verificar_dropshipper";
+export type Accion = "margen_bajo" | "ventas_caida" | "bajar_precio" | "verificar_dropshipper" | "republicar";
 
 export const ACCIONES: { valor: Accion | "al_dia"; etiqueta: string; color: string; detalle: string }[] = [
   { valor: "margen_bajo", etiqueta: "Margen bajo", color: "#e5484d", detalle: "Margen bruto menor a 30 %" },
   { valor: "ventas_caida", etiqueta: "Ventas en caída", color: "#d9a200", detalle: "Este mes vende menos de la mitad que el anterior" },
   { valor: "bajar_precio", etiqueta: "Competidor más barato", color: "#f76808", detalle: "Alguien vende lo mismo más barato y tiene stock" },
   { valor: "verificar_dropshipper", etiqueta: "Verificar con dropshipper", color: "#e5484d", detalle: "Privatizado a un dropshipper y sin ventas en 30 días" },
+  { valor: "republicar", etiqueta: "Republicar", color: "#0090ff", detalle: "30 días sin ninguna venta y es de nuestra bodega" },
   { valor: "al_dia", etiqueta: "Al día", color: "#30a46c", detalle: "Nada que revisar" },
 ];
 
@@ -49,6 +50,7 @@ export const ACCIONES: { valor: Accion | "al_dia"; etiqueta: string; color: stri
 export function detalleAccion(valor: Accion | "al_dia", r: Reglas): string {
   const pct = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString("es-PA")} %`;
   if (valor === "margen_bajo") return `Margen bruto menor a ${pct(r.margen_minimo)}`;
+  if (valor === "republicar") return `${r.dias_republicar} días sin ninguna venta y es de nuestra bodega (no la B280)`;
   if (valor === "ventas_caida") return `En 30 días vende menos del ${pct(r.caida_ventas)} de los 30 anteriores`;
   return ACCIONES.find((a) => a.valor === valor)?.detalle ?? "";
 }
@@ -94,4 +96,26 @@ export function accionesPublicacion(
   if (p.competidorMasBarato) out.push("bajar_precio");
   if (!nuevo && p.privatizadaA && p.netas30 !== null && p.netas30 <= 0) out.push("verificar_dropshipper");
   return out;
+}
+
+/** La bodega de Dropi (B280, «Bodega Dropi Panama»): lo que está ahí no se puede republicar, porque la publicación es de Dropi. */
+export const BODEGA_DROPI = 280;
+
+/**
+ * Republicar (pedido de Alcides, 22 oct 2026): una publicación activa en Dropi que lleva `dias_republicar` (30) sin ninguna venta
+ * se manda a republicar, solo si es de nuestra bodega (no de la B280 de Dropi) y ya lleva publicada al menos esos días. Sin
+ * bodega conocida o sin datos de ventas de Dropi, no se sabe: no sale.
+ */
+export function necesitaRepublicar(
+  p: { archivada: boolean; enDropi: EnDropi; bodegaId: number | null; hayVentas: boolean; ultimaVenta: string | null; publicadaDesde: string | null },
+  hoy: string,
+  reglas: Pick<Reglas, "dias_republicar"> = REGLAS_DEFECTO,
+): boolean {
+  if (p.archivada || p.enDropi !== "activo" || !p.hayVentas || p.bodegaId === null || p.bodegaId === BODEGA_DROPI) return false;
+  const n = reglas.dias_republicar;
+  // Vendió hace menos de N días: no.
+  if (p.ultimaVenta && dias(p.ultimaVenta, hoy) < n) return false;
+  // Nunca vendió: solo si ya lleva N días publicada (si no se sabe desde cuándo, no).
+  if (!p.ultimaVenta && (!p.publicadaDesde || dias(p.publicadaDesde, hoy) < n)) return false;
+  return true;
 }
