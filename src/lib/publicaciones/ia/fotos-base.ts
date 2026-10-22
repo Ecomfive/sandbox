@@ -122,9 +122,9 @@ export function familiaDeProducto(titulo: string, categoria: string | null): Fam
  * miniatura; las últimas solo se piden si todavía falta para llegar al mínimo de la galería. «Comparación» y «Estilo cliente» son de relleno.
  */
 export const JUEGO_BASE: Record<FamiliaProducto, TipoFoto[]> = {
-  suplemento: ["principal", "ingredientes", "beneficios", "uso", "como_usar", "contenido", "detalle", "escala", "estilo_cliente", "comparacion"],
-  belleza: ["principal", "detalle", "uso", "beneficios", "ingredientes", "escala", "contenido", "como_usar", "estilo_cliente", "comparacion"],
-  general: ["principal", "uso", "beneficios", "escala", "detalle", "contenido", "como_usar", "comparacion", "estilo_cliente", "ingredientes"],
+  suplemento: ["principal", "ingredientes", "beneficios", "como_usar", "uso", "contenido", "detalle", "escala", "estilo_cliente", "comparacion"],
+  belleza: ["principal", "como_usar", "beneficios", "ingredientes", "uso", "detalle", "escala", "contenido", "estilo_cliente", "comparacion"],
+  general: ["principal", "uso", "beneficios", "como_usar", "escala", "detalle", "contenido", "comparacion", "estilo_cliente", "ingredientes"],
 };
 
 export const ETIQUETA_FAMILIA: Record<FamiliaProducto, string> = { suplemento: "suplemento o producto de salud", belleza: "cuidado personal o belleza", general: "producto general (hogar, gadget, accesorio)" };
@@ -141,7 +141,7 @@ export const NO_SE_GENERA = [
 export function textoJuegoBase(familia: FamiliaProducto): string {
   const orden = JUEGO_BASE[familia];
   return [
-    `Juego de fotos que necesita el comprador de un ${ETIQUETA_FAMILIA[familia]}, de la más a la menos importante: ${orden.map((t) => `${t} (${etiquetaTipoFoto(t)})`).join(" › ")}. Elige las que faltan siguiendo ese orden; salta una solo si la foto del producto muestra que no aplica (por ejemplo, ingredientes de un producto sin ingredientes).`,
+    `Juego de fotos que necesita el comprador de un ${ETIQUETA_FAMILIA[familia]}, de la más a la menos importante: ${orden.map((t) => `${t} (${etiquetaTipoFoto(t)})`).join(" › ")}. Elige las que faltan siguiendo ese orden; salta una solo si la foto del producto muestra que no aplica (por ejemplo, ingredientes de un producto sin ingredientes). Si el producto se aplica o se toma, «como_usar» (con los pasos escritos) va antes que «uso» (una escena sin texto).`,
     `Qué resuelve cada tipo:\n${TIPOS_FOTO.map((t) => `- ${t.valor}: ${FICHA_FOTO[t.valor].para}`).join("\n")}`,
     `Esto no se genera con IA (si hace falta, dilo en «analisis» para que el equipo use la foto real):\n- ${NO_SE_GENERA.join("\n- ")}`,
   ].join("\n\n");

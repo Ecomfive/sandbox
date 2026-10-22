@@ -35,7 +35,7 @@ export function normalizarTextos(tipo: string, crudo: unknown): string[] {
 }
 
 /** Promesas médicas: lo que no se puede escribir en una imagen de un suplemento o producto de salud (curar, tratar, garantizar). */
-const RIESGO = /\b(?:cura|curar|curativ[oa]s?|sana(?:r)? (?:la |el )?(?:diabetes|cancer|cáncer)|elimina(?:r)? (?:la |el )?(?:diabetes|cancer|cáncer|enfermedad)|milagr\w*|garantiz\w*|garantizad\w*|sin efectos secundarios|adelgaz\w*|previene(?:r)? (?:la |el )?(?:diabetes|cancer|cáncer)|trata(?:r)? (?:la |el )?(?:diabetes|cancer|cáncer|artritis|hipertensi[oó]n))\b|100 ?%/i;
+const RIESGO = /\b(?:cura|curar|curativ[oa]s?|sana(?:r)? (?:la |el )?(?:diabetes|cancer|cáncer)|elimina(?:r)? (?:la |el )?(?:diabetes|cancer|cáncer|enfermedad)|milagr\w*|garantiz\w*|garantizad\w*|sin efectos secundarios|adelgaz\w*|previen\w*|prevenci\w*|(?:alivia|aliviar|calma|elimina|quita)\w* (?:el |los |la |las )?dolor(?:es)?|trata(?:r)? (?:la |el )?(?:diabetes|cancer|cáncer|artritis|hipertensi[oó]n))\b|100 ?%/i;
 
 /** La primera línea que promete curar, tratar o garantizar algo; undefined si ninguna. */
 export const lineaRiesgosa = (textos: string[]): string | undefined => textos.find((t) => RIESGO.test(t));
@@ -51,7 +51,7 @@ export function textoDeFoto(tipo: string, textos: string[]): string {
   const lista = textos.map((x, i) => (t === "como_usar" ? `${i + 1}. «${x}»` : `- «${x}»`)).join("\n");
   return [
     `Texto de la imagen (escríbelo exactamente así, en español, con sus tildes, letra por letra: sin cambiar, quitar ni agregar palabras):\nTítulo: «${LIMITES_TEXTO[t].titulo}»\n${lista}`,
-    "Tipografía sans-serif sencilla y muy legible, en un tamaño grande, con buen contraste sobre el fondo y bien alineada. No escribas ningún otro texto.",
+    "Tipografía de diseño editorial moderno, no genérica: el título en una sans-serif geométrica en negrita (estilo Montserrat o Poppins) y los textos de apoyo en una sans-serif humanista de peso medio (estilo Nunito u Open Sans), con jerarquía clara (título grande, texto de apoyo más pequeño), buen contraste, bien alineada y con un color de acento tomado del empaque. Si el estilo del equipo define la tipografía, úsala. No escribas ningún otro texto.",
     `Distribución: ${DISTRIBUCION_TEXTO[t]}`,
   ].join("\n");
 }

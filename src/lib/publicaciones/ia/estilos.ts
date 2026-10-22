@@ -49,11 +49,12 @@ export function pedidoEstiloImagen(etiquetaTipo: string | null, cantidad: number
       "Reglas:",
       "- Describe lo que se repite en las imágenes (si hay varias): composición y encuadre, fondo y colores (nombra los tonos), iluminación, elementos gráficos (íconos, formas, flechas, marcos) y cómo se reparte el espacio.",
       "- Si las imágenes llevan texto, NO lo transcribas ni lo copies: describe solo dónde va y cómo se organiza (por ejemplo «columna de 4 beneficios con ícono a la izquierda»).",
+      "- Describe la tipografía sin nombrar la fuente exacta: estilo (geométrica, redondeada, con serifa, manuscrita), grosor, tamaños relativos entre título y texto, mayúsculas o minúsculas y color del texto.",
       "- No describas el producto concreto, ni marcas, logos, personas reconocibles ni precios.",
       "- Sé concreto y breve: cada campo, una o dos frases.",
       "- Dime también qué evitar para no salirse de ese estilo.",
     ].join("\n"),
-    'Responde SOLO con un JSON, sin texto antes ni después: {"estilo":"…","composicion":"…","colores":"…","luz":"…","elementos":"…","distribucion_texto":"…","evitar":"…"}. Si algún campo no aplica, déjalo vacío.',
+    'Responde SOLO con un JSON, sin texto antes ni después: {"estilo":"…","composicion":"…","colores":"…","luz":"…","elementos":"…","distribucion_texto":"…","tipografia":"…","evitar":"…"}. Si algún campo no aplica, déjalo vacío.',
   ].join("\n\n");
   const texto = `${cantidad === 1 ? "Imagen modelo adjunta" : `${cantidad} imágenes modelo adjuntas`}${etiquetaTipo ? `, para fotos de tipo «${etiquetaTipo}»` : ", para cualquier tipo de foto"}. Escribe la guía de estilo.`;
   return { instrucciones, texto };
@@ -66,6 +67,7 @@ const CAMPOS_GUIA: [clave: string, etiqueta: string, max: number][] = [
   ["luz", "Luz", 200],
   ["elementos", "Elementos gráficos", 300],
   ["distribucion_texto", "Reparto del espacio para texto", 300],
+  ["tipografia", "Tipografía", 250],
   ["evitar", "Evitar", 300],
 ];
 

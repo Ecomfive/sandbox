@@ -22,8 +22,8 @@ test("una foto que no es informativa nunca lleva texto", () => {
 });
 
 test("se detecta lo que promete curar, tratar o garantizar y se deja lo que dice apoyo o bienestar", () => {
-  for (const malo of ["Cura la diabetes", "Elimina el cáncer", "Resultados garantizados", "100% efectivo", "Adelgaza rápido", "Efecto milagro", "Sin efectos secundarios", "Trata la artritis"]) assert.ok(lineaRiesgosa([malo]), malo);
-  for (const bueno of ["Hidrata en profundidad", "Apoya el bienestar", "Tratamiento capilar diario", "Ayuda a unificar el tono", "Aplica 2 veces al día"]) assert.equal(lineaRiesgosa([bueno]), undefined, bueno);
+  for (const malo of ["Cura la diabetes", "Elimina el cáncer", "Resultados garantizados", "100% efectivo", "Adelgaza rápido", "Efecto milagro", "Sin efectos secundarios", "Trata la artritis", "Previene rigidez", "Previene lesiones", "Alivia el dolor", "Elimina el dolor de rodillas"]) assert.ok(lineaRiesgosa([malo]), malo);
+  for (const bueno of ["Hidrata en profundidad", "Apoya el bienestar", "Tratamiento capilar diario", "Ayuda a unificar el tono", "Aplica 2 veces al día", "Apoyo en bienestar articular", "Favorece la movilidad", "Contribuye al bienestar de tus articulaciones"]) assert.equal(lineaRiesgosa([bueno]), undefined, bueno);
   assert.equal(lineaRiesgosa(["Hidrata", "Cura el acné", "Suaviza"]), "Cura el acné");
 });
 
@@ -33,6 +33,9 @@ test("a Gemini se le da el texto exacto entre comillas, el título del tipo y c�
   assert.match(pasos, /1\. «Limpia tu rostro»\n2\. «Aplica una capa fina»\n3\. «Masajea suavemente»/);
   assert.match(pasos, /escríbelo exactamente así, en español, con sus tildes/);
   assert.match(pasos, /No escribas ningún otro texto/);
+  assert.match(pasos, /no genérica/);
+  assert.match(pasos, /Montserrat/);
+  assert.match(pasos, /Si el estilo del equipo define la tipografía, úsala/);
   assert.match(pasos, /Los pasos numerados/);
   const beneficios = textoDeFoto("beneficios", ["Hidrata", "Aclara"]);
   assert.match(beneficios, /Título: «Beneficios»\n- «Hidrata»\n- «Aclara»/);
