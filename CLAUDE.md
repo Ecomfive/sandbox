@@ -473,6 +473,11 @@ convenciones técnicas del código.
   largo de la descripción los guarda la lectura del catálogo desde la migración 0129 (`fotos`, `videos`, `descripcion_largo`; el
   video cuenta cualquier campo de Dropi que diga «video» y queda null si no viene). Bloque «Optimización en Dropi» en la ficha,
   tarjeta «Por optimizar» y filtro «Optimización».
+  **Títulos con IA** (22 oct 2026, pedido de Hernán): botón «Sugerir títulos con IA» en el bloque de la ficha (solo con escritura del
+  módulo; `sugerirTitulosIA` en `publicaciones-dropi/actions.ts`). `src/lib/publicaciones/titulos-ia.ts` (con prueba) arma el prompt
+  con las reglas de `revisarPublicacion` y lee la respuesta: descarta las de más de `max_titulo` o menos de 3 palabras y revisa cada una
+  (`revisarTitulo`). La llamada (`titulos-ia-api.ts`, solo servidor) va a Chat Completions de OpenAI con `OPENAI_API_KEY` (o
+  `CHATGPT_API_KEY`) y `OPENAI_MODEL` (por defecto `gpt-4.1-mini`), sin `temperature`. No guarda nada: «Copiar» para pegarlo en Dropi.
   **Bodegas y «Dropi manda»** (22 oct 2026, pedido de Hernán, migración 0131): la cuenta de ECOMFIVE en `app.dropi.pa` es de
   **proveedor** (`type_user: SUPPLIER`, usuario 2094) y su pantalla «Mis productos» lee api-v2 `bff/catalog/products/produit/<usuario>/owner`
   (POST, `pageSize` 100, `page` desde 1, `get_stock: true`; `archive: true` = pestaña Archivados): trae por producto `warehouses`
