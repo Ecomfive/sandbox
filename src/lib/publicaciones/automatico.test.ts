@@ -26,13 +26,12 @@ test("al día si no hay nada que revisar", () => {
 });
 
 test("cada regla", () => {
-  assert.deepEqual(accionesPublicacion({ ...base, fechaPublicacion: "2026-10-05" }, HOY), ["nuevo"]);
-  assert.deepEqual(accionesPublicacion({ ...base, fechaPublicacion: null, primeraVenta: "2026-10-10" }, HOY), ["nuevo"]);
+  assert.deepEqual(accionesPublicacion({ ...base, fechaPublicacion: "2026-10-05" }, HOY), [], "nuevo ya no es una acción");
   assert.deepEqual(accionesPublicacion({ ...base, margen: 0.25 }, HOY), ["revisar_precio"]);
   assert.deepEqual(accionesPublicacion({ ...base, netas30: 15, netas30Antes: 40 }, HOY), ["revisar_precio"]);
   assert.deepEqual(accionesPublicacion({ ...base, netas30: 2, netas30Antes: 8 }, HOY), [], "con pocas ventas antes no cuenta como caída");
   assert.deepEqual(accionesPublicacion({ ...base, competidorMasBarato: true }, HOY), ["bajar_precio"]);
   assert.deepEqual(accionesPublicacion({ ...base, privatizadaA: "Juan", netas30: 0, netas30Antes: 0 }, HOY), ["verificar_dropshipper"]);
-  assert.deepEqual(accionesPublicacion({ ...base, privatizadaA: "Juan", netas30: 0, netas30Antes: 0, fechaPublicacion: "2026-10-15" }, HOY), ["nuevo"], "uno nuevo todavía no se verifica");
+  assert.deepEqual(accionesPublicacion({ ...base, privatizadaA: "Juan", netas30: 0, netas30Antes: 0, fechaPublicacion: "2026-10-15" }, HOY), [], "uno nuevo todavía no se verifica");
   assert.deepEqual(accionesPublicacion({ ...base, margen: 0.2, competidorMasBarato: true }, HOY), ["revisar_precio", "bajar_precio"]);
 });

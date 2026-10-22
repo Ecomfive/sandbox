@@ -90,7 +90,7 @@ export const STOCK_DROPI = [
   { valor: "sin_ventas", etiqueta: "Sin ventas en 30 días" },
 ];
 
-/** Cómo se filtra y agrupa la lista: arranca agrupada por acción y las archivadas en Dropi van ocultas (botón «Archivados»). */
+/** Cómo se filtra y agrupa la lista: las archivadas en Dropi van ocultas (botón «Archivados»); lo que necesita cada una está en las tarjetas de arriba. */
 export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
   clave: "publicaciones-dropi",
   campos: [
@@ -153,6 +153,5 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { etiqueta: "Ventas 30 días (Dropi)", valor: (f) => (f.ventas ? String(f.ventas.netas30) : "") },
     { etiqueta: "Stock en Dropi", valor: (f) => (f.ventas ? String(f.ventas.stock) : "") },
   ],
-  vistaInicial: { agrupar: "accion" },
 };
 
