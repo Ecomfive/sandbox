@@ -745,6 +745,14 @@ convenciones técnicas del código.
   donde estaba (el foco entra en el campo con `data-enfocar`, o en el primero).
   Un panel a la derecha (`lado="derecha"`) sale con una animación corta
   (`animate-entrar-derecha`, sin movimiento si la persona pide menos animación).
+  **Cómo se abre una ficha** (22 oct 2026, como las vistas de una tarea de ClickUp): una `Ventana` que es **ficha** —un panel a la derecha o la grande
+  `ancho="xl"` al centro, `esFicha` en `src/lib/ficha/modo.ts`, con prueba— se abre en el modo que cada persona eligió: **barra lateral**, **cuadro de
+  diálogo** al centro o **pantalla completa** (`lateral` / `centro` / `completa`). El botón de la cabecera (`SelectorModoFicha`,
+  `src/components/ui/selector-modo-ficha.tsx`: tres miniaturas, como el de ClickUp) lo cambia y la elección vale para **todas las fichas** (almacén
+  `modo-ficha-v1` en el navegador, `useModoFicha`; sin base de datos, así que no viaja a otro equipo). Mientras no elija, cada ficha se abre como siempre
+  (`modoPorDefecto`: el panel a la derecha → lateral; la de Producto → centro). Un diálogo pequeño (atajos, copiar permisos) no es ficha y no cambia. En los tres
+  modos el panel se desplaza por dentro; a pantalla completa el contenido se centra con un ancho cómodo. **Una ficha nueva** solo usa `<Ventana lado="derecha">`:
+  lo trae solo. Si su contenido pone columnas, que dependan del ancho de la ficha (`@container` + `@3xl:`) y no de la pantalla (`lg:`), como la de Producto.
   **Las fichas de una cuenta destino** son ese panel y sirven de modelo para otra
   ficha lateral. Toda la fila de la tabla se pulsa (`abrirFila` de `TablaDatos`:
   un clic en un botón, enlace o campo de la fila, como el interruptor de estado, no

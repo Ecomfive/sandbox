@@ -184,9 +184,9 @@ export function FichaProducto({
         // Los bloques en dos columnas que se llenan cada una por su lado (sin huecos), leyendo de izquierda a derecha en el orden
         // pedido por Alcides (21 oct 2026): Producto, Asociaciones, Competencia, Compras, Código de barras, Envío… La actividad, al
         // final y a todo el ancho. En pantallas angostas, una sola columna.
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="@container min-h-0 flex-1 overflow-y-auto">
           <ExclusividadProducto key={`exclusividad-${producto.id}`} skuId={producto.id} />
-          <div className="grid grid-cols-1 gap-x-10 p-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-10 p-5 @3xl:grid-cols-2">
             <div className="flex min-w-0 flex-col divide-y divide-border">
             <Seccion icono={CatalogoIcon} titulo="Producto">
               {/* La foto al lado de los datos; el nombre a lo ancho y SKU, Tipo, Estado y Categoría de a dos. */}
@@ -252,7 +252,7 @@ export function FichaProducto({
               ) : null}
             </Seccion>
             </div>
-            <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 lg:border-t-0 lg:pt-0">
+            <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 @3xl:border-t-0 @3xl:pt-0">
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
               {/* Sus publicaciones de Dropi como proveedor (Gestión de IDs Dropi): cómo se llama allá, en qué país y con qué ID. */}
               {producto.nombresDropi.length > 0 && (
