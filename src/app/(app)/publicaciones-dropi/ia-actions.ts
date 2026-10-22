@@ -34,6 +34,8 @@ import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/
 import { notaOptimizacion, revisarPublicacion, type Revision } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
+import { aplicarCambiosDropi, encolarCambioNombre } from "@/lib/publicaciones/cambios-dropi";
+import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -46,8 +48,6 @@ const BUCKET = "wms-productos";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const faltaMigracion = (m: string) => /does not exist|schema cache|relation/i.test(m);
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0134.";
-/** Lo más largo que Dropi acepta en «Nombre del producto» (y en el nombre de la guía de envío). */
-const MAX_NOMBRE_DROPI = 40;
 const urlPublica = (ruta: string) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${ruta}`;
 const idsDropi = (dropiId: string | null) => (String(dropiId ?? "").match(/\d{3,6}/g) ?? []).map(Number);
 /** Lo que acompaña a cada pedido para anotar el consumo: qué es, quién lo pidió y de qué publicación. */
@@ -331,7 +331,10 @@ export async function proponerTitulosIA(publicacionId: string): Promise<{ error?
  * El equipo usa un título (tal cual o corregido): queda guardado como el elegido y desde entonces es un ejemplo del estilo de Ecomfive
  * para las siguientes sugerencias. Devuelve cómo queda el título final frente a las reglas.
  */
-export async function elegirTituloIA(iaId: string, titulo: string): Promise<{ error?: string; chequeos?: ChequeoTitulo[]; cumple?: boolean }> {
+export async function elegirTituloIA(
+  iaId: string,
+  titulo: string,
+): Promise<{ error?: string; chequeos?: ChequeoTitulo[]; cumple?: boolean; dropi?: { estado: "aplicado" | "pendiente" | "error"; detalle: string } }> {
   const usuario = await requireModuloEscritura(MODULO);
   const limpio = typeof titulo === "string" ? titulo.replace(/\s+/g, " ").trim().slice(0, 200) : "";
   if (typeof iaId !== "string" || !UUID.test(iaId) || limpio.length < 8) return { error: "Escribe el título." };
@@ -359,9 +362,37 @@ export async function elegirTituloIA(iaId: string, titulo: string): Promise<{ er
     antes: { "Nombre en Dropi": pub.nombre },
     despues: { "Nombre en Dropi": limpio },
   });
+  const dropi = await enviarNombreADropi(supabase, pub, limpio, usuario);
   revalidatePath("/publicaciones-dropi");
   const c = chequearTitulo(limpio, categoria, contexto.reglas);
-  return { chequeos: c.chequeos, cumple: c.cumple };
+  return { chequeos: c.chequeos, cumple: c.cumple, dropi };
+}
+
+/**
+ * El título elegido, también en Dropi (pedido de Hernán, 22 oct 2026): «Nombre del producto» = el título y «Nombre del producto en
+ * la guía de envío» = el código del SKU vinculado (lo que ve despacho, que no cambia). Con «Conectar Dropi» vigente se aplica al
+ * instante; si no, queda pendiente y se aplica al conectar (src/lib/publicaciones/cambios-dropi.ts).
+ */
+async function enviarNombreADropi(
+  supabase: ReturnType<typeof createServiceClient>,
+  pub: Pub,
+  nombre: string,
+  usuario: UsuarioActual,
+): Promise<{ estado: "aplicado" | "pendiente" | "error"; detalle: string }> {
+  const [{ data: pais }, { data: sku }] = await Promise.all([
+    supabase.from("paises").select("id, codigo").eq("id", pub.pais_id).maybeSingle(),
+    pub.sku_maestro_id ? supabase.from("skus_maestros").select("codigo").eq("id", pub.sku_maestro_id).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  const codigo = (sku?.codigo as string | undefined)?.trim() || null;
+  const nombreGuia = codigo && codigo.length <= MAX_NOMBRE_DROPI ? codigo : null;
+  const encolado = await encolarCambioNombre(supabase, pub, { nombre, nombreGuia }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  if ("error" in encolado) return { estado: "error", detalle: encolado.error };
+  if (!pais) return { estado: "pendiente", detalle: "Queda pendiente en Dropi." };
+  const r = await aplicarCambiosDropi(supabase, { id: pais.id as string, codigo: pais.codigo as string }, [encolado.id]);
+  const res = r.resultados.get(encolado.id);
+  if (res?.ok) return { estado: "aplicado", detalle: `Cambiado en Dropi${nombreGuia ? ` (guía: ${nombreGuia})` : ""}.` };
+  if (!r.conSesion) return { estado: "pendiente", detalle: "Queda pendiente en Dropi: se aplica al pulsar «Conectar Dropi»." };
+  return { estado: "error", detalle: res?.error ?? "No se pudo cambiar en Dropi." };
 }
 
 /** «Me sirvió» o «no me sirvió» (con el porqué): queda en lo generado y sirve de ejemplo para la IA. */

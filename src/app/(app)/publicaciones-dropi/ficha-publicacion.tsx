@@ -26,6 +26,7 @@ import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { InsigniaConectado } from "./insignia-conectado";
+import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 
@@ -343,8 +344,9 @@ function ContenidoFicha({
                   <span className={labelClassSm}>Nombre en Dropi</span>
                   {/* Viene de Dropi: no se edita aquí. La única excepción es «Usar este título» del Asistente de IA (elegirTituloIA). */}
                   <input value={d.nombre} readOnly className={`${fieldClass} w-full cursor-default bg-muted text-muted-foreground`} />
-                  <span className="text-xs text-muted-foreground">Solo cambia con «Usar este título» del Asistente de IA.</span>
+                  <span className="text-xs text-muted-foreground">Solo cambia con «Usar este título» del Asistente de IA (y así también en Dropi).</span>
                 </label>
+                {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} puedeEscribir={puedeEscribir} />}
                 <div className="flex min-w-0 flex-col gap-1.5">
                   {conectado && (
                     <div className="flex">

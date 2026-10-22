@@ -14,6 +14,7 @@ import type { Revision } from "@/lib/publicaciones/optimizacion";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega, type BodegaAsignada } from "@/lib/publicaciones/sincronizar-dropi";
+import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 /** Una decisión sobre una recomendación (aceptada, rechazada o pospuesta), con su porqué. */
@@ -128,6 +129,8 @@ export interface FilaPublicacion {
   leidoProveedor: string | null;
   /** A qué bodega de Dropi pertenece (B280, B81): la que muestra Dropi o, sin stock, la de «Dónde está» o la del nombre. */
   bodega: BodegaAsignada | null;
+  /** El último cambio de nombre que el sistema mandó a Dropi (pendiente, aplicado o con error), o null. */
+  cambioDropi: CambioDropiVista | null;
 }
 
 /** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */

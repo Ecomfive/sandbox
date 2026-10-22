@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -66,6 +66,7 @@ export function TablaPublicaciones({
   tareas,
   abrirInicial = null,
   actualizadoDropi = null,
+  barraDropi = null,
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
@@ -84,6 +85,8 @@ export function TablaPublicaciones({
   abrirInicial?: string | null;
   /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá (se escribe en el servidor: así no cambia al hidratar). */
   actualizadoDropi?: string | null;
+  /** La conexión con Dropi para cambiar nombres al instante (`BarraConexionDropi`, la arma la página). */
+  barraDropi?: ReactNode;
 }) {
   const verVentas = corteVentas !== null;
   const def = DEF_PUBLICACIONES;
@@ -113,6 +116,7 @@ export function TablaPublicaciones({
           ? `Última actualización desde Dropi: ${actualizadoDropi} (bodegas, stock, precio, tipo y estado).`
           : "Todavía no se actualizó desde Dropi: las bodegas aparecen con la primera lectura de «Mis productos»."}
       </p>
+      {barraDropi}
       <ListaDatos
         def={def}
         filas={publicaciones}

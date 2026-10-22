@@ -507,17 +507,21 @@ function OpcionTitulo({ indice, inicial, porque, categoria, reglas, iaId, elegid
   const esElegido = elegido !== null && elegido === texto.replace(/\s+/g, " ").trim();
 
   async function copiar(guardarComoElegido: boolean) {
-    if (guardarComoElegido) {
-      setGuardando(true);
-      const res = await elegirTituloIA(iaId, texto).catch(() => ({ error: "No se pudo guardar el título elegido." }));
-      setGuardando(false);
-      if (res.error) return mostrarToast(res.error, "destructive");
-      alElegir(texto.replace(/\s+/g, " ").trim());
+    if (!guardarComoElegido) {
+      return navigator.clipboard.writeText(texto.trim()).then(
+        () => mostrarToast("Copiado"),
+        () => mostrarToast("No se pudo copiar", "destructive"),
+      );
     }
-    navigator.clipboard.writeText(texto.trim()).then(
-      () => mostrarToast(guardarComoElegido ? "Nombre en Dropi cambiado en el sistema y copiado: pégalo en Dropi" : "Copiado"),
-      () => mostrarToast("No se pudo copiar", "destructive"),
-    );
+    setGuardando(true);
+    const res: Awaited<ReturnType<typeof elegirTituloIA>> = await elegirTituloIA(iaId, texto).catch(() => ({ error: "No se pudo guardar el título elegido." }));
+    setGuardando(false);
+    if (res.error) return mostrarToast(res.error, "destructive");
+    alElegir(texto.replace(/\s+/g, " ").trim());
+    // Con «Conectar Dropi» vigente ya cambió en Dropi; si no, queda pendiente (o falló) y lo dice la ficha.
+    const d = res.dropi;
+    if (d?.estado === "aplicado") return mostrarToast(`Nombre cambiado en el sistema y en Dropi. ${d.detalle}`);
+    mostrarToast(`Nombre cambiado en el sistema. ${d?.detalle ?? ""}`, d?.estado === "error" ? "destructive" : "info");
   }
 
   return (

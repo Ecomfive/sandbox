@@ -9,6 +9,7 @@ import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
+import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
 import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
@@ -187,6 +188,8 @@ export interface DatosPublicaciones {
   corteVentas: string | null;
   /** Cuándo se leyó «Mis productos» de Dropi por última vez (bodegas, precio, tipo y estado); null si nunca. */
   leidoProveedor: string | null;
+  /** Cuántos cambios del sistema esperan para aplicarse en Dropi (migración 0137). */
+  pendientesDropi: number;
   reglas: ReglasGuardadas;
   /** Todas las decisiones del país (la más nueva primero), para la pestaña Recomendaciones. */
   decisiones: DecisionVista[];
@@ -224,7 +227,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo, proveedor] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -237,6 +240,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarEnCamino(supabase, paisId, usuario),
     cargarNuestrosEnDropi(supabase, paisId),
     cargarProductosProveedor(supabase, paisId),
+    cargarCambiosDropi(supabase, paisId),
   ]);
   const r = reglas.reglas;
   // La revisión de optimización: con lo que muestra Dropi (el primer ID que esté en el catálogo); si no se leyó, el título guardado.
@@ -313,6 +317,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
       leidoProveedor: proveedor?.leidoEn ?? null,
+      cambioDropi: cambiosDropi.porPublicacion.get(d.id) ?? null,
       bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),
       ...revisionDe(d),
       ...automatico(d, ventas, competidores, hoy, r, prov, stockActual),
@@ -358,5 +363,5 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
-  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, reglas, decisiones, conTareas, personas };
+  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, pendientesDropi: cambiosDropi.pendientes, reglas, decisiones, conTareas, personas };
 }
