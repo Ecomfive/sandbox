@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cambiosDesdeDropi, idsDeDropi, normalizarProductoProveedor, productoPrincipal, ubicacionDeBodega, ubicacionDeProducto, type ProductoProveedor } from "./sincronizar-dropi";
+import { bodegasEnOrden, cambiosDesdeDropi, codigoBodega, idsDeDropi, normalizarProductoProveedor, productoPrincipal, ubicacionDeBodega, ubicacionDeProducto, type ProductoProveedor } from "./sincronizar-dropi";
 
 const HOY = "2026-10-22";
 const prod = (id: number, extra: Partial<ProductoProveedor> = {}): ProductoProveedor => ({
@@ -35,6 +35,15 @@ test("normalizar: un simple con su bodega y uno variable con las variaciones sum
   assert.deepEqual(variable?.bodegas, [{ id: 81, nombre: "Proveedor Ecomfive", stock: 52 }]);
   assert.equal(variable?.archivado, true);
   assert.equal(normalizarProductoProveedor({ id: 1 }, false), null);
+});
+
+test("código de bodega y orden: B + su ID, la de más stock primero", () => {
+  assert.equal(codigoBodega(280), "B280");
+  assert.equal(codigoBodega(81), "B81");
+  assert.deepEqual(
+    bodegasEnOrden([{ id: 81, stock: 3 }, { id: 280, stock: 40 }]).map((b) => b.id),
+    [280, 81],
+  );
 });
 
 test("ubicación: por el nombre de la bodega, y la de más stock si hay varias", () => {

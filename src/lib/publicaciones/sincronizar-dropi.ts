@@ -64,6 +64,21 @@ export function normalizarProductoProveedor(o: Record<string, unknown>, archivad
   };
 }
 
+/** Cuándo se actualizó desde Dropi, en hora de Panamá: «22 oct 2026, 11:27 a. m.». */
+export const fechaHoraLectura = (iso: string) =>
+  new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
+
+/** El código corto de una bodega de Dropi, por su ID: «B280» (Bodega Dropi Panama), «B81» (Proveedor Ecomfive). */
+export const codigoBodega = (id: number) => `B${id}`;
+
+/**
+ * Las bodegas de un producto en el orden en que se muestran: la de más stock primero (la que decide «Dónde está»), luego las demás
+ * por stock.
+ */
+export function bodegasEnOrden<T extends { stock: number }>(bodegas: T[]): T[] {
+  return [...bodegas].sort((a, b) => b.stock - a.stock);
+}
+
 /** La ubicación de Gestión de IDs que corresponde a una bodega de Dropi, por su nombre («Bodega Dropi Panama» → bodega_dropi). */
 export function ubicacionDeBodega(nombre: string): string | null {
   const n = nombre.toLowerCase();

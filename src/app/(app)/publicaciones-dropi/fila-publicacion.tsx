@@ -9,6 +9,7 @@ import { ChevronRightIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { eliminarPublicacion } from "./actions";
 import { InsigniaConectado } from "./insignia-conectado";
 import { LlegadaCamino } from "./llegada-camino";
@@ -129,6 +130,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
             <span className="tabular-nums">{f.dropiId ? `ID ${f.dropiId}` : "Sin ID de Dropi"}</span>
             {f.dropiId.trim() !== "" && <InsigniaConectado />}
+            {/* A qué bodega de Dropi pertenece («B280»), según la última lectura de «Mis productos». */}
+            {f.bodegasDropi?.map((b) => (
+              <span key={b.id} className="rounded border border-border-control px-1 font-mono font-semibold text-foreground">
+                <span className="sr-only">Bodega {b.nombre}: </span>
+                {codigoBodega(b.id)}
+              </span>
+            ))}
             {f.sku ? (
               <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>
             ) : (
