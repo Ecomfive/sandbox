@@ -10,7 +10,7 @@ import {
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
-import type { CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
+import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
@@ -39,7 +39,12 @@ export interface FilaPublicacion {
   fechaPublicacion: string | null;
   ultimaRevision: string | null;
   proximaRevision: string | null;
+  /** La fecha anotada antes (ClickUp o a mano). Se usa solo si Dropi todavía no registró ningún cambio. */
   ultimoCambioPrecio: string | null;
+  /** El último cambio de precio que se vio en Dropi (fecha, de cuánto a cuánto), o null si no se vio ninguno. */
+  cambioPrecioDropi: CambioPrecio | null;
+  /** Desde cuándo se lee el catálogo de Dropi del país (antes de esa fecha no se pueden ver cambios). */
+  lecturaDropiDesde: string | null;
   /** La próxima revisión ya pasó (o nunca se revisó) y no está archivada. */
   revisionVencida: boolean;
   fotoUrl: string | null;
@@ -142,7 +147,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${numeroPublicacion(f.numero)} ${f.nombre} ${f.dropiId}` },
     { id: "precio", etiqueta: "Precio de venta", tipo: "numero", valor: (f) => f.precioVenta },
     { id: "margen", etiqueta: "Margen (%)", tipo: "numero", valor: (f) => (f.margen === null ? null : Math.round(f.margen * 1000) / 10) },
-    { id: "fechaPublicacion", etiqueta: "Fecha de publicación", tipo: "fecha", valor: (f) => f.fechaPublicacion },
+    { id: "fechaPublicacion", etiqueta: "Fecha de publicación", tipo: "fecha", valor: (f) => f.ventas?.primeraVenta?.slice(0, 10) ?? f.fechaPublicacion },
   ],
   // Archivadas: las que Dropi tiene archivadas (si vuelven a estar activas en Dropi, salen solas de aquí).
   cerrados: { etiqueta: "Archivados", esCerrado: (f) => f.archivada, campoEstado: "publicacion", valoresCerrados: ["archivado"], ocultosPorDefecto: true },

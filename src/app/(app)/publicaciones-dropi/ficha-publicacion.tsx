@@ -73,6 +73,7 @@ const desde = (p: FilaPublicacion): Formulario => ({
 });
 
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
+const fechaLarga = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 const usd = (v: number | null) => (v === null || !Number.isFinite(v) ? "—" : `$${v.toFixed(2)}`);
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
@@ -329,10 +330,26 @@ function ContenidoFicha({
                 <span className={labelClassSm}>Tipo</span>
                 <span className="text-sm">{p.tipoDropi === "privado" ? "Privado" : p.tipoDropi === "publico" ? "Público" : "—"}</span>
               </div>
-              <label className="flex min-w-0 flex-col gap-1">
+              {/* Ya no se anota (21 oct 2026): sale de Dropi. Por ahora, la primera venta de la carga de Ventas Dropi; sin ventas,
+                  la fecha que estaba anotada. */}
+              <div className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fecha de publicación</span>
-                <input type="date" value={d.fecha_publicacion} onChange={(e) => cambiar({ fecha_publicacion: e.target.value })} className={`${fieldClass} w-full`} />
-              </label>
+                <span className="text-sm">
+                  {p.ventas?.primeraVenta ? (
+                    <>
+                      Se vende desde el {fechaLarga(p.ventas.primeraVenta)}
+                      <span className="block text-xs text-muted-foreground">primera venta en Dropi</span>
+                    </>
+                  ) : p.fechaPublicacion ? (
+                    <>
+                      {fechaLarga(p.fechaPublicacion)}
+                      <span className="block text-xs text-muted-foreground">anotada · todavía sin ventas en Dropi</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+              </div>
               {(p.tipoDropi === "privado" || !!d.privatizado_a) && (
                 <>
                   <label className="flex min-w-0 flex-col gap-1">
@@ -377,8 +394,21 @@ function ContenidoFicha({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Último cambio de precio</dt>
-                <dd>
-                  <input type="date" aria-label="Último cambio de precio" value={d.ultimo_cambio_precio} onChange={(e) => cambiar({ ultimo_cambio_precio: e.target.value })} className={`${fieldClass} w-full !px-2 !py-1 text-xs`} />
+                {/* Lo detecta la lectura del catálogo de Dropi (Análisis de competencia): ya no se anota a mano. */}
+                <dd className="text-xs">
+                  {p.cambioPrecioDropi ? (
+                    <>
+                      <span className="block font-semibold">{fechaLarga(p.cambioPrecioDropi.fecha)}</span>
+                      <span className="block text-muted-foreground">
+                        de {usd(p.cambioPrecioDropi.antes)} a {usd(p.cambioPrecioDropi.despues)} en Dropi
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="block">{p.lecturaDropiDesde ? `Sin cambios en Dropi desde el ${fechaLarga(p.lecturaDropiDesde)}` : "Sin datos de Dropi"}</span>
+                      {p.ultimoCambioPrecio && <span className="block text-muted-foreground">Antes: {fechaLarga(p.ultimoCambioPrecio)}</span>}
+                    </>
+                  )}
                 </dd>
               </div>
             </dl>

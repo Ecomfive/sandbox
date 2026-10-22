@@ -8,7 +8,7 @@ import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
 import { accionesPublicacion, enDropi, estaArchivada } from "@/lib/publicaciones/automatico";
-import { cargarCompetidores, competidorMasBarato } from "@/lib/publicaciones/competencia-publicaciones";
+import { cargarCambiosPrecio, cargarCompetidores, competidorMasBarato, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -53,7 +53,8 @@ function automatico(
     acciones: accionesPublicacion(
       {
         archivada,
-        fechaPublicacion: (d.fecha_publicacion as string | null) ?? null,
+        // Primero la de Dropi (la primera venta); la anotada, solo si todavía no vendió.
+        fechaPublicacion: v?.primeraVenta ?? ((d.fecha_publicacion as string | null) ?? null),
         primeraVenta: v?.primeraVenta ?? null,
         margen: num(d.margen),
         netas30: v ? v.netas30 : null,
@@ -106,7 +107,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
-  const [{ skus, sugerencias }, opcionesSku, ventas, competidores] = await Promise.all([
+  const [{ skus, sugerencias }, opcionesSku, ventas, competidores, precios] = await Promise.all([
     cargarSugerencias(
       supabase,
       pais.id,
@@ -115,6 +116,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
     obtenerOpcionesSkuMaestro(supabase),
     cargarResumenVentas(supabase, pais.id),
     cargarCompetidores(supabase, pais.id),
+    cargarCambiosPrecio(supabase, pais.id),
   ]);
 
   const filas: FilaPublicacion[] = datos.map((d) => {
@@ -144,6 +146,8 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
       ultimaRevision: (d.ultima_revision as string | null) ?? null,
       proximaRevision: proxima,
       ultimoCambioPrecio: (d.ultimo_cambio_precio as string | null) ?? null,
+      cambioPrecioDropi: ultimoCambioDe((String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? []).map(Number), precios.cambios),
+      lecturaDropiDesde: precios.desde,
       revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
       fotoUrl: (d.foto_url as string | null) ?? null,
       notas: (d.notas as string | null) ?? "",
