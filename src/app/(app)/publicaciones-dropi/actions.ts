@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, ESTADOS_VENTA, TIPOS, UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -15,7 +15,6 @@ const RUTA = "/publicaciones-dropi";
 const BUCKET_FOTOS = "wms-productos";
 const PREFIJO_URL_PUBLICA = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 const hoy = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 const texto = (f: FormData, k: string, max: number) => {
@@ -32,10 +31,6 @@ const numero = (f: FormData, k: string): number | null | undefined => {
   const n = Number(t.replace(",", "."));
   return Number.isFinite(n) && n >= 0 && n < 1e9 ? Math.round(n * 100) / 100 : undefined;
 };
-const fecha = (f: FormData, k: string) => {
-  const t = texto(f, k, 10);
-  return FECHA.test(t) ? t : null;
-};
 
 type Datos = Record<string, string | number | boolean | null>;
 
@@ -46,31 +41,27 @@ function leerDatos(f: FormData): Datos | { error: string } {
   const precio = numero(f, "precio_venta");
   const costo = numero(f, "costo_mercancia");
   const fulfillment = numero(f, "fulfillment");
-  const real = numero(f, "coste_real");
-  if ([precio, costo, fulfillment, real].includes(undefined)) return { error: "Un precio o costo no es válido." };
-  const comp = texto(f, "competencia", 3);
+  if ([precio, costo, fulfillment].includes(undefined)) return { error: "Un precio o costo no es válido." };
   const email = texto(f, "privatizado_email", 200).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "El correo del dropshipper no es válido." };
   const resp = texto(f, "responsable_id", 64);
   return {
     nombre,
     dropi_id: texto(f, "dropi_id", 60) || null,
-    estado: deLista(f, "estado", ESTADOS) ?? "producto_nuevo",
-    estado_publicacion: deLista(f, "estado_publicacion", ESTADOS_PUBLICACION),
-    tipo_publicacion: deLista(f, "tipo_publicacion", TIPOS),
+    // Estado, «En Dropi» y Tipo ya no se editan (21 oct 2026): salen de Dropi y de reglas. No van aquí, así guardar no los borra.
     privatizado_a: texto(f, "privatizado_a", 120) || null,
     privatizado_email: email || null,
     precio_venta: precio ?? null,
     costo_mercancia: costo ?? null,
     fulfillment: fulfillment ?? null,
-    coste_real: real ?? null,
-    estado_venta: deLista(f, "estado_venta", ESTADOS_VENTA),
+    // «Coste real» ya no se usa (21 oct 2026): no va aquí, así guardar la ficha no borra el dato que quedó en la base.
+    // «Estado de venta» ya no se edita (lo reemplazan las ventas de Dropi de 30 días): no va aquí, así guardar la ficha no
+    // borra el dato que quedó en la base.
     ubicacion: deLista(f, "ubicacion", UBICACIONES),
-    estado_reposicion: deLista(f, "estado_reposicion", ESTADOS_REPOSICION),
-    competencia: comp === "si" ? true : comp === "no" ? false : null,
-    fecha_publicacion: fecha(f, "fecha_publicacion"),
-    ultima_revision: fecha(f, "ultima_revision"),
-    ultimo_cambio_precio: fecha(f, "ultimo_cambio_precio"),
+    // «Reposición» y «Competencia» ya no se editan aquí (la reposición se hace desde Compras y la competencia se ve en la del
+    // producto): no van, así guardar la ficha no borra lo que quedó en la base.
+    // «Fecha de publicación» ya no se anota (21 oct 2026): sale de Dropi (la primera venta). Al crear una se pone la de hoy.
+    // «Último cambio de precio» ya no se anota (21 oct 2026): lo detecta la lectura del catálogo de Dropi.
     notas: texto(f, "notas", 5000) || null,
     responsable_id: UUID.test(resp) ? resp : null,
   };
@@ -95,7 +86,7 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
   if ("error" in datos) return datos;
   const { data, error } = await supabase
     .from("dropi_publicaciones")
-    .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), ultimo_cambio_precio: datos.ultimo_cambio_precio ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
+    .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
     .select("id")
     .single();
   if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0116." : "No se pudo crear la publicación." };
@@ -108,19 +99,11 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
 const VISTA: [string, string, (v: unknown) => string][] = [
   ["nombre", "Producto", (v) => String(v ?? "—")],
   ["dropi_id", "ID Dropi", (v) => String(v ?? "—")],
-  ["estado", "Estado", (v) => etiqueta(ESTADOS, v as string)],
-  ["estado_publicacion", "En Dropi", (v) => etiqueta(ESTADOS_PUBLICACION, v as string)],
-  ["tipo_publicacion", "Tipo", (v) => etiqueta(TIPOS, v as string)],
   ["privatizado_a", "Privatizado a", (v) => String(v ?? "—")],
   ["precio_venta", "Precio de venta", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["costo_mercancia", "Costo mercancía", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
+  ["costo_mercancia", "Costo de producto", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["coste_real", "Coste real", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["estado_venta", "Estado de venta", (v) => etiqueta(ESTADOS_VENTA, v as string)],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
-  ["estado_reposicion", "Reposición", (v) => etiqueta(ESTADOS_REPOSICION, v as string)],
-  ["competencia", "Competencia", (v) => (v === null ? "—" : v ? "Sí" : "No")],
-  ["ultima_revision", "Última revisión", (v) => String(v ?? "—")],
 ];
 
 /** Guarda la ficha. Si cambia el precio, «Último cambio de precio» pasa a hoy (salvo que se haya escrito otra fecha). */
@@ -131,8 +114,6 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
-  const precioAntes = antes.precio_venta === null ? null : Number(antes.precio_venta);
-  if (datos.precio_venta !== precioAntes && datos.ultimo_cambio_precio === (antes.ultimo_cambio_precio ?? null)) datos.ultimo_cambio_precio = hoy();
 
   const { error } = await createServiceClient()
     .from("dropi_publicaciones")

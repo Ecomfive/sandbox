@@ -449,7 +449,24 @@ convenciones técnicas del código.
   (`sku_maestro_componentes`); si no existe, «Falta el compuesto» (nunca al simple: descontaría mal). Un «combo» solo busca entre
   compuestos. La página calcula las sugerencias al cargar (`cargarSugerencias`, `src/lib/publicaciones/sugerencias.ts`); la ficha las
   confirma con `vincularSkuPublicacion` («Vincular y siguiente»), con `CampoSkuMaestro` para elegir otro. Las exactas se vinculan con
-  `npx tsx scripts/vincular-skus-publicaciones.ts --aplicar` (también calcula las huellas que falten; actividad «Vínculo automático»).
+  `npx tsx scripts/vincular-skus-publicaciones.ts --aplicar` (también calcula las huellas que falten; actividad «Vínculo automático»). **Reglas y recomendaciones** (fase 1 de las automatizaciones, migración 0127, 21 oct 2026; pestañas Publicaciones ·
+  Recomendaciones · Reglas). Los umbrales (margen mínimo/crítico/saludable, caída de ventas, días de nuevo, combo) viven en
+  `dropi_publicaciones_reglas` y se editan en `/publicaciones-dropi/reglas`; `REGLAS` y sus valores de siempre en
+  `src/lib/publicaciones/reglas.ts` (con prueba), y `accionesPublicacion` y `nivelMargen` los reciben (nada de umbrales fijos en la
+  pantalla: el nivel del margen lo calcula el servidor). `recomendar` (`src/lib/publicaciones/recomendaciones.ts`, con prueba) propone
+  **Crear combo x2** (margen bajo, simple vinculado, ventas ≥ regla, sin compuesto x2 publicado; asume que el fulfillment se paga una vez
+  por pedido), **Subir precio** (sin competidor más barato, tope = el más barato de la competencia) y **Bajar precio frente a la
+  competencia** (sin quedar en crítico). La persona acepta, rechaza (con porqué obligatorio) o pospone (`decidirRecomendacion`,
+  `recomendaciones-actions.ts`): queda en `dropi_publicaciones_decisiones` con la foto de la recomendación, el precio y margen de ese
+  momento y `vigente_hasta` (aceptada 30 días, rechazada 90, pospuesta 7/14/30), y en la actividad. Se calcula al cargar
+  (`cargarPublicaciones`, `datos-publicaciones.ts`, compartido por la lista y la pestaña Recomendaciones); no se escribe nada al abrir.
+  **Tareas** (migración 0128): una aceptada es una tarea con `responsable_id`, `plazo` (regla `dias_plazo`, 7) y aviso «Para ti»
+  (`notificaciones_usuario` tipo `tarea`); mientras está abierta no se vuelve a sugerir (`pendientes`). `tareaCumplida` la da por hecha
+  si Dropi muestra un precio nuevo después de aceptarla y en la dirección pedida, o si el combo x2 ya está publicado; `cargarPublicaciones`
+  lo guarda con `after()` (a nombre de «Sistema», con su línea en la auditoría) y si no, «Ya lo hice» (`marcarTareaHecha`). Las
+  atrasadas cuentan en `PendientesHoy.tareasAtrasadas` (Hoy y menú). Vistas Pendientes · Por hacer · Hechas (`?ver=`).
+  **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
+  justifique, con bitácora y deshacer.
 - **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin
   cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
   llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de
@@ -981,6 +998,10 @@ convenciones técnicas del código.
   (modernos por su carpeta interna del ZIP; viejos por el contenedor OLE + extensión), CSV y texto (sin bytes nulos ni HTML), hasta
   25 MB (`detectarAdjunto(bytes, nombre)`); el servidor vuelve a guardar el archivo con el tipo de su contenido (un texto se sirve
   como `text/plain`, nunca como página).
+  **Proveedor de una lista** (21 oct 2026): se elige de `PROVEEDORES_COMPRA` (`def-compras.ts`: Chin, Zion, Alibaba; guardados
+  con el nombre que ya tenían, el Portal del proveedor reconoce a Chin por él) en la celda (`seleccion` en `CAMPOS_EDITABLES`), la
+  ficha y la compra nueva (`SelectorProveedor`). Una compra vieja con otro proveedor («Local») lo conserva: la ficha lo muestra como
+  opción y `proveedorDeLista` lo deja pasar. El **agente de envío** igual: `AGENTES_ENVIO` (Chin, Avery: los nombres de `wms_rutas_envio.agente`, con los que Envíos cruza los tiempos reales), `agenteDeLista`. Los dos usan `SelectorDeLista` en la ficha. Cada valor tiene su color (`colorProveedor`, `colorAgente`: tonos del neón del sistema, distintos entre sí y de Etapa/Estado; lo comprueba `proveedor-lista.test.ts`). Para sumar uno, agrégalo a su lista.
   **Foto comercial y foto real** (21 oct 2026): la foto comercial es la del producto en Producto; la foto real (`foto_url`,
   «Foto real del producto») es la que manda el proveedor. `FilaCompra.fotoComercial` = la de su primer producto con foto o, sin
   productos, la del producto con su mismo nombre (`productoDeCompra`); cada línea trae la suya (`lineas[].foto`, `ItemCompra.foto`:

@@ -15,7 +15,7 @@ import { estimarPlanificacion, nuevaPlanificacion, type Estimacion, type Tiempos
 import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
-import { ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, VIAS_ENVIO } from "./def-compras";
+import { agenteDeLista, ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, proveedorDeLista, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
 import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, dentroDelAlcance, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
 import { fotoDeProducto, fotosPorNombre } from "@/lib/compras/foto-producto";
@@ -137,8 +137,9 @@ const fechaOptativa = (formData: FormData, campo: string): string | null => (for
 function leerCambios(formData: FormData) {
   return {
     foto_url: textoOptativo(formData, "foto_url"),
-    proveedor: textoOptativo(formData, "proveedor"),
-    agente_envio: textoOptativo(formData, "agente_envio"),
+    // De la lista (`PROVEEDORES_COMPRA`); una compra vieja con otro proveedor lo conserva tal cual.
+    proveedor: proveedorDeLista(textoOptativo(formData, "proveedor")),
+    agente_envio: agenteDeLista(textoOptativo(formData, "agente_envio")),
     venta_importacion: formData.get("venta_importacion") === "si",
     // Una sola tienda por orden (se guarda como lista por las de antes).
     tiendas: listaDeTexto(textoOptativo(formData, "tiendas")).slice(0, 1),

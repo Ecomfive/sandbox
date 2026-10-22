@@ -112,6 +112,39 @@ export const VIAS_ENVIO = [
 ] as const;
 export const etiquetaVia = (v: string) => VIAS_ENVIO.find((x) => x.valor === v)?.etiqueta ?? v;
 
+/** Los proveedores que se eligen en una compra (21 oct 2026; antes era texto libre). Se guardan con el mismo nombre que ya
+ * tenían las compras: el Portal del proveedor reconoce las de Chin por ese nombre. Una compra vieja con otro proveedor lo
+ * conserva hasta que se cambie. */
+export const PROVEEDORES_COMPRA = [
+  { valor: "Chin", etiqueta: "Chin" },
+  { valor: "Zion", etiqueta: "Zion" },
+  { valor: "Alibaba", etiqueta: "Alibaba" },
+] as const;
+
+/** Los agentes de envío que se eligen en una compra (21 oct 2026; antes era texto libre). Con el mismo nombre que en Compras ›
+ * Envíos (`wms_rutas_envio.agente`), que cruza los tiempos reales con las compras por ese nombre. */
+export const AGENTES_ENVIO = [
+  { valor: "Chin", etiqueta: "Chin" },
+  { valor: "Avery", etiqueta: "Avery" },
+] as const;
+
+/** El valor con su nombre de la lista si coincide sin importar mayúsculas («CHIN» → «Chin»); si no, como viene. */
+export function deLista(lista: readonly { valor: string }[], texto: string | null): string | null {
+  const t = texto?.trim();
+  if (!t) return null;
+  return lista.find((p) => p.valor.toLowerCase() === t.toLowerCase())?.valor ?? t;
+}
+
+/** El color de cada proveedor y de cada agente: los tonos del neón del sistema (el borde de los paneles y el brillo del menú),
+ * distintos entre sí y de los de Etapa y Estado (que son los de ClickUp). Un valor fuera de la lista va sin color. */
+const PROVEEDOR_COLOR: Record<string, string> = { Chin: "#c22f6a", Zion: "#9b2fa8", Alibaba: "#e07a3a" };
+const AGENTE_COLOR: Record<string, string> = { Chin: "#5f43d1", Avery: "#325bba" };
+export const colorProveedor = (valor: string): string | undefined => PROVEEDOR_COLOR[valor];
+export const colorAgente = (valor: string): string | undefined => AGENTE_COLOR[valor];
+
+export const proveedorDeLista = (texto: string | null) => deLista(PROVEEDORES_COMPRA, texto);
+export const agenteDeLista = (texto: string | null) => deLista(AGENTES_ENVIO, texto);
+
 
 /** Días que lleva (o llevó, si ya cerró) una compra desde que se creó. */
 export function diasDeCompra(c: Pick<FilaCompra, "creadoEn" | "cerradoEn">, ahora: number = Date.now()): number {
@@ -289,6 +322,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       valores: (c) => [c.proveedor ?? SIN_VALOR],
       etiquetaSinValor: "Sin proveedor",
       agrupable: true,
+      colorValor: (v) => colorProveedor(v),
     },
     {
       id: "ventaImportacion",

@@ -6,33 +6,35 @@ import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/se
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
-import { ESTADOS, ESTADOS_PUBLICACION, ESTADOS_REPOSICION, ESTADOS_VENTA, TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import type { Reglas } from "@/lib/publicaciones/reglas";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
-import { DEF_PUBLICACIONES, DEF_PUBLICACIONES_ADMIN, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
+import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
+import { TIPOS_RECOMENDACION } from "@/lib/publicaciones/recomendaciones";
 import { FichaPublicacion } from "./ficha-publicacion";
 import { FilaPublicacionLista } from "./fila-publicacion";
+import { ProveedorTareas } from "./recomendacion-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 
 const NOMBRE: NombreFilas = { singular: "publicación", plural: "publicaciones" };
 const ICONOS: Record<string, IconoComp> = {
-  estado: EstadoIcon,
+  accion: EstadoIcon,
   revision: CalendarioIcon,
   venta: MargenIcon,
   ubicacion: InventarioIcon,
-  reposicion: InventarioIcon,
   tipo: EstadoIcon,
   publicacion: EstadoIcon,
   privatizado: PersonaIcon,
-  competencia: EstadoIcon,
   vinculo: ProductoIcon,
   nombre: ProductoIcon,
   precio: MargenIcon,
   margen: MargenIcon,
   margenBajo: MargenIcon,
+  recomendacion: EstadoIcon,
   ultimaRevision: CalendarioIcon,
-  proximaRevision: CalendarioIcon,
   fechaPublicacion: CalendarioIcon,
   stockDropi: InventarioIcon,
   ventaDropi: MargenIcon,
@@ -42,7 +44,9 @@ const ICONOS: Record<string, IconoComp> = {
   diasInventario: CalendarioIcon,
 };
 
-const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { estado: ESTADOS, venta: ESTADOS_VENTA, ventaDropi: ESTADOS_VENTA, ubicacion: UBICACIONES, reposicion: ESTADOS_REPOSICION, tipo: TIPOS, publicacion: ESTADOS_PUBLICACION };
+// Los grupos de «Acción» y «En Dropi» se pintan con su color (son calculados, no listas de la publicación).
+const comoOpciones = (l: { valor: string; etiqueta: string; color: string }[]): OpcionPublicacion[] => l.map((o) => ({ ...o, clickup: o.etiqueta }));
+const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { accion: comoOpciones(ACCIONES), recomendacion: comoOpciones(TIPOS_RECOMENDACION), publicacion: comoOpciones(EN_DROPI), ubicacion: UBICACIONES, tipo: TIPOS };
 
 /**
  * Las publicaciones del país: el tablero de acciones arriba y, debajo, la lista de filas con la barra de herramientas común y
@@ -57,6 +61,9 @@ export function TablaPublicaciones({
   puedeEscribir,
   puedeEliminar,
   corteVentas,
+  reglas,
+  decisionesDisponibles,
+  tareas,
   abrirInicial = null,
 }: {
   publicaciones: FilaPublicacion[];
@@ -68,11 +75,15 @@ export function TablaPublicaciones({
   puedeEliminar: boolean;
   /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
   corteVentas: string | null;
+  reglas: Reglas;
+  decisionesDisponibles: boolean;
+  /** A quién se asignan las tareas, quién es la persona y si existe la migración 0128. */
+  tareas: { personas: { id: string; nombre: string }[]; yo: string; conTareas: boolean };
   /** La publicación que se abre al cargar (`?abrir=`, desde la ficha de un producto); si no es de este país, nada. */
   abrirInicial?: string | null;
 }) {
   const verVentas = corteVentas !== null;
-  const def = verVentas ? DEF_PUBLICACIONES_ADMIN : DEF_PUBLICACIONES;
+  const def = DEF_PUBLICACIONES;
   const [abierta, setAbierta] = useState<string | null>(() => (abrirInicial && publicaciones.some((p) => p.id === abrirInicial) ? abrirInicial : null));
   const [orden, setOrden] = useState<string[]>([]);
   const i = abierta ? orden.indexOf(abierta) : -1;
@@ -84,8 +95,9 @@ export function TablaPublicaciones({
     () => false,
   );
   return (
+    <ProveedorTareas {...tareas}>
     <ProveedorSkusMaestros opciones={opcionesSku}>
-      <TableroAcciones publicaciones={publicaciones} def={def} />
+      <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
       <ListaDatos
         def={def}
         filas={publicaciones}
@@ -118,10 +130,13 @@ export function TablaPublicaciones({
         puedeEscribir={puedeEscribir}
         puedeEliminar={puedeEliminar}
         corteVentas={corteVentas}
+        margenMinimo={reglas.margen_minimo}
+        decisionesDisponibles={decisionesDisponibles}
         anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}
       />
     </ProveedorSkusMaestros>
+    </ProveedorTareas>
   );
 }
