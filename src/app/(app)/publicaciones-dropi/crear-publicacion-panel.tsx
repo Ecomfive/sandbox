@@ -26,7 +26,7 @@ export function CrearPublicacionPanel({ paisId }: { paisId: string }) {
             <Campo etiqueta="Precio de venta" id="pub-precio">
               <input id="pub-precio" name="precio_venta" type="number" min={0} step="0.01" placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
             </Campo>
-            <Campo etiqueta="Costo mercancía" id="pub-costo">
+            <Campo etiqueta="Costo de producto" id="pub-costo">
               <input id="pub-costo" name="costo_mercancia" type="number" min={0} step="0.01" placeholder="Ej: 1.16" className={`${fieldClass} w-full tabular-nums`} />
             </Campo>
             <Campo etiqueta="Fulfillment" id="pub-fulfillment">

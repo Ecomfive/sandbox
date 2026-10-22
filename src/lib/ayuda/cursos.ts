@@ -222,7 +222,7 @@ export const CURSOS: Curso[] = [
       {
         titulo: "Margen y revisión",
         parrafos: [
-          "La utilidad bruta es el precio de venta menos el costo mercancía y el fulfillment; el margen bruto es esa utilidad dividida entre el precio. Se calculan solos, y un punto rojo avisa que el margen está por debajo de 30 %.",
+          "La utilidad bruta es el precio de venta menos el costo de producto y el fulfillment; el margen bruto es esa utilidad dividida entre el precio. Se calculan solos, y un punto rojo avisa que el margen está por debajo de 30 %.",
           "Cada producto se revisa cada 28 días: la próxima revisión sale de la última y un punto ámbar avisa que ya pasó. El filtro «Revisión vencida» muestra lo que toca revisar.",
           "En la ficha cambias el estado, el precio y los costos, la venta, dónde está, la reposición, la privatización y las notas, y guardas con «Guardar cambios». Si cambias el precio, «Último cambio de precio» pasa a hoy.",
         ],
