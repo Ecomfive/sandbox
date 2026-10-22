@@ -27,6 +27,7 @@ export type ClaveRegla =
   | "combo_min_ventas"
   | "combo_descuento"
   | "dias_plazo"
+  | "max_titulo"
   | "min_fotos"
   | "min_descripcion";
 
@@ -38,6 +39,7 @@ export const REGLAS: DefRegla[] = [
   { clave: "min_ventas_antes", grupo: "ventas", etiqueta: "Ventas mínimas para comparar", descripcion: "La caída solo se mide si en los 30 días anteriores vendió al menos esto.", unidad: "unidades", defecto: 10, min: 1, max: 1000 },
   { clave: "dias_nuevo", grupo: "ventas", etiqueta: "Días de producto nuevo", descripcion: "Un producto publicado hace menos de estos días todavía no se verifica con su dropshipper.", unidad: "dias", defecto: 30, min: 1, max: 365 },
   { clave: "combo_min_ventas", grupo: "combo", etiqueta: "Ventas mínimas para sugerir un combo", descripcion: "Solo se sugiere un combo x2 si vendió al menos esto en 30 días.", unidad: "unidades", defecto: 5, min: 0, max: 1000 },
+  { clave: "max_titulo", grupo: "optimizacion", etiqueta: "Largo máximo del título", descripcion: "Dropi no admite títulos más largos: con más caracteres, se recomienda acortarlo.", unidad: "unidades", defecto: 40, min: 10, max: 200 },
   { clave: "min_fotos", grupo: "optimizacion", etiqueta: "Fotos mínimas por publicación", descripcion: "Con menos fotos en Dropi, se recomienda agregar más.", unidad: "unidades", defecto: 7, min: 1, max: 30 },
   { clave: "min_descripcion", grupo: "optimizacion", etiqueta: "Largo mínimo de la descripción", descripcion: "Con menos caracteres en la descripción de Dropi, se recomienda mejorarla (Dropi pide 200).", unidad: "unidades", defecto: 200, min: 50, max: 5000 },
   { clave: "dias_plazo", grupo: "tareas", etiqueta: "Plazo para hacer una recomendación aceptada", descripcion: "Pasado este plazo sin hacerse, la tarea sale como atrasada.", unidad: "dias", defecto: 7, min: 1, max: 90 },

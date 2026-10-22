@@ -232,7 +232,7 @@ export const CURSOS: Curso[] = [
         parrafos: [
           "Cada publicación se vincula con su producto de Producto. Si falta, la ficha sugiere uno (por la misma foto o un nombre parecido) con «Vincular» o «Vincular y siguiente»; si no es el correcto, busca otro por SKU o nombre.",
           "Un pack («PACK 2», «2x1») se vincula con su compuesto, no con el producto simple, porque al vender descontaría mal el inventario. Si el compuesto no existe, la ficha dice «Falta el compuesto»: créalo en Producto y vincúlalo.",
-          "Con el vínculo, la ficha muestra «En camino» (las unidades de compras que ya salieron hacia ese país) y la competencia del producto en Dropi. Sin vínculo, el producto no se puede comprar desde Compras › Reponer.",
+          "Con el vínculo, la ficha muestra «En camino» (las unidades de compras ya pedidas a ese país que todavía no llegan, ya salieron o estén en producción) y la competencia del producto en Dropi. Sin vínculo, el producto no se puede comprar desde Compras › Reponer.",
         ],
       },
     ],
