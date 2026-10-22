@@ -30,3 +30,9 @@ export async function cuentaDeProveedor(usuarioId: string): Promise<CuentaProvee
 
 /** La entrada del portal del proveedor. */
 export const RUTA_PORTAL_PROVEEDOR = "/proveedor";
+
+/** El idioma en que la cuenta ve su portal (migración 0130). Chino si no lo eligió o si la migración aún no se corrió. */
+export async function idiomaDeCuenta(cuentaId: string): Promise<"zh" | "es"> {
+  const { data, error } = await createServiceClient().from("proveedor_usuarios").select("idioma").eq("id", cuentaId).maybeSingle();
+  return !error && data?.idioma === "es" ? "es" : "zh";
+}

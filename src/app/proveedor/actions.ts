@@ -98,3 +98,12 @@ export async function marcarVistoPorProveedor(): Promise<void> {
   if (!cuenta) return;
   await createServiceClient().from("proveedor_novedades").update({ leida_en: new Date().toISOString() }).eq("proveedor_id", cuenta.proveedor.id).eq("lado", "ecomfive").is("leida_en", null);
 }
+
+/** 中文 / Español: el idioma en que la cuenta ve su portal (se guarda en su cuenta). */
+export async function cambiarIdiomaProveedor(idioma: string): Promise<{ error?: string }> {
+  const cuenta = await cuentaProveedorActual();
+  if (!cuenta) return SIN_SESION;
+  if (idioma !== "zh" && idioma !== "es") return { error: "Idioma no válido." };
+  const { error } = await createServiceClient().from("proveedor_usuarios").update({ idioma }).eq("id", cuenta.cuentaId);
+  return error ? { error: "No se pudo cambiar el idioma." } : {};
+}

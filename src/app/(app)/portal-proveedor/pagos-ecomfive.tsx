@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
+import { Traducido } from "@/components/proveedor/idioma-contexto";
 import { IndicadoresEcomfive, TablaPlazos, textoCuota, type AvisoVista, type FilaPlazo } from "@/components/proveedor/pagos-proveedor";
 import { Foto, TONO, Tarjeta, Vacio, botonNormal, botonPeligro, botonPrincipal, dinero, fecha } from "@/components/proveedor/piezas-proveedor";
 import { Badge } from "@/components/ui/badge";
@@ -201,7 +202,11 @@ function FilaAviso({ a, nombre, puedeEscribir, alCancelar }: { a: AvisoVista; no
       </td>
       <td className={claseTdLista}>
         {a.estado === "avisado" ? <Badge tone="info">Esperando a {nombre}</Badge> : <Badge tone="success">Confirmado {a.confirmadoEn ? fecha(a.confirmadoEn.slice(0, 10)) : ""}</Badge>}
-        {a.nota && <span className="block text-xs text-muted-foreground">«{a.nota}»</span>}
+        {a.nota && (
+          <span className="block text-xs text-muted-foreground">
+            «<Traducido texto={a.nota} />»
+          </span>
+        )}
       </td>
       <td className={`${claseTdLista} text-right`}>
         {puedeEscribir && a.estado === "avisado" && (
