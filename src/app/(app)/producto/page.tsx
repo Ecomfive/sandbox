@@ -48,7 +48,9 @@ const unoDe = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? 
  * descuenta cada componente) y físico o test (se está probando, todavía no se compra y no tiene stock). Su SKU es la llave
  * con la que una venta de Dropi o de Shopify lo encuentra. Todos se ven en Inventario.
  */
-export default async function ProductoPage() {
+export default async function ProductoPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
+  // Desde la ficha de una publicación de Dropi (y otras) se llega con `?abrir=<producto>`: abre su ficha al cargar.
+  const { abrir } = await searchParams;
   const usuario = await requireModulo("producto");
   const supabase = createServiceClient();
   // El producto es igual para todos los países; el país solo da formato a las fechas de su actividad.
@@ -315,6 +317,7 @@ export default async function ProductoPage() {
         productos={[...filas].sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0))}
         opcionesSimples={opcionesSimples}
         codigoPais={pais.codigo}
+        abrirInicial={typeof abrir === "string" ? abrir : null}
         puedeEscribir={!usuario.modulosSoloLectura.includes("producto")}
         puedeEliminar={!usuario.modulosSoloLectura.includes("producto") && esAdministrador(usuario)}
         referenciasTest={referenciasTest}

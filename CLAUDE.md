@@ -359,7 +359,7 @@ convenciones técnicas del código.
   de esas fichas es un selector (`CampoSkuMaestro`, `src/components/ui/selector-sku-maestro.tsx`, con una sola lista compartida por
   `ProveedorSkusMaestros`) y el servidor copia el código del producto en `sku` al guardar (`escribirHijos`, `resolverSkuMaestro`). La
   ficha de un producto muestra sus **Asociaciones** (variantes Shopify, productos Dropi y productos de los pedidos de Dropi), un acceso a
-  Inventario y «Crear ficha Shopify» (`/wms-productos/nuevo?sku_maestro=<id>`). Las variaciones de un producto Dropi variable
+  Inventario y «Crear ficha Shopify» (`/wms-productos/nuevo?sku_maestro=<id>`). **`/producto?abrir=<id>`** abre al cargar la ficha de ese producto (`abrirInicial` de `TablaProducto`, como `?abrir=` de Gestión de IDs Dropi: la ficha es un portal, así que solo se monta en el navegador, y el parámetro se quita de la dirección); lo usa «Abrir en Producto» de la ficha de una publicación. Las variaciones de un producto Dropi variable
   conservan su SKU como texto. **Código de barras** (migración 0072, `src/lib/wms/codigo-barras.ts`): cada producto puede tener el EAN-8, UPC-A, EAN-13 o GTIN-14 del fabricante
   (se valida el dígito de control GS1; `codigo_barras_origen = 'fabricante'`) o, si no trae ninguno, **uno interno**: al crear el producto viene elegido «Interno» y se genera solo (8 oct 2026; «Del fabricante» pide escribirlo y un compuesto arranca en «Sin código de barras»), y también se genera después desde su ficha
   («Generar código interno», `wms_asignar_codigo_barras_interno`): un **EAN-13 con prefijo 20** (el estándar GS1 reserva del 20 al 29 para
