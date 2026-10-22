@@ -38,16 +38,16 @@ test("estado de una cuota: por vencer, vence hoy, vencida y pagada a tiempo o ta
   assert.equal(estadoCuota(a, "2026-10-21").texto, "Vence en 10 d");
   assert.equal(estadoCuota(a, "2026-10-29").tono, "aviso");
   assert.equal(estadoCuota(a, "2026-10-31").texto, "Vence hoy");
-  assert.deepEqual(estadoCuota(a, "2026-11-05"), { tono: "peligro", texto: "Vencido 5 d", atraso: 5 });
+  assert.deepEqual(estadoCuota(a, "2026-11-05"), { tono: "peligro", texto: "Vencido 5 d", atraso: 5, clave: "vencido", n: 5 });
   const [aTiempo] = cuotasDe({ ...pedido, pagosAnticipo: pago(2500, "2026-10-30") });
   assert.equal(estadoCuota(aTiempo, "2026-11-20").texto, "Pagado a tiempo");
   const [tarde] = cuotasDe({ ...pedido, pagosAnticipo: pago(2500, "2026-11-08") });
-  assert.deepEqual(estadoCuota(tarde, "2026-11-20"), { tono: "aviso", texto: "Pagado 8 d tarde", atraso: 8 });
+  assert.deepEqual(estadoCuota(tarde, "2026-11-20"), { tono: "aviso", texto: "Pagado 8 d tarde", atraso: 8, clave: "pagado_tarde", n: 8 });
   // Un pago parcial no la da por pagada; en dos partes, cuenta la fecha de la última.
   const [parcial] = cuotasDe({ ...pedido, pagosAnticipo: pago(1000, "2026-10-25") });
   assert.equal(parcial.pendiente, 1500);
   const [enDos] = cuotasDe({ ...pedido, pagosAnticipo: [{ monto: 1000, fecha: "2026-10-25" }, { monto: 1500, fecha: "2026-11-02" }] });
-  assert.deepEqual(estadoCuota(enDos, "2026-11-20"), { tono: "aviso", texto: "Pagado 2 d tarde", atraso: 2 });
+  assert.deepEqual(estadoCuota(enDos, "2026-11-20"), { tono: "aviso", texto: "Pagado 2 d tarde", atraso: 2, clave: "pagado_tarde", n: 2 });
   assert.equal(cumplimiento([aTiempo, tarde, parcial]).aTiempo, 1);
   assert.equal(cumplimiento([aTiempo, tarde]).peor, 8);
 });
