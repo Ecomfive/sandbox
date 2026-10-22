@@ -1,5 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
+import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -40,6 +41,7 @@ export default async function RecomendacionesPage({ searchParams }: { searchPara
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Recomendaciones" oculto />
+      <ContadorPestana href="/publicaciones-dropi/recomendaciones" cantidad={sugeridas.length} />
       <PanelRecomendaciones
         sugeridas={sugeridas}
         decisiones={decisiones}
