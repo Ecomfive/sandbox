@@ -6,7 +6,9 @@ import { revisionVencida } from "@/lib/publicaciones/publicacion";
 import { estadoTarea, etiquetaRecomendacion, pendientes, recomendar, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
+import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
+import type { UsuarioActual } from "@/lib/auth";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
 import { detectarPack } from "@/lib/publicaciones/vincular";
@@ -177,7 +179,7 @@ export interface DatosPublicaciones {
  * Las publicaciones de un país listas para la lista, la ficha y la pestaña Recomendaciones: lo guardado más lo calculado (Dropi,
  * competencia, reglas y recomendaciones pendientes). `null` si falta la migración 0116.
  */
-export async function cargarPublicaciones(supabase: SupabaseClient, paisId: string): Promise<DatosPublicaciones | null> {
+export async function cargarPublicaciones(supabase: SupabaseClient, paisId: string, usuario: UsuarioActual): Promise<DatosPublicaciones | null> {
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
   const [filasR, numerosR, reglas, { decisiones, conTareas }, personas] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
@@ -201,7 +203,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -211,6 +213,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarResumenVentas(supabase, paisId),
     cargarCompetidores(supabase, paisId),
     cargarCambiosPrecio(supabase, paisId),
+    cargarEnCamino(supabase, paisId, usuario),
   ]);
   const r = reglas.reglas;
   const decisionesDe = new Map<string, DecisionVista[]>();
@@ -254,6 +257,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       deClickup: !!d.clickup_id,
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
       sugerencia: sugerencias.get(d.id) ?? null,
+      enCamino: d.sku_maestro_id ? (enCaminoPorSku.get(d.sku_maestro_id as string) ?? 0) : 0,
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
       ...automatico(d, ventas, competidores, hoy, r),

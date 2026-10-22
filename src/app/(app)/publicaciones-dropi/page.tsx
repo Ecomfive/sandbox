@@ -25,7 +25,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
   // Eliminar publicaciones: solo un administrador. Las ventas de Dropi (últimos 30 días) las ve todo el que abre el módulo.
   const admin = esAdministrador(usuario);
-  const datos = await cargarPublicaciones(supabase, pais.id);
+  const datos = await cargarPublicaciones(supabase, pais.id, usuario);
 
   if (!datos) {
     return (

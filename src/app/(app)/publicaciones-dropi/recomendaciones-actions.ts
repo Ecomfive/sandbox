@@ -188,9 +188,9 @@ export async function guardarReglas(_previo: { error?: string; ok?: boolean } | 
  * lectura: basta poder abrir el módulo. `null` si falta la migración 0116.
  */
 export async function contarRecomendacionesPendientes(): Promise<number | null> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await cargarPublicaciones(supabase, pais.id);
+  const datos = await cargarPublicaciones(supabase, pais.id, usuario);
   return datos ? datos.filas.reduce((n, f) => n + f.recomendaciones.length, 0) : null;
 }
