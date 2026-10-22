@@ -367,9 +367,19 @@ export const GUIAS: GuiaModulo[] = [
         ],
       },
       {
+        titulo: "Optimización en Dropi",
+        pasos: [
+          "La ficha de cada publicación trae el bloque «Optimización en Dropi»: lo que se revisa de cómo se ve en Dropi, con Cumple, Falta, Revisar o Sin datos, y la nota (cuántos puntos cumple). Se revisa con lo que muestra Dropi en la última lectura del catálogo, no con el nombre guardado aquí.",
+          "Título: en español (sin palabras en inglés como hair, growth, cream, blocker), con la cantidad si es un suplemento (60 cápsulas, 30 gomitas), que diga para qué sirve («para la ciática», «contra la caída»; si no lo dice, queda para revisar) y claro (no muy corto ni todo en mayúsculas).",
+          "Fotos (7 como mínimo), video, descripción (200 caracteres como mínimo) y precio sugerido (que exista y sea mayor que nuestro precio, para que al dropshipper le quede margen). Fotos, video y descripción dicen «Sin datos» hasta la próxima lectura del catálogo de Dropi.",
+          "Lo que falta sale como recomendación (Optimizar el título, Agregar fotos, Agregar video, Mejorar la descripción, Ajustar el precio sugerido) en la tarjeta «Por optimizar» del tablero y en la pestaña Recomendaciones (grupo «Optimización en Dropi»). Se acepta y se asigna como las demás, y el sistema la da por hecha cuando la lectura de Dropi ya no ve lo que faltaba.",
+          "El filtro «Optimización» de la lista separa las que les falta mucho, algo o están completas, y «Nota de optimización (%)» permite ordenarlas.",
+        ],
+      },
+      {
         titulo: "Reglas",
         pasos: [
-          "La pestaña «Reglas» tiene los números con que el sistema decide: margen mínimo (30 %), crítico (20 %) y saludable (40 %), la caída de ventas (50 %), las ventas mínimas para comparar (10), los días de producto nuevo (30) para el combo x2, las ventas mínimas en 30 días (5) y su descuento (10 %), y el plazo para hacer una recomendación aceptada (7 días). Entre paréntesis, los valores de siempre.",
+          "La pestaña «Reglas» tiene los números con que el sistema decide: margen mínimo (30 %), crítico (20 %) y saludable (40 %), la caída de ventas (50 %), las ventas mínimas para comparar (10), los días de producto nuevo (30) para el combo x2, las ventas mínimas en 30 días (5) y su descuento (10 %), el mínimo de fotos (7) y de caracteres de la descripción (200), y el plazo para hacer una recomendación aceptada (7 días). Entre paréntesis, los valores de siempre.",
           "Cámbialos y pulsa «Guardar reglas»: las tarjetas, los filtros de margen y las recomendaciones se calculan con los nuevos. Queda quién cambió cada uno y cuándo (también en la auditoría). «Valores de siempre» los devuelve a los del sistema. Solo los cambia quien puede modificar este módulo.",
         ],
       },
@@ -553,6 +563,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-22", titulo: "Optimización de las publicaciones en Dropi", texto: "Gestión de IDs Dropi revisa cómo se ve cada publicación en Dropi: título en español, con la cantidad y para qué sirve, fotos (7 como mínimo), video, descripción y precio sugerido. Lo que falta sale como recomendación en la nueva tarjeta «Por optimizar» y en la ficha, y se vuelve tarea al aceptarlo.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/recomendaciones" },
   { fecha: "2026-10-22", titulo: "Gestión de IDs Dropi: producto en la misma ficha y «Conectado»", texto: "«Abrir en Producto» ahora abre la ficha del producto encima de la de la publicación, sin llevarte al módulo Producto (con Ctrl o clic central sí se abre en otra pestaña). Además, una publicación con ID de Dropi se marca «Conectado» (en su ficha y en la lista) y su ID queda bloqueado hasta pulsar el lápiz; el nombre en Dropi ya no se edita, porque viene de Dropi.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-21", titulo: "Pagos a Chin en el portal", texto: "Portal del proveedor tiene la pestaña «Pagos»: el cumplimiento de los anticipos y los saldos, lo que vence y el aviso de pago a Chin con su comprobante y a qué productos va. Chin lo confirma en su portal y queda pagado. Ya está cargado lo pagado según las hojas de pagos de Chin, y la ficha de cada compra de Chin muestra sus pagos.", modulo: "portal-proveedor", href: "/portal-proveedor?tab=pagos" },
   { fecha: "2026-10-22", titulo: "Elige cómo se abren las fichas", texto: "Como en ClickUp, el ícono «Cambiar diseño» de la cabecera de cualquier ficha (junto a «Cerrar»; al pasar el cursor por encima muestra las tres opciones y se repliega al elegir una) deja elegir si se abre en una barra lateral, en un cuadro de diálogo al centro o a pantalla completa. Tu elección vale para todas las fichas del sistema y se guarda en tu navegador; mientras no elijas, cada ficha se abre como siempre (la de Producto, al centro).", href: "/" },

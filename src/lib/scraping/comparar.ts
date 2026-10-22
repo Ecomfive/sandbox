@@ -28,6 +28,12 @@ export interface ProductoVisto {
   stock: number | null;
   categoria: string | null;
   creadoEnDropi: string | null;
+  /** Cuántas fotos tiene en Dropi (la galería). */
+  fotos?: number | null;
+  /** Cuántos videos (null si la lectura no lo trae). */
+  videos?: number | null;
+  /** El largo de la descripción, sin etiquetas (null si la lectura no la trae). */
+  descripcionLargo?: number | null;
 }
 
 export interface ProductoGuardado {
@@ -95,6 +101,9 @@ export function normalizarDropi(o: unknown): ProductoVisto | null {
     stock,
     categoria,
     creadoEnDropi: typeof p.created_at === "string" ? p.created_at : null,
+    fotos: Array.isArray(p.gallery) ? galeria.length : null,
+    videos: Array.isArray(p.videos) ? p.videos.length : num(p.videos),
+    descripcionLargo: num(p.descripcion_largo),
   };
 }
 

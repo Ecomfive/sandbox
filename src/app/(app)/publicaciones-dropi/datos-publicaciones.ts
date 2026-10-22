@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
 import { accionesPublicacion, enDropi, estaArchivada } from "@/lib/publicaciones/automatico";
-import { cargarCambiosPrecio, cargarCompetidores, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
+import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
+import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { revisionVencida } from "@/lib/publicaciones/publicacion";
-import { estadoTarea, etiquetaRecomendacion, pendientes, recomendar, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { estadoTarea, etiquetaRecomendacion, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
@@ -201,7 +202,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enDropiCatalogo] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -211,8 +212,27 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarResumenVentas(supabase, paisId),
     cargarCompetidores(supabase, paisId),
     cargarCambiosPrecio(supabase, paisId),
+    cargarNuestrosEnDropi(supabase, paisId),
   ]);
   const r = reglas.reglas;
+  // La revisión de optimización: con lo que muestra Dropi (el primer ID que esté en el catálogo); si no se leyó, el título guardado.
+  const revisionDe = (d: Fila): Pick<FilaPublicacion, "revisiones" | "nota" | "tituloDropi"> => {
+    const cat = idsDropi(d).map((id) => enDropiCatalogo.get(id)).find((x) => !!x) ?? null;
+    const revisiones = revisarPublicacion(
+      {
+        titulo: cat?.nombre ?? (d.nombre as string),
+        categoria: cat?.categoria ?? null,
+        precio: cat?.precio ?? num(d.precio_venta),
+        precioSugerido: cat?.precioSugerido ?? null,
+        fotos: cat?.fotos ?? null,
+        videos: cat?.videos ?? null,
+        descripcionLargo: cat?.descripcionLargo ?? null,
+        leidoEnDropi: !!cat,
+      },
+      r,
+    );
+    return { revisiones, nota: notaOptimizacion(revisiones), tituloDropi: cat?.nombre ?? null };
+  };
   const decisionesDe = new Map<string, DecisionVista[]>();
   for (const d of decisiones) decisionesDe.set(d.publicacionId, [...(decisionesDe.get(d.publicacionId) ?? []), d]);
 
@@ -256,6 +276,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       sugerencia: sugerencias.get(d.id) ?? null,
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
+      ...revisionDe(d),
       ...automatico(d, ventas, competidores, hoy, r),
     };
   });
@@ -269,7 +290,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     // Las tareas abiertas que los datos ya muestran hechas.
     for (const d of f.decisiones) {
       if (d.estado !== "por_hacer" && d.estado !== "atrasada") continue;
-      const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado });
+      const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado, revisiones: f.revisiones });
       if (!c) continue;
       d.hechaEn = c.fecha ? `${c.fecha.slice(0, 10)}T12:00:00Z` : new Date().toISOString();
       d.hechaComo = c.como;
@@ -295,7 +316,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       },
       r,
     );
-    f.recomendaciones = pendientes(recs, f.decisiones, hoy);
+    f.recomendaciones = pendientes([...recs, ...recomendarOptimizacion(f.revisiones, f.archivada)], f.decisiones, hoy);
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 

@@ -127,6 +127,14 @@ async function scrapingCompetencia(puente) {
         categories: (o.categories || []).map((c) => ({ name: c.name })),
         warehouse_product: (o.warehouse_product || []).map((w) => ({ stock: w.stock })),
         variations: (o.variations || []).map((v) => ({ warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ stock: w.stock })) })),
+        // Para Gestión de IDs Dropi › Optimización (migración 0129): cuántos videos (cualquier campo de Dropi que diga «video»;
+        // sin ninguno, no se sabe) y el largo de la descripción sin etiquetas. Las fotos se cuentan con la galería.
+        videos: (() => {
+          let n = null;
+          for (const [k, v] of Object.entries(o)) if (/video/i.test(k)) n = (n ?? 0) + (Array.isArray(v) ? v.length : v ? 1 : 0);
+          return n;
+        })(),
+        descripcion_largo: typeof o.description === "string" ? o.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().length : null,
       });
     }
     if (!objetos.length) break;

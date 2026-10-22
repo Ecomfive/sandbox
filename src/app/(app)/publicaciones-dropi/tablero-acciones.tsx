@@ -7,8 +7,11 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { AnalisisCompetenciaIcon, DropshipperIcon, EnlaceIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
-import { TIPOS_RECOMENDACION } from "@/lib/publicaciones/recomendaciones";
+import { AnalisisCompetenciaIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
+
+const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
+const tiposDe = (g: GrupoRecomendacion) => TIPOS_RECOMENDACION.filter((t) => t.grupo === g).map((t) => t.valor);
 import { DEF_PUBLICACIONES, estadoVinculo, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
@@ -77,14 +80,18 @@ const TARJETAS: Tarjeta[] = [
     titulo: "Recomendaciones",
     icono: SugerenciaIcon,
     color: "violeta",
-    detalle: "Con algo que el sistema sugiere hacer",
-    cuenta: (f) => f.recomendaciones.length > 0,
-    atajo: {
-      id: "recomendaciones",
-      etiqueta: "Recomendaciones",
-      ayuda: "Filtrar la lista: con recomendaciones",
-      filtro: { campo: "recomendacion", valor: { tipo: "seleccion" as const, valores: TIPOS_RECOMENDACION.map((t) => t.valor) } },
-    },
+    detalle: "De precio o combo, sin decidir",
+    cuenta: (f) => f.recomendaciones.some((r) => grupoDe(r.tipo) === "precio"),
+    atajo: { id: "recomendaciones", etiqueta: "Recomendaciones", ayuda: "Filtrar la lista: con recomendaciones de precio o combo", filtro: seleccion("recomendacion", ...tiposDe("precio")), suma: true },
+  },
+  {
+    id: "por-optimizar",
+    titulo: "Por optimizar",
+    icono: EstadoIcon,
+    color: "azul",
+    detalle: "Título, fotos, video o precio sugerido por mejorar en Dropi",
+    cuenta: (f) => f.recomendaciones.some((r) => grupoDe(r.tipo) === "optimizacion"),
+    atajo: { id: "por-optimizar", etiqueta: "Por optimizar", ayuda: "Filtrar la lista: con algo por optimizar en Dropi", filtro: seleccion("recomendacion", ...tiposDe("optimizacion")), suma: true },
   },
   {
     id: "sin-vincular",
@@ -126,7 +133,7 @@ function TarjetaAccion({ t, valor, total, extra, detalle, def }: { t: Tarjeta; v
         <span aria-hidden="true" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${c.icono}`}>
           <Icono className="h-[18px] w-[18px]" />
         </span>
-        <span className="min-w-0 text-xs leading-tight font-medium tracking-wide text-muted-foreground uppercase">{t.titulo}</span>
+        <span className="min-w-0 text-xs leading-tight font-medium tracking-wide text-muted-foreground uppercase hyphens-auto [overflow-wrap:anywhere]">{t.titulo}</span>
       </span>
       <span className="flex items-baseline gap-1">
         <span className={`text-3xl leading-none font-semibold tabular-nums ${c.numero}`}>{valor.toLocaleString("es-PA")}</span>
@@ -149,7 +156,7 @@ function TarjetaAccion({ t, valor, total, extra, detalle, def }: { t: Tarjeta; v
 export function TableroAcciones({ publicaciones, reglas, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; def?: DefTabla<FilaPublicacion> }) {
   const abiertas = publicaciones.filter((f) => !f.archivada);
   return (
-    <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-4 2xl:grid-cols-8">
+    <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {TARJETAS.map((t) => (
         <TarjetaAccion key={t.id} t={t} valor={abiertas.filter(t.cuenta).length} total={abiertas.length} extra={t.extra ? t.extra(abiertas, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas) : t.detalle} def={def} />
       ))}
