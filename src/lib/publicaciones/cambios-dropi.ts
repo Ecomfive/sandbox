@@ -36,6 +36,8 @@ export interface CambioDropi {
   /** El precio que tenía antes (para mostrar «de … a …»). */
   precioAntes?: number | null;
   precioSugeridoAntes?: number | null;
+  /** El nombre que tenía la publicación antes de este cambio (migración 0149): para volver a él si se deshace el cambio pendiente. */
+  nombreAntes?: string | null;
 }
 
 /**
@@ -61,11 +63,14 @@ export async function encolarCambio(
     const r = await consulta(columnas, true);
     return r.error ? consulta(columnas, false) : r;
   };
-  let previo = await leer("id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
+  // Sin la migración 0149 no se guarda el nombre de antes (el cambio igual se encola; solo no se podrá volver al nombre anterior al deshacerlo).
+  const hayNombreAntes = !(await supabase.from("dropi_cambios_pendientes").select("nombre_antes").limit(1)).error;
+  const conNombreAntes = hayNombreAntes ? ", nombre_antes" : "";
+  let previo = await leer(`id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes${conNombreAntes}`);
   const hayPrecios = !previo.error;
   if (!hayPrecios) {
     if (conPrecio) return { error: "Falta correr en Supabase la migración 0139 para mandar precios a Dropi." };
-    previo = await leer("id, nombre, nombre_guia");
+    previo = await leer(`id, nombre, nombre_guia${conNombreAntes}`);
   }
   const p = (previo.data ?? null) as Record<string, unknown> | null;
   const elegir = <T,>(nuevo: T | undefined, viejo: unknown): T | null => (nuevo !== undefined ? nuevo : ((viejo as T | null | undefined) ?? null));
@@ -78,6 +83,8 @@ export async function encolarCambio(
     creado_por: por.id,
     creado_por_nombre: por.nombre,
   };
+  // El nombre de antes es el de la primera vez que se pidió el cambio (el que tenía el sistema antes de tocarlo).
+  if (hayNombreAntes && (cambio.nombre !== undefined || p?.nombre_antes != null)) fila.nombre_antes = p?.nombre_antes ?? cambio.nombreAntes ?? null;
   if (hayPrecios) {
     fila.precio = elegir(cambio.precio, p?.precio);
     fila.precio_sugerido = elegir(cambio.precioSugerido, p?.precio_sugerido);
@@ -148,10 +155,10 @@ export async function encolarApagar(
 export async function encolarCambioNombre(
   supabase: SupabaseClient,
   pub: { id: string; pais_id: string; dropi_id: string | null },
-  cambio: { nombre: string; nombreGuia: string | null },
+  cambio: { nombre: string; nombreGuia: string | null; nombreAntes?: string | null },
   por: { id: string; nombre: string },
 ): Promise<{ id: string } | { error: string }> {
-  return encolarCambio(supabase, pub, { nombre: cambio.nombre, nombreGuia: cambio.nombreGuia }, por);
+  return encolarCambio(supabase, pub, { nombre: cambio.nombre, nombreGuia: cambio.nombreGuia, nombreAntes: cambio.nombreAntes }, por);
 }
 
 /**
@@ -181,11 +188,13 @@ export async function enviarNombreADropi(
   pub: { id: string; pais_id: string; dropi_id: string | null; sku_maestro_id: string | null },
   nombre: string,
   por: { id: string; nombre: string },
+  /** El nombre que tenía la publicación antes de este cambio (para poder deshacerlo). */
+  nombreAntes?: string | null,
 ): Promise<{ estado: "pendiente" | "error"; detalle: string }> {
   const { data: sku } = pub.sku_maestro_id ? await supabase.from("skus_maestros").select("codigo").eq("id", pub.sku_maestro_id).maybeSingle() : { data: null };
   const codigo = (sku?.codigo as string | undefined)?.trim() || null;
   const nombreGuia = codigo && codigo.length <= MAX_NOMBRE_DROPI ? codigo : null;
-  const encolado = await encolarCambioNombre(supabase, pub, { nombre, nombreGuia }, por);
+  const encolado = await encolarCambioNombre(supabase, pub, { nombre, nombreGuia, nombreAntes }, por);
   if ("error" in encolado) return { estado: "error", detalle: encolado.error };
   return { estado: "pendiente", detalle: `Para Dropi${nombreGuia ? ` (guía: ${nombreGuia})` : ""}: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }

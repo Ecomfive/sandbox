@@ -179,7 +179,7 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
     dropi = r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`;
   }
   if (cambiaNombre) {
-    const r = await enviarNombreADropi(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null, sku_maestro_id: (antes.sku_maestro_id as string | null) ?? null }, nombreNuevo, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+    const r = await enviarNombreADropi(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null, sku_maestro_id: (antes.sku_maestro_id as string | null) ?? null }, nombreNuevo, { id: usuario.id, nombre: usuario.nombre || usuario.email }, antes.nombre);
     dropi = r.estado === "pendiente" ? `Nombre${dropi ? " y precio" : ""} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` : `El nombre se guardó, pero no quedó para Dropi: ${r.detalle}`;
   }
   revalidatePath(RUTA);

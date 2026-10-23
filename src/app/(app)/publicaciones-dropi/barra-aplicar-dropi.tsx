@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { EnlaceIcon } from "@/lib/nav-icons";
 import { marcadorAplicarDropi } from "@/lib/publicaciones/marcador-aplicar-dropi";
+import { VentanaCambiosPendientes } from "./pendientes-dropi";
 
 const claseBoton = `inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted ${anilloFoco}`;
 
@@ -18,6 +19,7 @@ export function BarraAplicarDropi({ pendientes }: { pendientes: number }) {
   const ref = useRef<HTMLAnchorElement>(null);
   const { mostrarToast } = useToast();
   const [abierta, setAbierta] = useState(false);
+  const [verPendientes, setVerPendientes] = useState(false);
   useEffect(() => {
     try {
       ref.current?.setAttribute("href", marcadorAplicarDropi(window.location.origin));
@@ -40,14 +42,24 @@ export function BarraAplicarDropi({ pendientes }: { pendientes: number }) {
       <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className={`inline-flex items-center gap-1.5 ${pendientes ? "font-medium text-destructive" : ""}`}>
           <span aria-hidden="true" className={`h-2 w-2 rounded-full ${pendientes ? "bg-destructive" : "bg-success"}`} />
-          {pendientes
-            ? `${pendientes} ${pendientes === 1 ? "cambio espera" : "cambios esperan"} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`
-            : "Nada pendiente para Dropi."}
+          {pendientes ? (
+            // Pulsarlo abre la lista de cambios pendientes, donde cada uno se puede deshacer antes de aplicarlo en Dropi.
+            <button
+              type="button"
+              onClick={() => setVerPendientes(true)}
+              className={`rounded text-left underline-offset-4 hover:underline hover:decoration-dotted ${anilloFoco}`}
+            >
+              {`${pendientes} ${pendientes === 1 ? "cambio espera" : "cambios esperan"} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`}
+            </button>
+          ) : (
+            "Nada pendiente para Dropi."
+          )}
         </span>
         <button type="button" onClick={() => setAbierta((a) => !a)} aria-expanded={abierta} className={claseBoton}>
           {abierta ? "Ocultar" : "Cómo aplicar en Dropi"}
         </button>
       </p>
+      <VentanaCambiosPendientes abierta={verPendientes} alCerrar={() => setVerPendientes(false)} />
       {abierta && (
         <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground">
           <ol className="m-0 flex list-decimal flex-col gap-1 pl-5">
