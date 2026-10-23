@@ -106,7 +106,7 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
         <span className="flex flex-col tabular-nums lg:items-end">
           <span className="max-w-full truncate">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>
           {v.stock <= 0 && f.enCamino > 0 && (
-            <span className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-azul lg:justify-end">
+            <span className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-success lg:justify-end">
               <span className="whitespace-nowrap">{entero(f.enCamino)} en camino</span>
               <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} />
             </span>

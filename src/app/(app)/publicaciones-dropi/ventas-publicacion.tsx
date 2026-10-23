@@ -41,7 +41,7 @@ export function VentasEnDropi({ v, corte, enCamino = 0, llegada = null, sinFecha
       </dl>
       {v.stockEstado === "sin_stock_vende" && <p className="text-sm font-medium text-destructive">Se está vendiendo y no tiene stock en Dropi.</p>}
       {v.stock <= 0 && enCamino > 0 && (
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-azul">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-success">
           <span>
             Viene mercancía en camino: {entero(enCamino)} {enCamino === 1 ? "unidad" : "unidades"}
             {llegada && <> · llega aprox. {fecha(llegada)}</>}
