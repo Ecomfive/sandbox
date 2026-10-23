@@ -129,13 +129,21 @@ const conUrls = (p: PlanFotos): PlanFotosVista => ({ ...p, fotos: p.fotos.map((f
 type FilaIA = { id: string; tipo: string; resultado: unknown; modelo: string | null; creado_por_nombre: string | null; creado_en: string };
 type Pub = { id: string; nombre: string; dropi_id: string | null; pais_id: string; precio_venta: number | null; margen: number | null; foto_url: string | null; sku_maestro_id: string | null };
 
-/** La publicación, si existe y es de un país que la persona puede ver. */
+/**
+ * La publicación, si existe y es de un país que la persona puede ver. Sin foto propia, `foto_url` trae la del producto vinculado
+ * (23 oct 2026, como la lista): con ella la IA analiza y genera fotos.
+ */
 async function publicacionPermitida(id: string, usuario: UsuarioActual): Promise<Pub | null> {
   if (typeof id !== "string" || !UUID.test(id)) return null;
   const supabase = createServiceClient();
   const { data } = await supabase.from("dropi_publicaciones").select("id, nombre, dropi_id, pais_id, precio_venta, margen, foto_url, sku_maestro_id").eq("id", id).maybeSingle();
   if (!data || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, data.pais_id as string))) return null;
-  return data as Pub;
+  const pub = data as Pub;
+  if (!pub.foto_url && pub.sku_maestro_id) {
+    const { data: sku } = await supabase.from("skus_maestros").select("foto_url").eq("id", pub.sku_maestro_id).maybeSingle();
+    pub.foto_url = (sku?.foto_url as string | null | undefined) ?? null;
+  }
+  return pub;
 }
 
 /**
@@ -418,7 +426,7 @@ export async function planearFotosIA(publicacionId: string): Promise<{ error?: s
   if (!proveedorTexto()) return { error: SIN_IA };
   const sinMigracion = await migracionLista();
   if (sinMigracion) return { error: sinMigracion };
-  if (!pub.foto_url) return { error: "La publicación no tiene foto del producto: agrégala primero en su ficha." };
+  if (!pub.foto_url) return { error: "Ni la publicación ni su producto vinculado tienen foto: agrégala primero en su ficha o en la del producto." };
   const { datos, contexto, fotosFaltan } = await cargarBase(pub);
   const cantidad = Math.max(1, Math.min(MAX_FOTOS, fotosFaltan));
   const r = await pedirIA({ ...pedidoFotos(datos, contexto, cantidad), imagenes: [pub.foto_url] }, true, consumoDe("fotos_plan", usuario, pub));
@@ -459,7 +467,7 @@ export async function generarFotoIA(iaId: string, indice: number, textosEditados
   const plan = fila.resultado as PlanFotos;
   const foto = plan.fotos?.[indice];
   if (!foto) return { error: "Esa foto ya no está en el plan." };
-  if (!pub.foto_url) return { error: "La publicación no tiene foto del producto: agrégala primero en su ficha." };
+  if (!pub.foto_url) return { error: "Ni la publicación ni su producto vinculado tienen foto: agrégala primero en su ficha o en la del producto." };
 
   // El texto de una foto informativa: el que dejó la persona o, si no, el del plan.
   const textos = normalizarTextos(foto.tipo, Array.isArray(textosEditados) ? textosEditados : (foto.textos ?? []));

@@ -300,7 +300,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       cambioPrecioDropi: ultimoCambioDe(idsDropi(d), precios.cambios),
       lecturaDropiDesde: precios.desde,
       revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
-      fotoUrl: (d.foto_url as string | null) ?? null,
+      // Sin foto propia, la del producto vinculado (pedido de Hernán, 23 oct 2026): así no queda el cuadro vacío.
+      fotoUrl: (d.foto_url as string | null) ?? (d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string)?.foto ?? null) : null),
       notas: (d.notas as string | null) ?? "",
       responsableId: (d.responsable_id as string | null) ?? null,
       relacionados: ((d.relacionados as string[] | null) ?? []).map((x) => nombrePorId.get(x)).filter((x): x is string => !!x),
