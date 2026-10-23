@@ -130,7 +130,7 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
       : p.precioSugerido === null || p.precioSugerido <= 0
         ? r("precio_sugerido", "falta", "Sin precio sugerido en Dropi")
         : p.precio !== null && p.precioSugerido <= p.precio
-          ? r("precio_sugerido", "falta", `El sugerido ($${p.precioSugerido.toFixed(2)}) no es mayor que nuestro precio ($${p.precio.toFixed(2)}): al dropshipper no le queda margen`)
+          ? r("precio_sugerido", "falta", `Sugerido $${p.precioSugerido.toFixed(2)}, nuestro precio $${p.precio.toFixed(2)}: al dropshipper no le queda margen`)
           : r("precio_sugerido", "ok", `$${p.precioSugerido.toFixed(2)}`),
   ];
 }

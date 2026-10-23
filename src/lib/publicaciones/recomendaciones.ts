@@ -83,7 +83,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
     if (margenCombo >= reglas.margen_minimo)
       out.push({
         tipo: "combo_x2",
-        titulo: `${p.combo ? "Publicar el combo x2" : "Crear combo x2"} a ${usd(precioCombo)}`,
+        titulo: `${p.combo ? "Publicar el combo x2" : "Crear combo x2"} a ${usd(precioCombo)} (hoy, 1 unidad a ${usd(p.precio)})`,
         motivo: `${baseMotivo}. Vende ${ventas} en 30 días.${p.combo ? ` El compuesto ${p.combo.codigo} ya existe en Producto y no está publicado.` : " No tiene combo x2."}`,
         resultado: `Con 2 unidades a ${usd(precioCombo)} (${pct(reglas.combo_descuento)} menos que dos sueltas) el margen sería ${pct(margenCombo)}: el fulfillment se paga una vez por pedido.`,
         datos: { margen: p.margen, precio: p.precio, costo: p.costo, fulfillment: ful, ventas30: ventas, precioCombo, margenCombo: Math.round(margenCombo * 10000) / 10000, comboExistente: p.combo?.codigo ?? null },
@@ -103,7 +103,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
     if (precio > p.precio && margenNuevo - p.margen >= 0.02)
       out.push({
         tipo: "subir_precio",
-        titulo: `Subir el precio a ${usd(precio)}`,
+        titulo: `Subir el precio de ${usd(p.precio)} a ${usd(precio)} (+${usd(precio - p.precio)})`,
         motivo: `${baseMotivo}. Nadie lo vende más barato${tope ? `; ${tope}` : ""}.`,
         resultado: `A ${usd(precio)} el margen sería ${pct(margenNuevo)}${margenNuevo < reglas.margen_minimo ? " (todavía bajo el mínimo, para no pasar a la competencia)" : ""}.`,
         datos: { margen: p.margen, precio: p.precio, costo: p.costo, fulfillment: ful, precioSugerido: precio, margenNuevo: Math.round(margenNuevo * 10000) / 10000, competidor: p.competidorMinimo?.proveedor ?? null, precioCompetidor: p.competidorMinimo?.precio ?? null },
@@ -117,7 +117,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
     if (precio < p.precio && precio > 0 && margenNuevo >= reglas.margen_critico)
       out.push({
         tipo: "igualar_precio",
-        titulo: `Bajar el precio a ${usd(precio)}`,
+        titulo: `Bajar el precio de ${usd(p.precio)} a ${usd(precio)} (−${usd(p.precio - precio)})`,
         motivo: `${p.competidorMasBarato.proveedor} vende lo mismo a ${usd(p.competidorMasBarato.precio)} (precio equivalente) y tiene stock; nosotros, a ${usd(p.precio)}.`,
         resultado: `A ${usd(precio)} el margen quedaría en ${pct(margenNuevo)} (tu crítico es ${pct(reglas.margen_critico)}).`,
         datos: { margen: p.margen, precio: p.precio, costo: p.costo, fulfillment: ful, precioSugerido: precio, margenNuevo: Math.round(margenNuevo * 10000) / 10000, competidor: p.competidorMasBarato.proveedor, precioCompetidor: p.competidorMasBarato.precio },
@@ -163,7 +163,8 @@ export function recomendarOptimizacion(revs: Revision[], archivada: boolean): Re
     if (!fallas.length) continue;
     out.push({
       tipo,
-      titulo: TITULO_OPTIMIZACION[tipo]!,
+      // El precio sugerido dice sus números en el título («hoy sugerido $9.99, nuestro precio $9.99»), para decidir sin abrir nada.
+      titulo: tipo === "precio_sugerido" && fallas[0].detalle.includes(":") ? `${TITULO_OPTIMIZACION[tipo]!} (${fallas[0].detalle.split(":")[0]})` : TITULO_OPTIMIZACION[tipo]!,
       motivo: fallas.map((f) => `${f.etiqueta}: ${f.detalle}`).join(". ") + ".",
       resultado: RESULTADO_OPTIMIZACION[tipo]!,
       datos: Object.fromEntries(fallas.map((f) => [f.clave, f.estado])),
