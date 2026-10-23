@@ -1,4 +1,4 @@
-// Portal del proveedor: leer las hojas de pagos de Chin («payment record for EcomFive», una por país) y emparejar cada fila con su
+// Portal del proveedor: leer las hojas de pagos de Shen Zhen («payment record for EcomFive», una por país) y emparejar cada fila con su
 // compra. Lógica pura; la importación está en scripts/importar-pagos-proveedor.ts.
 //
 // Columnas: Product, Quantity, Amount, Delivery Time (= envío), Dowm payment (= anticipo), Paid amount, Payment Time (lo pagado del
@@ -188,8 +188,8 @@ export function emparejar(filas: { fila: FilaHoja; pais: string }[], pedidos: Pe
 const ETAPAS_ABIERTAS = new Set(["por_cotizar", "cotizado", "produccion", "enviado"]);
 
 /**
- * Las unidades que manda el proveedor (23 oct 2026, regla de Hernán): si la hoja de Chin trae otra cantidad que la compra (pediste 1,000
- * y el paquete que él vende trae 960), la compra se cambia a la de Chin. Solo compras abiertas emparejadas con su fila.
+ * Las unidades que manda el proveedor (23 oct 2026, regla de Hernán): si la hoja de Shen Zhen trae otra cantidad que la compra (pediste 1,000
+ * y el paquete que él vende trae 960), la compra se cambia a la de Shen Zhen. Solo compras abiertas emparejadas con su fila.
  */
 export function unidadesDelProveedor(
   filas: { fila: FilaHoja }[],

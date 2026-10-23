@@ -13,7 +13,7 @@ import { PortalChin, type AvisoEcomfive } from "./portal-chin";
 export const dynamic = "force-dynamic";
 
 /**
- * El portal del proveedor: lo que Ecomfive le pide a Chin, lo que cotizó, lo que está en producción y lo que envió. Lee el espejo de
+ * El portal del proveedor: lo que Ecomfive le pide a Shen Zhen, lo que cotizó, lo que está en producción y lo que envió. Lee el espejo de
  * sus compras (`proveedor_pedidos`); nada del resto del sistema. Se ve en el idioma de la cuenta (chino por defecto): los textos de la
  * pantalla salen del diccionario y lo escrito por personas se traduce con Gemini (`traducirTextos`, guardado en `traducciones`).
  */

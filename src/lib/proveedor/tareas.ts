@@ -1,7 +1,7 @@
-// Compras › «Qué hacer con Chin» (23 oct 2026, pedido de Hernán): lo que nos toca para cerrar el ciclo con el proveedor, armado con
+// Compras › «Qué hacer con Shen Zhen» (23 oct 2026, pedido de Hernán): lo que nos toca para cerrar el ciclo con el proveedor, armado con
 // el espejo (`proveedor_pedidos`), las cuotas por pagar y lo que el proveedor hizo en su tablero (`proveedor_novedades` del lado
 // proveedor, sin leer = «Nuevo»). Cada tarea se va sola cuando el ciclo avanza (se decide la cotización, se paga, se marca la
-// llegada). Lo usa el Tablero de Chin. Lógica pura, con prueba.
+// llegada). Lo usa el Tablero de Shen Zhen. Lógica pura, con prueba.
 
 import type { PedidoPortal } from "./datos";
 import { diasEntre } from "./fechas";
@@ -16,13 +16,13 @@ export const ETIQUETA_TAREA: Record<TipoTarea, string> = {
   pagar_anticipo: "Pagar anticipo",
   pagar_saldo: "Pagar saldo",
   confirmar_llegada: "Confirmar llegada",
-  esperando: "Esperando a Chin",
+  esperando: "Esperando a Shen Zhen",
 };
 
 /** Orden de los tipos en los contadores de arriba. */
 export const ORDEN_TAREAS: TipoTarea[] = ["decidir", "pagar_anticipo", "pagar_saldo", "confirmar_llegada", "falta_costo", "esperando"];
 
-/** Días en «Por cotizar» a partir de los cuales se espera a Chin. */
+/** Días en «Por cotizar» a partir de los cuales se espera a Shen Zhen. */
 export const DIAS_ESPERA_COTIZAR = 5;
 /** Un anticipo que vence dentro de estos días ya cuenta como urgente. */
 const DIAS_URGENTE = 3;
@@ -42,7 +42,7 @@ export interface Tarea {
   urgente: boolean;
   /** Para ordenar dentro de lo urgente y lo demás: más alto, antes. */
   peso: number;
-  /** Adónde lleva: la compra o los pagos a Chin. */
+  /** Adónde lleva: la compra o los pagos a Shen Zhen. */
   destino: "compra" | "pagos";
 }
 

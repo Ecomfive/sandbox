@@ -563,7 +563,7 @@ convenciones técnicas del código.
   activos y archivados, y baja `api/inventories/history` de cada uno, de a tres; si falla uno no sube nada) y `… cargar` (baja a
   `datos-privados/`, borra los temporales y corre `importar-ventas-dropi.ts --aplicar`, que reemplaza la carga del país). El stock
   es el `total_stock` de Dropi. Corre desde la copia `C:/Users/herna/ecomfive-tareas` (main al día), como «dropi-diario».
-- **Portal del proveedor (Chin)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Chin
+- **Portal del proveedor (Shen Zhen)** **(El proveedor se llamaba «Chin»: desde el 23 oct 2026, migración 0143, es «Shen Zhen» en la base —`proveedores`, `wms_compras.proveedor`/`agente_envio`, `wms_rutas_envio.agente`— y en todas las pantallas. Las rutas y archivos conservan `chin` en su nombre —`/compras/tablero-chin`, `portal-chin.tsx`—: no se ven y renombrarlos rompería enlaces y favoritos. Las migraciones antiguas y `scripts/importar-rutas-envio.ts` (de una sola vez) siguen diciendo «Chin».)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Shen Zhen
   cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
   llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de
   `proveedores` desde «Cotizar» (Backlog, anuladas u otro proveedor quedan `visible = false`); si la copia falla, la compra se guarda
@@ -577,20 +577,20 @@ convenciones técnicas del código.
   `/portal-proveedor` debajo de Compras (`portal-proveedor.tsx`, la interfaz del prototipo con los tokens del sistema), pestañas
   Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Por decidir» muestra solo la foto de referencia: el espacio de la real va en blanco (`Foto enBlanco`), porque la real se agrega después (22 oct 2026). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
   **con `actualizarCampoCompra`** (mismos permisos de Compras, evento, Actividad y auditoría) y dejan una novedad para el proveedor;
-  la nota para el proveedor se escribe en «En cotización». «Nueva compra en Cotizar» lleva a `/compras/lista?proveedor=Chin`, que
+  la nota para el proveedor se escribe en «En cotización». «Nueva compra en Cotizar» lleva a `/compras/lista?proveedor=Shen Zhen`, que
   abre la compra nueva con proveedor y agente puestos (`CrearCompraPanel` se abre sola después de montarse: `Ventana` no se puede
   dibujar en el servidor). Los plazos salen de Compras › Envíos (si un país y vía tienen dos rutas, la última cambiada).
-  **Fase 3** (migración 0126): el portal de Chin en **`/proveedor`** (`src/app/proveedor/`, fuera de `(app)`: su propio layout sin menú).
+  **Fase 3** (migración 0126): el portal de Shen Zhen en **`/proveedor`** (`src/app/proveedor/`, fuera de `(app)`: su propio layout sin menú).
   Solo lo abre una cuenta de `proveedor_usuarios` (`requireProveedor` / `cuentaProveedorActual`, `src/lib/proveedor/sesion.ts`); el login
   la manda ahí, y `requireModulo` y el layout de `(app)` devuelven al portal a una cuenta de proveedor que abra otra página
   (`cuentaDeProveedor`, `src/lib/proveedor/cuenta.ts`). Lo que hace el proveedor lo aplica `src/lib/proveedor/aplicar.ts` **a la compra**
   sin pasar por los permisos de Compras (el proveedor no tiene perfil): cotizar = línea de producto (si tiene una), `qty_total`,
   `monto_total` y etapa `cotizado` en un solo update (el proveedor pone **solo unidades y monto total**; `costo_unitario` sale siempre de
-  `unitarioDesdeTotal` = total ÷ unidades con 4 decimales, en `validarCotizacion`; decidido con Hernán el 23 oct 2026), comentario «Cotización de Chin…» con la foto real como adjunto (origen
+  `unitarioDesdeTotal` = total ÷ unidades con 4 decimales, en `validarCotizacion`; decidido con Hernán el 23 oct 2026), comentario «Cotización de Shen Zhen…» con la foto real como adjunto (origen
   `proveedor`, copiada de `proveedor-portal` a `wms-compras`, validada por su firma; ruta `<proveedor>/<pedido>/fotos/<id>`,
   `rutaEsDelPedido`); enviar = etapa `tracking`, `fecha_envio` (hasta 60 días atrás, nunca futura) y su planificación
   (`cargarTiempos`, ahora en `src/lib/compras/tiempos-datos.ts`). Cada cambio: evento con origen `proveedor`, auditoría, novedad y aviso
-  en la campana de `proveedores.notificar_a`. Las cuentas las crea un administrador con «Crear cuenta» del Tablero de Chin (`cuenta-actions.ts`,
+  en la campana de `proveedores.notificar_a`. Las cuentas las crea un administrador con «Crear cuenta» del Tablero de Shen Zhen (`cuenta-actions.ts`,
   clave temporal con `crypto.randomInt`; **varias cuentas por proveedor** desde el 23 oct 2026, una por persona). Crear la cuenta o
   «Generar clave nueva» marca `app_metadata.clave_temporal = true` en su usuario (sin migración): mientras la tenga, `/proveedor` muestra
   `ElegirClave` (`proveedor/cambiar-clave.tsx`, `tieneClaveTemporal` en `lib/proveedor/sesion.ts`) en vez del portal. La cuenta cambia
@@ -600,48 +600,48 @@ convenciones técnicas del código.
   `fecha_pago_1` es la fecha en que vence; decidido con Hernán). **Desde el 23 oct 2026 ya no hay avisos de pago** (se quitaron `pagos-actions.ts`, `confirmarAvisoPago`
   y `vista-pagos.ts`; `proveedor_avisos_pago` queda con lo viejo): el comprobante va por privado. **Registro de pagos editable**
   (migración 0142, `proveedor_registro`): la tabla con las columnas de la hoja «payment record» (`components/proveedor/registro-pagos.tsx`,
-  100 filas por tanda) se edita celda por celda en el portal (`guardarCeldaRegistroProveedor`) y en «Pagos a Chin»
+  100 filas por tanda) se edita celda por celda en el portal (`guardarCeldaRegistroProveedor`) y en «Pagos a Shen Zhen»
   (`guardarCeldaRegistroEcomfive`: escritura de Compras y montos, países permitidos). Lo editado vive por `fila` (id del pedido u
   `hoja:<clave>` de `proveedor_historial`, que sobrevive a cada importación), **no toca la compra** (Francis la actualiza a mano) y
   `guardarCeldaRegistro` (`registro-datos.ts`) deja evento `registroPagos` en la compra, novedad al otro lado (campana de `notificar_a`
-  si lo cambió Chin; «Lo nuevo de Ecomfive» si lo cambió Ecomfive) y auditoría. `conRegistro` (`resumen-pagos.ts`) aplica a las cuotas
+  si lo cambió Shen Zhen; «Lo nuevo de Ecomfive» si lo cambió Ecomfive) y auditoría. `conRegistro` (`resumen-pagos.ts`) aplica a las cuotas
   monto, envío, anticipo, pagado/fecha de pago y pago del saldo; sin pagar, vence y saldo escritos a mano solo cambian la vista
-  (`filasRegistro`, con prueba). La migración 0141 (pagos origen `proveedor`, `llegada_proveedor`) queda; su flujo «Anotar» se quitó. También entra por las hojas de pagos de Chin
+  (`filasRegistro`, con prueba). La migración 0141 (pagos origen `proveedor`, `llegada_proveedor`) queda; su flujo «Anotar» se quitó. También entra por las hojas de pagos de Shen Zhen
   (`scripts/importar-pagos-proveedor.ts`, se puede repetir; `proveedor_historial` con `pedido_id` si se emparejó —`emparejar`,
   `hoja-pagos.ts`— o historial suelto que cuenta para el cumplimiento). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
   UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto
-  (un pedido viejo sin hoja saldría vencido sin estarlo). La ficha de compra muestra «Pagos a Chin» (solo lectura,
+  (un pedido viejo sin hoja saldría vencido sin estarlo). La ficha de compra muestra «Pagos a Shen Zhen» (solo lectura,
   `pagos-proveedor-compra.tsx`, oculto si el rol no ve el monto).
-  **Idioma** (migración 0130, 22 oct 2026): Chin ve su portal en **chino simplificado** (`proveedor_usuarios.idioma`, 'zh' por defecto;
+  **Idioma** (migración 0130, 22 oct 2026): Shen Zhen ve su portal en **chino simplificado** (`proveedor_usuarios.idioma`, 'zh' por defecto;
   «中文 / Español» arriba, `cambiarIdiomaProveedor`; `idiomaDeCuenta` cae a chino sin la migración). Los textos de la pantalla están en
   `src/lib/proveedor/textos.ts` (`TEXTOS.es` / `TEXTOS.zh`, fechas, estados de cuota y tránsito por `clave` + `n`, y `errorEn` para los
   errores de las acciones; **un texto nuevo del portal va en los dos idiomas**, lo comprueba `idioma.test.ts`). Lo escrito por personas se
   traduce con Gemini (`traducirTextos`, `src/lib/proveedor/traducir.ts`: `GEMINI_API_KEY`, modelo `GEMINI_TEXT_MODEL` o
   `gemini-3.5-flash-lite`, tandas de 60, máximo 4 por carga, nunca lanza) y se guarda en `traducciones` (huella sha256 + destino): a
-  chino los productos, las notas, «Lo nuevo» y los productos de pagos; a español lo que escribe Chin (comentario de cotización, detalle de
+  chino los productos, las notas, «Lo nuevo» y los productos de pagos; a español lo que escribe Shen Zhen (comentario de cotización, detalle de
   novedad, nota al confirmar un pago). Las pantallas reciben las traducciones por `IdiomaProveedor` (`useIdioma`: `t`, `tr`, `fecha`,
   `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)».
-  **Las unidades las manda Chin** (23 oct 2026, regla de Hernán): la cantidad que pone Chin es la que trae su paquete (pides 1,000 y
+  **Las unidades las manda Shen Zhen** (23 oct 2026, regla de Hernán): la cantidad que pone Shen Zhen es la que trae su paquete (pides 1,000 y
   vende 960), así que la compra toma la suya. Desde el portal ya pasaba (`aplicarCotizacion` cambia `qty_total` y la línea única);
   desde sus hojas, `importar-pagos-proveedor.ts --aplicar` cambia las compras abiertas emparejadas con otra cantidad
   (`unidadesDelProveedor`, con prueba): `qty_total` y la línea única (monto igual, costo por unidad recalculado), con su evento y auditoría.
-  **Qué hacer con Chin** (23 oct 2026, pedido de Hernán): panel arriba del Tablero de Chin
+  **Qué hacer con Shen Zhen** (23 oct 2026, pedido de Hernán): panel arriba del Tablero de Shen Zhen
   (solo ahí, decisión de Hernán: no en la lista de Compras). `tareasChin` (`src/lib/proveedor/tareas.ts`, con prueba) arma las tareas con el espejo, `cuotasPorPagar`,
   `estadoTransito` y las `proveedor_novedades` del lado proveedor sin leer («Nuevo»): decidir cotización, falta el costo, pagar
   anticipo/saldo (urgente: vencido o vence en ≤ 3 días; lo avisado pasa a «Esperando»), confirmar llegada (pasó el plazo de
-  Envíos) y esperando a Chin (> `DIAS_ESPERA_COTIZAR` 5 en Por cotizar, por `proveedor_pedidos.creado_en`; avisos sin confirmar).
+  Envíos) y esperando a Shen Zhen (> `DIAS_ESPERA_COTIZAR` 5 en Por cotizar, por `proveedor_pedidos.creado_en`; avisos sin confirmar).
   Lo carga `cargarTareasChin` (`tareas-datos.ts`; países permitidos, montos solo si los ve). `marcarVistoChin(pedidoIds)` pone
   `leida_en`. Componente `compras/tablero-chin/que-hacer-chin.tsx` (6 a la vista, «Ver las N tareas»).
-  **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Chin**
+  **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Shen Zhen**
   (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
-  sigue el Tablero). Trae «Lo que ve Chin» (el mismo `PortalChin` en español con `soloLectura`: sin botones, sin selector ni «Salir» y sin
-  marcar «Lo nuevo» como visto), «Pagos a Chin» (`compras/tablero-chin/pagos-ecomfive.tsx` + `pagos-actions.ts`: modificar Compras y ver
-  sus montos) y, para un administrador, los botones «Cuenta de Chin» (`CuentasProveedor`: todas sus cuentas, clave nueva, desactivar) y a su
+  sigue el Tablero). Trae «Lo que ve Shen Zhen» (el mismo `PortalChin` en español con `soloLectura`: sin botones, sin selector ni «Salir» y sin
+  marcar «Lo nuevo» como visto), «Pagos a Shen Zhen» (`compras/tablero-chin/pagos-ecomfive.tsx` + `pagos-actions.ts`: modificar Compras y ver
+  sus montos) y, para un administrador, los botones «Cuenta de Shen Zhen» (`CuentasProveedor`: todas sus cuentas, clave nueva, desactivar) y a su
   lado «Crear cuenta» (`CrearCuentaProveedor`; ambos en `cuenta-proveedor.tsx` + `cuenta-actions.ts`, cada uno en una `Ventana`; se
   había perdido al pasar a Compras porque el formulario solo salía sin ninguna cuenta y se repuso el 23 oct 2026). Se
   quitaron Novedades, Por decidir, En cotización y Tránsito: decidir una cotización y marcar una llegada se hacen cambiando la etapa de la
-  compra, y la **nota para Chin** (`wms_compras.nota_proveedor`) es el campo «Nota para Chin» de la ficha de una compra de Chin
-  (`leerCambios` solo la guarda si viaja en el formulario). Los avisos de Chin en la campana llevan a la compra
+  compra, y la **nota para Shen Zhen** (`wms_compras.nota_proveedor`) es el campo «Nota para Shen Zhen» de la ficha de una compra de Shen Zhen
+  (`leerCambios` solo la guarda si viaja en el formulario). Los avisos de Shen Zhen en la campana llevan a la compra
   (`/compras/lista?ver=todos&abrir=<id>`) y los de pagos a `/compras/tablero-chin?ver=pagos`; `/portal-proveedor` solo redirige ahí. El
   módulo de permisos `portal-proveedor` ya no está en el menú, la matriz ni el Centro de ayuda (sus filas viejas en `permisos_rol` no se usan).
 - **Actividad con comentarios, común a todos los módulos** (22 oct 2026). La Actividad de Compras se separó en una pieza común:
@@ -1124,7 +1124,7 @@ convenciones técnicas del código.
   país por código ISO —cualquiera del mundo, no hace falta que exista en `paises`—, vía, DDP/DAP, courier, días prometidos
   mín/máx, activo, nota) y `wms_rutas_envio_tarifas` (tipo de producto, precio, por CBM o kg, vigente desde; una nueva no borra la
   anterior). **Lo real** sale de las compras con `agente_envio` (campo nuevo de la compra, aparte del proveedor; las de proveedor
-  «Chin» quedaron con agente «Chin»), del mismo país y una sola vía, con fecha de envío y de llegada: histórico, últimos 12 meses
+  «Shen Zhen» quedaron con agente «Shen Zhen»), del mismo país y una sola vía, con fecha de envío y de llegada: histórico, últimos 12 meses
   y año en curso por la fecha de llegada (`src/lib/compras/rutas-envio.ts`, con prueba); punto rojo si el promedio de 12 meses
   pasa del máximo prometido. Quien tiene países limitados solo ve y toca las rutas de sus países.
   **La pantalla** (21 oct 2026, rediseño aprobado con maqueta; `panel-envios.tsx`): filtros arriba (vía, agente, país, «Solo activas», «Agrupar por» país/agente/vía —se recuerda en el
@@ -1168,10 +1168,10 @@ convenciones técnicas del código.
   (modernos por su carpeta interna del ZIP; viejos por el contenedor OLE + extensión), CSV y texto (sin bytes nulos ni HTML), hasta
   25 MB (`detectarAdjunto(bytes, nombre)`); el servidor vuelve a guardar el archivo con el tipo de su contenido (un texto se sirve
   como `text/plain`, nunca como página).
-  **Proveedor de una lista** (21 oct 2026): se elige de `PROVEEDORES_COMPRA` (`def-compras.ts`: Chin, Zion, Alibaba; guardados
-  con el nombre que ya tenían, el Portal del proveedor reconoce a Chin por él) en la celda (`seleccion` en `CAMPOS_EDITABLES`), la
+  **Proveedor de una lista** (21 oct 2026): se elige de `PROVEEDORES_COMPRA` (`def-compras.ts`: Shen Zhen, Zion, Alibaba; guardados
+  con el nombre que ya tenían, el Portal del proveedor reconoce a Shen Zhen por él) en la celda (`seleccion` en `CAMPOS_EDITABLES`), la
   ficha y la compra nueva (`SelectorProveedor`). Una compra vieja con otro proveedor («Local») lo conserva: la ficha lo muestra como
-  opción y `proveedorDeLista` lo deja pasar. El **agente de envío** igual: `AGENTES_ENVIO` (Chin, Avery: los nombres de `wms_rutas_envio.agente`, con los que Envíos cruza los tiempos reales), `agenteDeLista`. Los dos usan `SelectorDeLista` en la ficha. Cada valor tiene su color (`colorProveedor`, `colorAgente`: tonos del neón del sistema, distintos entre sí y de Etapa/Estado; lo comprueba `proveedor-lista.test.ts`). Para sumar uno, agrégalo a su lista.
+  opción y `proveedorDeLista` lo deja pasar. El **agente de envío** igual: `AGENTES_ENVIO` (Shen Zhen, Avery: los nombres de `wms_rutas_envio.agente`, con los que Envíos cruza los tiempos reales), `agenteDeLista`. Los dos usan `SelectorDeLista` en la ficha. Cada valor tiene su color (`colorProveedor`, `colorAgente`: tonos del neón del sistema, distintos entre sí y de Etapa/Estado; lo comprueba `proveedor-lista.test.ts`). Para sumar uno, agrégalo a su lista.
   **Foto comercial y foto real** (21 oct 2026): la foto comercial es la del producto en Producto; la foto real (`foto_url`,
   «Foto real del producto») es la que manda el proveedor. `FilaCompra.fotoComercial` = la de su primer producto con foto o, sin
   productos, la del producto con su mismo nombre (`productoDeCompra`); cada línea trae la suya (`lineas[].foto`, `ItemCompra.foto`:

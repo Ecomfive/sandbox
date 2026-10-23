@@ -7,9 +7,9 @@ import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 import { guardarCeldaRegistroEcomfive } from "./registro-actions";
 
 /**
- * «Pagos a Chin» (lado de Ecomfive): el cumplimiento y el «Registro de pagos» con las columnas de la hoja de Chin. Desde el 23 oct 2026
- * (decisión de Hernán) Francis y Chin cambian cualquier celda; ya no se avisan pagos desde aquí: el comprobante va por privado. Lo de
- * la tabla no toca la compra (Compras se actualiza a mano). Lo que Chin cambia llega como «Nuevo» en «Qué hacer con Chin» y a la campana.
+ * «Pagos a Shen Zhen» (lado de Ecomfive): el cumplimiento y el «Registro de pagos» con las columnas de la hoja de Shen Zhen. Desde el 23 oct 2026
+ * (decisión de Hernán) Francis y Shen Zhen cambian cualquier celda; ya no se avisan pagos desde aquí: el comprobante va por privado. Lo de
+ * la tabla no toca la compra (Compras se actualiza a mano). Lo que Shen Zhen cambia llega como «Nuevo» en «Qué hacer con Shen Zhen» y a la campana.
  */
 export function PagosEcomfive({ nombre, resumen, filas, cambios, editable }: { nombre: string; resumen: ResumenPagos; filas: FilaRegistro[]; cambios: CambioRegistro[]; editable: boolean }) {
   return (

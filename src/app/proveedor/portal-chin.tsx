@@ -44,9 +44,9 @@ export interface DatosPortalChin {
 }
 
 /**
- * El portal de Chin: Por cotizar, Cotizado, En producción, Enviado y Pagos, en su idioma (chino simplificado por defecto). Cotizar (con
+ * El portal de Shen Zhen: Por cotizar, Cotizado, En producción, Enviado y Pagos, en su idioma (chino simplificado por defecto). Cotizar (con
  * foto real y unidades por caja) y marcar enviado cambian la compra en el sistema de Ecomfive; los pagos y la llegada que anota en
- * Pagos (Registro de pagos) quedan en su registro y avisan a Ecomfive. Con `soloLectura` es «Lo que ve Chin» del Tablero de Chin de
+ * Pagos (Registro de pagos) quedan en su registro y avisan a Ecomfive. Con `soloLectura` es «Lo que ve Shen Zhen» del Tablero de Shen Zhen de
  * Ecomfive: lo mismo que él ve, en español y sin botones.
  */
 export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPortalChin & { idioma: Idioma; soloLectura?: boolean }) {

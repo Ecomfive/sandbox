@@ -27,7 +27,7 @@ export interface FilaCompra {
   ventaImportacion: boolean;
   /** Si se anuló (no se borra: sale de la lista y de los cálculos, migración 0096): cuándo, quién y por qué. */
   anulada: { en: string; por: string | null; motivo: string | null } | null;
-  /** Quién trae la mercancía (Chin, Avery…), aparte del proveedor que la vende (migración 0092). */
+  /** Quién trae la mercancía (Shen Zhen, Avery…), aparte del proveedor que la vende (migración 0092). */
   agenteEnvio: string | null;
   /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */
   tiendas: string[];
@@ -56,7 +56,7 @@ export interface FilaCompra {
   creadorNombre: string | null;
   descripcion: string | null;
   urlProducto: string | null;
-  /** La nota que Chin lee junto al pedido en su portal (`nota_proveedor`; se escribe en la ficha de una compra de Chin). */
+  /** La nota que Shen Zhen lee junto al pedido en su portal (`nota_proveedor`; se escribe en la ficha de una compra de Shen Zhen). */
   notaProveedor: string | null;
   paisesDestino: string[];
   fechaInicio: string | null;
@@ -116,10 +116,10 @@ export const VIAS_ENVIO = [
 export const etiquetaVia = (v: string) => VIAS_ENVIO.find((x) => x.valor === v)?.etiqueta ?? v;
 
 /** Los proveedores que se eligen en una compra (21 oct 2026; antes era texto libre). Se guardan con el mismo nombre que ya
- * tenían las compras: el Portal del proveedor reconoce las de Chin por ese nombre. Una compra vieja con otro proveedor lo
+ * tenían las compras: el Portal del proveedor reconoce las de Shen Zhen por ese nombre. Una compra vieja con otro proveedor lo
  * conserva hasta que se cambie. */
 export const PROVEEDORES_COMPRA = [
-  { valor: "Chin", etiqueta: "Chin" },
+  { valor: "Shen Zhen", etiqueta: "Shen Zhen" },
   { valor: "Zion", etiqueta: "Zion" },
   { valor: "Alibaba", etiqueta: "Alibaba" },
 ] as const;
@@ -127,11 +127,11 @@ export const PROVEEDORES_COMPRA = [
 /** Los agentes de envío que se eligen en una compra (21 oct 2026; antes era texto libre). Con el mismo nombre que en Compras ›
  * Envíos (`wms_rutas_envio.agente`), que cruza los tiempos reales con las compras por ese nombre. */
 export const AGENTES_ENVIO = [
-  { valor: "Chin", etiqueta: "Chin" },
+  { valor: "Shen Zhen", etiqueta: "Shen Zhen" },
   { valor: "Avery", etiqueta: "Avery" },
 ] as const;
 
-/** El valor con su nombre de la lista si coincide sin importar mayúsculas («CHIN» → «Chin»); si no, como viene. */
+/** El valor con su nombre de la lista si coincide sin importar mayúsculas («CHIN» → «Shen Zhen»); si no, como viene. */
 export function deLista(lista: readonly { valor: string }[], texto: string | null): string | null {
   const t = texto?.trim();
   if (!t) return null;
@@ -140,8 +140,8 @@ export function deLista(lista: readonly { valor: string }[], texto: string | nul
 
 /** El color de cada proveedor y de cada agente: los tonos del neón del sistema (el borde de los paneles y el brillo del menú),
  * distintos entre sí y de los de Etapa y Estado (que son los de ClickUp). Un valor fuera de la lista va sin color. */
-const PROVEEDOR_COLOR: Record<string, string> = { Chin: "#c22f6a", Zion: "#9b2fa8", Alibaba: "#e07a3a" };
-const AGENTE_COLOR: Record<string, string> = { Chin: "#5f43d1", Avery: "#325bba" };
+const PROVEEDOR_COLOR: Record<string, string> = { "Shen Zhen": "#c22f6a", Zion: "#9b2fa8", Alibaba: "#e07a3a" };
+const AGENTE_COLOR: Record<string, string> = { "Shen Zhen": "#5f43d1", Avery: "#325bba" };
 export const colorProveedor = (valor: string): string | undefined => PROVEEDOR_COLOR[valor];
 export const colorAgente = (valor: string): string | undefined => AGENTE_COLOR[valor];
 

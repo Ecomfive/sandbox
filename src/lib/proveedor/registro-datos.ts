@@ -20,7 +20,7 @@ export async function cargarRegistro(supabase: SupabaseClient, proveedorId: stri
   );
 }
 
-/** Los últimos cambios del Registro de pagos (de Chin o de Ecomfive), para «Últimos cambios». */
+/** Los últimos cambios del Registro de pagos (de Shen Zhen o de Ecomfive), para «Últimos cambios». */
 export async function cargarCambiosRegistro(supabase: SupabaseClient, proveedorId: string): Promise<{ texto: string; creadoEn: string }[]> {
   const { data } = await supabase
     .from("proveedor_novedades")
@@ -40,7 +40,7 @@ function textoValor(campo: CampoRegistro, v: string | number | null): string {
   return typeof v === "number" ? v.toLocaleString("es-PA") : String(v);
 }
 
-/** Quién cambia la celda: el proveedor desde su portal o alguien de Ecomfive desde el Tablero de Chin. */
+/** Quién cambia la celda: el proveedor desde su portal o alguien de Ecomfive desde el Tablero de Shen Zhen. */
 export type AutorRegistro = { lado: "proveedor"; nombre: string; proveedor: string; notificarA: string | null } | { lado: "ecomfive"; nombre: string; usuarioId: string; proveedor: string };
 
 /**

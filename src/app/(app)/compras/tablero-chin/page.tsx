@@ -17,13 +17,13 @@ import type { CuentaPortal } from "./cuenta-proveedor";
 import { QueHacerChin } from "./que-hacer-chin";
 import { TableroChin } from "./tablero-chin";
 
-export const metadata = { title: "Tablero de Chin · Compras" };
+export const metadata = { title: "Tablero de Shen Zhen · Compras" };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Compras › Tablero de Chin (22 oct 2026; reemplaza a la página «Portal del proveedor»): el portal de Chin tal como lo ve él, en español
- * y solo para ver; «Pagos a Chin» (avisar un pago y lo que falta pagar) y, para un administrador, las cuentas con las que Chin entra (verlas y crear una).
+ * Compras › Tablero de Shen Zhen (22 oct 2026; reemplaza a la página «Portal del proveedor»): el portal de Shen Zhen tal como lo ve él, en español
+ * y solo para ver; «Pagos a Shen Zhen» (avisar un pago y lo que falta pagar) y, para un administrador, las cuentas con las que Shen Zhen entra (verlas y crear una).
  * Decidir una cotización o marcar una llegada se hace en la compra, cambiando su etapa. Lee el espejo (`proveedor_pedidos`).
  */
 export default async function TableroChinPage({ searchParams }: { searchParams: Promise<{ ver?: string | string[] }> }) {
@@ -36,15 +36,15 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   if (errorProveedor || !espejo || "error" in espejo) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <EncabezadoPagina titulo="Tablero de Chin" oculto />
+        <EncabezadoPagina titulo="Tablero de Shen Zhen" oculto />
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          {espejo && "error" in espejo ? espejo.error : "No se pudo cargar el tablero de Chin."}
+          {espejo && "error" in espejo ? espejo.error : "No se pudo cargar el tablero de Shen Zhen."}
         </p>
       </Pagina>
     );
   }
 
-  // Las fotos como las ve Chin: la comercial de referencia y, como real, la que subió él (enlaces de una hora) o la de la compra.
+  // Las fotos como las ve Shen Zhen: la comercial de referencia y, como real, la que subió él (enlaces de una hora) o la de la compra.
   const { pedidos, realDeCompra } = await conFotosDeCompras(
     supabase,
     espejo.pedidos.filter((p) => puedeVerPais(usuario.paisesPermitidos, p.paisCodigo)),
@@ -54,7 +54,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   for (const p of activos) if (realDeCompra[p.id]) fotosReales[p.id] = realDeCompra[p.id];
   const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
 
-  // Pagos: quien no ve los montos de Compras tampoco ve los pagos a Chin.
+  // Pagos: quien no ve los montos de Compras tampoco ve los pagos a Shen Zhen.
   const veMontos = !campoOculto(restriccionesDe(usuario.afinado.compras), "monto");
   const admin = esAdministrador(usuario);
   const [firmadas, estado, { data: nuevasParaChin }, { data: filasCuentas }, chin] = await Promise.all([
@@ -67,7 +67,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   const porRuta = new Map(firmadas.map((f) => [f.path, f.signedUrl]));
   for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
 
-  // El Registro de pagos de Chin, solo de los países que la persona ve.
+  // El Registro de pagos de Shen Zhen, solo de los países que la persona ve.
   const pagos =
     !estado || "error" in estado
       ? null
@@ -80,7 +80,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
           cambios: await cargarCambiosRegistro(supabase, espejo.proveedor.id),
         };
 
-  // Lo que escribe Chin (comentarios de cotización), traducido al español.
+  // Lo que escribe Shen Zhen (comentarios de cotización), traducido al español.
   const traducciones = await traducirTextos(supabase, activos.map((p) => p.comentarioProveedor), "es");
 
   // Las cuentas del proveedor solo las ve (y las crea y administra) un administrador.
@@ -112,7 +112,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Tablero de Chin" oculto />
+      <EncabezadoPagina titulo="Tablero de Shen Zhen" oculto />
       {chin && <QueHacerChin proveedor={chin.proveedor} tareas={chin.tareas} />}
       <TableroChin
         proveedor={{ id: espejo.proveedor.id, nombre: espejo.proveedor.nombre }}

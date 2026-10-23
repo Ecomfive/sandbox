@@ -1,6 +1,6 @@
 // Portal del proveedor › «Registro de pagos» (23 oct 2026, pedido de Hernán): los envíos con las columnas de la hoja «payment record»
-// de Chin (Product, Quantity, Amount, Delivery Time, Down payment, Paid amount, Payment Time, Unpaid Amount, Due date for payment,
-// Balance payment, Arrival Time, Paid Time). Chin (en su portal) y Ecomfive (en el Tablero de Chin) cambian cualquier celda: lo editado
+// de Shen Zhen (Product, Quantity, Amount, Delivery Time, Down payment, Paid amount, Payment Time, Unpaid Amount, Due date for payment,
+// Balance payment, Arrival Time, Paid Time). Shen Zhen (en su portal) y Ecomfive (en el Tablero de Shen Zhen) cambian cualquier celda: lo editado
 // vive en `proveedor_registro` (migración 0142), aparte de la compra (Compras lo actualiza Francis a mano). Una celda vacía vuelve al
 // valor de siempre (de la compra, de la hoja o calculado). Lógica pura, con prueba.
 
@@ -28,7 +28,7 @@ export const TIPO_CAMPO: Record<CampoRegistro, "texto" | "numero" | "fecha"> = {
 /** Las que normalmente se calculan solas (se pueden fijar a mano; vacías vuelven a calcularse). */
 export const CAMPOS_CALCULADOS: readonly CampoRegistro[] = ["anticipo", "sin_pagar", "vence", "saldo"];
 
-/** El nombre de cada columna en la hoja de Chin (va debajo del nombre en el idioma de la pantalla). */
+/** El nombre de cada columna en la hoja de Shen Zhen (va debajo del nombre en el idioma de la pantalla). */
 export const COLUMNA_HOJA: Record<CampoRegistro, string> = {
   producto: "Product",
   unidades: "Quantity",
@@ -47,7 +47,7 @@ export const COLUMNA_HOJA: Record<CampoRegistro, string> = {
 /** Lo editado de una fila (null o ausente = el valor de siempre). */
 export type Registro = Partial<Record<CampoRegistro, string | number | null>>;
 
-/** La clave de una fila: el pedido del espejo o, para una fila de las hojas de Chin sin compra, su clave de la hoja. */
+/** La clave de una fila: el pedido del espejo o, para una fila de las hojas de Shen Zhen sin compra, su clave de la hoja. */
 export const filaDePedido = (pedidoId: string) => pedidoId;
 export const filaDeHoja = (clave: string) => `hoja:${clave}`;
 

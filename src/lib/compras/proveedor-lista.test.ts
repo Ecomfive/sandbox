@@ -4,7 +4,7 @@ import { AGENTES_ENVIO, agenteDeLista, colorAgente, colorEstado, colorEtapa, col
 import { CAMPOS_EDITABLES, normalizarValor } from "../../app/(app)/compras/def-edicion-compras";
 
 test("el proveedor se elige de la lista", () => {
-  assert.equal(proveedorDeLista("CHIN"), "Chin");
+  assert.equal(proveedorDeLista("SHEN ZHEN"), "Shen Zhen");
   assert.equal(proveedorDeLista(" alibaba "), "Alibaba");
   assert.equal(proveedorDeLista("Local"), "Local");
   assert.equal(proveedorDeLista(""), null);
@@ -18,7 +18,7 @@ test("el agente de envío se elige de la lista", () => {
   assert.equal(agenteDeLista("avery"), "Avery");
   assert.equal(agenteDeLista(null), null);
   const def = CAMPOS_EDITABLES.agenteEnvio;
-  assert.deepEqual(normalizarValor(def, "Chin"), { valor: "Chin" });
+  assert.deepEqual(normalizarValor(def, "Shen Zhen"), { valor: "Shen Zhen" });
   assert.deepEqual(normalizarValor(def, ""), { valor: null });
   assert.ok("error" in normalizarValor(def, "DHL"));
 });

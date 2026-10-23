@@ -104,7 +104,7 @@ test("las fotos del proveedor quedan en la carpeta de su pedido y no se acepta o
   assert.ok(!rutaEsDelPedido(42, prov, ped));
 });
 
-test("lee la hoja de pagos de Chin: anticipo en partes, saldo, UPS y fechas mal escritas", () => {
+test("lee la hoja de pagos de Shen Zhen: anticipo en partes, saldo, UPS y fechas mal escritas", () => {
   const hoja = [
     "Product,Quantity,Amount,Delivery Time,Dowm payment,Paid amount,Payment Time,Unpaid Amount,Due date for payment,Blance payment,Arrival Time,Paid Time",
     'Presbyopic Glasses,2000,4400,01/04/2026,2200,2200,22/04/2026,0,,0,20/06/2026,09/07/2026',
@@ -163,7 +163,7 @@ test("cada lado solo da sus pasos", () => {
   assert.ok(puedeConfirmarPago("proveedor") && !puedeConfirmarPago("ecomfive"));
 });
 
-test("unidades del proveedor: la compra abierta toma la cantidad de la hoja de Chin; lo que llegó no se toca", () => {
+test("unidades del proveedor: la compra abierta toma la cantidad de la hoja de Shen Zhen; lo que llegó no se toca", () => {
   const fila = (unidades: number | null) => ({ fila: { producto: "Magnesium", unidades, monto: 1850, anticipo: 925, fechaEnvio: "2026-10-23", fechaLlegada: null, pagosAnticipo: [], pagosSaldo: [] } });
   const pedido = (id: string, etapa: string, unidades: number | null) => ({ id, producto: "Magnesium", paisCodigo: "MX", unidades, montoTotal: 1850, fechaEnvio: "2026-10-23", etapa });
   const filas = [fila(960), fila(960), fila(1000), fila(null)];

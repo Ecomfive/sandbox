@@ -12,7 +12,7 @@ import { Vacio, dinero } from "./piezas-proveedor";
 
 type Guardar = (fila: string, campo: CampoRegistro, valor: string) => Promise<{ error?: string }>;
 
-/** Las columnas después del producto, en el orden de la hoja de Chin. */
+/** Las columnas después del producto, en el orden de la hoja de Shen Zhen. */
 const COLUMNAS: { campo: CampoRegistro; titulo: keyof Textos; derecha?: boolean }[] = [
   { campo: "unidades", titulo: "colCantidad", derecha: true },
   { campo: "monto", titulo: "colMonto", derecha: true },
@@ -40,9 +40,9 @@ export interface CambioRegistro {
 
 /**
  * «Registro de pagos» (23 oct 2026, como el artefacto que aprobó Hernán): el título, tres tarjetas (lo que falta de anticipos y de
- * saldos, y los últimos cambios) y la tabla con las columnas de la hoja «payment record» de Chin, antes el producto (foto, nombre,
- * código y país). Con `guardar`, cualquier celda se cambia tocándola (Chin en su portal, Ecomfive en el Tablero de Chin): las que se
- * editan van en morado y las calculadas en gris (se pueden fijar a mano y, vacías, vuelven a calcularse). Se filtra por país (Chin
+ * saldos, y los últimos cambios) y la tabla con las columnas de la hoja «payment record» de Shen Zhen, antes el producto (foto, nombre,
+ * código y país). Con `guardar`, cualquier celda se cambia tocándola (Shen Zhen en su portal, Ecomfive en el Tablero de Shen Zhen): las que se
+ * editan van en morado y las calculadas en gris (se pueden fijar a mano y, vacías, vuelven a calcularse). Se filtra por país (Shen Zhen
  * lleva una hoja por país) y la última fila suma lo que falta.
  */
 export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: FilaRegistro[]; guardar?: Guardar; pista: string; cambios?: CambioRegistro[] }) {

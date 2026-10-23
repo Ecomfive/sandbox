@@ -17,7 +17,7 @@ export async function iniciarSesion(_prevState: LoginState, formData: FormData):
   if (error) {
     return { error: "Correo o contraseña incorrectos." };
   }
-  // Una cuenta del portal del proveedor (Chin) entra a su portal, no al sistema.
+  // Una cuenta del portal del proveedor (Shen Zhen) entra a su portal, no al sistema.
   const cuenta = data.user ? await cuentaDeProveedor(data.user.id) : null;
   if (cuenta) {
     await createServiceClient().from("proveedor_usuarios").update({ ultimo_ingreso_en: new Date().toISOString() }).eq("id", cuenta.cuentaId);

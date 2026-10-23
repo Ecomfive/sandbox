@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type { CuentaPortal } from "./cuenta-proveedor";
 
 // Las cuentas con las que el proveedor entra a su portal (fase 3 de PORTAL-PROVEEDOR.md). Solo un administrador las crea, le da una clave
-// nueva o la desactiva. La clave temporal se muestra una vez a quien la genera, para que se la pase a Chin (como en Usuarios y roles);
+// nueva o la desactiva. La clave temporal se muestra una vez a quien la genera, para que se la pase a Shen Zhen (como en Usuarios y roles);
 // queda marcada (`app_metadata.clave_temporal`) y al entrar el portal le pide elegir la suya (`cambiarClaveProveedor`).
 
 const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";

@@ -30,7 +30,7 @@ export function CamposRuta({ ruta, agentes, paisInicial, faltante, invalido }: {
           </select>
         </Campo>
         <Campo etiqueta="Agente" id={`ruta-agente-${sufijo}`}>
-          <input id={`ruta-agente-${sufijo}`} type="text" name="agente" list={`agentes-${sufijo}`} defaultValue={ruta?.agente ?? ""} maxLength={60} placeholder="Ej: Chin" className={fieldClass} />
+          <input id={`ruta-agente-${sufijo}`} type="text" name="agente" list={`agentes-${sufijo}`} defaultValue={ruta?.agente ?? ""} maxLength={60} placeholder="Ej: Shen Zhen" className={fieldClass} />
           <datalist id={`agentes-${sufijo}`}>
             {agentes.map((a) => (
               <option key={a} value={a} />

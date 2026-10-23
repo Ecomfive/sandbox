@@ -7,7 +7,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { GastoIcon } from "@/lib/nav-icons";
 import { obtenerPagosProveedorCompra, type PagosProveedorCompra } from "./pagos-proveedor-compra-actions";
 
-/** «Pagos a Chin» en la ficha de una compra: solo lectura (se avisa en Compras › Tablero de Chin y lo confirma Chin). */
+/** «Pagos a Shen Zhen» en la ficha de una compra: solo lectura (se avisa en Compras › Tablero de Shen Zhen y lo confirma Shen Zhen). */
 export function PagosProveedorCompraBloque({ compraId }: { compraId: string }) {
   const [datos, setDatos] = useState<PagosProveedorCompra | null>(null);
   useEffect(() => {
@@ -48,7 +48,7 @@ export function PagosProveedorCompraBloque({ compraId }: { compraId: string }) {
             ))}
           </tbody>
         </table>
-        <p className="m-0 mt-2 text-xs text-muted-foreground">Se avisan en Compras › Tablero de Chin › Pagos a Chin y los confirma Chin en su portal.</p>
+        <p className="m-0 mt-2 text-xs text-muted-foreground">Se avisan en Compras › Tablero de Shen Zhen › Pagos a Shen Zhen y los confirma Shen Zhen en su portal.</p>
       </Seccion>
     </div>
   );
