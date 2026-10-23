@@ -38,8 +38,8 @@ export function BarraAplicarDropi({ pendientes }: { pendientes: number }) {
   return (
     <div className="-mb-2 flex flex-col gap-2 text-xs text-muted-foreground">
       <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className={`h-2 w-2 rounded-full ${pendientes ? "bg-warning" : "bg-success"}`} />
+        <span className={`inline-flex items-center gap-1.5 ${pendientes ? "font-medium text-destructive" : ""}`}>
+          <span aria-hidden="true" className={`h-2 w-2 rounded-full ${pendientes ? "bg-destructive" : "bg-success"}`} />
           {pendientes
             ? `${pendientes} ${pendientes === 1 ? "cambio espera" : "cambios esperan"} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`
             : "Nada pendiente para Dropi."}
