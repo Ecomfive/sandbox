@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { compraCuenta } from "@/lib/compras/cuenta";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { colorEtapa, etiquetaEtapa, numeroOC } from "../compras/def-compras";
 import { obtenerComprasProducto, type CompraDeProducto } from "./compras-actions";
@@ -17,7 +18,8 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  * debajo cada compra, de la más nueva a la más vieja, que se abre en Compras. Solo cuenta las compras con el producto
  * vinculado (Compras › Productos). Si se compró en varios países, las compras van **agrupadas por país** (cada país con sus compras
  * juntas, el que más compró primero) y no mezcladas. Con `limite` muestra solo las últimas. Con `pais` (Inventario, que es de un país) cuenta y
- * lista solo las compras de ese país, y dice aparte lo comprado en todos.
+ * lista solo las compras de ese país, y dice aparte lo comprado en todos. Una compra descartada se ve en la lista (atenuada) pero **no
+ * suma** en ningún total (`compraCuenta`).
  */
 export function ComprasProducto({ id, limite, pais }: { id: string; limite?: number; pais?: string }) {
   const [cargadas, setDatos] = useState<CompraDeProducto[] | "error" | null>(null);
@@ -41,11 +43,12 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
     );
   const todas = cargadas;
   let datos = cargadas;
-  const unidadesTodas = todas.reduce((t, c) => t + c.unidades, 0);
+  const vigentesTodas = todas.filter(compraCuenta);
+  const unidadesTodas = vigentesTodas.reduce((t, c) => t + c.unidades, 0);
   const enOtros = pais ? todas.some((c) => c.pais !== pais) : false;
   if (pais) datos = datos.filter((c) => c.pais === pais);
   const otrosPaises = enOtros && (
-    <p className="m-0 text-xs text-muted-foreground">En todos los países: {entero(unidadesTodas)} u. en {entero(todas.length)} compras (el detalle está en la ficha del producto).</p>
+    <p className="m-0 text-xs text-muted-foreground">En todos los países: {entero(unidadesTodas)} u. en {entero(vigentesTodas.length)} compras (el detalle está en la ficha del producto).</p>
   );
   if (datos.length === 0)
     return (
@@ -55,14 +58,16 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
       </div>
     );
 
-  const unidades = datos.reduce((t, c) => t + c.unidades, 0);
-  const conCosto = datos.filter((c) => c.total !== null);
+  const vigentes = datos.filter(compraCuenta);
+  const unidades = vigentes.reduce((t, c) => t + c.unidades, 0);
+  const conCosto = vigentes.filter((c) => c.total !== null);
   const total = conCosto.reduce((t, c) => t + (c.total ?? 0), 0);
   const unidadesConCosto = conCosto.reduce((t, c) => t + c.unidades, 0);
   const porPais = new Map<string, number>();
-  for (const c of datos) porPais.set(c.pais ?? "—", (porPais.get(c.pais ?? "—") ?? 0) + c.unidades);
-  const primera = datos[datos.length - 1].fecha;
-  const ultima = datos[0].fecha;
+  // Un país con solo compras descartadas queda en la lista, con 0 unidades.
+  for (const c of datos) porPais.set(c.pais ?? "—", (porPais.get(c.pais ?? "—") ?? 0) + (compraCuenta(c) ? c.unidades : 0));
+  const primera = vigentes.length ? vigentes[vigentes.length - 1].fecha : null;
+  const ultima = vigentes.length ? vigentes[0].fecha : null;
   const vistas = limite ? datos.slice(0, limite) : datos;
   // En varios países: un bloque por país, el que más unidades compró primero; dentro, de la más nueva a la más vieja.
   const grupos =
@@ -79,10 +84,10 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
         <Cifra etiqueta="Unidades compradas" valor={entero(unidades)} />
         <Cifra etiqueta="Total invertido" valor={conCosto.length ? usd(total) : "—"} />
         <Cifra etiqueta="Costo promedio" valor={unidadesConCosto ? usd(total / unidadesConCosto) : "—"} />
-        <Cifra etiqueta={datos.length === 1 ? "Compra" : "Compras"} valor={entero(datos.length)} />
+        <Cifra etiqueta={vigentes.length === 1 ? "Compra" : "Compras"} valor={entero(vigentes.length)} />
       </dl>
       <p className="m-0 text-xs text-muted-foreground">
-        {datos.length === 1 ? `El ${formatearFecha(primera)}` : `Del ${formatearFecha(primera)} al ${formatearFecha(ultima)}`}
+        {primera === null || ultima === null ? "Todas las compras están descartadas" : vigentes.length === 1 ? `El ${formatearFecha(primera)}` : `Del ${formatearFecha(primera)} al ${formatearFecha(ultima)}`}
       </p>
       {grupos ? (
         grupos.map((g) => (
@@ -90,7 +95,7 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
             <h4 className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border pb-1 text-xs font-semibold">
               <span>{g.pais === "—" ? "Sin país" : g.pais}</span>
               <span className="font-normal text-muted-foreground tabular-nums">
-                {entero(g.compras.length)} {g.compras.length === 1 ? "compra" : "compras"} · {entero(g.unidades)} u.
+                {entero(g.compras.filter(compraCuenta).length)} {g.compras.filter(compraCuenta).length === 1 ? "compra" : "compras"} · {entero(g.unidades)} u.
               </span>
             </h4>
             <ListaCompras compras={g.compras} conPais={false} />
@@ -114,7 +119,7 @@ function ListaCompras({ compras, conPais }: { compras: CompraDeProducto[]; conPa
   return (
     <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-[13px]">
       {compras.map((c) => (
-        <li key={`${c.compraId}-${c.sku}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+        <li key={`${c.compraId}-${c.sku}`} className={`flex flex-wrap items-center gap-x-3 gap-y-1 py-2 ${compraCuenta(c) ? "" : "opacity-60"}`}>
           <Link href={`/compras/lista?ver=todos&abrir=${c.compraId}`} className={`rounded font-medium hover:underline ${anilloFoco}`}>
             {c.codigo ?? numeroOC(c.numero)}
           </Link>
