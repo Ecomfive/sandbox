@@ -180,7 +180,7 @@ function Encabezado({ vista, estado }: { vista: AsistenteVista; estado: EstadoIA
           <Estatus ok={estado.texto} texto={estado.texto ? `${estado.proveedor} · ${estado.modelo}` : "Sin IA de texto conectada"} />
           <Estatus ok={estado.gemini} texto={estado.gemini ? "Gemini · fotos" : "Sin Gemini para fotos"} />
           {c.indicaciones > 0 && <Estatus ok texto={`${c.indicaciones} ${c.indicaciones === 1 ? "indicación" : "indicaciones"} del equipo`} />}
-          {c.ejemplos > 0 && <Estatus ok texto={`${c.ejemplos} ${c.ejemplos === 1 ? "título aprobado" : "títulos aprobados"} de ejemplo`} />}
+          {c.ejemplos > 0 && <Estatus ok texto={`${c.ejemplos} ${c.ejemplos === 1 ? "título del equipo" : "títulos del equipo"} de ejemplo`} />}
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -499,11 +499,11 @@ function MedidorLargo({ largo, min, max }: { largo: number; min: number; max: nu
   );
 }
 
-function OpcionTitulo({ indice, inicial, porque, categoria, reglas, iaId, elegido, alElegir }: { indice: number; inicial: string; porque: string; categoria: string | null; reglas: { minTitulo: number; maxTitulo: number }; iaId: string; elegido: string | null; alElegir: (t: string) => void }) {
+function OpcionTitulo({ indice, inicial, porque, categoria, nombreProducto, reglas, iaId, elegido, alElegir }: { indice: number; inicial: string; porque: string; categoria: string | null; nombreProducto: string | null; reglas: { minTitulo: number; maxTitulo: number }; iaId: string; elegido: string | null; alElegir: (t: string) => void }) {
   const { mostrarToast } = useToast();
   const [texto, setTexto] = useState(inicial);
   const [guardando, setGuardando] = useState(false);
-  const r = chequearTitulo(texto, categoria, reglas);
+  const r = chequearTitulo(texto, categoria, reglas, nombreProducto);
   const largo = r.chequeos.find((c) => c.clave === "largo")!;
   const esElegido = elegido !== null && elegido === texto.replace(/\s+/g, " ").trim();
 
@@ -631,7 +631,7 @@ function PanelTitulos({ publicacionId, estado, vista }: { publicacionId: string;
             {t.enfoque && <p className="m-0 text-sm text-muted-foreground">{t.enfoque}</p>}
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {t.titulos.map((x, i) => (
-                <OpcionTitulo key={`${actual.id}-${i}`} indice={i} inicial={x.titulo} porque={x.porque} categoria={c.categoria} reglas={c.reglas} iaId={actual.id} elegido={elegido} alElegir={setElegido} />
+                <OpcionTitulo key={`${actual.id}-${i}`} indice={i} inicial={x.titulo} porque={x.porque} categoria={c.categoria} nombreProducto={c.nombreProducto} reglas={c.reglas} iaId={actual.id} elegido={elegido} alElegir={setElegido} />
               ))}
             </ul>
             {t.descartados > 0 && (

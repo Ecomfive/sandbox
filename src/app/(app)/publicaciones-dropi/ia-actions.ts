@@ -27,7 +27,7 @@ import {
   type PropuestaTitulos,
   type TipoIA,
 } from "@/lib/publicaciones/ia/asistente";
-import { chequearTitulo, reglasParaIA, type ChequeoTitulo, type Ejemplos, type ReglasIA } from "@/lib/publicaciones/ia/criterios";
+import { chequearTitulo, correccionesDeAuditoria, reglasParaIA, type ChequeoTitulo, type Ejemplos, type ReglasIA } from "@/lib/publicaciones/ia/criterios";
 import { avisoDeReintento, compararTexto, lineaRiesgosa, normalizarTextos, pedidoLeerTexto, textoLeido } from "@/lib/publicaciones/ia/texto-imagen";
 import { cargarEstilos } from "@/lib/publicaciones/ia/estilos-datos";
 import { cargarIndicaciones } from "@/lib/publicaciones/ia/indicaciones-datos";
@@ -103,6 +103,8 @@ export interface ContextoVista {
   fotoUrl: string | null;
   tituloActual: string;
   categoria: string | null;
+  /** El nombre del producto vinculado: sus palabras en inglés son su nombre comercial y no cuentan como inglés en el título. */
+  nombreProducto: string | null;
   /** De dónde sale el título: lo que muestra Dropi o, si no se leyó, el nombre guardado. */
   tituloDeDropi: boolean;
   reglas: ReglasIA;
@@ -147,12 +149,22 @@ async function publicacionPermitida(id: string, usuario: UsuarioActual): Promise
 }
 
 /**
- * Lo que la IA aprende del equipo: los títulos que eligió (o corrigió y usó) en otras publicaciones, y por qué rechazó recomendaciones de
- * título o dijo que una sugerencia no le sirvió. Sin la tabla, nada.
+ * Lo que la IA aprende del equipo: los nombres que cambió a mano en la ficha (de la auditoría, antes → después), los títulos que eligió
+ * (o corrigió y usó) en el asistente, y por qué rechazó recomendaciones de título o dijo que una sugerencia no le sirvió. Sin la tabla, nada.
  */
 async function cargarEjemplos(): Promise<Ejemplos> {
   const supabase = createServiceClient();
-  const out: Ejemplos = { titulos: [], rechazos: [] };
+  const out: Ejemplos = { titulos: [], rechazos: [], correcciones: [] };
+  // Los cambios de nombre hechos a mano en la ficha (actualizarPublicacion) quedan en la auditoría con el dato «Producto».
+  const { data: manuales } = await supabase
+    .from("historial_auditoria")
+    .select("antes, despues, entidad_id")
+    .eq("accion", "editar_publicacion_dropi")
+    .eq("entidad", "dropi_publicaciones")
+    .not("despues->>Producto", "is", null)
+    .order("creado_en", { ascending: false })
+    .limit(150);
+  out.correcciones = correccionesDeAuditoria(manuales ?? []);
   const { data } = await supabase.from("dropi_publicaciones_ia").select("resultado").eq("tipo", "titulos").order("creado_en", { ascending: false }).limit(80);
   for (const f of data ?? []) {
     const r = f.resultado as PropuestaTitulos & { feedback?: { util: boolean; nota: string } };
@@ -195,6 +207,7 @@ async function cargarBase(pub: Pub) {
       videos: cat?.videos ?? null,
       descripcionLargo: cat?.descripcionLargo ?? null,
       leidoEnDropi: !!cat,
+      nombreProducto: (sku.data as { nombre: string } | null)?.nombre ?? null,
     },
     reglas,
   );
@@ -220,17 +233,18 @@ async function cargarBase(pub: Pub) {
     fotoUrl: pub.foto_url,
     tituloActual: cat?.nombre ?? pub.nombre,
     categoria: cat?.categoria ?? null,
+    nombreProducto: s?.nombre ?? null,
     tituloDeDropi: !!cat,
     reglas: reglasIA,
     revisiones,
     nota: notaOptimizacion(revisiones),
     competidores: [...new Set(delProducto.map((c) => c.nombre))].slice(0, 8),
     indicaciones: Object.values(indicaciones).filter((t) => (t ?? "").trim()).length,
-    ejemplos: ejemplos.titulos.length,
+    ejemplos: ejemplos.titulos.length + (ejemplos.correcciones?.length ?? 0),
   };
   // Cuántas fotos faltan para el mínimo de las reglas (si se leyó el catálogo); sin dato, 4.
   const fotosFaltan = cat?.fotos == null ? 4 : Math.max(1, reglas.min_fotos - cat.fotos);
-  return { datos, contexto, vista, fotosFaltan, categoria: cat?.categoria ?? null };
+  return { datos, contexto, vista, fotosFaltan, categoria: cat?.categoria ?? null, nombreProducto: s?.nombre ?? null };
 }
 
 /** Lo último que se generó para una publicación y el contexto con que se revisa. Basta poder abrir el módulo. */
@@ -311,17 +325,17 @@ export async function proponerTitulosIA(publicacionId: string): Promise<{ error?
   if (!proveedorTexto()) return { error: SIN_IA };
   const sinMigracion = await migracionLista();
   if (sinMigracion) return { error: sinMigracion };
-  const { datos, contexto, categoria } = await cargarBase(pub);
+  const { datos, contexto, categoria, nombreProducto } = await cargarBase(pub);
   const r = await pedirIA({ ...pedidoTitulos(datos, contexto), imagenes: pub.foto_url ? [pub.foto_url] : [] }, false, consumoDe("titulos", usuario, pub));
   if ("error" in r) return { error: r.error };
   const actual = datos.tituloDropi ?? datos.nombre;
-  let propuesta = normalizarTitulos(r.texto, categoria, contexto.reglas, actual);
+  let propuesta = normalizarTitulos(r.texto, categoria, contexto.reglas, actual, nombreProducto);
   if (!propuesta) return { error: "La IA no devolvió títulos que se puedan usar. Vuelve a intentar." };
   // La IA cuenta mal los caracteres: lo que no cumple el largo se le devuelve una vez con su largo real para que lo ajuste.
   const fallidos = propuesta.titulos.filter((t) => !t.cumple);
   if (fallidos.length) {
     const r2 = await pedirIA({ ...pedidoCorregirTitulos(fallidos, contexto), imagenes: [] }, false, consumoDe("titulos", usuario, pub));
-    const corregida = "error" in r2 ? null : normalizarTitulos(r2.texto, categoria, contexto.reglas, actual);
+    const corregida = "error" in r2 ? null : normalizarTitulos(r2.texto, categoria, contexto.reglas, actual, nombreProducto);
     if (corregida) {
       const buenos = [...propuesta.titulos.filter((t) => t.cumple), ...corregida.titulos.filter((t) => t.cumple)].filter((t, i, a) => a.findIndex((x) => x.titulo.toLowerCase() === t.titulo.toLowerCase()) === i);
       propuesta = buenos.length
@@ -352,7 +366,7 @@ export async function elegirTituloIA(
   if (!fila || fila.tipo !== "titulos") return { error: "No se encontró la propuesta." };
   const pub = await publicacionPermitida(fila.publicacion_id as string, usuario);
   if (!pub) return { error: "No se encontró la publicación." };
-  const { contexto, categoria } = await cargarBase(pub);
+  const { contexto, categoria, nombreProducto } = await cargarBase(pub);
   const r = fila.resultado as PropuestaTitulos;
   const editado = !r.titulos?.some((t) => t.titulo === limpio);
   const resultado: PropuestaTitulos = { ...r, elegido: { titulo: limpio, editado, por: usuario.nombre || usuario.email, en: new Date().toISOString() } };
@@ -373,7 +387,7 @@ export async function elegirTituloIA(
   });
   const dropi = await enviarADropi(supabase, pub, limpio, { id: usuario.id, nombre: usuario.nombre || usuario.email });
   revalidatePath("/publicaciones-dropi");
-  const c = chequearTitulo(limpio, categoria, contexto.reglas);
+  const c = chequearTitulo(limpio, categoria, contexto.reglas, nombreProducto);
   return { chequeos: c.chequeos, cumple: c.cumple, dropi };
 }
 
