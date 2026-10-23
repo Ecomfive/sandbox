@@ -1,54 +1,53 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import { useRouter } from "next/navigation";
-import { Fragment, useMemo, useState } from "react";
-import { claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
-import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { useMemo, useRef, useState } from "react";
+import { claseThLista } from "@/components/panel/piezas-panel";
+import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import type { TipoCuota } from "@/lib/proveedor/cuotas";
-import { hoyPanama } from "@/lib/proveedor/fechas";
-import { sugerenciaPago, totalesRegistro, type FilaRegistro } from "@/lib/proveedor/registro-pagos";
+import { CAMPOS_CALCULADOS, COLUMNA_HOJA, TIPO_CAMPO, totalesRegistro, type CampoRegistro, type FilaRegistro } from "@/lib/proveedor/registro-pagos";
+import type { Textos } from "@/lib/proveedor/textos";
 import { useIdioma } from "./idioma-contexto";
-import { Tarjeta, Vacio, botonNormal, botonPrincipal, dinero } from "./piezas-proveedor";
+import { Tarjeta, Vacio, dinero } from "./piezas-proveedor";
 
-type R = Promise<{ error?: string }>;
+type Guardar = (fila: string, campo: CampoRegistro, valor: string) => Promise<{ error?: string }>;
 
-/** Las acciones del portal (solo el proveedor anota); sin ellas la tabla es solo para ver. */
-export interface AccionesRegistro {
-  anotarPago: (pedidoId: string, cuota: TipoCuota, monto: number, fecha: string) => R;
-  quitarPago: (pagoId: string) => R;
-  anotarLlegada: (pedidoId: string, fecha: string) => R;
-}
+/** Las columnas después del producto, en el orden de la hoja de Chin. */
+const COLUMNAS: { campo: CampoRegistro; titulo: keyof Textos; derecha?: boolean }[] = [
+  { campo: "unidades", titulo: "colCantidad", derecha: true },
+  { campo: "monto", titulo: "colMonto", derecha: true },
+  { campo: "fecha_envio", titulo: "colEntrega" },
+  { campo: "anticipo", titulo: "colAnticipo", derecha: true },
+  { campo: "pagado", titulo: "colPagado", derecha: true },
+  { campo: "fecha_pago", titulo: "colFechaPago" },
+  { campo: "sin_pagar", titulo: "colSinPagar", derecha: true },
+  { campo: "vence", titulo: "colVencePago" },
+  { campo: "saldo", titulo: "colSaldo", derecha: true },
+  { campo: "llegada", titulo: "colLlegada" },
+  { campo: "fecha_pago_saldo", titulo: "colPagoSaldo" },
+];
+
+/** Cuántas filas se ven de entrada (y cuántas más con «Ver más»). */
+const POR_TANDA = 100;
 
 const COLOR_TONO: Record<string, string> = { peligro: "text-destructive", aviso: "text-warning", info: "text-azul", exito: "text-success", neutro: "" };
 
 /**
- * «Registro de pagos» (23 oct 2026): los envíos con las columnas de la hoja «payment record» de Chin. En su portal (con `acciones`)
- * anota cada pago recibido y su fecha de llegada; en el Tablero de Chin, Ecomfive la ve igual, solo para leer. Se filtra por país
- * (Chin lleva una hoja por país) y la última fila suma lo que falta.
+ * «Registro de pagos» (23 oct 2026): los envíos con las columnas de la hoja «payment record» de Chin, y antes el producto (foto, nombre,
+ * código y país). Con `guardar`, cualquier celda se cambia tocándola (Chin en su portal, Ecomfive en el Tablero de Chin); las calculadas
+ * (en gris) se pueden fijar a mano y, vacías, vuelven a calcularse. Se filtra por país (Chin lleva una hoja por país) y la última fila
+ * suma lo que falta.
  */
-export function RegistroPagos({ filas, acciones, pista }: { filas: FilaRegistro[]; acciones?: AccionesRegistro; pista: string }) {
-  const { t, tr, fecha, numero } = useIdioma();
+export function RegistroPagos({ filas, guardar, pista }: { filas: FilaRegistro[]; guardar?: Guardar; pista: string }) {
+  const { t } = useIdioma();
   const paises = useMemo(() => [...new Set(filas.map((f) => f.paisCodigo ?? "—"))].sort(), [filas]);
   const [pais, setPais] = useState<string | null>(null);
-  const [abierta, setAbierta] = useState<string | null>(null);
+  const [cuantas, setCuantas] = useState(POR_TANDA);
   const visibles = pais ? filas.filter((f) => (f.paisCodigo ?? "—") === pais) : filas;
+  // Los totales son de todas las filas del país; a la vista van las más nuevas, de a 100 (cada celda es un botón).
   const totales = totalesRegistro(visibles);
-  const columnas: { texto: string; derecha?: boolean }[] = [
-    { texto: t.colProducto },
-    { texto: t.colCantidad, derecha: true },
-    { texto: t.colMonto, derecha: true },
-    { texto: t.colEntrega },
-    { texto: t.colAnticipo, derecha: true },
-    { texto: t.colPagado, derecha: true },
-    { texto: t.colFechaPago },
-    { texto: t.colSinPagar, derecha: true },
-    { texto: t.colVencePago },
-    { texto: t.colSaldo, derecha: true },
-    { texto: t.colLlegada },
-    { texto: t.colPagoSaldo },
-  ];
-  const n = columnas.length + (acciones ? 1 : 0);
+  const aLaVista = visibles.slice(0, cuantas);
 
   return (
     <Tarjeta
@@ -63,7 +62,10 @@ export function RegistroPagos({ filas, acciones, pista }: { filas: FilaRegistro[
                   key={p ?? "todos"}
                   type="button"
                   aria-pressed={pais === p}
-                  onClick={() => setPais(p)}
+                  onClick={() => {
+                    setPais(p);
+                    setCuantas(POR_TANDA);
+                  }}
                   className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${pais === p ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"} ${anilloFoco}`}
                 >
                   {p ?? t.todosPaises}
@@ -74,176 +76,174 @@ export function RegistroPagos({ filas, acciones, pista }: { filas: FilaRegistro[
         </span>
       }
     >
+      {guardar && (
+        <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 border-b border-border px-4 py-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-primario/40 bg-primario-suave" />
+            {t.leyEditable}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-border bg-muted" />
+            {t.leyCalculada}
+          </span>
+        </p>
+      )}
       {visibles.length === 0 ? (
         <Vacio>{t.registroVacio}</Vacio>
       ) : (
-        <div className="max-h-[640px] overflow-auto">
-          <table className="w-full border-collapse">
+        <div className="max-h-[680px] overflow-auto">
+          <table className="w-full min-w-[1280px] border-collapse text-[13px]">
             <thead className="sticky top-0 z-[1] bg-card">
               <tr>
-                {columnas.map((c, i) => (
-                  <th key={i} scope="col" className={`${claseThLista} ${c.derecha ? "text-right" : ""}`}>
-                    {c.texto}
+                <th scope="col" className={`${claseThLista} align-bottom`}>
+                  <span className="block">{t.colProducto}</span>
+                  <span className="block text-[11px] font-normal text-muted-foreground normal-case">{COLUMNA_HOJA.producto}</span>
+                </th>
+                {COLUMNAS.map((c) => (
+                  <th key={c.campo} scope="col" className={`${claseThLista} align-bottom whitespace-nowrap ${c.derecha ? "text-right" : ""} ${CAMPOS_CALCULADOS.includes(c.campo) ? "bg-muted/60" : ""}`}>
+                    <span className="block">{t[c.titulo] as string}</span>
+                    <span className="block text-[11px] font-normal text-muted-foreground normal-case">{COLUMNA_HOJA[c.campo]}</span>
                   </th>
                 ))}
-                {acciones && (
-                  <th scope="col" className={claseThLista}>
-                    <span className="sr-only">{t.anotar}</span>
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
-              {visibles.map((f) => (
-                <Fragment key={f.clave}>
-                  <tr>
-                    <td className={`${claseTdLista} max-w-[20rem] whitespace-normal`}>
-                      {tr(f.producto)}
-                      {!pais && f.paisCodigo && <span className="ml-1.5 text-xs font-semibold text-muted-foreground">{f.paisCodigo}</span>}
+              {aLaVista.map((f) => (
+                <tr key={f.fila} className="border-t border-border">
+                  <td className="min-w-[17rem] px-3 py-1.5">
+                    <span className="flex items-center gap-2.5">
+                      {f.foto ? (
+                        <img src={f.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
+                      ) : (
+                        <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border-control" />
+                      )}
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <Celda f={f} campo="producto" guardar={guardar} claseTexto="font-semibold" />
+                        <span className="px-1.5 text-xs text-muted-foreground tabular-nums">
+                          {[f.referencia, f.paisCodigo].filter(Boolean).join(" · ") || "—"}
+                        </span>
+                      </span>
+                    </span>
+                  </td>
+                  {COLUMNAS.map((c) => (
+                    <td key={c.campo} className={`px-1 py-1 ${CAMPOS_CALCULADOS.includes(c.campo) ? "bg-muted/40" : guardar ? "bg-primario-suave/25" : ""}`}>
+                      <Celda f={f} campo={c.campo} guardar={guardar} derecha={c.derecha} claseTexto={claseDe(f, c.campo)} />
                     </td>
-                    <td className={`${claseTdLista} text-right tabular-nums`}>{numero(f.unidades)}</td>
-                    <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(f.monto)}</td>
-                    <td className={`${claseTdLista} tabular-nums`}>{fecha(f.envio)}</td>
-                    <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(f.anticipo)}</td>
-                    <td className={`${claseTdLista} text-right tabular-nums`}>{f.pagadoAnticipo ? dinero(f.pagadoAnticipo) : ""}</td>
-                    <td className={`${claseTdLista} tabular-nums`}>{f.fechaPagoAnticipo ? fecha(f.fechaPagoAnticipo) : ""}</td>
-                    <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(f.sinPagar)}</td>
-                    <td className={`${claseTdLista} bg-success-soft/40 tabular-nums ${f.vence && f.estadoAnticipo ? COLOR_TONO[f.estadoAnticipo.tono] : ""}`}>{f.vence ? fecha(f.vence) : ""}</td>
-                    <td className={`${claseTdLista} bg-warning-soft/40 text-right tabular-nums`}>{dinero(f.saldo)}</td>
-                    <td className={`${claseTdLista} bg-warning-soft/40 tabular-nums`}>
-                      {f.llegada ? fecha(f.llegada) : ""}
-                      {f.llegada && f.llegadaPropia && !acciones && <span className="block text-[11px] text-muted-foreground">{t.llegadaDelProveedor}</span>}
-                    </td>
-                    <td className={`${claseTdLista} bg-warning-soft/40 tabular-nums`}>{f.fechaPagoSaldo ? fecha(f.fechaPagoSaldo) : ""}</td>
-                    {acciones && (
-                      <td className={claseTdLista}>
-                        {f.pedidoId && (
-                          <button type="button" aria-expanded={abierta === f.clave} onClick={() => setAbierta((a) => (a === f.clave ? null : f.clave))} className={botonNormal}>
-                            {t.anotar}
-                          </button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                  {acciones && abierta === f.clave && f.pedidoId && (
-                    <tr>
-                      <td colSpan={n} className="border-b border-border bg-muted/40 px-4 py-3">
-                        <PanelAnotar f={f} acciones={acciones} alTerminar={() => setAbierta(null)} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                  ))}
+                </tr>
               ))}
             </tbody>
             <tfoot className="sticky bottom-0 bg-card">
-              <tr>
-                <th scope="row" colSpan={7} className={`${claseTdLista} text-right font-semibold`}>
+              <tr className="border-t-2 border-border">
+                <th scope="row" colSpan={7} className="px-3 py-2.5 text-right font-semibold">
                   {t.totalFila}
                 </th>
-                <td className={`${claseTdLista} bg-warning-soft text-right font-semibold tabular-nums`}>{dinero(totales.sinPagar)}</td>
-                <td className={claseTdLista} />
-                <td className={`${claseTdLista} bg-warning-soft text-right font-semibold tabular-nums`}>{dinero(totales.saldo)}</td>
-                <td colSpan={2 + (acciones ? 1 : 0)} className={claseTdLista} />
+                <td className="bg-warning-soft px-3 py-2.5 text-right font-semibold tabular-nums">{dinero(totales.sinPagar, totales.sinPagar % 1 ? 2 : 0)}</td>
+                <td />
+                <td className="bg-warning-soft px-3 py-2.5 text-right font-semibold tabular-nums">{dinero(totales.saldo, totales.saldo % 1 ? 2 : 0)}</td>
+                <td colSpan={2} />
               </tr>
             </tfoot>
           </table>
+          {visibles.length > aLaVista.length && (
+            <button type="button" onClick={() => setCuantas((n) => n + POR_TANDA)} className={`w-full border-t border-border px-4 py-2.5 text-left text-xs font-medium text-azul hover:bg-muted/50 ${anilloFoco}`}>
+              {t.verMasFilas(visibles.length - aLaVista.length)}
+            </button>
+          )}
         </div>
       )}
     </Tarjeta>
   );
 }
 
-/** Anotar un pago recibido, la fecha de llegada y quitar lo que se anotó mal. */
-function PanelAnotar({ f, acciones, alTerminar }: { f: FilaRegistro; acciones: AccionesRegistro; alTerminar: () => void }) {
-  const { t, fecha, error } = useIdioma();
+/** El color de lo calculado: lo que falta en rojo, el vencimiento según su estado, el saldo en ámbar. */
+function claseDe(f: FilaRegistro, campo: CampoRegistro): string {
+  if (campo === "sin_pagar") return Number(f.valores.sin_pagar ?? 0) > 0 ? "font-semibold text-destructive" : "";
+  if (campo === "vence") return f.valores.vence && f.estadoAnticipo ? `font-semibold ${COLOR_TONO[f.estadoAnticipo.tono]}` : "";
+  if (campo === "saldo") return "font-semibold text-warning";
+  return "";
+}
+
+/** Una celda: lo que se ve y, con `guardar`, un botón que la vuelve un campo para escribir (Enter guarda, Esc cancela). */
+function Celda({ f, campo, guardar, derecha = false, claseTexto = "" }: { f: FilaRegistro; campo: CampoRegistro; guardar?: Guardar; derecha?: boolean; claseTexto?: string }) {
+  const { t, tr, fecha, numero, error } = useIdioma();
   const { mostrarToast } = useToast();
   const router = useRouter();
-  const sugerida = sugerenciaPago(f);
-  const [cuota, setCuota] = useState<TipoCuota>(sugerida?.cuota ?? "saldo");
-  const [monto, setMonto] = useState(sugerida ? String(sugerida.monto) : "");
-  const [fechaPago, setFechaPago] = useState(hoyPanama());
-  const [llegada, setLlegada] = useState(f.llegadaPropia ? (f.llegada ?? "") : "");
-  const [ocupado, setOcupado] = useState(false);
+  const valor = f.valores[campo];
+  const tipo = TIPO_CAMPO[campo];
+  const [editando, setEditando] = useState(false);
+  const [borrador, setBorrador] = useState("");
+  const [guardando, setGuardando] = useState<string | null>(null);
+  // Esc cierra el campo sin guardar (al cerrarse, el campo pierde el foco y su onBlur no debe guardar).
+  const cancelado = useRef(false);
+  const editada = f.editadas.includes(campo) && CAMPOS_CALCULADOS.includes(campo);
 
-  async function correr(accion: () => R, ok: string, cerrar = true) {
-    setOcupado(true);
-    const r = await accion().catch(() => ({ error: "No se pudo anotar el pago." }));
-    setOcupado(false);
-    if (r.error) return mostrarToast(error(r.error), "destructive");
-    mostrarToast(ok);
-    if (cerrar) alTerminar();
+  const mostrar = (v: string | number | null) => {
+    if (v === null || v === undefined || v === "") return "";
+    if (tipo === "fecha") return fecha(String(v));
+    if (campo === "producto") return tr(String(v));
+    if (campo === "unidades") return numero(Number(v));
+    const n = Number(v);
+    return dinero(n, n % 1 ? 2 : 0);
+  };
+  const texto = guardando !== null ? mostrar(guardando === "" ? null : guardando) : mostrar(valor);
+
+  async function confirmar() {
+    setEditando(false);
+    if (cancelado.current) return;
+    const nuevo = borrador.trim();
+    if (nuevo === String(valor ?? "")) return;
+    setGuardando(nuevo);
+    const r = await guardar!(f.fila, campo, nuevo).catch(() => ({ error: "No se pudo guardar." }));
+    if (r.error) {
+      setGuardando(null);
+      return mostrarToast(error(r.error), "destructive");
+    }
+    mostrarToast(t.celdaGuardada);
     router.refresh();
+    setGuardando(null);
   }
 
-  const cuotaTexto = (c: TipoCuota) => (c === "anticipo" ? t.anticipo50 : t.saldo50);
+  const alineado = derecha ? "text-right" : "text-left";
+  if (!guardar)
+    return <span className={`block px-1.5 py-1.5 tabular-nums ${alineado} ${claseTexto}`}>{texto || <span className="text-muted-foreground">—</span>}</span>;
+  if (editando)
+    return (
+      <input
+        autoFocus
+        type={tipo === "fecha" ? "date" : "text"}
+        inputMode={tipo === "numero" ? "decimal" : undefined}
+        value={borrador}
+        onChange={(e) => setBorrador(e.target.value)}
+        onBlur={confirmar}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            cancelado.current = true;
+            setEditando(false);
+          }
+        }}
+        aria-label={`${COLUMNA_HOJA[campo]} · ${tr(String(f.valores.producto ?? ""))}`}
+        className={`w-full min-w-[6.5rem] rounded-md border-2 border-primario bg-card px-1.5 py-1 text-[13px] outline-none ${alineado}`}
+      />
+    );
   return (
-    <div className="flex flex-col gap-4">
-      <form
-        className="flex flex-wrap items-end gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void correr(() => acciones.anotarPago(f.pedidoId!, cuota, Number(monto.replace(",", ".")), fechaPago), t.pagoAnotado);
-        }}
-      >
-        <span className="w-full text-sm font-semibold">{t.anotarPago}</span>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {t.deCuota}
-          <select value={cuota} onChange={(e) => setCuota(e.target.value as TipoCuota)} className={fieldClassSm}>
-            <option value="anticipo">{cuotaTexto("anticipo")}</option>
-            <option value="saldo">{cuotaTexto("saldo")}</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {t.monto} (USD)
-          <input inputMode="decimal" required value={monto} onChange={(e) => setMonto(e.target.value)} className={`${fieldClassSm} w-32`} />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {t.fechaRecibido}
-          <input type="date" required max={hoyPanama()} value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} className={fieldClassSm} />
-        </label>
-        <button type="submit" disabled={ocupado} className={botonPrincipal}>
-          {ocupado ? t.guardando : t.guardar}
-        </button>
-      </form>
-
-      <form
-        className="flex flex-wrap items-end gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void correr(() => acciones.anotarLlegada(f.pedidoId!, llegada), t.llegadaGuardada);
-        }}
-      >
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {t.fechaLlegada}
-          <input type="date" min={f.envio} max={hoyPanama()} value={llegada} onChange={(e) => setLlegada(e.target.value)} className={fieldClassSm} />
-        </label>
-        <button type="submit" disabled={ocupado} className={botonNormal}>
-          {t.guardarLlegada}
-        </button>
-      </form>
-
-      {f.anotados.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-muted-foreground">{t.loAnotado}</span>
-          <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {f.anotados.map((a) => (
-              <li key={a.id} className="flex items-center gap-3 text-sm">
-                <span className="tabular-nums">
-                  {fecha(a.fecha)} · {cuotaTexto(a.cuota)} · {dinero(a.monto, 2)}
-                </span>
-                <button
-                  type="button"
-                  disabled={ocupado}
-                  onClick={() => void correr(() => acciones.quitarPago(a.id), t.pagoQuitado, false)}
-                  className={`rounded text-xs font-medium text-destructive hover:underline disabled:opacity-50 ${anilloFoco}`}
-                >
-                  {t.quitar}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+    <button
+      type="button"
+      onClick={() => {
+        cancelado.current = false;
+        setBorrador(valor === null || valor === undefined ? "" : String(valor));
+        setEditando(true);
+      }}
+      aria-label={`${COLUMNA_HOJA[campo]} · ${tr(String(f.valores.producto ?? ""))}: ${texto || "—"}`}
+      className={`block min-h-8 w-full cursor-text rounded-md px-1.5 py-1.5 tabular-nums hover:bg-primario-suave hover:shadow-[inset_0_0_0_1px_var(--primario)] ${alineado} ${guardando !== null ? "opacity-60" : ""} ${claseTexto} ${anilloFoco}`}
+    >
+      {texto || <span className="text-muted-foreground">—</span>}
+      {editada && (
+        <span title={t.editadaAMano} className="ml-1 text-[11px] text-muted-foreground">
+          ✎
+        </span>
       )}
-    </div>
+    </button>
   );
 }

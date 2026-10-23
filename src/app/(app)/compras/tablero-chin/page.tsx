@@ -74,7 +74,9 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
       : {
           resumen: estado.resumen,
           vencidas: estado.porPagar.filter((c) => c.estado.tono === "peligro").length,
-          filas: (await cargarRegistro(supabase, espejo.proveedor.id, pedidos, estado)).filter((f) => puedeVerPais(usuario.paisesPermitidos, f.paisCodigo)),
+          filas: (await cargarRegistro(supabase, espejo.proveedor.id, estado)).filter((f) => puedeVerPais(usuario.paisesPermitidos, f.paisCodigo)),
+          // Cambiar celdas pide modificar Compras (ver los montos ya se pidió para tener `pagos`).
+          editable: !usuario.modulosSoloLectura.includes("compras"),
         };
 
   // Lo que escribe Chin (comentarios de cotización), traducido al español.

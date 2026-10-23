@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { TipoCuota } from "./cuotas";
+import type { Registro } from "./registro-pagos";
 import type { DatosPagos, HistorialSuelto, PagosDe } from "./resumen-pagos";
 
 export interface AvisoPago {
@@ -22,15 +23,17 @@ export interface AvisoPago {
 type Fila = Record<string, unknown>;
 
 export async function cargarPagosProveedor(supabase: SupabaseClient, proveedorId: string): Promise<{ datos: DatosPagos; avisos: AvisoPago[] } | { error: string }> {
-  const [pagos, historial, avisos] = await Promise.all([
+  const [pagos, historial, avisos, registro] = await Promise.all([
     traerTodasConError<Fila>((d, h) => supabase.from("proveedor_pagos").select("pedido_id, historial_id, cuota, monto, fecha").eq("proveedor_id", proveedorId).order("id").range(d, h)),
-    traerTodasConError<Fila>((d, h) => supabase.from("proveedor_historial").select("id, pedido_id, producto, pais_codigo, monto_total, anticipo_monto, fecha_envio, fecha_llegada").eq("proveedor_id", proveedorId).order("id").range(d, h)),
+    traerTodasConError<Fila>((d, h) => supabase.from("proveedor_historial").select("id, clave, pedido_id, producto, unidades, pais_codigo, monto_total, anticipo_monto, fecha_envio, fecha_llegada").eq("proveedor_id", proveedorId).order("id").range(d, h)),
     supabase
       .from("proveedor_avisos_pago")
       .select("id, fecha, monto, referencia, estado, avisado_por_nombre, confirmado_en, nota, comprobante_ruta, proveedor_aviso_cuotas(pedido_id, cuota, monto, proveedor_pedidos(producto))")
       .eq("proveedor_id", proveedorId)
       .order("creado_en", { ascending: false })
       .limit(100),
+    // Lo editado en el Registro de pagos (migración 0142; sin ella, nada).
+    traerTodasConError<Fila>((d, h) => supabase.from("proveedor_registro").select("fila, producto, unidades, monto, fecha_envio, anticipo, pagado, fecha_pago, sin_pagar, vence, saldo, llegada, fecha_pago_saldo").eq("proveedor_id", proveedorId).order("fila").range(d, h)),
   ]);
   if (pagos.error || historial.error || avisos.error) return { error: "Falta correr en Supabase la migración 0127 (pagos del proveedor)." };
 
@@ -52,6 +55,8 @@ export async function cargarPagosProveedor(supabase: SupabaseClient, proveedorId
     }
     historialSuelto.push({
       id: h.id as string,
+      clave: h.clave as string,
+      unidades: h.unidades === null || h.unidades === undefined ? null : Number(h.unidades),
       producto: h.producto as string,
       paisCodigo: (h.pais_codigo as string | null) ?? null,
       montoTotal: Number(h.monto_total),
@@ -79,5 +84,10 @@ export async function cargarPagosProveedor(supabase: SupabaseClient, proveedorId
       producto: ((c.proveedor_pedidos as { producto: string } | null)?.producto as string) ?? "—",
     })),
   }));
-  return { datos: { pagosPorPedido, hojaPorPedido, historialSuelto, ultimaHoja }, avisos: listaAvisos };
+  const porFila: Record<string, Registro> = {};
+  for (const r of registro.error ? [] : (registro.data ?? [])) {
+    const { fila, ...campos } = r;
+    porFila[fila as string] = campos as Registro;
+  }
+  return { datos: { pagosPorPedido, hojaPorPedido, historialSuelto, ultimaHoja, registro: porFila }, avisos: listaAvisos };
 }

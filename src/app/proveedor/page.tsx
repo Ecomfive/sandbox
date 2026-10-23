@@ -33,13 +33,12 @@ export default async function PortalProveedorPage() {
     );
   }
   // Las fotos como en Compras: la comercial de referencia y la real de la compra si todavía no subió la suya.
-  const { pedidos: activos, realDeCompra } = await conFotosDeCompras(
-    supabase,
-    espejo.pedidos.filter((p) => p.etapa === "por_cotizar" || p.etapa === "cotizado" || p.etapa === "produccion" || p.etapa === "enviado"),
-  );
+  // (Todos, no solo los activos: el Registro de pagos también muestra la foto de lo que ya llegó.)
+  const { pedidos: conFotos, realDeCompra } = await conFotosDeCompras(supabase, espejo.pedidos);
+  const activos = conFotos.filter((p) => p.etapa === "por_cotizar" || p.etapa === "cotizado" || p.etapa === "produccion" || p.etapa === "enviado");
 
   const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
-  const fotosReales: Record<string, string> = { ...realDeCompra };
+  const fotosReales: Record<string, string> = Object.fromEntries(activos.filter((p) => realDeCompra[p.id]).map((p) => [p.id, realDeCompra[p.id]]));
   if (rutas.length) {
     const { data } = await supabase.storage.from(BUCKET_PROVEEDOR).createSignedUrls(rutas, 3600);
     const porRuta = new Map((data ?? []).map((f) => [f.path, f.signedUrl]));
@@ -56,15 +55,15 @@ export default async function PortalProveedorPage() {
     .limit(20);
   const nuevos: AvisoEcomfive[] = (avisos ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string }));
 
-  const estado = await estadoPagos(supabase, espejo);
-  const pagos = "error" in estado ? null : { resumen: estado.resumen, filas: await cargarRegistro(supabase, cuenta.proveedor.id, espejo.pedidos, estado) };
+  const estado = await estadoPagos(supabase, { ...espejo, pedidos: conFotos });
+  const pagos = "error" in estado ? null : { resumen: estado.resumen, filas: await cargarRegistro(supabase, cuenta.proveedor.id, estado) };
 
   // En chino: los nombres de los productos, las notas de Ecomfive y «Lo nuevo». En español: sus propios comentarios.
   const traducciones =
     idioma === "zh"
       ? await traducirTextos(
           supabase,
-          [...activos.flatMap((p) => [p.producto, p.notaParaProveedor]), ...nuevos.map((a) => a.texto), ...(pagos ? pagos.filas.map((f) => f.producto) : [])],
+          [...activos.flatMap((p) => [p.producto, p.notaParaProveedor]), ...nuevos.map((a) => a.texto), ...(pagos ? pagos.filas.map((f) => String(f.valores.producto ?? "")) : [])],
           "zh",
         )
       : await traducirTextos(supabase, activos.map((p) => p.comentarioProveedor), "es");

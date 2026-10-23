@@ -595,13 +595,16 @@ convenciones técnicas del código.
   su clave con `cambiarClaveProveedor` (`proveedor/actions.ts`): comprueba la actual con `createAnonClient` (sin tocar la sesión de las
   cookies), guarda la nueva con el cliente de servicio y quita la marca; también desde «Cambiar clave» de la cabecera del portal.
   **Fase 4** (migración 0127): pagos. **Lo pagado vive en `proveedor_pagos`, nunca en los campos de pago de la compra** (en Compras
-  `fecha_pago_1` es la fecha en que vence; decidido con Hernán). **Desde el 23 oct 2026 (migración 0141, decisión de Hernán) ya no hay
-  avisos de pago** (se quitaron `pagos-actions.ts`, `confirmarAvisoPago` y `vista-pagos.ts`; las tablas `proveedor_avisos_pago` quedan con
-  lo viejo): el comprobante va por privado y **el proveedor anota el pago** en su «Registro de pagos» (`pagos-manuales.ts`: `anotarPago`,
-  `quitarPago`, origen `proveedor`, `registrado_por`) y su llegada (`proveedor_pedidos.llegada_proveedor`, aparte de la de la compra:
-  cada uno marca la suya). Cada anotación: novedad, campana de `notificar_a` y auditoría de la compra. Compras se actualiza a mano. La
-  tabla (`components/proveedor/registro-pagos.tsx`, `filasRegistro` en `registro-pagos.ts` con prueba, datos en `registro-datos.ts`) tiene
-  las columnas de la hoja «payment record» y filtro por país; en el Tablero de Chin es solo lectura. También entra por las hojas de pagos de Chin
+  `fecha_pago_1` es la fecha en que vence; decidido con Hernán). **Desde el 23 oct 2026 ya no hay avisos de pago** (se quitaron `pagos-actions.ts`, `confirmarAvisoPago`
+  y `vista-pagos.ts`; `proveedor_avisos_pago` queda con lo viejo): el comprobante va por privado. **Registro de pagos editable**
+  (migración 0142, `proveedor_registro`): la tabla con las columnas de la hoja «payment record» (`components/proveedor/registro-pagos.tsx`,
+  100 filas por tanda) se edita celda por celda en el portal (`guardarCeldaRegistroProveedor`) y en «Pagos a Chin»
+  (`guardarCeldaRegistroEcomfive`: escritura de Compras y montos, países permitidos). Lo editado vive por `fila` (id del pedido u
+  `hoja:<clave>` de `proveedor_historial`, que sobrevive a cada importación), **no toca la compra** (Francis la actualiza a mano) y
+  `guardarCeldaRegistro` (`registro-datos.ts`) deja evento `registroPagos` en la compra, novedad al otro lado (campana de `notificar_a`
+  si lo cambió Chin; «Lo nuevo de Ecomfive» si lo cambió Ecomfive) y auditoría. `conRegistro` (`resumen-pagos.ts`) aplica a las cuotas
+  monto, envío, anticipo, pagado/fecha de pago y pago del saldo; sin pagar, vence y saldo escritos a mano solo cambian la vista
+  (`filasRegistro`, con prueba). La migración 0141 (pagos origen `proveedor`, `llegada_proveedor`) queda; su flujo «Anotar» se quitó. También entra por las hojas de pagos de Chin
   (`scripts/importar-pagos-proveedor.ts`, se puede repetir; `proveedor_historial` con `pedido_id` si se emparejó —`emparejar`,
   `hoja-pagos.ts`— o historial suelto que cuenta para el cumplimiento). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
   UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto

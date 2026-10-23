@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Espejo } from "./datos";
 import { hoyPanama } from "./fechas";
 import { cargarPagosProveedor, type AvisoPago } from "./pagos-datos";
+import type { Registro } from "./registro-pagos";
 import { claveCuota, cuotasPorPagar, enviosConCuotas, resumenPagos, type CuotaPorPagar, type EnvioConCuotas, type ResumenPagos } from "./resumen-pagos";
 
 /** Desde cuándo se mide el cumplimiento de los anticipos en los indicadores. */
@@ -15,6 +16,8 @@ export interface EstadoPagos {
   porPagar: CuotaPorPagar[];
   resumen: ResumenPagos;
   avisos: AvisoPago[];
+  /** Lo editado en el Registro de pagos, por fila. */
+  registro: Record<string, Registro>;
 }
 
 export async function estadoPagos(supabase: SupabaseClient, espejo: Espejo): Promise<EstadoPagos | { error: string }> {
@@ -24,5 +27,5 @@ export async function estadoPagos(supabase: SupabaseClient, espejo: Espejo): Pro
   const envios = enviosConCuotas(espejo.pedidos, r.datos, espejo.proveedor.porcentajeAnticipo, espejo.proveedor.diasAnticipo);
   const avisadas = new Set(r.avisos.filter((a) => a.estado === "avisado").flatMap((a) => a.cuotas.map((c) => claveCuota(c.pedidoId, c.cuota))));
   const porPagar = cuotasPorPagar(envios, hoy, avisadas);
-  return { envios, porPagar, resumen: resumenPagos(envios, porPagar, hoy, CUMPLIMIENTO_DESDE), avisos: r.avisos };
+  return { envios, porPagar, resumen: resumenPagos(envios, porPagar, hoy, CUMPLIMIENTO_DESDE), avisos: r.avisos, registro: r.datos.registro };
 }

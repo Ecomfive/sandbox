@@ -33,6 +33,8 @@ export function TableroChin({
     /** Cuotas vencidas (el número de la pestaña). */
     vencidas: number;
     filas: FilaRegistro[];
+    /** Puede cambiar celdas del Registro de pagos (modificar Compras). */
+    editable: boolean;
   } | null;
   traducciones: Record<string, string>;
   /** Solo para un administrador: las cuentas con las que el proveedor entra a su portal. */
@@ -104,7 +106,7 @@ export function TableroChin({
         </div>
 
         {vista === "pagos" && pagos ? (
-          <PagosEcomfive nombre={nombre} resumen={pagos.resumen} filas={pagos.filas} />
+          <PagosEcomfive nombre={nombre} resumen={pagos.resumen} filas={pagos.filas} editable={pagos.editable} />
         ) : (
           <PortalChin {...tablero} idioma="es" soloLectura />
         )}
