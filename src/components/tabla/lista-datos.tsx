@@ -30,6 +30,7 @@ export function ListaDatos<F>({
   porPagina = POR_PAGINA,
   accionPrincipal,
   variante = "tarjetas",
+  encabezado,
   vacio,
 }: {
   def: DefTabla<F>;
@@ -52,6 +53,11 @@ export function ListaDatos<F>({
    * línea fina, como una lista (una fila la dibuja `renderFila` sin borde propio).
    */
   variante?: "tarjetas" | "filas";
+  /**
+   * Solo con `variante="filas"`: la franja con el nombre de cada columna, encima de las filas (de cada grupo, si se agrupa). Queda
+   * fija arriba al bajar la página mientras se vean filas de esa lista. Quien la pasa la dibuja con las mismas columnas que sus filas.
+   */
+  encabezado?: ReactNode;
   vacio: string;
 }) {
   const tabla = useTablaInteractiva(def, filas, { porPagina });
@@ -63,11 +69,16 @@ export function ListaDatos<F>({
   const dibujar = (f: F) => <div key={claveFila(f)}>{renderFila(f, enOrden)}</div>;
   const juntas = (filasDelGrupo: F[]) =>
     variante === "filas" ? (
-      <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card p-0">
-        {filasDelGrupo.map((f) => (
-          <li key={claveFila(f)}>{renderFila(f, enOrden)}</li>
-        ))}
-      </ul>
+      // Con encabezado, la franja va FUERA de la lista (un `overflow-hidden` no deja que algo se quede fijo dentro de él) y las dos
+      // comparten esta caja, que es lo que marca hasta dónde baja la franja fija.
+      <div className="flex flex-col">
+        {encabezado && <div className="sticky top-0 z-[15] rounded-t-xl border border-b-0 border-border bg-muted">{encabezado}</div>}
+        <ul role="list" className={`m-0 flex list-none flex-col divide-y divide-border overflow-hidden border border-border bg-card p-0 ${encabezado ? "rounded-b-xl" : "rounded-xl"}`}>
+          {filasDelGrupo.map((f) => (
+            <li key={claveFila(f)}>{renderFila(f, enOrden)}</li>
+          ))}
+        </ul>
+      </div>
     ) : (
       filasDelGrupo.map(dibujar)
     );
