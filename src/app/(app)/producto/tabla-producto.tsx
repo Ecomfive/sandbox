@@ -3,23 +3,15 @@
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { SkuCopiable } from "@/components/ui/sku-copiable";
-import { Tooltip } from "@/components/ui/tooltip";
-import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import type { IconoComp } from "@/components/tabla/botones-vista";
-import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
+import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearProductoPanel } from "./crear-producto-panel";
-import { DEF_PRODUCTO, ETIQUETA_CLASE, ETIQUETA_TIPO, numeroProducto, TONO_CLASE, type FilaProducto, type ReferenciasTest } from "./def-producto";
+import { DEF_PRODUCTO, type FilaProducto, type ReferenciasTest } from "./def-producto";
 import { FichaProducto } from "./ficha-producto";
-import { VistaRapidaProducto } from "./vista-rapida-producto";
-import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
-import { CeldaTestProducto } from "./test-producto";
+import { FilaProductoLista } from "./fila-producto";
 import { TableroProducto } from "./tablero-producto";
-import { usd } from "../productos-test/informe";
-import { rutaLegible, SEPARADOR } from "@/lib/categorias/taxonomia";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = {
@@ -38,70 +30,13 @@ const ICONOS: Record<string, IconoComp> = {
   comprado: ComprasIcon,
   test: EstadoIcon,
   oferta: ComprasIcon,
+  decidir: EstadoIcon,
 };
 
-const COLUMNAS: ColumnaTabla<FilaProducto>[] = [
-  { id: "numero", label: "N.º", ocultable: false, clase: "tabular-nums text-muted-foreground whitespace-nowrap", render: (p) => numeroProducto(p.numero) },
-  { id: "codigo", label: "SKU", ocultable: true, clase: "font-medium", render: (p) => <SkuCopiable codigo={p.codigo} /> },
-  { id: "foto", label: "Foto", ocultable: true, render: (p) => <MiniaturaFoto url={p.foto} nombre={p.nombre} /> },
-  {
-    id: "nombre",
-    label: "Producto",
-    ocultable: true,
-    // Al pasar el cursor: el mapa de un compuesto, o la foto grande y las compras de un producto simple.
-    render: (p) => (
-      <TarjetaEmergente ancho={p.tipo === "combo" ? "34rem" : "17rem"} contenido={<VistaRapidaProducto producto={p} />}>
-        <span className="cursor-default underline decoration-dotted decoration-border-control underline-offset-4">{p.nombre}</span>
-      </TarjetaEmergente>
-    ),
-  },
-  {
-    id: "categoria",
-    label: "Categoría",
-    ocultable: true,
-    clase: "text-muted-foreground",
-    // El último nivel a la vista; la ruta completa de Shopify al pasar el cursor. Un punto ámbar si quedó para revisar.
-    render: (p) =>
-      p.categoria ? (
-        <Tooltip texto={`${rutaLegible(p.categoria.ruta)}${p.categoria.revisar ? " · por revisar" : ""}`}>
-          <span tabIndex={0} className="flex max-w-[16rem] items-center gap-1.5 rounded">
-            {p.categoria.revisar && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning" />}
-            <span className="truncate">{p.categoria.ruta.split(SEPARADOR).at(-1)}</span>
-          </span>
-        </Tooltip>
-      ) : (
-        "—"
-      ),
-  },
-  { id: "tipo", label: "Tipo", ocultable: true, clase: "text-muted-foreground", render: (p) => ETIQUETA_TIPO[p.tipo] ?? p.tipo },
-  { id: "clase", label: "Estado", ocultable: true, render: (p) => <Badge tone={TONO_CLASE[p.clase]}>{ETIQUETA_CLASE[p.clase] ?? p.clase}</Badge> },
-  // Si pasó por Test productos y cómo le fue; al pasar el cursor, los datos de su test.
-  { id: "test", label: "Test", ocultable: true, render: (p) => <CeldaTestProducto producto={p} /> },
-  // En cuánto se testeó (la oferta de su test más reciente); solo los que vienen de Test productos.
-  {
-    id: "oferta",
-    label: "Oferta",
-    ocultable: true,
-    clase: "text-right tabular-nums",
-    render: (p) => (p.tests[0]?.oferta != null ? usd(p.tests[0].oferta) : <span className="text-muted-foreground">—</span>),
-  },
-  { id: "barras", label: "Código de barras", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.codigoBarras ?? "—" },
-  { id: "vencimiento", label: "Vencimiento", ocultable: true, clase: "text-muted-foreground", render: (p) => (p.manejaVencimiento ? "Por lote" : "—") },
-  { id: "componentes", label: "Componentes", ocultable: true, clase: "text-muted-foreground", render: (p) => p.componentes || "—" },
-  {
-    id: "comprado",
-    label: "Unidades compradas",
-    ocultable: true,
-    clase: "text-right tabular-nums",
-    render: (p) => (p.unidadesCompradas ? p.unidadesCompradas.toLocaleString("es-PA") : <span className="text-muted-foreground">—</span>),
-  },
-  { id: "asociaciones", label: "Fichas", ocultable: true, clase: "text-muted-foreground tabular-nums", render: (p) => p.asociaciones.length },
-];
-
 /**
- * Lista de productos con la barra de herramientas común (agrupar por clase o tipo, filtros y «Agregar»). **La tabla no
- * tiene columna de acciones**: toda la fila abre la ficha del producto, donde se cambia su clase y se ven sus fichas
- * enlazadas y su actividad — mismo patrón que Cuentas destino.
+ * Lista de productos con la barra de herramientas común (agrupar por clase o tipo, filtros y «Agregar»). Desde el 23 oct 2026 va
+ * por filas, como Gestión de IDs Dropi (`FilaProductoLista`): toda la fila abre la ficha del producto, donde se cambia su clase y
+ * se ven sus fichas enlazadas, su test y su actividad.
  */
 export function TablaProducto({
   productos,
@@ -143,20 +78,15 @@ export function TablaProducto({
   return (
     <>
       <TableroProducto productos={productos} />
-      <TablaDatos
+      <ListaDatos
         def={DEF_PRODUCTO}
         filas={productos}
-        columnas={COLUMNAS}
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(p) => p.id}
-        anchoMinimo="48rem"
+        variante="filas"
+        renderFila={(p, enOrden) => <FilaProductoLista p={p} alAbrir={() => setAbierto({ id: p.id, orden: enOrden.map((x) => x.id) })} />}
         accionPrincipal={puedeEscribir ? <CrearProductoPanel opcionesSimples={opcionesSimples} /> : undefined}
-        abrirFila={{
-          etiqueta: (p) => `Abrir la ficha del producto ${p.codigo} (${numeroProducto(p.numero)})`,
-          alAbrir: (p, orden) => setAbierto({ id: p.id, orden }),
-        }}
-        ariaLabel="Productos"
         vacio="Todavía no hay productos. Usa «Agregar» para crear el primero."
       />
       {enNavegador && (

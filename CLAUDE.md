@@ -351,6 +351,9 @@ convenciones técnicas del código.
   sin foto, sin conectar (sin asociaciones ni publicaciones), sin stock / stock bajo (< `STOCK_BAJO` 50) en Dropi, nunca comprado y
   categoría a revisar, solo activos; winner sin comprar (activo o test con test «winner» o «enviado_a_compras» y 0 órdenes).
   `FilaProducto.stockDropi`: suma de `dropi_productos_proveedor.stock` de los IDs de sus publicaciones abiertas (`idsDeDropi`).
+  **Lista por filas** (23 oct 2026): `ListaDatos variante="filas"` con `FilaProductoLista` (`fila-producto.tsx`, como
+  `FilaPublicacionLista`): foto, nombre (vista rápida al pasar el cursor), número, SKU y categoría; estado y tipo; último test con
+  oferta; compras; stock en Dropi o «Sin conectar». Ya no hay columnas para ocultar (se quitó `CeldaTestProducto`).
 - **Módulo «Producto»** (`/producto`, módulo `producto`, migración 0070; sustituye al Catálogo maestro, cuya ruta redirige aquí). Un
   producto vive en `skus_maestros` (el nombre de la tabla se conserva) y se crea desde «Agregar»: **simple o compuesto** (un compuesto
   es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **Activo o Test** (se ve como «Estado» y se elige en la ficha; en la base es la columna `clase`, y Activo se guarda como `'fisico'`:
