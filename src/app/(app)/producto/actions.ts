@@ -163,6 +163,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   // carpeta del producto. Si algo falla, el producto queda creado sin foto (se pone después desde su ficha).
   const fotoSubida = texto(formData, "foto_url");
   const prefijoNuevos = `${PREFIJO_FOTOS}productos/nuevos/`;
+  let conFoto = false;
   if (fotoSubida && fotoSubida.startsWith(prefijoNuevos) && !fotoSubida.includes("..")) {
     const origen = fotoSubida.slice(PREFIJO_FOTOS.length);
     const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(origen);
@@ -173,10 +174,17 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
       if (!errorMover) {
         await supabase.from("skus_maestros").update({ foto_url: PREFIJO_FOTOS + destino }).eq("id", data.id);
         if (archivo) await guardarHuella(supabase, data.id, archivo);
+        conFoto = true;
       }
     } else {
       await supabase.storage.from(BUCKET_FOTOS).remove([origen]);
     }
+  }
+  // Un pack (el compuesto de UN solo producto, por ejemplo 2 o 3 unidades) sin foto propia toma la del producto original: se COPIA a
+  // la carpeta del compuesto (no se comparte la dirección: si alguien cambia la del simple, la del pack no se mueve). Un compuesto de
+  // productos distintos no la toma: lleva la que se suba. Lo pide la ficha con `foto_del_simple` (marcado por defecto).
+  if (!conFoto && tipo === "combo" && componentes.size === 1 && texto(formData, "foto_del_simple") === "1") {
+    await copiarFotoDelSimple(supabase, data.id, [...componentes.keys()][0]);
   }
 
   await registrarAuditoria({
@@ -188,6 +196,24 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   revalidatePath("/producto");
   revalidatePath("/inventario");
   return { id: data.id as string };
+}
+
+/** Copia la foto de un producto (el simple de un pack) a la carpeta de otro y la deja como la suya. Si algo falla, queda sin foto. */
+async function copiarFotoDelSimple(supabase: SupabaseClient, destinoId: string, origenId: string): Promise<boolean> {
+  const { data: simple } = await supabase.from("skus_maestros").select("foto_url").eq("id", origenId).maybeSingle();
+  const url = simple?.foto_url as string | null | undefined;
+  if (!url || !url.startsWith(PREFIJO_FOTOS) || url.includes("..")) return false;
+  const origen = url.slice(PREFIJO_FOTOS.length).split("?")[0];
+  const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(origen);
+  if (!archivo) return false;
+  const imagen = detectarImagen(new Uint8Array(await archivo.slice(0, 64).arrayBuffer()));
+  if (!imagen) return false;
+  const destino = `productos/${destinoId}/${Date.now()}-del-simple.${imagen.extension}`;
+  const { error } = await supabase.storage.from(BUCKET_FOTOS).upload(destino, archivo, { contentType: imagen.tipo });
+  if (error) return false;
+  await supabase.from("skus_maestros").update({ foto_url: PREFIJO_FOTOS + destino }).eq("id", destinoId);
+  await guardarHuella(supabase, destinoId, archivo);
+  return true;
 }
 
 type Clase = "fisico" | "test" | "inactivo" | "descontinuado";
