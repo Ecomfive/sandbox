@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { normalizarAnalisis, normalizarPlanFotos, normalizarPropuestaTexto, normalizarTitulos, pedidoAnalisis, pedidoCorregirTitulos, pedidoFotos, pedidoTexto, pedidoTitulos, promptFoto, tipoIADeRecomendacion, type ContextoIA, type DatosPublicacionIA } from "./asistente";
 import { cuerpoMensaje, extraerMensaje, mensajeErrorClaude } from "./anthropic";
-import { chequearTitulo, reglasParaIA, textoCriterios, textoEjemplos, textoIndicaciones } from "./criterios";
+import { chequearTitulo, correccionesDeAuditoria, reglasParaIA, textoCriterios, textoEjemplos, textoIndicaciones } from "./criterios";
 import { cuerpoRespuesta, extraerJson, extraerRespuesta, mensajeErrorOpenAI } from "./openai";
 
 const reglas = reglasParaIA({ max_titulo: 40, min_fotos: 7, min_descripcion: 200 });
@@ -253,4 +253,22 @@ test("pedidoCorregirTitulos devuelve cada título con su largo real y el rango",
   assert.match(p.texto, /«Cápsulas para fortalecer y crecer cabello sano» \(46 caracteres/);
   assert.match(p.texto, /idea: dice el beneficio/);
   assert.match(p.instrucciones, new RegExp(`entre ${contexto.reglas.minTitulo} y ${contexto.reglas.maxTitulo} caracteres`));
+});
+
+test("los nombres cambiados a mano en la ficha llegan a la IA como antes → después", () => {
+  const filas = [
+    { entidad_id: "a", antes: { Producto: "15 Days Cleanse" }, despues: { Producto: "15 Days Cleanse 30ca Limpieza Intestinal" } },
+    { entidad_id: "a", antes: { Producto: "15 Days Cleanse" }, despues: { Producto: "15 Days Cleanse apoyo para la salud intestinal" } },
+    { entidad_id: "b", antes: { SKU: "DEOS/X", Producto: "DEOS Suplemento" }, despues: { SKU: "Sin vincular", Producto: "P-JS Deos PACK 2" } },
+    { antes: { "Precio de venta": "$10.00" }, despues: { "Precio de venta": "$12.00" } },
+    { antes: { Producto: "—" }, despues: { Producto: "Algo" } },
+    { antes: { Producto: "Igual" }, despues: { Producto: "Igual" } },
+    { antes: { Producto: "Viejo" }, despues: { Producto: "15 days cleanse 30ca limpieza intestinal" } },
+  ];
+  const c = correccionesDeAuditoria(filas);
+  assert.deepEqual(c, [{ antes: "15 Days Cleanse", despues: "15 Days Cleanse 30ca Limpieza Intestinal" }]);
+  const texto = textoEjemplos({ titulos: [], rechazos: [], correcciones: c });
+  assert.match(texto, /corrigió a mano/);
+  assert.match(texto, /«15 Days Cleanse» → «15 Days Cleanse 30ca Limpieza Intestinal»/);
+  assert.match(pedidoTitulos(datos, { ...contexto, ejemplos: { ...contexto.ejemplos, correcciones: c } }).texto, /30ca Limpieza Intestinal/);
 });

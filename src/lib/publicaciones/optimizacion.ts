@@ -32,6 +32,8 @@ export interface EntradaRevision {
   descripcionLargo: number | null;
   /** Se leyó de Dropi en el catálogo (si no, precio sugerido y lo demás no se pueden revisar). */
   leidoEnDropi: boolean;
+  /** El nombre del producto vinculado (Producto): sus palabras en inglés son su nombre comercial y no cuentan como inglés. */
+  nombreProducto?: string | null;
 }
 
 const sinTildes = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -46,9 +48,14 @@ const INGLES = new Set(
 // Las que también son españolas o casi siempre aparecen como marca: no cuentan.
 for (const p of ["max", "plus", "extra", "natural", "detox", "anti", "yoga", "fitness", "gym", "collagen"]) INGLES.delete(p);
 
-export function palabrasEnIngles(titulo: string): string[] {
+/**
+ * Las palabras en inglés del título. Las que están en `nombreProducto` no cuentan: si el producto se llama en inglés («15 Days Cleanse»),
+ * el título conserva ese nombre tal cual (pedido de Alcides, 23 oct 2026); lo que se le agrega va en español.
+ */
+export function palabrasEnIngles(titulo: string, nombreProducto?: string | null): string[] {
+  const delNombre = new Set(sinTildes(nombreProducto ?? "").split(/[^a-z]+/));
   const vistas = new Set<string>();
-  for (const w of sinTildes(titulo).split(/[^a-z]+/)) if (w.length >= 3 && INGLES.has(w)) vistas.add(w);
+  for (const w of sinTildes(titulo).split(/[^a-z]+/)) if (w.length >= 3 && INGLES.has(w) && !delNombre.has(w)) vistas.add(w);
   return [...vistas];
 }
 
@@ -61,14 +68,33 @@ export function esSuplemento(titulo: string, categoria: string | null): boolean 
 
 /** El título dice para qué es («para la ciática», «contra la caída», «anti…», «alivio», «reduce…»). */
 const ANGULO = /\b(para|contra|anti|alivio|alivia|reduce|elimina|mejora|ayuda|ideal|quita|combate|previene|controla|fortalece|aumenta)\b/;
+/**
+ * O lo dice directo, sin «para» («15 Days Cleanse 30ca Limpieza Intestinal»): el uso o el beneficio como sustantivo. Sin tildes y en
+ * minúsculas; se puede sumar uno nuevo aquí.
+ */
+const USO = /\b(limpieza|desintoxica\w*|depurativ\w*|salud|energia|sueno|descanso|relajacion|digesti\w*|intestin\w*|colon|cabello|crecimiento|caida|piel|unas|articulac\w*|huesos|inmun\w*|defensas|memoria|concentracion|estres|ansiedad|libido|rendimiento|muscul\w*|adelgaz\w*|quema\w*|metabolismo|hidratacion|manchas|arrugas|acne|dolor|circulacion|prostata|higado|rinones|vista|antioxidante|belleza|cuidado)\b/;
 
 export function tieneAngulo(titulo: string): boolean {
-  return ANGULO.test(sinTildes(titulo));
+  const t = sinTildes(titulo);
+  return ANGULO.test(t) || USO.test(t);
 }
+
+/**
+ * La cantidad abreviada, cuando el nombre completo no cabe en los 40 caracteres de Dropi (pedido de Alcides, 23 oct 2026): «30c» o
+ * «30ca» cápsulas, «60sg» softgels, «30go» gomitas, «60t» tabletas (también «caps» y «tab»). Con o sin espacio entre número y letras.
+ */
+export const ABREVIATURAS_CANTIDAD = [
+  { abrev: "c", nombre: "cápsulas" },
+  { abrev: "sg", nombre: "softgels" },
+  { abrev: "go", nombre: "gomitas" },
+  { abrev: "t", nombre: "tabletas" },
+] as const;
+const CANTIDAD_ABREVIADA = /\b\d+\s?(c|ca|cap|caps|sg|go|t|tab|tabs)\b/;
 
 /** Una cantidad en el título: contenido (cápsulas, ml, g) o unidades (x2, 2 pares, pack 3, 2 unidades). */
 export function tieneCantidad(titulo: string): boolean {
   if (medidaEnNombre(titulo)) return true;
+  if (CANTIDAD_ABREVIADA.test(sinTildes(titulo))) return true;
   return /\b(\d+\s*(?:x|unidades?|pares?|piezas?|pzs?|uds?)\b|x\s?\d+\b|pack\s*-?\s*\d+)/i.test(sinTildes(titulo));
 }
 
@@ -88,7 +114,7 @@ export const ETIQUETA_REVISION: Record<ClaveRevision, string> = {
 export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min_titulo" | "max_titulo" | "min_fotos" | "min_descripcion">): Revision[] {
   const r = (clave: ClaveRevision, estado: EstadoRevision, detalle: string): Revision => ({ clave, etiqueta: ETIQUETA_REVISION[clave], estado, detalle });
   const t = p.titulo.trim();
-  const ingles = palabrasEnIngles(t);
+  const ingles = palabrasEnIngles(t, p.nombreProducto);
   const palabras = t.split(/\s+/).filter(Boolean);
   const letras = t.replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ]/g, "");
   const mayusculas = letras.length >= 8 && letras === letras.toUpperCase();

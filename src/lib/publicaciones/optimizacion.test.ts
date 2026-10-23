@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { notaOptimizacion, palabrasEnIngles, revisarPublicacion, tieneCantidad, type EntradaRevision } from "./optimizacion";
+import { notaOptimizacion, palabrasEnIngles, revisarPublicacion, tieneAngulo, tieneCantidad, type EntradaRevision } from "./optimizacion";
 import { REGLAS_DEFECTO } from "./reglas";
 import { recomendarOptimizacion, tareaCumplida } from "./recomendaciones";
 
@@ -61,4 +61,17 @@ test("largo del título: entre 35 y 40 caracteres (reglas editables)", () => {
   assert.equal(estado({ titulo: "Cinturón lumbar para aliviar la ciática" }, "titulo_largo"), "ok");
   const r = revisarPublicacion({ ...base, titulo: "Cinturón lumbar para aliviar la ciática" }, { ...REGLAS_DEFECTO, max_titulo: 30 }).find((x) => x.clave === "titulo_largo")!;
   assert.equal(r.estado, "falta");
+});
+
+test("cantidad abreviada, uso sin «para» y nombre del producto en inglés (23 oct 2026)", () => {
+  const t = "15 Days Cleanse 30ca Limpieza Intestinal";
+  assert.equal(tieneCantidad(t), true);
+  for (const x of ["Biotina 30c para el cabello", "Omega 3 60sg salud", "Melatonina 30go sueño", "Zinc 60t defensas", "Magnesio 60 caps"]) assert.equal(tieneCantidad(x), true, x);
+  assert.equal(tieneCantidad("Crema Perfect para la piel"), false);
+  assert.equal(tieneAngulo(t), true);
+  assert.equal(tieneAngulo("Biotina Salud Digestiva"), true);
+  assert.equal(tieneAngulo("Bolso Nayla grande morado"), false);
+  assert.deepEqual(palabrasEnIngles("Hair Growth Serum 30ml crecimiento", "Hair Growth Serum"), []);
+  assert.deepEqual(palabrasEnIngles("Hair Growth Serum 30ml crecimiento"), ["hair", "growth", "serum"]);
+  assert.deepEqual(palabrasEnIngles("Hair Growth Serum cream", "Hair Growth Serum"), ["cream"]);
 });
