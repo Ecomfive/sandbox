@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { aplicarCotizacion, aplicarEnvio } from "@/lib/proveedor/aplicar";
-import { anotarLlegada, anotarPago, quitarPago } from "@/lib/proveedor/pagos-manuales";
+import { guardarCeldaRegistro } from "@/lib/proveedor/registro-datos";
 import { cuentaProveedorActual } from "@/lib/proveedor/sesion";
 import { BUCKET_PROVEEDOR, rutaFotoReal } from "@/lib/proveedor/rutas";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
@@ -54,25 +54,16 @@ export async function marcarEnviado(pedidoId: string, fecha: string): Promise<{ 
   return aplicarEnvio(cuenta, pedidoId, fecha);
 }
 
-/** «Registro de pagos»: el proveedor anota un pago que recibió (anticipo o saldo). */
-export async function anotarPagoProveedor(pedidoId: string, cuota: string, monto: number, fecha: string): Promise<{ error?: string }> {
+/** «Registro de pagos»: el proveedor cambia una celda de su tabla (vacía, vuelve al valor de siempre). Ecomfive recibe el aviso. */
+export async function guardarCeldaRegistroProveedor(fila: string, campo: string, valor: string): Promise<{ error?: string }> {
   const cuenta = await cuentaProveedorActual();
   if (!cuenta) return SIN_SESION;
-  return anotarPago(cuenta, pedidoId, cuota, monto, fecha);
-}
-
-/** «Registro de pagos»: quita un pago que anotó el proveedor. */
-export async function quitarPagoProveedor(pagoId: string): Promise<{ error?: string }> {
-  const cuenta = await cuentaProveedorActual();
-  if (!cuenta) return SIN_SESION;
-  return quitarPago(cuenta, pagoId);
-}
-
-/** «Registro de pagos»: la fecha de llegada según el proveedor (vacía, la borra). */
-export async function anotarLlegadaProveedor(pedidoId: string, fecha: string): Promise<{ error?: string }> {
-  const cuenta = await cuentaProveedorActual();
-  if (!cuenta) return SIN_SESION;
-  return anotarLlegada(cuenta, pedidoId, fecha);
+  return guardarCeldaRegistro(createServiceClient(), cuenta.proveedor.id, fila, campo, valor, {
+    lado: "proveedor",
+    nombre: cuenta.nombre,
+    proveedor: cuenta.proveedor.nombre,
+    notificarA: cuenta.proveedor.notificarA,
+  });
 }
 
 /** Lo nuevo de Ecomfive (decisiones, llegadas) queda visto al abrir el portal. */

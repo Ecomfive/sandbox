@@ -93,7 +93,7 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
           { clave: "cotizado" as const, titulo: t.tabCotizado, cuenta: de("cotizado").length },
           { clave: "produccion" as const, titulo: t.tabProduccion, cuenta: de("produccion").length },
           { clave: "enviado" as const, titulo: t.tabEnviado, cuenta: de("enviado").length },
-          ...(pagos ? [{ clave: "pagos" as const, titulo: t.tabPagos, cuenta: pagos.filas.filter((f) => f.sinPagar > 0).length }] : []),
+          ...(pagos ? [{ clave: "pagos" as const, titulo: t.tabPagos, cuenta: pagos.filas.filter((f) => Number(f.valores.sin_pagar ?? 0) > 0).length }] : []),
         ]}
         valor={tab}
         alCambiar={setTab}

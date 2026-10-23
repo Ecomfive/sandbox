@@ -3,6 +3,7 @@
 
 import { cuotasDe, cumplimiento, estadoCuota, estaPagada, saldoTrasLlegada, type Cuota, type EstadoCuota, type Pago, type TipoCuota } from "./cuotas";
 import { diasEntre } from "./fechas";
+import { filaDeHoja, filaDePedido, type Registro } from "./registro-pagos";
 
 export interface PagosDe {
   anticipo: Pago[];
@@ -12,6 +13,9 @@ export interface PagosDe {
 /** Una fila de las hojas de Chin sin compra en el sistema: cuenta para el cumplimiento, no se paga desde el portal. */
 export interface HistorialSuelto {
   id: string;
+  /** Su clave en las hojas («PA#123»): no cambia al volver a importar (la usa el Registro de pagos). */
+  clave: string;
+  unidades: number | null;
   producto: string;
   paisCodigo: string | null;
   montoTotal: number;
@@ -24,6 +28,7 @@ export interface HistorialSuelto {
 /** Lo mínimo de un pedido para sus cuotas. */
 export interface PedidoConPagos {
   id: string;
+  unidades: number | null;
   producto: string;
   referencia: string | null;
   paisCodigo: string | null;
@@ -37,6 +42,9 @@ export interface PedidoConPagos {
 
 export interface EnvioConCuotas {
   clave: string;
+  /** La fila del Registro de pagos (`proveedor_registro.fila`). */
+  fila: string;
+  unidades: number | null;
   pedidoId: string | null;
   producto: string;
   referencia: string | null;
@@ -58,6 +66,40 @@ export interface DatosPagos {
   historialSuelto: HistorialSuelto[];
   /** El envío más reciente de las hojas: lo que salió después se controla solo con los avisos del portal. */
   ultimaHoja: string | null;
+  /** Lo editado en el Registro de pagos (migración 0142), por fila; vacío sin la migración. */
+  registro: Record<string, Registro>;
+}
+
+const n = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
+const f = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? null : String(v));
+
+/**
+ * Lo editado en el Registro de pagos que cuenta para las cuotas: monto, envío, anticipo, lo pagado del anticipo (y su fecha) y la fecha
+ * en que se pagó el saldo (el saldo completo). Sin pagar, vence y saldo escritos a mano solo cambian lo que muestra la tabla.
+ */
+export function conRegistro(
+  base: { montoTotal: number | null; fechaEnvio: string | null; anticipoMonto: number | null; pagos: PagosDe },
+  r: Registro | undefined,
+  porcentajeAnticipo: number,
+): { montoTotal: number | null; fechaEnvio: string | null; anticipoMonto: number | null; pagos: PagosDe } {
+  if (!r) return base;
+  const montoTotal = n(r.monto) ?? base.montoTotal;
+  const fechaEnvio = f(r.fecha_envio) ?? base.fechaEnvio;
+  const anticipoMonto = n(r.anticipo) ?? base.anticipoMonto;
+  const pagado = n(r.pagado);
+  const fechaPago = f(r.fecha_pago);
+  const anticipo =
+    pagado !== null
+      ? pagado > 0
+        ? [{ monto: pagado, fecha: fechaPago ?? fechaEnvio ?? "" }]
+        : []
+      : fechaPago
+        ? base.pagos.anticipo.map((p) => ({ ...p, fecha: fechaPago }))
+        : base.pagos.anticipo;
+  const fechaSaldo = f(r.fecha_pago_saldo);
+  const montoAnticipo = montoTotal ? Math.min(montoTotal, anticipoMonto ?? (montoTotal * porcentajeAnticipo) / 100) : 0;
+  const saldo = fechaSaldo && montoTotal ? [{ monto: Math.round((montoTotal - montoAnticipo) * 100) / 100, fecha: fechaSaldo }] : base.pagos.saldo;
+  return { montoTotal, fechaEnvio, anticipoMonto, pagos: { anticipo, saldo } };
 }
 
 /**
@@ -70,36 +112,52 @@ export function enviosConCuotas(pedidos: PedidoConPagos[], datos: DatosPagos, po
   const envios: EnvioConCuotas[] = [];
   for (const p of pedidos) {
     const hoja = datos.hojaPorPedido[p.id];
-    const montoTotal = hoja?.monto ?? p.montoTotal;
-    if (!p.fechaEnvio || !montoTotal) continue;
-    if (!hoja && datos.ultimaHoja && p.fechaEnvio <= datos.ultimaHoja) continue;
-    const pagos = datos.pagosPorPedido[p.id] ?? vacio;
+    const fila = filaDePedido(p.id);
+    const r = datos.registro[fila];
+    const { montoTotal, fechaEnvio, anticipoMonto, pagos } = conRegistro(
+      { montoTotal: hoja?.monto ?? p.montoTotal, fechaEnvio: p.fechaEnvio, anticipoMonto: hoja?.anticipo ?? p.anticipoMonto, pagos: datos.pagosPorPedido[p.id] ?? vacio },
+      r,
+      porcentajeAnticipo,
+    );
+    if (!fechaEnvio || !montoTotal) continue;
+    if (!hoja && !r && datos.ultimaHoja && fechaEnvio <= datos.ultimaHoja) continue;
     const fechaLlegada = p.fechaLlegada ?? hoja?.llegada ?? null;
     envios.push({
       clave: p.id,
+      fila,
+      unidades: p.unidades,
       pedidoId: p.id,
       producto: p.producto,
       referencia: p.referencia,
       paisCodigo: p.paisCodigo,
       fotoReferencia: p.fotoReferencia,
-      fechaEnvio: p.fechaEnvio,
+      fechaEnvio,
       fechaLlegada,
       montoTotal,
-      cuotas: cuotasDe({ montoTotal, fechaEnvio: p.fechaEnvio, fechaLlegada, anticipoMonto: hoja?.anticipo ?? p.anticipoMonto, pagosAnticipo: pagos.anticipo, pagosSaldo: pagos.saldo }, porcentajeAnticipo, diasAnticipo),
+      cuotas: cuotasDe({ montoTotal, fechaEnvio, fechaLlegada, anticipoMonto, pagosAnticipo: pagos.anticipo, pagosSaldo: pagos.saldo }, porcentajeAnticipo, diasAnticipo),
     });
   }
   for (const h of datos.historialSuelto) {
+    const fila = filaDeHoja(h.clave);
+    const { montoTotal, fechaEnvio, anticipoMonto, pagos } = conRegistro(
+      { montoTotal: h.montoTotal, fechaEnvio: h.fechaEnvio, anticipoMonto: h.anticipoMonto, pagos: h.pagos },
+      datos.registro[fila],
+      porcentajeAnticipo,
+    );
+    if (!fechaEnvio || !montoTotal) continue;
     envios.push({
-      clave: `h:${h.id}`,
+      clave: fila,
+      fila,
+      unidades: h.unidades,
       pedidoId: null,
       producto: h.producto,
       referencia: null,
       paisCodigo: h.paisCodigo,
       fotoReferencia: null,
-      fechaEnvio: h.fechaEnvio,
+      fechaEnvio,
       fechaLlegada: h.fechaLlegada,
-      montoTotal: h.montoTotal,
-      cuotas: cuotasDe({ montoTotal: h.montoTotal, fechaEnvio: h.fechaEnvio, fechaLlegada: h.fechaLlegada, anticipoMonto: h.anticipoMonto, pagosAnticipo: h.pagos.anticipo, pagosSaldo: h.pagos.saldo }, porcentajeAnticipo, diasAnticipo),
+      montoTotal,
+      cuotas: cuotasDe({ montoTotal, fechaEnvio, fechaLlegada: h.fechaLlegada, anticipoMonto, pagosAnticipo: pagos.anticipo, pagosSaldo: pagos.saldo }, porcentajeAnticipo, diasAnticipo),
     });
   }
   return envios.sort((a, b) => b.fechaEnvio.localeCompare(a.fechaEnvio));
