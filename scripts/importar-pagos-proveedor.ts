@@ -1,6 +1,7 @@
 // Importa las hojas de pagos de Chin («payment record for EcomFive», una por país) al portal del proveedor (migración 0127): cada fila
 // queda en `proveedor_historial` (con su pedido si se emparejó con una compra) y lo pagado en `proveedor_pagos` (origen «hoja»).
 // Se puede repetir: cada corrida reemplaza lo que trajo la anterior. Los pagos avisados y confirmados en el portal no se tocan.
+// Las unidades las manda Chin (23 oct 2026): una compra abierta emparejada con otra cantidad toma la de su hoja (`unidadesDelProveedor`).
 //
 //   npx tsx --env-file=.env.local scripts/importar-pagos-proveedor.ts            (solo informa)
 //   npx tsx --env-file=.env.local scripts/importar-pagos-proveedor.ts --aplicar
@@ -10,7 +11,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
-import { emparejar, leerHojaPagos, type FilaHoja, type PedidoParaEmparejar } from "../src/lib/proveedor/hoja-pagos";
+import { emparejar, leerHojaPagos, unidadesDelProveedor, type FilaHoja, type PedidoParaEmparejar } from "../src/lib/proveedor/hoja-pagos";
 import { traerTodasLasFilas } from "../src/lib/supabase/paginar";
 
 const HOJAS = [
@@ -29,7 +30,7 @@ async function main() {
   const filas: { fila: FilaHoja; pais: string; clave: string }[] = [];
   for (const { hoja, archivo } of HOJAS) leerHojaPagos(readFileSync(archivo, "utf8")).forEach((fila, i) => filas.push({ fila, pais: hoja, clave: `${hoja}#${i + 1}` }));
 
-  const espejo = await traerTodasLasFilas<Record<string, unknown>>((d, h) => s.from("proveedor_pedidos").select("id, producto, pais_codigo, unidades, monto_total, fecha_envio").eq("proveedor_id", prov.id).order("id").range(d, h));
+  const espejo = await traerTodasLasFilas<Record<string, unknown>>((d, h) => s.from("proveedor_pedidos").select("id, compra_id, producto, pais_codigo, unidades, monto_total, fecha_envio, etapa").eq("proveedor_id", prov.id).order("id").range(d, h));
   const pedidos: PedidoParaEmparejar[] = espejo.map((p) => ({
     id: p.id as string,
     producto: p.producto as string,
@@ -39,6 +40,10 @@ async function main() {
     fechaEnvio: (p.fecha_envio as string | null) ?? null,
   }));
   const pareja = emparejar(filas, pedidos);
+  // Las unidades las manda Chin: una compra abierta con otra cantidad que su fila toma la de la hoja.
+  const etapaDe = new Map(espejo.map((p) => [p.id as string, p.etapa as string]));
+  const compraDe = new Map(espejo.map((p) => [p.id as string, p.compra_id as string]));
+  const cambiosUnidades = unidadesDelProveedor(filas, pareja, pedidos.map((p) => ({ ...p, etapa: etapaDe.get(p.id) ?? "" })));
   const sinCompra = filas.filter((_, i) => !pareja.has(i));
   const pagos = filas.reduce((n, f) => n + f.fila.pagosAnticipo.length + f.fila.pagosSaldo.length, 0);
   console.log(`${filas.length} filas en las hojas · ${pareja.size} con su compra · ${sinCompra.length} como historial suelto · ${pagos} pagos`);
@@ -49,6 +54,7 @@ async function main() {
       "\n",
   );
   console.log("Reporte: datos-privados/pagos-proveedor-sin-compra.txt");
+  for (const c of cambiosUnidades) console.log(`Unidades de ${PROVEEDOR}: ${pedidos.find((p) => p.id === c.pedidoId)?.producto} · ${c.antes ?? "—"} → ${c.ahora}`);
   if (!aplicar) return console.log("Sin --aplicar: no se guardó nada.");
 
   // Lo que trajo la corrida anterior se reemplaza (los pagos avisados en el portal no son de la hoja y se quedan).
@@ -93,7 +99,21 @@ async function main() {
       await s.from("proveedor_pedidos").update({ anticipo_monto: f.anticipo }).eq("id", pedidoId);
     }
   }
-  console.log(`Guardado: ${historial.length} filas de historial, ${filasPago.length} pagos, ${distintos} pedidos con anticipo distinto del 50 %.`);
+  // La compra (y su producto, si tiene uno solo) toma las unidades de Chin; el monto queda y el costo por unidad se recalcula.
+  for (const c of cambiosUnidades) {
+    const compraId = compraDe.get(c.pedidoId)!;
+    const { data: compra } = await s.from("wms_compras").select("qty_total, monto_total").eq("id", compraId).single();
+    const { data: lineas } = await s.from("wms_compra_items").select("id").eq("compra_id", compraId);
+    if (lineas?.length === 1) {
+      const costo = compra?.monto_total != null ? Math.round((Number(compra.monto_total) / c.ahora) * 10000) / 10000 : null;
+      await s.from("wms_compra_items").update({ cantidad_pedida: c.ahora, ...(costo !== null ? { costo_unitario: costo } : {}), actualizado_en: new Date().toISOString() }).eq("id", lineas[0].id);
+    }
+    await s.from("wms_compras").update({ qty_total: c.ahora, actualizado_en: new Date().toISOString() }).eq("id", compraId);
+    const autor = `Sistema · hoja de ${PROVEEDOR}`;
+    await s.from("wms_compra_eventos").insert({ compra_id: compraId, campo: "qtyTotal", valor_antes: c.antes === null ? null : String(c.antes), valor_despues: String(c.ahora), autor, origen: "sistema" });
+    await s.from("historial_auditoria").insert({ usuario_id: null, usuario_nombre: autor, accion: "editar_campo_compra", entidad: "wms_compras", entidad_id: compraId, detalle: `Cantidad total ${c.antes ?? "—"} → ${c.ahora}: la que trae el paquete de ${PROVEEDOR}` });
+  }
+  console.log(`Guardado: ${historial.length} filas de historial, ${filasPago.length} pagos, ${distintos} pedidos con anticipo distinto del 50 %, ${cambiosUnidades.length} compras con las unidades de ${PROVEEDOR}.`);
 }
 
 main().catch((e) => {

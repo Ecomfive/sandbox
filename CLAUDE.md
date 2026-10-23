@@ -612,6 +612,10 @@ convenciones técnicas del código.
   chino los productos, las notas, «Lo nuevo» y los productos de pagos; a español lo que escribe Chin (comentario de cotización, detalle de
   novedad, nota al confirmar un pago). Las pantallas reciben las traducciones por `IdiomaProveedor` (`useIdioma`: `t`, `tr`, `fecha`,
   `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)».
+  **Las unidades las manda Chin** (23 oct 2026, regla de Hernán): la cantidad que pone Chin es la que trae su paquete (pides 1,000 y
+  vende 960), así que la compra toma la suya. Desde el portal ya pasaba (`aplicarCotizacion` cambia `qty_total` y la línea única);
+  desde sus hojas, `importar-pagos-proveedor.ts --aplicar` cambia las compras abiertas emparejadas con otra cantidad
+  (`unidadesDelProveedor`, con prueba): `qty_total` y la línea única (monto igual, costo por unidad recalculado), con su evento y auditoría.
   **Qué hacer con Chin** (23 oct 2026, pedido de Hernán): panel arriba del Tablero de Chin
   (solo ahí, decisión de Hernán: no en la lista de Compras). `tareasChin` (`src/lib/proveedor/tareas.ts`, con prueba) arma las tareas con el espejo, `cuotasPorPagar`,
   `estadoTransito` y las `proveedor_novedades` del lado proveedor sin leer («Nuevo»): decidir cotización, falta el costo, pagar
