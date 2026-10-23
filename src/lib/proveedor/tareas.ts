@@ -1,7 +1,7 @@
 // Compras › «Qué hacer con Chin» (23 oct 2026, pedido de Hernán): lo que nos toca para cerrar el ciclo con el proveedor, armado con
 // el espejo (`proveedor_pedidos`), las cuotas por pagar y lo que el proveedor hizo en su tablero (`proveedor_novedades` del lado
 // proveedor, sin leer = «Nuevo»). Cada tarea se va sola cuando el ciclo avanza (se decide la cotización, se paga, se marca la
-// llegada). Lo usan Compras y el Tablero de Chin. Lógica pura, con prueba.
+// llegada). Lo usa el Tablero de Chin. Lógica pura, con prueba.
 
 import type { PedidoPortal } from "./datos";
 import { diasEntre } from "./fechas";

@@ -1,11 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requirePestana } from "@/lib/auth";
-import { pestanaVisible } from "@/lib/permisos/afinado";
-import { cargarTareasChin } from "@/lib/proveedor/tareas-datos";
-import { createServiceClient } from "@/lib/supabase/server";
-import { campoOculto, restriccionesDe } from "../permisos-compras";
-import { QueHacerChin } from "../tablero-chin/que-hacer-chin";
 import { cargarColoresEtiquetas, cargarColoresTiendas, cargarCompras } from "../datos-compras";
 import type { Grupo } from "../calculos-compras";
 import { TablaCompras } from "../tabla-compras";
@@ -33,21 +28,11 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
   const reponerInicial = leerReponer(reponer);
   // Solo letras, números y espacios (lo pone el enlace del Portal del proveedor).
   const proveedorInicial = typeof proveedor === "string" && /^[\p{L}\p{N} .-]{1,60}$/u.test(proveedor) ? proveedor : null;
-  // «Qué hacer con Chin» arriba, para quien también ve el Tablero de Chin (sus pagos llevan ahí).
-  const veChin = pestanaVisible(usuario.afinado.compras, "tablero-chin");
-  const [{ compras, paises, vista, error, restricciones }, coloresEtiquetas, coloresTiendas, chin] = await Promise.all([
-    cargarCompras(ver),
-    cargarColoresEtiquetas(),
-    cargarColoresTiendas(),
-    veChin
-      ? cargarTareasChin(createServiceClient(), { paisesPermitidos: usuario.paisesPermitidos, veMontos: !campoOculto(restriccionesDe(usuario.afinado.compras), "monto") })
-      : Promise.resolve(null),
-  ]);
+  const [{ compras, paises, vista, error, restricciones }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Compras" oculto />
-      {chin && <QueHacerChin proveedor={chin.proveedor} tareas={chin.tareas} />}
       {error ? (
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
           No se pudieron cargar las compras.

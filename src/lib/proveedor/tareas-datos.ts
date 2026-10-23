@@ -1,5 +1,5 @@
 // Compras › «Qué hacer con Chin»: junta lo que necesita `tareasChin` (espejo, pagos, novedades sin leer y desde cuándo espera cada
-// pedido por cotizar) para Compras y el Tablero de Chin. Solo servidor; quien llama ya comprobó el acceso a Compras y dice qué
+// pedido por cotizar) para el Tablero de Chin. Solo servidor; quien llama ya comprobó el acceso a Compras y dice qué
 // países ve y si ve los montos.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
