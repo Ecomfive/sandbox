@@ -38,8 +38,8 @@ function EstadoRepublicar({ c }: { c: CambioDropiVista }) {
       </span>
     );
   return (
-    <span className={`flex items-center gap-1.5 text-xs ${c.estado === "error" ? "text-destructive" : "text-warning"}`}>
-      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.estado === "error" ? "bg-destructive" : "bg-warning"}`} />
+    <span className="flex items-center gap-1.5 text-xs text-destructive">
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
       {c.estado === "error"
         ? `No se pudo republicar en Dropi: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
         : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto."}
