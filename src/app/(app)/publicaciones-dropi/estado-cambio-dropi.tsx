@@ -3,7 +3,7 @@ import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
 /**
- * Cómo va el último cambio para Dropi (nombre, precio o precio sugerido) de una publicación: cambiado (por el favorito «Aplicar en Dropi»), pendiente (hasta
+ * Cómo va el último cambio para Dropi (nombre, precio o precio sugerido) de una publicación: cambiado (por el favorito «Aplicar en Dropi»), pendiente, en rojo para que se note (hasta
  * que alguien lo pulse) o con error (el próximo «Aplicar en Dropi» lo vuelve a intentar).
  */
 export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
@@ -19,8 +19,8 @@ export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
       </span>
     );
   return (
-    <span className={`flex items-center gap-1.5 text-xs ${c.estado === "error" ? "text-destructive" : "text-warning"}`}>
-      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.estado === "error" ? "bg-destructive" : "bg-warning"}`} />
+    <span className="flex items-center gap-1.5 text-xs text-destructive">
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
       {c.estado === "error"
         ? `No se pudo cambiar en Dropi: ${c.error ?? "sin detalle"} Se vuelve a intentar al pulsar «Aplicar en Dropi».`
         : `Pendiente en Dropi (${que}): pulsa «Aplicar en Dropi» con Dropi abierto.`}
