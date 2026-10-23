@@ -2,7 +2,7 @@
 // descripción mínimas) puestas como criterios para la IA y como chequeos de lo que ella propone. Así la IA trabaja con las mismas
 // reglas que la «Optimización en Dropi» y lo que no cumple se descarta o se marca antes de mostrarse. Sin base ni React, con prueba.
 
-import { esSuplemento, palabrasEnIngles, tieneAngulo, tieneCantidad } from "../optimizacion";
+import { ABREVIATURAS_CANTIDAD, esSuplemento, palabrasEnIngles, tieneAngulo, tieneCantidad } from "../optimizacion";
 import type { Reglas } from "../reglas";
 
 /** Los números de las reglas que usa la IA (lo que dice la pantalla Reglas). */
@@ -37,10 +37,10 @@ export interface ResultadoChequeo {
  * Pasa un título por las mismas reglas de «Optimización en Dropi»: de `minTitulo` a `maxTitulo` caracteres, en español, con la cantidad
  * si es un suplemento y (solo orienta) que diga para qué sirve.
  */
-export function chequearTitulo(titulo: string, categoria: string | null, r: Pick<ReglasIA, "minTitulo" | "maxTitulo">): ResultadoChequeo {
+export function chequearTitulo(titulo: string, categoria: string | null, r: Pick<ReglasIA, "minTitulo" | "maxTitulo">, nombreProducto?: string | null): ResultadoChequeo {
   const t = titulo.trim();
   const largo = t.length;
-  const ingles = palabrasEnIngles(t);
+  const ingles = palabrasEnIngles(t, nombreProducto);
   const suple = esSuplemento(t, categoria);
   const chequeos: ChequeoTitulo[] = [
     {
@@ -55,7 +55,7 @@ export function chequearTitulo(titulo: string, categoria: string | null, r: Pick
   const mayusculas = letras.length >= 8 && letras === letras.toUpperCase();
   const palabras = t.split(/\s+/).filter(Boolean).length;
   chequeos.push({ clave: "formato", ok: !mayusculas && palabras >= 3, texto: mayusculas ? "Todo en mayúsculas" : palabras < 3 ? "Muy corto" : "Claro", obligatorio: true });
-  if (suple) chequeos.push({ clave: "cantidad", ok: tieneCantidad(t), texto: tieneCantidad(t) ? "Dice la cantidad" : "Falta la cantidad (cápsulas, gomitas, tabletas)", obligatorio: true });
+  if (suple) chequeos.push({ clave: "cantidad", ok: tieneCantidad(t), texto: tieneCantidad(t) ? "Dice la cantidad" : "Falta la cantidad (30c, 30go, 30t, 30sg)", obligatorio: true });
   chequeos.push({ clave: "angulo", ok: tieneAngulo(t), texto: tieneAngulo(t) ? "Dice para qué sirve" : "No dice para qué sirve", obligatorio: false });
   return { chequeos, cumple: chequeos.every((c) => !c.obligatorio || c.ok) };
 }
@@ -63,7 +63,7 @@ export function chequearTitulo(titulo: string, categoria: string | null, r: Pick
 /** Las reglas en palabras, para ponerlas en el pedido a la IA. */
 export function textoCriterios(r: ReglasIA): string {
   return [
-    `Título: de ${r.minTitulo} a ${r.maxTitulo} caracteres contando espacios (Dropi no admite más de ${r.maxTitulo}; menos de ${r.minTitulo} desaprovecha espacio), en español sin palabras en inglés, con la cantidad si es un suplemento (60 cápsulas, 30 gomitas), que diga para qué sirve («para…», «contra…», «alivio de…») y claro: no todo en mayúsculas.`,
+    `Título: de ${r.minTitulo} a ${r.maxTitulo} caracteres contando espacios (Dropi no admite más de ${r.maxTitulo}; menos de ${r.minTitulo} desaprovecha espacio). Orden: el nombre del producto, la cantidad y el uso principal. El nombre del producto va tal cual aunque esté en inglés («15 Days Cleanse»); lo que se le agrega va en español. Si es un suplemento, la cantidad; si no cabe completa, abreviada: ${ABREVIATURAS_CANTIDAD.map((a) => `30${a.abrev} = 30 ${a.nombre}`).join(", ")} (mejor abreviar que dejar fuera el uso). El uso puede ir directo, sin «para» («Limpieza Intestinal»). Claro: no todo en mayúsculas. Ejemplo: «15 Days Cleanse 30c Limpieza Intestinal».`,
     `Fotos: mínimo ${r.minFotos} por publicación.`,
     `Descripción: mínimo ${r.minDescripcion} caracteres.`,
   ].join("\n- ");

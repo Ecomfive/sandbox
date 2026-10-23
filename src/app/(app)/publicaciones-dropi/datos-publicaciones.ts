@@ -256,6 +256,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         videos: cat?.videos ?? null,
         descripcionLargo: cat?.descripcionLargo ?? null,
         leidoEnDropi: !!cat,
+        nombreProducto: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string)?.nombre ?? null) : null,
       },
       r,
     );
