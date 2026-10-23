@@ -116,7 +116,7 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
   const pais = await paisDeCodigo(codigoPais, usuario.paisesPermitidos);
   if (!pais) return { error: "Ese país no está en el sistema o no lo puedes ver." };
   const leer = (columnas: string) =>
-    createServiceClient().from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones(nombre)` as "*").eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).order("creado_en").limit(MAX);
+    createServiceClient().from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones!publicacion_id(nombre)` as "*").eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).order("creado_en").limit(MAX);
   let r = await leer("id, tipo, quitar_privados, nuevo_dropi_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
   // Sin la migración 0148, sin apagados; sin la 0145, sin republicaciones.
   if (r.error) r = await leer("id, tipo, nuevo_dropi_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");

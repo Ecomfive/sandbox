@@ -37,8 +37,10 @@ const COLUMNAS = "id, tipo, estado, error, intentos, publicacion_id, nombre, nom
 /** Los cambios pendientes y con error de un país, con el nombre de la publicación y lo que hay hoy en ella (para describir el antes). */
 async function leerPendientes(paisId: string, soloIds?: string[]): Promise<{ filas: Fila[]; error?: string }> {
   const supabase = createServiceClient();
+  // `!publicacion_id`: la tabla tiene dos llaves hacia `dropi_publicaciones` (publicacion_id y nueva_publicacion_id, migración 0145) y sin decir
+  // cuál, PostgREST rechaza el pedido por ambiguo.
   const leer = (columnas: string) => {
-    const q = supabase.from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones(nombre, precio_venta)` as "*").eq("pais_id", paisId).in("estado", ["pendiente", "error"]);
+    const q = supabase.from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones!publicacion_id(nombre, precio_venta)` as "*").eq("pais_id", paisId).in("estado", ["pendiente", "error"]);
     return (soloIds ? q.in("id", soloIds) : q).order("creado_en").limit(200);
   };
   // Sin las migraciones 0145, 0148 o 0149 faltan columnas: se lee con lo que haya.
