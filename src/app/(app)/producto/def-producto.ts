@@ -1,6 +1,7 @@
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { grupoReporte, primerNivel, rutaLegible } from "@/lib/categorias/taxonomia";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { ETIQUETA_PUNTO, puntosParaDecidir, type PuntoDecidir } from "@/lib/producto/para-decidir";
 
 /** Simple: un solo producto. Compuesto: una combinación de productos simples (al venderlo se descuenta cada uno). */
 export const ETIQUETA_TIPO: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
@@ -92,6 +93,8 @@ export interface FilaProducto {
   /** Si tiene variantes: sus opciones con los valores, y las variantes. */
   opcionesVariantes: { nombre: string; valores: string[] }[];
   variantes: { id: string; codigo: string; nombre: string; opciones: Record<string, string> }[];
+  /** Unidades en Dropi según la última lectura (suma de sus publicaciones abiertas); null si no tiene publicación leída. */
+  stockDropi: number | null;
 }
 
 /** Un test del producto en Test productos, con sus métricas (null = sin dato). */
@@ -171,6 +174,18 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
         { valor: "ok", etiqueta: "Revisada" },
         { valor: "sin", etiqueta: "Sin categoría" },
       ],
+    },
+    {
+      // Lo que le falta al producto (tarjetas de arriba): un producto puede tener varios puntos; sin ninguno, «Nada pendiente».
+      id: "decidir",
+      etiqueta: "Para decidir",
+      tipo: "seleccion",
+      valores: (p) => {
+        const puntos = puntosParaDecidir(p);
+        return puntos.length ? puntos : [SIN_VALOR];
+      },
+      opciones: () => (Object.entries(ETIQUETA_PUNTO) as [PuntoDecidir, string][]).map(([valor, etiqueta]) => ({ valor, etiqueta })),
+      etiquetaSinValor: "Nada pendiente",
     },
     { id: "comprado", etiqueta: "Unidades compradas", tipo: "numero", valor: (p) => p.unidadesCompradas },
     { id: "oferta", etiqueta: "Oferta", tipo: "numero", valor: (p) => p.tests[0]?.oferta ?? null },

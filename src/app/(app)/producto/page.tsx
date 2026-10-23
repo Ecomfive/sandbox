@@ -4,10 +4,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
-import { KpiGroup } from "@/components/ui/kpi-card";
 import { cargarProductos } from "./datos-producto";
 import { TablaProducto } from "./tabla-producto";
-import { TarjetasClase } from "./tarjetas-clase";
 
 export const metadata = { title: "Producto" };
 
@@ -26,15 +24,11 @@ export default async function ProductoPage({ searchParams }: { searchParams: Pro
   // El producto es igual para todos los países; el país solo da formato a las fechas de su actividad.
   const pais = await getPaisActual(supabase);
 
-  const { filas, conteo, opcionesSimples, referenciasTest } = await cargarProductos(usuario, supabase);
+  const { filas, opcionesSimples, referenciasTest } = await cargarProductos(usuario, supabase);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Producto" oculto />
-
-      <KpiGroup titulo="Productos">
-        <TarjetasClase conteo={conteo} />
-      </KpiGroup>
 
       <TablaProducto
         productos={[...filas].sort((a, b) => (b.numero ?? 0) - (a.numero ?? 0))}

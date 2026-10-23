@@ -17,6 +17,7 @@ import { FichaProducto } from "./ficha-producto";
 import { VistaRapidaProducto } from "./vista-rapida-producto";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { CeldaTestProducto } from "./test-producto";
+import { TableroProducto } from "./tablero-producto";
 import { usd } from "../productos-test/informe";
 import { rutaLegible, SEPARADOR } from "@/lib/categorias/taxonomia";
 
@@ -141,6 +142,7 @@ export function TablaProducto({
 
   return (
     <>
+      <TableroProducto productos={productos} />
       <TablaDatos
         def={DEF_PRODUCTO}
         filas={productos}

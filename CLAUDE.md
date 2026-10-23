@@ -345,6 +345,12 @@ convenciones técnicas del código.
   descripción de 200 caracteres como mínimo y, si el producto es público, una bodega con
   100 unidades y 3 imágenes. Peso en gramos, medidas en centímetros. No incluye Carga masiva,
   Actualización masiva ni las descargas en Excel de Dropi.
+- **Tablero de Producto** (23 oct 2026, pedido de Hernán, al estilo de Gestión de IDs Dropi): `tablero-producto.tsx` (reemplaza
+  `tarjetas-clase.tsx`) con «Estado» (Activos, En test, Inactivos + descontinuados; filtran «clase») y «Para decidir»: el campo
+  `decidir` de `DEF_PRODUCTO`, varios valores por producto de `puntosParaDecidir` (`src/lib/producto/para-decidir.ts`, con prueba):
+  sin foto, sin conectar (sin asociaciones ni publicaciones), sin stock / stock bajo (< `STOCK_BAJO` 50) en Dropi, nunca comprado y
+  categoría a revisar, solo activos; winner sin comprar (activo o test con test «winner» o «enviado_a_compras» y 0 órdenes).
+  `FilaProducto.stockDropi`: suma de `dropi_productos_proveedor.stock` de los IDs de sus publicaciones abiertas (`idsDeDropi`).
 - **Módulo «Producto»** (`/producto`, módulo `producto`, migración 0070; sustituye al Catálogo maestro, cuya ruta redirige aquí). Un
   producto vive en `skus_maestros` (el nombre de la tabla se conserva) y se crea desde «Agregar»: **simple o compuesto** (un compuesto
   es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **Activo o Test** (se ve como «Estado» y se elige en la ficha; en la base es la columna `clase`, y Activo se guarda como `'fisico'`:

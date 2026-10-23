@@ -1,5 +1,6 @@
 import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
 import type { Asociacion, FilaProducto, ReferenciasTest, TestProducto } from "./def-producto";
@@ -34,7 +35,7 @@ const unoDe = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? 
 
 /**
  * Todo lo que necesita la ficha de un producto y la lista de Producto: las filas (con sus asociaciones, tests, compras y
- * variantes), la lista de productos simples para armar un compuesto, el conteo por clase y la referencia del «Resultado del
+ * variantes), la lista de productos simples para armar un compuesto y la referencia del «Resultado del
  * test». La usan la página de Producto y la ficha que se abre desde otros módulos (`obtenerProductoParaFicha`).
  */
 export async function cargarProductos(usuario: UsuarioActual, supabase: SupabaseClient) {
@@ -52,7 +53,7 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
-  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners, categorias, publicaciones] = await Promise.all([
+  const [componentesFilas, variantes, dropi, enPedidos, fotos, numeros, lineasCompra, tests, winners, categorias, publicaciones, stockDropi] = await Promise.all([
     traerTodasConError<{ combo_id: string; componente_id: string; cantidad: number; componente: unknown }>((desde, hasta) =>
       supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, componente:componente_id(codigo)").order("combo_id").order("componente_id").range(desde, hasta),
     ),
@@ -93,6 +94,10 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     ),
     // El nombre con que está cada producto en Dropi: el de sus publicaciones vinculadas (migración 0116; sin ella, nada).
     supabase.from("dropi_publicaciones").select("id, sku_maestro_id, nombre, dropi_id, estado, paises(codigo)").not("sku_maestro_id", "is", null),
+    // El stock en Dropi de nuestros productos (la última lectura de «Mis productos», migración 0131; sin ella, sin stock).
+    traerTodasConError<{ pais_id: string; dropi_producto_id: number; stock: number | null; paises: unknown }>((desde, hasta) =>
+      supabase.from("dropi_productos_proveedor").select("pais_id, dropi_producto_id, stock, paises(codigo)").order("pais_id").order("dropi_producto_id").range(desde, hasta),
+    ),
   ]);
   const nombresDropiPorSku = new Map<string, FilaProducto["nombresDropi"]>();
   const publicacionesOrdenadas = [...((publicaciones.error ? [] : publicaciones.data) ?? [])].sort((a, b) => Number(a.estado === "archivado") - Number(b.estado === "archivado"));
@@ -104,6 +109,24 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     const actuales = nombresDropiPorSku.get(id) ?? [];
     if (!nombre || actuales.some((n) => n.nombre === nombre && n.pais === pais)) continue;
     nombresDropiPorSku.set(id, [...actuales, { id: String(pub.id), nombre, pais, dropiId: String(pub.dropi_id ?? ""), archivada: pub.estado === "archivado" }]);
+  }
+  // Unidades en Dropi de cada producto: la suma de los productos de Dropi de sus publicaciones abiertas (cada ID una vez).
+  const stockPorDropi = new Map(
+    (stockDropi.error ? [] : (stockDropi.data ?? [])).map((s) => [`${unoDe(s.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? ""}:${s.dropi_producto_id}`, Number(s.stock ?? 0)]),
+  );
+  const stockDropiPorSku = new Map<string, number>();
+  const idsContados = new Set<string>();
+  for (const pub of publicacionesOrdenadas) {
+    if (pub.estado === "archivado") continue;
+    const pais = unoDe(pub.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? "";
+    if (!puedeVerPais(usuario.paisesPermitidos, pais || null)) continue;
+    for (const id of idsDeDropi(pub.dropi_id as string | null)) {
+      const clave = `${pais}:${id}`;
+      const stock = stockPorDropi.get(clave);
+      if (stock === undefined || idsContados.has(`${pub.sku_maestro_id}:${clave}`)) continue;
+      idsContados.add(`${pub.sku_maestro_id}:${clave}`);
+      stockDropiPorSku.set(pub.sku_maestro_id as string, (stockDropiPorSku.get(pub.sku_maestro_id as string) ?? 0) + stock);
+    }
   }
   const categoriaPorId = new Map(
     categorias.error
@@ -276,10 +299,9 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     opciones: (p.opciones ?? null) as Record<string, string> | null,
     opcionesVariantes: (p.opciones_variantes ?? []) as { nombre: string; valores: string[] }[],
     variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })),
+    stockDropi: stockDropiPorSku.get(p.id) ?? null,
   }));
 
-  const conteo = { fisico: 0, test: 0, inactivo: 0, descontinuado: 0 };
-  for (const p of lista) conteo[p.clase === "test" || p.clase === "inactivo" || p.clase === "descontinuado" ? p.clase : "fisico"]++;
   // Un compuesto se arma con productos simples y variantes, nunca con un producto que tiene variantes (no lleva stock:
   // al vender el compuesto se descuenta la variante elegida).
   const opcionesSimples = lista
@@ -287,5 +309,5 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     .sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }))
     .map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.clase, numero: numeroPorId.get(p.id) ?? null, foto: fotoPorId.get(p.id) ?? null }));
 
-  return { filas, conteo, opcionesSimples, referenciasTest };
+  return { filas, opcionesSimples, referenciasTest };
 }
