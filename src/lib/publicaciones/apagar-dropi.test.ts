@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APAGAR_JS, armarApagado, CONCEPTO_APAGAR, nombreDelPublico, privadasDe, type PublicacionParaApagar } from "./apagar-dropi";
+import { APAGAR_JS, armarApagado, CONCEPTO_APAGAR, grupoDe, nombreDelPublico, privadasDe, type PublicacionParaApagar } from "./apagar-dropi";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
 
@@ -38,6 +38,18 @@ test("un producto privado se reconoce por su nombre sin el «P-XX»; las privada
   // Una privada no tiene privadas; un público con otro nombre parecido no se confunde.
   assert.deepEqual(privadasDe(todas[1], todas), []);
   assert.deepEqual(privadasDe(pub("1", "Aceite de Semilla", "publico"), todas), []);
+});
+
+test("el grupo de un producto: desde el público, sus privadas; desde una privada, el público y las otras privadas", () => {
+  const todas = [
+    pub("8406", "Aceite de Semilla de Calabaza", "publico"),
+    pub("11178", "P-MA Aceite de semilla de calabaza.", "privado"),
+    pub("8770", "P-SR Aceite de Semilla de Calabaza", "privado", true),
+    pub("9634", "Cutting Mix", "publico"),
+  ];
+  assert.deepEqual(grupoDe(todas[0], todas).map((x) => x.id), ["11178", "8770"]);
+  assert.deepEqual(grupoDe(todas[1], todas).map((x) => x.id).sort(), ["8406", "8770"]);
+  assert.deepEqual(grupoDe(todas[3], todas), []);
 });
 
 test("apagar el público: salida de todo el stock con el concepto «stock» y sin tocar privatizaciones", () => {

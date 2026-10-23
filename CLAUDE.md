@@ -482,9 +482,14 @@ convenciones técnicas del código.
   para comprobar que quedó en cero y sin privatización, y archiva (`archiveProduct`). **Dropi no archiva con órdenes pendientes**: entonces devuelve
   `ok: true, archivado: false`, el cambio sigue **pendiente** con el motivo y cada «Aplicar en Dropi» lo reintenta (solo repite el archivado: el
   stock ya está en cero); `guardarResultadosDropi` archiva la publicación del sistema **solo cuando Dropi confirma** que quedó archivada. La ficha trae el
-  botón «Apagar en Dropi» (`BotonApagarDropi`): de un público, la persona **elige** cuáles de sus privadas se apagan con él (`privadasDe`: las que
-  tienen su mismo nombre sin el «P-XX»; vienen marcadas); un privado se apaga solo y con su privatización. El navegador no decide a qué IDs se toca: el
-  servidor vuelve a calcular las privadas válidas. Con stock en la B280 o con variaciones no se apaga (a mano). Sin ClickUp: el estado, el motivo y la
+  botón «Apagar en Dropi» (`BotonApagarDropi`): lista la publicación y **todas las del mismo producto** (`grupoDe`: las que tienen su mismo nombre
+  sin el «P-XX»; desde un público, sus privadas, que vienen marcadas; desde una privada, el público y las otras, sin marcar), cada una con los pasos que
+  se le harán en Dropi (sacar el stock, quitar la privatización si es privada, archivar), y la persona **elige** cuáles se apagan. **Qué hace el sistema al
+  dejarlo pendiente:** una publicación con un apagado esperando (`FilaPublicacion.apagadoPendiente`, de `cargarCambiosDropi.apagando`) ya cuenta como
+  apagada: va a Archivados, sin acciones ni recomendaciones, con «Apagado pendiente» en rojo (no se guarda como archivada en la base porque la lectura de
+  Dropi, que manda, la volvería a «activa»); al confirmar Dropi se archiva de verdad y, si se quitó la privatización, el sistema borra `privatizado_a` /
+  `privatizado_email` (queda en la Actividad con el valor de antes). El stock del sistema es el que lee Dropi cada mañana: no se edita aquí. El navegador no
+  decide a qué IDs se toca: el servidor vuelve a calcular el grupo válido. Con stock en la B280 o con variaciones no se apaga (a mano). Sin ClickUp: el estado, el motivo y la
   Actividad son los del sistema. **Pendiente de confirmar** (Hernán): reactivar un apagado (devolver stock y sacarlo de Archivados) y si los privados
   se apagan siempre con el público; el «Archivar» de siempre sigue siendo solo del sistema.
   **Sin «Notas» en la ficha; compras solo para administradores** (23 oct 2026, pedido de Hernán): el campo «Notas» se quitó (la columna

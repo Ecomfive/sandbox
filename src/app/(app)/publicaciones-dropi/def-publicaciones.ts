@@ -104,8 +104,10 @@ export interface FilaPublicacion {
   archivada: boolean;
   /** Si es un duplicado de otra publicación con el mismo ID de Dropi (migración 0147): «PUB-0309 · nombre» de la que vale. */
   duplicadaDe: string | null;
-  /** Sus publicaciones privadas («P-MA …»), para apagarlas con ella (`privadasDe`); vacío en una privada. */
-  privadas: { id: string; nombre: string; dropiId: string; archivada: boolean }[];
+  /** Tiene un apagado esperando «Aplicar en Dropi» (migración 0148): en el sistema ya cuenta como apagada (va a Archivados, sin acciones). */
+  apagadoPendiente: boolean;
+  /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
+  grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string }[];
   /** Público o privado según Dropi; sin datos de Dropi, lo que estaba marcado. */
   tipoDropi: "publico" | "privado" | null;
   /** Lo que necesita (calculado): vacío = al día. */

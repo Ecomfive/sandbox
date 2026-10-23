@@ -168,7 +168,8 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   const supabase = createServiceClient();
   const leerFilas = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).in("id", limpios.map((r) => r.id));
-  let lectura = await leerFilas("id, tipo, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
+  let lectura = await leerFilas("id, tipo, quitar_privados, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
+  if (lectura.error) lectura = await leerFilas("id, tipo, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
   if (lectura.error) lectura = await leerFilas("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
   if (lectura.error) lectura = await leerFilas("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, intentos");
   const filas = (lectura.data ?? []) as unknown as Record<string, unknown>[];
@@ -188,13 +189,23 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         .from("dropi_cambios_pendientes")
         .update(hecho ? { estado: "aplicado", aplicado_en: ahora, error: null, intentos: Number(f.intentos) + 1 } : parcial ? { estado: "pendiente", error: r.error, intentos: Number(f.intentos) + 1 } : { estado: "error", error: r.error, intentos: Number(f.intentos) + 1 })
         .eq("id", r.id);
+      // Sin stock y sin privatización en Dropi (aunque no haya dejado archivar): en el sistema la publicación deja de ser de ese correo.
+      let privatizacion = "";
+      if (r.ok && f.quitar_privados === true) {
+        const { data: antes } = await supabase.from("dropi_publicaciones").select("privatizado_a, privatizado_email").eq("id", f.publicacion_id as string).maybeSingle();
+        const previo = [antes?.privatizado_a, antes?.privatizado_email].filter(Boolean).join(" · ");
+        if (previo) {
+          await supabase.from("dropi_publicaciones").update({ privatizado_a: null, privatizado_email: null, actualizado_en: ahora }).eq("id", f.publicacion_id as string);
+          privatizacion = ` · privatización quitada (antes: ${previo})`;
+        }
+      }
       // Archivado en Dropi: ahora sí queda archivada también en el sistema.
       if (hecho) await supabase.from("dropi_publicaciones").update({ estado: "archivado", estado_publicacion: "archivado", actualizado_en: ahora }).eq("id", f.publicacion_id as string);
       auditoria.push({
         accion: hecho ? "dropi_apagado" : parcial ? "dropi_apagado_parcial" : "dropi_apagado_error",
         entidad: "dropi_publicaciones",
         entidadId: f.publicacion_id as string,
-        detalle: hecho ? `ID ${f.dropi_producto_id}: sin stock y archivado en Dropi (desde Dropi)` : `ID ${f.dropi_producto_id} · ${r.error}`,
+        detalle: hecho ? `ID ${f.dropi_producto_id}: sin stock y archivado en Dropi${privatizacion} (desde Dropi)` : `ID ${f.dropi_producto_id} · ${r.error}${privatizacion}`,
       });
       if (hecho) aplicados++;
       else errores++;

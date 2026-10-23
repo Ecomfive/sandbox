@@ -191,8 +191,10 @@ export async function enviarNombreADropi(
 }
 
 /** El último cambio en Dropi de cada publicación del país y cuántos siguen pendientes. Sin la migración 0137, vacío. */
-export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: string): Promise<{ porPublicacion: Map<string, CambioDropiVista>; pendientes: number }> {
+export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: string): Promise<{ porPublicacion: Map<string, CambioDropiVista>; pendientes: number; apagando: Set<string> }> {
   const porPublicacion = new Map<string, CambioDropiVista>();
+  // Las publicaciones con un apagado esperando (pendiente, a medias o con error): en el sistema ya se ven como apagadas.
+  const apagando = new Set<string>();
   const leer = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
   let r = await leer("id, publicacion_id, tipo, nuevo_dropi_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
@@ -200,10 +202,11 @@ export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: strin
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, error, creado_en, aplicado_en");
   const { data, error } = r as unknown as { data: Record<string, unknown>[] | null; error: unknown };
-  if (error) return { porPublicacion, pendientes: 0 };
+  if (error) return { porPublicacion, pendientes: 0, apagando };
   let pendientes = 0;
   for (const f of data ?? []) {
     if (f.estado === "pendiente") pendientes++;
+    if (f.tipo === "apagar" && (f.estado === "pendiente" || f.estado === "error")) apagando.add(f.publicacion_id as string);
     if (porPublicacion.has(f.publicacion_id as string)) continue;
     porPublicacion.set(f.publicacion_id as string, {
       id: f.id as string,
@@ -219,5 +222,5 @@ export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: strin
       aplicadoEn: (f.aplicado_en as string | null) ?? null,
     });
   }
-  return { porPublicacion, pendientes };
+  return { porPublicacion, pendientes, apagando };
 }

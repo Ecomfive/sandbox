@@ -342,7 +342,7 @@ function ContenidoFicha({
               )}
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
               {!sinGuardar && puedeArchivar && conectado && !p.duplicadaDe && p.enDropi !== "archivado" && p.bodega?.id !== BODEGA_DROPI && <BotonApagarDropi p={p} deshabilitado={pendiente} />}
-              {!sinGuardar && puedeArchivar && !p.duplicadaDe && (
+              {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente && (
                 <BotonAccion icono={ArchivarIcon} disabled={pendiente} onClick={archivar}>
                   {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
                 </BotonAccion>

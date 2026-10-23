@@ -32,6 +32,16 @@ export interface PublicacionParaApagar {
 }
 
 /**
+ * Las demás publicaciones del mismo producto (el público y sus privadas), para elegir cuáles se apagan juntas: de un público, sus privadas;
+ * de una privada, el público y sus otras privadas. Todas tienen el mismo nombre sin el prefijo «P-XX».
+ */
+export function grupoDe(publicacion: PublicacionParaApagar, todas: PublicacionParaApagar[]): PublicacionParaApagar[] {
+  const base = nombreDelPublico(publicacion.nombre);
+  if (!base) return [];
+  return todas.filter((x) => x.id !== publicacion.id && nombreDelPublico(x.nombre) === base && (publicacion.tipo === "privado" ? true : x.tipo === "privado"));
+}
+
+/**
  * Las publicaciones privadas de una pública (el «P-MA …» y el «P-SR …» del aceite de semilla de calabaza): las que tienen el mismo
  * nombre sin el prefijo «P-XX». Se apagan con ella (o no, según elija la persona). Una privada no tiene privadas.
  */

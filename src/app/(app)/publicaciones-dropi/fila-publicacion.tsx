@@ -201,6 +201,12 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               </span>
             )}
             {f.tipoDropi === "privado" && <span>Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>}
+            {f.apagadoPendiente && (
+              <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
+                <Punto clase="bg-destructive" texto="Apagado pendiente en Dropi" />
+                Apagado pendiente
+              </span>
+            )}
           </span>
         </span>
       </span>
