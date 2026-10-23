@@ -10,10 +10,12 @@ import { hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { traducirTextos } from "@/lib/proveedor/traducir";
+import { cargarTareasChin } from "@/lib/proveedor/tareas-datos";
 import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { campoOculto, restriccionesDe } from "../permisos-compras";
 import type { CuentaPortal } from "./cuenta-proveedor";
+import { QueHacerChin } from "./que-hacer-chin";
 import { TableroChin } from "./tablero-chin";
 
 export const metadata = { title: "Tablero de Chin · Compras" };
@@ -56,11 +58,12 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   // Pagos: quien no ve los montos de Compras tampoco ve los pagos a Chin.
   const veMontos = !campoOculto(restriccionesDe(usuario.afinado.compras), "monto");
   const admin = esAdministrador(usuario);
-  const [firmadas, estado, { data: nuevasParaChin }, { data: filaCuenta }] = await Promise.all([
+  const [firmadas, estado, { data: nuevasParaChin }, { data: filaCuenta }, chin] = await Promise.all([
     rutas.length ? supabase.storage.from(BUCKET_PROVEEDOR).createSignedUrls(rutas, 3600).then((r) => r.data ?? []) : Promise.resolve([]),
     veMontos ? estadoPagos(supabase, { ...espejo, pedidos }) : Promise.resolve(null),
     supabase.from("proveedor_novedades").select("id, texto, creado_en").eq("proveedor_id", espejo.proveedor.id).eq("lado", "ecomfive").is("leida_en", null).order("creado_en", { ascending: false }).limit(20),
     supabase.from("proveedor_usuarios").select("id, nombre, email, activo, ultimo_ingreso_en").eq("proveedor_id", espejo.proveedor.id).order("creado_en").limit(1).maybeSingle(),
+    cargarTareasChin(supabase, { paisesPermitidos: usuario.paisesPermitidos, veMontos }),
   ]);
   const porRuta = new Map(firmadas.map((f) => [f.path, f.signedUrl]));
   for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
@@ -103,6 +106,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Tablero de Chin" oculto />
+      {chin && <QueHacerChin proveedor={chin.proveedor} tareas={chin.tareas} />}
       <TableroChin
         proveedor={{ id: espejo.proveedor.id, nombre: espejo.proveedor.nombre }}
         tablero={tablero}

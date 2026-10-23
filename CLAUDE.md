@@ -608,6 +608,13 @@ convenciones técnicas del código.
   chino los productos, las notas, «Lo nuevo» y los productos de pagos; a español lo que escribe Chin (comentario de cotización, detalle de
   novedad, nota al confirmar un pago). Las pantallas reciben las traducciones por `IdiomaProveedor` (`useIdioma`: `t`, `tr`, `fecha`,
   `cuota`, `transito`, `error`, `numero`) y `Traducido` muestra la traducción con «(ver original)».
+  **Qué hacer con Chin** (23 oct 2026, pedido de Hernán): panel arriba de `/compras/lista` (si ve la pestaña tablero-chin) y del
+  Tablero de Chin. `tareasChin` (`src/lib/proveedor/tareas.ts`, con prueba) arma las tareas con el espejo, `cuotasPorPagar`,
+  `estadoTransito` y las `proveedor_novedades` del lado proveedor sin leer («Nuevo»): decidir cotización, falta el costo, pagar
+  anticipo/saldo (urgente: vencido o vence en ≤ 3 días; lo avisado pasa a «Esperando»), confirmar llegada (pasó el plazo de
+  Envíos) y esperando a Chin (> `DIAS_ESPERA_COTIZAR` 5 en Por cotizar, por `proveedor_pedidos.creado_en`; avisos sin confirmar).
+  Lo carga `cargarTareasChin` (`tareas-datos.ts`; países permitidos, montos solo si los ve). `marcarVistoChin(pedidoIds)` pone
+  `leida_en`. Componente `compras/tablero-chin/que-hacer-chin.tsx` (6 a la vista, «Ver las N tareas»).
   **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Chin**
   (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
   sigue el Tablero). Trae «Lo que ve Chin» (el mismo `PortalChin` en español con `soloLectura`: sin botones, sin selector ni «Salir» y sin
