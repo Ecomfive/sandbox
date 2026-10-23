@@ -106,8 +106,10 @@ export interface FilaPublicacion {
   duplicadaDe: string | null;
   /** Tiene un apagado esperando «Aplicar en Dropi» (migración 0148): en el sistema ya cuenta como apagada (va a Archivados, sin acciones). */
   apagadoPendiente: boolean;
+  /** Dropi todavía no se tocó con ese apagado (ningún intento): se puede deshacer desde el sistema sin consecuencias. */
+  apagadoSinTocar: boolean;
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
-  grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string }[];
+  grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
   /** Público o privado según Dropi; sin datos de Dropi, lo que estaba marcado. */
   tipoDropi: "publico" | "privado" | null;
   /** Lo que necesita (calculado): vacío = al día. */

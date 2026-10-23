@@ -332,6 +332,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       // Con un apagado esperando «Aplicar en Dropi», en el sistema ya es una publicación apagada: va a Archivados y no genera acciones ni recomendaciones.
       ...(cambiosDropi.apagando.has(d.id as string) ? { archivada: true, acciones: [] as FilaPublicacion["acciones"] } : {}),
       apagadoPendiente: cambiosDropi.apagando.has(d.id as string),
+      apagadoSinTocar: cambiosDropi.apagando.get(d.id as string) === 0,
       duplicadaDe: null,
       grupo: [],
     };
@@ -346,7 +347,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   for (const f of filas)
     f.grupo = grupoDe({ id: f.id, nombre: f.nombre, tipo: f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }, paraApagar).map((x) => {
       const o = porIdFila.get(x.id)!;
-      return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail };
+      return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail, apagadoPendiente: o.apagadoPendiente, apagadoSinTocar: o.apagadoSinTocar };
     });
 
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.

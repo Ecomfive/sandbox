@@ -66,6 +66,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   dropi_republicada: "La republicó en Dropi",
   dropi_republicar_error: "No pudo republicarla en Dropi",
   dropi_apagar_pendiente: "Dejó pendiente apagarla en Dropi",
+  dropi_apagar_cancelado: "Deshizo el apagado antes de aplicarlo en Dropi",
   dropi_apagado: "La apagó y archivó en Dropi",
   dropi_apagado_parcial: "La dejó sin stock en Dropi, pero no pudo archivarla",
   dropi_apagado_error: "No pudo apagarla en Dropi",
