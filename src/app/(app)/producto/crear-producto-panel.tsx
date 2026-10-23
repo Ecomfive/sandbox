@@ -108,6 +108,10 @@ export function CrearProductoPanel({
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   // La foto subida, para el aviso de posible duplicado.
   const [foto, setFoto] = useState<string | null>(null);
+  // Los productos elegidos como componentes: uno solo = un pack (toma la foto del original); varios distintos = foto nueva.
+  const [elegidos, setElegidos] = useState<string[]>([]);
+  const original = combo && elegidos.length === 1 ? (opcionesSimples.find((o) => o.id === elegidos[0]) ?? null) : null;
+  const variosDistintos = combo && elegidos.length >= 2;
   // Se vuelve a armar vacío al abrir la ficha otra vez.
   const [vueltaEnvio, setVueltaEnvio] = useState(0);
   const [conVariantes, setConVariantes] = useState(false);
@@ -184,6 +188,24 @@ export function CrearProductoPanel({
               soltarEnTodo
               alCambiar={setFoto}
             />
+            {/* Un pack (N unidades de un mismo producto) usa la foto del original, salvo que se suba otra. */}
+            {original?.foto && !foto && (
+              <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-sm">
+                <input type="checkbox" name="foto_del_simple" value="1" defaultChecked className="h-4 w-4 shrink-0" />
+                {/* eslint-disable-next-line @next/next/no-img-element -- foto de Storage */}
+                <img src={original.foto} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
+                <span className="min-w-0">
+                  Usar la foto de <strong className="font-medium">{original.nombre}</strong>
+                </span>
+              </label>
+            )}
+            {/* Un compuesto de productos distintos no tiene una foto que heredar: se sube la suya. */}
+            {variosDistintos && !foto && (
+              <p role="status" className="m-0 flex items-center gap-2 text-sm text-muted-foreground">
+                <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning" />
+                Son productos distintos: sube una foto nueva para el compuesto.
+              </p>
+            )}
             <Campo etiqueta="Nombre" id="campo-nombre-producto" obligatorio faltante={faltante}>
               <input
                 id="campo-nombre-producto"
@@ -338,7 +360,7 @@ export function CrearProductoPanel({
             <Seccion icono={ProductoIcon} titulo="Componentes">
               {opcionesSimples.length > 0 ? (
                 <div id="campo-componentes">
-                  <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} inicial={componenteInicial} />
+                  <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} inicial={componenteInicial} alCambiar={setElegidos} />
                 </div>
               ) : (
                 <p id="campo-componentes" role="alert" className="py-1 text-xs text-destructive">
