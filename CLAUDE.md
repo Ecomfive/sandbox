@@ -492,6 +492,12 @@ convenciones técnicas del código.
   decide a qué IDs se toca: el servidor vuelve a calcular el grupo válido. Con stock en la B280 o con variaciones no se apaga (a mano). Sin ClickUp: el estado, el motivo y la
   Actividad son los del sistema. **Pendiente de confirmar** (Hernán): reactivar un apagado (devolver stock y sacarlo de Archivados) y si los privados
   se apagan siempre con el público; el «Archivar» de siempre sigue siendo solo del sistema.
+  **Deshacer un apagado** (23 oct 2026, pedido de Hernán): mientras Dropi no se haya tocado, el apagado se puede revertir. Con el apagado pendiente, el
+  botón de la ficha y el ícono de la fila pasan a «Deshacer apagado» (`DeshacerIcon`): abre una ventana con la publicación y las demás de su producto que
+  también lo tengan pendiente (marcadas) y `deshacerApagado` pasa esas filas de la cola a `reemplazado` (no hace falta migración: `reemplazado` ya sale de
+  las listas y libera el índice único); en el sistema vuelven a verse como antes porque el apagado pendiente era lo único que las mostraba apagadas. **Solo
+  con `intentos = 0`**: uno que ya se intentó en Dropi puede tener el stock en cero y no se deshace desde aquí (hay que reactivarlo, pendiente de definir).
+  Queda en la Actividad («Deshizo el apagado antes de aplicarlo en Dropi»). Antes de eso, en la ventana de «Aplicar en Dropi» también se puede «Posponer».
   **Sin «Notas» en la ficha; compras solo para administradores** (23 oct 2026, pedido de Hernán): el campo «Notas» se quitó (la columna
   `notas` se conserva sin leerla ni escribirla; la migración 0146 pasó lo escrito a un comentario «Notas anteriores» de la Actividad, y lo nuevo
   va como comentario). La ficha trae el bloque «Compras» (`ComprasProducto` del producto vinculado) **solo para un administrador**

@@ -477,6 +477,16 @@ export function ArchivarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Deshacer: una flecha curva que vuelve hacia atrás. */
+export function DeshacerIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+    </Icon>
+  );
+}
+
 /** Apagar: el símbolo de encendido (un círculo abierto con una raya arriba), para «Apagar en Dropi»; distinto del de archivar. */
 export function ApagarIcon(props: SVGProps<SVGSVGElement>) {
   return (

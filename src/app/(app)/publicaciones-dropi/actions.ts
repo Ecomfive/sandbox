@@ -306,6 +306,52 @@ export async function apagarPublicacion(id: string, otrasIds: string[]): Promise
 }
 
 /**
+ * «Deshacer apagado» (pedido de Hernán, 23 oct 2026): quita de la cola de «Aplicar en Dropi» los apagados que todavía **no** se aplicaron en
+ * Dropi, por si hubo un error o se cambió de opinión. En el sistema vuelven a verse como antes (el apagado pendiente es lo que las mostraba
+ * apagadas; nada más se había movido). Solo los que Dropi no ha tocado (ningún intento): uno que ya sacó el stock en Dropi a medias no se
+ * deshace desde aquí, porque Dropi ya cambió. Se puede pedir de una publicación y de las demás de su producto (`otrasIds`).
+ */
+export async function deshacerApagado(id: string, otrasIds: string[]): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (!Array.isArray(otrasIds) || otrasIds.length > 50 || !otrasIds.every((x) => typeof x === "string" && UUID.test(x))) return { error: "Las publicaciones elegidas no son válidas." };
+  const supabase = createServiceClient();
+  const { data: delPais } = await supabase.from("dropi_publicaciones").select("id, nombre, tipo_publicacion, dropi_id").eq("pais_id", antes.pais_id);
+  const todas = (delPais ?? []).map((x) => ({ id: x.id as string, nombre: x.nombre as string, tipo: (x.tipo_publicacion as "publico" | "privado" | null) ?? null, dropiId: String(x.dropi_id ?? ""), archivada: false }));
+  const yo = todas.find((x) => x.id === id);
+  if (!yo) return { error: "La publicación ya no existe." };
+  // Solo ella y las del mismo producto (el navegador no decide a qué publicaciones se toca).
+  const validas = new Set([id, ...grupoDe(yo, todas).map((x) => x.id)]);
+  const objetivos = [...new Set([id, ...otrasIds])].filter((x) => validas.has(x));
+  const { data: filas, error } = await supabase
+    .from("dropi_cambios_pendientes")
+    .select("id, publicacion_id, intentos, dropi_producto_id")
+    .eq("tipo", "apagar")
+    .in("estado", ["pendiente", "error"])
+    .in("publicacion_id", objetivos);
+  if (error) return { error: "No se pudo leer lo que está pendiente." };
+  const deshacibles = (filas ?? []).filter((f) => Number(f.intentos) === 0);
+  const tocadas = (filas ?? []).length - deshacibles.length;
+  if (deshacibles.length === 0) {
+    return { error: tocadas > 0 ? "Ese apagado ya se intentó en Dropi (el stock puede estar en cero): no se puede deshacer desde aquí." : "No hay un apagado pendiente que deshacer." };
+  }
+  const { error: errorCancelar } = await supabase
+    .from("dropi_cambios_pendientes")
+    .update({ estado: "reemplazado" })
+    .in("id", deshacibles.map((f) => f.id as string))
+    .eq("estado", "pendiente")
+    .eq("intentos", 0);
+  if (errorCancelar) return { error: "No se pudo deshacer el apagado." };
+  for (const f of deshacibles) {
+    const nombre = todas.find((x) => x.id === f.publicacion_id)?.nombre ?? "";
+    await registrarAuditoria({ accion: "dropi_apagar_cancelado", entidad: "dropi_publicaciones", entidadId: f.publicacion_id as string, detalle: `${nombre} · ID Dropi ${f.dropi_producto_id}: apagado deshecho antes de aplicarse en Dropi` });
+  }
+  revalidatePath(RUTA);
+  return { detalle: `${deshacibles.length === 1 ? "Apagado deshecho" : `${deshacibles.length} apagados deshechos`}: Dropi no se tocó.${tocadas > 0 ? ` ${tocadas === 1 ? "Uno ya se había intentado en Dropi y no se pudo deshacer." : `${tocadas} ya se habían intentado en Dropi y no se pudieron deshacer.`}` : ""}` };
+}
+
+/**
  * «Republicar» en la ficha (pedido de Hernán, 23 oct 2026; migración 0145): nada se republica solo. Deja la republicación en la cola
  * de «Aplicar en Dropi», que crea el producto de nuevo en Dropi (datos, fotos y stock), le saca el stock al viejo y lo archiva; al
  * terminar, el sistema crea la publicación nueva y archiva esta (`guardarResultadosDropi`).
