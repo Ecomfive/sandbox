@@ -180,7 +180,7 @@ function Encabezado({ vista, estado }: { vista: AsistenteVista; estado: EstadoIA
           <Estatus ok={estado.texto} texto={estado.texto ? `${estado.proveedor} · ${estado.modelo}` : "Sin IA de texto conectada"} />
           <Estatus ok={estado.gemini} texto={estado.gemini ? "Gemini · fotos" : "Sin Gemini para fotos"} />
           {c.indicaciones > 0 && <Estatus ok texto={`${c.indicaciones} ${c.indicaciones === 1 ? "indicación" : "indicaciones"} del equipo`} />}
-          {c.ejemplos > 0 && <Estatus ok texto={`${c.ejemplos} ${c.ejemplos === 1 ? "título aprobado" : "títulos aprobados"} de ejemplo`} />}
+          {c.ejemplos > 0 && <Estatus ok texto={`${c.ejemplos} ${c.ejemplos === 1 ? "título del equipo" : "títulos del equipo"} de ejemplo`} />}
         </div>
       </div>
       <div className="flex items-center gap-3">

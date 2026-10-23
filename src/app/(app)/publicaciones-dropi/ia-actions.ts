@@ -27,7 +27,7 @@ import {
   type PropuestaTitulos,
   type TipoIA,
 } from "@/lib/publicaciones/ia/asistente";
-import { chequearTitulo, reglasParaIA, type ChequeoTitulo, type Ejemplos, type ReglasIA } from "@/lib/publicaciones/ia/criterios";
+import { chequearTitulo, correccionesDeAuditoria, reglasParaIA, type ChequeoTitulo, type Ejemplos, type ReglasIA } from "@/lib/publicaciones/ia/criterios";
 import { avisoDeReintento, compararTexto, lineaRiesgosa, normalizarTextos, pedidoLeerTexto, textoLeido } from "@/lib/publicaciones/ia/texto-imagen";
 import { cargarEstilos } from "@/lib/publicaciones/ia/estilos-datos";
 import { cargarIndicaciones } from "@/lib/publicaciones/ia/indicaciones-datos";
@@ -147,12 +147,22 @@ async function publicacionPermitida(id: string, usuario: UsuarioActual): Promise
 }
 
 /**
- * Lo que la IA aprende del equipo: los títulos que eligió (o corrigió y usó) en otras publicaciones, y por qué rechazó recomendaciones de
- * título o dijo que una sugerencia no le sirvió. Sin la tabla, nada.
+ * Lo que la IA aprende del equipo: los nombres que cambió a mano en la ficha (de la auditoría, antes → después), los títulos que eligió
+ * (o corrigió y usó) en el asistente, y por qué rechazó recomendaciones de título o dijo que una sugerencia no le sirvió. Sin la tabla, nada.
  */
 async function cargarEjemplos(): Promise<Ejemplos> {
   const supabase = createServiceClient();
-  const out: Ejemplos = { titulos: [], rechazos: [] };
+  const out: Ejemplos = { titulos: [], rechazos: [], correcciones: [] };
+  // Los cambios de nombre hechos a mano en la ficha (actualizarPublicacion) quedan en la auditoría con el dato «Producto».
+  const { data: manuales } = await supabase
+    .from("historial_auditoria")
+    .select("antes, despues, entidad_id")
+    .eq("accion", "editar_publicacion_dropi")
+    .eq("entidad", "dropi_publicaciones")
+    .not("despues->>Producto", "is", null)
+    .order("creado_en", { ascending: false })
+    .limit(150);
+  out.correcciones = correccionesDeAuditoria(manuales ?? []);
   const { data } = await supabase.from("dropi_publicaciones_ia").select("resultado").eq("tipo", "titulos").order("creado_en", { ascending: false }).limit(80);
   for (const f of data ?? []) {
     const r = f.resultado as PropuestaTitulos & { feedback?: { util: boolean; nota: string } };
@@ -226,7 +236,7 @@ async function cargarBase(pub: Pub) {
     nota: notaOptimizacion(revisiones),
     competidores: [...new Set(delProducto.map((c) => c.nombre))].slice(0, 8),
     indicaciones: Object.values(indicaciones).filter((t) => (t ?? "").trim()).length,
-    ejemplos: ejemplos.titulos.length,
+    ejemplos: ejemplos.titulos.length + (ejemplos.correcciones?.length ?? 0),
   };
   // Cuántas fotos faltan para el mínimo de las reglas (si se leyó el catálogo); sin dato, 4.
   const fotosFaltan = cat?.fotos == null ? 4 : Math.max(1, reglas.min_fotos - cat.fotos);

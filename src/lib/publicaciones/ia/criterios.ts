@@ -94,11 +94,62 @@ export interface Ejemplos {
   titulos: string[];
   /** Por qué el equipo rechazó recomendaciones de título: lo que hay que evitar. */
   rechazos: string[];
+  /** Nombres en Dropi que el equipo cambió a mano en la ficha (antes → después): el criterio más directo del equipo. */
+  correcciones?: Correccion[];
+}
+
+export interface Correccion {
+  antes: string;
+  despues: string;
+}
+
+/** Cuántas correcciones a mano se pasan a la IA en cada pedido (las más nuevas). */
+export const MAX_CORRECCIONES = 12;
+
+/**
+ * Los cambios de nombre hechos a mano en la ficha de una publicación, desde la auditoría (`editar_publicacion_dropi`, dato «Producto»),
+ * con las filas de la más nueva a la más vieja: el último cambio de cada publicación (los anteriores son pasos intermedios), sin vacíos,
+ * sin «—», sin cambios que no cambian nada y un solo cambio por nombre final. Una fila que también trae «SKU» no es de la ficha (la
+ * escribió un script de revisión de vínculos) y no cuenta.
+ */
+export function correccionesDeAuditoria(filas: { antes: unknown; despues: unknown; entidad_id?: string | null }[], max = MAX_CORRECCIONES): Correccion[] {
+  const out: Correccion[] = [];
+  const vistos = new Set<string>();
+  const publicaciones = new Set<string>();
+  const leer = (o: unknown) => {
+    const v = o && typeof o === "object" ? (o as Record<string, unknown>).Producto : null;
+    const t = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+    return t && t !== "—" ? t : "";
+  };
+  for (const f of filas) {
+    if (f.despues && typeof f.despues === "object" && "SKU" in f.despues) continue;
+    if (f.entidad_id) {
+      if (publicaciones.has(f.entidad_id)) continue;
+      publicaciones.add(f.entidad_id);
+    }
+    const antes = leer(f.antes);
+    const despues = leer(f.despues);
+    if (!antes || !despues || antes === despues) continue;
+    const clave = despues.toLowerCase();
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    out.push({ antes, despues });
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 /** Los títulos aprobados y los rechazos anteriores, para que la IA se ajuste al estilo del equipo. Vacío si no hay nada. */
 export function textoEjemplos(e: Ejemplos): string {
   const partes: string[] = [];
+  const correcciones = e.correcciones ?? [];
+  if (correcciones.length)
+    partes.push(
+      `Nombres que el equipo corrigió a mano en Dropi (antes → después). Es lo que más pesa: entiende por qué se cambió cada uno y escribe con ese mismo criterio, sin copiarlos:\n- ${correcciones
+        .slice(0, MAX_CORRECCIONES)
+        .map((c) => `«${c.antes}» → «${c.despues}»`)
+        .join("\n- ")}`,
+    );
   if (e.titulos.length) partes.push(`Títulos que el equipo aprobó antes (imita su estilo, no los copies):\n- ${e.titulos.slice(0, 8).join("\n- ")}`);
   if (e.rechazos.length) partes.push(`Por qué el equipo rechazó sugerencias antes (evítalo):\n- ${e.rechazos.slice(0, 6).join("\n- ")}`);
   return partes.join("\n\n");
