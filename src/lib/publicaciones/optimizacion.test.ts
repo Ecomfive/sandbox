@@ -4,7 +4,7 @@ import { notaOptimizacion, palabrasEnIngles, revisarPublicacion, tieneAngulo, ti
 import { REGLAS_DEFECTO } from "./reglas";
 import { recomendarOptimizacion, tareaCumplida } from "./recomendaciones";
 
-const base: EntradaRevision = { titulo: "", categoria: null, precio: 4.99, precioSugerido: 12.99, fotos: null, videos: null, descripcionLargo: null, leidoEnDropi: true };
+const base: EntradaRevision = { titulo: "", categoria: null, precio: 4.99, precioSugerido: 4.99, fotos: null, videos: null, descripcionLargo: null, leidoEnDropi: true };
 const estado = (e: Partial<EntradaRevision>, clave: string) => revisarPublicacion({ ...base, ...e }, REGLAS_DEFECTO).find((r) => r.clave === clave)!.estado;
 
 test("título en inglés", () => {
@@ -34,6 +34,9 @@ test("para qué sirve, formato, fotos, video, descripción y precio sugerido", (
   assert.equal(estado({ videos: 0 }, "video"), "falta");
   assert.equal(estado({ descripcionLargo: 120 }, "descripcion"), "falta");
   assert.equal(estado({ precioSugerido: 4.5 }, "precio_sugerido"), "falta");
+  // El sugerido va igual al precio: uno más alto no deja al dropshipper vender por debajo (23 oct 2026).
+  assert.equal(estado({ precioSugerido: 12.99 }, "precio_sugerido"), "falta");
+  assert.equal(estado({ precioSugerido: 4.99 }, "precio_sugerido"), "ok");
   assert.equal(estado({ precioSugerido: null }, "precio_sugerido"), "falta");
   assert.equal(estado({ leidoEnDropi: false }, "precio_sugerido"), "sin_datos");
 });

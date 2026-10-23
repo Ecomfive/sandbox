@@ -100,7 +100,8 @@ export async function enviarPrecioADropi(
   precioAntes: number | null,
   por: { id: string; nombre: string },
 ): Promise<{ estado: "pendiente" | "error"; detalle: string }> {
-  const r = await encolarCambio(supabase, pub, { precio, precioAntes }, por);
+  // El sugerido va siempre igual al precio (decisión de Alcides, 23 oct 2026): así Dropi no le impide al dropshipper vender por debajo.
+  const r = await encolarCambio(supabase, pub, { precio, precioAntes, precioSugerido: precio }, por);
   if ("error" in r) return { estado: "error", detalle: r.error };
   return { estado: "pendiente", detalle: `Precio $${precio.toFixed(2)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }
