@@ -2,7 +2,6 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { requireModulo } from "@/lib/auth";
-import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { BarraAplicarDropi } from "./barra-aplicar-dropi";
@@ -27,8 +26,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
-  // Eliminar publicaciones: solo un administrador. Las ventas de Dropi (últimos 30 días) las ve todo el que abre el módulo.
-  const admin = esAdministrador(usuario);
+  // Ninguna publicación se elimina: quien puede editar, archiva. Las ventas de Dropi (últimos 30 días) las ve todo el que abre el módulo.
   const datos = await cargarPublicaciones(supabase, pais.id, usuario);
 
   if (!datos) {
@@ -53,7 +51,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         codigoPais={pais.codigo}
         nombrePais={pais.nombre}
         puedeEscribir={puedeEscribir}
-        puedeEliminar={puedeEscribir && admin}
+        puedeArchivar={puedeEscribir}
         corteVentas={datos.corteVentas}
         reglas={datos.reglas.reglas}
         decisionesDisponibles={datos.reglas.disponible}

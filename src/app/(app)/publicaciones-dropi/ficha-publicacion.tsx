@@ -10,7 +10,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, ProductoIcon, ArchivarIcon } from "@/lib/nav-icons";
 import {
   UBICACIONES,
   numeroPublicacion,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
-import { actualizarPublicacion, eliminarPublicacion } from "./actions";
+import { actualizarPublicacion, archivarPublicacion } from "./actions";
 import { ActividadPublicacion } from "./actividad-publicacion";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
@@ -122,7 +122,7 @@ export function FichaPublicacion({
   codigoPais,
   nombrePais,
   puedeEscribir,
-  puedeEliminar,
+  puedeArchivar,
   corteVentas = null,
   margenMinimo,
   decisionesDisponibles,
@@ -135,7 +135,7 @@ export function FichaPublicacion({
   nombrePais: string;
   puedeEscribir: boolean;
   /** Solo un administrador: elimina la publicación de verdad. */
-  puedeEliminar: boolean;
+  puedeArchivar: boolean;
   /** Hasta qué día llegan las ventas de Dropi (solo un administrador las ve); `null` si no se muestran. */
   corteVentas?: string | null;
   /** El margen mínimo de las reglas: por debajo, el punto rojo. */
@@ -154,7 +154,7 @@ export function FichaPublicacion({
       codigoPais={codigoPais}
       nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
-      puedeEliminar={puedeEliminar}
+      puedeArchivar={puedeArchivar}
       corteVentas={corteVentas}
       margenMinimo={margenMinimo}
       decisionesDisponibles={decisionesDisponibles}
@@ -170,7 +170,7 @@ function ContenidoFicha({
   codigoPais,
   nombrePais,
   puedeEscribir,
-  puedeEliminar,
+  puedeArchivar,
   corteVentas,
   margenMinimo,
   decisionesDisponibles,
@@ -182,7 +182,7 @@ function ContenidoFicha({
   codigoPais: string;
   nombrePais: string;
   puedeEscribir: boolean;
-  puedeEliminar: boolean;
+  puedeArchivar: boolean;
   corteVentas: string | null;
   margenMinimo: number;
   decisionesDisponibles: boolean;
@@ -208,8 +208,8 @@ function ContenidoFicha({
     setBase(actual);
   }
   const [pendiente, empezar] = useTransition();
-  // Eliminar va aparte: así, mientras termina de guardar, el botón no dice «Eliminando...».
-  const [eliminando, setEliminando] = useState(false);
+  // Archivar va aparte: así, mientras termina de guardar, el botón no dice «Un momento...».
+  const [archivando, setArchivando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   // La ficha del producto vinculado, abierta encima de esta (no lleva al módulo Producto).
@@ -251,18 +251,16 @@ function ContenidoFicha({
     });
   }
 
-  function eliminar() {
-    if (!confirm(`¿Eliminar "${p.nombre}"? No se puede deshacer.`)) return;
+  // Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se archiva, y se puede sacar de Archivados.
+  function archivar() {
+    const archivarla = !p.archivada;
     setError(null);
-    setEliminando(true);
+    setArchivando(true);
     empezar(async () => {
-      const r = await eliminarPublicacion(p.id).catch(() => ({ error: "No se pudo eliminar. Inténtalo de nuevo." }));
-      setEliminando(false);
+      const r = await archivarPublicacion(p.id, archivarla).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      setArchivando(false);
       if (r.error) setError(r.error);
-      else {
-        mostrarToast("Publicación eliminada");
-        alCerrar();
-      }
+      else mostrarToast(archivarla ? "Publicación archivada" : "Publicación fuera de Archivados");
     });
   }
 
@@ -313,9 +311,9 @@ function ContenidoFicha({
                   </button>
                 </>
               )}
-              {!sinGuardar && puedeEliminar && (
-                <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
-                  {eliminando ? "Eliminando..." : "Eliminar"}
+              {!sinGuardar && puedeArchivar && (
+                <BotonAccion icono={ArchivarIcon} disabled={pendiente} onClick={archivar}>
+                  {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
                 </BotonAccion>
               )}
             </div>

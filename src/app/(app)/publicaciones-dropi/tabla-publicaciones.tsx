@@ -59,7 +59,7 @@ export function TablaPublicaciones({
   codigoPais,
   nombrePais,
   puedeEscribir,
-  puedeEliminar,
+  puedeArchivar,
   corteVentas,
   reglas,
   decisionesDisponibles,
@@ -74,7 +74,7 @@ export function TablaPublicaciones({
   codigoPais: string;
   nombrePais: string;
   puedeEscribir: boolean;
-  puedeEliminar: boolean;
+  puedeArchivar: boolean;
   /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
   corteVentas: string | null;
   reglas: Reglas;
@@ -132,7 +132,7 @@ export function TablaPublicaciones({
               setOrden(enOrden.map((x) => x.id));
               setAbierta(f.id);
             }}
-            alEliminar={puedeEliminar ? () => setAbierta((a) => (a === f.id ? null : a)) : undefined}
+            puedeArchivar={puedeArchivar}
           />
         )}
         etiquetaGrupo={(campo, grupo) => {
@@ -147,7 +147,7 @@ export function TablaPublicaciones({
         codigoPais={codigoPais}
         nombrePais={nombrePais}
         puedeEscribir={puedeEscribir}
-        puedeEliminar={puedeEliminar}
+        puedeArchivar={puedeArchivar}
         corteVentas={corteVentas}
         margenMinimo={reglas.margen_minimo}
         decisionesDisponibles={decisionesDisponibles}
