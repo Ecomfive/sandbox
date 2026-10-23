@@ -1053,6 +1053,11 @@ convenciones técnicas del código.
   no necesita lote; el despacho (`wms_aplicar_venta`) sí consume lotes vigentes. Las ubicaciones aún no son por lote. La pestaña
   **Vencimientos** (`/inventario/vencimientos`, `wms_vigilancia_vencimientos`) lista vencidos y por vencer. La fecha de «hoy» es la de
   America/Panama (`wms_hoy()`).
+- **Foto de un pack = la del producto original** (23 oct 2026, pedido de Hernán): al crear un compuesto en Producto (`CrearProductoPanel`) con **un solo
+  producto** como componente (N unidades, **cualquier cantidad**: pack de 2, 3, 6, 12…), la ficha ofrece «Usar la foto de {original}» (marcado por defecto, `foto_del_simple`; si
+  se sube otra foto, esa manda) y `crearProducto` **copia** la foto del simple a la carpeta del compuesto (`copiarFotoDelSimple`: revisada por su firma,
+  con su huella; no se comparte la dirección). Un compuesto de **productos distintos** no hereda nada: la ficha avisa «sube una foto nueva». Vale también cuando
+  se abre desde Gestión de IDs Dropi («Crear el compuesto»). No toca compuestos que ya existen.
 - **Regla: una compra descartada o anulada no suma** (23 oct 2026, pedido de Hernán; la almohada ortopédica sumaba 1 100 u. con dos compras descartadas).
   Al sumar lo comprado de un producto (unidades, costo, costo promedio, cuántas compras, «Unidades compradas», órdenes, «Nunca comprados») solo
   cuentan las compras que pasan `compraCuenta` (`src/lib/compras/cuenta.ts`, con prueba: ni etapa «Descartado» ni `anulada_en`). Siguen **visibles** en

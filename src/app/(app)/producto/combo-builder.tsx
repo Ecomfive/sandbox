@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { MapaComponentes } from "./mapa-componentes";
@@ -16,16 +16,25 @@ export function ComboBuilder({
   opciones,
   nombreProducto,
   inicial = null,
+  alCambiar,
 }: {
   opciones: OpcionSkuMaestro[];
   nombreProducto: string;
   /** El primer componente ya elegido (un pack de Dropi: N × el simple). */
   inicial?: { componenteId: string; cantidad: number } | null;
+  /** Cada vez que cambian los productos elegidos (para saber si es un pack de uno solo o de varios distintos). */
+  alCambiar?: (ids: string[]) => void;
 }) {
   const [filas, setFilas] = useState<{ clave: number; id: string | null; cantidad: string }[]>(() => [
     { clave: 0, id: inicial?.componenteId ?? null, cantidad: String(inicial?.cantidad ?? 1) },
   ]);
   const elegidos = new Set(filas.map((f) => f.id).filter(Boolean));
+  const clavesElegidas = [...elegidos].join(",");
+  useEffect(() => {
+    alCambiar?.(clavesElegidas ? clavesElegidas.split(",") : []);
+    // Solo cuando cambian los elegidos, no cuando cambia la función.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clavesElegidas]);
   const cambiar = (clave: number, cambios: Partial<{ id: string | null; cantidad: string }>) => setFilas((fs) => fs.map((f) => (f.clave === clave ? { ...f, ...cambios } : f)));
   const porId = new Map(opciones.map((o) => [o.id, o]));
   const armado = filas.flatMap((f) => (f.id && porId.has(f.id) ? [{ producto: porId.get(f.id)!, cantidad: Math.max(0, Math.floor(Number(f.cantidad) || 0)) }] : []));
