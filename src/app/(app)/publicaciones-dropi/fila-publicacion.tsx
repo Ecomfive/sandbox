@@ -11,6 +11,7 @@ import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { archivarPublicacion } from "./actions";
+import { BotonApagarFila } from "./apagar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { LlegadaCamino } from "./llegada-camino";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
@@ -140,7 +141,7 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
     { nombre: "En Dropi" },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-16" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[6.5rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
           {c.nombre}
@@ -260,7 +261,14 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
     <div className="flex items-center">
       <div className="min-w-0 flex-1">{fila}</div>
       {/* Una duplicada no sale de Archivados: en su lugar, un espacio del mismo ancho para que las filas no se corran. */}
-      {f.duplicadaDe ? <span aria-hidden="true" className="mr-3 w-9 shrink-0" /> : <BotonArchivarFila f={f} />}
+      {f.duplicadaDe ? (
+        <span aria-hidden="true" className="mr-3 w-[4.75rem] shrink-0" />
+      ) : (
+        <>
+          <BotonApagarFila f={f} />
+          <BotonArchivarFila f={f} />
+        </>
+      )}
     </div>
   );
 }
