@@ -213,8 +213,8 @@ export function cambiosDesdeDropi(
     detalle.push(`En Dropi: ${pub.estadoPublicacion ?? "sin anotar"} → ${estado}`);
   }
   const nombre = p.nombre.trim();
-  // Un nombre con forma de código de SKU («CINTURON/LUMBAR») quedó así en Dropi por error (22 oct 2026): no se copia al sistema.
-  if (pub.nombre !== undefined && !pub.nombrePendiente && nombre && !nombre.includes("/") && nombre !== pub.nombre.trim()) {
+  // El sistema muestra siempre el nombre que tiene Dropi (pedido de Alcides, 22 oct 2026), aunque tenga forma de código.
+  if (pub.nombre !== undefined && !pub.nombrePendiente && nombre && nombre !== pub.nombre.trim()) {
     cambios.nombre = nombre;
     detalle.push(`Nombre: ${pub.nombre.trim()} → ${nombre}`);
   }
