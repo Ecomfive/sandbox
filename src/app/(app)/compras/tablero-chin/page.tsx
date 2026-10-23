@@ -10,7 +10,7 @@ import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { traducirTextos } from "@/lib/proveedor/traducir";
 import { cargarTareasChin } from "@/lib/proveedor/tareas-datos";
-import { cargarRegistro } from "@/lib/proveedor/registro-datos";
+import { cargarCambiosRegistro, cargarRegistro } from "@/lib/proveedor/registro-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { campoOculto, restriccionesDe } from "../permisos-compras";
 import type { CuentaPortal } from "./cuenta-proveedor";
@@ -77,6 +77,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
           filas: (await cargarRegistro(supabase, espejo.proveedor.id, estado)).filter((f) => puedeVerPais(usuario.paisesPermitidos, f.paisCodigo)),
           // Cambiar celdas pide modificar Compras (ver los montos ya se pidió para tener `pagos`).
           editable: !usuario.modulosSoloLectura.includes("compras"),
+          cambios: await cargarCambiosRegistro(supabase, espejo.proveedor.id),
         };
 
   // Lo que escribe Chin (comentarios de cotización), traducido al español.
@@ -105,7 +106,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
     plazos: espejo.plazos,
     fotosReales,
     avisos: (nuevasParaChin ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string })),
-    pagos: pagos ? { resumen: pagos.resumen, filas: pagos.filas } : null,
+    pagos: pagos ? { resumen: pagos.resumen, filas: pagos.filas, cambios: pagos.cambios } : null,
     traducciones,
   };
 

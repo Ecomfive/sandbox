@@ -3,13 +3,12 @@
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { claseThLista } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { CAMPOS_CALCULADOS, COLUMNA_HOJA, TIPO_CAMPO, totalesRegistro, type CampoRegistro, type FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import type { Textos } from "@/lib/proveedor/textos";
 import { useIdioma } from "./idioma-contexto";
-import { Tarjeta, Vacio, dinero } from "./piezas-proveedor";
+import { Vacio, dinero } from "./piezas-proveedor";
 
 type Guardar = (fila: string, campo: CampoRegistro, valor: string) => Promise<{ error?: string }>;
 
@@ -33,14 +32,21 @@ const POR_TANDA = 100;
 
 const COLOR_TONO: Record<string, string> = { peligro: "text-destructive", aviso: "text-warning", info: "text-azul", exito: "text-success", neutro: "" };
 
+/** Un cambio reciente del registro (quién cambió qué), para «Últimos cambios». */
+export interface CambioRegistro {
+  texto: string;
+  creadoEn: string;
+}
+
 /**
- * «Registro de pagos» (23 oct 2026): los envíos con las columnas de la hoja «payment record» de Chin, y antes el producto (foto, nombre,
- * código y país). Con `guardar`, cualquier celda se cambia tocándola (Chin en su portal, Ecomfive en el Tablero de Chin); las calculadas
- * (en gris) se pueden fijar a mano y, vacías, vuelven a calcularse. Se filtra por país (Chin lleva una hoja por país) y la última fila
- * suma lo que falta.
+ * «Registro de pagos» (23 oct 2026, como el artefacto que aprobó Hernán): el título, tres tarjetas (lo que falta de anticipos y de
+ * saldos, y los últimos cambios) y la tabla con las columnas de la hoja «payment record» de Chin, antes el producto (foto, nombre,
+ * código y país). Con `guardar`, cualquier celda se cambia tocándola (Chin en su portal, Ecomfive en el Tablero de Chin): las que se
+ * editan van en morado y las calculadas en gris (se pueden fijar a mano y, vacías, vuelven a calcularse). Se filtra por país (Chin
+ * lleva una hoja por país) y la última fila suma lo que falta.
  */
-export function RegistroPagos({ filas, guardar, pista }: { filas: FilaRegistro[]; guardar?: Guardar; pista: string }) {
-  const { t } = useIdioma();
+export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: FilaRegistro[]; guardar?: Guardar; pista: string; cambios?: CambioRegistro[] }) {
+  const { t, tr } = useIdioma();
   const paises = useMemo(() => [...new Set(filas.map((f) => f.paisCodigo ?? "—"))].sort(), [filas]);
   const [pais, setPais] = useState<string | null>(null);
   const [cuantas, setCuantas] = useState(POR_TANDA);
@@ -48,15 +54,51 @@ export function RegistroPagos({ filas, guardar, pista }: { filas: FilaRegistro[]
   // Los totales son de todas las filas del país; a la vista van las más nuevas, de a 100 (cada celda es un botón).
   const totales = totalesRegistro(visibles);
   const aLaVista = visibles.slice(0, cuantas);
+  const usd = (n: number) => dinero(n, n % 1 ? 2 : 0);
+  const fondoTh = (campo: CampoRegistro) => (CAMPOS_CALCULADOS.includes(campo) ? "bg-muted" : guardar ? "bg-primario-suave" : "");
 
   return (
-    <Tarjeta
-      titulo={t.registroTitulo}
-      accion={
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">{pista}</span>
-          {paises.length > 1 && (
-            <span role="group" aria-label={t.colDestino} className="flex gap-1">
+    <section aria-labelledby="registro-pagos" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 id="registro-pagos" className="m-0 text-xl font-bold">
+          {t.registroTitulo}
+        </h2>
+        <p className="m-0 text-sm text-muted-foreground">{pista}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <div className="flex min-w-[13rem] flex-col gap-1 rounded-2xl border border-border bg-card px-4 py-3">
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            {t.colSinPagar} · {t.totalFila}
+          </span>
+          <span className="text-2xl font-bold text-destructive tabular-nums">{usd(totales.sinPagar)}</span>
+        </div>
+        <div className="flex min-w-[13rem] flex-col gap-1 rounded-2xl border border-border bg-card px-4 py-3">
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            {t.colSaldo} · {t.totalFila}
+          </span>
+          <span className="text-2xl font-bold text-warning tabular-nums">{usd(totales.saldo)}</span>
+        </div>
+        <div className="flex min-w-0 flex-[1_1_20rem] flex-col gap-1.5 rounded-2xl border border-border bg-card px-4 py-3">
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t.ultimosCambios}</span>
+          {cambios.length === 0 ? (
+            <span className="text-sm text-muted-foreground">{t.sinCambiosRegistro}</span>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {cambios.slice(0, 3).map((c, i) => (
+                <li key={i} className="text-[13px] [overflow-wrap:anywhere]">
+                  {tr(c.texto)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border px-4 py-3">
+          {paises.length > 1 ? (
+            <span role="group" aria-label={t.colDestino} className="flex flex-wrap gap-1.5">
               {[null, ...paises].map((p) => (
                 <button
                   key={p ?? "todos"}
@@ -66,93 +108,93 @@ export function RegistroPagos({ filas, guardar, pista }: { filas: FilaRegistro[]
                     setPais(p);
                     setCuantas(POR_TANDA);
                   }}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${pais === p ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"} ${anilloFoco}`}
+                  className={`min-h-8 rounded-full border px-3.5 text-xs font-semibold ${pais === p ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"} ${anilloFoco}`}
                 >
                   {p ?? t.todosPaises}
                 </button>
               ))}
             </span>
+          ) : (
+            <span />
           )}
-        </span>
-      }
-    >
-      {guardar && (
-        <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 border-b border-border px-4 py-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-primario/40 bg-primario-suave" />
-            {t.leyEditable}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-border bg-muted" />
-            {t.leyCalculada}
-          </span>
-        </p>
-      )}
-      {visibles.length === 0 ? (
-        <Vacio>{t.registroVacio}</Vacio>
-      ) : (
-        <div className="max-h-[680px] overflow-auto">
-          <table className="w-full min-w-[1280px] border-collapse text-[13px]">
-            <thead className="sticky top-0 z-[1] bg-card">
-              <tr>
-                <th scope="col" className={`${claseThLista} align-bottom`}>
-                  <span className="block">{t.colProducto}</span>
-                  <span className="block text-[11px] font-normal text-muted-foreground normal-case">{COLUMNA_HOJA.producto}</span>
-                </th>
-                {COLUMNAS.map((c) => (
-                  <th key={c.campo} scope="col" className={`${claseThLista} align-bottom whitespace-nowrap ${c.derecha ? "text-right" : ""} ${CAMPOS_CALCULADOS.includes(c.campo) ? "bg-muted/60" : ""}`}>
-                    <span className="block">{t[c.titulo] as string}</span>
-                    <span className="block text-[11px] font-normal text-muted-foreground normal-case">{COLUMNA_HOJA[c.campo]}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {aLaVista.map((f) => (
-                <tr key={f.fila} className="border-t border-border">
-                  <td className="min-w-[17rem] px-3 py-1.5">
-                    <span className="flex items-center gap-2.5">
-                      {f.foto ? (
-                        <img src={f.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
-                      ) : (
-                        <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border-control" />
-                      )}
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <Celda f={f} campo="producto" guardar={guardar} claseTexto="font-semibold" />
-                        <span className="px-1.5 text-xs text-muted-foreground tabular-nums">
-                          {[f.referencia, f.paisCodigo].filter(Boolean).join(" · ") || "—"}
-                        </span>
-                      </span>
-                    </span>
-                  </td>
-                  {COLUMNAS.map((c) => (
-                    <td key={c.campo} className={`px-1 py-1 ${CAMPOS_CALCULADOS.includes(c.campo) ? "bg-muted/40" : guardar ? "bg-primario-suave/25" : ""}`}>
-                      <Celda f={f} campo={c.campo} guardar={guardar} derecha={c.derecha} claseTexto={claseDe(f, c.campo)} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="sticky bottom-0 bg-card">
-              <tr className="border-t-2 border-border">
-                <th scope="row" colSpan={7} className="px-3 py-2.5 text-right font-semibold">
-                  {t.totalFila}
-                </th>
-                <td className="bg-warning-soft px-3 py-2.5 text-right font-semibold tabular-nums">{dinero(totales.sinPagar, totales.sinPagar % 1 ? 2 : 0)}</td>
-                <td />
-                <td className="bg-warning-soft px-3 py-2.5 text-right font-semibold tabular-nums">{dinero(totales.saldo, totales.saldo % 1 ? 2 : 0)}</td>
-                <td colSpan={2} />
-              </tr>
-            </tfoot>
-          </table>
-          {visibles.length > aLaVista.length && (
-            <button type="button" onClick={() => setCuantas((n) => n + POR_TANDA)} className={`w-full border-t border-border px-4 py-2.5 text-left text-xs font-medium text-azul hover:bg-muted/50 ${anilloFoco}`}>
-              {t.verMasFilas(visibles.length - aLaVista.length)}
-            </button>
+          {guardar && (
+            <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-primario/40 bg-primario-suave" />
+                {t.leyEditable}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-border bg-muted" />
+                {t.leyCalculada}
+              </span>
+            </span>
           )}
         </div>
-      )}
-    </Tarjeta>
+
+        {visibles.length === 0 ? (
+          <Vacio>{t.registroVacio}</Vacio>
+        ) : (
+          <div className="max-h-[720px] overflow-auto">
+            <table className="w-full min-w-[1320px] border-collapse text-[13px]">
+              <thead className="sticky top-0 z-[1] bg-card">
+                <tr>
+                  <th scope="col" className="border-b border-border bg-card px-3 py-2.5 text-left align-bottom">
+                    <span className="block font-semibold">{t.colProducto}</span>
+                    <span className="block text-[11px] font-normal text-muted-foreground">{COLUMNA_HOJA.producto}</span>
+                  </th>
+                  {COLUMNAS.map((c) => (
+                    <th key={c.campo} scope="col" className={`border-b border-border px-3 py-2.5 align-bottom whitespace-nowrap ${c.derecha ? "text-right" : "text-left"} ${fondoTh(c.campo)}`}>
+                      <span className="block font-semibold">{t[c.titulo] as string}</span>
+                      <span className="block text-[11px] font-normal text-muted-foreground">{COLUMNA_HOJA[c.campo]}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {aLaVista.map((f) => (
+                  <tr key={f.fila} className="border-t border-border">
+                    <td className="min-w-[17rem] px-3 py-2">
+                      <span className="flex items-center gap-2.5">
+                        {f.foto ? (
+                          <img src={f.foto} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-border object-cover" />
+                        ) : (
+                          <span aria-hidden="true" className="h-11 w-11 shrink-0 rounded-lg border border-dashed border-border-control" />
+                        )}
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <Celda f={f} campo="producto" guardar={guardar} claseTexto="font-semibold" />
+                          <span className="px-1.5 font-mono text-xs text-muted-foreground">{[f.referencia, f.paisCodigo].filter(Boolean).join(" · ") || "—"}</span>
+                        </span>
+                      </span>
+                    </td>
+                    {COLUMNAS.map((c) => (
+                      <td key={c.campo} className={`px-1 py-1 ${CAMPOS_CALCULADOS.includes(c.campo) ? "bg-muted/50" : guardar ? "bg-primario-suave/40" : ""}`}>
+                        <Celda f={f} campo={c.campo} guardar={guardar} derecha={c.derecha} claseTexto={claseDe(f, c.campo)} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="sticky bottom-0 bg-card">
+                <tr className="border-t-2 border-border bg-muted/40">
+                  <th scope="row" colSpan={7} className="px-3 py-3 text-right font-bold">
+                    {t.totalFila}
+                  </th>
+                  <td className="bg-[#fef08a] px-3 py-3 text-right font-bold text-[#18181b] tabular-nums">{usd(totales.sinPagar)}</td>
+                  <td />
+                  <td className="bg-[#fef08a] px-3 py-3 text-right font-bold text-[#18181b] tabular-nums">{usd(totales.saldo)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+            {visibles.length > aLaVista.length && (
+              <button type="button" onClick={() => setCuantas((n) => n + POR_TANDA)} className={`w-full border-t border-border px-4 py-2.5 text-left text-xs font-medium text-azul hover:bg-muted/50 ${anilloFoco}`}>
+                {t.verMasFilas(visibles.length - aLaVista.length)}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

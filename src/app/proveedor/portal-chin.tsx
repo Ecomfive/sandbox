@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { IdiomaProveedor, Traducido, useIdioma } from "@/components/proveedor/idioma-contexto";
 import { Foto, Pestanas, Producto, TONO, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
+import type { CambioRegistro } from "@/components/proveedor/registro-pagos";
 import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import { claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,7 @@ export interface DatosPortalChin {
   fotosReales: Record<string, string>;
   avisos: AvisoEcomfive[];
   /** Pagos (fase 4); null si falta la migración 0127. */
-  pagos: { resumen: ResumenPagos; filas: FilaRegistro[] } | null;
+  pagos: { resumen: ResumenPagos; filas: FilaRegistro[]; cambios: CambioRegistro[] } | null;
   /** Lo escrito por personas, ya traducido al idioma de la pantalla (texto original → traducción). */
   traducciones: Record<string, string>;
 }
@@ -103,7 +104,7 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
       {tab === "cotizado" && <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={soloLectura ? null : setCotizando} />}
       {tab === "produccion" && <EnProduccion pedidos={de("produccion")} hoy={hoy} diasAnticipo={cuenta.diasAnticipo} soloLectura={soloLectura} alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })} />}
       {tab === "enviado" && <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />}
-      {tab === "pagos" && pagos && <PagosChin resumen={pagos.resumen} filas={pagos.filas} soloLectura={soloLectura} />}
+      {tab === "pagos" && pagos && <PagosChin resumen={pagos.resumen} filas={pagos.filas} cambios={pagos.cambios} soloLectura={soloLectura} />}
 
       {cotizando && (
         <PanelCotizar

@@ -20,6 +20,18 @@ export async function cargarRegistro(supabase: SupabaseClient, proveedorId: stri
   );
 }
 
+/** Los últimos cambios del Registro de pagos (de Chin o de Ecomfive), para «Últimos cambios». */
+export async function cargarCambiosRegistro(supabase: SupabaseClient, proveedorId: string): Promise<{ texto: string; creadoEn: string }[]> {
+  const { data } = await supabase
+    .from("proveedor_novedades")
+    .select("texto, creado_en")
+    .eq("proveedor_id", proveedorId)
+    .like("texto", "%cambió en el Registro de pagos%")
+    .order("creado_en", { ascending: false })
+    .limit(3);
+  return (data ?? []).map((n) => ({ texto: n.texto as string, creadoEn: n.creado_en as string }));
+}
+
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 function textoValor(campo: CampoRegistro, v: string | number | null): string {
   if (v === null || v === undefined || v === "") return "vacío";

@@ -5,6 +5,7 @@ import { PortalChin, type DatosPortalChin } from "@/app/proveedor/portal-chin";
 import { IdiomaProveedor } from "@/components/proveedor/idioma-contexto";
 import { Pestanas, botonNormal, botonPrincipal } from "@/components/proveedor/piezas-proveedor";
 import { Ventana } from "@/components/ui/ventana";
+import type { CambioRegistro } from "@/components/proveedor/registro-pagos";
 import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 import { CrearCuentaProveedor, CuentasProveedor, type CuentaPortal } from "./cuenta-proveedor";
@@ -35,6 +36,7 @@ export function TableroChin({
     filas: FilaRegistro[];
     /** Puede cambiar celdas del Registro de pagos (modificar Compras). */
     editable: boolean;
+    cambios: CambioRegistro[];
   } | null;
   traducciones: Record<string, string>;
   /** Solo para un administrador: las cuentas con las que el proveedor entra a su portal. */
@@ -106,7 +108,7 @@ export function TableroChin({
         </div>
 
         {vista === "pagos" && pagos ? (
-          <PagosEcomfive nombre={nombre} resumen={pagos.resumen} filas={pagos.filas} editable={pagos.editable} />
+          <PagosEcomfive nombre={nombre} resumen={pagos.resumen} filas={pagos.filas} cambios={pagos.cambios} editable={pagos.editable} />
         ) : (
           <PortalChin {...tablero} idioma="es" soloLectura />
         )}
