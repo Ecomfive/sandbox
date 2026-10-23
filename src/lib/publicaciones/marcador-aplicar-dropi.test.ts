@@ -28,6 +28,7 @@ test("el favorito arma exactamente el mismo guardado que el sistema (el probado 
     [base, { nombre: null, nombreGuia: null, precio: 5.29 }],
     [{ ...base, suggested_price: "12.99" }, { nombre: null, nombreGuia: null, precio: 5.29, precioSugerido: 13.99 }],
     [base, { nombre: null, nombreGuia: null, precio: 6.99 }],
+    [{ ...base, suggested_price: "7.00" }, { nombre: null, nombreGuia: null, precio: 7.99 }],
     [base, { nombre: "Otro", nombreGuia: null, precio: 0 }],
   ];
   for (const [p, c] of casos) assert.deepEqual(JSON.parse(JSON.stringify(armarDelFavorito(p, bp, c))), JSON.parse(JSON.stringify(armarGuardadoProducto(p as Record<string, unknown>, bp, c))));

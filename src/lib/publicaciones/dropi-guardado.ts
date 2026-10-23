@@ -44,7 +44,16 @@ export function armarGuardadoProducto(
   const sugerido = cambio.precioSugerido ?? null;
   if ((precio !== null && !(precio > 0)) || (sugerido !== null && !(sugerido > 0))) return { error: "El precio debe ser mayor que cero." };
   const precioFinal = precio ?? Number(producto.sale_price);
-  const sugeridoFinal = sugerido ?? Number(producto.suggested_price);
+  let sugeridoFinal = sugerido ?? Number(producto.suggested_price);
+  // Dropi no deja un sugerido menor que el precio: si se sube el precio por encima del sugerido (y no se pidió otro sugerido), el
+  // sugerido sube con la misma proporción que tenía sobre el precio anterior (igual al precio si eran iguales).
+  let sugeridoAjustado: number | null = null;
+  if (precio !== null && sugerido === null && sugeridoFinal > 0 && sugeridoFinal < precioFinal) {
+    const anterior = Number(producto.sale_price);
+    const proporcion = anterior > 0 ? Math.max(1, sugeridoFinal / anterior) : 1;
+    sugeridoAjustado = Math.round(precioFinal * proporcion * 100) / 100;
+    sugeridoFinal = sugeridoAjustado;
+  }
   if ((precio !== null || sugerido !== null) && sugeridoFinal > 0 && sugeridoFinal < precioFinal) return { error: `El precio sugerido ($${sugeridoFinal.toFixed(2)}) quedaría menor que el precio ($${precioFinal.toFixed(2)}).` };
   if (cambio.nombreGuia !== null && cambio.nombreGuia.length > MAX_NOMBRE_DROPI) return { error: `El nombre de la guía admite ${MAX_NOMBRE_DROPI} caracteres.` };
   const bodegas: Obj[] = (Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : []).map((w) => {
@@ -62,7 +71,7 @@ export function armarGuardadoProducto(
       dropi_app_description: producto.dropi_app_description,
       type: producto.type,
       sale_price: precio ?? num(producto.sale_price),
-      suggested_price: sugerido ?? num(producto.suggested_price),
+      suggested_price: sugerido ?? sugeridoAjustado ?? num(producto.suggested_price),
       user_id: producto.user_id,
       privated_product: producto.privated_product,
       active: producto.active,

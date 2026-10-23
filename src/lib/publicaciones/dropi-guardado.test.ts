@@ -92,6 +92,11 @@ test("precios: solo se cambia lo que se pide y el sugerido no queda menor que el
     assert.equal(solo.cuerpo.suggested_price, 12.99);
     assert.equal(solo.cuerpo.name, producto7587.name);
   }
-  assert.ok("error" in armarGuardadoProducto({ ...producto7587, suggested_price: "5.49" }, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 6.99 }));
+  // Subir el precio por encima del sugerido sube también el sugerido, con la misma proporción (igual al precio si eran iguales).
+  const igual = armarGuardadoProducto({ ...producto7587, sale_price: "5.49", suggested_price: "5.49" }, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 6.99 });
+  assert.ok("cuerpo" in igual && igual.cuerpo.suggested_price === 6.99);
+  const conMargen = armarGuardadoProducto({ ...producto7587, sale_price: "5.00", suggested_price: "6.50" }, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 7.0 });
+  assert.ok("cuerpo" in conMargen && conMargen.cuerpo.suggested_price === 9.1);
+  assert.ok("error" in armarGuardadoProducto({ ...producto7587, suggested_price: "5.49" }, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 6.99, precioSugerido: 6.5 }));
   assert.ok("error" in armarGuardadoProducto(producto7587, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 0 }));
 });
