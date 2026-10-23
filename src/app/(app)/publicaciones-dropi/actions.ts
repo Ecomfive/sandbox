@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
-import { enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
+import { encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -232,4 +232,22 @@ export async function archivarPublicacion(id: string, archivar: boolean): Promis
   });
   revalidatePath(RUTA);
   return {};
+}
+
+/**
+ * «Republicar» en la ficha (pedido de Hernán, 23 oct 2026; migración 0145): nada se republica solo. Deja la republicación en la cola
+ * de «Aplicar en Dropi», que crea el producto de nuevo en Dropi (datos, fotos y stock), le saca el stock al viejo y lo archiva; al
+ * terminar, el sistema crea la publicación nueva y archiva esta (`guardarResultadosDropi`).
+ */
+export async function republicarPublicacion(id: string): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (antes.estado === "archivado" || antes.estado_publicacion === "archivado") return { error: "Está archivada: sácala de Archivados antes de republicarla." };
+  const r = await encolarRepublicar(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  if ("error" in r) return { error: r.error };
+  if (!r.yaEstaba)
+    await registrarAuditoria({ accion: "dropi_republicar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»` });
+  revalidatePath(RUTA);
+  return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
 }
