@@ -8,7 +8,7 @@ import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
  */
 export async function obtenerOpcionesSkuMaestro(supabase: SupabaseClient): Promise<OpcionSkuMaestro[]> {
   const { data } = await traerTodasConError<Record<string, unknown>>((desde, hasta) =>
-    supabase.from("skus_maestros").select("id, codigo, nombre, estado, foto_url").order("codigo").order("id").range(desde, hasta),
+    supabase.from("skus_maestros").select("id, codigo, nombre, estado, foto_url, tipo").order("codigo").order("id").range(desde, hasta),
   );
-  return (data ?? []).map((s) => ({ id: s.id as string, codigo: s.codigo as string, nombre: s.nombre as string, estado: s.estado as string, foto: (s.foto_url as string | null) ?? null }));
+  return (data ?? []).map((s) => ({ id: s.id as string, codigo: s.codigo as string, nombre: s.nombre as string, estado: s.estado as string, foto: (s.foto_url as string | null) ?? null, compuesto: s.tipo === "combo" }));
 }

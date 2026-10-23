@@ -6,10 +6,12 @@ import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Button } from "@/components/ui/button";
 import { SkuCopiable } from "@/components/ui/sku-copiable";
-import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { CampoSkuMaestro, useOpcionesSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import type { SkuResumen } from "@/lib/publicaciones/sugerencias";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
+import { crearProducto } from "../producto/actions";
+import { CrearProductoPanel } from "../producto/crear-producto-panel";
 import { vincularSkuPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 
@@ -48,6 +50,7 @@ export function VinculoSku({
 }) {
   const { mostrarToast } = useToast();
   const puedeCrearProducto = usePuedeAbrir("producto");
+  const opcionesSku = useOpcionesSkuMaestro();
   const [pendiente, empezar] = useTransition();
   const [elegido, setElegido] = useState<OpcionSkuMaestro | null>(null);
   const [cambiando, setCambiando] = useState(false);
@@ -140,11 +143,26 @@ export function VinculoSku({
             Es un pack de {s.pack}: falta su compuesto en Producto. Créalo (con {s.pack} × {s.sku.codigo}) y vincúlalo aquí.
           </p>
           <Producto sku={s.sku} pequeño />
-          {puedeCrearProducto && (
-            // Abre la ficha «Nuevo producto» ya como compuesto, con el pack armado (N × el simple).
-            <Link href={`/producto?nuevo=1&componente=${s.sku.id}&cantidad=${s.pack ?? 1}`} className="w-fit text-xs font-medium underline underline-offset-2">
-              Crear el compuesto en Producto
-            </Link>
+          {puedeCrearProducto && puedeEscribir && (
+            // La ficha «Nuevo producto» se abre aquí encima (sin salir de Gestión de IDs Dropi), ya como compuesto con el pack armado
+            // (N × el simple); al crearlo queda vinculado a esta publicación.
+            <CrearProductoPanel
+              opcionesSimples={opcionesSku.filter((o) => !o.compuesto)}
+              compuestoInicial={{ componenteId: s.sku.id, cantidad: s.pack ?? 1 }}
+              mensajeExito="Compuesto creado"
+              action={async (datos) => {
+                const r = await crearProducto(datos);
+                if (r.error || !r.id) return r;
+                const v = await vincularSkuPublicacion(p.id, r.id).catch(() => ({ error: "No se pudo guardar el vínculo." }));
+                if (v.error) mostrarToast(`El compuesto se creó, pero no se vinculó: ${v.error}`, "destructive");
+                return {};
+              }}
+              boton={(abrir) => (
+                <button type="button" onClick={abrir} className="w-fit text-xs font-medium underline underline-offset-2">
+                  Crear el compuesto en Producto
+                </button>
+              )}
+            />
           )}
         </div>
       )}

@@ -48,7 +48,7 @@ export function CrearProductoPanel({
   opcionesSimples: OpcionSkuMaestro[];
   /** Se abre sola con `?nuevo=1` en la dirección. */
   abrirConNuevo?: boolean;
-  /** Solo la primera vez que se abre: ya como compuesto, con este componente. */
+  /** Se abre ya como compuesto, con este componente (con `abrirConNuevo`, solo la primera vez: después «Agregar» abre en blanco). */
   compuestoInicial?: CompuestoInicial | null;
   /** Otra acción que crea el producto y hace algo más (Test productos lo agrega además a su lista). */
   action?: (formData: FormData) => Promise<{ error?: string } | void>;
@@ -125,7 +125,8 @@ export function CrearProductoPanel({
       boton={boton}
       abrirConNuevo={abrirConNuevo}
       alAbrir={() => {
-        const inicial = !compuestoUsado.current && compuestoInicial && opcionesSimples.some((o) => o.id === compuestoInicial.componenteId) ? compuestoInicial : null;
+        const inicial =
+          compuestoInicial && !(abrirConNuevo && compuestoUsado.current) && opcionesSimples.some((o) => o.id === compuestoInicial.componenteId) ? compuestoInicial : null;
         compuestoUsado.current = true;
         setComponenteInicial(inicial);
         setTipo(inicial ? "combo" : "simple");

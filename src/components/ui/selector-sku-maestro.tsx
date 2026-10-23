@@ -14,6 +14,8 @@ export interface OpcionSkuMaestro {
   numero?: number | null;
   /** La foto del producto, si tiene. */
   foto?: string | null;
+  /** Si es un compuesto (no puede ser componente de otro compuesto). */
+  compuesto?: boolean;
 }
 
 const SkusMaestrosContext = createContext<OpcionSkuMaestro[]>([]);
