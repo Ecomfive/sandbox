@@ -89,7 +89,7 @@ async function revisarFoto(supabase: Supabase, cuenta: CuentaProveedor, p: Pedid
 export async function aplicarCotizacion(
   cuenta: CuentaProveedor,
   pedidoId: string,
-  entrada: { unidades: unknown; costoUnitario?: unknown; montoTotal?: unknown; comentario?: unknown; fotoRuta?: unknown },
+  entrada: { unidades: unknown; montoTotal?: unknown; comentario?: unknown; fotoRuta?: unknown },
 ): Promise<Resultado> {
   const supabase = createServiceClient();
   const p = await pedidoDe(supabase, cuenta, pedidoId);

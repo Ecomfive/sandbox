@@ -73,12 +73,15 @@ test("tránsito contra el plazo: en plazo, por llegar, atrasado y llegado", () =
 });
 
 test("la cotización acepta costo por unidad o total y marca si cambió las unidades", () => {
-  assert.deepEqual(validarCotizacion({ unidades: 960, costoUnitario: "1.5" }), { unidades: 960, costoUnitario: 1.5, montoTotal: 1440 });
+  assert.deepEqual(validarCotizacion({ unidades: 960, montoTotal: "1,440" }), { unidades: 960, costoUnitario: 1.5, montoTotal: 1440 });
   assert.deepEqual(validarCotizacion({ unidades: "1,000", montoTotal: 2130 }), { unidades: 1000, costoUnitario: 2.13, montoTotal: 2130 });
+  // El costo por unidad siempre sale de la fórmula (total ÷ unidades, 4 decimales); aunque llegue uno escrito, no se usa.
+  assert.deepEqual(validarCotizacion({ unidades: 960, montoTotal: 2300 }), { unidades: 960, costoUnitario: 2.3958, montoTotal: 2300 });
+  assert.deepEqual(validarCotizacion({ unidades: 960, montoTotal: 2300, costoUnitario: 9 } as { unidades: unknown; montoTotal: unknown }), { unidades: 960, costoUnitario: 2.3958, montoTotal: 2300 });
   assert.ok("error" in validarCotizacion({ unidades: 960 }));
   assert.ok("error" in validarCotizacion({ unidades: 0, montoTotal: 100 }));
   assert.ok("error" in validarCotizacion({ unidades: 10.5, montoTotal: 100 }));
-  assert.ok("error" in validarCotizacion({ unidades: 1000, costoUnitario: -2 }));
+  assert.ok("error" in validarCotizacion({ unidades: 1000, montoTotal: -2 }));
   assert.ok("error" in validarCotizacion({ unidades: 1000, montoTotal: 5_000_000 }));
   assert.deepEqual(cambioDeUnidades(1000, 960), { pedidas: 1000, cotizadas: 960 });
   assert.equal(cambioDeUnidades(1000, 1000), null);

@@ -31,17 +31,16 @@ export async function prepararSubidaFotoReal(pedidoId: string, nombreArchivo: st
   return { ruta, token: firmada.token };
 }
 
-/** Cotizar o corregir la cotización: unidades, costo por unidad o total, foto real (ya subida) y comentario. */
+/** Cotizar o corregir la cotización: unidades y monto total (el costo por unidad se calcula), foto real (ya subida) y comentario. */
 export async function cotizarPedido(
   pedidoId: string,
-  datos: { unidades: string; costoUnitario?: string; montoTotal?: string; comentario?: string; fotoRuta?: string | null },
+  datos: { unidades: string; montoTotal?: string; comentario?: string; fotoRuta?: string | null },
 ): Promise<{ error?: string }> {
   const cuenta = await cuentaProveedorActual();
   if (!cuenta) return SIN_SESION;
   if (!esUuid(pedidoId) || !datos || typeof datos !== "object") return { error: "Pedido no válido." };
   return aplicarCotizacion(cuenta, pedidoId, {
     unidades: datos.unidades,
-    costoUnitario: datos.costoUnitario,
     montoTotal: datos.montoTotal,
     comentario: datos.comentario,
     fotoRuta: datos.fotoRuta || undefined,

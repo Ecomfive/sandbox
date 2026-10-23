@@ -584,7 +584,8 @@ convenciones técnicas del código.
   la manda ahí, y `requireModulo` y el layout de `(app)` devuelven al portal a una cuenta de proveedor que abra otra página
   (`cuentaDeProveedor`, `src/lib/proveedor/cuenta.ts`). Lo que hace el proveedor lo aplica `src/lib/proveedor/aplicar.ts` **a la compra**
   sin pasar por los permisos de Compras (el proveedor no tiene perfil): cotizar = línea de producto (si tiene una), `qty_total`,
-  `monto_total` y etapa `cotizado` en un solo update, comentario «Cotización de Chin…» con la foto real como adjunto (origen
+  `monto_total` y etapa `cotizado` en un solo update (el proveedor pone **solo unidades y monto total**; `costo_unitario` sale siempre de
+  `unitarioDesdeTotal` = total ÷ unidades con 4 decimales, en `validarCotizacion`; decidido con Hernán el 23 oct 2026), comentario «Cotización de Chin…» con la foto real como adjunto (origen
   `proveedor`, copiada de `proveedor-portal` a `wms-compras`, validada por su firma; ruta `<proveedor>/<pedido>/fotos/<id>`,
   `rutaEsDelPedido`); enviar = etapa `tracking`, `fecha_envio` (hasta 60 días atrás, nunca futura) y su planificación
   (`cargarTiempos`, ahora en `src/lib/compras/tiempos-datos.ts`). Cada cambio: evento con origen `proveedor`, auditoría, novedad y aviso

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { cambioDeUnidades, totalDesdeUnitario, unitarioDesdeTotal } from "@/lib/proveedor/cotizacion";
+import { cambioDeUnidades, unitarioDesdeTotal } from "@/lib/proveedor/cotizacion";
 import { clavePlazo, type PedidoPortal } from "@/lib/proveedor/datos";
 import { hoyPanama } from "@/lib/proveedor/fechas";
 import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
@@ -461,7 +461,6 @@ function PanelCotizar({ p, fotoReal, alCerrar, alCotizar }: { p: PedidoPortal; f
   const { mostrarToast } = useToast();
   const corrigiendo = p.etapa === "cotizado";
   const [unidades, setUnidades] = useState(String(p.unidades ?? p.unidadesPedidas ?? ""));
-  const [unitario, setUnitario] = useState(corrigiendo && p.costoUnitario != null ? String(p.costoUnitario) : "");
   const [total, setTotal] = useState(corrigiendo && p.montoTotal != null ? String(p.montoTotal) : "");
   const [comentario, setComentario] = useState(p.comentarioProveedor ?? "");
   const [foto, setFoto] = useState<{ ruta: string; preview: string } | null>(null);
@@ -469,6 +468,8 @@ function PanelCotizar({ p, fotoReal, alCerrar, alCotizar }: { p: PedidoPortal; f
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const uds = Number(unidades) || 0;
+  // El proveedor pone solo las unidades y el monto total; el costo por unidad sale de la fórmula (total ÷ unidades).
+  const unitario = uds > 0 && Number(total) > 0 ? unitarioDesdeTotal(Number(total), uds) : null;
 
   async function elegirFoto(archivo: File | undefined) {
     if (!archivo) return;
@@ -489,12 +490,12 @@ function PanelCotizar({ p, fotoReal, alCerrar, alCotizar }: { p: PedidoPortal; f
 
   async function enviar() {
     setError(null);
-    if (!uds || (!Number(unitario) && !Number(total))) return setError(t.errorFaltaPrecio);
+    if (!uds || !Number(total)) return setError(t.errorFaltaPrecio);
     setGuardando(true);
-    const r = await cotizarPedido(p.id, { unidades, costoUnitario: unitario, montoTotal: total, comentario, fotoRuta: foto?.ruta ?? null });
+    const r = await cotizarPedido(p.id, { unidades, montoTotal: total, comentario, fotoRuta: foto?.ruta ?? null });
     setGuardando(false);
     if (r.error) return setError(errorEn(r.error));
-    const montoTotal = Number(total) || totalDesdeUnitario(Number(unitario), uds);
+    const montoTotal = Math.round(Number(total) * 100) / 100;
     alCotizar(
       { unidades: uds, unidadesPedidas: p.unidadesPedidas, montoTotal, costoUnitario: unitarioDesdeTotal(montoTotal, uds), comentarioProveedor: comentario.trim() || null, ...(foto ? { fotoRealRuta: foto.ruta } : {}) },
       foto?.preview ?? null,
@@ -549,34 +550,12 @@ function PanelCotizar({ p, fotoReal, alCerrar, alCotizar }: { p: PedidoPortal; f
             step={1}
             inputMode="numeric"
             value={unidades}
-            onChange={(e) => {
-              setUnidades(e.target.value);
-              const n = Number(e.target.value);
-              if (n > 0 && Number(unitario)) setTotal(String(totalDesdeUnitario(Number(unitario), n)));
-            }}
+            onChange={(e) => setUnidades(e.target.value)}
             className={fieldClass}
           />
           <span className="text-xs text-muted-foreground">{cambio ? t.cambioUnidades(numero(cambio.pedidas)) : t.pistaUnidades}</span>
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>{t.costoUnidad}</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              inputMode="decimal"
-              data-enfocar
-              placeholder={t.ejemploCosto}
-              value={unitario}
-              onChange={(e) => {
-                setUnitario(e.target.value);
-                const u = Number(e.target.value);
-                if (u > 0 && uds) setTotal(String(totalDesdeUnitario(u, uds)));
-              }}
-              className={fieldClass}
-            />
-          </label>
           <label className="flex flex-col gap-1">
             <span className={labelClass}>{t.totalUsd}</span>
             <input
@@ -584,16 +563,20 @@ function PanelCotizar({ p, fotoReal, alCerrar, alCotizar }: { p: PedidoPortal; f
               min={0}
               step="0.01"
               inputMode="decimal"
+              data-enfocar
               placeholder={t.ejemploTotal}
               value={total}
-              onChange={(e) => {
-                setTotal(e.target.value);
-                const n = Number(e.target.value);
-                if (n > 0 && uds) setUnitario(String(unitarioDesdeTotal(n, uds)));
-              }}
+              onChange={(e) => setTotal(e.target.value)}
               className={fieldClass}
             />
           </label>
+          <div className="flex flex-col gap-1">
+            <span className={labelClass}>{t.costoUnidad}</span>
+            <output aria-live="polite" className="flex h-9 items-center rounded-md border border-border bg-muted px-3 text-sm font-semibold tabular-nums">
+              {unitario != null ? `$${unitario.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : "—"}
+            </output>
+            <span className="text-xs text-muted-foreground">{t.costoCalculado}</span>
+          </div>
         </div>
         <label className="flex flex-col gap-1">
           <span className={labelClass}>{t.fotoProductoReal}</span>

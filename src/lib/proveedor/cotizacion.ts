@@ -1,11 +1,11 @@
-// Portal del proveedor: la cotización que pone el proveedor (costo por unidad, total y unidades por caja). Lógica pura.
+// Portal del proveedor: la cotización que pone el proveedor (unidades y monto total; el costo por unidad sale de la fórmula). Lógica pura.
 
 /** Unidades que se aceptan en una cotización (una caja suelta hasta un contenedor de bolsas). */
 export const MAX_UNIDADES = 1_000_000;
 /** Monto máximo de una cotización, para atajar un cero de más. */
 export const MAX_MONTO = 1_000_000;
 
-export const totalDesdeUnitario = (unitario: number, unidades: number) => Math.round(unitario * unidades * 100) / 100;
+/** El costo por unidad de una cotización: monto total ÷ unidades, con 4 decimales. */
 export const unitarioDesdeTotal = (total: number, unidades: number) => (unidades > 0 ? Math.round((total / unidades) * 10000) / 10000 : 0);
 
 export interface CotizacionValida {
@@ -15,23 +15,17 @@ export interface CotizacionValida {
 }
 
 /**
- * Valida lo que manda el proveedor. Basta el costo por unidad o el total (el otro se calcula con las unidades); si vienen los dos,
- * manda el total. Devuelve el error como texto.
+ * Valida lo que manda el proveedor: las unidades y el monto total (desde el 23 oct 2026, pedido de Hernán, ya no escribe el costo por
+ * unidad). El costo por unidad se calcula siempre con `unitarioDesdeTotal`. Devuelve el error como texto.
  */
-export function validarCotizacion(entrada: { unidades: unknown; costoUnitario?: unknown; montoTotal?: unknown }): CotizacionValida | { error: string } {
+export function validarCotizacion(entrada: { unidades: unknown; montoTotal?: unknown }): CotizacionValida | { error: string } {
   const unidades = numero(entrada.unidades);
   if (unidades == null || !Number.isInteger(unidades) || unidades < 1 || unidades > MAX_UNIDADES) return { error: "Las unidades deben ser un número entero mayor que cero." };
   const total = numero(entrada.montoTotal);
-  const unitario = numero(entrada.costoUnitario);
-  if (total != null) {
-    if (total <= 0 || total > MAX_MONTO) return { error: "El total debe ser mayor que cero." };
-    return { unidades, montoTotal: Math.round(total * 100) / 100, costoUnitario: unitarioDesdeTotal(total, unidades) };
-  }
-  if (unitario != null) {
-    if (unitario <= 0 || unitario * unidades > MAX_MONTO) return { error: "El costo por unidad debe ser mayor que cero." };
-    return { unidades, costoUnitario: Math.round(unitario * 10000) / 10000, montoTotal: totalDesdeUnitario(unitario, unidades) };
-  }
-  return { error: "Falta el costo por unidad o el total." };
+  if (total == null) return { error: "Falta el monto total." };
+  if (total <= 0 || total > MAX_MONTO) return { error: "El total debe ser mayor que cero." };
+  const montoTotal = Math.round(total * 100) / 100;
+  return { unidades, montoTotal, costoUnitario: unitarioDesdeTotal(montoTotal, unidades) };
 }
 
 /** Si el proveedor cotizó otras unidades que las pedidas (la caja trae 960 y se pidieron 1,000). */
