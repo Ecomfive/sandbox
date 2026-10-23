@@ -6,7 +6,7 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { DECISIONES, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { REGLAS, leerValorRegla, mostrarRegla, revisarReglas, type ClaveRegla, type Reglas } from "@/lib/publicaciones/reglas";
-import { enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
+import { encolarCambio, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -123,6 +123,12 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
       const r = await enviarPrecioADropi(supabase, { id: pub.id as string, pais_id: pub.pais_id as string, dropi_id: (pub.dropi_id as string | null) ?? null }, nuevo, antes, { id: usuario.id, nombre: usuario.nombre || usuario.email });
       dropi = r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`;
     }
+  }
+  // Aceptar «Igualar el precio sugerido» lo deja en la cola de «Aplicar en Dropi» con el sugerido = el precio de venta (23 oct 2026).
+  const precioActual = pub.precio_venta === null ? null : Number(pub.precio_venta);
+  if (decision === "aceptada" && tipo === "precio_sugerido" && precioActual !== null && precioActual > 0) {
+    const r = await encolarCambio(supabase, { id: pub.id as string, pais_id: pub.pais_id as string, dropi_id: (pub.dropi_id as string | null) ?? null }, { precioSugerido: precioActual }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+    dropi = "error" in r ? `No quedó para Dropi: ${r.error}` : `Precio sugerido $${precioActual.toFixed(2)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
   }
   revalidatePath("/publicaciones-dropi");
   revalidatePath("/publicaciones-dropi/recomendaciones");

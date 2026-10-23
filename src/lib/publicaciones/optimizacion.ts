@@ -155,9 +155,11 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
       ? r("precio_sugerido", "sin_datos", "No se leyó en el catálogo de Dropi")
       : p.precioSugerido === null || p.precioSugerido <= 0
         ? r("precio_sugerido", "falta", "Sin precio sugerido en Dropi")
-        : p.precio !== null && p.precioSugerido <= p.precio
-          ? r("precio_sugerido", "falta", `Sugerido $${p.precioSugerido.toFixed(2)}, nuestro precio $${p.precio.toFixed(2)}: al dropshipper no le queda margen`)
-          : r("precio_sugerido", "ok", `$${p.precioSugerido.toFixed(2)}`),
+        : // El sugerido va IGUAL al precio (decisión de Alcides, 23 oct 2026): el dropshipper no lo usa de referencia y, si es más alto,
+          // Dropi no le deja montar una orden por debajo de él.
+          p.precio !== null && Math.abs(p.precioSugerido - p.precio) > 0.005
+          ? r("precio_sugerido", "falta", `Sugerido $${p.precioSugerido.toFixed(2)}, nuestro precio $${p.precio.toFixed(2)}: debe ser igual al precio`)
+          : r("precio_sugerido", "ok", `$${p.precioSugerido.toFixed(2)}, igual al precio`),
   ];
 }
 
