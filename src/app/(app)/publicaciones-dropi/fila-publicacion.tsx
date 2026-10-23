@@ -5,12 +5,12 @@ import { useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ChevronRightIcon, DropiIcon, PapeleraIcon } from "@/lib/nav-icons";
+import { ArchivarIcon, ChevronRightIcon, DropiIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
-import { eliminarPublicacion } from "./actions";
+import { archivarPublicacion } from "./actions";
 import { InsigniaConectado } from "./insignia-conectado";
 import { LlegadaCamino } from "./llegada-camino";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
@@ -57,31 +57,31 @@ function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: st
   );
 }
 
-/** «Eliminar» de la fila (solo un administrador): pide confirmación y borra la publicación de verdad. */
-function BotonEliminarFila({ f, alEliminar }: { f: FilaPublicacion; alEliminar: () => void }) {
+/**
+ * «Archivar» de la fila (o «Sacar de Archivados» si ya lo está). Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se
+ * archiva, y se puede deshacer.
+ */
+function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
-  function eliminar() {
-    if (!confirm(`¿Eliminar "${f.nombre}"? No se puede deshacer.`)) return;
+  const archivar = !f.archivada;
+  function cambiar() {
     empezar(async () => {
-      const r = await eliminarPublicacion(f.id).catch(() => ({ error: "No se pudo eliminar. Inténtalo de nuevo." }));
-      if (r.error) mostrarToast(r.error, "destructive");
-      else {
-        mostrarToast("Publicación eliminada");
-        alEliminar();
-      }
+      const r = await archivarPublicacion(f.id, archivar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      mostrarToast(r.error ?? (archivar ? "Publicación archivada" : "Publicación fuera de Archivados"), r.error ? "destructive" : undefined);
     });
   }
+  const texto = archivar ? "Archivar publicación" : "Sacar de Archivados";
   return (
-    <Tooltip texto="Eliminar publicación">
+    <Tooltip texto={texto}>
       <button
         type="button"
-        onClick={eliminar}
+        onClick={cambiar}
         disabled={pendiente}
-        aria-label={`Eliminar la publicación ${f.nombre}`}
-        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive disabled:opacity-50 ${anilloFoco}`}
+        aria-label={`${texto}: ${f.nombre}`}
+        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 ${anilloFoco}`}
       >
-        <PapeleraIcon className="h-4 w-4" />
+        <ArchivarIcon className="h-4 w-4" />
       </button>
     </Tooltip>
   );
@@ -122,7 +122,7 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
  * dónde está y cómo está en Dropi,
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
  */
-export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; alEliminar?: () => void }) {
+export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchivar = false }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; puedeArchivar?: boolean }) {
   const enDropi = EN_DROPI.find((e) => e.valor === (f.archivada && f.enDropi !== "archivado" ? "archivado" : f.enDropi));
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
   const sugerida = !f.sku && f.sugerencia && f.sugerencia.tipo !== "ninguno" ? f.sugerencia : null;
@@ -213,12 +213,12 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
       <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />
     </button>
   );
-  // Con «Eliminar» (solo un administrador) la fila es el botón que abre la ficha y, al lado, el de eliminar: un botón no va dentro de otro.
-  if (!alEliminar) return fila;
+  // Con «Archivar» la fila es el botón que abre la ficha y, al lado, el de archivar: un botón no va dentro de otro.
+  if (!puedeArchivar) return fila;
   return (
     <div className="flex items-center">
       <div className="min-w-0 flex-1">{fila}</div>
-      <BotonEliminarFila f={f} alEliminar={alEliminar} />
+      <BotonArchivarFila f={f} />
     </div>
   );
 }
