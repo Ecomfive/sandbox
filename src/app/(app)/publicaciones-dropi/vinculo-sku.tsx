@@ -141,7 +141,8 @@ export function VinculoSku({
           </p>
           <Producto sku={s.sku} pequeño />
           {puedeCrearProducto && (
-            <Link href="/producto?nuevo=1" className="w-fit text-xs font-medium underline underline-offset-2">
+            // Abre la ficha «Nuevo producto» ya como compuesto, con el pack armado (N × el simple).
+            <Link href={`/producto?nuevo=1&componente=${s.sku.id}&cantidad=${s.pack ?? 1}`} className="w-fit text-xs font-medium underline underline-offset-2">
               Crear el compuesto en Producto
             </Link>
           )}

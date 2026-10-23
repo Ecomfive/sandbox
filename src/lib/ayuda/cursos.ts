@@ -216,7 +216,7 @@ export const CURSOS: Curso[] = [
         parrafos: [
           "Cada fila es un producto que Ecomfive tiene publicado en Dropi como proveedor, en el país de la barra de arriba, con su foto, su ID de Dropi, su SKU y su número propio (PUB-0001…), que es distinto al ID de Dropi y no cambia.",
           "La lista arranca agrupada por estado: Producto nuevo, Revisar precio y venta, Verificar con dropshipper, Validar bajar precio, Bajar precio y Al día. Los archivados se ven con el botón «Archivados».",
-          "Arriba, el tablero de acciones cuenta lo que espera una decisión (los estados del flujo, Revisión vencida, Margen bajo, Sin vincular a Producto y Sin stock). Pulsa una tarjeta para filtrar la lista y otra vez para quitar el filtro.",
+          "Arriba, el tablero de acciones cuenta lo que espera una decisión (los estados del flujo, Revisión vencida, Margen bajo, Sin vincular producto y Sin stock). Pulsa una tarjeta para filtrar la lista y otra vez para quitar el filtro.",
         ],
       },
       {
