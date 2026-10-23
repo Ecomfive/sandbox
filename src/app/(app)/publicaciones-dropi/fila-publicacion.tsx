@@ -102,17 +102,20 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
           {entero(v.netas30)} {v.netas30 === 1 ? "venta" : "ventas"} en 30 días
         </span>
       }
-      apoyo={
-        <span className="flex flex-col tabular-nums lg:items-end">
-          <span className="max-w-full truncate">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>
-          {v.stock <= 0 && f.enCamino > 0 && (
-            <span className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-success lg:justify-end">
-              <span className="whitespace-nowrap">{entero(f.enCamino)} en camino</span>
-              <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} />
-            </span>
-          )}
-        </span>
-      }
+      apoyo={<span className="tabular-nums">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>}
+    />
+  );
+}
+
+/** La mercancía que viene en camino de un producto sin stock: las unidades arriba y la fecha de llegada abajo, en su propia columna. */
+function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
+  const viene = f.ventas !== null && f.ventas.stock <= 0 && f.enCamino > 0;
+  return (
+    <Celda
+      nombre="En camino"
+      alinear="derecha"
+      principal={viene ? <span className="font-medium tabular-nums text-success">{entero(f.enCamino)} en camino</span> : <span className="text-muted-foreground">—</span>}
+      apoyo={viene ? <span className="flex flex-wrap items-center gap-1.5 whitespace-normal font-medium text-success lg:justify-end"><LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} /></span> : undefined}
     />
   );
 }
@@ -131,7 +134,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
       type="button"
       onClick={alAbrir}
       aria-label={`Abrir la ficha de ${f.nombre}`}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_2rem_1rem]" : "lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_2rem_1rem]"} ${anilloFoco}`}
+      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_2rem_1rem]" : "lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_2rem_1rem]"} ${anilloFoco}`}
     >
       {/* Producto */}
       <span className="flex min-w-0 items-center gap-3">
@@ -194,7 +197,8 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
             )
           }
         />
-        <CeldaVentas f={f} />
+        {verVentas && <CeldaVentas f={f} />}
+        {verVentas && <CeldaEnCamino f={f} />}
         <Celda
           nombre="Dónde está"
           principal={ubicacion ? <ConPunto color={ubicacion.color} texto={ubicacion.etiqueta} /> : <span className="text-muted-foreground">—</span>}
