@@ -196,7 +196,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>
             ) : (
               <span className="inline-flex items-center gap-1.5">
-                <Punto clase="bg-warning" texto="Sin vincular" />
+                <Punto clase="bg-warning" texto="Sin vincular producto" />
                 {sugerida ? `${ETIQUETA_SUGERENCIA[sugerida.tipo]}${sugerida.sku ? ` · ${sugerida.sku.codigo}` : ""}` : "Sin SKU"}
               </span>
             )}
