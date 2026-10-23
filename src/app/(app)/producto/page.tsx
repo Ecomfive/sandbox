@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
+import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { cargarProductos } from "./datos-producto";
 import { TablaProducto } from "./tabla-producto";
 
@@ -18,7 +19,12 @@ export const dynamic = "force-dynamic";
  */
 export default async function ProductoPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   // Desde la ficha de una publicación de Dropi (y otras) se llega con `?abrir=<producto>`: abre su ficha al cargar.
-  const { abrir } = await searchParams;
+  // «Crear el compuesto en Producto» (Gestión de IDs Dropi) llega con `?nuevo=1&componente=<simple>&cantidad=<pack>`: la ficha
+  // «Nuevo producto» se abre sola, ya como compuesto con ese componente.
+  const { abrir, componente, cantidad } = await searchParams;
+  const unidades = Number(cantidad);
+  const compuestoInicial =
+    typeof componente === "string" && esUuid(componente) && Number.isInteger(unidades) && unidades >= 1 && unidades <= 1000 ? { componenteId: componente, cantidad: unidades } : null;
   const usuario = await requireModulo("producto");
   const supabase = createServiceClient();
   // El producto es igual para todos los países; el país solo da formato a las fechas de su actividad.
@@ -35,6 +41,7 @@ export default async function ProductoPage({ searchParams }: { searchParams: Pro
         opcionesSimples={opcionesSimples}
         codigoPais={pais.codigo}
         abrirInicial={typeof abrir === "string" ? abrir : null}
+        compuestoInicial={compuestoInicial}
         puedeEscribir={!usuario.modulosSoloLectura.includes("producto")}
         puedeEliminar={!usuario.modulosSoloLectura.includes("producto") && esAdministrador(usuario)}
         referenciasTest={referenciasTest}

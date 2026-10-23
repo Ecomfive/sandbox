@@ -12,8 +12,19 @@ import { MapaComponentes } from "./mapa-componentes";
  * Un producto ya elegido en otra fila no se vuelve a ofrecer. Debajo, el **mapa** de lo que lleva: cada componente conectado al
  * producto nuevo, con su cantidad.
  */
-export function ComboBuilder({ opciones, nombreProducto }: { opciones: OpcionSkuMaestro[]; nombreProducto: string }) {
-  const [filas, setFilas] = useState<{ clave: number; id: string | null; cantidad: string }[]>([{ clave: 0, id: null, cantidad: "1" }]);
+export function ComboBuilder({
+  opciones,
+  nombreProducto,
+  inicial = null,
+}: {
+  opciones: OpcionSkuMaestro[];
+  nombreProducto: string;
+  /** El primer componente ya elegido (un pack de Dropi: N × el simple). */
+  inicial?: { componenteId: string; cantidad: number } | null;
+}) {
+  const [filas, setFilas] = useState<{ clave: number; id: string | null; cantidad: string }[]>(() => [
+    { clave: 0, id: inicial?.componenteId ?? null, cantidad: String(inicial?.cantidad ?? 1) },
+  ]);
   const elegidos = new Set(filas.map((f) => f.id).filter(Boolean));
   const cambiar = (clave: number, cambios: Partial<{ id: string | null; cantidad: string }>) => setFilas((fs) => fs.map((f) => (f.clave === clave ? { ...f, ...cambios } : f)));
   const porId = new Map(opciones.map((o) => [o.id, o]));

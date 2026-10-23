@@ -27,8 +27,16 @@ import { CategoriaNuevoProducto } from "./categoria-nuevo-producto";
  * botones de opción, como la vía de envío de una compra. El SKU se sugiere solo mientras se escribe el nombre. El SKU es obligatorio: con él una venta de Dropi
  * o de una tienda de Shopify encuentra el producto para descontar el inventario.
  */
+/** El compuesto con que se abre la ficha desde otra página (un pack de Dropi: N × el producto simple). */
+export interface CompuestoInicial {
+  componenteId: string;
+  cantidad: number;
+}
+
 export function CrearProductoPanel({
   opcionesSimples,
+  abrirConNuevo,
+  compuestoInicial,
   action = crearProducto,
   mensajeExito = "Producto creado",
   ocultos,
@@ -38,6 +46,10 @@ export function CrearProductoPanel({
   alCambiarEnviando,
 }: {
   opcionesSimples: OpcionSkuMaestro[];
+  /** Se abre sola con `?nuevo=1` en la dirección. */
+  abrirConNuevo?: boolean;
+  /** Solo la primera vez que se abre: ya como compuesto, con este componente. */
+  compuestoInicial?: CompuestoInicial | null;
   /** Otra acción que crea el producto y hace algo más (Test productos lo agrega además a su lista). */
   action?: (formData: FormData) => Promise<{ error?: string } | void>;
   mensajeExito?: string;
@@ -52,6 +64,9 @@ export function CrearProductoPanel({
 }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
+  // El compuesto de la dirección se usa al abrir la primera vez; después «Agregar» abre la ficha en blanco como siempre.
+  const [componenteInicial, setComponenteInicial] = useState<CompuestoInicial | null>(null);
+  const compuestoUsado = useRef(false);
   // El código de barras (decisión de Hernán, 8 oct 2026): lo normal es que el producto venga sin código, así que viene marcado
   // «Interno» (también en un compuesto); si trae el del fabricante, se elige y se escribe.
   const [origenBarras, setOrigenBarras] = useState<"interno" | "fabricante" | "ninguno" | null>(null);
@@ -108,8 +123,12 @@ export function CrearProductoPanel({
       mensajeExito={mensajeExito}
       ocultos={ocultos}
       boton={boton}
+      abrirConNuevo={abrirConNuevo}
       alAbrir={() => {
-        setTipo("simple");
+        const inicial = !compuestoUsado.current && compuestoInicial && opcionesSimples.some((o) => o.id === compuestoInicial.componenteId) ? compuestoInicial : null;
+        compuestoUsado.current = true;
+        setComponenteInicial(inicial);
+        setTipo(inicial ? "combo" : "simple");
         setNombre("");
         setFoto(null);
         setCodigo("");
@@ -318,7 +337,7 @@ export function CrearProductoPanel({
             <Seccion icono={ProductoIcon} titulo="Componentes">
               {opcionesSimples.length > 0 ? (
                 <div id="campo-componentes">
-                  <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} />
+                  <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} inicial={componenteInicial} />
                 </div>
               ) : (
                 <p id="campo-componentes" role="alert" className="py-1 text-xs text-destructive">

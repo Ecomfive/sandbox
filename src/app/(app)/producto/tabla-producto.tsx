@@ -7,7 +7,7 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
-import { CrearProductoPanel } from "./crear-producto-panel";
+import { CrearProductoPanel, type CompuestoInicial } from "./crear-producto-panel";
 import { DEF_PRODUCTO, type FilaProducto, type ReferenciasTest } from "./def-producto";
 import { FichaProducto } from "./ficha-producto";
 import { FilaProductoLista } from "./fila-producto";
@@ -43,6 +43,7 @@ export function TablaProducto({
   opcionesSimples,
   codigoPais,
   abrirInicial = null,
+  compuestoInicial = null,
   puedeEscribir,
   puedeEliminar,
   referenciasTest,
@@ -52,6 +53,8 @@ export function TablaProducto({
   codigoPais: string;
   /** El producto que se abre al cargar (`?abrir=`, desde la ficha de una publicación de Dropi); si no existe, nada. */
   abrirInicial?: string | null;
+  /** Con `?nuevo=1&componente=&cantidad=`: la ficha «Nuevo producto» se abre sola, como compuesto con ese componente. */
+  compuestoInicial?: CompuestoInicial | null;
   puedeEscribir: boolean;
   /** Solo un administrador: elimina el producto de verdad (si nada depende de él). */
   puedeEliminar: boolean;
@@ -86,7 +89,7 @@ export function TablaProducto({
         claveFila={(p) => p.id}
         variante="filas"
         renderFila={(p, enOrden) => <FilaProductoLista p={p} alAbrir={() => setAbierto({ id: p.id, orden: enOrden.map((x) => x.id) })} />}
-        accionPrincipal={puedeEscribir ? <CrearProductoPanel opcionesSimples={opcionesSimples} /> : undefined}
+        accionPrincipal={puedeEscribir ? <CrearProductoPanel opcionesSimples={opcionesSimples} abrirConNuevo compuestoInicial={compuestoInicial} /> : undefined}
         vacio="Todavía no hay productos. Usa «Agregar» para crear el primero."
       />
       {enNavegador && (
