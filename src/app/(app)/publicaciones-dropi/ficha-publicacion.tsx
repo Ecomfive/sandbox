@@ -10,7 +10,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, ProductoIcon, ArchivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, ProductoIcon, ArchivarIcon } from "@/lib/nav-icons";
 import {
   UBICACIONES,
   numeroPublicacion,
@@ -18,11 +18,11 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
-import { actualizarPublicacion, archivarPublicacion } from "./actions";
+import { actualizarPublicacion, archivarPublicacion, republicarPublicacion } from "./actions";
 import { ActividadPublicacion } from "./actividad-publicacion";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
-import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
+import { ACCIONES, BODEGA_DROPI, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
@@ -210,6 +210,7 @@ function ContenidoFicha({
   const [pendiente, empezar] = useTransition();
   // Archivar va aparte: así, mientras termina de guardar, el botón no dice «Un momento...».
   const [archivando, setArchivando] = useState(false);
+  const [republicando, setRepublicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   // La ficha del producto vinculado, abierta encima de esta (no lleva al módulo Producto).
@@ -264,6 +265,22 @@ function ContenidoFicha({
     });
   }
 
+  // «Republicar» (pedido de Hernán, 23 oct 2026): nada se republica solo; el botón lo deja para «Aplicar en Dropi». Solo con ID de
+  // Dropi, sin archivar y de nuestra bodega (lo de la B280 es de Dropi).
+  const puedeRepublicar = conectado && !p.archivada && p.bodega?.id !== BODEGA_DROPI;
+  const republicacionPendiente = p.cambioDropi?.tipo === "republicar" && p.cambioDropi.estado !== "aplicado";
+  function republicar() {
+    if (!confirm(`Se va a crear en Dropi una publicación nueva igual a esta (datos, fotos y stock) y la del ID ${p.dropiId} queda archivada y sin stock. En el sistema se crea la nueva con el mismo producto vinculado y esta se archiva. Se hace al pulsar «Aplicar en Dropi» con Dropi abierto. ¿Seguir?`)) return;
+    setError(null);
+    setRepublicando(true);
+    empezar(async () => {
+      const r = await republicarPublicacion(p.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      setRepublicando(false);
+      if (r.error) setError(r.error);
+      else mostrarToast(r.detalle ?? "Republicación pendiente");
+    });
+  }
+
   return (
     <Ventana
       abierto
@@ -310,6 +327,11 @@ function ContenidoFicha({
                     Cancelar
                   </button>
                 </>
+              )}
+              {!sinGuardar && puedeArchivar && puedeRepublicar && (
+                <BotonAccion icono={ActualizarIcon} disabled={pendiente || republicacionPendiente} onClick={republicar}>
+                  {republicando ? "Un momento..." : republicacionPendiente ? "Republicación pendiente" : "Republicar"}
+                </BotonAccion>
               )}
               {!sinGuardar && puedeArchivar && (
                 <BotonAccion icono={ArchivarIcon} disabled={pendiente} onClick={archivar}>
