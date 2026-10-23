@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { requireModulo } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { getPaisActual } from "@/lib/pais";
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { BarraAplicarDropi } from "./barra-aplicar-dropi";
@@ -52,6 +53,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         nombrePais={pais.nombre}
         puedeEscribir={puedeEscribir}
         puedeArchivar={puedeEscribir}
+        esAdmin={esAdministrador(usuario)}
         corteVentas={datos.corteVentas}
         reglas={datos.reglas.reglas}
         decisionesDisponibles={datos.reglas.disponible}

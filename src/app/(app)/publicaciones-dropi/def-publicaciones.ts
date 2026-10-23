@@ -79,7 +79,6 @@ export interface FilaPublicacion {
   /** La próxima revisión ya pasó (o nunca se revisó) y no está archivada. */
   revisionVencida: boolean;
   fotoUrl: string | null;
-  notas: string;
   responsableId: string | null;
   /** Los nombres de las publicaciones relacionadas. */
   relacionados: string[];

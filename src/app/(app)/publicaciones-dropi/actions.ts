@@ -60,7 +60,7 @@ function leerDatos(f: FormData): Datos | { error: string } {
     // producto): no van, así guardar la ficha no borra lo que quedó en la base.
     // «Fecha de publicación» ya no se anota (21 oct 2026): sale de Dropi (la primera venta). Al crear una se pone la de hoy.
     // «Último cambio de precio» ya no se anota (21 oct 2026): lo detecta la lectura del catálogo de Dropi.
-    notas: texto(f, "notas", 5000) || null,
+    // Las «Notas» salieron de la ficha (23 oct 2026): lo que había pasó a la Actividad (migración 0146). La columna se conserva sin tocarla.
     responsable_id: UUID.test(resp) ? resp : null,
   };
 }
