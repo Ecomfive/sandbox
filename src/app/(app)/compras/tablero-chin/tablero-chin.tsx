@@ -3,31 +3,24 @@
 import { useEffect, useState } from "react";
 import { PortalChin, type DatosPortalChin } from "@/app/proveedor/portal-chin";
 import { IdiomaProveedor } from "@/components/proveedor/idioma-contexto";
-import type {
-  AvisoVista,
-  FilaPlazo,
-} from "@/components/proveedor/pagos-proveedor";
 import { Pestanas, botonNormal } from "@/components/proveedor/piezas-proveedor";
 import { Ventana } from "@/components/ui/ventana";
-import type {
-  CuotaPorPagar,
-  ResumenPagos,
-} from "@/lib/proveedor/resumen-pagos";
+import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
+import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 import { CuentaProveedor, type CuentaPortal } from "./cuenta-proveedor";
 import { PagosEcomfive } from "./pagos-ecomfive";
 
 type Vista = "tablero" | "pagos";
 
 /**
- * Compras › Tablero de Chin: su portal tal como lo ve él (en español y solo para ver) y «Pagos a Chin» (avisar un pago, lo que falta
- * pagar y el cumplimiento). Un administrador ve además «Cuenta de Chin», que se abre en una ventana.
+ * Compras › Tablero de Chin: su portal tal como lo ve él (en español y solo para ver) y «Pagos a Chin» (el cumplimiento y su Registro
+ * de pagos, solo para ver). Un administrador ve además «Cuenta de Chin», que se abre en una ventana.
  */
 export function TableroChin({
   proveedor,
   tablero,
   pagos,
   traducciones,
-  puedeEscribir,
   cuentaPortal,
   vistaInicial,
 }: {
@@ -36,12 +29,11 @@ export function TableroChin({
   /** null si la persona no ve los montos de Compras o falta la migración 0127. */
   pagos: {
     resumen: ResumenPagos;
-    porPagar: CuotaPorPagar[];
-    avisos: AvisoVista[];
-    plazos: FilaPlazo[];
+    /** Cuotas vencidas (el número de la pestaña). */
+    vencidas: number;
+    filas: FilaRegistro[];
   } | null;
   traducciones: Record<string, string>;
-  puedeEscribir: boolean;
   /** Solo para un administrador: la cuenta con la que el proveedor entra a su portal. */
   cuentaPortal: { cuenta: CuentaPortal | null; entrada: string } | null;
   vistaInicial: Vista;
@@ -58,10 +50,7 @@ export function TableroChin({
     window.history.replaceState(window.history.state, "", url);
   }, [vista]);
 
-  const vencidas = pagos
-    ? pagos.porPagar.filter((c) => !c.avisada && c.estado.tono === "peligro")
-        .length
-    : 0;
+  const vencidas = pagos?.vencidas ?? 0;
 
   return (
     <IdiomaProveedor idioma="es" traducciones={traducciones}>
@@ -103,14 +92,7 @@ export function TableroChin({
         </div>
 
         {vista === "pagos" && pagos ? (
-          <PagosEcomfive
-            nombre={nombre}
-            resumen={pagos.resumen}
-            porPagar={pagos.porPagar}
-            avisos={pagos.avisos}
-            plazos={pagos.plazos}
-            puedeEscribir={puedeEscribir}
-          />
+          <PagosEcomfive nombre={nombre} resumen={pagos.resumen} filas={pagos.filas} />
         ) : (
           <PortalChin {...tablero} idioma="es" soloLectura />
         )}

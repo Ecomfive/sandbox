@@ -6,12 +6,11 @@ import { puedeVerPais } from "@/lib/paises-permitidos";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { cargarEspejo } from "@/lib/proveedor/datos";
 import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
-import { hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { traducirTextos } from "@/lib/proveedor/traducir";
 import { cargarTareasChin } from "@/lib/proveedor/tareas-datos";
-import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
+import { cargarRegistro } from "@/lib/proveedor/registro-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { campoOculto, restriccionesDe } from "../permisos-compras";
 import type { CuentaPortal } from "./cuenta-proveedor";
@@ -68,18 +67,18 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   const porRuta = new Map(firmadas.map((f) => [f.path, f.signedUrl]));
   for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
 
+  // El Registro de pagos de Chin, solo de los países que la persona ve.
   const pagos =
     !estado || "error" in estado
       ? null
       : {
           resumen: estado.resumen,
-          porPagar: estado.porPagar,
-          avisos: await avisosParaVista(supabase, estado.avisos.filter((a) => a.cuotas.every((c) => pedidos.some((p) => p.id === c.pedidoId)))),
-          plazos: filasPlazos(estado.envios.filter((e) => !e.pedidoId || pedidos.some((p) => p.id === e.pedidoId)), hoyPanama()),
+          vencidas: estado.porPagar.filter((c) => c.estado.tono === "peligro").length,
+          filas: (await cargarRegistro(supabase, espejo.proveedor.id, pedidos, estado)).filter((f) => puedeVerPais(usuario.paisesPermitidos, f.paisCodigo)),
         };
 
-  // Lo que escribe Chin (comentarios de cotización, notas al confirmar un pago), traducido al español.
-  const traducciones = await traducirTextos(supabase, [...activos.map((p) => p.comentarioProveedor), ...(pagos ? pagos.avisos.map((a) => a.nota) : [])], "es");
+  // Lo que escribe Chin (comentarios de cotización), traducido al español.
+  const traducciones = await traducirTextos(supabase, activos.map((p) => p.comentarioProveedor), "es");
 
   // La cuenta del proveedor solo la ve (y la administra) un administrador.
   let cuentaPortal: { cuenta: CuentaPortal | null; entrada: string } | null = null;
@@ -99,7 +98,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
     plazos: espejo.plazos,
     fotosReales,
     avisos: (nuevasParaChin ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string })),
-    pagos: pagos ? { resumen: pagos.resumen, avisos: pagos.avisos.filter((a) => a.estado === "avisado"), plazos: pagos.plazos } : null,
+    pagos: pagos ? { resumen: pagos.resumen, filas: pagos.filas } : null,
     traducciones,
   };
 
@@ -112,7 +111,6 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
         tablero={tablero}
         pagos={pagos}
         traducciones={traducciones}
-        puedeEscribir={!usuario.modulosSoloLectura.includes("compras")}
         cuentaPortal={cuentaPortal}
         vistaInicial={ver === "pagos" && pagos ? "pagos" : "tablero"}
       />

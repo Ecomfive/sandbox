@@ -591,9 +591,13 @@ convenciones técnicas del código.
   en la campana de `proveedores.notificar_a`. La cuenta la crea un administrador en la pestaña «Cuenta de Chin» (`cuenta-actions.ts`, clave
   temporal con `crypto.randomInt`, una sola cuenta por proveedor).
   **Fase 4** (migración 0127): pagos. **Lo pagado vive en `proveedor_pagos`, nunca en los campos de pago de la compra** (en Compras
-  `fecha_pago_1` es la fecha en que vence; decidido con Hernán). Entra por avisos de Ecomfive (`proveedor_avisos_pago` + `_cuotas`,
-  `pagos-actions.ts`: los montos los recalcula el servidor con `estadoPagos`; comprobante imagen/PDF en `proveedor-portal/<prov>/avisos/`)
-  que el proveedor confirma (`confirmarAvisoPago`, primero marca confirmado para no duplicar), o por las hojas de pagos de Chin
+  `fecha_pago_1` es la fecha en que vence; decidido con Hernán). **Desde el 23 oct 2026 (migración 0141, decisión de Hernán) ya no hay
+  avisos de pago** (se quitaron `pagos-actions.ts`, `confirmarAvisoPago` y `vista-pagos.ts`; las tablas `proveedor_avisos_pago` quedan con
+  lo viejo): el comprobante va por privado y **el proveedor anota el pago** en su «Registro de pagos» (`pagos-manuales.ts`: `anotarPago`,
+  `quitarPago`, origen `proveedor`, `registrado_por`) y su llegada (`proveedor_pedidos.llegada_proveedor`, aparte de la de la compra:
+  cada uno marca la suya). Cada anotación: novedad, campana de `notificar_a` y auditoría de la compra. Compras se actualiza a mano. La
+  tabla (`components/proveedor/registro-pagos.tsx`, `filasRegistro` en `registro-pagos.ts` con prueba, datos en `registro-datos.ts`) tiene
+  las columnas de la hoja «payment record» y filtro por país; en el Tablero de Chin es solo lectura. También entra por las hojas de pagos de Chin
   (`scripts/importar-pagos-proveedor.ts`, se puede repetir; `proveedor_historial` con `pedido_id` si se emparejó —`emparejar`,
   `hoja-pagos.ts`— o historial suelto que cuenta para el cumplimiento). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
   UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto

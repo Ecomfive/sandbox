@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { IdiomaProveedor, Traducido, useIdioma } from "@/components/proveedor/idioma-contexto";
 import { Foto, Pestanas, Producto, TONO, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
-import type { AvisoVista, FilaPlazo } from "@/components/proveedor/pagos-proveedor";
+import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import { claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
@@ -36,15 +36,16 @@ export interface DatosPortalChin {
   fotosReales: Record<string, string>;
   avisos: AvisoEcomfive[];
   /** Pagos (fase 4); null si falta la migración 0127. */
-  pagos: { resumen: ResumenPagos; avisos: AvisoVista[]; plazos: FilaPlazo[] } | null;
+  pagos: { resumen: ResumenPagos; filas: FilaRegistro[] } | null;
   /** Lo escrito por personas, ya traducido al idioma de la pantalla (texto original → traducción). */
   traducciones: Record<string, string>;
 }
 
 /**
  * El portal de Chin: Por cotizar, Cotizado, En producción, Enviado y Pagos, en su idioma (chino simplificado por defecto). Cotizar (con
- * foto real y unidades por caja), marcar enviado y confirmar pagos cambian la compra en el sistema de Ecomfive. Con `soloLectura` es la
- * pestaña «Tablero de Chin» del Portal del proveedor de Ecomfive: lo mismo que él ve, en español y sin botones.
+ * foto real y unidades por caja) y marcar enviado cambian la compra en el sistema de Ecomfive; los pagos y la llegada que anota en
+ * Pagos (Registro de pagos) quedan en su registro y avisan a Ecomfive. Con `soloLectura` es «Lo que ve Chin» del Tablero de Chin de
+ * Ecomfive: lo mismo que él ve, en español y sin botones.
  */
 export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPortalChin & { idioma: Idioma; soloLectura?: boolean }) {
   return (
@@ -92,7 +93,7 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
           { clave: "cotizado" as const, titulo: t.tabCotizado, cuenta: de("cotizado").length },
           { clave: "produccion" as const, titulo: t.tabProduccion, cuenta: de("produccion").length },
           { clave: "enviado" as const, titulo: t.tabEnviado, cuenta: de("enviado").length },
-          ...(pagos ? [{ clave: "pagos" as const, titulo: t.tabPagos, cuenta: pagos.avisos.length, viva: true }] : []),
+          ...(pagos ? [{ clave: "pagos" as const, titulo: t.tabPagos, cuenta: pagos.filas.filter((f) => f.sinPagar > 0).length }] : []),
         ]}
         valor={tab}
         alCambiar={setTab}
@@ -102,7 +103,7 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
       {tab === "cotizado" && <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={soloLectura ? null : setCotizando} />}
       {tab === "produccion" && <EnProduccion pedidos={de("produccion")} hoy={hoy} diasAnticipo={cuenta.diasAnticipo} soloLectura={soloLectura} alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })} />}
       {tab === "enviado" && <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />}
-      {tab === "pagos" && pagos && <PagosChin resumen={pagos.resumen} avisos={pagos.avisos} plazos={pagos.plazos} soloLectura={soloLectura} />}
+      {tab === "pagos" && pagos && <PagosChin resumen={pagos.resumen} filas={pagos.filas} soloLectura={soloLectura} />}
 
       {cotizando && (
         <PanelCotizar

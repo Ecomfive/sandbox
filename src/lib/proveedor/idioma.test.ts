@@ -48,8 +48,8 @@ test("fechas, estados y errores en chino", () => {
   assert.equal(textoCuota({ clave: "vencido", n: 5 }, "es"), "Vencido 5 d");
   assert.equal(textoTransito({ clave: "atrasado", n: 3 }, "zh"), "延误 3 天");
   assert.equal(textoTransito({ clave: "en_plazo", n: 0 }, "es"), "En plazo");
-  assert.equal(errorEn("Ya lo confirmaste.", "zh"), "您已确认过。");
-  assert.equal(errorEn("Ya lo confirmaste.", "es"), "Ya lo confirmaste.");
+  assert.equal(errorEn("La fecha no puede ser futura.", "zh"), "日期不能是未来日期。");
+  assert.equal(errorEn("La fecha no puede ser futura.", "es"), "La fecha no puede ser futura.");
   assert.equal(errorEn("La fecha de envío no puede ser de hace más de 60 días.", "zh"), "发货日期不能早于 60 天前。");
   assert.equal(errorEn("Algo nuevo", "zh"), "Algo nuevo");
 });

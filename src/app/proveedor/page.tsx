@@ -1,9 +1,8 @@
 import { idiomaDeCuenta } from "@/lib/proveedor/cuenta";
 import { cargarEspejo } from "@/lib/proveedor/datos";
 import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
-import { hoyPanama } from "@/lib/proveedor/fechas";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
-import { avisosParaVista, filasPlazos } from "@/lib/proveedor/vista-pagos";
+import { cargarRegistro } from "@/lib/proveedor/registro-datos";
 import { requireProveedor } from "@/lib/proveedor/sesion";
 import { traducirTextos } from "@/lib/proveedor/traducir";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
@@ -55,14 +54,14 @@ export default async function PortalProveedorPage() {
   const nuevos: AvisoEcomfive[] = (avisos ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string }));
 
   const estado = await estadoPagos(supabase, espejo);
-  const pagos = "error" in estado ? null : { resumen: estado.resumen, avisos: await avisosParaVista(supabase, estado.avisos.filter((a) => a.estado === "avisado")), plazos: filasPlazos(estado.envios, hoyPanama()) };
+  const pagos = "error" in estado ? null : { resumen: estado.resumen, filas: await cargarRegistro(supabase, cuenta.proveedor.id, espejo.pedidos, estado) };
 
   // En chino: los nombres de los productos, las notas de Ecomfive y «Lo nuevo». En español: sus propios comentarios.
   const traducciones =
     idioma === "zh"
       ? await traducirTextos(
           supabase,
-          [...activos.flatMap((p) => [p.producto, p.notaParaProveedor]), ...nuevos.map((a) => a.texto), ...(pagos ? [...pagos.avisos.flatMap((a) => a.cuotas.map((c) => c.producto)), ...pagos.plazos.map((f) => f.producto)] : [])],
+          [...activos.flatMap((p) => [p.producto, p.notaParaProveedor]), ...nuevos.map((a) => a.texto), ...(pagos ? pagos.filas.map((f) => f.producto) : [])],
           "zh",
         )
       : await traducirTextos(supabase, activos.map((p) => p.comentarioProveedor), "es");
