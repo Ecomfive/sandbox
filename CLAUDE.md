@@ -482,7 +482,7 @@ convenciones técnicas del código.
   para comprobar que quedó en cero y sin privatización, y archiva (`archiveProduct`). **Dropi no archiva con órdenes pendientes**: entonces devuelve
   `ok: true, archivado: false`, el cambio sigue **pendiente** con el motivo y cada «Aplicar en Dropi» lo reintenta (solo repite el archivado: el
   stock ya está en cero); `guardarResultadosDropi` archiva la publicación del sistema **solo cuando Dropi confirma** que quedó archivada. La ficha trae el
-  botón «Apagar en Dropi» (`BotonApagarDropi`): lista la publicación y **todas las del mismo producto** (`grupoDe`: las que tienen su mismo nombre
+  botón «Apagar en Dropi» (`BotonApagarDropi`, con su propio ícono de encendido `ApagarIcon`; **cada fila de la lista lleva además el ícono `BotonApagarFila`, junto al de archivar, que abre la misma ventana**; `puedeApagar` decide cuándo): lista la publicación y **todas las del mismo producto** (`grupoDe`: las que tienen su mismo nombre
   sin el «P-XX»; desde un público, sus privadas, que vienen marcadas; desde una privada, el público y las otras, sin marcar), cada una con los pasos que
   se le harán en Dropi (sacar el stock, quitar la privatización si es privada, archivar), y la persona **elige** cuáles se apagan. **Qué hace el sistema al
   dejarlo pendiente:** una publicación con un apagado esperando (`FilaPublicacion.apagadoPendiente`, de `cargarCambiosDropi.apagando`) ya cuenta como

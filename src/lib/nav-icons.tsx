@@ -477,6 +477,16 @@ export function ArchivarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Apagar: el símbolo de encendido (un círculo abierto con una raya arriba), para «Apagar en Dropi»; distinto del de archivar. */
+export function ApagarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v8" />
+      <path d="M7.4 6.6a8 8 0 1 0 9.2 0" />
+    </Icon>
+  );
+}
+
 /** Marcador: vistas guardadas de una tabla. */
 export function VistasIcon(props: SVGProps<SVGSVGElement>) {
   return (

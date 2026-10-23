@@ -27,7 +27,7 @@ import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { InsigniaConectado } from "./insignia-conectado";
-import { BotonApagarDropi } from "./apagar-dropi";
+import { BotonApagarDropi, puedeApagar } from "./apagar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
@@ -341,7 +341,7 @@ function ContenidoFicha({
                 </BotonAccion>
               )}
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
-              {!sinGuardar && puedeArchivar && conectado && !p.duplicadaDe && p.enDropi !== "archivado" && p.bodega?.id !== BODEGA_DROPI && <BotonApagarDropi p={p} deshabilitado={pendiente} />}
+              {!sinGuardar && puedeArchivar && puedeApagar(p) && <BotonApagarDropi p={p} deshabilitado={pendiente} />}
               {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente && (
                 <BotonAccion icono={ArchivarIcon} disabled={pendiente} onClick={archivar}>
                   {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
