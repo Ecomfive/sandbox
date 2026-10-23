@@ -1,8 +1,7 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- foto de Storage */
 import { useEffect, useRef, useState, useTransition } from "react";
-import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
+import { BloqueCompetencia, FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
@@ -359,7 +358,7 @@ function ContenidoFicha({
         <fieldset disabled={!puedeEscribir} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-5">
           <Seccion icono={ProductoIcon} titulo="Producto">
             <div className="flex gap-4">
-              {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nombre} className="h-24 w-24 shrink-0 rounded-lg border border-border object-cover" /> : <span aria-hidden="true" className="h-24 w-24 shrink-0 rounded-lg border border-dashed border-border-control" />}
+              <FotoAmpliable url={p.fotoUrl} nombre={p.nombre} tam="h-24 w-24" dentroDeFieldset />
               <div className="grid min-w-0 flex-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1">
                   <span className={labelClassSm}>Nombre en Dropi</span>
