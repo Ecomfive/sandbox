@@ -589,7 +589,11 @@ convenciones técnicas del código.
   `rutaEsDelPedido`); enviar = etapa `tracking`, `fecha_envio` (hasta 60 días atrás, nunca futura) y su planificación
   (`cargarTiempos`, ahora en `src/lib/compras/tiempos-datos.ts`). Cada cambio: evento con origen `proveedor`, auditoría, novedad y aviso
   en la campana de `proveedores.notificar_a`. Las cuentas las crea un administrador con «Crear cuenta» del Tablero de Chin (`cuenta-actions.ts`,
-  clave temporal con `crypto.randomInt`; **varias cuentas por proveedor** desde el 23 oct 2026, una por persona).
+  clave temporal con `crypto.randomInt`; **varias cuentas por proveedor** desde el 23 oct 2026, una por persona). Crear la cuenta o
+  «Generar clave nueva» marca `app_metadata.clave_temporal = true` en su usuario (sin migración): mientras la tenga, `/proveedor` muestra
+  `ElegirClave` (`proveedor/cambiar-clave.tsx`, `tieneClaveTemporal` en `lib/proveedor/sesion.ts`) en vez del portal. La cuenta cambia
+  su clave con `cambiarClaveProveedor` (`proveedor/actions.ts`): comprueba la actual con `createAnonClient` (sin tocar la sesión de las
+  cookies), guarda la nueva con el cliente de servicio y quita la marca; también desde «Cambiar clave» de la cabecera del portal.
   **Fase 4** (migración 0127): pagos. **Lo pagado vive en `proveedor_pagos`, nunca en los campos de pago de la compra** (en Compras
   `fecha_pago_1` es la fecha en que vence; decidido con Hernán). **Desde el 23 oct 2026 (migración 0141, decisión de Hernán) ya no hay
   avisos de pago** (se quitaron `pagos-actions.ts`, `confirmarAvisoPago` y `vista-pagos.ts`; las tablas `proveedor_avisos_pago` quedan con

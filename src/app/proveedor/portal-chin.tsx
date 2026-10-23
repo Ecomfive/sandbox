@@ -19,6 +19,7 @@ import type { Idioma } from "@/lib/proveedor/textos";
 import { estadoTransito, textoPlazo, type Plazo } from "@/lib/proveedor/transito";
 import { supabase } from "@/lib/supabase/client";
 import { cambiarIdiomaProveedor, cotizarPedido, marcarEnviado, marcarVistoPorProveedor, prepararSubidaFotoReal } from "./actions";
+import { FormularioClave } from "./cambiar-clave";
 import { PagosChin } from "./pagos-chin";
 
 export interface AvisoEcomfive {
@@ -137,8 +138,9 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
             <h1 className="m-0 text-lg font-semibold">{t.marca}</h1>
             <p className="m-0 text-[13px] text-muted-foreground">{t.sesion(cuenta.nombre)}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <SelectorIdioma />
+            <CambiarClave />
             <form action={cerrarSesion}>
               <button type="submit" className={botonNormal}>
                 {t.salir}
@@ -149,6 +151,34 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
       </header>
       <main className="mx-auto flex w-full max-w-[1240px] flex-col gap-5 px-4 py-5">{cuerpo}</main>
     </div>
+  );
+}
+
+/** «Cambiar clave»: abre el formulario en una ventana; la sesión sigue abierta con la clave nueva. */
+function CambiarClave() {
+  const { t } = useIdioma();
+  const { mostrarToast } = useToast();
+  const [abierta, setAbierta] = useState(false);
+  return (
+    <>
+      <button type="button" className={botonNormal} onClick={() => setAbierta(true)}>
+        {t.cambiarClave}
+      </button>
+      {abierta && (
+        <Ventana abierto alCerrar={() => setAbierta(false)} ancho="sm" titulo={t.cambiarClave}>
+          <div className="p-4">
+            <FormularioClave
+              temporal={false}
+              alCancelar={() => setAbierta(false)}
+              alGuardar={() => {
+                setAbierta(false);
+                mostrarToast(t.claveCambiada);
+              }}
+            />
+          </div>
+        </Ventana>
+      )}
+    </>
   );
 }
 

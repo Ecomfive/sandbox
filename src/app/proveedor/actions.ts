@@ -3,10 +3,12 @@
 import { randomUUID } from "node:crypto";
 import { aplicarCotizacion, aplicarEnvio } from "@/lib/proveedor/aplicar";
 import { anotarLlegada, anotarPago, quitarPago } from "@/lib/proveedor/pagos-manuales";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { getUsuarioSesion } from "@/lib/auth";
 import { cuentaProveedorActual } from "@/lib/proveedor/sesion";
 import { BUCKET_PROVEEDOR, rutaFotoReal } from "@/lib/proveedor/rutas";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createAnonClient, createServiceClient } from "@/lib/supabase/server";
 
 // Acciones del portal del proveedor. Cada una empieza con la cuenta de la sesión (nunca con un proveedor que mande el navegador) y
 // devuelve el error como valor: en producción, Next.js oculta el mensaje de una excepción.
@@ -89,4 +91,30 @@ export async function cambiarIdiomaProveedor(idioma: string): Promise<{ error?: 
   if (idioma !== "zh" && idioma !== "es") return { error: "Idioma no válido." };
   const { error } = await createServiceClient().from("proveedor_usuarios").update({ idioma }).eq("id", cuenta.cuentaId);
   return error ? { error: "No se pudo cambiar el idioma." } : {};
+}
+
+/**
+ * La cuenta cambia su clave: pide la actual (o la temporal que le dio Ecomfive) y la nueva dos veces. La actual se comprueba con un
+ * cliente aparte, sin tocar la sesión de las cookies; la nueva se guarda y se quita la marca de clave temporal.
+ */
+export async function cambiarClaveProveedor(actual: string, nueva: string, repetida: string): Promise<{ error?: string }> {
+  const cuenta = await cuentaProveedorActual();
+  const usuario = await getUsuarioSesion();
+  if (!cuenta || !usuario?.email || usuario.id !== cuenta.usuarioId) return SIN_SESION;
+  const claveActual = String(actual ?? "");
+  const claveNueva = String(nueva ?? "");
+  if (claveNueva.length < 8) return { error: "La clave nueva debe tener al menos 8 caracteres." };
+  if (claveNueva.length > 72) return { error: "La clave nueva es muy larga." };
+  if (claveNueva !== String(repetida ?? "")) return { error: "Las claves nuevas no coinciden." };
+  if (claveNueva === claveActual) return { error: "La clave nueva debe ser distinta de la actual." };
+
+  const comprobar = createAnonClient();
+  const { error: errorActual } = await comprobar.auth.signInWithPassword({ email: usuario.email, password: claveActual });
+  if (errorActual) return { error: "La clave actual no es correcta." };
+  await comprobar.auth.signOut({ scope: "local" });
+
+  const { error } = await createServiceClient().auth.admin.updateUserById(cuenta.usuarioId, { password: claveNueva, app_metadata: { clave_temporal: false } });
+  if (error) return { error: "No se pudo cambiar la clave." };
+  await registrarAuditoria({ accion: "cambiar_contrasena", entidad: "proveedor_usuarios", entidadId: cuenta.usuarioId, detalle: `${cuenta.nombre} (${cuenta.proveedor.nombre}) cambió su clave del portal` });
+  return {};
 }

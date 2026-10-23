@@ -13,6 +13,13 @@ export function createServiceClient() {
   });
 }
 
+/** Cliente sin sesión guardada (llave pública): para comprobar una clave sin tocar la sesión de las cookies. */
+export function createAnonClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 /** Cliente con la sesión de auth del usuario actual (cookies), para login/logout y saber quién es. */
 export async function createSessionClient() {
   const cookieStore = await cookies();
