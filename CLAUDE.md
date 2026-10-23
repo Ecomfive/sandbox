@@ -469,7 +469,7 @@ convenciones técnicas del código.
   (`cambios-dropi.ts`) junta un cambio nuevo con el pendiente de la misma publicación (nombre + precio en un solo paso). Aceptar «Subir
   precio» o «Bajar precio frente a la competencia» (`decidirRecomendacion`) y cambiar el precio en la ficha (`actualizarPublicacion`)
   guardan el precio y lo encolan (`enviarPrecioADropi`). `armarGuardadoProducto` y `ARMAR_JS` cambian solo lo que trae el cambio,
-  rechazan un sugerido menor que el precio y el favorito comprueba precio y sugerido después de guardar. Al aplicarse un precio,
+  si el precio nuevo pasa al sugerido de Dropi (y no se pidió otro sugerido) suben el sugerido con la misma proporción que tenía sobre el precio anterior (igual al precio si eran iguales: Dropi no admite un sugerido menor), y el favorito comprueba precio y sugerido después de guardar. Al aplicarse un precio,
   `guardarResultadosDropi` deja hechas las tareas de precio abiertas de esa publicación. La lectura diaria no pisa un precio
   pendiente (`precioPendiente`). «Ajustar el precio sugerido» todavía no se encola solo (no hay un valor sugerido calculado).
   **Si se elimina algo en Dropi, no se pierde historia** (22 oct 2026): en el sistema una publicación se **archiva, no se borra**
