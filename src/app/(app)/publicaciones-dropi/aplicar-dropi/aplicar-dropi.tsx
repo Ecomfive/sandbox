@@ -6,7 +6,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { origenDropi } from "@/lib/publicaciones/marcador-aplicar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
-type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number };
+type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean };
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "sin_dropi"; mensaje: string }
@@ -71,7 +71,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     if (!dropi || !origen || dropi.closed) return void setEstado({ tipo: "sin_dropi", mensaje: "La pestaña de Dropi se cerró: vuelve a pulsar «Aplicar en Dropi» con Dropi abierto." });
     enviados.current = { cambios, pospuestos };
     setEstado({ tipo: "aplicando", cambios, hechos: 0 });
-    dropi.postMessage({ tipo: "pendientes", cambios: cambios.map(({ id, tipo, nuevo, producto, nombre, guia, precio, sugerido }) => ({ id, tipo, nuevo, producto, nombre, guia, precio, sugerido })) }, origen);
+    dropi.postMessage({ tipo: "pendientes", cambios: cambios.map(({ id, tipo, quitarPrivados, nuevo, producto, nombre, guia, precio, sugerido }) => ({ id, tipo, quitarPrivados, nuevo, producto, nombre, guia, precio, sugerido })) }, origen);
   }
 
   const cerrar = (
@@ -106,7 +106,9 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
       </div>
     );
   const porId = new Map(estado.resultados.map((r) => [r.id, r]));
-  const aplicados = estado.resultados.filter((r) => r.ok).length;
+  // Un apagado que quedó sin stock pero sin archivar no está terminado: sigue pendiente (se reintenta en el próximo «Aplicar en Dropi»).
+  const sinArchivar = (c: CambioParaDropi, r: Resultado | undefined) => c.tipo === "apagar" && !!r?.ok && !r.archivado;
+  const aplicados = estado.cambios.filter((c) => porId.get(c.id)?.ok && !sinArchivar(c, porId.get(c.id))).length;
   return (
     <div className="flex flex-col gap-3">
       <div role="status" className={`${caja} flex flex-col gap-1`}>
@@ -123,8 +125,18 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
             return (
               <li key={c.id} className="flex flex-col gap-0.5 px-4 py-2.5">
                 <DetalleCambio c={c} />
-                <span className={`text-xs font-medium ${r?.ok ? "text-success" : "text-destructive"}`}>
-                  {r ? (r.ok ? (c.tipo === "republicar" ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó archivada y sin stock` : "Cambiado en Dropi") : `No se pudo: ${r.error ?? "sin detalle"}`) : "Sin respuesta de Dropi"}
+                <span className={`text-xs font-medium ${r?.ok && !sinArchivar(c, r) ? "text-success" : "text-destructive"}`}>
+                  {r
+                    ? r.ok
+                      ? c.tipo === "republicar"
+                        ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó archivada y sin stock`
+                        : c.tipo === "apagar"
+                          ? r.archivado
+                            ? "Apagado y archivado en Dropi"
+                            : `Sin stock en Dropi, falta archivar: ${r.error ?? "Dropi no lo dejó"}`
+                          : "Cambiado en Dropi"
+                      : `No se pudo: ${r.error ?? "sin detalle"}`
+                    : "Sin respuesta de Dropi"}
                 </span>
               </li>
             );
@@ -138,6 +150,14 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
 
 /** Lo que cambia un cambio pendiente: el nombre o la publicación, el precio y el ID de Dropi. */
 function DetalleCambio({ c }: { c: CambioParaDropi }) {
+  if (c.tipo === "apagar")
+    return (
+      <>
+        <span className="font-medium">Apagar: {c.publicacion}</span>
+        <span className="text-xs">Sacar todo el stock (concepto «stock»){c.quitarPrivados ? ", quitar la privatización" : ""} y archivar. Si Dropi no deja archivar (órdenes pendientes), se reintenta en el próximo «Aplicar en Dropi».</span>
+        <span className="text-xs text-muted-foreground">ID {c.producto}</span>
+      </>
+    );
   if (c.tipo === "republicar")
     return (
       <>

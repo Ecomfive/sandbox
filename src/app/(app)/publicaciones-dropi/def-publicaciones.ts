@@ -104,6 +104,8 @@ export interface FilaPublicacion {
   archivada: boolean;
   /** Si es un duplicado de otra publicación con el mismo ID de Dropi (migración 0147): «PUB-0309 · nombre» de la que vale. */
   duplicadaDe: string | null;
+  /** Sus publicaciones privadas («P-MA …»), para apagarlas con ella (`privadasDe`); vacío en una privada. */
+  privadas: { id: string; nombre: string; dropiId: string; archivada: boolean }[];
   /** Público o privado según Dropi; sin datos de Dropi, lo que estaba marcado. */
   tipoDropi: "publico" | "privado" | null;
   /** Lo que necesita (calculado): vacío = al día. */

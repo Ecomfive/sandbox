@@ -9,6 +9,7 @@ import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
+import { privadasDe } from "@/lib/publicaciones/apagar-dropi";
 import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
 import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
@@ -329,11 +330,16 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       ...revisionDe(d),
       ...automatico(d, ventas, competidores, hoy, r, prov, stockActual),
       duplicadaDe: null,
+      privadas: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.
     if (!original) return fila;
     return { ...fila, archivada: true, acciones: [], duplicadaDe: `${numeroPublicacion(numeroPorId.get(original))} · ${nombrePorId.get(original) ?? "otra publicación"}` };
   });
+
+  // Las privadas de cada pública («P-MA …»), para apagarlas juntas.
+  const paraApagar = filas.map((f) => ({ id: f.id, nombre: f.nombre, tipo: f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }));
+  for (const f of filas) f.privadas = privadasDe({ id: f.id, nombre: f.nombre, tipo: f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }, paraApagar).map((x) => ({ id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada }));
 
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.
   const publicados = new Set(filas.filter((f) => !f.archivada && f.sku).map((f) => f.sku!.id));
