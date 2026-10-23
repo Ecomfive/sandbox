@@ -183,3 +183,26 @@ export function emparejar(filas: { fila: FilaHoja; pais: string }[], pedidos: Pe
   }
   return resultado;
 }
+
+/** Etapas del portal en que la compra todavía sigue lo que pone el proveedor; lo que ya llegó (o se descartó) no se toca. */
+const ETAPAS_ABIERTAS = new Set(["por_cotizar", "cotizado", "produccion", "enviado"]);
+
+/**
+ * Las unidades que manda el proveedor (23 oct 2026, regla de Hernán): si la hoja de Chin trae otra cantidad que la compra (pediste 1,000
+ * y el paquete que él vende trae 960), la compra se cambia a la de Chin. Solo compras abiertas emparejadas con su fila.
+ */
+export function unidadesDelProveedor(
+  filas: { fila: FilaHoja }[],
+  pareja: Map<number, string>,
+  pedidos: (PedidoParaEmparejar & { etapa: string })[],
+): { pedidoId: string; antes: number | null; ahora: number }[] {
+  const porId = new Map(pedidos.map((p) => [p.id, p]));
+  const cambios: { pedidoId: string; antes: number | null; ahora: number }[] = [];
+  for (const [i, id] of pareja) {
+    const p = porId.get(id);
+    const ahora = filas[i]?.fila.unidades;
+    if (!p || !ETAPAS_ABIERTAS.has(p.etapa) || ahora == null || ahora <= 0 || !Number.isInteger(ahora) || p.unidades === ahora) continue;
+    cambios.push({ pedidoId: id, antes: p.unidades, ahora });
+  }
+  return cambios;
+}

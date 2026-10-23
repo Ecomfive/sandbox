@@ -6,7 +6,7 @@ import { cuotasDe, cumplimiento, estadoCuota, saldoTrasLlegada } from "./cuotas"
 import { ETAPA_PORTAL_DE_COMPRA, viaPortal } from "./espejo";
 import { sumarDias } from "./fechas";
 import { puedeAvisarPago, puedeConfirmarPago, puedePasar } from "./permisos-proveedor";
-import { emparejar, leerHojaPagos } from "./hoja-pagos";
+import { emparejar, leerHojaPagos, unidadesDelProveedor } from "./hoja-pagos";
 import { rutaEsDelPedido, rutaFotoReal } from "./rutas";
 import { estadoTransito, textoPlazo } from "./transito";
 
@@ -158,4 +158,13 @@ test("cada lado solo da sus pasos", () => {
   assert.ok(!puedePasar("proveedor", "enviado", "llegado"));
   assert.ok(puedeAvisarPago("ecomfive") && !puedeAvisarPago("proveedor"));
   assert.ok(puedeConfirmarPago("proveedor") && !puedeConfirmarPago("ecomfive"));
+});
+
+test("unidades del proveedor: la compra abierta toma la cantidad de la hoja de Chin; lo que llegó no se toca", () => {
+  const fila = (unidades: number | null) => ({ fila: { producto: "Magnesium", unidades, monto: 1850, anticipo: 925, fechaEnvio: "2026-10-23", fechaLlegada: null, pagosAnticipo: [], pagosSaldo: [] } });
+  const pedido = (id: string, etapa: string, unidades: number | null) => ({ id, producto: "Magnesium", paisCodigo: "MX", unidades, montoTotal: 1850, fechaEnvio: "2026-10-23", etapa });
+  const filas = [fila(960), fila(960), fila(1000), fila(null)];
+  const pareja = new Map([[0, "a"], [1, "b"], [2, "c"], [3, "d"]]);
+  const cambios = unidadesDelProveedor(filas, pareja, [pedido("a", "enviado", 1000), pedido("b", "llegado", 1000), pedido("c", "produccion", 1000), pedido("d", "cotizado", 1000)]);
+  assert.deepEqual(cambios, [{ pedidoId: "a", antes: 1000, ahora: 960 }]);
 });
