@@ -498,6 +498,14 @@ convenciones técnicas del código.
   las listas y libera el índice único); en el sistema vuelven a verse como antes porque el apagado pendiente era lo único que las mostraba apagadas. **Solo
   con `intentos = 0`**: uno que ya se intentó en Dropi puede tener el stock en cero y no se deshace desde aquí (hay que reactivarlo, pendiente de definir).
   Queda en la Actividad («Deshizo el apagado antes de aplicarlo en Dropi»). Antes de eso, en la ventana de «Aplicar en Dropi» también se puede «Posponer».
+  **Lista de cambios pendientes con «Deshacer»** (23 oct 2026, pedido de Hernán; migración 0149 `nombre_antes`): el texto «N cambios esperan para Dropi» de
+  la barra de arriba de la lista es pulsable y abre `VentanaCambiosPendientes` (`pendientes-dropi.tsx`; lee `listarCambiosPendientes`, `pendientes-actions.ts`):
+  todos los cambios de la cola (nombre, precio, apagar, republicar; pendientes y con error), cada uno con lo que lleva, qué pasa en el sistema al deshacerlo y
+  «Deshacer» (`deshacerCambioPendiente`), que lo pasa a `reemplazado` y **deja el sistema como estaba**: el nombre vuelve a `nombre_antes` (el de la primera vez que se
+  pidió el cambio; `encolarCambio` lo guarda), el precio vuelve a `precio_antes`, un apagado deja de verse apagado. El nombre o el precio solo se devuelven
+  si el sistema todavía tiene el valor del cambio (si alguien lo volvió a tocar no se pisa); un cambio anterior a la 0149 se quita de la cola pero el nombre
+  se queda. Un apagado o una republicación que ya se intentó en Dropi (`intentos > 0`) **no** se deshace desde aquí. Una tarea de precio ya aceptada
+  no se reabre al deshacer el precio. Queda en la Actividad (`dropi_cambio_deshecho`, `dropi_apagar_cancelado`, `dropi_republicar_cancelado`).
   **Sin «Notas» en la ficha; compras solo para administradores** (23 oct 2026, pedido de Hernán): el campo «Notas» se quitó (la columna
   `notas` se conserva sin leerla ni escribirla; la migración 0146 pasó lo escrito a un comentario «Notas anteriores» de la Actividad, y lo nuevo
   va como comentario). La ficha trae el bloque «Compras» (`ComprasProducto` del producto vinculado) **solo para un administrador**

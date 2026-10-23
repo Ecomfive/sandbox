@@ -385,7 +385,7 @@ export async function elegirTituloIA(
     antes: { "Nombre en Dropi": pub.nombre },
     despues: { "Nombre en Dropi": limpio },
   });
-  const dropi = await enviarADropi(supabase, pub, limpio, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  const dropi = await enviarADropi(supabase, pub, limpio, { id: usuario.id, nombre: usuario.nombre || usuario.email }, pub.nombre);
   revalidatePath("/publicaciones-dropi");
   const c = chequearTitulo(limpio, categoria, contexto.reglas, nombreProducto);
   return { chequeos: c.chequeos, cumple: c.cumple, dropi };
