@@ -19,7 +19,9 @@ export function FormularioClave({ temporal, alGuardar, alCancelar }: { temporal:
   const [guardando, setGuardando] = useState(false);
 
   return (
+    // `method="post"`: si se envía antes de que cargue la página, las claves no quedan en la dirección.
     <form
+      method="post"
       className="flex flex-col gap-4"
       onSubmit={async (e) => {
         e.preventDefault();
