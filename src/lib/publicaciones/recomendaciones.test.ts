@@ -35,6 +35,7 @@ test("el cinturón lumbar recibe el combo x2 y subir precio", () => {
   assert.match(combo.titulo, /Crear combo x2 a \$8\.99/);
   const subir = recs.find((r) => r.tipo === "subir_precio")!;
   assert.equal(subir.datos.precioSugerido, 5.39);
+  assert.equal(subir.titulo, "Subir el precio de $4.99 a $5.39 (+$0.40)");
 });
 
 test("con margen sano, archivado o sin costo no recomienda nada", () => {
@@ -69,6 +70,7 @@ test("bajar frente a la competencia solo si el margen no queda crítico", () => 
   const sano = { ...cinturon, precio: 9.99, margen: margenA(9.99, 2.26, 1.5) };
   const r = recomendar({ ...sano, competidorMasBarato: { proveedor: "OTRO", precio: 8.5 } }, REGLAS_DEFECTO).find((x) => x.tipo === "igualar_precio")!;
   assert.equal(r.datos.precioSugerido, 8.49);
+  assert.equal(r.titulo, "Bajar el precio de $9.99 a $8.49 (−$1.50)");
   assert.equal(recomendar({ ...sano, competidorMasBarato: { proveedor: "OTRO", precio: 4.2 } }, REGLAS_DEFECTO).length, 0);
 });
 
