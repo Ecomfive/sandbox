@@ -29,7 +29,16 @@ export interface AvisoEcomfive {
   creadoEn: string;
 }
 
-type Tab = "cotizar" | "cotizado" | "produccion" | "enviado" | "pagos";
+export type TabPortal = "cotizar" | "cotizado" | "produccion" | "enviado" | "pagos";
+type Tab = TabPortal;
+
+/** Lo que el Tablero de Shen Zhen de Ecomfive le cambia al portal: su propia vista de pagos (editable) y la pestaña con que abre. */
+interface DesdeEcomfive {
+  /** En la pestaña «Pagos» va esto (el Registro de pagos que edita Ecomfive) en vez de la vista de Shen Zhen. */
+  pagosEcomfive?: ReactNode;
+  tabInicial?: TabPortal;
+  alCambiarTab?: (tab: TabPortal) => void;
+}
 
 export interface DatosPortalChin {
   cuenta: { nombre: string; proveedor: string; diasAnticipo: number };
@@ -47,9 +56,9 @@ export interface DatosPortalChin {
  * El portal de Shen Zhen: Por cotizar, Cotizado, En producción, Enviado y Pagos, en su idioma (chino simplificado por defecto). Cotizar (con
  * foto real y unidades por caja) y marcar enviado cambian la compra en el sistema de Ecomfive; los pagos y la llegada que anota en
  * Pagos (Registro de pagos) quedan en su registro y avisan a Ecomfive. Con `soloLectura` es «Lo que ve Shen Zhen» del Tablero de Shen Zhen de
- * Ecomfive: lo mismo que él ve, en español y sin botones.
+ * Ecomfive: lo mismo que él ve, en español y sin botones (su pestaña «Pagos» trae el Registro de pagos que edita Ecomfive, `pagosEcomfive`).
  */
-export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPortalChin & { idioma: Idioma; soloLectura?: boolean }) {
+export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPortalChin & DesdeEcomfive & { idioma: Idioma; soloLectura?: boolean }) {
   return (
     <IdiomaProveedor idioma={idioma} traducciones={datos.traducciones}>
       <PortalChinContenido {...datos} soloLectura={soloLectura} />
@@ -57,11 +66,15 @@ export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPorta
   );
 }
 
-function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pagos, soloLectura }: DatosPortalChin & { soloLectura: boolean }) {
+function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pagos, soloLectura, pagosEcomfive, tabInicial, alCambiarTab }: DatosPortalChin & DesdeEcomfive & { soloLectura: boolean }) {
   const { t, tr, fecha, idioma } = useIdioma();
   const [lista, setLista] = useState(pedidos);
   const [fotos, setFotos] = useState(fotosReales);
-  const [tab, setTab] = useState<Tab>("cotizar");
+  const [tab, setTabEstado] = useState<Tab>(tabInicial === "pagos" && !pagos ? "cotizar" : (tabInicial ?? "cotizar"));
+  const setTab = (t: Tab) => {
+    setTabEstado(t);
+    alCambiarTab?.(t);
+  };
   const [cotizando, setCotizando] = useState<PedidoPortal | null>(null);
   const hoy = useMemo(() => hoyPanama(), []);
 
@@ -105,7 +118,7 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
       {tab === "cotizado" && <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={soloLectura ? null : setCotizando} />}
       {tab === "produccion" && <EnProduccion pedidos={de("produccion")} hoy={hoy} diasAnticipo={cuenta.diasAnticipo} soloLectura={soloLectura} alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })} />}
       {tab === "enviado" && <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />}
-      {tab === "pagos" && pagos && <PagosChin resumen={pagos.resumen} filas={pagos.filas} cambios={pagos.cambios} soloLectura={soloLectura} />}
+      {tab === "pagos" && pagos && (soloLectura && pagosEcomfive ? pagosEcomfive : <PagosChin resumen={pagos.resumen} filas={pagos.filas} cambios={pagos.cambios} soloLectura={soloLectura} />)}
 
       {cotizando && (
         <PanelCotizar
