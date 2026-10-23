@@ -35,10 +35,17 @@ const num = (v: unknown) => (v === null || v === undefined || v === "" ? v : Num
 export function armarGuardadoProducto(
   producto: Obj,
   bodegasProveedor: Obj[],
-  cambio: { nombre: string; nombreGuia: string | null },
+  /** Lo que se cambia: el nombre (y el de la guía), el precio y el precio sugerido. `null` o sin poner = se deja como está. */
+  cambio: { nombre: string | null; nombreGuia: string | null; precio?: number | null; precioSugerido?: number | null },
 ): { cuerpo: Obj } | { error: string } {
   if (producto.type !== "SIMPLE") return { error: "Tiene variaciones: cámbialo a mano en Dropi." };
-  if (!cambio.nombre.trim() || cambio.nombre.length > MAX_NOMBRE_DROPI) return { error: `El nombre debe tener de 1 a ${MAX_NOMBRE_DROPI} caracteres.` };
+  if (cambio.nombre !== null && (!cambio.nombre.trim() || cambio.nombre.length > MAX_NOMBRE_DROPI)) return { error: `El nombre debe tener de 1 a ${MAX_NOMBRE_DROPI} caracteres.` };
+  const precio = cambio.precio ?? null;
+  const sugerido = cambio.precioSugerido ?? null;
+  if ((precio !== null && !(precio > 0)) || (sugerido !== null && !(sugerido > 0))) return { error: "El precio debe ser mayor que cero." };
+  const precioFinal = precio ?? Number(producto.sale_price);
+  const sugeridoFinal = sugerido ?? Number(producto.suggested_price);
+  if ((precio !== null || sugerido !== null) && sugeridoFinal > 0 && sugeridoFinal < precioFinal) return { error: `El precio sugerido ($${sugeridoFinal.toFixed(2)}) quedaría menor que el precio ($${precioFinal.toFixed(2)}).` };
   if (cambio.nombreGuia !== null && cambio.nombreGuia.length > MAX_NOMBRE_DROPI) return { error: `El nombre de la guía admite ${MAX_NOMBRE_DROPI} caracteres.` };
   const bodegas: Obj[] = (Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : []).map((w) => {
     const b = (w.warehouse ?? {}) as Obj;
@@ -50,12 +57,12 @@ export function armarGuardadoProducto(
   return {
     cuerpo: {
       id: producto.id,
-      name: cambio.nombre,
+      name: cambio.nombre ?? producto.name,
       description: producto.description,
       dropi_app_description: producto.dropi_app_description,
       type: producto.type,
-      sale_price: num(producto.sale_price),
-      suggested_price: num(producto.suggested_price),
+      sale_price: precio ?? num(producto.sale_price),
+      suggested_price: sugerido ?? num(producto.suggested_price),
       user_id: producto.user_id,
       privated_product: producto.privated_product,
       active: producto.active,

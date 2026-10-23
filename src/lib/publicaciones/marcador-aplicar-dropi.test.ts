@@ -3,7 +3,8 @@ import test from "node:test";
 import { armarGuardadoProducto } from "./dropi-guardado";
 import { ARMAR_JS, marcadorAplicarDropi, origenDropi } from "./marcador-aplicar-dropi";
 
-type Armar = (o: object, bp: object[], c: { nombre: string; nombreGuia: string | null }) => object;
+type Cambio = { nombre: string | null; nombreGuia: string | null; precio?: number | null; precioSugerido?: number | null };
+type Armar = (o: object, bp: object[], c: Cambio) => object;
 const armarDelFavorito = new Function(`${ARMAR_JS}; return armar;`)() as Armar;
 
 const ciudad = { id: 501, name: "CIUDAD DE PANAMA" };
@@ -17,12 +18,17 @@ const base = {
 const bp = [{ id: 81, name: "Proveedor Ecomfive", address: "Ave Centenario, Costa del Este", warehouse_white_brand: false }];
 
 test("el favorito arma exactamente el mismo guardado que el sistema (el probado con Dropi)", () => {
-  const casos: [object, { nombre: string; nombreGuia: string | null }][] = [
+  const casos: [object, Cambio][] = [
     [base, { nombre: "Probióticos URO", nombreGuia: "URO/PROBIOTIC" }],
     [{ ...base, warehouse_product: [] }, { nombre: "Extracto de ajo sin olor", nombreGuia: null }],
     [{ ...base, name_in_guide: "VIEJA" }, { nombre: "Otro nombre", nombreGuia: null }],
     [{ ...base, type: "VARIABLE" }, { nombre: "X", nombreGuia: null }],
     [base, { nombre: "x".repeat(41), nombreGuia: null }],
+    // Precios (22 oct 2026): solo el precio, el precio y el sugerido, un sugerido menor que el precio y un precio en cero.
+    [base, { nombre: null, nombreGuia: null, precio: 5.29 }],
+    [{ ...base, suggested_price: "12.99" }, { nombre: null, nombreGuia: null, precio: 5.29, precioSugerido: 13.99 }],
+    [base, { nombre: null, nombreGuia: null, precio: 6.99 }],
+    [base, { nombre: "Otro", nombreGuia: null, precio: 0 }],
   ];
   for (const [p, c] of casos) assert.deepEqual(JSON.parse(JSON.stringify(armarDelFavorito(p, bp, c))), JSON.parse(JSON.stringify(armarGuardadoProducto(p as Record<string, unknown>, bp, c))));
 });

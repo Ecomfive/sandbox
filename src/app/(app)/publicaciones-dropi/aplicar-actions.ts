@@ -9,12 +9,19 @@ import { createServiceClient } from "@/lib/supabase/server";
 const MODULO = "publicaciones-dropi";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX = 100;
+const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
 export interface CambioParaDropi {
   id: string;
   producto: number;
-  nombre: string;
+  /** null = no se cambia el nombre. */
+  nombre: string | null;
   guia: string | null;
+  /** null = no se cambia (migración 0139). */
+  precio: number | null;
+  sugerido: number | null;
+  precioAntes: number | null;
+  sugeridoAntes: number | null;
   publicacion: string;
 }
 
@@ -34,21 +41,23 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
   const usuario = await requireModuloEscritura(MODULO);
   const pais = await paisDeCodigo(codigoPais, usuario.paisesPermitidos);
   if (!pais) return { error: "Ese país no está en el sistema o no lo puedes ver." };
-  const { data, error } = await createServiceClient()
-    .from("dropi_cambios_pendientes")
-    .select("id, dropi_producto_id, nombre, nombre_guia, dropi_publicaciones(nombre)")
-    .eq("pais_id", pais.id)
-    .in("estado", ["pendiente", "error"])
-    .order("creado_en")
-    .limit(MAX);
+  const leer = (columnas: string) =>
+    createServiceClient().from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones(nombre)` as "*").eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).order("creado_en").limit(MAX);
+  let r = await leer("id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
+  if (r.error) r = await leer("id, dropi_producto_id, nombre, nombre_guia");
+  const { data, error } = r as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null };
   if (error) return { error: /does not exist|schema cache/i.test(error.message) ? "Falta correr en Supabase la migración 0137." : "No se pudieron leer los cambios pendientes." };
   return {
     pais: pais.nombre,
     cambios: (data ?? []).map((f) => ({
       id: f.id as string,
       producto: Number(f.dropi_producto_id),
-      nombre: f.nombre as string,
+      nombre: (f.nombre as string | null) ?? null,
       guia: (f.nombre_guia as string | null) ?? null,
+      precio: num(f.precio),
+      sugerido: num(f.precio_sugerido),
+      precioAntes: num(f.precio_antes),
+      sugeridoAntes: num(f.precio_sugerido_antes),
       publicacion: ((f.dropi_publicaciones as { nombre?: string } | null)?.nombre ?? "") as string,
     })),
   };
@@ -69,12 +78,11 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
     .map((r) => ({ id: r.id as string, ok: r.ok === true, error: typeof r.error === "string" ? r.error.slice(0, 300) : "Sin detalle" }));
   if (!limpios.length) return { aplicados: 0, errores: 0 };
   const supabase = createServiceClient();
-  const { data: filas } = await supabase
-    .from("dropi_cambios_pendientes")
-    .select("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, intentos")
-    .eq("pais_id", pais.id)
-    .in("estado", ["pendiente", "error"])
-    .in("id", limpios.map((r) => r.id));
+  const leerFilas = (columnas: string) =>
+    supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).in("id", limpios.map((r) => r.id));
+  let lectura = await leerFilas("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
+  if (lectura.error) lectura = await leerFilas("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, intentos");
+  const filas = (lectura.data ?? []) as unknown as Record<string, unknown>[];
   const porId = new Map((filas ?? []).map((f) => [f.id as string, f]));
   const ahora = new Date().toISOString();
   const auditoria: Parameters<typeof registrarAuditoriaLote>[0] = [];
@@ -91,8 +99,19 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       accion: r.ok ? "dropi_nombre_aplicado" : "dropi_nombre_error",
       entidad: "dropi_publicaciones",
       entidadId: f.publicacion_id as string,
-      detalle: r.ok ? `ID ${f.dropi_producto_id} · «${f.nombre}»${f.nombre_guia ? ` · guía «${f.nombre_guia}»` : ""} (desde Dropi)` : `ID ${f.dropi_producto_id} · ${r.error}`,
+      detalle: r.ok
+        ? `ID ${f.dropi_producto_id} · ${[f.nombre ? `«${f.nombre}»` : "", f.nombre_guia ? `guía «${f.nombre_guia}»` : "", f.precio != null ? `precio $${Number(f.precio).toFixed(2)}` : "", f.precio_sugerido != null ? `sugerido $${Number(f.precio_sugerido).toFixed(2)}` : ""].filter(Boolean).join(" · ")} (desde Dropi)`
+        : `ID ${f.dropi_producto_id} · ${r.error}`,
     });
+    // Un precio ya aplicado en Dropi deja hechas las tareas abiertas de subir o bajar el precio de esa publicación (migración 0128).
+    if (r.ok && f.precio != null)
+      await supabase
+        .from("dropi_publicaciones_decisiones")
+        .update({ hecha_en: ahora, hecha_por_nombre: usuario.nombre || usuario.email, hecha_como: "dropi", hecha_nota: `Aplicado en Dropi: $${Number(f.precio).toFixed(2)}` })
+        .eq("publicacion_id", f.publicacion_id as string)
+        .eq("decision", "aceptada")
+        .in("tipo", ["subir_precio", "igualar_precio"])
+        .is("hecha_en", null);
     if (r.ok) aplicados++;
     else errores++;
   }

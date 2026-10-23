@@ -6,6 +6,7 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { DECISIONES, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { REGLAS, leerValorRegla, mostrarRegla, revisarReglas, type ClaveRegla, type Reglas } from "@/lib/publicaciones/reglas";
+import { enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -36,7 +37,7 @@ function limpiarRecomendacion(r: unknown) {
  * `dropi_publicaciones_decisiones` con lo que decía la recomendación y el precio y margen de ese momento, y en la actividad de la
  * publicación. La recomendación deja de verse hasta `vigente_hasta`.
  */
-export async function decidirRecomendacion(entrada: { publicacionId: string; recomendacion: unknown; decision: string; nota: string; dias?: number; responsableId?: string | null }): Promise<{ error?: string }> {
+export async function decidirRecomendacion(entrada: { publicacionId: string; recomendacion: unknown; decision: string; nota: string; dias?: number; responsableId?: string | null }): Promise<{ error?: string; dropi?: string }> {
   let usuario;
   try {
     usuario = await requireModuloEscritura(MODULO);
@@ -54,7 +55,7 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
   if (decision === "rechazada" && !nota) return { error: "Escribe por qué la rechazas." };
 
   const supabase = createServiceClient();
-  const { data: pub } = await supabase.from("dropi_publicaciones").select("id, nombre, pais_id, precio_venta, margen").eq("id", publicacionId).maybeSingle();
+  const { data: pub } = await supabase.from("dropi_publicaciones").select("id, nombre, pais_id, dropi_id, precio_venta, margen").eq("id", publicacionId).maybeSingle();
   if (!pub || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pub.pais_id as string))) return { error: "No se encontró la publicación." };
 
   const dia = hoy();
@@ -104,9 +105,28 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
       autor_id: usuario.id,
       autor_nombre: usuario.nombre ?? usuario.email ?? null,
     });
+  // Aceptar subir o bajar el precio lo cambia en el sistema y lo deja en la cola de «Aplicar en Dropi» (22 oct 2026). El precio sale
+  // de la recomendación que se vio; se revisa que sea un número razonable.
+  let dropi: string | undefined;
+  const nuevo = Number(rec.datos.precioSugerido);
+  if (decision === "aceptada" && (tipo === "subir_precio" || tipo === "igualar_precio") && Number.isFinite(nuevo) && nuevo > 0 && nuevo < 10000) {
+    const antes = pub.precio_venta === null ? null : Number(pub.precio_venta);
+    if (antes === null || Math.abs(antes - nuevo) > 0.004) {
+      await supabase.from("dropi_publicaciones").update({ precio_venta: nuevo, ultimo_cambio_precio: dia, actualizado_en: new Date().toISOString() }).eq("id", publicacionId);
+      await registrarAuditoria({
+        accion: "editar_publicacion_dropi",
+        entidad: "dropi_publicaciones",
+        entidadId: publicacionId,
+        antes: { "Precio de venta": antes === null ? "—" : `$${antes.toFixed(2)}` },
+        despues: { "Precio de venta": `$${nuevo.toFixed(2)}` },
+      });
+      const r = await enviarPrecioADropi(supabase, { id: pub.id as string, pais_id: pub.pais_id as string, dropi_id: (pub.dropi_id as string | null) ?? null }, nuevo, antes, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+      dropi = r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`;
+    }
+  }
   revalidatePath("/publicaciones-dropi");
   revalidatePath("/publicaciones-dropi/recomendaciones");
-  return {};
+  return { dropi };
 }
 
 /** Marca como hecha una tarea (una recomendación aceptada) que el sistema todavía no detectó, con una nota opcional. */

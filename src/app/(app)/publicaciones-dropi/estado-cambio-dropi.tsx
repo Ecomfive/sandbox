@@ -3,17 +3,18 @@ import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
 /**
- * Cómo va el último cambio de nombre para Dropi de una publicación: cambiado (por el favorito «Aplicar en Dropi»), pendiente (hasta
+ * Cómo va el último cambio para Dropi (nombre, precio o precio sugerido) de una publicación: cambiado (por el favorito «Aplicar en Dropi»), pendiente (hasta
  * que alguien lo pulse) o con error (el próximo «Aplicar en Dropi» lo vuelve a intentar).
  */
 export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
   const guia = c.nombreGuia ? ` · guía «${c.nombreGuia}»` : "";
+  // Qué lleva el cambio: el nombre, el precio y/o el precio sugerido.
+  const que = [c.nombre ? `«${c.nombre}»${guia}` : "", c.precio !== null ? `precio $${c.precio.toFixed(2)}` : "", c.precioSugerido !== null ? `sugerido $${c.precioSugerido.toFixed(2)}` : ""].filter(Boolean).join(" · ");
   if (c.estado === "aplicado")
     return (
       <span className="flex items-center gap-1.5 text-xs text-success">
         <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
-        Cambiado en Dropi el {fecha(c.aplicadoEn ?? c.creadoEn)}
-        {guia}
+        Cambiado en Dropi el {fecha(c.aplicadoEn ?? c.creadoEn)} ({que})
       </span>
     );
   return (
@@ -21,7 +22,7 @@ export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
       <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.estado === "error" ? "bg-destructive" : "bg-warning"}`} />
       {c.estado === "error"
         ? `No se pudo cambiar en Dropi: ${c.error ?? "sin detalle"} Se vuelve a intentar al pulsar «Aplicar en Dropi».`
-        : `Pendiente en Dropi («${c.nombre}»${guia}): pulsa «Aplicar en Dropi» con Dropi abierto.`}
+        : `Pendiente en Dropi (${que}): pulsa «Aplicar en Dropi» con Dropi abierto.`}
     </span>
   );
 }

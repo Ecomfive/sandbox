@@ -13,33 +13,96 @@ export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazad
 export interface CambioDropiVista {
   id: string;
   estado: EstadoCambioDropi;
-  nombre: string;
+  /** null si el cambio no toca el nombre (solo el precio). */
+  nombre: string | null;
   nombreGuia: string | null;
+  precio: number | null;
+  precioSugerido: number | null;
   error: string | null;
   creadoEn: string;
   aplicadoEn: string | null;
 }
 
+/** Lo que lleva un cambio para Dropi. Lo que no se pone (`undefined`) se conserva del cambio pendiente que ya hubiera. */
+export interface CambioDropi {
+  nombre?: string | null;
+  nombreGuia?: string | null;
+  precio?: number | null;
+  precioSugerido?: number | null;
+  /** El precio que tenía antes (para mostrar «de … a …»). */
+  precioAntes?: number | null;
+  precioSugeridoAntes?: number | null;
+}
+
 /**
- * Deja en la cola el cambio de nombre de una publicación (reemplaza el que estuviera pendiente de la misma). Necesita un ID de Dropi;
- * con dos («8165/7409») va al primero. Devuelve el id del cambio, o un error (sin ID o sin la migración 0137).
+ * Deja un cambio en la cola de «Aplicar en Dropi» (migración 0137; precio y precio sugerido desde la 0139). Si la publicación ya
+ * tenía un cambio esperando (pendiente o con error), se juntan en uno nuevo y el anterior queda «reemplazado»: así un nombre y un
+ * precio pendientes van juntos a Dropi. Necesita un ID de Dropi; con dos («8165/7409») va al primero.
  */
+export async function encolarCambio(
+  supabase: SupabaseClient,
+  pub: { id: string; pais_id: string; dropi_id: string | null },
+  cambio: CambioDropi,
+  por: { id: string; nombre: string },
+): Promise<{ id: string } | { error: string }> {
+  const productoId = idsDeDropi(pub.dropi_id)[0];
+  if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
+  const conPrecio = cambio.precio !== undefined || cambio.precioSugerido !== undefined;
+  const leer = (columnas: string) => supabase.from("dropi_cambios_pendientes").select(columnas).eq("publicacion_id", pub.id).in("estado", ["pendiente", "error"]).order("creado_en", { ascending: false }).limit(1).maybeSingle();
+  let previo = await leer("id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
+  const hayPrecios = !previo.error;
+  if (!hayPrecios) {
+    if (conPrecio) return { error: "Falta correr en Supabase la migración 0139 para mandar precios a Dropi." };
+    previo = await leer("id, nombre, nombre_guia");
+  }
+  const p = (previo.data ?? null) as Record<string, unknown> | null;
+  const elegir = <T,>(nuevo: T | undefined, viejo: unknown): T | null => (nuevo !== undefined ? nuevo : ((viejo as T | null | undefined) ?? null));
+  const fila: Record<string, unknown> = {
+    pais_id: pub.pais_id,
+    publicacion_id: pub.id,
+    dropi_producto_id: productoId,
+    nombre: elegir(cambio.nombre, p?.nombre),
+    nombre_guia: elegir(cambio.nombreGuia, p?.nombre_guia),
+    creado_por: por.id,
+    creado_por_nombre: por.nombre,
+  };
+  if (hayPrecios) {
+    fila.precio = elegir(cambio.precio, p?.precio);
+    fila.precio_sugerido = elegir(cambio.precioSugerido, p?.precio_sugerido);
+    // El «antes» es el de la primera vez que se pidió el cambio (el que de verdad tenía Dropi).
+    fila.precio_antes = p?.precio_antes ?? cambio.precioAntes ?? null;
+    fila.precio_sugerido_antes = p?.precio_sugerido_antes ?? cambio.precioSugeridoAntes ?? null;
+  }
+  if (p?.id) await supabase.from("dropi_cambios_pendientes").update({ estado: "reemplazado" }).eq("id", p.id as string);
+  const { data, error } = await supabase.from("dropi_cambios_pendientes").insert(fila).select("id").single();
+  if (error || !data) return { error: /does not exist|schema cache/i.test(error?.message ?? "") ? "Falta correr en Supabase la migración 0137." : "No se pudo dejar el cambio para Dropi." };
+  return { id: data.id as string };
+}
+
+/** El cambio de nombre (y el de la guía) para Dropi; se junta con un cambio de precio pendiente si lo hay. */
 export async function encolarCambioNombre(
   supabase: SupabaseClient,
   pub: { id: string; pais_id: string; dropi_id: string | null },
   cambio: { nombre: string; nombreGuia: string | null },
   por: { id: string; nombre: string },
 ): Promise<{ id: string } | { error: string }> {
-  const productoId = idsDeDropi(pub.dropi_id)[0];
-  if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
-  await supabase.from("dropi_cambios_pendientes").update({ estado: "reemplazado" }).eq("publicacion_id", pub.id).in("estado", ["pendiente", "error"]);
-  const { data, error } = await supabase
-    .from("dropi_cambios_pendientes")
-    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, nombre: cambio.nombre, nombre_guia: cambio.nombreGuia, creado_por: por.id, creado_por_nombre: por.nombre })
-    .select("id")
-    .single();
-  if (error || !data) return { error: /does not exist|schema cache/i.test(error?.message ?? "") ? "Falta correr en Supabase la migración 0137." : "No se pudo dejar el cambio para Dropi." };
-  return { id: data.id as string };
+  return encolarCambio(supabase, pub, { nombre: cambio.nombre, nombreGuia: cambio.nombreGuia }, por);
+}
+
+/**
+ * Un precio nuevo, también para Dropi (22 oct 2026): al aceptar «Subir precio» o «Bajar precio frente a la competencia», o al
+ * cambiarlo en la ficha. Queda en la cola y lo aplica «Aplicar en Dropi».
+ */
+export async function enviarPrecioADropi(
+  supabase: SupabaseClient,
+  pub: { id: string; pais_id: string; dropi_id: string | null },
+  precio: number,
+  precioAntes: number | null,
+  por: { id: string; nombre: string },
+): Promise<{ estado: "pendiente" | "error"; detalle: string }> {
+  const r = await encolarCambio(supabase, pub, { precio, precioAntes }, por);
+  if ("error" in r) return { estado: "error", detalle: r.error };
+  return { estado: "pendiente", detalle: `Precio $${precio.toFixed(2)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }
 
 /**
@@ -64,13 +127,12 @@ export async function enviarNombreADropi(
 /** El último cambio en Dropi de cada publicación del país y cuántos siguen pendientes. Sin la migración 0137, vacío. */
 export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: string): Promise<{ porPublicacion: Map<string, CambioDropiVista>; pendientes: number }> {
   const porPublicacion = new Map<string, CambioDropiVista>();
-  const { data, error } = await supabase
-    .from("dropi_cambios_pendientes")
-    .select("id, publicacion_id, estado, nombre, nombre_guia, error, creado_en, aplicado_en")
-    .eq("pais_id", paisId)
-    .neq("estado", "reemplazado")
-    .order("creado_en", { ascending: false })
-    .limit(2000);
+  const leer = (columnas: string) =>
+    supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
+  let r = await leer("id, publicacion_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
+  // Sin la migración 0139, sin precios.
+  if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, error, creado_en, aplicado_en");
+  const { data, error } = r as unknown as { data: Record<string, unknown>[] | null; error: unknown };
   if (error) return { porPublicacion, pendientes: 0 };
   let pendientes = 0;
   for (const f of data ?? []) {
@@ -79,8 +141,10 @@ export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: strin
     porPublicacion.set(f.publicacion_id as string, {
       id: f.id as string,
       estado: f.estado as EstadoCambioDropi,
-      nombre: f.nombre as string,
+      nombre: (f.nombre as string | null) ?? null,
       nombreGuia: (f.nombre_guia as string | null) ?? null,
+      precio: f.precio === null || f.precio === undefined ? null : Number(f.precio),
+      precioSugerido: f.precio_sugerido === null || f.precio_sugerido === undefined ? null : Number(f.precio_sugerido),
       error: (f.error as string | null) ?? null,
       creadoEn: f.creado_en as string,
       aplicadoEn: (f.aplicado_en as string | null) ?? null,

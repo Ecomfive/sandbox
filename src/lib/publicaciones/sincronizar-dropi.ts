@@ -186,7 +186,7 @@ export function cambiosDesdeDropi(
    * `nombre` (22 oct 2026): el nombre también lo manda Dropi, salvo que haya un cambio nuestro esperando «Aplicar en Dropi»
    * (`nombrePendiente`), que no se pisa antes de llegar. Sin `nombre`, no se compara.
    */
-  pub: { ubicacion: string | null; precioVenta: number | null; tipo: string | null; estadoPublicacion: string | null; nombre?: string; nombrePendiente?: boolean },
+  pub: { ubicacion: string | null; precioVenta: number | null; tipo: string | null; estadoPublicacion: string | null; nombre?: string; nombrePendiente?: boolean; precioPendiente?: boolean },
   p: ProductoProveedor,
   hoy: string,
 ): { cambios: CambiosPublicacion; detalle: string[] } {
@@ -197,7 +197,8 @@ export function cambiosDesdeDropi(
     cambios.ubicacion = ubicacion;
     detalle.push(`Dónde está: ${nombreUbicacion(pub.ubicacion)} → ${nombreUbicacion(ubicacion)}`);
   }
-  if (p.precio !== null && (pub.precioVenta === null || Math.abs(pub.precioVenta - p.precio) > 0.005)) {
+  // Un precio nuestro esperando «Aplicar en Dropi» no se pisa con el que Dropi todavía muestra.
+  if (!pub.precioPendiente && p.precio !== null && (pub.precioVenta === null || Math.abs(pub.precioVenta - p.precio) > 0.005)) {
     cambios.precio_venta = p.precio;
     cambios.ultimo_cambio_precio = hoy;
     detalle.push(`Precio: ${usd(pub.precioVenta)} → ${usd(p.precio)}`);
