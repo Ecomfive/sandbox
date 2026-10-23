@@ -60,6 +60,7 @@ export function TablaPublicaciones({
   nombrePais,
   puedeEscribir,
   puedeArchivar,
+  esAdmin,
   corteVentas,
   reglas,
   decisionesDisponibles,
@@ -75,6 +76,8 @@ export function TablaPublicaciones({
   nombrePais: string;
   puedeEscribir: boolean;
   puedeArchivar: boolean;
+  /** Un administrador: la ficha le muestra las compras del producto vinculado. */
+  esAdmin: boolean;
   /** Hasta qué día llegan las ventas de Dropi; `null` si no se muestran (solo las ve un administrador). */
   corteVentas: string | null;
   reglas: Reglas;
@@ -149,6 +152,7 @@ export function TablaPublicaciones({
         nombrePais={nombrePais}
         puedeEscribir={puedeEscribir}
         puedeArchivar={puedeArchivar}
+        puedeVerCompras={esAdmin}
         corteVentas={corteVentas}
         margenMinimo={reglas.margen_minimo}
         decisionesDisponibles={decisionesDisponibles}

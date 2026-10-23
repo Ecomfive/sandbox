@@ -210,7 +210,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       supabase
         .from("dropi_publicaciones")
         .select(
-          "id, nombre, dropi_id, estado, estado_publicacion, tipo_publicacion, privatizado_a, privatizado_email, precio_venta, costo_mercancia, fulfillment, coste_real, utilidad, margen, estado_venta, ubicacion, estado_reposicion, competencia, fecha_publicacion, ultima_revision, proxima_revision, ultimo_cambio_precio, foto_url, notas, responsable_id, relacionados, clickup_id, sku_maestro_id",
+          "id, nombre, dropi_id, estado, estado_publicacion, tipo_publicacion, privatizado_a, privatizado_email, precio_venta, costo_mercancia, fulfillment, coste_real, utilidad, margen, estado_venta, ubicacion, estado_reposicion, competencia, fecha_publicacion, ultima_revision, proxima_revision, ultimo_cambio_precio, foto_url, responsable_id, relacionados, clickup_id, sku_maestro_id",
         )
         .eq("pais_id", paisId)
         .order("nombre")
@@ -303,7 +303,6 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
       // Sin foto propia, la del producto vinculado (pedido de Hernán, 23 oct 2026): así no queda el cuadro vacío.
       fotoUrl: (d.foto_url as string | null) ?? (d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string)?.foto ?? null) : null),
-      notas: (d.notas as string | null) ?? "",
       responsableId: (d.responsable_id as string | null) ?? null,
       relacionados: ((d.relacionados as string[] | null) ?? []).map((x) => nombrePorId.get(x)).filter((x): x is string => !!x),
       deClickup: !!d.clickup_id,

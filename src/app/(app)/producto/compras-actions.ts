@@ -1,6 +1,7 @@
 "use server";
 
 import { getUsuarioActual } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { campoOculto, dentroDelAlcance, restriccionesDe } from "../compras/permisos-compras";
@@ -27,12 +28,14 @@ export interface CompraDeProducto {
 /**
  * El histórico de compras de un producto: cada orden en la que está vinculado (Compras › Productos), de la más nueva a la
  * más vieja. Un producto con variantes suma las compras de sus variantes. Lo pueden ver quienes abren Producto o Inventario,
- * y cada uno solo las de sus países permitidos.
+ * y cada uno solo las de sus países permitidos. También un administrador que abre Gestión de IDs Dropi (la ficha de una publicación
+ * le muestra las compras del producto vinculado; a quien no es administrador se le rechaza aquí, no solo en la pantalla).
  * Devuelve el error como valor.
  */
 export async function obtenerComprasProducto(id: string): Promise<{ compras: CompraDeProducto[] } | { error: string }> {
   const usuario = await getUsuarioActual();
-  if (!usuario || !(usuario.modulos.includes("producto") || usuario.modulos.includes("inventario"))) return { error: "No tienes acceso." };
+  const comoAdminDeGestion = !!usuario && usuario.modulos.includes("publicaciones-dropi") && esAdministrador(usuario);
+  if (!usuario || !(usuario.modulos.includes("producto") || usuario.modulos.includes("inventario") || comoAdminDeGestion)) return { error: "No tienes acceso." };
   if (!ES_ID(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
   const { data: variantes } = await supabase.from("skus_maestros").select("id").eq("padre_id", id);

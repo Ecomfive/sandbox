@@ -16,6 +16,7 @@ import {
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
+import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { actualizarPublicacion, archivarPublicacion, republicarPublicacion } from "./actions";
 import { ActividadPublicacion } from "./actividad-publicacion";
@@ -50,7 +51,6 @@ interface Formulario {
   ultima_revision: string;
   ultimo_cambio_precio: string;
   responsable_id: string;
-  notas: string;
 }
 
 const t = (n: number | null) => (n === null ? "" : String(n));
@@ -74,7 +74,6 @@ const desde = (p: FilaPublicacion): Formulario => ({
   ultima_revision: p.ultimaRevision ?? "",
   ultimo_cambio_precio: p.ultimoCambioPrecio ?? "",
   responsable_id: p.responsableId ?? "",
-  notas: p.notas,
 });
 
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
@@ -122,6 +121,7 @@ export function FichaPublicacion({
   nombrePais,
   puedeEscribir,
   puedeArchivar,
+  puedeVerCompras,
   corteVentas = null,
   margenMinimo,
   decisionesDisponibles,
@@ -135,6 +135,8 @@ export function FichaPublicacion({
   puedeEscribir: boolean;
   /** Solo un administrador: elimina la publicación de verdad. */
   puedeArchivar: boolean;
+  /** Solo un administrador: las compras del producto vinculado (el servidor lo vuelve a comprobar). */
+  puedeVerCompras: boolean;
   /** Hasta qué día llegan las ventas de Dropi (solo un administrador las ve); `null` si no se muestran. */
   corteVentas?: string | null;
   /** El margen mínimo de las reglas: por debajo, el punto rojo. */
@@ -154,6 +156,7 @@ export function FichaPublicacion({
       nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
       puedeArchivar={puedeArchivar}
+      puedeVerCompras={puedeVerCompras}
       corteVentas={corteVentas}
       margenMinimo={margenMinimo}
       decisionesDisponibles={decisionesDisponibles}
@@ -170,6 +173,7 @@ function ContenidoFicha({
   nombrePais,
   puedeEscribir,
   puedeArchivar,
+  puedeVerCompras,
   corteVentas,
   margenMinimo,
   decisionesDisponibles,
@@ -182,6 +186,7 @@ function ContenidoFicha({
   nombrePais: string;
   puedeEscribir: boolean;
   puedeArchivar: boolean;
+  puedeVerCompras: boolean;
   corteVentas: string | null;
   margenMinimo: number;
   decisionesDisponibles: boolean;
@@ -597,12 +602,12 @@ function ContenidoFicha({
             </Seccion>
           )}
 
-          <Seccion icono={ComprasIcon} titulo="Notas">
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className={labelClassSm}>Notas</span>
-              <textarea value={d.notas} onChange={(e) => cambiar({ notas: e.target.value })} rows={4} maxLength={5000} placeholder="Ej: competencia en Dropi, por qué se bajó el precio…" className={`${fieldClass} w-full resize-y`} />
-            </label>
-          </Seccion>
+          {/* Las compras del producto vinculado: solo para un administrador (histórico; las descartadas no suman en los totales). */}
+          {puedeVerCompras && p.sku && (
+            <Seccion icono={ComprasIcon} titulo="Compras">
+              <ComprasProducto key={p.sku.id} id={p.sku.id} />
+            </Seccion>
+          )}
         </fieldset>
 
       </form>
