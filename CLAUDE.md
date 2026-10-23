@@ -588,8 +588,8 @@ convenciones técnicas del código.
   `proveedor`, copiada de `proveedor-portal` a `wms-compras`, validada por su firma; ruta `<proveedor>/<pedido>/fotos/<id>`,
   `rutaEsDelPedido`); enviar = etapa `tracking`, `fecha_envio` (hasta 60 días atrás, nunca futura) y su planificación
   (`cargarTiempos`, ahora en `src/lib/compras/tiempos-datos.ts`). Cada cambio: evento con origen `proveedor`, auditoría, novedad y aviso
-  en la campana de `proveedores.notificar_a`. La cuenta la crea un administrador en la pestaña «Cuenta de Chin» (`cuenta-actions.ts`, clave
-  temporal con `crypto.randomInt`, una sola cuenta por proveedor).
+  en la campana de `proveedores.notificar_a`. Las cuentas las crea un administrador con «Crear cuenta» del Tablero de Chin (`cuenta-actions.ts`,
+  clave temporal con `crypto.randomInt`; **varias cuentas por proveedor** desde el 23 oct 2026, una por persona).
   **Fase 4** (migración 0127): pagos. **Lo pagado vive en `proveedor_pagos`, nunca en los campos de pago de la compra** (en Compras
   `fecha_pago_1` es la fecha en que vence; decidido con Hernán). **Desde el 23 oct 2026 (migración 0141, decisión de Hernán) ya no hay
   avisos de pago** (se quitaron `pagos-actions.ts`, `confirmarAvisoPago` y `vista-pagos.ts`; las tablas `proveedor_avisos_pago` quedan con
@@ -623,7 +623,9 @@ convenciones técnicas del código.
   (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
   sigue el Tablero). Trae «Lo que ve Chin» (el mismo `PortalChin` en español con `soloLectura`: sin botones, sin selector ni «Salir» y sin
   marcar «Lo nuevo» como visto), «Pagos a Chin» (`compras/tablero-chin/pagos-ecomfive.tsx` + `pagos-actions.ts`: modificar Compras y ver
-  sus montos) y, para un administrador, el botón «Cuenta de Chin» (`cuenta-proveedor.tsx` + `cuenta-actions.ts` en una `Ventana`). Se
+  sus montos) y, para un administrador, los botones «Cuenta de Chin» (`CuentasProveedor`: todas sus cuentas, clave nueva, desactivar) y a su
+  lado «Crear cuenta» (`CrearCuentaProveedor`; ambos en `cuenta-proveedor.tsx` + `cuenta-actions.ts`, cada uno en una `Ventana`; se
+  había perdido al pasar a Compras porque el formulario solo salía sin ninguna cuenta y se repuso el 23 oct 2026). Se
   quitaron Novedades, Por decidir, En cotización y Tránsito: decidir una cotización y marcar una llegada se hacen cambiando la etapa de la
   compra, y la **nota para Chin** (`wms_compras.nota_proveedor`) es el campo «Nota para Chin» de la ficha de una compra de Chin
   (`leerCambios` solo la guarda si viaja en el formulario). Los avisos de Chin en la campana llevan a la compra

@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Compras › Tablero de Chin (22 oct 2026; reemplaza a la página «Portal del proveedor»): el portal de Chin tal como lo ve él, en español
- * y solo para ver; «Pagos a Chin» (avisar un pago y lo que falta pagar) y, para un administrador, la cuenta con la que Chin entra.
+ * y solo para ver; «Pagos a Chin» (avisar un pago y lo que falta pagar) y, para un administrador, las cuentas con las que Chin entra (verlas y crear una).
  * Decidir una cotización o marcar una llegada se hace en la compra, cambiando su etapa. Lee el espejo (`proveedor_pedidos`).
  */
 export default async function TableroChinPage({ searchParams }: { searchParams: Promise<{ ver?: string | string[] }> }) {
@@ -57,11 +57,11 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   // Pagos: quien no ve los montos de Compras tampoco ve los pagos a Chin.
   const veMontos = !campoOculto(restriccionesDe(usuario.afinado.compras), "monto");
   const admin = esAdministrador(usuario);
-  const [firmadas, estado, { data: nuevasParaChin }, { data: filaCuenta }, chin] = await Promise.all([
+  const [firmadas, estado, { data: nuevasParaChin }, { data: filasCuentas }, chin] = await Promise.all([
     rutas.length ? supabase.storage.from(BUCKET_PROVEEDOR).createSignedUrls(rutas, 3600).then((r) => r.data ?? []) : Promise.resolve([]),
     veMontos ? estadoPagos(supabase, { ...espejo, pedidos }) : Promise.resolve(null),
     supabase.from("proveedor_novedades").select("id, texto, creado_en").eq("proveedor_id", espejo.proveedor.id).eq("lado", "ecomfive").is("leida_en", null).order("creado_en", { ascending: false }).limit(20),
-    supabase.from("proveedor_usuarios").select("id, nombre, email, activo, ultimo_ingreso_en").eq("proveedor_id", espejo.proveedor.id).order("creado_en").limit(1).maybeSingle(),
+    supabase.from("proveedor_usuarios").select("id, nombre, email, activo, ultimo_ingreso_en").eq("proveedor_id", espejo.proveedor.id).order("creado_en"),
     cargarTareasChin(supabase, { paisesPermitidos: usuario.paisesPermitidos, veMontos }),
   ]);
   const porRuta = new Map(firmadas.map((f) => [f.path, f.signedUrl]));
@@ -80,16 +80,21 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   // Lo que escribe Chin (comentarios de cotización), traducido al español.
   const traducciones = await traducirTextos(supabase, activos.map((p) => p.comentarioProveedor), "es");
 
-  // La cuenta del proveedor solo la ve (y la administra) un administrador.
-  let cuentaPortal: { cuenta: CuentaPortal | null; entrada: string } | null = null;
+  // Las cuentas del proveedor solo las ve (y las crea y administra) un administrador.
+  const filaCuenta = filasCuentas?.[0];
+  let cuentaPortal: { cuentas: CuentaPortal[]; entrada: string } | null = null;
   if (admin) {
     const h = await headers();
     const host = h.get("x-forwarded-host") ?? h.get("host");
     const entrada = host ? `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}/login` : "/login";
-    const cuenta = filaCuenta
-      ? { id: filaCuenta.id as string, nombre: filaCuenta.nombre as string, email: (filaCuenta.email as string | null) ?? null, activo: !!filaCuenta.activo, ultimoIngreso: (filaCuenta.ultimo_ingreso_en as string | null) ?? null }
-      : null;
-    cuentaPortal = { cuenta, entrada };
+    const cuentas = (filasCuentas ?? []).map((c) => ({
+      id: c.id as string,
+      nombre: c.nombre as string,
+      email: (c.email as string | null) ?? null,
+      activo: !!c.activo,
+      ultimoIngreso: (c.ultimo_ingreso_en as string | null) ?? null,
+    }));
+    cuentaPortal = { cuentas, entrada };
   }
 
   const tablero = {

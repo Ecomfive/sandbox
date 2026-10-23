@@ -3,18 +3,19 @@
 import { useEffect, useState } from "react";
 import { PortalChin, type DatosPortalChin } from "@/app/proveedor/portal-chin";
 import { IdiomaProveedor } from "@/components/proveedor/idioma-contexto";
-import { Pestanas, botonNormal } from "@/components/proveedor/piezas-proveedor";
+import { Pestanas, botonNormal, botonPrincipal } from "@/components/proveedor/piezas-proveedor";
 import { Ventana } from "@/components/ui/ventana";
 import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
-import { CuentaProveedor, type CuentaPortal } from "./cuenta-proveedor";
+import { CrearCuentaProveedor, CuentasProveedor, type CuentaPortal } from "./cuenta-proveedor";
 import { PagosEcomfive } from "./pagos-ecomfive";
 
 type Vista = "tablero" | "pagos";
 
 /**
  * Compras › Tablero de Chin: su portal tal como lo ve él (en español y solo para ver) y «Pagos a Chin» (el cumplimiento y su Registro
- * de pagos, solo para ver). Un administrador ve además «Cuenta de Chin», que se abre en una ventana.
+ * de pagos, solo para ver). Un administrador ve además «Cuenta de Chin» (las cuentas con las que entra a su portal) y, a su lado, «Crear
+ * cuenta» para darle acceso a otra persona; cada uno se abre en una ventana.
  */
 export function TableroChin({
   proveedor,
@@ -34,12 +35,13 @@ export function TableroChin({
     filas: FilaRegistro[];
   } | null;
   traducciones: Record<string, string>;
-  /** Solo para un administrador: la cuenta con la que el proveedor entra a su portal. */
-  cuentaPortal: { cuenta: CuentaPortal | null; entrada: string } | null;
+  /** Solo para un administrador: las cuentas con las que el proveedor entra a su portal. */
+  cuentaPortal: { cuentas: CuentaPortal[]; entrada: string } | null;
   vistaInicial: Vista;
 }) {
   const [vista, setVista] = useState<Vista>(vistaInicial);
-  const [cuentaAbierta, setCuentaAbierta] = useState(false);
+  const [ventanaCuenta, setVentanaCuenta] = useState<"ver" | "crear" | null>(null);
+  const [cuentas, setCuentas] = useState(cuentaPortal?.cuentas ?? []);
   const nombre = proveedor.nombre;
 
   // La vista queda en la dirección para volver a ella o compartirla (los avisos de pago de la campana llegan con ?ver=pagos).
@@ -81,13 +83,23 @@ export function TableroChin({
             <span />
           )}
           {cuentaPortal && (
-            <button
-              type="button"
-              className={botonNormal}
-              onClick={() => setCuentaAbierta(true)}
-            >
-              Cuenta de {nombre}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className={botonNormal}
+                onClick={() => setVentanaCuenta("ver")}
+              >
+                Cuenta de {nombre}
+                {cuentas.length > 1 ? ` (${cuentas.length})` : ""}
+              </button>
+              <button
+                type="button"
+                className={botonPrincipal}
+                onClick={() => setVentanaCuenta("crear")}
+              >
+                Crear cuenta
+              </button>
+            </div>
           )}
         </div>
 
@@ -98,18 +110,39 @@ export function TableroChin({
         )}
       </div>
 
-      {cuentaPortal && cuentaAbierta && (
+      {cuentaPortal && ventanaCuenta === "ver" && (
         <Ventana
           abierto
-          alCerrar={() => setCuentaAbierta(false)}
+          alCerrar={() => setVentanaCuenta(null)}
           ancho="lg"
           titulo={`Cuenta de ${nombre}`}
         >
           <div className="flex flex-col gap-4 p-4">
-            <CuentaProveedor
+            <CuentasProveedor
               proveedor={proveedor}
-              cuenta={cuentaPortal.cuenta}
+              cuentas={cuentas}
               entrada={cuentaPortal.entrada}
+              alCambiar={(c) =>
+                setCuentas((todas) => todas.map((x) => (x.id === c.id ? c : x)))
+              }
+            />
+          </div>
+        </Ventana>
+      )}
+
+      {cuentaPortal && ventanaCuenta === "crear" && (
+        <Ventana
+          abierto
+          alCerrar={() => setVentanaCuenta(null)}
+          ancho="md"
+          titulo={`Crear cuenta para ${nombre}`}
+        >
+          <div className="p-4">
+            <CrearCuentaProveedor
+              proveedor={proveedor}
+              entrada={cuentaPortal.entrada}
+              alCrear={(c) => setCuentas((todas) => [...todas, c])}
+              alTerminar={() => setVentanaCuenta(null)}
             />
           </div>
         </Ventana>
