@@ -127,7 +127,7 @@ const ES = {
   todosPaises: "Todos",
   original: "Original",
   verOriginal: "ver original",
-  soloLectura: "Así ve Shen Zhen su portal (en su cuenta, en chino). Aquí es solo para ver: lo que él registra lo hace desde su portal.",
+  soloLectura: "Así ve Shen Zhen su portal (en su cuenta, en chino). Lo que él registra lo hace desde su portal; aquí solo se cambia el Registro de pagos, en «Pagos».",
   cambiarClave: "Cambiar clave",
   elegirClave: "Elige tu clave",
   elegirClaveTexto: "Entraste con una clave temporal. Elige una clave propia para seguir: solo tú la sabrás.",
