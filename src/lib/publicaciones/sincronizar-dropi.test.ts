@@ -107,5 +107,5 @@ test("cambios: el nombre lo manda Dropi, salvo un cambio nuestro pendiente", () 
   assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: `"${p.nombre} viejo de ClickUp` }, p, HOY).cambios, { nombre: p.nombre });
   assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: "otro", nombrePendiente: true }, p, HOY).cambios, {});
   assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: p.nombre }, p, HOY).cambios, {});
-  assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: "Cinturón lumbar" }, prod(1, { nombre: "CINTURON/LUMBAR" }), HOY).cambios, {}, "un nombre con forma de SKU no se copia");
+  assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: "Cinturón lumbar" }, prod(1, { nombre: "CINTURON/LUMBAR" }), HOY).cambios, { nombre: "CINTURON/LUMBAR" }, "el sistema muestra lo que tiene Dropi");
 });

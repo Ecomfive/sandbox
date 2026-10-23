@@ -20,7 +20,7 @@ import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { actualizarPublicacion, eliminarPublicacion } from "./actions";
 import { ActividadPublicacion } from "./actividad-publicacion";
-import type { FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { OptimizacionFicha } from "./optimizacion-publicacion";
@@ -359,9 +359,9 @@ function ContenidoFicha({
                 </label>
                 {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} />}
                 <div className="flex min-w-0 flex-col gap-1.5">
-                  {conectado && (
+                  {conexionDropi(p) && (
                     <div className="flex">
-                      <InsigniaConectado />
+                      <InsigniaConectado estado={conexionDropi(p)!} />
                     </div>
                   )}
                   <label className="flex min-w-0 flex-col gap-1">

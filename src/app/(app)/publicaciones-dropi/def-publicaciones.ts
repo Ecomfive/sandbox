@@ -133,6 +133,18 @@ export interface FilaPublicacion {
   cambioDropi: CambioDropiVista | null;
 }
 
+/**
+ * Si el ID de Dropi de la publicación está en Dropi: «conectado» si «Mis productos» lo lista (o, sin esa lectura en el país, si
+ * Dropi reporta sus ventas); «no_aparece» si tiene ID pero la lectura no lo trae; null sin ID o sin forma de saberlo.
+ */
+export type ConexionDropi = "conectado" | "no_aparece";
+export function conexionDropi(f: Pick<FilaPublicacion, "dropiId" | "bodegasDropi" | "leidoProveedor" | "ventas">): ConexionDropi | null {
+  if (!f.dropiId.trim()) return null;
+  if (f.bodegasDropi !== null) return "conectado";
+  if (f.leidoProveedor) return "no_aparece";
+  return f.ventas ? "conectado" : null;
+}
+
 /** En qué está el vínculo con Producto: vinculado, o la sugerencia que hay. */
 export const estadoVinculo = (f: FilaPublicacion) => (f.sku ? "vinculado" : (f.sugerencia?.tipo ?? "ninguno"));
 export const VINCULOS = [
