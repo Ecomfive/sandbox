@@ -642,9 +642,10 @@ convenciones técnicas del código.
   `leida_en`. Componente `compras/tablero-chin/que-hacer-chin.tsx` (6 a la vista, «Ver las N tareas»).
   **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Shen Zhen**
   (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
-  sigue el Tablero). Trae «Lo que ve Shen Zhen» (el mismo `PortalChin` en español con `soloLectura`: sin botones, sin selector ni «Salir» y sin
-  marcar «Lo nuevo» como visto), «Pagos a Shen Zhen» (`compras/tablero-chin/pagos-ecomfive.tsx` + `pagos-actions.ts`: modificar Compras y ver
-  sus montos) y, para un administrador, los botones «Cuenta de Shen Zhen» (`CuentasProveedor`: todas sus cuentas, clave nueva, desactivar) y a su
+  sigue el Tablero). Trae el mismo `PortalChin` en español con `soloLectura` (sin botones, sin selector ni «Salir» y sin marcar «Lo nuevo» como
+  visto) y **una sola pestaña de pagos** (23 oct 2026, pedido de Hernán): la «Pagos» del portal, que en el Tablero muestra `pagosEcomfive`
+  (`compras/tablero-chin/pagos-ecomfive.tsx`, el Registro de pagos que edita Ecomfive: modificar Compras y ver sus montos) en vez de la vista de
+  Shen Zhen; `tabInicial`/`alCambiarTab` llevan `?ver=pagos`. Ya no hay pestaña «Pagos a Shen Zhen» arriba. Y, para un administrador, los botones «Cuenta de Shen Zhen» (`CuentasProveedor`: todas sus cuentas, clave nueva, desactivar) y a su
   lado «Crear cuenta» (`CrearCuentaProveedor`; ambos en `cuenta-proveedor.tsx` + `cuenta-actions.ts`, cada uno en una `Ventana`; se
   había perdido al pasar a Compras porque el formulario solo salía sin ninguna cuenta y se repuso el 23 oct 2026). Se
   quitaron Novedades, Por decidir, En cotización y Tránsito: decidir una cotización y marcar una llegada se hacen cambiando la etapa de la
