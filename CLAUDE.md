@@ -1055,8 +1055,7 @@ convenciones técnicas del código.
   **Vencimientos** (`/inventario/vencimientos`, `wms_vigilancia_vencimientos`) lista vencidos y por vencer. La fecha de «hoy» es la de
   America/Panama (`wms_hoy()`).
 - **Foto de un pack = la del producto original** (23 oct 2026, pedido de Hernán): al crear un compuesto en Producto (`CrearProductoPanel`) con **un solo
-  producto** como componente (N unidades, **cualquier cantidad**: pack de 2, 3, 6, 12…), la ficha ofrece «Usar la foto de {original}» (marcado por defecto, `foto_del_simple`; si
-  se sube otra foto, esa manda) y `crearProducto` **copia** la foto del simple a la carpeta del compuesto (`copiarFotoDelSimple`: revisada por su firma,
+  producto** como componente (N unidades, **cualquier cantidad**: pack de 2, 3, 6, 12…), **el sistema le pone solo la foto del original, sin preguntar** (no hay casilla; si se sube otra a propósito, esa manda): `crearProducto` **copia** la foto del simple a la carpeta del compuesto (`copiarFotoDelSimple`: revisada por su firma,
   con su huella; no se comparte la dirección). Un compuesto de **productos distintos** no hereda nada: la ficha avisa «sube una foto nueva». Vale también cuando
   se abre desde Gestión de IDs Dropi («Crear el compuesto»). No toca compuestos que ya existen.
 - **Regla: una compra descartada o anulada no suma** (23 oct 2026, pedido de Hernán; la almohada ortopédica sumaba 1 100 u. con dos compras descartadas).
