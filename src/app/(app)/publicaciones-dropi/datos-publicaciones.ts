@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { accionesPublicacion, enDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
-import { revisionVencida } from "@/lib/publicaciones/publicacion";
+import { numeroPublicacion, revisionVencida } from "@/lib/publicaciones/publicacion";
 import { estadoTarea, etiquetaRecomendacion, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
@@ -224,6 +224,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   ]);
   if (filasR.error) return null;
   const numeroPorId = new Map(numerosR.error ? [] : (numerosR.data ?? []).map((n) => [n.id, Number(n.numero)]));
+  // Las duplicadas (migración 0147) van aparte, igual que el correlativo: sin la migración, ninguna.
+  const duplicadasR = await traerTodasConError<{ id: string; duplicada_de: string | null }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones").select("id, duplicada_de").eq("pais_id", paisId).not("duplicada_de", "is", null).order("id").range(desde, hasta),
+  );
+  const duplicadaDe = new Map(duplicadasR.error ? [] : (duplicadasR.data ?? []).map((n) => [n.id, n.duplicada_de as string]));
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
@@ -268,12 +273,13 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const decisionesDe = new Map<string, DecisionVista[]>();
   for (const d of decisiones) decisionesDe.set(d.publicacionId, [...(decisionesDe.get(d.publicacionId) ?? []), d]);
 
-  const filas: FilaPublicacion[] = datos.map((d) => {
+  const filas: FilaPublicacion[] = datos.map((d): FilaPublicacion => {
     const estado = d.estado as string;
     const proxima = (d.proxima_revision as string | null) ?? null;
     const camino = d.sku_maestro_id ? enCaminoPorSku.get(d.sku_maestro_id as string) : undefined;
     const prov = proveedor ? productoPrincipal(idsDropi(d), proveedor.productos) : null;
-    return {
+    const original = duplicadaDe.get(d.id);
+    const fila: FilaPublicacion = {
       id: d.id,
       numero: numeroPorId.get(d.id) ?? null,
       nombre: d.nombre as string,
@@ -322,7 +328,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),
       ...revisionDe(d),
       ...automatico(d, ventas, competidores, hoy, r, prov, stockActual),
+      duplicadaDe: null,
     };
+    // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.
+    if (!original) return fila;
+    return { ...fila, archivada: true, acciones: [], duplicadaDe: `${numeroPublicacion(numeroPorId.get(original))} · ${nombrePorId.get(original) ?? "otra publicación"}` };
   });
 
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.

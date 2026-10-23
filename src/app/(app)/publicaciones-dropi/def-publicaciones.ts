@@ -100,8 +100,10 @@ export interface FilaPublicacion {
   ventas: VentasPublicacion | null;
   /** Cómo está en Dropi según lo que reporta Dropi (ya no se marca a mano). */
   enDropi: EnDropi;
-  /** Va a «Archivados»: archivada en Dropi (sin datos de Dropi, lo que estaba marcado a mano). */
+  /** Va a «Archivados»: archivada en Dropi (sin datos de Dropi, lo que estaba marcado a mano), o duplicada. */
   archivada: boolean;
+  /** Si es un duplicado de otra publicación con el mismo ID de Dropi (migración 0147): «PUB-0309 · nombre» de la que vale. */
+  duplicadaDe: string | null;
   /** Público o privado según Dropi; sin datos de Dropi, lo que estaba marcado. */
   tipoDropi: "publico" | "privado" | null;
   /** Lo que necesita (calculado): vacío = al día. */

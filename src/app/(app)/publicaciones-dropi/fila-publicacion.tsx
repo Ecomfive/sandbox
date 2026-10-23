@@ -253,7 +253,8 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
   return (
     <div className="flex items-center">
       <div className="min-w-0 flex-1">{fila}</div>
-      <BotonArchivarFila f={f} />
+      {/* Una duplicada no sale de Archivados: en su lugar, un espacio del mismo ancho para que las filas no se corran. */}
+      {f.duplicadaDe ? <span aria-hidden="true" className="mr-3 w-9 shrink-0" /> : <BotonArchivarFila f={f} />}
     </div>
   );
 }

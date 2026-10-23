@@ -295,7 +295,9 @@ function ContenidoFicha({
         <>
           <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroPublicacion(p.numero)}</span>
           <span className="text-lg font-semibold">{p.nombre}</span>
-          {p.archivada ? (
+          {p.duplicadaDe ? (
+            <Badge color="#8d8d8d">Duplicada</Badge>
+          ) : p.archivada ? (
             <Badge color="#8d8d8d">Archivada</Badge>
           ) : (
             (p.acciones.length ? p.acciones : (["al_dia"] as const)).map((v) => {
@@ -337,7 +339,7 @@ function ContenidoFicha({
                   {republicando ? "Un momento..." : republicacionPendiente ? "Republicación pendiente" : "Republicar"}
                 </BotonAccion>
               )}
-              {!sinGuardar && puedeArchivar && (
+              {!sinGuardar && puedeArchivar && !p.duplicadaDe && (
                 <BotonAccion icono={ArchivarIcon} disabled={pendiente} onClick={archivar}>
                   {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
                 </BotonAccion>
@@ -351,6 +353,12 @@ function ContenidoFicha({
           </div>
         )}
 
+        {p.duplicadaDe && (
+          <p role="note" className="m-0 border-b border-border bg-muted/50 px-5 py-3 text-sm">
+            <span className="font-semibold">Duplicada de {p.duplicadaDe}.</span> Tiene el mismo ID de Dropi ({p.dropiId}): venía repetida de ClickUp. Usa esa; esta queda en
+            Archivados.
+          </p>
+        )}
         <div className="border-b border-border px-5 py-5">
           <Seccion icono={InventarioIcon} titulo="Producto vinculado (SKU)">
             <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} alAbrirProducto={setProductoAbierto} />

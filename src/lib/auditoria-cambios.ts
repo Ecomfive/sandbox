@@ -52,6 +52,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   revisar_publicacion_dropi: "Marcó la publicación como revisada",
   eliminar_publicacion_dropi: "Eliminó la publicación",
   archivar_publicacion_dropi: "Archivó la publicación",
+  marcar_publicacion_duplicada: "La marcó como duplicada",
   desarchivar_publicacion_dropi: "Sacó la publicación de Archivados",
   vincular_sku_publicacion: "Vinculó el producto",
   desvincular_sku_publicacion: "Quitó el producto vinculado",

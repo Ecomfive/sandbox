@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
@@ -65,6 +66,25 @@ function leerDatos(f: FormData): Datos | { error: string } {
   };
 }
 
+/**
+ * Otra publicación del país que ya usa alguno de esos IDs de Dropi (pedido de Hernán, 23 oct 2026: al importar ClickUp entraron
+ * pares con el mismo ID). No cuentan las marcadas como duplicadas (migración 0147). El mensaje de error, o null si está libre.
+ */
+async function idDropiRepetido(paisId: string, dropiId: string | null, menos: string | null): Promise<string | null> {
+  const ids = idsDeDropi(dropiId);
+  if (!ids.length) return null;
+  const supabase = createServiceClient();
+  const leer = (columnas: string) => supabase.from("dropi_publicaciones").select(columnas).eq("pais_id", paisId).not("dropi_id", "is", null).limit(5000);
+  let r = await leer("id, numero, nombre, dropi_id, duplicada_de");
+  if (r.error) r = await leer("id, numero, nombre, dropi_id");
+  const otra = ((r.data ?? []) as unknown as Record<string, unknown>[]).find(
+    (p) => p.id !== menos && !p.duplicada_de && idsDeDropi(p.dropi_id as string | null).some((x) => ids.includes(x)),
+  );
+  if (!otra) return null;
+  const repetido = idsDeDropi(otra.dropi_id as string | null).find((x) => ids.includes(x));
+  return `El ID ${repetido} de Dropi ya es de ${numeroPublicacion(otra.numero as number | null)} (${otra.nombre}). Ábrela en vez de crear otra.`;
+}
+
 /** La publicación, si existe y es de un país que la persona ve. */
 async function publicacionPermitida(id: string, permitidos: string[] | null) {
   if (!UUID.test(id)) return null;
@@ -82,6 +102,8 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
   if (!UUID.test(paisId) || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, paisId))) return { error: "País no válido." };
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
+  const repetido = await idDropiRepetido(paisId, (datos.dropi_id as string | null) ?? null, null);
+  if (repetido) return { error: repetido };
   const { data, error } = await supabase
     .from("dropi_publicaciones")
     .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
@@ -116,6 +138,11 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
+  // Un ID de Dropi nuevo no puede ser el de otra publicación del país (las duplicadas no cuentan).
+  if ((datos.dropi_id ?? null) !== ((antes.dropi_id as string | null) ?? null) && !antes.duplicada_de) {
+    const repetido = await idDropiRepetido(antes.pais_id, (datos.dropi_id as string | null) ?? null, id);
+    if (repetido) return { error: repetido };
+  }
   // El nombre se edita aquí y viaja a Dropi (22 oct 2026); la sincronización con Dropi no lo pisa.
   const nombreNuevo = String(datos.nombre ?? "").trim();
   const cambiaNombre = !!nombreNuevo && nombreNuevo !== String(antes.nombre ?? "").trim();
@@ -218,6 +245,8 @@ export async function archivarPublicacion(id: string, archivar: boolean): Promis
   const usuario = await requireModuloEscritura(MODULO);
   const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  // Una duplicada (migración 0147) se queda en Archivados: la que vale es la otra.
+  if (!archivar && antes.duplicada_de) return { error: "Es un duplicado de otra publicación con el mismo ID de Dropi: usa esa." };
   const supabase = createServiceClient();
   const cambios = archivar
     ? { estado: "archivado", estado_publicacion: "archivado" }
