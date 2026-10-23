@@ -39,7 +39,7 @@ function IconoEnDropi({ estado }: { estado: { valor: string; etiqueta: string; c
   return (
     <Tooltip texto={estado.etiqueta}>
       <span role="img" aria-label={estado.etiqueta} className="relative inline-flex h-7 w-7 items-center justify-center">
-        <DropiIcon className={`h-6 w-6 ${apagado ? "text-muted-foreground/60" : "text-foreground"}`} />
+        <DropiIcon marca className={`h-6 w-6 ${apagado ? "opacity-40 grayscale" : ""}`} />
         <span aria-hidden="true" style={{ backgroundColor: estado.color }} className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card" />
       </span>
     </Tooltip>
