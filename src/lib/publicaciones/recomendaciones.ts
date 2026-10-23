@@ -140,7 +140,7 @@ const RESULTADO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
   mas_fotos: "Más fotos (producto, uso, tamaño, empaque) dan al dropshipper material para sus anuncios.",
   agregar_video: "Un video del producto en uso es lo que más usa el dropshipper para anunciar.",
   mejorar_descripcion: "Una descripción completa (beneficios, uso, contenido) ayuda a vender y evita devoluciones.",
-  precio_sugerido: "Un precio sugerido por encima del nuestro le muestra al dropshipper cuánto puede ganar.",
+  precio_sugerido: "Con el sugerido igual al precio, Dropi deja al dropshipper vender al precio que quiera (un sugerido más alto le impide montar órdenes por debajo).",
 };
 
 const TITULO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
@@ -148,7 +148,7 @@ const TITULO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
   mas_fotos: "Agregar fotos en Dropi",
   agregar_video: "Agregar un video en Dropi",
   mejorar_descripcion: "Mejorar la descripción en Dropi",
-  precio_sugerido: "Ajustar el precio sugerido en Dropi",
+  precio_sugerido: "Igualar el precio sugerido al precio en Dropi",
 };
 
 /**

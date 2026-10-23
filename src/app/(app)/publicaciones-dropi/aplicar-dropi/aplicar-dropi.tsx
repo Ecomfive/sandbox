@@ -6,7 +6,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { origenDropi } from "@/lib/publicaciones/marcador-aplicar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
-type Resultado = { id: string; ok: boolean; error?: string };
+type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number };
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "sin_dropi"; mensaje: string }
@@ -71,7 +71,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     if (!dropi || !origen || dropi.closed) return void setEstado({ tipo: "sin_dropi", mensaje: "La pestaña de Dropi se cerró: vuelve a pulsar «Aplicar en Dropi» con Dropi abierto." });
     enviados.current = { cambios, pospuestos };
     setEstado({ tipo: "aplicando", cambios, hechos: 0 });
-    dropi.postMessage({ tipo: "pendientes", cambios: cambios.map(({ id, producto, nombre, guia, precio, sugerido }) => ({ id, producto, nombre, guia, precio, sugerido })) }, origen);
+    dropi.postMessage({ tipo: "pendientes", cambios: cambios.map(({ id, tipo, nuevo, producto, nombre, guia, precio, sugerido }) => ({ id, tipo, nuevo, producto, nombre, guia, precio, sugerido })) }, origen);
   }
 
   const cerrar = (
@@ -123,7 +123,9 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
             return (
               <li key={c.id} className="flex flex-col gap-0.5 px-4 py-2.5">
                 <DetalleCambio c={c} />
-                <span className={`text-xs font-medium ${r?.ok ? "text-success" : "text-destructive"}`}>{r ? (r.ok ? "Cambiado en Dropi" : `No se pudo: ${r.error ?? "sin detalle"}`) : "Sin respuesta de Dropi"}</span>
+                <span className={`text-xs font-medium ${r?.ok ? "text-success" : "text-destructive"}`}>
+                  {r ? (r.ok ? (c.tipo === "republicar" ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó archivada y sin stock` : "Cambiado en Dropi") : `No se pudo: ${r.error ?? "sin detalle"}`) : "Sin respuesta de Dropi"}
+                </span>
               </li>
             );
           })}
@@ -136,6 +138,17 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
 
 /** Lo que cambia un cambio pendiente: el nombre o la publicación, el precio y el ID de Dropi. */
 function DetalleCambio({ c }: { c: CambioParaDropi }) {
+  if (c.tipo === "republicar")
+    return (
+      <>
+        <span className="font-medium">Republicar: {c.publicacion}</span>
+        <span className="text-xs">Un producto nuevo en Dropi con los mismos datos, fotos y stock; el ID {c.producto} queda archivado y sin stock.</span>
+        <span className="text-xs text-muted-foreground">
+          ID {c.producto}
+          {c.nuevo ? ` · ya creado como ID ${c.nuevo}: sigue desde ahí` : ""}
+        </span>
+      </>
+    );
   return (
     <>
       <span className="font-medium">{c.nombre ?? c.publicacion}</span>
@@ -183,7 +196,7 @@ function ElegirCambios({ cambios, alAplicar, cerrar }: { cambios: CambioParaDrop
               <button
                 type="button"
                 aria-pressed={pospuesto}
-                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.nombre ?? c.publicacion}`}
+                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.tipo === "republicar" ? `republicar ${c.publicacion}` : (c.nombre ?? c.publicacion)}`}
                 onClick={() => alternar(c.id)}
                 className={`inline-flex min-h-9 shrink-0 items-center rounded-md border px-3 py-1.5 text-xs font-medium ${anilloFoco} ${pospuesto ? "border-foreground bg-accent text-foreground" : "border-border bg-card hover:bg-muted"}`}
               >

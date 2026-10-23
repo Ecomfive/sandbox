@@ -1,0 +1,101 @@
+// «Republicar» una publicación en Dropi (pedido de Hernán, 23 oct 2026; migración 0145): crear en Dropi un producto nuevo igual al
+// viejo (datos, fotos y stock), sacarle el stock al viejo y archivarlo. Lo hace el favorito «Aplicar en Dropi» desde la pestaña de
+// Dropi (marcador-aplicar-dropi.ts), con lo mismo que hace la pantalla de Dropi (leído de su código el 23 oct 2026):
+// - Crear: `POST api/products` con el mismo cuerpo del guardado (`armarGuardadoProducto`) y `id: null`; responde `objects.id`.
+//   Cada bodega de `warehouselected` lleva su `stock` inicial.
+// - Fotos: una por una, `POST api/products/photos/upload` (FormData: `files`, `id`, `main`); se bajan del CDN de Dropi con la ruta
+//   `urlS3` de la galería del producto viejo.
+// - Stock: un `PUT api/products/<id>` donde la bodega lleva `quantity`, `type_movement` («ENTRADA» o «SALIDA») y `concept`.
+// - Archivar: `POST api/products/<id>/archiveProduct`.
+// Sin base ni red, con prueba (que también compara la versión en JavaScript del favorito).
+
+import { armarGuardadoProducto } from "./dropi-guardado";
+
+type Obj = Record<string, unknown>;
+
+/** El CDN de las fotos de Dropi (`AWS3.cloudfront_server` de su código): la foto está en `<CDN>/<urlS3>`. */
+export const CDN_FOTOS_DROPI = "https://d39ru7awumhhs2.cloudfront.net";
+
+/**
+ * El cuerpo del `POST api/products` que crea el producto nuevo: el del guardado del viejo tal cual, sin ID, sin reservas a privados
+ * y con el stock que tiene hoy en cada bodega. Error si no se puede republicar: con variaciones, con stock en una bodega que no es
+ * del proveedor (la B280 de Dropi), con unidades privatizadas o con porcentajes por dropshipper (no se copian bien: a mano).
+ */
+export function armarProductoNuevo(producto: Obj, bodegasProveedor: Obj[]): { cuerpo: Obj } | { error: string } {
+  const r = armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null });
+  if ("error" in r) return r;
+  const propias = new Set(bodegasProveedor.map((b) => Number(b.id)));
+  const bodegas = Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : [];
+  if (bodegas.some((w) => Number(w.stock) > 0 && !propias.has(Number(w.warehouse_id)))) return { error: "Tiene stock en una bodega que no es de ECOMFIVE (la B280 de Dropi): no se republica." };
+  const privados = Array.isArray(producto.private_product_inventories) ? (producto.private_product_inventories as Obj[]) : [];
+  if (privados.some((p) => !p.deleted_at && Number(p.stock) > 0)) return { error: "Tiene unidades privatizadas: quítalas en Dropi antes de republicar." };
+  if (Array.isArray(producto.user_profit_percentage_product) && producto.user_profit_percentage_product.length) return { error: "Tiene porcentajes por dropshipper: republícala a mano en Dropi." };
+  const cuerpo: Obj = { ...r.cuerpo, id: null, private_product_inventories: [] };
+  cuerpo.warehouselected = (r.cuerpo.warehouselected as Obj[]).map((b) => ({ ...b, stock: Number(b.stock ?? 0) }));
+  return { cuerpo };
+}
+
+/**
+ * El `PUT api/products/<id>` que mueve stock, como el «Stock» de la pantalla de Dropi: `movimientos` = unidades por bodega
+ * (positivas = entrada, negativas = salida) y `concepto` = el motivo que pide Dropi. Lo demás va igual que el guardado.
+ */
+export function armarMovimientoStock(producto: Obj, bodegasProveedor: Obj[], movimientos: Record<string, number>, concepto: string): { cuerpo: Obj } | { error: string } {
+  const r = armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null });
+  if ("error" in r) return r;
+  let movidas = 0;
+  const cuerpo: Obj = { ...r.cuerpo };
+  cuerpo.warehouselected = (r.cuerpo.warehouselected as Obj[]).map((b) => {
+    const q = Number(movimientos[String(b.warehouse_id)] ?? 0);
+    if (!q) return b;
+    movidas++;
+    return { ...b, quantity: Math.abs(q), type_movement: q > 0 ? "ENTRADA" : "SALIDA", concept: concepto };
+  });
+  if (!movidas) return { error: "Esa bodega no está en el producto." };
+  return { cuerpo };
+}
+
+/** El stock de cada bodega con unidades (`{ "81": 224 }`). */
+export function stockPorBodega(producto: Obj): Record<string, number> {
+  const s: Record<string, number> = {};
+  for (const w of Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : []) if (Number(w.stock) > 0) s[String(w.warehouse_id)] = Number(w.stock);
+  return s;
+}
+
+/** Las fotos del producto que se copian, la principal primero, con su dirección en el CDN (o la `url` completa si no tiene `urlS3`). */
+export function fotosParaCopiar(producto: Obj): { url: string; nombre: string; main: boolean }[] {
+  const galeria = Array.isArray(producto.gallery) ? (producto.gallery as Obj[]) : [];
+  return galeria
+    .filter((f) => !f.variation_id)
+    .map((f) => {
+      const s3 = String(f.urlS3 ?? "").trim();
+      const u = String(f.url ?? "").trim();
+      const url = s3 ? `${CDN_FOTOS_DROPI}/${encodeURI(s3)}` : /^https?:\/\//i.test(u) ? u : "";
+      return { url, nombre: (s3 || u).split("/").pop() || "foto.jpg", main: f.main === true };
+    })
+    .filter((f) => f.url)
+    .sort((a, b) => Number(b.main) - Number(a.main));
+}
+
+/** Lo mismo en JavaScript simple para el favorito (va después de `ARMAR_JS`, que define `armar`). La prueba compara los dos. */
+export const REPUBLICAR_JS = [
+  "var CDN=" + JSON.stringify(CDN_FOTOS_DROPI) + ";",
+  "function nuevo(o,bp){var r=armar(o,bp,{nombre:null,nombreGuia:null});if(r.error)return r;",
+  "var pr={};bp.forEach(function(p){pr[Number(p.id)]=1});",
+  "var wp=Array.isArray(o.warehouse_product)?o.warehouse_product:[];",
+  "if(wp.some(function(w){return Number(w.stock)>0&&!pr[Number(w.warehouse_id)]}))return{error:'Tiene stock en una bodega que no es de ECOMFIVE (la B280 de Dropi): no se republica.'};",
+  "var pi=Array.isArray(o.private_product_inventories)?o.private_product_inventories:[];",
+  "if(pi.some(function(p){return!p.deleted_at&&Number(p.stock)>0}))return{error:'Tiene unidades privatizadas: quítalas en Dropi antes de republicar.'};",
+  "if(Array.isArray(o.user_profit_percentage_product)&&o.user_profit_percentage_product.length)return{error:'Tiene porcentajes por dropshipper: republícala a mano en Dropi.'};",
+  "var c=Object.assign({},r.cuerpo,{id:null,private_product_inventories:[]});",
+  "c.warehouselected=r.cuerpo.warehouselected.map(function(b){return Object.assign({},b,{stock:Number(b.stock!=null?b.stock:0)})});",
+  "return{cuerpo:c}}",
+  "function mover(o,bp,m,k){var r=armar(o,bp,{nombre:null,nombreGuia:null});if(r.error)return r;var n=0,c=Object.assign({},r.cuerpo);",
+  "c.warehouselected=r.cuerpo.warehouselected.map(function(b){var q=Number(m[String(b.warehouse_id)]||0);if(!q)return b;n++;",
+  "return Object.assign({},b,{quantity:Math.abs(q),type_movement:q>0?'ENTRADA':'SALIDA',concept:k})});",
+  "if(!n)return{error:'Esa bodega no está en el producto.'};return{cuerpo:c}}",
+  "function stockDe(o){var s={};(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).forEach(function(w){if(Number(w.stock)>0)s[String(w.warehouse_id)]=Number(w.stock)});return s}",
+  "function fotosDe(o){return(Array.isArray(o.gallery)?o.gallery:[]).filter(function(f){return!f.variation_id}).map(function(f){",
+  "var s=String(f.urlS3!=null?f.urlS3:'').trim(),u=String(f.url!=null?f.url:'').trim();",
+  "return{url:s?CDN+'/'+encodeURI(s):(/^https?:\\/\\//i.test(u)?u:''),nombre:(s||u).split('/').pop()||'foto.jpg',main:f.main===true}",
+  "}).filter(function(f){return f.url}).sort(function(a,b){return Number(b.main)-Number(a.main)})}",
+].join("");
