@@ -464,6 +464,14 @@ convenciones técnicas del código.
   bodega que no sea la B280 (`BODEGA_DROPI`: esa publicación es de Dropi y no se republica), con `dias_republicar` (30) sin ninguna venta
   (o, si nunca vendió, publicadas hace al menos esos días); sin bodega o sin ventas de Dropi no sale. Se agrega en `cargarPublicaciones`
   después de armar la fila (necesita `f.bodega`).
+  **Si se elimina algo en Dropi, no se pierde historia** (22 oct 2026): en el sistema una publicación se **archiva, no se borra**
+  (borrarla corta el vínculo ID de Dropi → producto del que dependen Ventas Dropi, Compras › Reponer y la competencia, y se van sus
+  comentarios, decisiones y lo de la IA). `scripts/importar-ventas-dropi.ts` y `scripts/importar-dinero-ventas-dropi.ts` reemplazan
+  solo lo de los productos que trae la carga: los que ya no vienen (eliminados en Dropi) conservan sus ventas y su plata, y en
+  `dropi_ventas_productos` quedan archivados y sin stock. La lectura de «Mis productos» (`publicaciones-sincronizar-dropi.ts`) archiva
+  sola la publicación cuyo ID estaba en la lectura anterior y ya no está, con su línea en la actividad; no lo hace si la lectura trae
+  menos del 90 % de los productos de la anterior (una lectura a medias). Si el producto vuelve a aparecer, `cambiosDesdeDropi` la
+  activa otra vez.
   **Tareas** (migración 0128): una aceptada es una tarea con `responsable_id`, `plazo` (regla `dias_plazo`, 7) y aviso «Para ti»
   (`notificaciones_usuario` tipo `tarea`); mientras está abierta no se vuelve a sugerir (`pendientes`). `tareaCumplida` la da por hecha
   si Dropi muestra un precio nuevo después de aceptarla y en la dirección pedida, o si el combo x2 ya está publicado; `cargarPublicaciones`
