@@ -5,7 +5,7 @@ import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { ArchivarIcon } from "@/lib/nav-icons";
+import { ApagarIcon } from "@/lib/nav-icons";
 import { apagarPublicacion } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
 
@@ -67,7 +67,7 @@ export function BotonApagarDropi({ p, deshabilitado }: { p: FilaPublicacion; des
   const yo: Paso = { id: p.id, nombre: p.nombre, dropiId: p.dropiId, tipo: p.tipoDropi, stock: p.stockProveedor, correo: p.privatizadoEmail };
   return (
     <>
-      <BotonAccion icono={ArchivarIcon} disabled={deshabilitado || p.apagadoPendiente} onClick={abrir}>
+      <BotonAccion icono={ApagarIcon} disabled={deshabilitado || p.apagadoPendiente} onClick={abrir}>
         {p.apagadoPendiente ? "Apagado pendiente" : "Apagar en Dropi"}
       </BotonAccion>
       <Ventana abierto={abierta} alCerrar={() => setAbierta(false)} titulo="Apagar en Dropi" ancho="md">
