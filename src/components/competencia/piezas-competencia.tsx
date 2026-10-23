@@ -11,16 +11,40 @@ import { obtenerCompetenciaProducto, obtenerHistorialCompetencia, type Competenc
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const num = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-PA"));
 
-/** Una foto pequeña que se abre grande con un clic (Escape o un clic afuera la cierran). */
-export function FotoAmpliable({ url, nombre, tam = "h-12 w-12" }: { url: string | null; nombre: string; tam?: string }) {
+/**
+ * Una foto pequeña que se abre grande con un clic (Escape o un clic afuera la cierran), encima de lo que haya, sin llevar a ningún
+ * sitio. Con `dentroDeFieldset` va como `role="button"` y no como `<button>`: un `<fieldset disabled>` (la ficha de solo lectura)
+ * apaga los botones, y ver una foto en grande no es editar.
+ */
+export function FotoAmpliable({ url, nombre, tam = "h-12 w-12", dentroDeFieldset = false }: { url: string | null; nombre: string; tam?: string; dentroDeFieldset?: boolean }) {
   const [abierta, setAbierta] = useState(false);
   if (!url) return <span className={`${tam} block shrink-0 rounded-md border border-dashed border-border-control`} aria-hidden="true" />;
+  const imagen = (
+    // eslint-disable-next-line @next/next/no-img-element -- fotos de Dropi (CloudFront) y de Storage
+    <img src={url} alt="" loading="lazy" className={`${tam} rounded-md border border-border object-cover hover:opacity-90`} />
+  );
   return (
     <>
-      <button type="button" onClick={() => setAbierta(true)} aria-label={`Ver la foto de ${nombre}`} className={`shrink-0 rounded-md ${anilloFoco}`}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- fotos de Dropi (CloudFront) */}
-        <img src={url} alt="" loading="lazy" className={`${tam} rounded-md border border-border object-cover hover:opacity-90`} />
-      </button>
+      {dentroDeFieldset ? (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={() => setAbierta(true)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            setAbierta(true);
+          }}
+          aria-label={`Ver la foto de ${nombre}`}
+          className={`block shrink-0 rounded-md ${anilloFoco}`}
+        >
+          {imagen}
+        </span>
+      ) : (
+        <button type="button" onClick={() => setAbierta(true)} aria-label={`Ver la foto de ${nombre}`} className={`shrink-0 rounded-md ${anilloFoco}`}>
+          {imagen}
+        </button>
+      )}
       <VisorImagen src={abierta ? url : null} alt={nombre} onClose={() => setAbierta(false)} />
     </>
   );

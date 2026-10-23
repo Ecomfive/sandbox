@@ -98,12 +98,12 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     id: "sin-vincular",
-    titulo: "Sin vincular",
+    titulo: "Sin vincular producto",
     icono: EnlaceIcon,
     color: "violeta",
     detalle: "Sin su producto de Producto",
     cuenta: (f) => estadoVinculo(f) !== "vinculado",
-    atajo: { id: "sin-vincular", etiqueta: "Sin vincular", ayuda: "Filtrar la lista: sin vincular a Producto", filtro: seleccion("vinculo", ...VINCULOS_SIN_VINCULAR) },
+    atajo: { id: "sin-vincular", etiqueta: "Sin vincular producto", ayuda: "Filtrar la lista: sin vincular a Producto", filtro: seleccion("vinculo", ...VINCULOS_SIN_VINCULAR) },
   },
   {
     id: "sin-stock",

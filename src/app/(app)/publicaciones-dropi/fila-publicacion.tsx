@@ -15,6 +15,10 @@ import { InsigniaConectado } from "./insignia-conectado";
 import { LlegadaCamino } from "./llegada-camino";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
 
+/** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
+const COLUMNAS_CON_VENTAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
+const COLUMNAS_SIN_VENTAS = "lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_4rem_1rem]";
+
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 
@@ -121,6 +125,33 @@ function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
 }
 
 /**
+ * El nombre de cada columna de la lista, en una franja que queda fija arriba al bajar (`encabezado` de `ListaDatos`). Solo en pantalla
+ * ancha: en angosta los datos van debajo del producto y cada uno ya dice cuál es. Usa la misma rejilla que `FilaPublicacionLista`; con
+ * «Archivar» la fila deja a la derecha el botón (36 px y 12 px de margen), que aquí se compensa con el relleno.
+ */
+export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = false }: { verVentas?: boolean; puedeArchivar?: boolean }) {
+  const derecha = "text-right";
+  const columnas: { nombre: string; clase?: string }[] = [
+    { nombre: "Producto" },
+    { nombre: "Precio", clase: derecha },
+    { nombre: "Utilidad y margen", clase: derecha },
+    ...(verVentas ? [{ nombre: "Ventas · 30 días", clase: derecha }, { nombre: "En camino", clase: derecha }] : []),
+    { nombre: "Dónde está" },
+    { nombre: "En Dropi" },
+  ];
+  return (
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-16" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+      {columnas.map((c) => (
+        <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
+          {c.nombre}
+        </span>
+      ))}
+      <span aria-hidden="true" />
+    </div>
+  );
+}
+
+/**
  * Una publicación como fila de la lista: foto, nombre con su ID y su SKU, precio, utilidad y margen, sus ventas,
  * dónde está y cómo está en Dropi,
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
@@ -134,7 +165,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
       type="button"
       onClick={alAbrir}
       aria-label={`Abrir la ficha de ${f.nombre}`}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_2rem_1rem]" : "lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_2rem_1rem]"} ${anilloFoco}`}
+      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS} ${anilloFoco}`}
     >
       {/* Producto */}
       <span className="flex min-w-0 items-center gap-3">
@@ -165,7 +196,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>
             ) : (
               <span className="inline-flex items-center gap-1.5">
-                <Punto clase="bg-warning" texto="Sin vincular" />
+                <Punto clase="bg-warning" texto="Sin vincular producto" />
                 {sugerida ? `${ETIQUETA_SUGERENCIA[sugerida.tipo]}${sugerida.sku ? ` · ${sugerida.sku.codigo}` : ""}` : "Sin SKU"}
               </span>
             )}

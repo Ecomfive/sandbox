@@ -1,5 +1,6 @@
 import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { compraCuenta } from "@/lib/compras/cuenta";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
@@ -68,7 +69,7 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     // El N.º correlativo va aparte: sin la migración 0089 la columna no existe y la lista se carga igual.
     traerTodasConError<{ id: string; numero: number }>((desde, hasta) => supabase.from("skus_maestros").select("id, numero").order("id").range(desde, hasta)),
     traerTodasLasFilas<{ sku_maestro_id: string; compra_id: string; cantidad_pedida: number; wms_compras: unknown }>((desde, hasta) =>
-      supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, anulada_en, paises(codigo))").order("id").range(desde, hasta),
+      supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, etapa, anulada_en, paises(codigo))").order("id").range(desde, hasta),
     ),
     // Los tests de Test productos vinculados a cada producto (migración 0099), solo para quien puede abrir Test productos.
     usuario.modulos.includes("productos-test")
@@ -187,9 +188,9 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
   const ordenesPorId = new Map<string, Map<string, { numero: number; fecha: string }>>();
   for (const l of lineasCompra) {
     // Solo lo comprado en los países que la persona puede ver (migración 0087).
-    const compra = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { numero: number; creado_en: string; anulada_en: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null;
-    // Una compra anulada no cuenta.
-    if (compra?.anulada_en) continue;
+    const compra = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { numero: number; creado_en: string; etapa: string; anulada_en: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null;
+    // Una compra anulada o descartada no cuenta (`compraCuenta`).
+    if (compra && !compraCuenta({ etapa: compra.etapa, anulada: compra.anulada_en })) continue;
     const paisCompra = compra ? ((Array.isArray(compra.paises) ? compra.paises[0] : compra.paises)?.codigo ?? null) : null;
     if (!puedeVerPais(usuario.paisesPermitidos, paisCompra)) continue;
     const n = Number(l.cantidad_pedida);
