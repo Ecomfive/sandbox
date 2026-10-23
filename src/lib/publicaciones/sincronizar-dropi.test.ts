@@ -109,3 +109,9 @@ test("cambios: el nombre lo manda Dropi, salvo un cambio nuestro pendiente", () 
   assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: p.nombre }, p, HOY).cambios, {});
   assert.deepEqual(cambiosDesdeDropi({ ...base, nombre: "Cinturón lumbar" }, prod(1, { nombre: "CINTURON/LUMBAR" }), HOY).cambios, { nombre: "CINTURON/LUMBAR" }, "el sistema muestra lo que tiene Dropi");
 });
+
+test("cambios: un precio nuestro esperando «Aplicar en Dropi» no se pisa", () => {
+  const base = { ubicacion: "bodega_ecomfive", precioVenta: 5.29, tipo: "publico", estadoPublicacion: "activo" };
+  assert.deepEqual(cambiosDesdeDropi({ ...base, precioPendiente: true }, prod(1, { precio: 4.99 }), HOY).cambios, {});
+  assert.equal(cambiosDesdeDropi(base, prod(1, { precio: 4.99 }), HOY).cambios.precio_venta, 4.99);
+});

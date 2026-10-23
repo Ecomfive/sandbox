@@ -6,7 +6,7 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { UBICACIONES, etiqueta, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
-import { enviarNombreADropi } from "@/lib/publicaciones/cambios-dropi";
+import { enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
@@ -147,9 +147,16 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
       despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k])])),
     });
   let dropi: string | undefined;
+  // El precio cambiado en la ficha también va a Dropi por la cola (22 oct 2026), junto con el nombre si los dos cambiaron.
+  const precioAntes = antes.precio_venta === null || antes.precio_venta === undefined ? null : Number(antes.precio_venta);
+  const precioNuevo = typeof datos.precio_venta === "number" ? datos.precio_venta : null;
+  if (precioNuevo !== null && precioNuevo > 0 && (precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004)) {
+    const r = await enviarPrecioADropi(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, precioNuevo, precioAntes, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+    dropi = r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`;
+  }
   if (cambiaNombre) {
     const r = await enviarNombreADropi(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null, sku_maestro_id: (antes.sku_maestro_id as string | null) ?? null }, nombreNuevo, { id: usuario.id, nombre: usuario.nombre || usuario.email });
-    dropi = r.estado === "pendiente" ? r.detalle : `El nombre se guardó, pero no quedó para Dropi: ${r.detalle}`;
+    dropi = r.estado === "pendiente" ? `Nombre${dropi ? " y precio" : ""} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` : `El nombre se guardó, pero no quedó para Dropi: ${r.detalle}`;
   }
   revalidatePath(RUTA);
   return { dropi };

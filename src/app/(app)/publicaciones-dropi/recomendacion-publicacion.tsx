@@ -56,7 +56,7 @@ export function TarjetaRecomendacion({ publicacionId, rec, puedeDecidir, respons
     empezar(async () => {
       const r = await decidirRecomendacion({ publicacionId, recomendacion: rec, decision: eligiendo, nota, dias, responsableId: eligiendo === "aceptada" ? responsable : null });
       if (r.error) return setError(r.error);
-      mostrarToast(TOAST[eligiendo]);
+      mostrarToast(r.dropi ? `${TOAST[eligiendo]}. ${r.dropi}` : TOAST[eligiendo]);
       setEligiendo(null);
       setNota("");
       router.refresh();

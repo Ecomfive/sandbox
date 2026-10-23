@@ -83,3 +83,15 @@ test("verificación después de guardar y lectura de la sesión", () => {
   assert.equal(t?.venceEn.toISOString(), "2026-10-23T01:57:44.000Z");
   assert.equal(leerTokenDropi("no-es-un-token"), null);
 });
+
+test("precios: solo se cambia lo que se pide y el sugerido no queda menor que el precio", () => {
+  const solo = armarGuardadoProducto({ ...producto7587, suggested_price: "12.99" }, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 5.29 });
+  assert.ok("cuerpo" in solo);
+  if ("cuerpo" in solo) {
+    assert.equal(solo.cuerpo.sale_price, 5.29);
+    assert.equal(solo.cuerpo.suggested_price, 12.99);
+    assert.equal(solo.cuerpo.name, producto7587.name);
+  }
+  assert.ok("error" in armarGuardadoProducto({ ...producto7587, suggested_price: "5.49" }, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 6.99 }));
+  assert.ok("error" in armarGuardadoProducto(producto7587, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 0 }));
+});

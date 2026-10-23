@@ -464,6 +464,14 @@ convenciones técnicas del código.
   bodega que no sea la B280 (`BODEGA_DROPI`: esa publicación es de Dropi y no se republica), con `dias_republicar` (30) sin ninguna venta
   (o, si nunca vendió, publicadas hace al menos esos días); sin bodega o sin ventas de Dropi no sale. Se agrega en `cargarPublicaciones`
   después de armar la fila (necesita `f.bodega`).
+  **«Aplicar en Dropi» también cambia precios** (migración 0139, 22 oct 2026): `dropi_cambios_pendientes` lleva `precio`,
+  `precio_sugerido` y sus «antes» (el nombre pasa a ser opcional; un cambio lleva al menos una cosa). `encolarCambio`
+  (`cambios-dropi.ts`) junta un cambio nuevo con el pendiente de la misma publicación (nombre + precio en un solo paso). Aceptar «Subir
+  precio» o «Bajar precio frente a la competencia» (`decidirRecomendacion`) y cambiar el precio en la ficha (`actualizarPublicacion`)
+  guardan el precio y lo encolan (`enviarPrecioADropi`). `armarGuardadoProducto` y `ARMAR_JS` cambian solo lo que trae el cambio,
+  rechazan un sugerido menor que el precio y el favorito comprueba precio y sugerido después de guardar. Al aplicarse un precio,
+  `guardarResultadosDropi` deja hechas las tareas de precio abiertas de esa publicación. La lectura diaria no pisa un precio
+  pendiente (`precioPendiente`). «Ajustar el precio sugerido» todavía no se encola solo (no hay un valor sugerido calculado).
   **Si se elimina algo en Dropi, no se pierde historia** (22 oct 2026): en el sistema una publicación se **archiva, no se borra**
   (borrarla corta el vínculo ID de Dropi → producto del que dependen Ventas Dropi, Compras › Reponer y la competencia, y se van sus
   comentarios, decisiones y lo de la IA). `scripts/importar-ventas-dropi.ts` y `scripts/importar-dinero-ventas-dropi.ts` reemplazan

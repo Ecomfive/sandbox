@@ -56,7 +56,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
           return setEstado({ tipo: "listo", cambios: [], resultados: [], guardado: null });
         }
         setEstado({ tipo: "aplicando", cambios, hechos: 0 });
-        dropi.postMessage({ tipo: "pendientes", cambios: cambios.map(({ id, producto, nombre, guia }) => ({ id, producto, nombre, guia })) }, origen);
+        dropi.postMessage({ tipo: "pendientes", cambios: cambios.map(({ id, producto, nombre, guia, precio, sugerido }) => ({ id, producto, nombre, guia, precio, sugerido })) }, origen);
       });
     return () => window.removeEventListener("message", alRecibir);
   }, [puedeEscribir]);
@@ -107,11 +107,18 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
             const r = porId.get(c.id);
             return (
               <li key={c.id} className="flex flex-col gap-0.5 px-4 py-2.5">
-                <span className="font-medium">{c.nombre}</span>
+                <span className="font-medium">{c.nombre ?? c.publicacion}</span>
+                {(c.precio !== null || c.sugerido !== null) && (
+                  <span className="text-xs tabular-nums">
+                    {c.precio !== null && `Precio ${c.precioAntes !== null ? `$${c.precioAntes.toFixed(2)} → ` : ""}$${c.precio.toFixed(2)}`}
+                    {c.precio !== null && c.sugerido !== null && " · "}
+                    {c.sugerido !== null && `Sugerido ${c.sugeridoAntes !== null ? `$${c.sugeridoAntes.toFixed(2)} → ` : ""}$${c.sugerido.toFixed(2)}`}
+                  </span>
+                )}
                 <span className="text-xs text-muted-foreground">
                   ID {c.producto}
                   {c.guia ? ` · guía ${c.guia}` : ""}
-                  {c.publicacion && c.publicacion !== c.nombre ? ` · ${c.publicacion}` : ""}
+                  {c.nombre && c.publicacion && c.publicacion !== c.nombre ? ` · ${c.publicacion}` : ""}
                 </span>
                 <span className={`text-xs font-medium ${r?.ok ? "text-success" : "text-destructive"}`}>{r ? (r.ok ? "Cambiado en Dropi" : `No se pudo: ${r.error ?? "sin detalle"}`) : "Sin respuesta de Dropi"}</span>
               </li>
