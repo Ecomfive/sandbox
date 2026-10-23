@@ -13,7 +13,7 @@ import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { eliminarPublicacion } from "./actions";
 import { InsigniaConectado } from "./insignia-conectado";
 import { LlegadaCamino } from "./llegada-camino";
-import type { FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
 
 const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
@@ -145,7 +145,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, alEliminar
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
             <span className="tabular-nums">{f.dropiId ? `ID ${f.dropiId}` : "Sin ID de Dropi"}</span>
-            {f.dropiId.trim() !== "" && <InsigniaConectado />}
+            {conexionDropi(f) && <InsigniaConectado estado={conexionDropi(f)!} />}
             {/* A qué bodega de Dropi pertenece («B280»): la que muestra Dropi o, si hoy no tiene stock, la última que se conoció. */}
             {f.bodega ? (
               <span className="rounded border border-border-control px-1 font-mono font-semibold text-foreground">
