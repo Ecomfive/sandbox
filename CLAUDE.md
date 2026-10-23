@@ -474,6 +474,7 @@ convenciones técnicas del código.
   (o, si nunca vendió, publicadas hace al menos esos días); sin bodega o sin ventas de Dropi no sale. Se agrega en `cargarPublicaciones`
   después de armar la fila (necesita `f.bodega`).
   **Elegir qué aplicar** (23 oct 2026, pedido de Hernán): al pulsar el favorito, la ventana `/publicaciones-dropi/aplicar-dropi` (`aplicar-dropi.tsx`) **ya no manda todo solo**: muestra la lista de pendientes (`pendientesParaDropi`), cada cambio con «Posponer» (solo en pantalla: sigue pendiente para la próxima vez; no hay columna) y «Aplicar en Dropi (N)» le manda al favorito únicamente los no pospuestos (el favorito espera el mensaje `pendientes` sin límite de tiempo, no cambió); `guardarResultadosDropi` guarda solo los enviados.
+  **Icono de la columna «En Dropi»** (23 oct 2026): `<DropiIcon marca />` (`src/lib/nav-icons.tsx`) dibuja el logo con los colores de Dropi —círculo naranja `NARANJA_DROPI` = #FF9045, el del favicon de app.dropi.pa y de su hoja de estilos, y la mascota en blanco, igual en los dos temas—; apagado (sin ID o sin datos) va desaturado. Sin `marca` (el menú) sigue siendo del color del texto.
   **«Aplicar en Dropi» también cambia precios** (migración 0139, 22 oct 2026): `dropi_cambios_pendientes` lleva `precio`,
   `precio_sugerido` y sus «antes» (el nombre pasa a ser opcional; un cambio lleva al menos una cosa). `encolarCambio`
   (`cambios-dropi.ts`) junta un cambio nuevo con el pendiente de la misma publicación (nombre + precio en un solo paso). Aceptar «Subir
