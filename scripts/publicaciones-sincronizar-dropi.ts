@@ -71,6 +71,8 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   const usados = new Set<number>();
   const cambios: { id: string; nombre: string; dropiId: number; cambios: ReturnType<typeof cambiosDesdeDropi>["cambios"]; detalle: string[] }[] = [];
   const noEstan: string[] = [];
+  // Publicaciones cuyo producto ya no está en Dropi (se eliminó): se archivan solas, sin borrar nada (22 oct 2026).
+  const desaparecidas: { id: string; nombre: string; dropiId: string }[] = [];
   for (const pub of pubs) {
     const ids = idsDeDropi(pub.dropi_id);
     ids.forEach((id) => usados.add(id));
@@ -78,6 +80,8 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     const p = productoPrincipal(ids, productos);
     if (!p) {
       noEstan.push(`${pub.dropi_id} ${pub.nombre}`);
+      // Solo si el ID sí estaba en la lectura anterior: así una publicación con el ID mal escrito desde siempre no se archiva sola.
+      if (pub.estado_publicacion !== "archivado" && anteriores && ids.some((id) => anteriores.has(id))) desaparecidas.push({ id: pub.id, nombre: pub.nombre, dropiId: String(pub.dropi_id) });
       continue;
     }
     const r = cambiosDesdeDropi(
@@ -104,6 +108,7 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     estado: cuenta("estado_publicacion"),
     nombre: cuenta("nombre"),
     idNoEstaEnDropi: noEstan,
+    archivadasPorDesaparecer: desaparecidas.map((d) => `${d.dropiId} ${d.nombre}`),
     creadas: nuevos.map((p) => `${p.id} ${p.nombre} (${p.bodegas.length ? codigoBodega(bodegasEnOrden(p.bodegas)[0].id) : "sin bodega"})`),
     enDropiSinPublicacion: sinPublicacion,
     aplicado: aplicar,
@@ -142,6 +147,17 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
       "Actividad",
     ),
   );
+  // Resguardo: si esta lectura trae muchos menos productos que la anterior (una lectura a medias), no se archiva nada.
+  const lecturaCompleta = !!anteriores && productos.size >= anteriores.size * 0.9;
+  if (desaparecidas.length && lecturaCompleta) {
+    for (const d of desaparecidas) revisar(await supabase.from("dropi_publicaciones").update({ estado_publicacion: "archivado", actualizado_en: leidoEn }).eq("id", d.id), `Archivar ${d.nombre}`);
+    revisar(
+      await supabase.from("historial_auditoria").insert(
+        desaparecidas.map((d) => ({ usuario_id: null, usuario_nombre: "Sistema", accion: "sincronizar_dropi_publicacion", entidad: "dropi_publicaciones", entidad_id: d.id, detalle: `ID ${d.dropiId} · Archivada: el producto ya no aparece en Dropi (se eliminó). Su historia y sus ventas se conservan.` })),
+      ),
+      "Actividad de las archivadas",
+    );
+  }
   if (nuevos.length) {
     const creadas = revisar(
       await supabase

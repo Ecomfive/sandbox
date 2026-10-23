@@ -1,7 +1,9 @@
 // Desempeño › Ventas Dropi: carga a la base (migración 0120) el Historial de Existencia de Dropi que se bajó a
 // datos-privados/dropi-historial-movimientos.json (cada movimiento de stock de cada producto) y dropi-historial-resumen.json (el
 // nombre, la lista y si es privado de cada producto). Agrupa por producto y día en hora de Panamá, y por dropshipper (lo
-// cancelado o devuelto se le carga a quien creó la orden). Cada carga reemplaza la anterior del país.
+// cancelado o devuelto se le carga a quien creó la orden). Cada carga reemplaza lo de los productos que trae; los que ya no vienen
+// (eliminados en Dropi) conservan su historia, quedan archivados y sin stock (22 oct 2026: para no perder ventas pasadas). El
+// resumen por dropshipper sí se reemplaza entero (es una foto de hoy).
 // Cada día lo corre `scripts/ventas-dropi.ts cargar` (tarea «ventas-dropi-diario»), después de bajar la lectura del navegador.
 //
 //   npx tsx scripts/importar-ventas-dropi.ts            → informe (no escribe)
@@ -115,11 +117,30 @@ async function main() {
   const porMes = [...dsMes.values()].map((x) => ({ pais_id: pais.id, dropi_usuario_id: x.usuario, dropi_producto_id: x.producto, mes: x.mes, pedidas: x.pedidas, ordenes: x.ordenes.size, no_efectivas: x.noEfectivas }));
   const netasTotal = diarias.reduce((a, d) => a + netas(d as never), 0);
   console.log(`Corte ${corteFecha}: ${productos.length} productos, ${movimientos} movimientos, ${diarias.length} filas por día, ${dropshippers.length} dropshippers (${porMes.length} filas por producto y mes), ${netasTotal} unidades netas.`);
-  if (!aplicar) return console.log("Con --aplicar se cargan (reemplazan la carga anterior de Panamá).");
+  if (!aplicar) return console.log("Con --aplicar se cargan (reemplazan lo de estos productos; los que ya no vienen conservan su historia).");
 
-  for (const t of ["dropi_ventas_diarias", "dropi_ventas_productos", "dropi_ventas_dropshippers", "dropi_ventas_dropshipper_mes"]) {
-    const { error } = await supabase.from(t).delete().eq("pais_id", pais.id);
-    if (error) throw new Error(error.message.includes("does not exist") || error.message.includes("schema cache") ? `Falta correr la migración ${t === "dropi_ventas_dropshipper_mes" ? "0122" : "0120"}.` : `${t}: ${error.message}`);
+  // Los productos que trae esta carga reemplazan lo suyo; los que ya no vienen se conservan (su historia no se pierde si se
+  // eliminan en Dropi) y quedan archivados y sin stock, porque Dropi ya no los lista.
+  const ids = productos.map((p) => Number(p.dropi_producto_id));
+  const { data: previos, error: errPrevios } = await supabase.from("dropi_ventas_productos").select("dropi_producto_id").eq("pais_id", pais.id).limit(20000);
+  if (errPrevios) throw new Error(errPrevios.message.includes("does not exist") || errPrevios.message.includes("schema cache") ? "Falta correr la migración 0120." : errPrevios.message);
+  const nuevos = new Set(ids);
+  const conservados = (previos ?? []).map((x) => Number(x.dropi_producto_id)).filter((id) => !nuevos.has(id));
+  for (let i = 0; i < ids.length; i += 300) {
+    const tanda = ids.slice(i, i + 300);
+    for (const t of ["dropi_ventas_diarias", "dropi_ventas_productos", "dropi_ventas_dropshipper_mes"]) {
+      const { error } = await supabase.from(t).delete().eq("pais_id", pais.id).in("dropi_producto_id", tanda);
+      if (error) throw new Error(error.message.includes("does not exist") || error.message.includes("schema cache") ? `Falta correr la migración ${t === "dropi_ventas_dropshipper_mes" ? "0122" : "0120"}.` : `${t}: ${error.message}`);
+    }
+  }
+  for (let i = 0; i < conservados.length; i += 300) {
+    const { error } = await supabase.from("dropi_ventas_productos").update({ lista: "archivado", stock: 0 }).eq("pais_id", pais.id).in("dropi_producto_id", conservados.slice(i, i + 300));
+    if (error) throw new Error(`Conservar los que ya no vienen: ${error.message}`);
+  }
+  if (conservados.length) console.log(`${conservados.length} productos ya no vienen en la exportación (eliminados en Dropi): se conserva su historia, archivados y sin stock.`);
+  {
+    const { error } = await supabase.from("dropi_ventas_dropshippers").delete().eq("pais_id", pais.id);
+    if (error) throw new Error(`dropi_ventas_dropshippers: ${error.message}`);
   }
   await enTandas("dropi_ventas_productos", productos);
   await enTandas("dropi_ventas_diarias", diarias);

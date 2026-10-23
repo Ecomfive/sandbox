@@ -1,7 +1,8 @@
 // Desempeño › Ventas Dropi: carga la plata de cada producto (migración 0130) desde el Excel «ECOMFIVE DROPI 2026 DIARIO» de la
 // oficina: hoja ÓRDENES (ganancia, comisión, coste real y descuentos de cada orden) y hoja COSTOS (el costo unitario de cada
 // producto por mes, para repartir el coste de una orden de varios productos). El precio de proveedor de cada publicación (Gestión
-// de IDs Dropi) reparte la ganancia. Cada carga reemplaza la anterior de Panamá. Las reglas viven en src/lib/publicaciones/dinero.ts.
+// de IDs Dropi) reparte la ganancia. Cada carga reemplaza lo de los productos que trae; los que ya no vienen conservan su plata
+// (22 oct 2026: un producto eliminado en Dropi no pierde su historia). Las reglas viven en src/lib/publicaciones/dinero.ts.
 //
 //   npx tsx scripts/importar-dinero-ventas-dropi.ts "<ruta del Excel>"            → informe (no escribe)
 //   npx tsx scripts/importar-dinero-ventas-dropi.ts "<ruta del Excel>" --aplicar  → carga
@@ -136,8 +137,11 @@ async function main() {
     console.log("\nSolo informe. Para cargar: agrega --aplicar");
     return;
   }
-  const { error: errBorrar } = await supabase.from("dropi_ventas_dinero").delete().eq("pais_id", pais.id);
-  if (errBorrar) throw new Error(`dropi_ventas_dinero: ${errBorrar.message}`);
+  const idsCarga = [...new Set(dias.map((d) => d.producto))];
+  for (let i = 0; i < idsCarga.length; i += 300) {
+    const { error: errBorrar } = await supabase.from("dropi_ventas_dinero").delete().eq("pais_id", pais.id).in("dropi_producto_id", idsCarga.slice(i, i + 300));
+    if (errBorrar) throw new Error(`dropi_ventas_dinero: ${errBorrar.message}`);
+  }
   for (let i = 0; i < dias.length; i += 1000) {
     const { error } = await supabase.from("dropi_ventas_dinero").insert(
       dias.slice(i, i + 1000).map((d) => ({
