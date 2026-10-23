@@ -128,6 +128,16 @@ const ES = {
   original: "Original",
   verOriginal: "ver original",
   soloLectura: "Así ve Chin su portal (en su cuenta, en chino). Aquí es solo para ver: lo que él registra lo hace desde su portal.",
+  cambiarClave: "Cambiar clave",
+  elegirClave: "Elige tu clave",
+  elegirClaveTexto: "Entraste con una clave temporal. Elige una clave propia para seguir: solo tú la sabrás.",
+  claveActual: "Clave actual",
+  claveTemporal: "Clave temporal (la que te dio Ecomfive)",
+  claveNueva: "Clave nueva (mínimo 8 caracteres)",
+  claveRepetir: "Repite la clave nueva",
+  guardarClave: "Guardar clave",
+  guardandoClave: "Guardando…",
+  claveCambiada: "Listo: tu clave nueva quedó guardada.",
 };
 
 export type Textos = typeof ES;
@@ -251,6 +261,16 @@ const ZH: Textos = {
   original: "原文",
   verOriginal: "查看原文",
   soloLectura: "",
+  cambiarClave: "修改密码",
+  elegirClave: "设置您的密码",
+  elegirClaveTexto: "您使用的是临时密码。请设置您自己的密码后继续：只有您知道这个密码。",
+  claveActual: "当前密码",
+  claveTemporal: "临时密码（Ecomfive 提供的）",
+  claveNueva: "新密码（至少 8 个字符）",
+  claveRepetir: "再次输入新密码",
+  guardarClave: "保存密码",
+  guardandoClave: "正在保存…",
+  claveCambiada: "完成：新密码已保存。",
 };
 
 export const TEXTOS: Record<Idioma, Textos> = { es: ES, zh: ZH };
@@ -311,6 +331,12 @@ const ERRORES_ZH: Record<string, string> = {
   "El texto es muy largo.": "文字太长。",
   "Escribe un número mayor o igual que cero.": "请输入大于或等于零的数字。",
   "La fecha no puede ser futura.": "日期不能是未来日期。",
+  "La clave nueva debe tener al menos 8 caracteres.": "新密码至少需要 8 个字符。",
+  "La clave nueva es muy larga.": "新密码太长。",
+  "Las claves nuevas no coinciden.": "两次输入的新密码不一致。",
+  "La clave nueva debe ser distinta de la actual.": "新密码必须与当前密码不同。",
+  "La clave actual no es correcta.": "当前密码不正确。",
+  "No se pudo cambiar la clave.": "无法修改密码。",
 };
 
 /** Un error de una acción del portal en el idioma de la cuenta (si no está en la lista, va en español). */

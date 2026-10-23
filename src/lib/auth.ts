@@ -90,12 +90,15 @@ function juntarAfinado(rolId: string | null, finos: Pick<PermisosFinos, "afinado
  * layout, la página y el resto de la petición comparten la misma respuesta. Se separa del perfil para poder pedir
  * lo que solo depende del id (los favoritos) sin esperar a que se resuelvan el perfil y los permisos.
  */
-export const getUsuarioIdSesion = cache(async (): Promise<string | null> => {
+export const getUsuarioIdSesion = cache(async (): Promise<string | null> => (await getUsuarioSesion())?.id ?? null);
+
+/** El usuario de autenticación con sesión (con su `app_metadata`), de la misma consulta que `getUsuarioIdSesion`. */
+export const getUsuarioSesion = cache(async () => {
   const session = await createSessionClient();
   const {
     data: { user },
   } = await session.auth.getUser();
-  return user?.id ?? null;
+  return user ?? null;
 });
 
 /** Usuario con sesión activa, su rol y los módulos a los que ese rol tiene acceso (una vez por petición). */

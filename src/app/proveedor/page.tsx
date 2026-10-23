@@ -3,10 +3,11 @@ import { cargarEspejo } from "@/lib/proveedor/datos";
 import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { cargarCambiosRegistro, cargarRegistro } from "@/lib/proveedor/registro-datos";
-import { requireProveedor } from "@/lib/proveedor/sesion";
+import { requireProveedor, tieneClaveTemporal } from "@/lib/proveedor/sesion";
 import { traducirTextos } from "@/lib/proveedor/traducir";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { createServiceClient } from "@/lib/supabase/server";
+import { ElegirClave } from "./cambiar-clave";
 import { PortalChin, type AvisoEcomfive } from "./portal-chin";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ export const dynamic = "force-dynamic";
  */
 export default async function PortalProveedorPage() {
   const cuenta = await requireProveedor();
+  // Con la clave temporal que le dio un administrador, primero elige la suya.
+  if (await tieneClaveTemporal()) return <ElegirClave idioma={await idiomaDeCuenta(cuenta.cuentaId)} nombre={cuenta.nombre} />;
   const supabase = createServiceClient();
   const [espejo, idioma] = await Promise.all([cargarEspejo(supabase, cuenta.proveedor.id), idiomaDeCuenta(cuenta.cuentaId)]);
   if ("error" in espejo) {
