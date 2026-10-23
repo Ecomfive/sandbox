@@ -180,7 +180,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
       await supabase.storage.from(BUCKET_FOTOS).remove([origen]);
     }
   }
-  // Un pack (el compuesto de UN solo producto, por ejemplo 2 o 3 unidades) sin foto propia toma la del producto original: se COPIA a
+  // Un pack (el compuesto de UN solo producto, de cualquier cantidad de unidades: 2, 3, 6, 12…) sin foto propia toma la del producto original: se COPIA a
   // la carpeta del compuesto (no se comparte la dirección: si alguien cambia la del simple, la del pack no se mueve). Un compuesto de
   // productos distintos no la toma: lleva la que se suba. Lo pide la ficha con `foto_del_simple` (marcado por defecto).
   if (!conFoto && tipo === "combo" && componentes.size === 1 && texto(formData, "foto_del_simple") === "1") {
