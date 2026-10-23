@@ -1,8 +1,8 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Button } from "@/components/ui/button";
 import { SkuCopiable } from "@/components/ui/sku-copiable";
@@ -16,7 +16,7 @@ import type { FilaPublicacion } from "./def-publicaciones";
 function Producto({ sku, pequeño = false }: { sku: SkuResumen; pequeño?: boolean }) {
   return (
     <span className="flex min-w-0 items-center gap-2.5">
-      {sku.foto ? <img src={sku.foto} alt="" className={`${pequeño ? "h-8 w-8" : "h-10 w-10"} shrink-0 rounded-md border border-border object-cover`} /> : <span aria-hidden="true" className={`${pequeño ? "h-8 w-8" : "h-10 w-10"} shrink-0 rounded-md border border-dashed border-border-control`} />}
+      <FotoAmpliable url={sku.foto} nombre={sku.codigo} tam={pequeño ? "h-8 w-8" : "h-10 w-10"} />
       <span className="flex min-w-0 flex-col">
         <SkuCopiable codigo={sku.codigo} className="font-mono text-xs font-semibold" />
         <span className="truncate text-xs text-muted-foreground">

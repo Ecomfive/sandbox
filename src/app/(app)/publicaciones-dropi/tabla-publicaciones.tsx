@@ -15,7 +15,7 @@ import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { TIPOS_RECOMENDACION } from "@/lib/publicaciones/recomendaciones";
 import { FichaPublicacion } from "./ficha-publicacion";
-import { FilaPublicacionLista } from "./fila-publicacion";
+import { EncabezadoFilasPublicacion, FilaPublicacionLista } from "./fila-publicacion";
 import { ProveedorTareas } from "./recomendacion-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 
@@ -124,6 +124,7 @@ export function TablaPublicaciones({
         nombre={NOMBRE}
         claveFila={(f) => f.id}
         variante="filas"
+        encabezado={<EncabezadoFilasPublicacion verVentas={verVentas} puedeArchivar={puedeArchivar} />}
         renderFila={(f, enOrden) => (
           <FilaPublicacionLista
             f={f}

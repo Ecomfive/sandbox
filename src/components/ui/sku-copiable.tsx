@@ -45,7 +45,7 @@ export function SkuCopiable({ codigo, className = "", children }: { codigo: stri
         type="button"
         onClick={alPulsar}
         aria-label={`Copiar el SKU ${codigo}`}
-        className={`inline-flex max-w-full cursor-copy items-center rounded text-left underline-offset-4 hover:underline hover:decoration-dotted ${anilloFoco} ${className}`}
+        className={`inline-flex max-w-full cursor-pointer items-center rounded text-left underline-offset-4 hover:underline hover:decoration-dotted ${anilloFoco} ${className}`}
       >
         {children ?? <span className="truncate">{codigo}</span>}
       </button>

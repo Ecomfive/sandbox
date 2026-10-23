@@ -474,6 +474,12 @@ convenciones técnicas del código.
   (o, si nunca vendió, publicadas hace al menos esos días); sin bodega o sin ventas de Dropi no sale. Se agrega en `cargarPublicaciones`
   después de armar la fila (necesita `f.bodega`).
   **Elegir qué aplicar** (23 oct 2026, pedido de Hernán): al pulsar el favorito, la ventana `/publicaciones-dropi/aplicar-dropi` (`aplicar-dropi.tsx`) **ya no manda todo solo**: muestra la lista de pendientes (`pendientesParaDropi`), cada cambio con «Posponer» (solo en pantalla: sigue pendiente para la próxima vez; no hay columna) y «Aplicar en Dropi (N)» le manda al favorito únicamente los no pospuestos (el favorito espera el mensaje `pendientes` sin límite de tiempo, no cambió); `guardarResultadosDropi` guarda solo los enviados.
+  **Encabezado fijo, fotos y cursor** (23 oct 2026, pedido de Hernán): la lista lleva una franja con el nombre de cada columna
+  (`EncabezadoFilasPublicacion`, `encabezado` de `ListaDatos` con `variante="filas"`; solo en pantalla ancha, comparte la rejilla de la fila
+  y queda fija con `sticky top-0 z-[15]` **fuera** del `<ul overflow-hidden>`, que impediría que se quede fija). Las fotos del «Producto
+  vinculado» y del «Producto» de la ficha son `FotoAmpliable` (se amplían encima con `VisorImagen`, sin llevar a ningún sitio; la de la ficha
+  va con `dentroDeFieldset`, como `role="button"`, para que un fieldset de solo lectura no la apague). **Un elemento que se pulsa lleva
+  la mano** (`cursor-pointer`, ya global para botones): nada de `cursor-copy` ni `cursor-zoom-in`, que dibujan un «+» (el SKU copiable lo tenía).
   **Icono de la columna «En Dropi»** (23 oct 2026): `<DropiIcon marca />` (`src/lib/nav-icons.tsx`) dibuja el logo con los colores de Dropi —círculo naranja `NARANJA_DROPI` = #FF9045, el del favicon de app.dropi.pa y de su hoja de estilos, y la mascota en blanco, igual en los dos temas—; apagado (sin ID o sin datos) va desaturado. Sin `marca` (el menú) sigue siendo del color del texto.
   **«Aplicar en Dropi» también cambia precios** (migración 0139, 22 oct 2026): `dropi_cambios_pendientes` lleva `precio`,
   `precio_sugerido` y sus «antes» (el nombre pasa a ser opcional; un cambio lleva al menos una cosa). `encolarCambio`
