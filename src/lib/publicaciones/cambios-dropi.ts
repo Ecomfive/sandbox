@@ -13,7 +13,7 @@ export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazad
 export interface CambioDropiVista {
   id: string;
   /** «cambio» = nombre y/o precios; «republicar» = crear el producto de nuevo en Dropi (migración 0145). */
-  tipo: "cambio" | "republicar";
+  tipo: "cambio" | "republicar" | "apagar";
   /** El ID del producto nuevo de una republicación, cuando Dropi ya lo creó. */
   nuevoDropiId: number | null;
   estado: EstadoCambioDropi;
@@ -115,6 +115,35 @@ export async function encolarRepublicar(
   return { id: data.id as string, yaEstaba: false };
 }
 
+/**
+ * «Apagar en Dropi» (pedido de Hernán, 23 oct 2026; migración 0148): deja en la cola que se saque todo el stock del producto en Dropi
+ * (con `quitarPrivados`, también su privatización) y se archive. Si ya había un apagado esperando, no se agrega otro (el pendiente
+ * se reintenta solo en cada «Aplicar en Dropi»; si antes no pedía quitar privados y ahora sí, se actualiza).
+ */
+export async function encolarApagar(
+  supabase: SupabaseClient,
+  pub: { id: string; pais_id: string; dropi_id: string | null },
+  opciones: { quitarPrivados: boolean },
+  por: { id: string; nombre: string },
+): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
+  const productoId = idsDeDropi(pub.dropi_id)[0];
+  if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
+  const falta = (m: string) => /tipo|column|does not exist|schema cache|quitar_privados/i.test(m);
+  const previo = await supabase.from("dropi_cambios_pendientes").select("id, quitar_privados").eq("publicacion_id", pub.id).eq("tipo", "apagar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
+  if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0148." : "No se pudo dejar el apagado para Dropi." };
+  if (previo.data) {
+    if (opciones.quitarPrivados && !previo.data.quitar_privados) await supabase.from("dropi_cambios_pendientes").update({ quitar_privados: true }).eq("id", previo.data.id as string);
+    return { id: previo.data.id as string, yaEstaba: true };
+  }
+  const { data, error } = await supabase
+    .from("dropi_cambios_pendientes")
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "apagar", quitar_privados: opciones.quitarPrivados, creado_por: por.id, creado_por_nombre: por.nombre })
+    .select("id")
+    .single();
+  if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0148." : "No se pudo dejar el apagado para Dropi." };
+  return { id: data.id as string, yaEstaba: false };
+}
+
 /** El cambio de nombre (y el de la guía) para Dropi; se junta con un cambio de precio pendiente si lo hay. */
 export async function encolarCambioNombre(
   supabase: SupabaseClient,
@@ -162,8 +191,10 @@ export async function enviarNombreADropi(
 }
 
 /** El último cambio en Dropi de cada publicación del país y cuántos siguen pendientes. Sin la migración 0137, vacío. */
-export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: string): Promise<{ porPublicacion: Map<string, CambioDropiVista>; pendientes: number }> {
+export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: string): Promise<{ porPublicacion: Map<string, CambioDropiVista>; pendientes: number; apagando: Set<string> }> {
   const porPublicacion = new Map<string, CambioDropiVista>();
+  // Las publicaciones con un apagado esperando (pendiente, a medias o con error): en el sistema ya se ven como apagadas.
+  const apagando = new Set<string>();
   const leer = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
   let r = await leer("id, publicacion_id, tipo, nuevo_dropi_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
@@ -171,14 +202,15 @@ export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: strin
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, error, creado_en, aplicado_en");
   const { data, error } = r as unknown as { data: Record<string, unknown>[] | null; error: unknown };
-  if (error) return { porPublicacion, pendientes: 0 };
+  if (error) return { porPublicacion, pendientes: 0, apagando };
   let pendientes = 0;
   for (const f of data ?? []) {
     if (f.estado === "pendiente") pendientes++;
+    if (f.tipo === "apagar" && (f.estado === "pendiente" || f.estado === "error")) apagando.add(f.publicacion_id as string);
     if (porPublicacion.has(f.publicacion_id as string)) continue;
     porPublicacion.set(f.publicacion_id as string, {
       id: f.id as string,
-      tipo: f.tipo === "republicar" ? "republicar" : "cambio",
+      tipo: f.tipo === "republicar" ? "republicar" : f.tipo === "apagar" ? "apagar" : "cambio",
       nuevoDropiId: f.nuevo_dropi_id === null || f.nuevo_dropi_id === undefined ? null : Number(f.nuevo_dropi_id),
       estado: f.estado as EstadoCambioDropi,
       nombre: (f.nombre as string | null) ?? null,
@@ -190,5 +222,5 @@ export async function cargarCambiosDropi(supabase: SupabaseClient, paisId: strin
       aplicadoEn: (f.aplicado_en as string | null) ?? null,
     });
   }
-  return { porPublicacion, pendientes };
+  return { porPublicacion, pendientes, apagando };
 }

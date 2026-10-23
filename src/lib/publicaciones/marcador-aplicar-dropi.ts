@@ -11,8 +11,13 @@
  * Un cambio de tipo «republicar» (23 oct 2026, migración 0145) crea el producto de nuevo (`republicar`, con `REPUBLICAR_JS`): lo
  * crea (salvo que un intento anterior ya lo haya creado: `c.nuevo`), le sube las fotos que le falten, le pone el stock del viejo si
  * Dropi no lo tomó al crearlo, le saca el stock al viejo, lo archiva y comprueba. Devuelve el ID nuevo aunque falle un paso después.
+ *
+ * Un cambio de tipo «apagar» (23 oct 2026, migración 0148; `apagar`, con `APAGAR_JS`) hace lo que Nicole a mano: saca todo el stock
+ * (concepto «stock»), con `quitarPrivados` quita la privatización, comprueba que quedó en cero e intenta archivar. Si Dropi no deja
+ * archivar (órdenes pendientes) devuelve `ok: true, archivado: false`: queda pendiente y el próximo «Aplicar en Dropi» solo repite el archivado.
  */
 
+import { APAGAR_JS } from "./apagar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
 
 /** El armado del guardado de Dropi, en JavaScript simple para el favorito (el mismo de `armarGuardadoProducto`). */
@@ -45,6 +50,7 @@ const CODIGO = [
   "function pedir(r,m,b){return fetch(A+r,{method:m||'GET',headers:H,body:b?JSON.stringify(b):undefined}).then(function(x){return x.json().catch(function(){return null}).then(function(j){return{ok:x.ok&&!(j&&j.isSuccess===false),s:x.status,j:j}})},function(e){return{ok:false,s:0,j:{message:String(e&&e.message||e)}}})}",
   "function motivo(r){return r.s===401?'La sesión de Dropi venció: inicia sesión de nuevo en Dropi.':'Dropi respondió '+r.s+(r.j&&r.j.message?': '+r.j.message:'')+'.'}",
   REPUBLICAR_JS,
+  APAGAR_JS,
   // Una foto: se baja del CDN de Dropi y se sube al producto nuevo como lo hace la pantalla de Dropi.
   "function subir(id,f){return fetch(f.url).then(function(x){return x.ok?x.blob():null},function(){return null}).then(function(b){if(!b)return false;",
   "var d=new FormData();d.append('files',new File([b],f.nombre,{type:b.type||'image/jpeg'}));d.append('id',String(id));d.append('main',f.main?'true':'false');",
@@ -72,7 +78,24 @@ const CODIGO = [
   "for(k in sw)tn+=sw[k];for(k in sq)tv+=sq[k];",
   "if(tv>0)return f('El '+c.producto+' sigue con '+tv+' unidades en Dropi.');",
   "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null}}",
+  "async function apagar(c,bp){",
+  "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
+  "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
+  "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
+  "var p=apagado(o,bp,c.quitarPrivados===true);if(p.error)return{ok:false,error:p.error};",
+  "if(p.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',p.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
+  "var d=await pedir('/products/'+c.producto),n=d.j&&d.j.objects;if(!d.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
+  "var sn=stockDe(n),tv=0,k;for(k in sn)tv+=sn[k];if(tv>0)return{ok:false,error:'Dropi sigue mostrando '+tv+' unidades de stock.'};",
+  "if(c.quitarPrivados===true&&(Array.isArray(n.private_product_inventories)?n.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return{ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'};",
+  "o=n}",
+  "if(o.archived)return{ok:true,archivado:true};",
+  "var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});",
+  "if(!ar.ok)return{ok:true,archivado:false,error:'Sin stock en Dropi, pero no dejó archivarlo: '+motivo(ar)+' Si tiene órdenes pendientes, se reintenta en el próximo Aplicar en Dropi.'};",
+  "var v=await pedir('/products/'+c.producto),w=v.j&&v.j.objects;",
+  "if(v.ok&&w&&!w.archived)return{ok:true,archivado:false,error:'Se pidió archivarlo, pero Dropi todavía no lo muestra archivado.'};",
+  "return{ok:true,archivado:true}}",
   "async function aplicar(c,bp){",
+  "if(c.tipo==='apagar')return apagar(c,bp);",
   "if(c.tipo==='republicar')return republicar(c,bp);",
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",

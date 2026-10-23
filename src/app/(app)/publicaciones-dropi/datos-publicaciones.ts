@@ -9,6 +9,7 @@ import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
+import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
 import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
 import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
@@ -328,12 +329,25 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),
       ...revisionDe(d),
       ...automatico(d, ventas, competidores, hoy, r, prov, stockActual),
+      // Con un apagado esperando «Aplicar en Dropi», en el sistema ya es una publicación apagada: va a Archivados y no genera acciones ni recomendaciones.
+      ...(cambiosDropi.apagando.has(d.id as string) ? { archivada: true, acciones: [] as FilaPublicacion["acciones"] } : {}),
+      apagadoPendiente: cambiosDropi.apagando.has(d.id as string),
       duplicadaDe: null,
+      grupo: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.
     if (!original) return fila;
     return { ...fila, archivada: true, acciones: [], duplicadaDe: `${numeroPublicacion(numeroPorId.get(original))} · ${nombrePorId.get(original) ?? "otra publicación"}` };
   });
+
+  // El grupo de cada producto (el público y sus privadas «P-MA …»), para apagarlas juntas.
+  const paraApagar = filas.map((f) => ({ id: f.id, nombre: f.nombre, tipo: f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }));
+  const porIdFila = new Map(filas.map((f) => [f.id, f]));
+  for (const f of filas)
+    f.grupo = grupoDe({ id: f.id, nombre: f.nombre, tipo: f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }, paraApagar).map((x) => {
+      const o = porIdFila.get(x.id)!;
+      return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail };
+    });
 
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.
   const publicados = new Set(filas.filter((f) => !f.archivada && f.sku).map((f) => f.sku!.id));

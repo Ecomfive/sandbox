@@ -8,6 +8,7 @@ const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "num
  */
 export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
   if (c.tipo === "republicar") return <EstadoRepublicar c={c} />;
+  if (c.tipo === "apagar") return <EstadoApagar c={c} />;
   const guia = c.nombreGuia ? ` · guía «${c.nombreGuia}»` : "";
   // Qué lleva el cambio: el nombre, el precio y/o el precio sugerido.
   const que = [c.nombre ? `«${c.nombre}»${guia}` : "", c.precio !== null ? `precio $${c.precio.toFixed(2)}` : "", c.precioSugerido !== null ? `sugerido $${c.precioSugerido.toFixed(2)}` : ""].filter(Boolean).join(" · ");
@@ -24,6 +25,28 @@ export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
       {c.estado === "error"
         ? `No se pudo cambiar en Dropi: ${c.error ?? "sin detalle"} Se vuelve a intentar al pulsar «Aplicar en Dropi».`
         : `Pendiente en Dropi (${que}): pulsa «Aplicar en Dropi» con Dropi abierto.`}
+    </span>
+  );
+}
+
+/**
+ * Cómo va un apagado (migración 0148): hecho (sin stock y archivado en Dropi), pendiente, o con error. Si quedó sin stock pero Dropi no
+ * dejó archivar (órdenes pendientes), el motivo viene en `error` y sigue pendiente: cada «Aplicar en Dropi» reintenta el archivado.
+ */
+function EstadoApagar({ c }: { c: CambioDropiVista }) {
+  if (c.estado === "aplicado")
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-success">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+        Apagado en Dropi el {fecha(c.aplicadoEn ?? c.creadoEn)}: sin stock y archivado.
+      </span>
+    );
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-destructive">
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+      {c.error
+        ? `${c.estado === "error" ? "No se pudo apagar en Dropi" : "Apagado a medias en Dropi"}: ${c.error} Se reintenta al pulsar «Aplicar en Dropi».`
+        : "Apagado pendiente: pulsa «Aplicar en Dropi» con Dropi abierto (saca el stock y archiva)."}
     </span>
   );
 }

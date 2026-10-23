@@ -6,7 +6,8 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
-import { encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
+import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
+import { encolarApagar, encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -261,6 +262,47 @@ export async function archivarPublicacion(id: string, archivar: boolean): Promis
   });
   revalidatePath(RUTA);
   return {};
+}
+
+/**
+ * «Apagar en Dropi» en la ficha (pedido de Hernán, 23 oct 2026; migración 0148): deja pendiente que «Aplicar en Dropi» saque todo el
+ * stock del producto en Dropi y lo archive; si es un producto privado, también le quita la privatización. De una publicación pública,
+ * la persona elige cuáles del mismo producto (sus privadas «P-MA …», o el público si parte de una privada) se apagan con ella (`otrasIds`). Nada se apaga solo, y el sistema archiva la
+ * publicación cuando Dropi confirma que quedó archivada (si Dropi no deja por órdenes pendientes, sigue pendiente y se reintenta).
+ */
+export async function apagarPublicacion(id: string, otrasIds: string[]): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (!Array.isArray(otrasIds) || otrasIds.length > 50 || !otrasIds.every((x) => typeof x === "string" && UUID.test(x))) return { error: "Las publicaciones elegidas no son válidas." };
+  const supabase = createServiceClient();
+  const { data: delPais } = await supabase.from("dropi_publicaciones").select("id, nombre, tipo_publicacion, dropi_id, estado, estado_publicacion, pais_id").eq("pais_id", antes.pais_id);
+  const todas = (delPais ?? []).map((x) => ({ id: x.id as string, nombre: x.nombre as string, tipo: (x.tipo_publicacion as "publico" | "privado" | null) ?? null, dropiId: String(x.dropi_id ?? ""), archivada: x.estado === "archivado" || x.estado_publicacion === "archivado" }));
+  const yo = todas.find((x) => x.id === id);
+  if (!yo) return { error: "La publicación ya no existe." };
+  // Solo las del mismo producto (el navegador no decide a qué IDs de Dropi se toca).
+  const validas = new Set(grupoDe(yo, todas).map((x) => x.id));
+  const elegidas = [...new Set(otrasIds)].filter((x) => validas.has(x));
+  const por = { id: usuario.id, nombre: usuario.nombre || usuario.email };
+  const objetivos = [{ id, nombre: antes.nombre, dropi_id: (antes.dropi_id as string | null) ?? null, pais_id: antes.pais_id, quitar: yo.tipo === "privado" }, ...elegidas.map((x) => {
+    const f = (delPais ?? []).find((y) => y.id === x)!;
+    // Una privada pierde también su privatización; un público solo el stock.
+    return { id: x, nombre: f.nombre as string, dropi_id: (f.dropi_id as string | null) ?? null, pais_id: f.pais_id as string, quitar: f.tipo_publicacion === "privado" };
+  })];
+  let pendientes = 0;
+  const sinId: string[] = [];
+  for (const o of objetivos) {
+    const r = await encolarApagar(supabase, { id: o.id, pais_id: o.pais_id, dropi_id: o.dropi_id }, { quitarPrivados: o.quitar }, por);
+    if ("error" in r) {
+      if (o.id === id) return { error: r.error };
+      sinId.push(o.nombre);
+      continue;
+    }
+    pendientes++;
+    if (!r.yaEstaba) await registrarAuditoria({ accion: "dropi_apagar_pendiente", entidad: "dropi_publicaciones", entidadId: o.id, detalle: `${o.nombre} · ID Dropi ${o.dropi_id}: pendiente para «Aplicar en Dropi» (sacar el stock${o.quitar ? ", quitar la privatización" : ""} y archivar)` });
+  }
+  revalidatePath(RUTA);
+  return { detalle: `${pendientes === 1 ? "Apagado pendiente" : `${pendientes} apagados pendientes`}: pulsa «Aplicar en Dropi» con Dropi abierto.${sinId.length ? ` Sin ID de Dropi: ${sinId.join(", ")}.` : ""}` };
 }
 
 /**
