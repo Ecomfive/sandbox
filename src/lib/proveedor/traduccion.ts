@@ -1,6 +1,6 @@
 // Portal del proveedor: qué textos escritos por personas hay que traducir y cómo se le pide a Gemini (lógica pura; la llamada y el
-// guardado están en traducir.ts). Chin ve en chino simplificado los nombres de productos y las notas de Ecomfive; Ecomfive ve en español
-// lo que escribe Chin.
+// guardado están en traducir.ts). Shen Zhen ve en chino simplificado los nombres de productos y las notas de Ecomfive; Ecomfive ve en español
+// lo que escribe Shen Zhen.
 
 export type Idioma = "zh" | "es";
 

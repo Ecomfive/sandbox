@@ -126,7 +126,7 @@ export function normalizarValor(def: CampoEditable, bruto: unknown): { valor: Va
   }
 }
 
-/** El valor como se lee en el historial de cambios («Chin», «Sí», «Marítimo, Aéreo», «—»). */
+/** El valor como se lee en el historial de cambios («Shen Zhen», «Sí», «Marítimo, Aéreo», «—»). */
 export function textoDeValor(def: CampoEditable, valor: unknown): string {
   if (valor === null || valor === undefined || valor === "") return "—";
   if (typeof valor === "boolean") return valor ? (def.siNo?.si ?? "Sí") : (def.siNo?.no ?? "No");

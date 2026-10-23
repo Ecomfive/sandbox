@@ -41,7 +41,7 @@ export interface PedidoPortal {
   comentarioProveedor: string | null;
   cotizadoEn: string | null;
   actualizadoEn: string;
-  /** Anticipo distinto del de siempre (lo dice la hoja de pagos de Chin; migración 0127). */
+  /** Anticipo distinto del de siempre (lo dice la hoja de pagos de Shen Zhen; migración 0127). */
   anticipoMonto: number | null;
 }
 

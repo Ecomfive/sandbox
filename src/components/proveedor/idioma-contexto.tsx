@@ -6,7 +6,7 @@ import { TEXTOS, errorEn, fechaCorta, textoCuota, textoTransito, type Idioma } f
 import type { EstadoCuota } from "@/lib/proveedor/cuotas";
 import type { EstadoTransito } from "@/lib/proveedor/transito";
 
-// El idioma de las pantallas del portal del proveedor: Chin las ve en chino y Ecomfive en español. Sin proveedor de contexto, español.
+// El idioma de las pantallas del portal del proveedor: Shen Zhen las ve en chino y Ecomfive en español. Sin proveedor de contexto, español.
 // `traducciones` trae lo escrito por personas ya traducido al idioma de la pantalla (texto original → traducción, de traducir.ts).
 
 interface Contexto {

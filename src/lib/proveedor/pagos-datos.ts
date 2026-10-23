@@ -1,4 +1,4 @@
-// Portal del proveedor: la lectura de los pagos (migración 0127): lo pagado por pedido, el historial de las hojas de Chin y los avisos
+// Portal del proveedor: la lectura de los pagos (migración 0127): lo pagado por pedido, el historial de las hojas de Shen Zhen y los avisos
 // de pago. Solo servidor, con el cliente de servicio; quien llama ya comprobó el acceso.
 
 import type { SupabaseClient } from "@supabase/supabase-js";

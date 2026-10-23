@@ -14,8 +14,8 @@ import { PagosEcomfive } from "./pagos-ecomfive";
 type Vista = "tablero" | "pagos";
 
 /**
- * Compras › Tablero de Chin: su portal tal como lo ve él (en español y solo para ver) y «Pagos a Chin» (el cumplimiento y su Registro
- * de pagos, solo para ver). Un administrador ve además «Cuenta de Chin» (las cuentas con las que entra a su portal) y, a su lado, «Crear
+ * Compras › Tablero de Shen Zhen: su portal tal como lo ve él (en español y solo para ver) y «Pagos a Shen Zhen» (el cumplimiento y su Registro
+ * de pagos, solo para ver). Un administrador ve además «Cuenta de Shen Zhen» (las cuentas con las que entra a su portal) y, a su lado, «Crear
  * cuenta» para darle acceso a otra persona; cada uno se abre en una ventana.
  */
 export function TableroChin({

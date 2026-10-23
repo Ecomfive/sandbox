@@ -8,9 +8,9 @@ import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 import { guardarCeldaRegistroProveedor } from "./actions";
 
 /**
- * «Pagos» del portal de Chin: el cumplimiento y su «Registro de pagos» (las columnas de su hoja «payment record»). Desde el 23 oct 2026
+ * «Pagos» del portal de Shen Zhen: el cumplimiento y su «Registro de pagos» (las columnas de su hoja «payment record»). Desde el 23 oct 2026
  * el proveedor cambia cualquier celda (Ecomfive le manda el comprobante por privado y recibe el aviso). Con `soloLectura` («Lo que ve
- * Chin» en el Tablero de Chin) se ve igual, sin editar: Ecomfive edita en «Pagos a Chin».
+ * Shen Zhen» en el Tablero de Shen Zhen) se ve igual, sin editar: Ecomfive edita en «Pagos a Shen Zhen».
  */
 export function PagosChin({ resumen, filas, cambios, soloLectura = false }: { resumen: ResumenPagos; filas: FilaRegistro[]; cambios: CambioRegistro[]; soloLectura?: boolean }) {
   const { t } = useIdioma();

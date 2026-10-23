@@ -13,7 +13,7 @@ export interface PagosProveedorCompra {
 }
 
 /**
- * «Pagos a Chin» en la ficha de una compra (fase 4 del portal del proveedor): anticipo y saldo con lo pagado, que vive en el portal y
+ * «Pagos a Shen Zhen» en la ficha de una compra (fase 4 del portal del proveedor): anticipo y saldo con lo pagado, que vive en el portal y
  * no en los campos de pago de la compra. Null si la compra no es de un proveedor con portal o todavía no tiene envío.
  */
 export async function obtenerPagosProveedorCompra(compraId: string): Promise<PagosProveedorCompra | null> {
@@ -41,7 +41,7 @@ export async function obtenerPagosProveedorCompra(compraId: string): Promise<Pag
   const enAviso = new Set((avisadas.data ?? []).map((x) => x.cuota as string));
   const cuotas = cuotasDe(
     {
-      // Si vino en la hoja de Chin, manda el total y el anticipo que él facturó.
+      // Si vino en la hoja de Shen Zhen, manda el total y el anticipo que él facturó.
       montoTotal: historial.data ? Number(historial.data.monto_total) : p.monto_total == null ? null : Number(p.monto_total),
       fechaEnvio: p.fecha_envio as string,
       fechaLlegada: (p.fecha_llegada as string | null) ?? (historial.data?.fecha_llegada as string | null) ?? null,

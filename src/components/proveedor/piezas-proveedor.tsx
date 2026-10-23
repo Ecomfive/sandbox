@@ -9,7 +9,7 @@ import type { PedidoPortal } from "@/lib/proveedor/datos";
 import { TEXTOS, fechaCorta, type Idioma } from "@/lib/proveedor/textos";
 import { useIdioma } from "./idioma-contexto";
 
-// Piezas que comparten las dos vistas del portal del proveedor (la de Ecomfive en Compras › Tablero de Chin y la de Chin en /proveedor):
+// Piezas que comparten las dos vistas del portal del proveedor (la de Ecomfive en Compras › Tablero de Shen Zhen y la de Shen Zhen en /proveedor):
 // la interfaz del prototipo aprobado, con los tokens del sistema.
 
 export const TONO: Record<TonoCuota, Tone> = { exito: "success", aviso: "warning", peligro: "destructive", info: "azul", neutro: "neutral" };

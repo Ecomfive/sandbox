@@ -7,8 +7,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { campoOculto, restriccionesDe } from "../permisos-compras";
 
 /**
- * «Pagos a Chin» › Registro de pagos: alguien de Ecomfive cambia una celda (vacía, vuelve al valor de siempre). No toca la compra
- * (Compras lo actualiza Francis a mano); Chin recibe el aviso en «Lo nuevo de Ecomfive». Pide modificar Compras y ver sus montos, y
+ * «Pagos a Shen Zhen» › Registro de pagos: alguien de Ecomfive cambia una celda (vacía, vuelve al valor de siempre). No toca la compra
+ * (Compras lo actualiza Francis a mano); Shen Zhen recibe el aviso en «Lo nuevo de Ecomfive». Pide modificar Compras y ver sus montos, y
  * solo filas de los países que la persona ve. Devuelve el error como valor.
  */
 export async function guardarCeldaRegistroEcomfive(fila: string, campo: string, valor: string): Promise<{ error?: string }> {

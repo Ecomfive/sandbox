@@ -113,7 +113,7 @@ export function CrearCuentaProveedor({
   );
 }
 
-/** «Cuenta de Chin» (solo administradores): las cuentas con las que el proveedor entra a su portal; a cada una, clave nueva o desactivarla. */
+/** «Cuenta de Shen Zhen» (solo administradores): las cuentas con las que el proveedor entra a su portal; a cada una, clave nueva o desactivarla. */
 export function CuentasProveedor({
   proveedor,
   cuentas,

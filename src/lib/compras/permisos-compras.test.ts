@@ -26,7 +26,7 @@ const COMPRA = {
   pagadoAProveedor: 700,
   fechaPago1: "2026-01-01",
   fechaPago2: "2026-02-01",
-  proveedor: "Chin",
+  proveedor: "Shen Zhen",
   agenteEnvio: "Avery",
   viaEnvio: ["mar"],
   tiendas: ["Wao"],
@@ -49,7 +49,7 @@ test("un campo oculto no llega a la pantalla, ni sus fechas ni su columna", () =
   assert.equal(c.fechaPago1, null);
   assert.equal(c.montoTotal, null);
   assert.equal(c.segundoPago, 300);
-  assert.equal(c.proveedor, "Chin");
+  assert.equal(c.proveedor, "Shen Zhen");
   assert.deepEqual(columnasOcultas(r).sort(), ["fechaPago1", "montoTotal", "primerPago", "valorUnitario"]);
   assert.ok(r.ocultos.includes("unitario"));
 });

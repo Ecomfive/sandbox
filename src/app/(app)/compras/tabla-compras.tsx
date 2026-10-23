@@ -327,7 +327,7 @@ export function TablaCompras({
   comentarioInicial?: string | null;
   /** Desde Compras › Reponer: abre la compra nueva con ese producto y esa cantidad elegidos. */
   reponerInicial?: { skuId: string; cantidad: number } | null;
-  /** `?proveedor=Chin` (desde el Portal del proveedor): abre la compra nueva con ese proveedor. */
+  /** `?proveedor=Shen Zhen` (desde el Portal del proveedor): abre la compra nueva con ese proveedor. */
   proveedorInicial?: string | null;
   /** El color elegido de cada etiqueta (por su nombre). */
   coloresEtiquetas?: Record<string, string>;

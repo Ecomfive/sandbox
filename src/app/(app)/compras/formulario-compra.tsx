@@ -31,8 +31,8 @@ import {
 } from "@/lib/nav-icons";
 
 /** Casilla suelta (Factura, Financiamiento): sin `Campo` porque no lleva etiqueta arriba. */
-/** Una compra de Chin (el proveedor con portal): su ficha trae la nota que él lee. */
-const esDeChin = (proveedor: string | null) => proveedor?.trim().toLowerCase() === "chin";
+/** Una compra de Shen Zhen (el proveedor con portal): su ficha trae la nota que él lee. */
+const esDeChin = (proveedor: string | null) => proveedor?.trim().toLowerCase() === "shen zhen";
 
 function Casilla({ id, texto, defaultChecked }: { id: string; texto: string; defaultChecked?: boolean }) {
   return (
@@ -387,9 +387,9 @@ export function FormularioCompra({
               </Campo>
             </CampoGobernado>
           </div>
-          {/* Lo que Chin lee junto al pedido en su portal (se le traduce al chino). Solo en una compra de Chin. */}
+          {/* Lo que Shen Zhen lee junto al pedido en su portal (se le traduce al chino). Solo en una compra de Shen Zhen. */}
           {compra && esDeChin(compra.proveedor) && (
-            <Campo etiqueta={conEmoji("notaProveedor", "Nota para Chin")} id="campo-nota-proveedor">
+            <Campo etiqueta={conEmoji("notaProveedor", "Nota para Shen Zhen")} id="campo-nota-proveedor">
               <textarea id="campo-nota-proveedor" name="nota_proveedor" rows={2} maxLength={600} defaultValue={compra.notaProveedor ?? ""} placeholder="Ej: Por favor cotizar 500 units y confirmar" className={`${fieldClass} resize-y`} />
             </Campo>
           )}

@@ -172,7 +172,7 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
   etiqueta: "Compras",
   pestanas: [
     { clave: "lista", etiqueta: "Compras", href: "/compras/lista" },
-    { clave: "tablero-chin", etiqueta: "Tablero de Chin", href: "/compras/tablero-chin" },
+    { clave: "tablero-chin", etiqueta: "Tablero de Shen Zhen", href: "/compras/tablero-chin" },
     { clave: "informe", etiqueta: "Informe", href: "/compras/informe" },
     { clave: "dashboard", etiqueta: "Dashboard", href: "/compras/dashboard" },
     { clave: "tiempos", etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },

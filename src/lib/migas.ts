@@ -48,7 +48,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/compras/dashboard": "Dashboard",
   "/compras/informe": "Informe",
   "/compras/lista": "Compras",
-  "/compras/tablero-chin": "Tablero de Chin",
+  "/compras/tablero-chin": "Tablero de Shen Zhen",
   "/compras/tiempos": "Tiempos y fallas",
   "/compras/envios": "Envíos",
   "/compras/planificacion": "Planificación",

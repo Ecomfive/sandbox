@@ -1,4 +1,4 @@
-# Portal del proveedor (Chin): plan de construcción
+# Portal del proveedor (Shen Zhen): plan de construcción
 
 Plan aprobado sobre el prototipo del 21 oct 2026 (https://claude.ai/artifact/4LZynFHH2dJQbeRLJS5nmN). **La interfaz es la del
 prototipo**: mismas pestañas, tablas, tarjetas, panel lateral y flujos; solo cambian los colores y piezas por los del sistema
@@ -11,38 +11,38 @@ Dos pantallas sobre el mismo dato:
 - **Nuestra vista** · *Operación › Fulfillment › Portal del proveedor* (`/portal-proveedor`, módulo `portal-proveedor`, en el menú
   justo debajo de Compras). Pestañas: **Novedades del proveedor**, **Por decidir**, **En cotización**, **Tránsito**, **Pagos**.
   La explicación de «Cómo funciona» del prototipo pasa a la guía del Centro de ayuda.
-- **Portal de Chin** · otra entrada, sin el menú ni nada más del sistema (`/proveedor`, más adelante `proveedores.ecomfive.io`).
+- **Portal de Shen Zhen** · otra entrada, sin el menú ni nada más del sistema (`/proveedor`, más adelante `proveedores.ecomfive.io`).
   Pestañas: **Por cotizar**, **Cotizado**, **En producción**, **Enviado**, **Pagos**.
 
-Acordado con Hernán: todo en español; solo Chin (proveedor y agente logístico a la vez); anticipo del 50 % a los **10 días corridos**
-desde la fecha de envío y saldo del 50 % a la llegada; plazos por mar Panamá 45–55, México 60 y **Costa Rica 80** días; Chin puede
+Acordado con Hernán: todo en español; solo Shen Zhen (proveedor y agente logístico a la vez); anticipo del 50 % a los **10 días corridos**
+desde la fecha de envío y saldo del 50 % a la llegada; plazos por mar Panamá 45–55, México 60 y **Costa Rica 80** días; Shen Zhen puede
 cambiar las unidades al cotizar (pides 1,000 y la caja trae 960).
 
 ## Cómo funciona el espejo
 
 ```
-Compras (wms_compras)  ──disparador──▶  proveedor_pedidos (espejo)  ◀──acciones del portal──  Portal de Chin
+Compras (wms_compras)  ──disparador──▶  proveedor_pedidos (espejo)  ◀──acciones del portal──  Portal de Shen Zhen
         ▲                                         │
         └──── la acción del portal aplica el cambio a la compra, deja el evento y avisa ◀──┘
 ```
 
-- **Compras no cambia.** Una compra con proveedor «Chin» que entra en `cotizar` aparece sola en el espejo. Un disparador en
-  `wms_compras` (insert/update) copia a `proveedor_pedidos` solo lo que Chin puede ver: nombre del producto, foto de referencia,
+- **Compras no cambia.** Una compra con proveedor «Shen Zhen» que entra en `cotizar` aparece sola en el espejo. Un disparador en
+  `wms_compras` (insert/update) copia a `proveedor_pedidos` solo lo que Shen Zhen puede ver: nombre del producto, foto de referencia,
   país, vía, unidades pedidas, nota para el proveedor, etapa y fecha de llegada. Así da igual dónde se cambie la compra (ficha, celda,
   lote, importación): el espejo siempre está al día.
-- **Chin nunca toca `wms_compras`.** Escribe en el espejo con las acciones del portal (`src/app/(proveedor)/…/actions.ts`), que
+- **Shen Zhen nunca toca `wms_compras`.** Escribe en el espejo con las acciones del portal (`src/app/(proveedor)/…/actions.ts`), que
   validan todo en el servidor y, en la misma acción, pasan el cambio a la compra (`src/lib/proveedor/aplicar.ts`):
   - Cotizar: `costo_unitario` y `cantidad_pedida` de su línea de producto (si la compra tiene una sola) o `qty_total` y `monto_total`;
     etapa a `cotizado`; la foto real queda como adjunto de la compra (`wms_compra_adjuntos`, origen `proveedor`).
   - Marcar enviado: etapa a `tracking` y `fecha_envio` (la Planificación se recalcula como hoy).
   - Confirmar un pago: `primer_pago`/`fecha_pago_1` o `segundo_pago`/`fecha_pago_2` y `pagado_a_proveedor`.
   - Cada cambio deja su evento en `wms_compra_eventos` (origen `proveedor`), una línea en la Actividad de la compra y la auditoría.
-- **Lo que Chin no ve:** precio de venta, márgenes, tiendas, etiquetas, responsables, comentarios internos, otras compras ni otros
+- **Lo que Shen Zhen no ve:** precio de venta, márgenes, tiendas, etiquetas, responsables, comentarios internos, otras compras ni otros
   proveedores. Si la compra se pasa a otro proveedor o se anula, sale del espejo.
 
 ### Quién mueve cada etapa
 
-| Paso | Ecomfive | Chin |
+| Paso | Ecomfive | Shen Zhen |
 |---|---|---|
 | Pedir cotización (compra en «01 - Cotizar» con unidades, país, vía, foto, nota) | Sí, desde Compras o «En cotización» | — |
 | Costo unitario, total, unidades por caja y foto real → Cotizado | — | Sí |
@@ -56,7 +56,7 @@ Compras (wms_compras)  ──disparador──▶  proveedor_pedidos (espejo)  �
 
 Todas con RLS activado y **sin políticas** (solo el servidor). Llaves UUID v7.
 
-- `proveedores`: `nombre` («Chin»), `nombre_en_compras` (el texto de `wms_compras.proveedor`), `dias_anticipo` (10),
+- `proveedores`: `nombre` («Shen Zhen»), `nombre_en_compras` (el texto de `wms_compras.proveedor`), `dias_anticipo` (10),
   `porcentaje_anticipo` (50), `activo`.
 - `proveedor_usuarios`: `usuario_id` (→ `auth.users`), `proveedor_id`, `nombre`, `activo`. **No tienen fila en `perfiles`**, así que
   `getUsuarioActual` no los reconoce y ninguna página ni acción del sistema les abre (todas exigen `requireModulo`).
@@ -69,12 +69,12 @@ Todas con RLS activado y **sin políticas** (solo el servidor). Llaves UUID v7.
 - `proveedor_aviso_cuotas`: `aviso_id`, `pedido_id`, `cuota` (anticipo · saldo), `monto`.
 - `proveedor_novedades`: lo que cambió cada lado (`lado` ecomfive/proveedor, `tipo`, `texto`, `pedido_id`, `leida_en`). Alimenta
   «Novedades del proveedor» y los contadores de las dos vistas.
-- `notificaciones_usuario.tipo` admite `'proveedor'`: la campana del responsable de la compra avisa cada cambio de Chin.
-- Disparador `proveedor_sincronizar_compra()` en `wms_compras` y carga inicial de las compras abiertas de Chin (hoy ~300: 91 en
+- `notificaciones_usuario.tipo` admite `'proveedor'`: la campana del responsable de la compra avisa cada cambio de Shen Zhen.
+- Disparador `proveedor_sincronizar_compra()` en `wms_compras` y carga inicial de las compras abiertas de Shen Zhen (hoy ~300: 91 en
   Cotizar, 29 Cotizado, 35 Producción, 135 Tracking, 10 Arribo).
 - Bucket privado `proveedor-portal` (`<proveedor>/<pedido>/…`): fotos reales y comprobantes, subida directa con dirección firmada,
   validados por su firma (`detectarImagen` / `detectarAdjunto`), vistos con enlaces firmados de una hora.
-- `wms_rutas_envio`: Chin · Costa Rica · mar queda en 80 días (hoy vacío). Los plazos del tránsito salen de esa tabla.
+- `wms_rutas_envio`: Shen Zhen · Costa Rica · mar queda en 80 días (hoy vacío). Los plazos del tránsito salen de esa tabla.
 
 ## Reglas puras (`src/lib/proveedor/`, con prueba en `test:seguridad`)
 
@@ -99,23 +99,23 @@ Todas con RLS activado y **sin políticas** (solo el servidor). Llaves UUID v7.
 ## Fases (cada una es un PR que Hernán combina)
 
 1. **Base y espejo.** Migración (tablas, disparador, bucket, carga inicial, ruta CR 80 días), reglas puras con pruebas y la lectura
-   del espejo. Sin pantallas. *Hernán corre la migración y verifico que las ~300 compras de Chin quedaron en el espejo.*
+   del espejo. Sin pantallas. *Hernán corre la migración y verifico que las ~300 compras de Shen Zhen quedaron en el espejo.*
 2. **Nuestra vista.** Página «Portal del proveedor» debajo de Compras con Novedades, Por decidir, En cotización y Tránsito
    (**Pagos pasa a la fase 4**: en Compras, `fecha_pago_1` es en realidad la fecha en que vence y casi no hay montos pagados, así
-   que el cumplimiento saldría falso hasta tener los avisos confirmados y el historial de las hojas de Chin); «Por decidir» y «Marcar llegada»
-   cambian la compra; «Nueva compra en Cotizar» abre la ficha de Compras con el proveedor Chin. Módulo `portal-proveedor` (se da a
+   que el cumplimiento saldría falso hasta tener los avisos confirmados y el historial de las hojas de Shen Zhen); «Por decidir» y «Marcar llegada»
+   cambian la compra; «Nueva compra en Cotizar» abre la ficha de Compras con el proveedor Shen Zhen. Módulo `portal-proveedor` (se da a
    los roles que tienen Compras), guía del Centro de ayuda y novedad.
-3. **Portal de Chin.** Cuenta de Chin (se crea desde Usuarios y roles como «usuario de proveedor»), entrada `/proveedor`, sus cinco
+3. **Portal de Shen Zhen.** Cuenta de Shen Zhen (se crea desde Usuarios y roles como «usuario de proveedor»), entrada `/proveedor`, sus cinco
    pestañas, el panel «Cotizar» (costo, total, unidades por caja, foto real, comentario) y «Marcar enviado». Cada cambio llega a la
    compra y a Novedades/campana.
-4. **Pagos.** «Avisar pago» con reparto por cuota y comprobante; Chin lo confirma y queda pagado. Indicadores de cumplimiento en las
+4. **Pagos.** «Avisar pago» con reparto por cuota y comprobante; Shen Zhen lo confirma y queda pagado. Indicadores de cumplimiento en las
    dos vistas. **Decidido (21 oct 2026):** lo pagado vive en el portal (`proveedor_pagos`) y **no se escribe en los campos de pago de
-   la compra**; la ficha de la compra muestra «Pagos a Chin» de solo lectura. El historial de las hojas de Chin se carga en esta fase
+   la compra**; la ficha de la compra muestra «Pagos a Shen Zhen» de solo lectura. El historial de las hojas de Shen Zhen se carga en esta fase
    (lo que estaba en la 5): 706 de 743 filas se emparejan con su compra y las demás quedan como historial suelto que cuenta igual.
-5. **Historial.** Importar las hojas de Chin (pagos de PA/CR/MX y cotizaciones) para que el cumplimiento y el tránsito tengan los
+5. **Historial.** Importar las hojas de Shen Zhen (pagos de PA/CR/MX y cotizaciones) para que el cumplimiento y el tránsito tengan los
    datos desde 2025: lo que se pueda emparejar con una compra (producto, país y fecha de envío) se vincula; el resto queda como
    historial. Script con `--aplicar`, como las demás importaciones.
-6. **Opcional:** dirección propia `proveedores.ecomfive.io` y un correo diario a Chin con lo pendiente.
+6. **Opcional:** dirección propia `proveedores.ecomfive.io` y un correo diario a Shen Zhen con lo pendiente.
 
 Cada fase con interfaz pasa por `ui-ux-pro-max` e `impeccable`, y por `tsc`, `test:seguridad` y `next build` antes del PR.
 
@@ -136,8 +136,8 @@ Cada fase con interfaz pasa por `ui-ux-pro-max` e `impeccable`, y por `tsc`, `te
 
 ## Decidido para la fase 3 (Hernán, 21 oct 2026)
 
-- **La campana avisa a Francis Aponte** cuando Chin cambia algo (precio, foto, envío, pago confirmado). Se guarda como dato del
+- **La campana avisa a Francis Aponte** cuando Shen Zhen cambia algo (precio, foto, envío, pago confirmado). Se guarda como dato del
   proveedor (`proveedores.notificar_a`, la persona), no fijo en el código, para poder cambiarlo.
-- **Chin tiene una sola cuenta** por ahora (la tabla ya admite más).
+- **Shen Zhen tiene una sola cuenta** por ahora (la tabla ya admite más).
 - **La foto real queda aparte**: va como adjunto de la compra (origen `proveedor`) y la foto de la compra sigue siendo la de
   referencia.

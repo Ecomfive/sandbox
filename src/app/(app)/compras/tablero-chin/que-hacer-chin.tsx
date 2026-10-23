@@ -48,9 +48,9 @@ function TarjetaTarea({ t, alAbrir }: { t: Tarea; alAbrir: () => void }) {
 }
 
 /**
- * «Qué hacer con Chin» (23 oct 2026, arriba del Tablero de Chin; solo ahí, decisión de Hernán): lo que nos toca para cerrar el ciclo con el proveedor,
+ * «Qué hacer con Shen Zhen» (23 oct 2026, arriba del Tablero de Shen Zhen; solo ahí, decisión de Hernán): lo que nos toca para cerrar el ciclo con el proveedor,
  * con lo que él hizo en su tablero marcado «Nuevo». Primero lo nuevo y lo urgente; cada tarjeta lleva a la compra (o a los pagos a
- * Chin) y se va sola cuando el ciclo avanza.
+ * Shen Zhen) y se va sola cuando el ciclo avanza.
  */
 export function QueHacerChin({ proveedor, tareas }: { proveedor: string; tareas: Tarea[] }) {
   const [todas, setTodas] = useState(false);

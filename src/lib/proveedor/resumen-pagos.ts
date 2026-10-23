@@ -1,4 +1,4 @@
-// Portal del proveedor: las cuotas de cada envío (pedidos del espejo e historial suelto de las hojas de Chin) y el resumen de pagos que
+// Portal del proveedor: las cuotas de cada envío (pedidos del espejo e historial suelto de las hojas de Shen Zhen) y el resumen de pagos que
 // ven las dos vistas. Lógica pura: los datos los trae `cargarPagosProveedor` (pagos-datos.ts).
 
 import { cuotasDe, cumplimiento, estadoCuota, estaPagada, saldoTrasLlegada, type Cuota, type EstadoCuota, type Pago, type TipoCuota } from "./cuotas";
@@ -10,7 +10,7 @@ export interface PagosDe {
   saldo: Pago[];
 }
 
-/** Una fila de las hojas de Chin sin compra en el sistema: cuenta para el cumplimiento, no se paga desde el portal. */
+/** Una fila de las hojas de Shen Zhen sin compra en el sistema: cuenta para el cumplimiento, no se paga desde el portal. */
 export interface HistorialSuelto {
   id: string;
   /** Su clave en las hojas («PA#123»): no cambia al volver a importar (la usa el Registro de pagos). */
@@ -59,7 +59,7 @@ export interface EnvioConCuotas {
 export interface DatosPagos {
   pagosPorPedido: Record<string, PagosDe>;
   /**
-   * Lo que dice la hoja de Chin de los pedidos que vinieron en ella (sus pagos se conocen): el total y el anticipo que facturó (manda
+   * Lo que dice la hoja de Shen Zhen de los pedidos que vinieron en ella (sus pagos se conocen): el total y el anticipo que facturó (manda
    * sobre el total de la compra, que a veces difiere en unos dólares) y la llegada, si la compra no la tiene.
    */
   hojaPorPedido: Record<string, { monto: number; anticipo: number; llegada: string | null }>;
@@ -103,7 +103,7 @@ export function conRegistro(
 }
 
 /**
- * Los envíos cuyos pagos se controlan: los pedidos que vinieron en las hojas de Chin, los enviados después de la última hoja (sus pagos
+ * Los envíos cuyos pagos se controlan: los pedidos que vinieron en las hojas de Shen Zhen, los enviados después de la última hoja (sus pagos
  * llegan por los avisos del portal) y el historial suelto. Un pedido viejo que no estaba en las hojas no se cuenta: no se sabe qué se
  * pagó y saldría vencido sin estarlo.
  */

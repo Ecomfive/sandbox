@@ -117,7 +117,7 @@ export const CURSOS: Curso[] = [
         parrafos: [
           "Cada compra a un proveedor es una orden con su N.º OC (OC-0001…) y el código de su país (ECOM01 Panamá, ECOM03 Costa Rica…), que se asigna solo al crearla. Una venta de importación (para un cliente) es una compra de un país con el «Tipo de venta» en «Venta de importación» (si no, es de Proveeduría).",
           "Arriba de la lista eliges qué ver: todos los países o uno. La lista arranca agrupada por etapa.",
-          "Cada orden lleva una sola Vía de envío (marítimo, aéreo o terrestre), una sola Tienda y su Agente de envío (quien la trae: Chin, Avery…). Con la vía, el país y la fecha de envío se calcula su Planificación.",
+          "Cada orden lleva una sola Vía de envío (marítimo, aéreo o terrestre), una sola Tienda y su Agente de envío (quien la trae: Shen Zhen, Avery…). Con la vía, el país y la fecha de envío se calcula su Planificación.",
         ],
       },
       {

@@ -60,7 +60,7 @@ const entrada = (e: Partial<EntradaTareas>): EntradaTareas => ({
   nuevos: new Set(),
   creadoEn: {},
   veMontos: true,
-  proveedor: "Chin",
+  proveedor: "Shen Zhen",
   hoy: HOY,
   ...e,
 });
@@ -68,7 +68,7 @@ const entrada = (e: Partial<EntradaTareas>): EntradaTareas => ({
 test("decidir: lo que cotizó, hace cuánto y la diferencia de unidades", () => {
   const [t] = tareasChin(entrada({ pedidos: [pedido({})] }));
   assert.equal(t.tipo, "decidir");
-  assert.match(t.texto, /Chin cotizó 960 u\. a \$1\.85 \(= \$1,780\.00\) hace 6 días\./);
+  assert.match(t.texto, /Shen Zhen cotizó 960 u\. a \$1\.85 \(= \$1,780\.00\) hace 6 días\./);
   assert.match(t.texto, /Pediste 1,000: vienen 40 menos\./);
   // Sin permiso de montos, la frase no los dice.
   assert.doesNotMatch(tareasChin(entrada({ pedidos: [pedido({})], veMontos: false }))[0].texto, /\$/);
@@ -107,7 +107,7 @@ test("pagos: urgente lo vencido o que vence en 3 días, lo más atrasado primero
   assert.equal(ts[0].destino, "pagos");
 });
 
-test("lo nuevo del proveedor va primero; esperando a Chin por cotizar y por avisos sin confirmar", () => {
+test("lo nuevo del proveedor va primero; esperando a Shen Zhen por cotizar y por avisos sin confirmar", () => {
   const ts = tareasChin(
     entrada({
       pedidos: [pedido({ id: "viejo", etapa: "por_cotizar" }), pedido({ id: "reciente", etapa: "por_cotizar" }), pedido({ id: "nuevo" })],

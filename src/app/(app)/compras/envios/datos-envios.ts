@@ -76,7 +76,7 @@ export async function cargarRutas(): Promise<{ rutas: FilaRuta[]; agentes: strin
       };
     });
 
-  const agentes = [...new Set(["Chin", "Avery", ...filas.flatMap((r) => (r.agente ? [r.agente] : [])), ...compras.map((c) => c.agente_envio)])].sort((a, b) => a.localeCompare(b, "es"));
+  const agentes = [...new Set(["Shen Zhen", "Avery", ...filas.flatMap((r) => (r.agente ? [r.agente] : [])), ...compras.map((c) => c.agente_envio)])].sort((a, b) => a.localeCompare(b, "es"));
   const tipos = [...new Set(["General", ...filas.flatMap((r) => r.tarifas.map((t) => t.tipo))])];
   return { rutas: filas, agentes, tipos };
 }

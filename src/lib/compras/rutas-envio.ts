@@ -1,4 +1,4 @@
-// Compras › Envíos: lo que promete cada agente de envío (Chin, Avery…) por país y vía, y lo que de verdad tardó. Es lógica pura:
+// Compras › Envíos: lo que promete cada agente de envío (Shen Zhen, Avery…) por país y vía, y lo que de verdad tardó. Es lógica pura:
 // la usan la página, las acciones y la importación desde ClickUp (con su prueba).
 
 export const VIAS_RUTA = [

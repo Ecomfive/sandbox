@@ -1,4 +1,4 @@
-// Portal del proveedor: los textos de la pantalla en español y en chino simplificado (pedido de Hernán, 22 oct 2026: Chin ve su portal en
+// Portal del proveedor: los textos de la pantalla en español y en chino simplificado (pedido de Hernán, 22 oct 2026: Shen Zhen ve su portal en
 // mandarín y Ecomfive ve su tablero en español). Lo escrito por personas no va aquí: se traduce con Gemini (traducir.ts). Lógica pura.
 //
 // Un texto nuevo del portal se agrega en los dos idiomas (una prueba comprueba que no falte ninguno).
@@ -106,7 +106,7 @@ const ES = {
   registroTitulo: "Registro de pagos",
   registroVacio: "Todavía no hay envíos con pagos.",
   registroPista: "Como tu hoja «payment record». Toca cualquier celda para cambiarla; Ecomfive recibe el aviso",
-  registroPistaEcomfive: "Las columnas de la hoja de Chin. Toca cualquier celda para cambiarla; Chin recibe el aviso",
+  registroPistaEcomfive: "Las columnas de la hoja de Shen Zhen. Toca cualquier celda para cambiarla; Shen Zhen recibe el aviso",
   leyEditable: "Toca la celda para cambiarla",
   leyCalculada: "Se calcula sola; también se puede cambiar (si la dejas vacía, vuelve a calcularse)",
   celdaGuardada: "Guardado.",
@@ -127,7 +127,7 @@ const ES = {
   todosPaises: "Todos",
   original: "Original",
   verOriginal: "ver original",
-  soloLectura: "Así ve Chin su portal (en su cuenta, en chino). Aquí es solo para ver: lo que él registra lo hace desde su portal.",
+  soloLectura: "Así ve Shen Zhen su portal (en su cuenta, en chino). Aquí es solo para ver: lo que él registra lo hace desde su portal.",
   cambiarClave: "Cambiar clave",
   elegirClave: "Elige tu clave",
   elegirClaveTexto: "Entraste con una clave temporal. Elige una clave propia para seguir: solo tú la sabrás.",
@@ -239,7 +239,7 @@ const ZH: Textos = {
   registroTitulo: "付款记录",
   registroVacio: "还没有需要付款的发货。",
   registroPista: "与您的「payment record」表格相同。点击任意单元格即可修改，Ecomfive 会收到通知",
-  registroPistaEcomfive: "Chin 表格的各列。点击任意单元格即可修改，Chin 会收到通知",
+  registroPistaEcomfive: "Shen Zhen 表格的各列。点击任意单元格即可修改，Shen Zhen 会收到通知",
   leyEditable: "点击单元格即可修改",
   leyCalculada: "自动计算；也可手动修改（清空后恢复自动计算）",
   celdaGuardada: "已保存。",

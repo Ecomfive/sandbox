@@ -25,7 +25,7 @@ const NOMBRE_CAMPO: Record<string, string> = {
   nombre: "Nombre",
   descripcion: "Descripción",
   urlProducto: "URL del producto",
-  notaProveedor: "Nota para Chin",
+  notaProveedor: "Nota para Shen Zhen",
   documentos: "Documentos",
   planificacion: "Planificación",
   agenteEnvio: "Agente de envío",
@@ -34,7 +34,7 @@ const NOMBRE_CAMPO: Record<string, string> = {
   productoRelacionado: "Producto relacionado",
   paisesDestino: "Países de destino",
   codigo: "Código",
-  registroPagos: "Registro de pagos de Chin",
+  registroPagos: "Registro de pagos de Shen Zhen",
 };
 const corto = (t: string | null, max = 120) => (t && t.length > max ? `${t.slice(0, max)}…` : t);
 

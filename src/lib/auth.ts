@@ -218,7 +218,7 @@ export function irAlInicio(usuario: Pick<UsuarioActual, "modulos">, excluirModul
 }
 
 /**
- * Sin perfil del equipo: una cuenta del portal del proveedor (Chin) vuelve a su portal, que es lo único que puede abrir; sin
+ * Sin perfil del equipo: una cuenta del portal del proveedor (Shen Zhen) vuelve a su portal, que es lo único que puede abrir; sin
  * sesión, a entrar.
  */
 async function irSinPerfil(): Promise<never> {

@@ -1,5 +1,5 @@
 // Lo que tardaron los envíos que ya llegaron, leído de la base: lo usan Compras (planificación automática) y el portal del proveedor
-// (cuando Chin marca un envío). Solo servidor.
+// (cuando Shen Zhen marca un envío). Solo servidor.
 
 import { tiemposDeTransito, type TiemposTransito } from "@/lib/compras/planificacion";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";

@@ -1,6 +1,6 @@
 // Portal del proveedor: las dos cuotas de cada pedido enviado y en qué estado están. Lógica pura.
 //
-// Acordado con Chin (21 oct 2026): el anticipo es el 50 % del total y vence 10 días corridos después de la fecha de envío (enviado
+// Acordado con Shen Zhen (21 oct 2026): el anticipo es el 50 % del total y vence 10 días corridos después de la fecha de envío (enviado
 // el 21 oct, vence el 31 oct); el saldo es el otro 50 % y vence el día que llega. El porcentaje y los días salen de `proveedores`.
 
 import { diasEntre, sumarDias } from "./fechas";

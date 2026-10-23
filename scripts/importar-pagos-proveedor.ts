@@ -1,7 +1,7 @@
-// Importa las hojas de pagos de Chin («payment record for EcomFive», una por país) al portal del proveedor (migración 0127): cada fila
+// Importa las hojas de pagos de Shen Zhen («payment record for EcomFive», una por país) al portal del proveedor (migración 0127): cada fila
 // queda en `proveedor_historial` (con su pedido si se emparejó con una compra) y lo pagado en `proveedor_pagos` (origen «hoja»).
 // Se puede repetir: cada corrida reemplaza lo que trajo la anterior. Los pagos avisados y confirmados en el portal no se tocan.
-// Las unidades las manda Chin (23 oct 2026): una compra abierta emparejada con otra cantidad toma la de su hoja (`unidadesDelProveedor`).
+// Las unidades las manda Shen Zhen (23 oct 2026): una compra abierta emparejada con otra cantidad toma la de su hoja (`unidadesDelProveedor`).
 //
 //   npx tsx --env-file=.env.local scripts/importar-pagos-proveedor.ts            (solo informa)
 //   npx tsx --env-file=.env.local scripts/importar-pagos-proveedor.ts --aplicar
@@ -19,7 +19,7 @@ const HOJAS = [
   { hoja: "CR", archivo: "datos-privados/chin-pagos-CR.csv" },
   { hoja: "MX", archivo: "datos-privados/chin-pagos-MX.csv" },
 ];
-const PROVEEDOR = "Chin";
+const PROVEEDOR = "Shen Zhen";
 const aplicar = process.argv.includes("--aplicar");
 
 async function main() {
@@ -40,7 +40,7 @@ async function main() {
     fechaEnvio: (p.fecha_envio as string | null) ?? null,
   }));
   const pareja = emparejar(filas, pedidos);
-  // Las unidades las manda Chin: una compra abierta con otra cantidad que su fila toma la de la hoja.
+  // Las unidades las manda Shen Zhen: una compra abierta con otra cantidad que su fila toma la de la hoja.
   const etapaDe = new Map(espejo.map((p) => [p.id as string, p.etapa as string]));
   const compraDe = new Map(espejo.map((p) => [p.id as string, p.compra_id as string]));
   const cambiosUnidades = unidadesDelProveedor(filas, pareja, pedidos.map((p) => ({ ...p, etapa: etapaDe.get(p.id) ?? "" })));
@@ -99,7 +99,7 @@ async function main() {
       await s.from("proveedor_pedidos").update({ anticipo_monto: f.anticipo }).eq("id", pedidoId);
     }
   }
-  // La compra (y su producto, si tiene uno solo) toma las unidades de Chin; el monto queda y el costo por unidad se recalcula.
+  // La compra (y su producto, si tiene uno solo) toma las unidades de Shen Zhen; el monto queda y el costo por unidad se recalcula.
   for (const c of cambiosUnidades) {
     const compraId = compraDe.get(c.pedidoId)!;
     const { data: compra } = await s.from("wms_compras").select("qty_total, monto_total").eq("id", compraId).single();

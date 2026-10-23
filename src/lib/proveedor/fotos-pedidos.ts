@@ -1,5 +1,5 @@
 // Portal del proveedor: las fotos de cada pedido, igual que en Compras. La de referencia es la foto comercial (la de Producto: la de
-// su primer producto con foto o, sin productos, la del producto con su mismo nombre); la foto real es la que subió Chin en el portal
+// su primer producto con foto o, sin productos, la del producto con su mismo nombre); la foto real es la que subió Shen Zhen en el portal
 // o, si no, la «Foto real del producto» de la compra (`wms_compras.foto_url`, que es lo que trae el espejo). Solo servidor.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -7,7 +7,7 @@ import { productoDeCompra } from "@/lib/compras/foto-producto";
 import { cargarFotosDeProductos } from "@/lib/compras/fotos-productos-datos";
 import type { PedidoPortal } from "./datos";
 
-/** Los pedidos con su foto comercial como referencia, y la foto real de la compra de cada uno (para cuando Chin no subió la suya). */
+/** Los pedidos con su foto comercial como referencia, y la foto real de la compra de cada uno (para cuando Shen Zhen no subió la suya). */
 export async function conFotosDeCompras(supabase: SupabaseClient, pedidos: PedidoPortal[]): Promise<{ pedidos: PedidoPortal[]; realDeCompra: Record<string, string> }> {
   const realDeCompra: Record<string, string> = {};
   for (const p of pedidos) if (p.fotoReferencia) realDeCompra[p.id] = p.fotoReferencia;
