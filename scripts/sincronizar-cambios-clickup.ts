@@ -10,6 +10,10 @@
 //   npx tsx scripts/sincronizar-cambios-clickup.ts            → informe (no escribe nada)
 //   npx tsx scripts/sincronizar-cambios-clickup.ts --aplicar  → aplica
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("sincronizar-cambios-clickup.ts");
+
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { CAMPOS_EDITABLES, textoDeValor } from "../src/app/(app)/compras/def-edicion-compras";

@@ -1,5 +1,9 @@
 // Baja la lista «Envíos desde China» de ClickUp (rutas de envío por agente, país y vía) a datos-privados/clickup-envios.json,
 // para importarla con scripts/importar-rutas-envio.ts. Token: CLICKUP_TOKEN de .env.local.
+
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("clickup-exportar-envios.mjs");
 import { readFileSync, writeFileSync } from "node:fs";
 const LISTA = "901705203080";
 const token = readFileSync(".env.local", "utf8").split(/\r?\n/).find((l) => l.startsWith("CLICKUP_TOKEN=")).slice(14).trim().replace(/^["']|["']$/g, "");

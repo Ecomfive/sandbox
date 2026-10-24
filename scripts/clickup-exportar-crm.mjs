@@ -6,6 +6,10 @@
 // Salida: datos-privados/clickup-crm.json (carpeta ignorada por git; son datos personales de clientes).
 // Solo lee de ClickUp: no cambia nada allá. No imprime datos de personas, solo conteos.
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("clickup-exportar-crm.mjs");
+
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const LISTA = "901707677923";

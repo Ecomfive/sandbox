@@ -7,6 +7,10 @@
 //   npx tsx scripts/importar-etapas-actividad.ts            → informe (no escribe)
 //   npx tsx scripts/importar-etapas-actividad.ts --aplicar  → guarda los eventos
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("importar-etapas-actividad.ts");
+
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 

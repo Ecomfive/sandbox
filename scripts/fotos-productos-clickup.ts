@@ -9,6 +9,10 @@
 // («… - ECOM-0012»), y los pares confirmados a mano en CONFIRMADOS. No toca un producto que ya tenga foto. Requiere la
 // migración 0086 (columna foto_url).
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("fotos-productos-clickup.ts");
+
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 

@@ -12,6 +12,10 @@
 //  - Es seguro repetirlo: lo que ya se importó (por id de tarea) se salta.
 //  - No imprime datos de personas: el detalle va al informe local datos-privados/informe-importacion.txt.
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("importar-dropshippers-clickup.ts");
+
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { listaDePaises, normalizarTelefono } from "../src/lib/crm/telefono";

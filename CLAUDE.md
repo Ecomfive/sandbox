@@ -563,7 +563,14 @@ convenciones técnicas del código.
   `staging_ordenes_dropi` solo la copia más reciente de cada pedido) y marca `dropi_conexiones` PA/proveedor. La tarea cuadra después los
   pedidos de ayer por estado contra el MCP de Dropi (`list_orders`). Corre desde la copia `C:/Users/herna/ecomfive-tareas` (main al
   día, con su `.env.local` enlazado), no desde `app/`, que otras sesiones cambian de rama.
-  **Bodegas y «Dropi manda»** (22 oct 2026, pedido de Hernán, migración 0131): la cuenta de ECOMFIVE en `app.dropi.pa` es de
+  **El sistema manda, no Dropi ni ClickUp** (24 oct 2026, pedido de Hernán; **manda sobre lo que sigue**): los productos se crean en el
+  sistema y se mandan a Dropi, así que `guardarNuestrosProductos` (`scripts/publicaciones-sincronizar-dropi.ts`, lo llaman la tarea de las 7:00
+  y el receptor) **ya no crea, cambia ni archiva publicaciones**: solo reemplaza `dropi_productos_proveedor` (stock y bodegas) y deja en su
+  resumen lo que no coincide (`distintasEnDropi`, `yaNoEstanEnDropi`, `nuevosEnDropiSinPublicacion`). Donde abajo diga «Dropi manda»,
+  «la lectura pone en cada publicación…» o «Productos nuevos: la sincronización crea la publicación», ya no es así. **ClickUp está
+  descontinuado**: todos los scripts que leían o importaban de ClickUp llaman a `clickupDescontinuado` (`scripts/clickup-descontinuado.mjs`) y
+  se detienen; no se trae nada de ClickUp a ningún módulo.
+  **Bodegas y «Dropi manda»** (22 oct 2026, pedido de Hernán, migración 0131; lo de escribir en las publicaciones quedó sin efecto el 24 oct): la cuenta de ECOMFIVE en `app.dropi.pa` es de
   **proveedor** (`type_user: SUPPLIER`, usuario 2094) y su pantalla «Mis productos» lee api-v2 `bff/catalog/products/produit/<usuario>/owner`
   (POST, `pageSize` 100, `page` desde 1, `get_stock: true`; `archive: true` = pestaña Archivados): trae por producto `warehouses`
   `[{id, name, stock}]` (las variables en `variation_warehouses`, una por variación), `total_stock`, `private_stock`, `private_product`,

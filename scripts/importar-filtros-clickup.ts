@@ -7,6 +7,10 @@
 //
 // Uso: npx tsx scripts/importar-filtros-clickup.ts [--aplicar]
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("importar-filtros-clickup.ts");
+
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 

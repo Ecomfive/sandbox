@@ -9,6 +9,10 @@
 // Token: variable CLICKUP_TOKEN, o la línea CLICKUP_TOKEN=... de .env.local (ese archivo no se sube a git).
 // Solo lee de ClickUp: no cambia nada allá. Solo imprime conteos.
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("clickup-exportar-compras.mjs");
+
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 // Las listas de compras compartidas con la cuenta (ver /team/{id}/shared).
