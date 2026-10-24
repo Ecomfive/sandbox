@@ -78,7 +78,6 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
           <DatoGobernado clave="agente"><Dato etiqueta="Agente de envío">{compra.agenteEnvio || SIN_DATO}</Dato></DatoGobernado>
           <Dato etiqueta="Tipo de venta">{compra.ventaImportacion ? "Venta de importación" : "Proveeduría"}</Dato>
           <DatoGobernado clave="tienda"><Dato etiqueta="Tienda">{compra.tiendas.length ? <span className="flex flex-wrap gap-1">{compra.tiendas.map((t) => <PastillaTienda key={t} nombre={t} />)}</span> : SIN_DATO}</Dato></DatoGobernado>
-          <DatoGobernado clave="responsable"><Dato etiqueta="Persona asignada">{compra.asignadoNombre || SIN_DATO}</Dato></DatoGobernado>
         </dl>
       </Seccion>
       <Seccion icono={GastoIcon} titulo="Cantidad y pagos">

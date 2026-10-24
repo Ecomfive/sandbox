@@ -216,7 +216,6 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
         { clave: "etapa", etiqueta: "Etapa", editable: true, ocultable: false },
         { clave: "estado", etiqueta: "Estado", editable: true, ocultable: false },
         { clave: "etiquetas", etiqueta: "Etiquetas", editable: true, ocultable: true },
-        { clave: "responsable", etiqueta: "Responsable", editable: true, ocultable: true },
         { clave: "limite", etiqueta: "Fecha límite", editable: true, ocultable: true },
       ],
     },
