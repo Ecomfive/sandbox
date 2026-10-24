@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
-import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { AdjuntoIcon, CalendarioIcon, ComprasIcon, EstadoIcon, EtiquetaIcon, GastoIcon, ProductoIcon } from "@/lib/nav-icons";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { combinarLista, type ModoLote } from "@/lib/compras/lote";
@@ -71,7 +71,6 @@ const ICONOS: Record<string, IconoComp> = {
   creado: CalendarioIcon,
   cerrado: CalendarioIcon,
   dias: CalendarioIcon,
-  asignado: PersonaIcon,
   factura: EstadoIcon,
   financiamiento: GastoIcon,
 };
@@ -186,7 +185,7 @@ function columnas(
                 <PastillaEtiqueta key={e} nombre={e} color={edicion.colores[e]} />
               ))}
             </span>
-            <span className="block text-xs text-muted-foreground">{[c.paisCodigo ?? "Importadora", c.proveedor, c.asignadoNombre].filter(Boolean).join(" · ")}</span>
+            <span className="block text-xs text-muted-foreground">{[c.paisCodigo ?? "Importadora", c.proveedor].filter(Boolean).join(" · ")}</span>
             {c.lineas.length > 0 && (
               <span className="block max-w-[28rem] truncate text-xs text-foreground-soft" title={resumenLineas(c.lineas, 50)}>
                 {resumenLineas(c.lineas)}
@@ -271,7 +270,6 @@ function columnas(
           edicion.tiendas,
         ),
     }),
-    col("asignado", "Responsable", { ...resto, clase: "text-muted-foreground", render: (c) => c.asignadoNombre || "—" }),
     col("planificacion", "Planificación", { ...resto, clase: "text-muted-foreground", render: (c) => c.planificacion || "—" }),
     col("montoTotal", "Monto Total", { ...resto, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.montoTotal, usd), render: (c) => ed(c, "montoTotal", usd(c.montoTotal)) }),
     col("valorUnitario", "Valor Unitario", { ...resto, clase: "tabular-nums", render: (c) => usd(valorUnitario(c)) }),
