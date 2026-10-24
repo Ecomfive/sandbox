@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
-import { CalendarioIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
 import { TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -33,6 +33,7 @@ const ICONOS: Record<string, IconoComp> = {
   precio: MargenIcon,
   margen: MargenIcon,
   margenBajo: MargenIcon,
+  idDropi: EnlaceIcon,
   recomendacion: EstadoIcon,
   ultimaRevision: CalendarioIcon,
   fechaPublicacion: CalendarioIcon,

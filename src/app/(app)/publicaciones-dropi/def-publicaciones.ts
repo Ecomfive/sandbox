@@ -236,6 +236,21 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       ordenGrupos: ["baja", "a_medias", "completa"],
     },
     { id: "notaOptimizacion", etiqueta: "Nota de optimización (%)", tipo: "numero", valor: (f) => (f.nota.total ? Math.round((f.nota.cumple / f.nota.total) * 100) : null) },
+    {
+      id: "idDropi",
+      etiqueta: "ID de Dropi",
+      tipo: "seleccion",
+      // Sin ID, con un ID que no aparece en Dropi, o conectado (el producto está en Dropi).
+      valores: (f) => [!f.dropiId.trim() ? "sin_id" : (conexionDropi(f) ?? "sin_datos")],
+      opciones: () => [
+        { valor: "sin_id", etiqueta: "Sin ID de Dropi" },
+        { valor: "no_aparece", etiqueta: "No aparece en Dropi" },
+        { valor: "conectado", etiqueta: "Conectado con Dropi" },
+        { valor: "sin_datos", etiqueta: "Sin lectura de Dropi" },
+      ],
+      agrupable: true,
+      ordenGrupos: ["sin_id", "no_aparece", "conectado", "sin_datos"],
+    },
     { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },
     // Las ventas de Dropi (21 oct 2026): reemplazan el «Estado de venta» que se marcaba a mano. Las ve todo el que abre el módulo.
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },
