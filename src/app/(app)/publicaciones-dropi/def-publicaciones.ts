@@ -110,8 +110,10 @@ export interface FilaPublicacion {
   apagadoSinTocar: boolean;
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
   grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
-  /** Público o privado según Dropi; sin datos de Dropi, lo que estaba marcado. */
+  /** Público o privado: el elegido en la ficha (el sistema manda, 24 oct 2026); si no hay nada anotado, lo que dice Dropi. */
   tipoDropi: "publico" | "privado" | null;
+  /** Público o privado según la última lectura de Dropi (solo de referencia; null sin datos de Dropi). */
+  tipoEnDropi: "publico" | "privado" | null;
   /** Lo que necesita (calculado): vacío = al día. */
   acciones: Accion[];
   /** El competidor que vende lo mismo más barato (precio equivalente), si hay. */

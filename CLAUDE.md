@@ -569,7 +569,11 @@ convenciones técnicas del código.
   resumen lo que no coincide (`distintasEnDropi`, `yaNoEstanEnDropi`, `nuevosEnDropiSinPublicacion`). Donde abajo diga «Dropi manda»,
   «la lectura pone en cada publicación…» o «Productos nuevos: la sincronización crea la publicación», ya no es así. **ClickUp está
   descontinuado**: todos los scripts que leían o importaban de ClickUp llaman a `clickupDescontinuado` (`scripts/clickup-descontinuado.mjs`) y
-  se detienen; no se trae nada de ClickUp a ningún módulo.
+  se detienen; no se trae nada de ClickUp a ningún módulo. **Estado y Tipo se eligen en la ficha** (24 oct 2026): `estado_publicacion` y
+  `tipo_publicacion` van en `leerDatos` solo si vienen en el formulario, y lo anotado manda: en `automatico()` (`datos-publicaciones.ts`)
+  `archivada` sale de lo anotado si hay estado y `tipoDropi` = el anotado o, sin anotar, lo de Dropi; `tipoEnDropi` guarda lo que reporta Dropi
+  (se muestra debajo como referencia y lo usa el grupo de «Apagar en Dropi»). Elegir «Archivado» pone también `estado` = archivado y otro estado
+  lo saca (`al_dia`); una duplicada no sale. «Sacar de Archivados» deja `estado_publicacion` = activo.
   **Bodegas y «Dropi manda»** (22 oct 2026, pedido de Hernán, migración 0131; lo de escribir en las publicaciones quedó sin efecto el 24 oct): la cuenta de ECOMFIVE en `app.dropi.pa` es de
   **proveedor** (`type_user: SUPPLIER`, usuario 2094) y su pantalla «Mis productos» lee api-v2 `bff/catalog/products/produit/<usuario>/owner`
   (POST, `pageSize` 100, `page` desde 1, `get_stock: true`; `archive: true` = pestaña Archivados): trae por producto `warehouses`

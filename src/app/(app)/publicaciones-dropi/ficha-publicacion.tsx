@@ -11,6 +11,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, ProductoIcon, ArchivarIcon } from "@/lib/nav-icons";
 import {
+  ESTADOS_PUBLICACION,
+  TIPOS,
   UBICACIONES,
   numeroPublicacion,
   type OpcionPublicacion,
@@ -197,6 +199,8 @@ function ContenidoFicha({
 }) {
   const { mostrarToast } = useToast();
   const [d, setD] = useState<Formulario>(desde(p));
+  // «Eliminado» no se ofrece (ninguna publicación se elimina), salvo que ya lo tenga.
+  const estadosParaElegir = ESTADOS_PUBLICACION.filter((o) => o.valor !== "eliminado" || d.estado_publicacion === "eliminado");
   // Lo último guardado (o lo que llegó del servidor): con eso se compara para saber si hay cambios sin guardar. Al guardar no se
   // rearma la ficha (antes cambiaba su clave y parecía que se cerraba): cuando llegan los datos nuevos, el formulario los toma
   // solo si no hay cambios a medio escribir.
@@ -448,14 +452,16 @@ function ContenidoFicha({
               </ul>
             )}
             <div className="grid gap-3 sm:grid-cols-2">
-              {/* Ya no se marcan a mano (21 oct 2026): salen de lo que reporta Dropi. */}
+              {/* Se eligen aquí (24 oct 2026, el sistema manda; antes salían de Dropi). Debajo, lo que reporta Dropi, solo de referencia. */}
               <div className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>En Dropi</span>
-                <span className="text-sm">{EN_DROPI.find((e) => e.valor === p.enDropi)?.etiqueta ?? "—"}</span>
+                <span aria-hidden="true" className={labelClassSm}>Estado</span>
+                <Selector nombre="Estado" valor={d.estado_publicacion} lista={estadosParaElegir} cambiar={(v) => cambiar({ estado_publicacion: v })} vacio="Sin anotar" />
+                <span className="text-xs text-muted-foreground">Dropi: {EN_DROPI.find((e) => e.valor === p.enDropi)?.etiqueta ?? "—"}</span>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Tipo</span>
-                <span className="text-sm">{p.tipoDropi === "privado" ? "Privado" : p.tipoDropi === "publico" ? "Público" : "—"}</span>
+                <span aria-hidden="true" className={labelClassSm}>Tipo</span>
+                <Selector nombre="Tipo" valor={d.tipo_publicacion} lista={TIPOS} cambiar={(v) => cambiar({ tipo_publicacion: v })} vacio="Sin anotar" />
+                {p.tipoEnDropi && <span className="text-xs text-muted-foreground">Dropi: {p.tipoEnDropi === "privado" ? "Privado" : "Público"}</span>}
               </div>
               {/* Ya no se anota (21 oct 2026): sale de Dropi. Por ahora, la primera venta de la carga de Ventas Dropi; sin ventas,
                   la fecha que estaba anotada. */}
@@ -477,7 +483,7 @@ function ContenidoFicha({
                   )}
                 </span>
               </div>
-              {(p.tipoDropi === "privado" || !!d.privatizado_a) && (
+              {((d.tipo_publicacion || p.tipoDropi) === "privado" || !!d.privatizado_a) && (
                 <>
                   <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Privatizado a</span>

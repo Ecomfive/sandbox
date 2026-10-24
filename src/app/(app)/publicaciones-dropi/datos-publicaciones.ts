@@ -41,7 +41,7 @@ function automatico(
   prov: ProductoProveedor | null,
   /** El stock por ID de la última lectura de «Mis productos»: manda sobre el de la carga de ventas, que puede tener días. */
   stockActual: Map<number, number> | undefined,
-): Pick<FilaPublicacion, "ventas" | "enDropi" | "archivada" | "tipoDropi" | "acciones" | "competidorMasBarato" | "competidorMinimo"> {
+): Pick<FilaPublicacion, "ventas" | "enDropi" | "archivada" | "tipoDropi" | "tipoEnDropi" | "acciones" | "competidorMasBarato" | "competidorMinimo"> {
   const ids = idsDropi(d);
   const v = ventas ? ventasDePublicacion(ids, ventas.resumen, stockActual) : null;
   const estadoDropi = prov
@@ -50,22 +50,20 @@ function automatico(
       : "activo"
     : enDropi({ hayCarga: !!ventas, tieneId: ids.length > 0, dropi: v ? { activo: v.activoEnDropi } : null });
   const manualArchivada = d.estado === "archivado" || d.estado_publicacion === "archivado";
-  const archivada = estaArchivada(estadoDropi, manualArchivada);
-  const tipo: "publico" | "privado" | null = prov
-    ? prov.privado
-      ? "privado"
-      : "publico"
-    : v
-      ? v.privadoEnDropi
-        ? "privado"
-        : "publico"
-      : ((d.tipo_publicacion as "publico" | "privado" | null) ?? null);
+  // Desde el 24 oct 2026 el sistema manda (pedido de Hernán): el estado y el tipo se eligen en la ficha y lo anotado gana; lo que
+  // reporta Dropi solo cuenta si la publicación no tiene nada anotado.
+  const estadoAnotado = (d.estado_publicacion as string | null) ?? null;
+  const archivada = estadoAnotado ? manualArchivada : estaArchivada(estadoDropi, manualArchivada);
+  const tipoEnDropi: "publico" | "privado" | null = prov ? (prov.privado ? "privado" : "publico") : v ? (v.privadoEnDropi ? "privado" : "publico") : null;
+  const tipoAnotado = d.tipo_publicacion === "publico" || d.tipo_publicacion === "privado" ? (d.tipo_publicacion as "publico" | "privado") : null;
+  const tipo = tipoAnotado ?? tipoEnDropi;
   const barato = competidorMasBarato({ nombre: d.nombre as string, precio: num(d.precio_venta), idsDropi: ids }, competidores);
   return {
     ventas: v,
     enDropi: estadoDropi,
     archivada,
     tipoDropi: tipo,
+    tipoEnDropi,
     competidorMasBarato: barato,
     competidorMinimo: competidorMinimo({ nombre: d.nombre as string, idsDropi: ids }, competidores),
     acciones: accionesPublicacion(
@@ -342,10 +340,10 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   });
 
   // El grupo de cada producto (el público y sus privadas «P-MA …»), para apagarlas juntas.
-  const paraApagar = filas.map((f) => ({ id: f.id, nombre: f.nombre, tipo: f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }));
+  const paraApagar = filas.map((f) => ({ id: f.id, nombre: f.nombre, tipo: f.tipoEnDropi ?? f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }));
   const porIdFila = new Map(filas.map((f) => [f.id, f]));
   for (const f of filas)
-    f.grupo = grupoDe({ id: f.id, nombre: f.nombre, tipo: f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }, paraApagar).map((x) => {
+    f.grupo = grupoDe({ id: f.id, nombre: f.nombre, tipo: f.tipoEnDropi ?? f.tipoDropi, dropiId: f.dropiId, archivada: f.archivada }, paraApagar).map((x) => {
       const o = porIdFila.get(x.id)!;
       return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail, apagadoPendiente: o.apagadoPendiente, apagadoSinTocar: o.apagadoSinTocar };
     });
