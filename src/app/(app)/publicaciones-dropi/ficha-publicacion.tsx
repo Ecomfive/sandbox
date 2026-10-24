@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, ProductoIcon, ArchivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   TIPOS,
@@ -21,7 +21,7 @@ import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
-import { actualizarPublicacion, archivarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
+import { actualizarPublicacion, archivarPublicacion, eliminarBorrador, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
@@ -283,6 +283,23 @@ function ContenidoFicha({
     });
   }
 
+  // Un borrador sí se elimina para siempre (24 oct 2026); las demás publicaciones solo se archivan.
+  const [eliminando, setEliminando] = useState(false);
+  function eliminar() {
+    if (!confirm(`Se va a eliminar para siempre el borrador «${p.nombre}», con sus datos y sus fotos. Esto no se puede deshacer. ¿Seguir?`)) return;
+    setError(null);
+    setEliminando(true);
+    empezar(async () => {
+      const r = await eliminarBorrador(p.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      setEliminando(false);
+      if (r.error) setError(r.error);
+      else {
+        mostrarToast(r.detalle ?? "Borrador eliminado");
+        alCerrar();
+      }
+    });
+  }
+
   // Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se archiva, y se puede sacar de Archivados.
   function archivar() {
     const archivarla = !p.archivada;
@@ -368,6 +385,11 @@ function ContenidoFicha({
               {!sinGuardar && puedeArchivar && p.sinPublicar && (
                 <BotonAccion icono={CheckIcon} disabled={pendiente || p.publicarPendiente} onClick={publicar}>
                   {publicando ? "Un momento..." : p.publicarPendiente ? "Publicación pendiente" : "Publicar en Dropi"}
+                </BotonAccion>
+              )}
+              {!sinGuardar && puedeArchivar && p.sinPublicar && !p.publicarPendiente && (
+                <BotonAccion icono={PapeleraIcon} disabled={pendiente} onClick={eliminar}>
+                  {eliminando ? "Un momento..." : "Eliminar borrador"}
                 </BotonAccion>
               )}
               {!sinGuardar && puedeArchivar && puedeRepublicar && !p.sinPublicar && (

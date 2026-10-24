@@ -4,15 +4,16 @@ import { useState, useTransition } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { CheckIcon } from "@/lib/nav-icons";
-import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
+import { faltantesCrearDropi, normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { guardarDatosDropi } from "./actions";
 import { CamposDatosDropi } from "./campos-datos-dropi";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 /**
  * Los datos que Dropi pide para publicar una publicación «Sin publicar» (peso, medidas, categoría, descripción, stock inicial y fotos), en su
- * propio formulario aparte del de la ficha (un formulario no va dentro de otro). Si la publicación ya está pendiente para Dropi, guardar
- * también actualiza lo pendiente. El nombre y el precio son los de la ficha.
+ * propio formulario aparte del de la ficha (un formulario no va dentro de otro). Un borrador se guarda aunque falten datos (el aviso de arriba dice
+ * cuáles faltan para publicarla); si la publicación ya está pendiente para Dropi, guardar también actualiza lo pendiente y tiene que seguir completa.
+ * El nombre y el precio son los de la ficha.
  */
 export function DatosParaDropi({ p, opciones }: { p: FilaPublicacion; opciones: OpcionesCrear }) {
   const { mostrarToast } = useToast();
@@ -34,9 +35,21 @@ export function DatosParaDropi({ p, opciones }: { p: FilaPublicacion; opciones: 
     });
   }
 
+  // Lo que Dropi todavía pide para publicarla, con lo último guardado (y el nombre y el precio de la ficha).
+  const falta = faltantesCrearDropi(normalizarDatosCrear({ ...p.datosDropi, nombre: p.nombre, precio: p.precioVenta, precioSugerido: p.precioVenta }));
   return (
-    <form onSubmit={guardar} aria-busy={pendiente} aria-label="Datos para Dropi" className="flex flex-col divide-y divide-border border-b border-border px-5 pb-5">
+    <form onSubmit={guardar} noValidate aria-busy={pendiente} aria-label="Datos para Dropi" className="flex flex-col divide-y divide-border border-b border-border px-5 pb-5">
       <input type="hidden" name="id" value={p.id} />
+      {falta.length > 0 && (
+        <div role="note" className="flex flex-col gap-1 py-4 text-sm">
+          <span className="font-semibold">Para publicarla en Dropi falta:</span>
+          <ul className="m-0 list-disc pl-5 text-muted-foreground">
+            {falta.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {/* `key`: al guardar se vuelven a tomar los datos que llegan del servidor. */}
       <CamposDatosDropi key={version} opciones={opciones} inicial={p.datosDropi} idBase="ficha-dd" />
       <div className="flex flex-col gap-2 pt-4">

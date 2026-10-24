@@ -537,8 +537,14 @@ convenciones técnicas del código.
   api/productwarranty/create`, aviso si fallan), le da el stock con una entrada si Dropi no lo tomó al crear y vuelve a leer para comprobar nombre, fotos y stock.
   **El ID se guarda apenas Dropi lo crea** (`nuevo_dropi_id`, y la publicación toma su `dropi_id` en `publicadaEnDropi`), aunque falle un paso después, para que un
   reintento no cree otro y la lectura de Dropi no lo trate como nuevo; solo si todo sale bien la publicación pasa a Activo. **Deshacer** una publicación pendiente la
-  deja «Sin publicar» con todos sus datos (nunca se borra) y se vuelve a publicar con «Publicar en Dropi» de su ficha (`publicarEnDropi`), donde también se editan
-  sus datos (`DatosParaDropi`, `guardarDatosDropi`). Solo productos **simples y públicos** (un privado nace de uno público; uno variable se arma a mano). Las categorías
+  deja «Sin publicar» con todos sus datos (no se borra sola) y se vuelve a publicar con «Publicar en Dropi» de su ficha (`publicarEnDropi`), donde también se editan
+  sus datos (`DatosParaDropi`, `guardarDatosDropi`). **Borradores** (24 oct 2026, migración 0152): si faltan datos, «Agregar › Publicar en Dropi» ofrece **«Guardar como
+  borrador»** (`secundario` de `FichaCrear`; `crearComoBorrador` guarda lo que haya, solo pide el nombre, y no queda pendiente). Un borrador es la misma «Sin publicar»:
+  en su ficha se completa (`DatosParaDropi` se guarda sin exigir todo y dice qué falta; si ya está pendiente para Dropi sí tiene que seguir completo) y se publica con
+  «Publicar en Dropi», que dice qué falta si no alcanza. **Un borrador sí se elimina para siempre** con «Eliminar borrador» (`eliminarBorrador`: solo `estado_publicacion =
+  'borrador'` sin `dropi_id` y sin cambio pendiente; se va con sus comentarios, su IA y sus fotos de Storage; el disparador de la 0140 lo permite solo para eso en la
+  0152). **Es la única excepción a «ninguna publicación se elimina»**: todas las demás se archivan. Archivar un borrador lo deja borrador (`estado = 'archivado'`).
+  **El Estado de la ficha** (elegir Archivado/Activo en el selector) también encola `archivar`, igual que el botón «Archivar» (`actualizarPublicacion`). Solo productos **simples y públicos** (un privado nace de uno público; uno variable se arma a mano). Las categorías
   que ofrece el formulario salen de nuestros productos leídos de Dropi (`opcionesParaCrear`), con «Otra categoría» para escribir otra; las bodegas, de las de
   ECOMFIVE leídas (no la B280, que es de Dropi). **Pendiente de probar con Dropi real**: crear un producto de verdad (hasta ahora está probado contra un Dropi simulado
   con las rutas que usa su pantalla) y que `unarchive` devuelva el producto sin stock (el stock lo pone la persona en Dropi).

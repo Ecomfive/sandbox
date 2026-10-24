@@ -214,6 +214,39 @@ async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof
   return {};
 }
 
+/**
+ * «Guardar como borrador» (pedido de Jhokser, 24 oct 2026): la publicación se guarda «Sin publicar» con lo que se haya llenado, aunque falten datos
+ * de los que Dropi exige. No queda pendiente para Dropi: se completa desde su ficha y se publica con «Publicar en Dropi», o se elimina.
+ */
+async function crearComoBorrador(f: FormData, usuario: Awaited<ReturnType<typeof requireModuloEscritura>>, paisId: string, supabase: ReturnType<typeof createServiceClient>): Promise<{ error?: string }> {
+  const basicos = leerDatos(f);
+  if ("error" in basicos) return basicos;
+  const precio = typeof basicos.precio_venta === "number" ? basicos.precio_venta : null;
+  const datos = await leerDatosDropi(f, supabase, { nombre: String(basicos.nombre), precio, publicacionId: null });
+  if ("error" in datos) return datos;
+  const { data, error } = await supabase
+    .from("dropi_publicaciones")
+    .insert({
+      ...basicos,
+      dropi_id: null,
+      tipo_publicacion: "publico",
+      estado_publicacion: "borrador",
+      datos_dropi: datos,
+      descripcion: datos.descripcion || null,
+      pais_id: paisId,
+      fecha_publicacion: null,
+      responsable_id: basicos.responsable_id ?? usuario.id,
+      creado_por: usuario.id,
+    })
+    .select("id")
+    .single();
+  if (error || !data) return { error: error?.code === "23514" ? "Falta correr en Supabase la migración 0151." : "No se pudo guardar el borrador." };
+  const falta = faltantesCrearDropi(datos);
+  await registrarAuditoria({ accion: "crear_borrador_dropi", entidad: "dropi_publicaciones", entidadId: data.id, detalle: `${datos.nombre} · borrador${falta.length ? ` (faltan ${falta.length} datos para Dropi)` : " (completo)"}` });
+  revalidatePath(RUTA);
+  return {};
+}
+
 /** «Agregar»: una publicación nueva en el país de la barra. */
 export async function crearPublicacion(f: FormData): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
@@ -222,6 +255,7 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
   if (!UUID.test(paisId) || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, paisId))) return { error: "País no válido." };
   // Un producto nuevo se publica en Dropi desde aquí (pedido de Jhokser, 24 oct 2026); «Ya está en Dropi» solo la anota.
   if (texto(f, "modo", 12) === "publicar") return crearParaPublicar(f, usuario, paisId, supabase);
+  if (texto(f, "modo", 12) === "borrador") return crearComoBorrador(f, usuario, paisId, supabase);
   const datos = leerDatos(f);
   if ("error" in datos) return datos;
   const repetido = await idDropiRepetido(paisId, (datos.dropi_id as string | null) ?? null, null);
@@ -311,6 +345,22 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
       despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k])])),
     });
   let dropi: string | undefined;
+  // Archivar o sacar de Archivados eligiendo el Estado en la ficha también queda pendiente para Dropi, igual que el botón «Archivar» (24 oct 2026).
+  const eraArchivada = antes.estado === "archivado" || antes.estado_publicacion === "archivado";
+  const ahoraArchivada = (datos.estado ?? antes.estado) === "archivado" || (datos.estado_publicacion ?? antes.estado_publicacion) === "archivado";
+  const dropiAntes = (antes.dropi_id as string | null) ?? null;
+  if (!sinPublicar && eraArchivada !== ahoraArchivada && dropiAntes && idsDeDropi(dropiAntes).length > 0) {
+    const r = await encolarArchivar(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: dropiAntes }, { restaurar: !ahoraArchivada }, { estado: (antes.estado as string | null) ?? null, estado_publicacion: (antes.estado_publicacion as string | null) ?? null }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+    if ("error" in r) dropi = `El estado se guardó, pero no quedó para Dropi: ${r.error}`;
+    else if ("cancelo" in r) {
+      // Era el contrario de uno pendiente: se cancelan entre sí y la publicación vuelve a como estaba antes de ese pedido.
+      await createServiceClient().from("dropi_publicaciones").update({ estado: r.cancelo.estado ?? undefined, estado_publicacion: r.cancelo.estado_publicacion }).eq("id", id);
+      dropi = "Se canceló el archivar que esperaba para Dropi: Dropi no se tocó.";
+    } else {
+      dropi = `${ahoraArchivada ? "Archivar" : "Salir de Archivados"} pendiente en Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
+      if (!r.yaEstaba) await registrarAuditoria({ accion: ahoraArchivada ? "dropi_archivar_pendiente" : "dropi_restaurar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${dropiAntes}: pendiente para «Aplicar en Dropi»` });
+    }
+  }
   // Sin publicar: el nombre y el precio se toman de la publicación al publicarla; no hay nada que mandar a Dropi todavía.
   if (sinPublicar) {
     revalidatePath(RUTA);
@@ -321,11 +371,11 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   const precioNuevo = typeof datos.precio_venta === "number" ? datos.precio_venta : null;
   if (precioNuevo !== null && precioNuevo > 0 && (precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004)) {
     const r = await enviarPrecioADropi(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, precioNuevo, precioAntes, { id: usuario.id, nombre: usuario.nombre || usuario.email });
-    dropi = r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`;
+    dropi = [dropi, r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`].filter(Boolean).join(" ");
   }
   if (cambiaNombre) {
     const r = await enviarNombreADropi(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null, sku_maestro_id: (antes.sku_maestro_id as string | null) ?? null }, nombreNuevo, { id: usuario.id, nombre: usuario.nombre || usuario.email }, antes.nombre);
-    dropi = r.estado === "pendiente" ? `Nombre${dropi ? " y precio" : ""} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` : `El nombre se guardó, pero no quedó para Dropi: ${r.detalle}`;
+    dropi = [dropi, r.estado === "pendiente" ? "Nombre para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto." : `El nombre se guardó, pero no quedó para Dropi: ${r.detalle}`].filter(Boolean).join(" ");
   }
   revalidatePath(RUTA);
   return { dropi };
@@ -345,10 +395,15 @@ export async function guardarDatosDropi(f: FormData): Promise<{ error?: string }
   const precio = pub.precio_venta === null || pub.precio_venta === undefined ? null : Number(pub.precio_venta);
   const datos = await leerDatosDropi(f, supabase, { nombre: String(pub.nombre ?? ""), precio, publicacionId: id });
   if ("error" in datos) return datos;
-  const { error } = await supabase.from("dropi_publicaciones").update({ datos_dropi: datos, descripcion: datos.descripcion, actualizado_en: new Date().toISOString() }).eq("id", id);
-  if (error) return { error: "No se pudieron guardar los datos." };
+  // Un borrador se guarda aunque falten datos; si ya está pendiente para Dropi tiene que seguir completo (lo pendiente toma estos datos).
   const pendiente = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", id).eq("tipo", "crear").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
-  if (pendiente.data) await encolarCrear(supabase, { id, pais_id: pub.pais_id }, datos, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  if (pendiente.data) {
+    const falta = faltantesCrearDropi(normalizarDatosCrear({ ...datos, nombre: pub.nombre, precio, precioSugerido: precio }));
+    if (falta.length) return { error: `Está pendiente para Dropi y le faltaría: ${falta.join(" ")} Complétalo, o deshaz la publicación pendiente para dejarla como borrador.` };
+  }
+  const { error } = await supabase.from("dropi_publicaciones").update({ datos_dropi: datos, descripcion: datos.descripcion || null, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudieron guardar los datos." };
+  if (pendiente.data) await encolarCrear(supabase, { id, pais_id: pub.pais_id }, normalizarDatosCrear({ ...datos, nombre: pub.nombre, precio, precioSugerido: precio }), { id: usuario.id, nombre: usuario.nombre || usuario.email });
   await registrarAuditoria({ accion: "editar_publicacion_dropi", entidad: "dropi_publicaciones", entidadId: id, detalle: `${pub.nombre}: cambió los datos para Dropi (${datos.fotos.length} fotos, ${datos.bodegas[0]?.unidades ?? 0} unidades)` });
   revalidatePath(RUTA);
   return {};
@@ -375,6 +430,32 @@ export async function publicarEnDropi(id: string): Promise<{ error?: string; det
   if (!r.yaEstaba) await registrarAuditoria({ accion: "dropi_crear_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${pub.nombre}: pendiente para «Aplicar en Dropi»` });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Publicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
+}
+
+/**
+ * Elimina **para siempre** un borrador (pedido de Jhokser, 24 oct 2026; migración 0152): solo una publicación «Sin publicar» que nunca existió en
+ * Dropi y no está pendiente de publicarse (si lo está, primero se deshace). Se va con sus comentarios, su actividad de IA y sus fotos de Storage.
+ * Todas las demás siguen sin poder eliminarse (se archivan). Queda una línea en la auditoría.
+ */
+export async function eliminarBorrador(id: string): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const pub = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!pub) return { error: "La publicación ya no existe o no es de tus países." };
+  if (pub.estado_publicacion !== "borrador" || pub.dropi_id) return { error: "Solo se eliminan los borradores que nunca se publicaron en Dropi; las demás se archivan." };
+  const supabase = createServiceClient();
+  const pendiente = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", id).in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
+  if (pendiente.data) return { error: "Tiene un cambio pendiente para Dropi: deshazlo en la lista de cambios pendientes antes de eliminarla." };
+  // Las fotos que subió este borrador y las que le generó la IA (nada más: nunca se borra un archivo de otra parte).
+  const datos = normalizarDatosCrear(pub.datos_dropi);
+  const archivos = datos.fotos.map((x) => x.url.split(`/object/public/${BUCKET}/`)[1]).filter((r): r is string => !!r && RUTA_FOTO_BORRADOR.test(r));
+  const { data: deLaIa } = await supabase.storage.from(BUCKET).list(`publicaciones/${id}/ia`, { limit: 200 });
+  for (const x of deLaIa ?? []) if (x.name) archivos.push(`publicaciones/${id}/ia/${x.name}`);
+  await registrarAuditoria({ accion: "eliminar_borrador_dropi", entidad: "dropi_publicaciones", entidadId: id, detalle: `${pub.nombre}: borrador eliminado para siempre` });
+  const { error } = await supabase.from("dropi_publicaciones").delete().eq("id", id);
+  if (error) return { error: /migraci|no se eliminan/i.test(error.message) ? "Falta correr en Supabase la migración 0152." : "No se pudo eliminar el borrador." };
+  if (archivos.length) await supabase.storage.from(BUCKET).remove(archivos);
+  revalidatePath(RUTA);
+  return { detalle: "Borrador eliminado" };
 }
 
 /** La actividad de una publicación para su ficha. Es una lectura: basta poder abrir el módulo. */
