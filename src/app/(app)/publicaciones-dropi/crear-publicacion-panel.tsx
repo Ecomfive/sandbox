@@ -29,6 +29,19 @@ export function CrearPublicacionPanel({ paisId, opciones }: { paisId: string; op
       mensajeExito={publicar ? "Publicación creada: queda pendiente para Dropi" : "Publicación creada"}
       ocultos={{ pais_id: paisId, modo }}
       alAbrir={() => setModo("publicar")}
+      // Con datos sin completar se guarda como borrador («Sin publicar»): se completa y se publica después, o se elimina.
+      secundario={
+        publicar
+          ? {
+              etiqueta: "Guardar como borrador",
+              mensajeExito: "Guardada como borrador («Sin publicar»)",
+              action: (f) => {
+                f.set("modo", "borrador");
+                return crearPublicacion(f);
+              },
+            }
+          : undefined
+      }
     >
       {({ faltante, invalido }) => (
         <>

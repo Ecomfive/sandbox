@@ -43,6 +43,7 @@ export function FichaCrear({
   alGuardar,
   incrustada = false,
   alCambiarEnviando,
+  secundario,
   children,
 }: {
   /** Título de la cabecera: «Nuevo gasto». */
@@ -70,6 +71,11 @@ export function FichaCrear({
   incrustada?: boolean;
   /** Avisa cuando empieza y termina de guardar (para que la ventana que la contiene no se cierre a medias). */
   alCambiarEnviando?: (enviando: boolean) => void;
+  /**
+   * Otro botón, más discreto, encima del de crear: guarda lo que haya **sin exigir los datos obligatorios** (por ejemplo «Guardar como
+   * borrador»). Manda el mismo formulario a su propia acción; la acción dice qué falta como `{ error }` si no se puede.
+   */
+  secundario?: { etiqueta: string; etiquetaEnviando?: string; mensajeExito: string; action: (formData: FormData) => Promise<{ error?: string } | void> };
   children: (ayuda: AyudaFaltantes) => ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -142,6 +148,26 @@ export function FichaCrear({
     if (!señalarFaltante()) alPulsarSinCompletar?.();
   }
 
+  // El botón secundario guarda sin revisar lo obligatorio (el servidor decide si alcanza).
+  function guardarSecundario() {
+    if (!secundario || !formRef.current) return;
+    const datos = new FormData(formRef.current);
+    setError(null);
+    startTransition(async () => {
+      try {
+        const resultado = await secundario.action(datos);
+        if (resultado && resultado.error) setError(resultado.error);
+        else {
+          setAbierto(false);
+          mostrarToast(secundario.mensajeExito);
+          alGuardar?.();
+        }
+      } catch {
+        setError("No se pudo guardar. Inténtalo de nuevo.");
+      }
+    });
+  }
+
   const formulario = (
         <form
           ref={formRef}
@@ -169,6 +195,16 @@ export function FichaCrear({
               </span>{" "}
               Obligatorio
             </p>
+            {secundario && (
+              <button
+                type="button"
+                onClick={guardarSecundario}
+                disabled={pending}
+                className="flex h-11 w-full items-center justify-center !rounded-full border border-border-control bg-card text-sm font-semibold hover:bg-muted disabled:opacity-50"
+              >
+                {pending ? (secundario.etiquetaEnviando ?? "Guardando...") : secundario.etiqueta}
+              </button>
+            )}
             <BotonCrear
               puede={completo && puedeExtra}
               enviando={pending}
