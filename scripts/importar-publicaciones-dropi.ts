@@ -7,6 +7,10 @@
 //   npx tsx scripts/importar-publicaciones-dropi.ts            → informe
 //   npx tsx scripts/importar-publicaciones-dropi.ts --aplicar  → importa (y copia las fotos a Storage)
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("importar-publicaciones-dropi.ts");
+
 process.loadEnvFile(".env.local");
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";

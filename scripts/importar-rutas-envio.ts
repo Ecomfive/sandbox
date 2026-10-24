@@ -6,6 +6,10 @@
 //   npx tsx scripts/importar-rutas-envio.ts            → informe
 //   npx tsx scripts/importar-rutas-envio.ts --aplicar  → crea las rutas que falten (las que ya existen no se tocan)
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("importar-rutas-envio.ts");
+
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { parsearTiempo } from "../src/lib/compras/rutas-envio";

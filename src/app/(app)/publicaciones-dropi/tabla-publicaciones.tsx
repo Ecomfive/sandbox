@@ -117,7 +117,7 @@ export function TablaPublicaciones({
       <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
       <p className="-mb-2 text-xs text-muted-foreground">
         {actualizadoDropi
-          ? `Última actualización desde Dropi: ${actualizadoDropi} (bodegas, stock, precio, tipo y estado).`
+          ? `Stock y bodegas leídos de Dropi: ${actualizadoDropi}.`
           : "Todavía no se actualizó desde Dropi: las bodegas aparecen con la primera lectura de «Mis productos»."}
       </p>
       {barraDropi}

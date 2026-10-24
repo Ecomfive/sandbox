@@ -1,8 +1,9 @@
 // Gestión de IDs Dropi › Bodegas (pedido de Hernán, 22 oct 2026): guarda la lectura de «Mis productos» de ECOMFIVE en Dropi
-// (scripts/scraping-proveedores-navegador.js › leerNuestrosProductos, migración 0131) y pone en cada publicación la ubicación,
-// el precio, el tipo y el estado que dice Dropi: Dropi manda. Un producto nuevo en Dropi (activo, sin publicación y que no estaba
-// en la lectura anterior) entra como publicación «Producto nuevo» con su bodega. Cada publicación que cambia o se crea queda en su
-// actividad a nombre de «Sistema». Lo llama el receptor (scripts/scraping-proveedores.ts recibir) al llegar una lectura `tipo: "nuestros"`.
+// (scripts/scraping-proveedores-navegador.js › leerNuestrosProductos, migración 0131): el stock y las bodegas de cada producto, en
+// `dropi_productos_proveedor` (de ahí salen «Sin stock», los días de inventario y Reponer). **No toca las publicaciones** (24 oct 2026,
+// pedido de Hernán: el sistema manda; los productos se crean en el sistema y se mandan a Dropi). Lo que en Dropi no coincide con una
+// publicación (precio, nombre, bodega, tipo, estado, productos sin publicación o que ya no están) solo se informa en el resumen.
+// Lo llama el receptor (scripts/scraping-proveedores.ts recibir) al llegar una lectura `tipo: "nuestros"` y la tarea diaria (dropi-diario.ts).
 //
 // A mano, con una lectura guardada (por defecto solo informa; --aplicar escribe):
 //   npx tsx scripts/publicaciones-sincronizar-dropi.ts datos-privados/scraping/pa-nuestros-<fecha>.json [--aplicar]
@@ -17,7 +18,6 @@ import {
   normalizarProductoProveedor,
   productoPrincipal,
   productosNuevos,
-  ubicacionDeProducto,
   type ProductoProveedor,
 } from "../src/lib/publicaciones/sincronizar-dropi";
 
@@ -104,19 +104,21 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     activos: [...productos.values()].filter((p) => !p.archivado).length,
     archivados: [...productos.values()].filter((p) => p.archivado).length,
     publicaciones: pubs.length,
-    actualizadas: cambios.length,
+    // Solo se informan (no se escriben): lo que Dropi tiene distinto, lo que ya no está y lo que está en Dropi sin publicación.
+    distintasEnDropi: cambios.length,
     ubicacion: cuenta("ubicacion"),
     precio: cuenta("precio_venta"),
     tipo: cuenta("tipo_publicacion"),
     estado: cuenta("estado_publicacion"),
     nombre: cuenta("nombre"),
     idNoEstaEnDropi: noEstan,
-    archivadasPorDesaparecer: desaparecidas.map((d) => `${d.dropiId} ${d.nombre}`),
-    creadas: nuevos.map((p) => `${p.id} ${p.nombre} (${p.bodegas.length ? codigoBodega(bodegasEnOrden(p.bodegas)[0].id) : "sin bodega"})`),
+    yaNoEstanEnDropi: desaparecidas.map((d) => `${d.dropiId} ${d.nombre}`),
+    nuevosEnDropiSinPublicacion: nuevos.map((p) => `${p.id} ${p.nombre} (${p.bodegas.length ? codigoBodega(bodegasEnOrden(p.bodegas)[0].id) : "sin bodega"})`),
     enDropiSinPublicacion: sinPublicacion,
     aplicado: aplicar,
   };
-  if (!aplicar) return { ...resumen, detalle: cambios.map((c) => `${c.nombre} (${c.dropiId}): ${c.detalle.join("; ")}`) };
+  const detalle = cambios.map((c) => `${c.nombre} (${c.dropiId}): ${c.detalle.join("; ")}`);
+  if (!aplicar) return { ...resumen, detalle };
 
   const filas = [...productos.values()].map((p) => ({
     pais_id: pais.id,
@@ -139,66 +141,8 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   // Lo que Dropi ya no lista (eliminado) sale de la tabla: se reemplaza en cada lectura.
   revisar(await supabase.from("dropi_productos_proveedor").delete().eq("pais_id", pais.id).lt("leido_en", leidoEn), "Quitar los que ya no están");
 
-  for (const c of cambios) {
-    revisar(await supabase.from("dropi_publicaciones").update({ ...c.cambios, actualizado_en: leidoEn }).eq("id", c.id), `Actualizar ${c.nombre}`);
-  }
-  await enTrozos(cambios, 200, async (t) =>
-    void revisar(
-      await supabase.from("historial_auditoria").insert(
-        t.map((c) => ({ usuario_id: null, usuario_nombre: "Sistema", accion: "sincronizar_dropi_publicacion", entidad: "dropi_publicaciones", entidad_id: c.id, detalle: `ID ${c.dropiId} · ${c.detalle.join(" · ")}` })),
-      ),
-      "Actividad",
-    ),
-  );
-  // Resguardo: si esta lectura trae muchos menos productos que la anterior (una lectura a medias), no se archiva nada.
-  const lecturaCompleta = !!anteriores && productos.size >= anteriores.size * 0.9;
-  if (desaparecidas.length && lecturaCompleta) {
-    for (const d of desaparecidas) revisar(await supabase.from("dropi_publicaciones").update({ estado_publicacion: "archivado", actualizado_en: leidoEn }).eq("id", d.id), `Archivar ${d.nombre}`);
-    revisar(
-      await supabase.from("historial_auditoria").insert(
-        desaparecidas.map((d) => ({ usuario_id: null, usuario_nombre: "Sistema", accion: "sincronizar_dropi_publicacion", entidad: "dropi_publicaciones", entidad_id: d.id, detalle: `ID ${d.dropiId} · Archivada: el producto ya no aparece en Dropi (se eliminó). Su historia y sus ventas se conservan.` })),
-      ),
-      "Actividad de las archivadas",
-    );
-  }
-  if (nuevos.length) {
-    const creadas = revisar(
-      await supabase
-        .from("dropi_publicaciones")
-        .insert(
-          nuevos.map((p) => ({
-            pais_id: pais.id,
-            nombre: p.nombre,
-            dropi_id: String(p.id),
-            estado: "producto_nuevo",
-            estado_publicacion: "activo",
-            tipo_publicacion: p.privado ? "privado" : "publico",
-            precio_venta: p.precio,
-            ubicacion: ubicacionDeProducto(p),
-            fecha_publicacion: (p.creado ?? hoy).slice(0, 10),
-          })),
-        )
-        .select("id, dropi_id"),
-      "Crear publicaciones nuevas",
-    ) as { id: string; dropi_id: string }[];
-    revisar(
-      await supabase.from("historial_auditoria").insert(
-        creadas.map((c) => {
-          const p = productos.get(Number(c.dropi_id))!;
-          const b = p.bodegas.length ? bodegasEnOrden(p.bodegas)[0] : null;
-          return {
-            usuario_id: null,
-            usuario_nombre: "Sistema",
-            accion: "crear_publicacion_dropi",
-            entidad: "dropi_publicaciones",
-            entidad_id: c.id,
-            detalle: `${p.nombre} (ID ${p.id}) · producto nuevo en Dropi${b ? ` · bodega ${codigoBodega(b.id)} ${b.nombre}` : ""}`,
-          };
-        }),
-      ),
-      "Actividad de las nuevas",
-    );
-  }
+  // Desde el 24 oct 2026 (pedido de Hernán) el sistema manda: los productos se crean en el sistema y se mandan a Dropi, así que esta
+  // lectura ya no crea, cambia ni archiva publicaciones (antes «Dropi manda»). Lo que no coincide solo se informa en el resumen.
   revisar(
     await supabase.from("dropi_productos_proveedor_lecturas").insert({
       pais_id: pais.id,
@@ -206,12 +150,12 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
       productos: resumen.productos,
       activos: resumen.activos,
       archivados: resumen.archivados,
-      publicaciones_actualizadas: cambios.length,
+      publicaciones_actualizadas: 0,
       duracion_ms: l.duracionMs + (Date.now() - t0),
     }),
     "Lectura",
   );
-  return resumen;
+  return { ...resumen, detalle };
 }
 
 // Uso directo con un archivo guardado.

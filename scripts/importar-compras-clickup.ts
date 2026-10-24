@@ -14,6 +14,10 @@
 // Responsables (decisión de Hernán, 5 oct 2026): lo de Zeylimar Moreno, Maria Jose Aponte, Fabiola Concha y Andreina Andrade
 // de Morales pasa a Francis Aponte; lo de Alcides Andrade se queda a su nombre.
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("importar-compras-clickup.ts");
+
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 

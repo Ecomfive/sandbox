@@ -6,6 +6,10 @@
 // Salida: datos-privados/clickup-gcc-panama.json (carpeta ignorada por git).
 // Token: la línea CLICKUP_TOKEN=... de .env.local. Solo lee de ClickUp: no cambia nada allá.
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("clickup-exportar-publicaciones-dropi.mjs");
+
 import { readFileSync, writeFileSync } from "node:fs";
 
 const LISTA = "901712264897"; // GCC 🇵🇦 Ecomfive Panamá

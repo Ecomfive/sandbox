@@ -4,6 +4,10 @@
 //
 // Uso: node scripts/clickup-inventario-compras.mjs   →   datos-privados/inventario-compras.txt
 
+import { clickupDescontinuado } from "./clickup-descontinuado.mjs";
+
+clickupDescontinuado("clickup-inventario-compras.mjs");
+
 import { readFileSync, writeFileSync } from "node:fs";
 
 const datos = JSON.parse(readFileSync("datos-privados/clickup-compras.json", "utf8"));
