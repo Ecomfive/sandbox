@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
-import { accionesPublicacion, enDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
+import { accionesPublicacion, BODEGA_DROPI, enDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
+import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion, revisionVencida } from "@/lib/publicaciones/publicacion";
@@ -26,6 +27,20 @@ const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const idsDropi = (d: Fila) => (String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? []).map(Number);
 
 type Fila = Record<string, unknown> & { id: string };
+
+/** Lo que el formulario de publicar en Dropi puede ofrecer: las categorías de nuestros productos en Dropi y las bodegas del proveedor (no la B280, que es de Dropi). */
+function opcionesParaCrear(productos: Iterable<ProductoProveedor>): OpcionesCrear {
+  const categorias = new Set<string>();
+  const bodegas = new Map<number, string>();
+  for (const p of productos) {
+    for (const c of p.categorias) if (c.trim()) categorias.add(c.trim());
+    for (const b of p.bodegas) if (b.id !== BODEGA_DROPI) bodegas.set(b.id, b.nombre);
+  }
+  return {
+    categorias: [...categorias].sort((a, b) => a.localeCompare(b, "es")),
+    bodegas: [...bodegas].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.id - b.id),
+  };
+}
 
 /**
  * Lo que ya no se marca a mano (21 oct 2026): cómo está en Dropi, si va a Archivados, el Tipo y qué necesita, a partir de las
@@ -183,6 +198,8 @@ async function cargarPersonas(supabase: SupabaseClient): Promise<{ id: string; n
 
 export interface DatosPublicaciones {
   filas: FilaPublicacion[];
+  /** Lo que ofrece el formulario de publicar en Dropi (migración 0151): categorías y bodegas que ya se conocen de Dropi. */
+  opcionesCrear: OpcionesCrear;
   opcionesSku: OpcionSkuMaestro[];
   corteVentas: string | null;
   /** Cuándo se leyó «Mis productos» de Dropi por última vez (bodegas, precio, tipo y estado); null si nunca. */
@@ -231,6 +248,13 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
+  // Los datos para Dropi de las «Sin publicar» (migración 0151) van aparte: sin la migración, ninguno.
+  const datosBorradores = new Map<string, unknown>();
+  const idsBorrador = datos.filter((d) => d.estado_publicacion === "borrador").map((d) => d.id);
+  if (idsBorrador.length) {
+    const b = await supabase.from("dropi_publicaciones").select("id, datos_dropi").in("id", idsBorrador);
+    if (!b.error) for (const x of b.data ?? []) datosBorradores.set(x.id as string, x.datos_dropi);
+  }
   const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
     cargarSugerencias(
       supabase,
@@ -331,6 +355,12 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       ...(cambiosDropi.apagando.has(d.id as string) ? { archivada: true, acciones: [] as FilaPublicacion["acciones"] } : {}),
       apagadoPendiente: cambiosDropi.apagando.has(d.id as string),
       apagadoSinTocar: cambiosDropi.apagando.get(d.id as string) === 0,
+      // Sin publicar (borrador): no existe en Dropi, así que no genera acciones ni recomendaciones.
+      ...(d.estado_publicacion === "borrador" ? { acciones: [] as FilaPublicacion["acciones"] } : {}),
+      sinPublicar: d.estado_publicacion === "borrador",
+      publicarPendiente: cambiosDropi.creando.has(d.id as string),
+      datosDropi: d.estado_publicacion === "borrador" ? normalizarDatosCrear(datosBorradores.get(d.id as string) ?? null) : null,
+      archivadoPendiente: cambiosDropi.archivando.has(d.id as string) ? (cambiosDropi.archivando.get(d.id as string) ? "restaurar" : "archivar") : null,
       duplicadaDe: null,
       grupo: [],
     };
@@ -390,5 +420,6 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
-  return { filas, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, pendientesDropi: cambiosDropi.pendientes, reglas, decisiones, conTareas, personas };
+  const opcionesCrear = opcionesParaCrear(proveedor?.productos.values() ?? []);
+  return { filas, opcionesCrear, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, pendientesDropi: cambiosDropi.pendientes, reglas, decisiones, conTareas, personas };
 }

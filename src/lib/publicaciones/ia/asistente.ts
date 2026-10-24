@@ -312,6 +312,8 @@ export interface Angulo {
 }
 
 export interface PropuestaTexto {
+  /** La descripción que el equipo eligió usar (migración 0151): ya en HTML para Dropi. Queda pendiente en la cola de «Aplicar en Dropi». */
+  elegida?: { html: string; por: string; en: string };
   descripcion: string;
   angulos: Angulo[];
   notas: string;

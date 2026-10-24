@@ -35,8 +35,10 @@ import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/
 import { notaOptimizacion, revisarPublicacion, type Revision } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
-import { enviarNombreADropi as enviarADropi } from "@/lib/publicaciones/cambios-dropi";
-import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
+import { encolarCambio, enviarNombreADropi as enviarADropi } from "@/lib/publicaciones/cambios-dropi";
+import { descripcionAHtml, medirDescripcion } from "@/lib/publicaciones/descripcion-dropi";
+import { normalizarDatosCrear, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
+import { MAX_NOMBRE_DROPI, MIN_DESCRIPCION_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -91,9 +93,12 @@ export interface GuardadoIA<T> {
   feedback: { util: boolean; nota: string } | null;
 }
 
-/** El plan de fotos con la dirección pública de cada imagen ya generada. */
+/**
+ * El plan de fotos con la dirección pública de cada imagen ya generada y, en `dropi`, si la foto quedó aprobada para subirla a Dropi
+ * (pendiente en la cola de «Aplicar en Dropi») o ya se subió (migración 0151).
+ */
 export interface PlanFotosVista extends Omit<PlanFotos, "fotos"> {
-  fotos: (PlanFotos["fotos"][number] & { url: string | null })[];
+  fotos: (PlanFotos["fotos"][number] & { url: string | null; dropi: "pendiente" | "subida" | null })[];
 }
 
 /** Lo que la publicación tiene hoy y las reglas con que se revisa: lo primero que se ve en el asistente. */
@@ -119,6 +124,10 @@ export interface ContextoVista {
 }
 
 export interface AsistenteVista {
+  /** La descripción elegida: pendiente en la cola de «Aplicar en Dropi» o ya aplicada (null = ninguna elegida). */
+  descripcionDropi: "pendiente" | "aplicada" | null;
+  /** Si la publicación todavía no existe en Dropi («Sin publicar»): lo elegido se guarda con ella y se publica junto. */
+  sinPublicar: boolean;
   contexto: ContextoVista;
   analisis: GuardadoIA<AnalisisIA> | null;
   titulos: GuardadoIA<PropuestaTitulos> | null;
@@ -126,7 +135,52 @@ export interface AsistenteVista {
   fotos: GuardadoIA<PlanFotosVista> | null;
 }
 
-const conUrls = (p: PlanFotos): PlanFotosVista => ({ ...p, fotos: p.fotos.map((f) => ({ ...f, url: f.ruta ? urlPublica(f.ruta) : null })) });
+const conUrls = (p: PlanFotos, estados?: { pendientes: Set<string>; subidas: Set<string> }): PlanFotosVista => ({
+  ...p,
+  fotos: p.fotos.map((f) => {
+    const url = f.ruta ? urlPublica(f.ruta) : null;
+    return { ...f, url, dropi: url && estados?.pendientes.has(url) ? ("pendiente" as const) : url && estados?.subidas.has(url) ? ("subida" as const) : null };
+  }),
+});
+
+/**
+ * Lo que de esta publicación ya está en la cola de «Aplicar en Dropi» (migración 0151): las fotos y la descripción que se eligieron en el
+ * asistente. En una publicación «Sin publicar» lo elegido vive en sus datos para Dropi. Sin la migración, todo vacío.
+ */
+async function estadoDeLoElegido(pubId: string) {
+  const supabase = createServiceClient();
+  const pendientes = new Set<string>();
+  const subidas = new Set<string>();
+  const descripciones = new Map<string, "pendiente" | "aplicada">();
+  const { data: cola, error } = await supabase.from("dropi_cambios_pendientes").select("estado, descripcion, fotos").eq("publicacion_id", pubId).eq("tipo", "cambio").neq("estado", "reemplazado").limit(300);
+  if (error) return { pendientes, subidas, descripciones, sinPublicar: false };
+  for (const c of cola ?? []) {
+    const vivo = c.estado === "pendiente" || c.estado === "error";
+    for (const f of Array.isArray(c.fotos) ? (c.fotos as FotoCrear[]) : []) (vivo ? pendientes : subidas).add(f.url);
+    if (typeof c.descripcion === "string" && c.descripcion) descripciones.set(c.descripcion, vivo ? "pendiente" : (descripciones.get(c.descripcion) ?? "aplicada"));
+  }
+  const { data: pub } = await supabase.from("dropi_publicaciones").select("estado_publicacion, datos_dropi").eq("id", pubId).maybeSingle();
+  const sinPublicar = pub?.estado_publicacion === "borrador";
+  if (sinPublicar) {
+    const d = normalizarDatosCrear(pub?.datos_dropi);
+    for (const f of d.fotos) pendientes.add(f.url);
+    if (d.descripcion) descripciones.set(d.descripcion, "pendiente");
+  }
+  return { pendientes, subidas, descripciones, sinPublicar };
+}
+
+/** La publicación con lo que agregó la migración 0151 (estado «Sin publicar», datos para Dropi y descripción); null si falta la migración. */
+async function extrasDePublicacion(pubId: string): Promise<{ estado_publicacion: string | null; datos_dropi: Record<string, unknown> | null; descripcion: string | null } | null> {
+  const { data, error } = await createServiceClient().from("dropi_publicaciones").select("estado_publicacion, datos_dropi, descripcion").eq("id", pubId).maybeSingle();
+  if (error || !data) return null;
+  return { estado_publicacion: (data.estado_publicacion as string | null) ?? null, datos_dropi: (data.datos_dropi as Record<string, unknown> | null) ?? null, descripcion: (data.descripcion as string | null) ?? null };
+}
+
+/** ¿Alguna foto esperando en la cola usa esa dirección? (Una foto aprobada no se borra de Storage aunque se rehaga la del plan.) */
+async function fotoEnCola(pubId: string, url: string): Promise<boolean> {
+  const { data } = await createServiceClient().from("dropi_cambios_pendientes").select("fotos").eq("publicacion_id", pubId).in("estado", ["pendiente", "error"]).not("fotos", "is", null).limit(100);
+  return (data ?? []).some((c) => Array.isArray(c.fotos) && (c.fotos as FotoCrear[]).some((f) => f.url === url));
+}
 
 type FilaIA = { id: string; tipo: string; resultado: unknown; modelo: string | null; creado_por_nombre: string | null; creado_en: string };
 type Pub = { id: string; nombre: string; dropi_id: string | null; pais_id: string; precio_venta: number | null; margen: number | null; foto_url: string | null; sku_maestro_id: string | null };
@@ -258,18 +312,22 @@ export async function obtenerAsistenteIA(publicacionId: string): Promise<Asisten
   ]);
   if (error) return { error: faltaMigracion(error.message) ? SIN_MIGRACION : "No se pudo cargar lo que generó la IA." };
   const filas = (data ?? []) as FilaIA[];
+  const elegido = await estadoDeLoElegido(publicacionId);
   const ultimo = <T,>(tipo: TipoIA, mapa: (r: unknown) => T): GuardadoIA<T> | null => {
     const f = filas.find((x) => x.tipo === tipo);
     if (!f) return null;
     const r = f.resultado as { feedback?: { util: boolean; nota: string } };
     return { id: f.id, creadoEn: f.creado_en, por: f.creado_por_nombre ?? "", modelo: f.modelo, resultado: mapa(f.resultado), feedback: r?.feedback ?? null };
   };
+  const texto = ultimo("texto", (r) => r as PropuestaTexto);
   return {
+    descripcionDropi: texto?.resultado.elegida ? (elegido.descripciones.get(texto.resultado.elegida.html) ?? null) : null,
+    sinPublicar: elegido.sinPublicar,
     contexto: base.vista,
     analisis: ultimo("analisis", (r) => r as AnalisisIA),
     titulos: ultimo("titulos", (r) => r as PropuestaTitulos),
-    texto: ultimo("texto", (r) => r as PropuestaTexto),
-    fotos: ultimo("fotos", (r) => conUrls(r as PlanFotos)),
+    texto,
+    fotos: ultimo("fotos", (r) => conUrls(r as PlanFotos, elegido)),
   };
 }
 
@@ -389,6 +447,91 @@ export async function elegirTituloIA(
   revalidatePath("/publicaciones-dropi");
   const c = chequearTitulo(limpio, categoria, contexto.reglas, nombreProducto);
   return { chequeos: c.chequeos, cumple: c.cumple, dropi };
+}
+
+/**
+ * «Usar esta descripción» (pedido de Jhokser, 24 oct 2026; migración 0151): la descripción propuesta por la IA (tal cual o corregida) pasa a
+ * ser la de la publicación y queda **pendiente para Dropi** en la cola de «Aplicar en Dropi» (se puede ver y deshacer en la lista de cambios
+ * pendientes). Dropi pide 200 caracteres como mínimo. En una publicación «Sin publicar» se guarda con ella y se publica junto.
+ */
+export async function elegirDescripcionIA(iaId: string, texto: string): Promise<{ error?: string; largo?: number; dropi?: { estado: "pendiente" | "error"; detalle: string } }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (typeof iaId !== "string" || !UUID.test(iaId) || typeof texto !== "string") return { error: "Descripción no válida." };
+  const html = descripcionAHtml(texto.slice(0, 20_000));
+  const medida = medirDescripcion(html);
+  if (!medida.cumple) return { error: `Dropi pide una descripción de al menos ${MIN_DESCRIPCION_DROPI} caracteres: esta tiene ${medida.largo}.` };
+  const supabase = createServiceClient();
+  const { data: fila } = await supabase.from("dropi_publicaciones_ia").select("id, publicacion_id, tipo, resultado").eq("id", iaId).maybeSingle();
+  if (!fila || fila.tipo !== "texto") return { error: "No se encontró la propuesta." };
+  const pub = await publicacionPermitida(fila.publicacion_id as string, usuario);
+  if (!pub) return { error: "No se encontró la publicación." };
+  const extras = await extrasDePublicacion(pub.id);
+  if (!extras) return { error: "Falta correr en Supabase la migración 0151." };
+  const por = { id: usuario.id, nombre: usuario.nombre || usuario.email };
+  let dropi: { estado: "pendiente" | "error"; detalle: string };
+  if (extras.estado_publicacion === "borrador") {
+    const guardado = await supabase.from("dropi_publicaciones").update({ descripcion: html, datos_dropi: { ...(extras.datos_dropi ?? {}), descripcion: html }, actualizado_en: new Date().toISOString() }).eq("id", pub.id);
+    if (guardado.error) return { error: "No se pudo guardar la descripción." };
+    dropi = { estado: "pendiente", detalle: "Guardada con la publicación: se sube a Dropi cuando la publiques." };
+  } else {
+    const r = await encolarCambio(supabase, pub, { descripcion: html, descripcionAntes: extras.descripcion }, por);
+    if ("error" in r) return { error: r.error };
+    const guardado = await supabase.from("dropi_publicaciones").update({ descripcion: html, actualizado_en: new Date().toISOString() }).eq("id", pub.id);
+    if (guardado.error) return { error: "Se dejó pendiente para Dropi, pero no se pudo guardar la descripción en la publicación." };
+    dropi = { estado: "pendiente", detalle: "Descripción pendiente para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto." };
+  }
+  const resultado: PropuestaTexto = { ...(fila.resultado as PropuestaTexto), elegida: { html, por: por.nombre, en: new Date().toISOString() } };
+  await supabase.from("dropi_publicaciones_ia").update({ resultado, actualizado_en: new Date().toISOString() }).eq("id", iaId);
+  await registrarAuditoria({
+    accion: "dropi_descripcion_pendiente",
+    entidad: "dropi_publicaciones",
+    entidadId: pub.id,
+    detalle: `${pub.nombre}: descripción nueva (${medida.largo} caracteres)`,
+    antes: { Descripción: extras.descripcion ? `${medirDescripcion(extras.descripcion).largo} caracteres` : "sin descripción guardada" },
+    despues: { Descripción: `${medida.largo} caracteres` },
+  });
+  revalidatePath("/publicaciones-dropi");
+  return { largo: medida.largo, dropi };
+}
+
+/**
+ * Aprobar fotos generadas para subirlas a Dropi (pedido de Jhokser, 24 oct 2026; migración 0151): las fotos marcadas del plan quedan
+ * **pendientes para Dropi** en la cola de «Aplicar en Dropi» (se ven y se deshacen en la lista de cambios pendientes); «Aplicar en Dropi» las
+ * sube al producto. En una publicación «Sin publicar» se suman a las fotos que se publican con ella.
+ */
+export async function aprobarFotosIA(iaId: string, indices: number[]): Promise<{ error?: string; aprobadas?: number; dropi?: { estado: "pendiente" | "error"; detalle: string } }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (typeof iaId !== "string" || !UUID.test(iaId) || !Array.isArray(indices) || indices.length === 0 || indices.length > MAX_FOTOS || !indices.every((i) => Number.isInteger(i) && i >= 0 && i < MAX_FOTOS)) return { error: "Elige las fotos que quieres subir." };
+  const supabase = createServiceClient();
+  const { data: fila } = await supabase.from("dropi_publicaciones_ia").select("id, publicacion_id, tipo, resultado").eq("id", iaId).maybeSingle();
+  if (!fila || fila.tipo !== "fotos") return { error: "No se encontró el plan de fotos." };
+  const pub = await publicacionPermitida(fila.publicacion_id as string, usuario);
+  if (!pub) return { error: "No se encontró la publicación." };
+  const extras = await extrasDePublicacion(pub.id);
+  if (!extras) return { error: "Falta correr en Supabase la migración 0151." };
+  const plan = fila.resultado as PlanFotos;
+  // Solo fotos ya generadas, de la carpeta de esta publicación (el navegador no decide qué archivo se sube).
+  const fotos: FotoCrear[] = [...new Set(indices)]
+    .map((i) => plan.fotos?.[i]?.ruta)
+    .filter((ruta): ruta is string => typeof ruta === "string" && ruta.startsWith(`publicaciones/${pub.id}/ia/`) && /^[A-Za-z0-9._/-]+$/.test(ruta))
+    .map((ruta) => ({ url: urlPublica(ruta), nombre: ruta.split("/").pop() ?? "foto.jpg" }));
+  if (!fotos.length) return { error: "Primero genera esas fotos." };
+  const por = { id: usuario.id, nombre: usuario.nombre || usuario.email };
+  let dropi: { estado: "pendiente" | "error"; detalle: string };
+  if (extras.estado_publicacion === "borrador") {
+    const datos = normalizarDatosCrear(extras.datos_dropi);
+    const todas = [...datos.fotos, ...fotos.filter((f) => !datos.fotos.some((x) => x.url === f.url))];
+    const guardado = await supabase.from("dropi_publicaciones").update({ datos_dropi: { ...(extras.datos_dropi ?? {}), fotos: todas }, actualizado_en: new Date().toISOString() }).eq("id", pub.id);
+    if (guardado.error) return { error: "No se pudieron guardar las fotos." };
+    dropi = { estado: "pendiente", detalle: "Guardadas con la publicación: se suben a Dropi cuando la publiques." };
+  } else {
+    const r = await encolarCambio(supabase, pub, { fotos }, por);
+    if ("error" in r) return { error: r.error };
+    dropi = { estado: "pendiente", detalle: `${fotos.length === 1 ? "1 foto pendiente" : `${fotos.length} fotos pendientes`} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` };
+  }
+  await registrarAuditoria({ accion: "dropi_fotos_pendiente", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: ${fotos.length} ${fotos.length === 1 ? "foto" : "fotos"} por subir a Dropi` });
+  revalidatePath("/publicaciones-dropi");
+  return { aprobadas: fotos.length, dropi };
 }
 
 /** «Me sirvió» o «no me sirvió» (con el porqué): queda en lo generado y sirve de ejemplo para la IA. */
@@ -545,7 +688,8 @@ export async function generarFotoIA(iaId: string, indice: number, textosEditados
     return { error: "No se pudo guardar la imagen generada." };
   }
   // La imagen reemplazada ya no la usa nadie (solo vivía en este plan): se borra, y solo si es de esta carpeta.
-  if (anterior && anterior.startsWith(`publicaciones/${pub.id}/ia/`)) await supabase.storage.from(BUCKET).remove([anterior]);
+  // Salvo que esa foto esté aprobada y esperando en la cola de «Aplicar en Dropi»: sin ella, ese cambio no podría subirla.
+  if (anterior && anterior.startsWith(`publicaciones/${pub.id}/ia/`) && !(await fotoEnCola(pub.id, urlPublica(anterior)))) await supabase.storage.from(BUCKET).remove([anterior]);
   await registrarAuditoria({ accion: "ia_foto_publicacion", entidad: "dropi_publicaciones", entidadId: pub.id, detalle: `${pub.nombre}: foto «${foto.titulo}» (${modeloImagen()})${textos.length ? ` con texto ${textoOk === true ? "verificado" : textoOk === false ? "por revisar" : "sin verificar"}` : ""}` });
   return { url: urlPublica(ruta), textos, textoOk };
 }

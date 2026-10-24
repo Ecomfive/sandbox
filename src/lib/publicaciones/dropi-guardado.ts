@@ -8,6 +8,8 @@
 
 /** Lo que Dropi admite en «Nombre del producto» y en «Nombre del producto en la guía de envío». */
 export const MAX_NOMBRE_DROPI = 40;
+/** El mínimo de caracteres que Dropi pide en la descripción de un producto. */
+export const MIN_DESCRIPCION_DROPI = 200;
 
 /** El usuario (`sub`) y el vencimiento (`exp`) de una sesión de Dropi (un JWT), sin validar la firma. `null` si no lo parece. */
 export function leerTokenDropi(token: string): { usuarioId: number; venceEn: Date } | null {
@@ -35,8 +37,8 @@ const num = (v: unknown) => (v === null || v === undefined || v === "" ? v : Num
 export function armarGuardadoProducto(
   producto: Obj,
   bodegasProveedor: Obj[],
-  /** Lo que se cambia: el nombre (y el de la guía), el precio y el precio sugerido. `null` o sin poner = se deja como está. */
-  cambio: { nombre: string | null; nombreGuia: string | null; precio?: number | null; precioSugerido?: number | null },
+  /** Lo que se cambia: el nombre (y el de la guía), el precio, el precio sugerido y la descripción. `null` o sin poner = se deja como está. */
+  cambio: { nombre: string | null; nombreGuia: string | null; precio?: number | null; precioSugerido?: number | null; descripcion?: string | null },
 ): { cuerpo: Obj } | { error: string } {
   if (producto.type !== "SIMPLE") return { error: "Tiene variaciones: cámbialo a mano en Dropi." };
   if (cambio.nombre !== null && (!cambio.nombre.trim() || cambio.nombre.length > MAX_NOMBRE_DROPI)) return { error: `El nombre debe tener de 1 a ${MAX_NOMBRE_DROPI} caracteres.` };
@@ -56,6 +58,9 @@ export function armarGuardadoProducto(
   }
   if ((precio !== null || sugerido !== null) && sugeridoFinal > 0 && sugeridoFinal < precioFinal) return { error: `El precio sugerido ($${sugeridoFinal.toFixed(2)}) quedaría menor que el precio ($${precioFinal.toFixed(2)}).` };
   if (cambio.nombreGuia !== null && cambio.nombreGuia.length > MAX_NOMBRE_DROPI) return { error: `El nombre de la guía admite ${MAX_NOMBRE_DROPI} caracteres.` };
+  // Dropi pide una descripción de 200 caracteres como mínimo (se cuenta el texto, sin etiquetas).
+  const descripcion = cambio.descripcion ?? null;
+  if (descripcion !== null && descripcion.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().length < MIN_DESCRIPCION_DROPI) return { error: `La descripción necesita al menos ${MIN_DESCRIPCION_DROPI} caracteres.` };
   const bodegas: Obj[] = (Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : []).map((w) => {
     const b = (w.warehouse ?? {}) as Obj;
     return { warehouse_id: w.warehouse_id, fullName: `${b.name ?? ""}(${b.address ?? ""})`, stock: w.stock, city: b.city, warehouse_white_brand: !!b.warehouse_white_brand };
@@ -67,7 +72,7 @@ export function armarGuardadoProducto(
     cuerpo: {
       id: producto.id,
       name: cambio.nombre ?? producto.name,
-      description: producto.description,
+      description: descripcion ?? producto.description,
       dropi_app_description: producto.dropi_app_description,
       type: producto.type,
       sale_price: precio ?? num(producto.sale_price),

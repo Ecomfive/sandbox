@@ -7,6 +7,7 @@ import {
 } from "@/lib/publicaciones/publicacion";
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
+import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
 import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { NivelMargen } from "@/lib/publicaciones/reglas";
@@ -108,6 +109,14 @@ export interface FilaPublicacion {
   apagadoPendiente: boolean;
   /** Dropi todavía no se tocó con ese apagado (ningún intento): se puede deshacer desde el sistema sin consecuencias. */
   apagadoSinTocar: boolean;
+  /** «Sin publicar» (migración 0151): todavía no existe en Dropi; tiene los datos que Dropi pide y se publica con «Aplicar en Dropi». */
+  sinPublicar: boolean;
+  /** Tiene la publicación en Dropi esperando «Aplicar en Dropi» (se puede deshacer desde la lista de cambios pendientes). */
+  publicarPendiente: boolean;
+  /** Lo que Dropi pide para publicarla (peso, medidas, categoría, descripción, stock inicial y fotos); solo en una «Sin publicar». */
+  datosDropi: DatosCrearDropi | null;
+  /** Tiene archivar (o sacar de Archivados) esperando «Aplicar en Dropi»: «archivar» o «restaurar». */
+  archivadoPendiente: "archivar" | "restaurar" | null;
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
   grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
   /** Público o privado: el elegido en la ficha (el sistema manda, 24 oct 2026); si no hay nada anotado, lo que dice Dropi. */

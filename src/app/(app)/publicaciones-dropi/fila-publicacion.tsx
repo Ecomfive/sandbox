@@ -72,8 +72,8 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
   const archivar = !f.archivada;
   function cambiar() {
     empezar(async () => {
-      const r = await archivarPublicacion(f.id, archivar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
-      mostrarToast(r.error ?? (archivar ? "Publicación archivada" : "Publicación fuera de Archivados"), r.error ? "destructive" : undefined);
+      const r = await archivarPublicacion(f.id, archivar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      mostrarToast(r.error ?? r.detalle ?? (archivar ? "Publicación archivada" : "Publicación fuera de Archivados"), r.error ? "destructive" : undefined);
     });
   }
   const texto = archivar ? "Archivar publicación" : "Sacar de Archivados";
@@ -202,6 +202,18 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               </span>
             )}
             {f.tipoDropi === "privado" && <span>Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>}
+            {f.sinPublicar && (
+              <span className={`inline-flex items-center gap-1.5 font-medium ${f.publicarPendiente ? "text-destructive" : ""}`}>
+                {f.publicarPendiente && <Punto clase="bg-destructive" texto="Publicación pendiente en Dropi" />}
+                {f.publicarPendiente ? "Publicación pendiente" : "Sin publicar"}
+              </span>
+            )}
+            {f.archivadoPendiente && !f.apagadoPendiente && (
+              <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
+                <Punto clase="bg-destructive" texto="Pendiente en Dropi" />
+                {f.archivadoPendiente === "restaurar" ? "Salir de Archivados pendiente" : "Archivar pendiente"}
+              </span>
+            )}
             {f.apagadoPendiente && (
               <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
                 <Punto clase="bg-destructive" texto="Apagado pendiente en Dropi" />
@@ -249,7 +261,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
             ) : undefined
           }
         />
-        <Celda nombre="En Dropi" principal={enDropi ? <IconoEnDropi estado={enDropi} /> : <span className="text-muted-foreground">—</span>} />
+        <Celda nombre="En Dropi" principal={f.sinPublicar ? <span className="text-xs text-muted-foreground">Sin publicar</span> : enDropi ? <IconoEnDropi estado={enDropi} /> : <span className="text-muted-foreground">—</span>} />
       </span>
 
       <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />

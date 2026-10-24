@@ -10,6 +10,7 @@ import { TIPOS, UBICACIONES, opcion, type OpcionPublicacion } from "@/lib/public
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { SIN_VALOR } from "@/lib/tabla/motor";
+import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { CrearPublicacionPanel } from "./crear-publicacion-panel";
 import { DEF_PUBLICACIONES, type FilaPublicacion } from "./def-publicaciones";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
@@ -56,6 +57,7 @@ const COLOR_GRUPO: Record<string, OpcionPublicacion[]> = { accion: comoOpciones(
 export function TablaPublicaciones({
   publicaciones,
   opcionesSku,
+  opcionesCrear,
   paisId,
   codigoPais,
   nombrePais,
@@ -72,6 +74,8 @@ export function TablaPublicaciones({
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
+  /** Categorías y bodegas que ofrece «Publicar en Dropi». */
+  opcionesCrear: OpcionesCrear;
   paisId: string;
   codigoPais: string;
   nombrePais: string;
@@ -144,7 +148,7 @@ export function TablaPublicaciones({
           const o = COLOR_GRUPO[campo] && grupo.clave !== SIN_VALOR ? opcion(COLOR_GRUPO[campo], grupo.clave) : null;
           return o ? <Badge color={o.color}>{o.etiqueta}</Badge> : <span className="font-semibold">{grupo.etiqueta}</span>;
         }}
-        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} /> : undefined}
+        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} opciones={opcionesCrear} /> : undefined}
         vacio="Todavía no hay publicaciones en este país."
       />
       <FichaPublicacion
@@ -157,6 +161,7 @@ export function TablaPublicaciones({
         corteVentas={corteVentas}
         margenMinimo={reglas.margen_minimo}
         decisionesDisponibles={decisionesDisponibles}
+        opcionesCrear={opcionesCrear}
         anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}

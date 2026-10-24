@@ -23,6 +23,8 @@ export const ESTADOS = [
 ];
 export const ESTADOS_PUBLICACION = [
   op("activo", "Activo", "#30a46c"),
+  // Una publicación nueva que todavía no se publicó en Dropi (migración 0151): tiene todos los datos que Dropi pide y espera «Aplicar en Dropi».
+  op("borrador", "Sin publicar", "#8e4ec6", "Sin publicar"),
   op("en_espera", "En espera de aprobación", "#b6b6ff", "En espera de aprobacion"),
   op("archivado", "Archivado", "#8d8d8d"),
   op("eliminado", "Eliminado", "#cecece"),
