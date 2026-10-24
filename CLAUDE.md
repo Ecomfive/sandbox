@@ -635,7 +635,10 @@ convenciones técnicas del código.
   cotizar»). Cuentas del portal en `proveedor_usuarios` (sin fila en `perfiles`: el sistema no las reconoce). Reglas puras en
   `src/lib/proveedor/` (con prueba que compara el `case` del disparador con `ETAPA_PORTAL_DE_COMPRA`): cuotas 50 % a los 10 días
   corridos del envío y 50 % a la llegada, tránsito contra `wms_rutas_envio` (CR mar = 80 días), cotización y qué paso da cada lado.
-  Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`.
+  Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`. **El nombre del pedido** (migración
+  0150, 24 oct 2026): `proveedor_pedidos.producto` = el nombre de la compra o, si está vacío o es solo su código (ECOM01-0603), el del producto de
+  su primera línea (`wms_compra_items` → `skus_maestros.nombre`); la 0150 redefine `proveedor_sincronizar` (la de 0124, solo cambia eso) y vuelve a
+  copiar todo el espejo.
   **Fase 2** (migración 0125: módulo `portal-proveedor` para quien tiene Compras y `proveedores.notificar_a` = Francis): página
   `/portal-proveedor` debajo de Compras (`portal-proveedor.tsx`, la interfaz del prototipo con los tokens del sistema), pestañas
   Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Por decidir» muestra solo la foto de referencia: el espacio de la real va en blanco (`Foto enBlanco`), porque la real se agrega después (22 oct 2026). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
