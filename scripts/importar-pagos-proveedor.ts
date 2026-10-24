@@ -30,7 +30,9 @@ async function main() {
   const filas: { fila: FilaHoja; pais: string; clave: string }[] = [];
   for (const { hoja, archivo } of HOJAS) leerHojaPagos(readFileSync(archivo, "utf8")).forEach((fila, i) => filas.push({ fila, pais: hoja, clave: `${hoja}#${i + 1}` }));
 
-  const espejo = await traerTodasLasFilas<Record<string, unknown>>((d, h) => s.from("proveedor_pedidos").select("id, compra_id, producto, pais_codigo, unidades, monto_total, fecha_envio, etapa").eq("proveedor_id", prov.id).order("id").range(d, h));
+  // Solo los pedidos visibles: una compra anulada (p. ej. una repetida) no se empareja con la hoja (24 oct 2026: 5 filas del 21 oct
+  // quedaron en las repetidas que Francis anuló y sus envíos salieron del Registro de pagos).
+  const espejo = await traerTodasLasFilas<Record<string, unknown>>((d, h) => s.from("proveedor_pedidos").select("id, compra_id, producto, pais_codigo, unidades, monto_total, fecha_envio, etapa").eq("proveedor_id", prov.id).eq("visible", true).order("id").range(d, h));
   const pedidos: PedidoParaEmparejar[] = espejo.map((p) => ({
     id: p.id as string,
     producto: p.producto as string,

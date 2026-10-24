@@ -674,7 +674,10 @@ convenciones técnicas del código.
   monto, envío, anticipo, pagado/fecha de pago y pago del saldo; sin pagar, vence y saldo escritos a mano solo cambian la vista
   (`filasRegistro`, con prueba). La migración 0141 (pagos origen `proveedor`, `llegada_proveedor`) queda; su flujo «Anotar» se quitó. También entra por las hojas de pagos de Shen Zhen
   (`scripts/importar-pagos-proveedor.ts`, se puede repetir; `proveedor_historial` con `pedido_id` si se emparejó —`emparejar`,
-  `hoja-pagos.ts`— o historial suelto que cuenta para el cumplimiento). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
+  `hoja-pagos.ts`, **solo con pedidos visibles**: una compra anulada no recibe filas de la hoja— o historial suelto que cuenta para el
+  cumplimiento). **Lo anulado no aparece en nada del proveedor** (regla de Hernán y Francis, 24 oct 2026): el espejo lo oculta y el
+  Registro de pagos solo arma filas con pedidos visibles; si una fila de la hoja queda pegada a una compra que se anula, su envío sale del
+  registro hasta pasarla a la compra activa (así se arreglaron el 24 oct las 5 filas del 21 oct pegadas a las repetidas OC-1244 a 1248). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
   UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto
   (un pedido viejo sin hoja saldría vencido sin estarlo). La ficha de compra muestra «Pagos a Shen Zhen» (solo lectura,
   `pagos-proveedor-compra.tsx`, oculto si el rol no ve el monto).
