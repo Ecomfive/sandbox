@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
@@ -34,6 +34,7 @@ const numero = (f: FormData, k: string): number | null | undefined => {
 
 type Datos = Record<string, string | number | boolean | null>;
 
+
 /** Lee y valida los datos de la ficha (crear o guardar). Devuelve el error como valor. */
 function leerDatos(f: FormData): Datos | { error: string } {
   const nombre = texto(f, "nombre", 300);
@@ -48,7 +49,10 @@ function leerDatos(f: FormData): Datos | { error: string } {
   return {
     nombre,
     dropi_id: texto(f, "dropi_id", 60) || null,
-    // Estado, «En Dropi» y Tipo ya no se editan (21 oct 2026): salen de Dropi y de reglas. No van aquí, así guardar no los borra.
+    // Estado y Tipo se eligen en la ficha (24 oct 2026, el sistema manda; antes salían de Dropi). Solo si vienen en el formulario:
+    // crear una publicación no los trae y no los borra. En la ficha no se ofrece «Eliminado» (ninguna publicación se elimina).
+    ...(f.has("estado_publicacion") ? { estado_publicacion: deLista(f, "estado_publicacion", ESTADOS_PUBLICACION) } : {}),
+    ...(f.has("tipo_publicacion") ? { tipo_publicacion: deLista(f, "tipo_publicacion", TIPOS) } : {}),
     privatizado_a: texto(f, "privatizado_a", 120) || null,
     privatizado_email: email || null,
     precio_venta: precio ?? null,
@@ -125,6 +129,8 @@ const VISTA: [string, string, (v: unknown) => string][] = [
   ["costo_mercancia", "Costo de producto", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
+  ["estado_publicacion", "Estado", (v) => (v ? etiqueta(ESTADOS_PUBLICACION, v as string) : "—")],
+  ["tipo_publicacion", "Tipo", (v) => (v ? etiqueta(TIPOS, v as string) : "—")],
 ];
 
 /**
@@ -144,6 +150,14 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
     const repetido = await idDropiRepetido(antes.pais_id, (datos.dropi_id as string | null) ?? null, id);
     if (repetido) return { error: repetido };
   }
+  // El Estado elegido en la ficha manda también sobre el estado interno con que «Archivar» la guarda: elegir «Activo» la saca de
+  // Archivados y elegir «Archivado» la archiva. Una duplicada se queda archivada (la que vale es la otra).
+  if ("estado_publicacion" in datos && datos.estado_publicacion !== ((antes.estado_publicacion as string | null) ?? null)) {
+    const archivar = datos.estado_publicacion === "archivado";
+    if (!archivar && antes.duplicada_de) return { error: "Es un duplicado de otra publicación con el mismo ID de Dropi: usa esa." };
+    if (archivar) datos.estado = "archivado";
+    else if (antes.estado === "archivado") datos.estado = "al_dia";
+  }
   // El nombre se edita aquí y viaja a Dropi (22 oct 2026); la sincronización con Dropi no lo pisa.
   const nombreNuevo = String(datos.nombre ?? "").trim();
   const cambiaNombre = !!nombreNuevo && nombreNuevo !== String(antes.nombre ?? "").trim();
@@ -159,6 +173,7 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
 
   const cambios = VISTA.filter(([k]) => {
     if (k === "nombre") return cambiaNombre;
+    if (!(k in datos)) return false;
     const a = antes[k] === null || antes[k] === undefined ? null : typeof datos[k] === "number" ? Number(antes[k]) : antes[k];
     return a !== datos[k];
   });
@@ -251,7 +266,7 @@ export async function archivarPublicacion(id: string, archivar: boolean): Promis
   const supabase = createServiceClient();
   const cambios = archivar
     ? { estado: "archivado", estado_publicacion: "archivado" }
-    : { estado: "al_dia", estado_publicacion: antes.estado_publicacion === "archivado" ? null : (antes.estado_publicacion as string | null) };
+    : { estado: "al_dia", estado_publicacion: !antes.estado_publicacion || antes.estado_publicacion === "archivado" ? "activo" : (antes.estado_publicacion as string) };
   const { error } = await supabase.from("dropi_publicaciones").update({ ...cambios, actualizado_en: new Date().toISOString() }).eq("id", id);
   if (error) return { error: archivar ? "No se pudo archivar la publicación." : "No se pudo sacar de Archivados." };
   await registrarAuditoria({
