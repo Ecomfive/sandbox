@@ -635,7 +635,10 @@ convenciones técnicas del código.
   cotizar»). Cuentas del portal en `proveedor_usuarios` (sin fila en `perfiles`: el sistema no las reconoce). Reglas puras en
   `src/lib/proveedor/` (con prueba que compara el `case` del disparador con `ETAPA_PORTAL_DE_COMPRA`): cuotas 50 % a los 10 días
   corridos del envío y 50 % a la llegada, tránsito contra `wms_rutas_envio` (CR mar = 80 días), cotización y qué paso da cada lado.
-  Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`.
+  Lectura: `cargarEspejo`. Verificar: `npx tsx --env-file=.env.local scripts/verificar-espejo-proveedor.ts`. **El nombre del pedido** (migración
+  0150, 24 oct 2026): `proveedor_pedidos.producto` = el nombre de la compra o, si está vacío o es solo su código (ECOM01-0603), el del producto de
+  su primera línea (`wms_compra_items` → `skus_maestros.nombre`); la 0150 redefine `proveedor_sincronizar` (la de 0124, solo cambia eso) y vuelve a
+  copiar todo el espejo.
   **Fase 2** (migración 0125: módulo `portal-proveedor` para quien tiene Compras y `proveedores.notificar_a` = Francis): página
   `/portal-proveedor` debajo de Compras (`portal-proveedor.tsx`, la interfaz del prototipo con los tokens del sistema), pestañas
   Novedades · Por decidir · En cotización · Tránsito (`?tab=`). «Por decidir» muestra solo la foto de referencia: el espacio de la real va en blanco (`Foto enBlanco`), porque la real se agrega después (22 oct 2026). «Pasar a Producción»/«Descartar» y «Marcar llegada» cambian la compra
@@ -671,7 +674,10 @@ convenciones técnicas del código.
   monto, envío, anticipo, pagado/fecha de pago y pago del saldo; sin pagar, vence y saldo escritos a mano solo cambian la vista
   (`filasRegistro`, con prueba). La migración 0141 (pagos origen `proveedor`, `llegada_proveedor`) queda; su flujo «Anotar» se quitó. También entra por las hojas de pagos de Shen Zhen
   (`scripts/importar-pagos-proveedor.ts`, se puede repetir; `proveedor_historial` con `pedido_id` si se emparejó —`emparejar`,
-  `hoja-pagos.ts`— o historial suelto que cuenta para el cumplimiento). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
+  `hoja-pagos.ts`, **solo con pedidos visibles**: una compra anulada no recibe filas de la hoja— o historial suelto que cuenta para el
+  cumplimiento). **Lo anulado no aparece en nada del proveedor** (regla de Hernán y Francis, 24 oct 2026): el espejo lo oculta y el
+  Registro de pagos solo arma filas con pedidos visibles; si una fila de la hoja queda pegada a una compra que se anula, su envío sale del
+  registro hasta pasarla a la compra activa (así se arreglaron el 24 oct las 5 filas del 21 oct pegadas a las repetidas OC-1244 a 1248). Cuotas en `cuotas.ts` (`anticipo_monto` cuando no es el 50 %:
   UPS sin saldo); `enviosConCuotas` solo cuenta los pedidos de las hojas, los enviados después de la última hoja y el historial suelto
   (un pedido viejo sin hoja saldría vencido sin estarlo). La ficha de compra muestra «Pagos a Shen Zhen» (solo lectura,
   `pagos-proveedor-compra.tsx`, oculto si el rol no ve el monto).
