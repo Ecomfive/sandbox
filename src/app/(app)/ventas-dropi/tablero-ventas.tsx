@@ -7,6 +7,8 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { CATEGORIAS, DIAS_REPONER, hayQueReponer, type Categoria, type ResumenProducto } from "@/lib/publicaciones/ventas";
 
 export interface ProductoVentas extends ResumenProducto {
+  /** Los IDs de Dropi que suma la fila: uno solo, o todos los del mismo producto del sistema en la vista «por producto». */
+  ids: number[];
   /** El SKU del sistema, si alguna publicación de Gestión de IDs Dropi lo vincula. */
   sku: string | null;
   /** La plata del producto en todo lo cargado del Excel de la oficina (migración 0130); null si no tiene órdenes ahí. */
@@ -172,13 +174,16 @@ function TablaOrdenable<T>({ etiqueta, filas, columnas, clave, inicial, alElegir
   );
 }
 
-/** El nombre del producto con su ID de Dropi y su SKU debajo. */
+/** «ID 7591» o, si la fila junta varios, «IDs 7591, 8406, 8770». */
+const textoIds = (p: ProductoVentas) => (p.ids.length > 1 ? `IDs ${p.ids.join(", ")}` : `ID ${p.ids[0] ?? p.id}`);
+
+/** El nombre del producto con su ID de Dropi (o sus IDs) y su SKU debajo. */
 function NombreProducto({ p }: { p: ProductoVentas }) {
   return (
     <span className="flex min-w-[13rem] max-w-[22rem] flex-col whitespace-normal">
       <span className="font-medium">{p.nombre}</span>
       <span className="text-xs text-muted-foreground tabular-nums">
-        ID {p.id}
+        {textoIds(p)}
         {p.sku && <span className="font-mono"> · {p.sku}</span>}
         {p.privado && " · privado"}
         {p.lista === "archivado" && " · archivado"}
@@ -214,7 +219,7 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
   const dinero = p.dinero;
   const datosDinero = dinero ? Object.keys(dinero.porMes).sort().map((m) => ({ mes: nombreMes(m), utilidad: Math.round(dinero.porMes[m] * 100) / 100 })) : [];
   return (
-    <Tarjeta id="vd-detalle" titulo={`${p.nombre} · ID ${p.id}`}>
+    <Tarjeta id="vd-detalle" titulo={`${p.nombre} · ${textoIds(p)}`}>
       <Nota>
         Unidades netas por mes. {CATEGORIAS.find((c) => c.valor === p.categoria)?.etiqueta}. Stock {entero(p.stock)}
         {p.diasInventario !== null ? `, para ${entero(p.diasInventario)} días` : ""}. Pedidas en total {entero(p.pedidas)}: {pct(p.pctCancelacion)} canceladas y {pct(p.pctDevolucion)} devueltas o rechazadas. Última venta: {fecha(p.ultimaVenta)}.
@@ -266,11 +271,13 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
  * El tablero de Ventas Dropi: las cifras de arriba, la tendencia por mes y por día, lo que hay que reponer, lo que crece y cae,
  * el stock quieto, todos los productos (con búsqueda, categoría y su detalle por mes), los SKU del sistema y los dropshippers.
  */
-export function TableroVentas({ corte, stockLeido = null, movimientos, productos, meses, dias, dropshippers, dinero }: { corte: string; /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */ stockLeido?: string | null; movimientos: number; productos: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
+export function TableroVentas({ corte, stockLeido = null, movimientos, productos, porProducto, meses, dias, dropshippers, dinero }: { corte: string; /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */ stockLeido?: string | null; movimientos: number; productos: ProductoVentas[]; /** Los mismos productos con los IDs de Dropi de un mismo SKU juntos. */ porProducto: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
   const [categoria, setCategoria] = useState<Categoria | "todas">("todas");
   const [busqueda, setBusqueda] = useState("");
   const [buscaDs, setBuscaDs] = useState("");
   const [elegido, setElegido] = useState<string | null>(null);
+  const [verPor, setVerPor] = useState<"id" | "producto">("id");
+  const lista = verPor === "producto" ? porProducto : productos;
 
   const k = useMemo(() => {
     const suma = (f: (p: ProductoVentas) => number) => productos.reduce((a, p) => a + f(p), 0);
@@ -298,29 +305,13 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
   const quietos = useMemo(() => productos.filter((p) => p.lista === "activo" && p.stock > 0 && p.netas30 <= 0), [productos]);
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return productos.filter((p) => (categoria === "todas" || p.categoria === categoria) && (!q || `${p.id} ${p.nombre} ${p.sku ?? ""}`.toLowerCase().includes(q)));
-  }, [productos, categoria, busqueda]);
-  const porSku = useMemo(() => {
-    const g = new Map<string, { sku: string; publicaciones: number; netas30: number; antes: number; netas90: number; netasTotal: number; stock: number; ultimaVenta: string | null }>();
-    for (const p of productos) {
-      if (!p.sku) continue;
-      const x = g.get(p.sku) ?? { sku: p.sku, publicaciones: 0, netas30: 0, antes: 0, netas90: 0, netasTotal: 0, stock: 0, ultimaVenta: null };
-      g.set(p.sku, x);
-      x.publicaciones++;
-      x.netas30 += p.netas30;
-      x.antes += p.netas30Antes;
-      x.netas90 += p.netas90;
-      x.netasTotal += p.netasTotal;
-      x.stock += Math.max(p.stock, 0);
-      if (p.ultimaVenta && (!x.ultimaVenta || p.ultimaVenta > x.ultimaVenta)) x.ultimaVenta = p.ultimaVenta;
-    }
-    return [...g.values()].map((x) => ({ ...x, dias: x.netas30 > 0 ? Math.round(x.stock / (x.netas30 / 30)) : null }));
-  }, [productos]);
+    return lista.filter((p) => (categoria === "todas" || p.categoria === categoria) && (!q || `${p.ids.join(" ")} ${p.nombre} ${p.sku ?? ""}`.toLowerCase().includes(q)));
+  }, [lista, categoria, busqueda]);
   const dsFiltrados = useMemo(() => {
     const q = buscaDs.trim().toLowerCase();
     return q ? dropshippers.filter((d) => d.nombre.toLowerCase().includes(q)) : dropshippers;
   }, [dropshippers, buscaDs]);
-  const detalle = elegido ? productos.find((p) => String(p.id) === elegido) : null;
+  const detalle = elegido ? lista.find((p) => String(p.id) === elegido) : null;
 
   // La plata: el último mes completo frente al anterior (el mes en curso todavía tiene órdenes sin entregar).
   const plata = useMemo(() => {
@@ -486,6 +477,18 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
         </div>
         <div className="flex flex-wrap items-center gap-3 px-3.5 pt-3">
           <input type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre, ID o SKU" aria-label="Buscar producto" className={`${fieldClass} max-w-sm flex-1`} />
+          <Segmentado
+            etiqueta="Ver"
+            valor={verPor}
+            alCambiar={(v) => {
+              setVerPor(v);
+              setElegido(null);
+            }}
+            opciones={[
+              { valor: "id" as const, etiqueta: "Por ID de Dropi" },
+              { valor: "producto" as const, etiqueta: "Por producto" },
+            ]}
+          />
           <span className="text-xs text-muted-foreground">{CATEGORIAS.find((c) => c.valor === categoria)?.detalle ?? "Toca un producto para ver sus ventas por mes."}</span>
         </div>
         <TablaOrdenable
@@ -515,48 +518,28 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
 
       {detalle && <DetalleProducto p={detalle} meses={meses.map((m) => m.mes)} />}
 
-      <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
-        <Tarjeta id="vd-sku" titulo={`Por SKU del sistema (${porSku.length})`}>
-          <Nota>Suma las publicaciones de Dropi de un mismo producto (públicas y privadas), por el vínculo de Gestión de IDs Dropi.</Nota>
-          <TablaOrdenable
-            etiqueta="Ventas por SKU"
-            filas={porSku}
-            clave={(s) => s.sku}
-            inicial={{ id: "netas30", dir: -1 }}
-            vacio="Ninguna publicación está vinculada a un SKU."
-            columnas={[
-              { id: "sku", titulo: "SKU", valor: (s) => s.sku, clase: "font-mono text-xs" },
-              { id: "netas30", titulo: "Netas 30 días", valor: (s) => s.netas30, ver: (s) => entero(s.netas30), numero: true },
-              { id: "antes", titulo: "30 días antes", valor: (s) => s.antes, ver: (s) => entero(s.antes), numero: true },
-              { id: "stock", titulo: "Stock", valor: (s) => s.stock, ver: (s) => entero(s.stock), numero: true },
-              { id: "dias", titulo: "Días de inventario", valor: (s) => s.dias, ver: (s) => (s.dias === null ? "—" : <span className={s.dias < DIAS_REPONER ? "font-semibold text-warning" : ""}>{entero(s.dias)}</span>), numero: true },
-              { id: "pubs", titulo: "Publicaciones", valor: (s) => s.publicaciones, numero: true },
-            ]}
-          />
-        </Tarjeta>
-        <section aria-labelledby="vd-ds" className="min-w-0 rounded-[10px] border border-border bg-card">
-          <CabeceraTarjeta id="vd-ds" titulo={`Dropshippers (${dsFiltrados.length})`} />
-          <Nota>Quién creó cada orden. Lo cancelado, rechazado o devuelto se le carga por el número de orden.</Nota>
-          <div className="px-3.5 pt-2.5">
-            <input type="search" value={buscaDs} onChange={(e) => setBuscaDs(e.target.value)} placeholder="Buscar dropshipper" aria-label="Buscar dropshipper" className={`${fieldClass} max-w-sm`} />
-          </div>
-          <TablaOrdenable
-            etiqueta="Ventas por dropshipper"
-            filas={dsFiltrados}
-            clave={(d) => String(d.id)}
-            inicial={{ id: "netas30", dir: -1 }}
-            vacio="Ningún dropshipper coincide con la búsqueda."
-            columnas={[
-              { id: "nombre", titulo: "Dropshipper", valor: (d) => d.nombre, clase: "font-medium" },
-              { id: "netas30", titulo: "Netas 30 días", valor: (d) => d.netas30, ver: (d) => entero(d.netas30), numero: true },
-              { id: "netas", titulo: "Netas en total", valor: (d) => d.netas, ver: (d) => entero(d.netas), numero: true },
-              { id: "no", titulo: "No efectivas", valor: (d) => (d.pedidas ? d.noEfectivas / d.pedidas : null), ver: (d) => <span className={d.pedidas >= 50 && d.noEfectivas / d.pedidas > 0.3 ? "font-semibold text-destructive" : ""}>{pct(d.pedidas ? d.noEfectivas / d.pedidas : null)}</span>, numero: true },
-              { id: "productos", titulo: "Productos", valor: (d) => d.productos, numero: true },
-              { id: "ultima", titulo: "Última orden", valor: (d) => d.ultimaOrden, ver: (d) => fecha(d.ultimaOrden) },
-            ]}
-          />
-        </section>
-      </div>
+      <section aria-labelledby="vd-ds" className="min-w-0 rounded-[10px] border border-border bg-card">
+        <CabeceraTarjeta id="vd-ds" titulo={`Dropshippers (${dsFiltrados.length})`} />
+        <Nota>Quién creó cada orden. Lo cancelado, rechazado o devuelto se le carga por el número de orden.</Nota>
+        <div className="px-3.5 pt-2.5">
+          <input type="search" value={buscaDs} onChange={(e) => setBuscaDs(e.target.value)} placeholder="Buscar dropshipper" aria-label="Buscar dropshipper" className={`${fieldClass} max-w-sm`} />
+        </div>
+        <TablaOrdenable
+          etiqueta="Ventas por dropshipper"
+          filas={dsFiltrados}
+          clave={(d) => String(d.id)}
+          inicial={{ id: "netas30", dir: -1 }}
+          vacio="Ningún dropshipper coincide con la búsqueda."
+          columnas={[
+            { id: "nombre", titulo: "Dropshipper", valor: (d) => d.nombre, clase: "font-medium" },
+            { id: "netas30", titulo: "Netas 30 días", valor: (d) => d.netas30, ver: (d) => entero(d.netas30), numero: true },
+            { id: "netas", titulo: "Netas en total", valor: (d) => d.netas, ver: (d) => entero(d.netas), numero: true },
+            { id: "no", titulo: "No efectivas", valor: (d) => (d.pedidas ? d.noEfectivas / d.pedidas : null), ver: (d) => <span className={d.pedidas >= 50 && d.noEfectivas / d.pedidas > 0.3 ? "font-semibold text-destructive" : ""}>{pct(d.pedidas ? d.noEfectivas / d.pedidas : null)}</span>, numero: true },
+            { id: "productos", titulo: "Productos", valor: (d) => d.productos, numero: true },
+            { id: "ultima", titulo: "Última orden", valor: (d) => d.ultimaOrden, ver: (d) => fecha(d.ultimaOrden) },
+          ]}
+        />
+      </section>
     </div>
   );
 }

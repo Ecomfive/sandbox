@@ -607,6 +607,14 @@ convenciones técnicas del código.
   activos y archivados, y baja `api/inventories/history` de cada uno, de a tres; si falla uno no sube nada) y `… cargar` (baja a
   `datos-privados/`, borra los temporales y corre `importar-ventas-dropi.ts --aplicar`, que reemplaza la carga del país). El stock
   es el `total_stock` de Dropi. Corre desde la copia `C:/Users/herna/ecomfive-tareas` (main al día), como «dropi-diario».
+  **Por producto** (23 oct 2026, pedido de Alcides: el aceite de semilla de calabaza vendió con cuatro IDs —8406 archivado, 7591 de la
+  B280 y dos privados— y ninguno mostraba la historia completa): «Todos los productos» de Ventas Dropi tiene «Ver: Por ID de Dropi /
+  Por producto». `agruparProductos` (`src/lib/publicaciones/ventas.ts`, con prueba) junta los IDs del mismo SKU (vínculo de Gestión de
+  IDs Dropi) en una fila con id negativo antes de `resumirProductos`; la página manda las dos listas (`productos` y `porProducto`) y
+  `ProductoVentas.ids` dice qué IDs suma cada fila (la plata se suma igual). La tarjeta «Por SKU del sistema» se quitó. La ficha de
+  Producto trae «Ventas en Dropi» (`ventas-dropi-producto.tsx` + `obtenerVentasDropiProducto`, `ventas-dropi-actions.ts`: Producto o
+  Inventario, países permitidos; todos los IDs de sus publicaciones y variantes, activas y archivadas, por país, con
+  `ventasDePublicacion`), solo si tiene publicaciones en Dropi.
 - **Portal del proveedor (Shen Zhen)** **(El proveedor se llamaba «Chin»: desde el 23 oct 2026, migración 0143, es «Shen Zhen» en la base —`proveedores`, `wms_compras.proveedor`/`agente_envio`, `wms_rutas_envio.agente`— y en todas las pantallas. Las rutas y archivos conservan `chin` en su nombre —`/compras/tablero-chin`, `portal-chin.tsx`—: no se ven y renombrarlos rompería enlaces y favoritos. Las migraciones antiguas y `scripts/importar-rutas-envio.ts` (de una sola vez) siguen diciendo «Chin».)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Shen Zhen
   cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
   llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de

@@ -11,7 +11,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
-import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, PapeleraIcon, ProductoIcon, TestIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, PapeleraIcon, ProductoIcon, TestIcon, VentasIcon } from "@/lib/nav-icons";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
@@ -26,6 +26,7 @@ import { NombreProducto } from "./nombre-producto";
 import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { SkuProducto } from "./sku-producto";
 import { ComprasProducto } from "./compras-producto";
+import { VentasDropiProducto } from "./ventas-dropi-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
 import { CategoriaProducto } from "./categoria-producto";
 import { SelectorClaseProducto } from "./selector-clase";
@@ -308,6 +309,11 @@ export function FichaProducto({
                 </Link>
               )}
             </Seccion>
+            {producto.nombresDropi.length > 0 && (
+              <Seccion icono={VentasIcon} titulo="Ventas en Dropi">
+                <VentasDropiProducto key={producto.id} id={producto.id} />
+              </Seccion>
+            )}
             {producto.tipo !== "combo" && (
               <Seccion icono={ComprasIcon} titulo="Compras">
                 <ComprasProducto key={producto.id} id={producto.id} />

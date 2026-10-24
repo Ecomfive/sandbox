@@ -134,6 +134,55 @@ export function resumirProductos(productos: ProductoDropi[], dias: VentaDia[], c
   });
 }
 
+/**
+ * Junta los productos de Dropi que son el mismo producto del sistema (por su SKU, del vínculo de Gestión de IDs Dropi) para
+ * resumirlos como uno: el aceite de semilla de calabaza vende con cuatro IDs (el público de la bodega propia, el de la B280 y dos
+ * privados) y cada uno, por separado, no deja ver su historia. Cada grupo recibe un id negativo (−1, −2…) y su nombre; lo que no
+ * tiene SKU queda igual. Devuelve los productos y los días listos para `resumirProductos`, y los IDs de Dropi de cada fila.
+ */
+export function agruparProductos(
+  productos: ProductoDropi[],
+  dias: VentaDia[],
+  grupoDe: (id: number) => { clave: string; nombre: string } | null,
+): { productos: ProductoDropi[]; dias: VentaDia[]; ids: Map<number, number[]>; clave: Map<number, string> } {
+  const grupos = new Map<string, { id: number; nombre: string; miembros: ProductoDropi[] }>();
+  const idDe = new Map<number, number>();
+  const sueltos: ProductoDropi[] = [];
+  for (const p of productos) {
+    const g = grupoDe(p.id);
+    if (!g) {
+      sueltos.push(p);
+      idDe.set(p.id, p.id);
+      continue;
+    }
+    let grupo = grupos.get(g.clave);
+    if (!grupo) grupos.set(g.clave, (grupo = { id: -(grupos.size + 1), nombre: g.nombre, miembros: [] }));
+    grupo.miembros.push(p);
+    idDe.set(p.id, grupo.id);
+  }
+  const menor = (a: string | null, b: string | null) => (a && (!b || a < b) ? a : b);
+  const mayor = (a: string | null, b: string | null) => (a && (!b || a > b) ? a : b);
+  const juntos: ProductoDropi[] = [...grupos.values()].map((g) => ({
+    id: g.id,
+    nombre: g.nombre,
+    lista: g.miembros.some((m) => m.lista === "activo") ? "activo" : "archivado",
+    privado: g.miembros.every((m) => m.privado),
+    variable: g.miembros.some((m) => m.variable),
+    stock: g.miembros.reduce((a, m) => a + Math.max(m.stock, 0), 0),
+    primeraVenta: g.miembros.reduce<string | null>((a, m) => menor(m.primeraVenta, a), null),
+    ultimaVenta: g.miembros.reduce<string | null>((a, m) => mayor(m.ultimaVenta, a), null),
+  }));
+  const ids = new Map<number, number[]>([...grupos.values()].map((g) => [g.id, g.miembros.map((m) => m.id).sort((a, b) => a - b)]));
+  for (const p of sueltos) ids.set(p.id, [p.id]);
+  const clave = new Map([...grupos].map(([k, g]) => [g.id, k]));
+  return {
+    productos: [...juntos, ...sueltos],
+    dias: dias.flatMap((d) => (idDe.has(d.producto) ? [{ ...d, producto: idDe.get(d.producto)! }] : [])),
+    ids,
+    clave,
+  };
+}
+
 /** El producto se está vendiendo y no tiene stock, o le alcanza para menos de 15 días. */
 export const hayQueReponer = (r: ResumenProducto) => r.netas30 > 0 && (r.stock <= 0 || (r.diasInventario !== null && r.diasInventario < DIAS_REPONER));
 
