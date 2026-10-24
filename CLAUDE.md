@@ -1124,7 +1124,7 @@ convenciones técnicas del código.
   Pendiente, Cobrado Cliente, Pendiente Cliente, Pago Cliente y Cuenta receptora se quitaron de la tabla, la ficha y la base;
   el dato de cada compra pasó a un comentario con su título («Track ID: …») para poder buscarlo en la Actividad. No los
   vuelvas a poner como campo ni como indicador (el «pago pendiente» del Informe y del Dashboard se quitó con ellos); la
-  fecha «Cerrada» sí sigue, porque la pone el sistema y de ella salen el ciclo y los tiempos. **Compras** (`/compras/lista`, `tabla-compras.tsx`): una sola vista, la `TablaDatos`
+  fecha «Cerrada» sí sigue, porque la pone el sistema y de ella salen el ciclo y los tiempos. **Sin «Responsable» en la lista ni en la ficha** (24 oct 2026, pedido de Jhokser): quién hizo cada cambio ya queda en la Actividad (`wms_compra_eventos.autor`, comentarios y auditoría), así que la columna «Responsable», el dato «Persona asignada» de la ficha y su clave de «Afinar» se quitaron. `asignado_a` / `FilaCompra.asignadoNombre` se conservan: los usa el alcance «solo las asignadas» (`dentroDelAlcance`) y las dimensiones «Responsable» del Dashboard y de Tiempos. **Compras** (`/compras/lista`, `tabla-compras.tsx`): una sola vista, la `TablaDatos`
   con aspecto de lista (**lo que se archiva —«Cerrados», oculto por defecto— lo decide el Estado: solo `estado = completado`;
   la etapa «Completado» no archiva**, porque el producto puede haber llegado y la compra seguir «En Gestión»; los tiempos y lo
   atrasado siguen por etapa) (agrupar —arranca por Etapa; el título de cada grupo lleva el color de su etapa, estado o etiqueta, como

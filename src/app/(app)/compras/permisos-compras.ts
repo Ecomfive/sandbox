@@ -20,7 +20,6 @@ const PROPIEDADES: Record<string, (keyof FilaCompra)[]> = {
   via: ["viaEnvio"],
   tienda: ["tiendas"],
   etiquetas: ["etiquetas"],
-  responsable: ["asignadoNombre"],
   limite: ["fechaLimite"],
 };
 
@@ -35,7 +34,6 @@ const COLUMNAS: Record<string, string[]> = {
   agente: ["agenteEnvio"],
   via: ["viaEnvio"],
   tienda: ["tienda"],
-  responsable: ["asignado"],
   limite: ["fechaLimite"],
 };
 
