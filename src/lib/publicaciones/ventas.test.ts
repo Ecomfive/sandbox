@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { estadoVentaSugerido, hayQueReponer, mesesEntre, restarDias, resumirProductos, totalesPorDia, totalesPorMes, ventasDePublicacion, type ProductoDropi, type VentaDia } from "./ventas";
+import { agruparProductos, estadoVentaSugerido, hayQueReponer, mesesEntre, restarDias, resumirProductos, totalesPorDia, totalesPorMes, ventasDePublicacion, type ProductoDropi, type VentaDia } from "./ventas";
 
 const CORTE = "2026-10-21";
 const prod = (id: number, stock: number): ProductoDropi => ({ id, nombre: `P${id}`, lista: "activo", privado: false, variable: false, stock, primeraVenta: null, ultimaVenta: null });
@@ -88,4 +88,31 @@ test("el stock de la última lectura de Dropi manda sobre el de la carga de vent
   assert.equal(v.stockEstado, "se_acaba");
   // Un ID que la lectura no trae se queda con el de la carga.
   assert.equal(ventasDePublicacion([8684], resumen, new Map([[1, 5]]))!.stock, 0);
+});
+
+test("agrupar por producto: suma los IDs de Dropi del mismo SKU y deja igual lo que no tiene SKU", () => {
+  const productos = [
+    { ...prod(7591, 8), primeraVenta: "2026-01-31", ultimaVenta: "2026-10-20" },
+    { ...prod(8406, 0), lista: "archivado" as const, primeraVenta: "2026-04-25", ultimaVenta: "2026-10-21" },
+    { ...prod(8770, 0), privado: true },
+    prod(9000, 5),
+  ];
+  const sku = { clave: "ACEITE/SEMILLA/CALABAZA", nombre: "Aceite de Semilla de Calabaza" };
+  const g = agruparProductos(productos, [dia(7591, CORTE, 10), dia(8406, CORTE, 20, { canceladas: 5 }), dia(8770, "2026-06-10", 7), dia(9000, CORTE, 3), dia(1234, CORTE, 99)], (id) => (id === 9000 ? null : sku));
+  assert.equal(g.productos.length, 2);
+  const [aceite, suelto] = resumirProductos(g.productos, g.dias, CORTE);
+  assert.equal(aceite.id, -1);
+  assert.equal(aceite.nombre, "Aceite de Semilla de Calabaza");
+  assert.deepEqual(g.ids.get(-1), [7591, 8406, 8770]);
+  assert.equal(g.clave.get(-1), "ACEITE/SEMILLA/CALABAZA");
+  assert.equal(aceite.netas30, 25); // 10 + (20 − 5)
+  assert.equal(aceite.porMes["2026-06"], 7);
+  assert.equal(aceite.stock, 8);
+  assert.equal(aceite.lista, "activo"); // uno de sus IDs sigue activo
+  assert.equal(aceite.privado, false);
+  assert.equal(aceite.primeraVenta, "2026-01-31");
+  assert.equal(aceite.ultimaVenta, "2026-10-21");
+  assert.equal(suelto.id, 9000);
+  assert.deepEqual(g.ids.get(9000), [9000]);
+  assert.equal(suelto.netas30, 3);
 });

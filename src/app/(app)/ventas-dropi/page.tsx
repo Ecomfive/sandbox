@@ -5,7 +5,7 @@ import { getPaisActual } from "@/lib/pais";
 import { dineroPorMes, margen, utilidad, type DineroDia } from "@/lib/publicaciones/dinero";
 import { cargarStockProveedor, stockVigente } from "@/lib/publicaciones/proveedor-datos";
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
-import { resumirProductos, restarDias, totalesPorDia, totalesPorMes, type ProductoDropi, type VentaDia } from "@/lib/publicaciones/ventas";
+import { agruparProductos, resumirProductos, restarDias, totalesPorDia, totalesPorMes, type ProductoDropi, type VentaDia } from "@/lib/publicaciones/ventas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { TableroVentas, type DineroVentas, type DropshipperVentas, type ProductoVentas } from "./tablero-ventas";
@@ -44,7 +44,7 @@ export default async function VentasDropiPage() {
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_productos").select("dropi_producto_id, nombre, lista, privado, variable, stock, primera_venta, ultima_venta").eq("pais_id", pais.id).order("dropi_producto_id").range(d, h)),
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_diarias").select("dropi_producto_id, dia, pedidas, ordenes, canceladas, rechazadas, devueltas").eq("pais_id", pais.id).order("dropi_producto_id").order("dia").range(d, h)),
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_dropshippers").select("dropi_usuario_id, nombre, pedidas, ordenes, no_efectivas, netas_30d, productos, ultima_orden").eq("pais_id", pais.id).order("dropi_usuario_id").range(d, h)),
-    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_publicaciones").select("dropi_id, skus_maestros(codigo)").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h)),
+    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_publicaciones").select("dropi_id, skus_maestros(codigo, nombre)").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h)),
     // La plata (migración 0130): sin la migración o sin carga, la página sigue solo con las unidades.
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_dinero").select("dropi_producto_id, dia, entregadas, unidades, ganancia, comision, coste, descuentos").eq("pais_id", pais.id).order("dropi_producto_id").order("dia").range(d, h)),
     supabase.from("dropi_ventas_dinero_cargas").select("hasta, ordenes, fuente").eq("pais_id", pais.id).order("cargado_en", { ascending: false }).limit(1).maybeSingle(),
@@ -63,11 +63,11 @@ export default async function VentasDropiPage() {
   }
 
   // El SKU del sistema de cada producto de Dropi, por el vínculo de Gestión de IDs Dropi.
-  const skuDe = new Map<number, string>();
+  const skuDe = new Map<number, { clave: string; nombre: string }>();
   for (const p of pubsR.data ?? []) {
-    const codigo = (p.skus_maestros as { codigo: string } | null)?.codigo;
-    if (!codigo) continue;
-    for (const id of String(p.dropi_id ?? "").match(/\d{3,6}/g) ?? []) skuDe.set(Number(id), codigo);
+    const sku = p.skus_maestros as { codigo: string; nombre: string } | null;
+    if (!sku?.codigo) continue;
+    for (const id of String(p.dropi_id ?? "").match(/\d{3,6}/g) ?? []) skuDe.set(Number(id), { clave: sku.codigo, nombre: sku.nombre || sku.codigo });
   }
 
   const productos: ProductoDropi[] = (productosR.data ?? []).map((p) => ({
@@ -112,7 +112,20 @@ export default async function VentasDropiPage() {
     x.descuentos += d.descuentos;
     x.porMes[d.dia.slice(0, 7)] = (x.porMes[d.dia.slice(0, 7)] ?? 0) + utilidad(d);
   }
-  const dineroDe = new Map([...sumas].map(([id, x]) => [id, { ganancia: x.ganancia, utilidad: utilidad(x), margen: margen(x), porMes: x.porMes }]));
+  // La plata de varios IDs de Dropi juntos (una fila de «por producto»); null si ninguno tiene órdenes en el Excel.
+  const dineroDe = (ids: number[]) => {
+    const xs = ids.map((id) => sumas.get(id)).filter((x) => !!x);
+    if (!xs.length) return null;
+    const t = { ganancia: 0, comision: 0, coste: 0, descuentos: 0, porMes: {} as Record<string, number> };
+    for (const x of xs) {
+      t.ganancia += x.ganancia;
+      t.comision += x.comision;
+      t.coste += x.coste;
+      t.descuentos += x.descuentos;
+      for (const [m, n] of Object.entries(x.porMes)) t.porMes[m] = (t.porMes[m] ?? 0) + n;
+    }
+    return { ganancia: t.ganancia, utilidad: utilidad(t), margen: margen(t), porMes: t.porMes };
+  };
   const dinero: DineroVentas | null =
     filasDinero.length && cargaDineroR.data
       ? {
@@ -122,7 +135,13 @@ export default async function VentasDropiPage() {
           meses: [...dineroPorMes(filasDinero)].sort(([a], [b]) => a.localeCompare(b)).map(([mes, x]) => ({ mes, ...x })),
         }
       : null;
-  const resumen: ProductoVentas[] = resumirProductos(productos, dias, corte).map((r) => ({ ...r, sku: skuDe.get(r.id) ?? null, dinero: dineroDe.get(r.id) ?? null }));
+  const resumen: ProductoVentas[] = resumirProductos(productos, dias, corte).map((r) => ({ ...r, ids: [r.id], sku: skuDe.get(r.id)?.clave ?? null, dinero: dineroDe([r.id]) }));
+  // Los mismos datos con los IDs de Dropi de un mismo producto del sistema juntos (públicos, privados, archivados, de la B280…).
+  const grupos = agruparProductos(productos, dias, (id) => skuDe.get(id) ?? null);
+  const porProducto: ProductoVentas[] = resumirProductos(grupos.productos, grupos.dias, corte).map((r) => {
+    const ids = grupos.ids.get(r.id) ?? [r.id];
+    return { ...r, ids, sku: grupos.clave.get(r.id) ?? skuDe.get(r.id)?.clave ?? null, dinero: dineroDe(ids) };
+  });
   const desdeMes = restarDias(`${corte.slice(0, 7)}-15`, MESES_ATRAS * 30.5);
   const dropshippers: DropshipperVentas[] = (dsR.data ?? []).map((d) => ({
     id: Number(d.dropi_usuario_id),
@@ -144,6 +163,7 @@ export default async function VentasDropiPage() {
         stockLeido={stockActual ? fechaHoraLectura(stockActual.leidoEn) : null}
         movimientos={Number(carga.movimientos)}
         productos={resumen}
+        porProducto={porProducto}
         meses={totalesPorMes(dias, `${desdeMes.slice(0, 7)}-01`, corte)}
         dias={totalesPorDia(dias, corte, 90)}
         dropshippers={dropshippers}
