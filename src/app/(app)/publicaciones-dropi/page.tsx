@@ -48,6 +48,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
       <TablaPublicaciones
         publicaciones={datos.filas}
         opcionesSku={datos.opcionesSku}
+        opcionesCrear={datos.opcionesCrear}
         paisId={pais.id}
         codigoPais={pais.codigo}
         nombrePais={pais.nombre}

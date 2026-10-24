@@ -20,7 +20,9 @@ import {
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
-import { actualizarPublicacion, archivarPublicacion, republicarPublicacion } from "./actions";
+import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
+import { actualizarPublicacion, archivarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
+import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
 import { VentasEnDropi } from "./ventas-publicacion";
@@ -128,6 +130,7 @@ export function FichaPublicacion({
   corteVentas = null,
   margenMinimo,
   decisionesDisponibles,
+  opcionesCrear,
   anterior,
   siguiente,
   alCerrar,
@@ -146,6 +149,8 @@ export function FichaPublicacion({
   margenMinimo: number;
   /** false si falta la migración 0127: las recomendaciones se ven pero no se pueden decidir. */
   decisionesDisponibles: boolean;
+  /** Categorías y bodegas que ofrece el formulario de los datos para Dropi de una publicación «Sin publicar». */
+  opcionesCrear: OpcionesCrear;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -163,6 +168,7 @@ export function FichaPublicacion({
       corteVentas={corteVentas}
       margenMinimo={margenMinimo}
       decisionesDisponibles={decisionesDisponibles}
+      opcionesCrear={opcionesCrear}
       anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
@@ -180,6 +186,7 @@ function ContenidoFicha({
   corteVentas,
   margenMinimo,
   decisionesDisponibles,
+  opcionesCrear,
   anterior,
   siguiente,
   alCerrar,
@@ -193,6 +200,7 @@ function ContenidoFicha({
   corteVentas: string | null;
   margenMinimo: number;
   decisionesDisponibles: boolean;
+  opcionesCrear: OpcionesCrear;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -200,7 +208,8 @@ function ContenidoFicha({
   const { mostrarToast } = useToast();
   const [d, setD] = useState<Formulario>(desde(p));
   // «Eliminado» no se ofrece (ninguna publicación se elimina), salvo que ya lo tenga.
-  const estadosParaElegir = ESTADOS_PUBLICACION.filter((o) => o.valor !== "eliminado" || d.estado_publicacion === "eliminado");
+  // «Sin publicar» tampoco se elige a mano: lo da «Publicar en Dropi» y se quita al publicarla.
+  const estadosParaElegir = ESTADOS_PUBLICACION.filter((o) => (o.valor !== "eliminado" || d.estado_publicacion === "eliminado") && o.valor !== "borrador");
   // Lo último guardado (o lo que llegó del servidor): con eso se compara para saber si hay cambios sin guardar. Al guardar no se
   // rearma la ficha (antes cambiaba su clave y parecía que se cerraba): cuando llegan los datos nuevos, el formulario los toma
   // solo si no hay cambios a medio escribir.
@@ -261,16 +270,29 @@ function ContenidoFicha({
     });
   }
 
+  // «Publicar en Dropi» (24 oct 2026): una publicación «Sin publicar» vuelve a quedar pendiente para «Aplicar en Dropi» (por ejemplo, después de deshacer).
+  const [publicando, setPublicando] = useState(false);
+  function publicar() {
+    setError(null);
+    setPublicando(true);
+    empezar(async () => {
+      const r = await publicarEnDropi(p.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      setPublicando(false);
+      if (r.error) setError(r.error);
+      else mostrarToast(r.detalle ?? "Publicación pendiente");
+    });
+  }
+
   // Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se archiva, y se puede sacar de Archivados.
   function archivar() {
     const archivarla = !p.archivada;
     setError(null);
     setArchivando(true);
     empezar(async () => {
-      const r = await archivarPublicacion(p.id, archivarla).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      const r = await archivarPublicacion(p.id, archivarla).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       setArchivando(false);
       if (r.error) setError(r.error);
-      else mostrarToast(archivarla ? "Publicación archivada" : "Publicación fuera de Archivados");
+      else mostrarToast(r.detalle ?? (archivarla ? "Publicación archivada" : "Publicación fuera de Archivados"));
     });
   }
 
@@ -302,6 +324,8 @@ function ContenidoFicha({
           <span className="text-lg font-semibold">{p.nombre}</span>
           {p.duplicadaDe ? (
             <Badge color="#8d8d8d">Duplicada</Badge>
+          ) : p.sinPublicar ? (
+            <Badge color="#8e4ec6">Sin publicar</Badge>
           ) : p.archivada ? (
             <Badge color="#8d8d8d">Archivada</Badge>
           ) : (
@@ -323,6 +347,8 @@ function ContenidoFicha({
         </>
       }
     >
+      {/* Una publicación «Sin publicar»: lo que Dropi pide para crearla. Es un formulario aparte (uno no va dentro de otro). */}
+      {p.sinPublicar && puedeEscribir && <DatosParaDropi p={p} opciones={opcionesCrear} />}
       <form onSubmit={guardar} aria-busy={pendiente} className="flex flex-1 flex-col">
         {puedeEscribir && (
           <div className="sticky top-[var(--alto-cabecera,3.8rem)] z-[5] flex flex-col gap-2 border-y border-border bg-card px-5 py-3">
@@ -339,7 +365,12 @@ function ContenidoFicha({
                   </button>
                 </>
               )}
-              {!sinGuardar && puedeArchivar && puedeRepublicar && (
+              {!sinGuardar && puedeArchivar && p.sinPublicar && (
+                <BotonAccion icono={CheckIcon} disabled={pendiente || p.publicarPendiente} onClick={publicar}>
+                  {publicando ? "Un momento..." : p.publicarPendiente ? "Publicación pendiente" : "Publicar en Dropi"}
+                </BotonAccion>
+              )}
+              {!sinGuardar && puedeArchivar && puedeRepublicar && !p.sinPublicar && (
                 <BotonAccion icono={ActualizarIcon} disabled={pendiente || republicacionPendiente} onClick={republicar}>
                   {republicando ? "Un momento..." : republicacionPendiente ? "Republicación pendiente" : "Republicar"}
                 </BotonAccion>
@@ -393,7 +424,7 @@ function ContenidoFicha({
                   />
                   <span id={`largo-nombre-${p.id}`} className="text-xs text-muted-foreground tabular-nums">
                     {d.nombre.trim().length} de {MAX_NOMBRE_DROPI} caracteres
-                    {d.nombre.trim() !== p.nombre.trim() && " · al guardar se cambia también en Dropi"}
+                    {!p.sinPublicar && d.nombre.trim() !== p.nombre.trim() && " · al guardar se cambia también en Dropi"}
                   </span>
                 </label>
                 {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} />}
@@ -410,10 +441,10 @@ function ContenidoFicha({
                         ref={campoId}
                         value={d.dropi_id}
                         onChange={(e) => cambiar({ dropi_id: e.target.value })}
-                        readOnly={idBloqueado}
+                        readOnly={idBloqueado || p.sinPublicar}
                         maxLength={60}
-                        placeholder="Ej: 11144"
-                        className={`${fieldClass} min-w-0 flex-1 tabular-nums ${idBloqueado ? "cursor-default bg-muted text-muted-foreground" : ""}`}
+                        placeholder={p.sinPublicar ? "Se llena al publicarla en Dropi" : "Ej: 11144"}
+                        className={`${fieldClass} min-w-0 flex-1 tabular-nums ${idBloqueado || p.sinPublicar ? "cursor-default bg-muted text-muted-foreground" : ""}`}
                       />
                       {idBloqueado && (
                         <Tooltip texto="Corregir el ID">
@@ -455,7 +486,11 @@ function ContenidoFicha({
               {/* Se eligen aquí (24 oct 2026, el sistema manda; antes salían de Dropi). Debajo, lo que reporta Dropi, solo de referencia. */}
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Estado</span>
-                <Selector nombre="Estado" valor={d.estado_publicacion} lista={estadosParaElegir} cambiar={(v) => cambiar({ estado_publicacion: v })} vacio="Sin anotar" />
+                {p.sinPublicar ? (
+                  <span className="text-sm font-medium">Sin publicar</span>
+                ) : (
+                  <Selector nombre="Estado" valor={d.estado_publicacion} lista={estadosParaElegir} cambiar={(v) => cambiar({ estado_publicacion: v })} vacio="Sin anotar" />
+                )}
                 <span className="text-xs text-muted-foreground">Dropi: {EN_DROPI.find((e) => e.valor === p.enDropi)?.etiqueta ?? "—"}</span>
               </div>
               <div className="flex min-w-0 flex-col gap-1">

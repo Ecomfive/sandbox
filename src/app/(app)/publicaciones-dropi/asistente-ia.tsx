@@ -11,9 +11,13 @@ import { CheckIcon, CopiarIcon, EstadoIcon, EtiquetaIcon, InteligenciaIcon, List
 import { etiquetaTipoFoto, type AccionAnalisis, type Impacto, type TipoIA } from "@/lib/publicaciones/ia/asistente";
 import { chequearTitulo } from "@/lib/publicaciones/ia/criterios";
 import { conTexto, LIMITES_TEXTO } from "@/lib/publicaciones/ia/fotos-base";
+import { medirDescripcion } from "@/lib/publicaciones/descripcion-dropi";
+import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
 import type { EstadoRevision } from "@/lib/publicaciones/optimizacion";
 import {
   analizarPublicacionIA,
+  aprobarFotosIA,
+  elegirDescripcionIA,
   elegirTituloIA,
   estadoAsistenteIA,
   generarFotoIA,
@@ -671,10 +675,16 @@ function Copiar({ texto, etiqueta }: { texto: string; etiqueta: string }) {
 }
 
 function PanelTexto({ publicacionId, estado, vista }: { publicacionId: string; estado: EstadoIA; vista: AsistenteVista }) {
+  const { mostrarToast } = useToast();
   const [actual, setActual] = useState(vista.texto);
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const min = vista.contexto.reglas.minDescripcion;
+  // El texto que se usará (el propuesto, tal cual o corregido) y cómo va en la cola de «Aplicar en Dropi».
+  const [texto, setTexto] = useState(vista.texto?.resultado.descripcion ?? "");
+  const [usando, setUsando] = useState(false);
+  const [enDropi, setEnDropi] = useState<AsistenteVista["descripcionDropi"]>(vista.descripcionDropi);
+  const medida = medirDescripcion(descripcionAHtml(texto));
 
   async function generar() {
     setError(null);
@@ -682,7 +692,21 @@ function PanelTexto({ publicacionId, estado, vista }: { publicacionId: string; e
     const r = await proponerTextoIA(publicacionId).catch(() => ({ error: "No se pudo generar. Inténtalo de nuevo." }) as { error: string; guardado?: undefined });
     setTrabajando(false);
     if (r.error) setError(r.error);
-    else if (r.guardado) setActual(r.guardado);
+    else if (r.guardado) {
+      setActual(r.guardado);
+      setTexto(r.guardado.resultado.descripcion);
+      setEnDropi(null);
+    }
+  }
+
+  async function usar(iaId: string) {
+    setError(null);
+    setUsando(true);
+    const r = await elegirDescripcionIA(iaId, texto).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }) as { error: string; dropi?: undefined });
+    setUsando(false);
+    if (r.error) return setError(r.error);
+    setEnDropi("pendiente");
+    mostrarToast(r.dropi?.detalle ?? "Descripción pendiente para Dropi");
   }
 
   const t = actual?.resultado;
@@ -702,11 +726,38 @@ function PanelTexto({ publicacionId, estado, vista }: { publicacionId: string; e
         <div className="grid gap-5 @3xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
           <div className="flex flex-col gap-5">
             {t.descripcion && (
-              <Tarjeta icono={ListaIcon} titulo="Descripción" derecha={<Copiar texto={t.descripcion} etiqueta="la descripción" />}>
-                <p className="m-0 max-h-[26rem] overflow-y-auto rounded-xl bg-muted/50 px-3.5 py-3 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{t.descripcion}</p>
-                <p className={`m-0 text-xs tabular-nums ${t.descripcion.length >= min ? "text-success" : "text-warning"}`}>
-                  {t.descripcion.length.toLocaleString("es-PA")} caracteres · mínimo {min}
+              <Tarjeta icono={ListaIcon} titulo="Descripción" derecha={<Copiar texto={texto} etiqueta="la descripción" />}>
+                <label className="flex flex-col gap-1.5">
+                  <span className="sr-only">Descripción para Dropi</span>
+                  <textarea
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value)}
+                    rows={12}
+                    disabled={usando}
+                    className={`${fieldClass} max-h-[26rem] w-full resize-y text-sm leading-relaxed [overflow-wrap:anywhere]`}
+                  />
+                </label>
+                <p className={`m-0 text-xs tabular-nums ${medida.largo >= min ? "text-success" : "text-warning"}`}>
+                  {medida.largo.toLocaleString("es-PA")} caracteres · mínimo {min}
                 </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" className={botonNeon} disabled={usando || !medida.cumple || enDropi === "pendiente"} onClick={() => usar(actual.id)}>
+                    <CheckIcon aria-hidden="true" className="h-4 w-4" />
+                    {usando ? "Un momento…" : enDropi === "pendiente" ? "Pendiente para Dropi" : "Usar esta descripción"}
+                  </button>
+                  {enDropi === "pendiente" && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
+                      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                      {vista.sinPublicar ? "Se sube a Dropi al publicarla" : "Pendiente: «Aplicar en Dropi»"}
+                    </span>
+                  )}
+                  {enDropi === "aplicada" && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
+                      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+                      Ya está en Dropi
+                    </span>
+                  )}
+                </div>
               </Tarjeta>
             )}
             {t.notas && <p className="m-0 rounded-xl bg-muted/50 px-3.5 py-3 text-sm text-muted-foreground">{t.notas}</p>}
@@ -766,6 +817,29 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
   const [textosEditados, setTextosEditados] = useState<Record<number, string>>({});
   const ocupado = planeando || generando !== null;
   const revFotos = vista.contexto.revisiones.find((r) => r.clave === "fotos");
+  const { mostrarToast } = useToast();
+  // Las fotos marcadas para subirlas a Dropi (sin guardar todavía) y las que ya quedaron pendientes en la cola.
+  const [marcadas, setMarcadas] = useState<Set<number>>(new Set());
+  const [aprobando, setAprobando] = useState(false);
+  const alternarMarca = (i: number) =>
+    setMarcadas((antes) => {
+      const ahora = new Set(antes);
+      if (ahora.has(i)) ahora.delete(i);
+      else ahora.add(i);
+      return ahora;
+    });
+
+  async function aprobar(iaId: string) {
+    setError(null);
+    setAprobando(true);
+    const indices = [...marcadas];
+    const r = await aprobarFotosIA(iaId, indices).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }) as { error: string; aprobadas?: undefined; dropi?: undefined });
+    setAprobando(false);
+    if (r.error) return setError(r.error);
+    setPlan((p) => (p ? { ...p, resultado: { ...p.resultado, fotos: p.resultado.fotos.map((f, k) => (indices.includes(k) && f.url ? { ...f, dropi: "pendiente" as const } : f)) } } : p));
+    setMarcadas(new Set());
+    mostrarToast(r.dropi?.detalle ?? "Fotos pendientes para Dropi");
+  }
 
   async function generarUna(iaId: string, i: number, textos?: string) {
     setGenerando(i);
@@ -791,6 +865,7 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
     setPlaneando(false);
     if (r.error || !r.guardado) return setError(r.error ?? "No se pudo analizar.");
     setPlan(r.guardado);
+    setMarcadas(new Set());
     setTextosEditados({});
     // Se generan una por una (cada una tarda): si una falla, sigue con las demás y queda anotado en su tarjeta.
     for (let i = 0; i < r.guardado.resultado.fotos.length; i++) await generarUna(r.guardado.id, i);
@@ -865,6 +940,24 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
                       {f.error}
                     </p>
                   )}
+                  {f.url && f.dropi === "pendiente" && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
+                      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                      {vista.sinPublicar ? "Se sube a Dropi al publicarla" : "Pendiente: «Aplicar en Dropi»"}
+                    </span>
+                  )}
+                  {f.url && f.dropi === "subida" && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
+                      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+                      Ya está en Dropi
+                    </span>
+                  )}
+                  {f.url && !f.dropi && (
+                    <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-xs font-medium">
+                      <input type="checkbox" checked={marcadas.has(i)} onChange={() => alternarMarca(i)} disabled={ocupado || aprobando} className="h-4 w-4" />
+                      Subir a Dropi
+                    </label>
+                  )}
                   <div className="flex gap-2">
                     {f.url && (
                       <a href={f.url} target="_blank" rel="noreferrer noopener" download className={`${botonChico} flex-1 justify-center`}>
@@ -879,6 +972,12 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
               </li>
             ))}
           </ul>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className={botonNeon} disabled={marcadas.size === 0 || ocupado || aprobando} onClick={() => aprobar(plan.id)}>
+              <CheckIcon aria-hidden="true" className="h-4 w-4" />
+              {aprobando ? "Un momento…" : marcadas.size ? `Dejar ${marcadas.size} ${marcadas.size === 1 ? "foto pendiente" : "fotos pendientes"} para Dropi` : "Marca las fotos que quieres subir a Dropi"}
+            </button>
+          </div>
           <Valoracion g={plan} />
         </div>
       )}

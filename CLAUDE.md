@@ -506,6 +506,42 @@ convenciones técnicas del código.
   si el sistema todavía tiene el valor del cambio (si alguien lo volvió a tocar no se pisa); un cambio anterior a la 0149 se quita de la cola pero el nombre
   se queda. Un apagado o una republicación que ya se intentó en Dropi (`intentos > 0`) **no** se deshace desde aquí. Una tarea de precio ya aceptada
   no se reabre al deshacer el precio. Queda en la Actividad (`dropi_cambio_deshecho`, `dropi_apagar_cancelado`, `dropi_republicar_cancelado`).
+  **Regla: todo lo que cambia algo en Dropi pasa por la cola de «Aplicar en Dropi»** (24 oct 2026, regla de Jhokser; migración 0151). El proceso es siempre el
+  mismo: se hace el cambio en el sistema → queda **pendiente** en `dropi_cambios_pendientes` (se ve en la lista de cambios pendientes y se puede «Deshacer»,
+  que deja el sistema como estaba) → el favorito «Aplicar en Dropi» lo manda a Dropi y la ventana deja «Posponer» cada uno. Nada habla con Dropi por otro
+  camino. Ya van por la cola: **nombre, precio y sugerido, descripción y fotos** (un `cambio`), **archivar y sacar de Archivados** (`archivar`), **apagar**,
+  **republicar** y **publicar una publicación nueva** (`crear`). **Un proceso nuevo del módulo que cambie algo en Dropi** se agrega así, sin saltarse nada:
+  (1) su `tipo` en la restricción de `dropi_cambios_pendientes` (migración, con reversa y prueba en PGlite); (2) su `encolarX` en `cambios-dropi.ts` (un solo cambio
+  pendiente por publicación si es una acción, y «cancelarse» con su contrario); (3) su función en el código del favorito (`marcador-aplicar-dropi.ts`, que se
+  comprueba de punta a punta contra un Dropi simulado en `marcador-flujo.test.ts`: lee el producto, comprueba que es del proveedor, hace el cambio, lo vuelve
+  a leer y devuelve `{ ok, error }`; si falla un paso a medias, un reintento sigue desde donde quedó); (4) `pendientesParaDropi` y `guardarResultadosDropi`
+  (`aplicar-actions.ts`), `DetalleCambio` (`aplicar-dropi.tsx`), `listarCambiosPendientes` y `deshacerCambioPendiente` (`pendientes-actions.ts`, solo mientras Dropi
+  no se haya tocado: `intentos = 0`), `EstadoCambioDropi` (ficha) y su etiqueta en `auditoria-cambios.ts`; (5) su línea en el Centro de ayuda. La acción de la
+  pantalla cambia el sistema **y** encola, y devuelve el detalle («queda pendiente: pulsa «Aplicar en Dropi»»); si falta un dato que Dropi exige, no encola.
+  **Archivar y sacar de Archivados** (`archivarPublicacion`): cambian la publicación al instante y encolan `archivar` (`restaurar` = sacarla): `archiveProduct` /
+  `unarchive` de Dropi, **solo eso** (no saca stock: eso es «Apagar»). El estado de antes (`estado_antes`, `estado_publicacion_antes`) se guarda para devolverla al
+  deshacer; el contrario de uno pendiente lo cancela (Dropi nunca se tocó). Sin ID de Dropi o «Sin publicar», solo cambia el sistema.
+  **Descripción y fotos**: `elegirDescripcionIA` («Usar esta descripción» del Asistente de IA; `descripcionAHtml` la vuelve HTML escapado, mínimo 200 caracteres
+  sin etiquetas, `descripcion-dropi.ts`) y `aprobarFotosIA` (las fotos generadas que se marcan «Subir a Dropi») van en un `cambio` (`descripcion`, `descripcion_antes`,
+  `fotos`), junto con el nombre o el precio pendientes. El favorito sube cada foto una por una y **no repite** una que la galería ya tiene (Dropi antepone un número
+  al nombre del archivo: se compara el final); `generarFotoIA` no borra de Storage una foto aprobada y esperando (`fotoEnCola`). Una descripción o una foto solo se
+  puede cambiar con la IA (no hay campo en la ficha). **Publicar un producto nuevo** (`crear`): «Agregar › Publicar en Dropi» (`crear-publicacion-panel.tsx`,
+  `campos-datos-dropi.tsx`) pide **todo lo que Dropi exige** y no deja crear hasta completarlo (reglas leídas del código de su pantalla «Crear producto» el
+  24 oct 2026, en `crear-dropi.ts`: nombre de hasta 40 caracteres; peso en gramos de 0,001 a 25 000; largo, ancho y alto en cm, mínimo 0,001; al menos una categoría;
+  descripción de 200 caracteres como mínimo; precio de venta y sugerido de 0,1 o más (aquí el sugerido va igual al precio); **al crear, producto simple y público: una
+  bodega con 100 unidades o más y mínimo 3 fotos**; si la cuenta tiene el permiso de garantías, las 4 por defecto de 10 días, que el favorito pone después de crear).
+  `crearPublicacion` (modo `publicar`) guarda la publicación con `estado_publicacion = 'borrador'` («Sin publicar», sin ID de Dropi, sin acciones ni recomendaciones)
+  y todo en `datos_dropi`, y encola `crear` con una copia (`datos`). Las fotos se suben directo a Storage (`prepararSubidaFotoBorrador`,
+  `publicaciones/borrador/<uuid>/…`) y el servidor las revisa **por su contenido** (JPG, PNG o WebP de hasta 10 MB: `fotosValidas`). El favorito (`crear`/`nuevoProducto`):
+  busca las categorías por nombre en `GET api/categories`, hace `POST api/products`, sube las fotos (la primera es la principal), pone las garantías (`POST
+  api/productwarranty/create`, aviso si fallan), le da el stock con una entrada si Dropi no lo tomó al crear y vuelve a leer para comprobar nombre, fotos y stock.
+  **El ID se guarda apenas Dropi lo crea** (`nuevo_dropi_id`, y la publicación toma su `dropi_id` en `publicadaEnDropi`), aunque falle un paso después, para que un
+  reintento no cree otro y la lectura de Dropi no lo trate como nuevo; solo si todo sale bien la publicación pasa a Activo. **Deshacer** una publicación pendiente la
+  deja «Sin publicar» con todos sus datos (nunca se borra) y se vuelve a publicar con «Publicar en Dropi» de su ficha (`publicarEnDropi`), donde también se editan
+  sus datos (`DatosParaDropi`, `guardarDatosDropi`). Solo productos **simples y públicos** (un privado nace de uno público; uno variable se arma a mano). Las categorías
+  que ofrece el formulario salen de nuestros productos leídos de Dropi (`opcionesParaCrear`), con «Otra categoría» para escribir otra; las bodegas, de las de
+  ECOMFIVE leídas (no la B280, que es de Dropi). **Pendiente de probar con Dropi real**: crear un producto de verdad (hasta ahora está probado contra un Dropi simulado
+  con las rutas que usa su pantalla) y que `unarchive` devuelva el producto sin stock (el stock lo pone la persona en Dropi).
   **Sin «Notas» en la ficha; compras solo para administradores** (23 oct 2026, pedido de Hernán): el campo «Notas» se quitó (la columna
   `notas` se conserva sin leerla ni escribirla; la migración 0146 pasó lo escrito a un comentario «Notas anteriores» de la Actividad, y lo nuevo
   va como comentario). La ficha trae el bloque «Compras» (`ComprasProducto` del producto vinculado) **solo para un administrador**

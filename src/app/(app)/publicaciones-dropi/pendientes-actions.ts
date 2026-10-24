@@ -5,6 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
+import { normalizarDatosCrear } from "@/lib/publicaciones/crear-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "publicaciones-dropi";
@@ -16,7 +17,7 @@ const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 /** Un cambio que espera «Aplicar en Dropi», para la lista de la barra de la página: qué es, qué pasaría al deshacerlo y si todavía se puede. */
 export interface CambioPendienteVista {
   id: string;
-  tipo: "cambio" | "republicar" | "apagar";
+  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear";
   publicacion: string;
   /** Lo que lleva el cambio, una línea por dato («Nombre: «A» → «B»», «Precio $5.00 → $6.00»…). */
   lineas: string[];
@@ -33,16 +34,21 @@ export interface CambioPendienteVista {
 type Fila = Record<string, unknown>;
 
 const COLUMNAS = "id, tipo, estado, error, intentos, publicacion_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes, nuevo_dropi_id, quitar_privados, creado_por_nombre, creado_en";
+/** Lo que agregó la migración 0151: archivar, descripción, fotos y publicar. */
+const COLUMNAS_0151 = "restaurar, estado_antes, estado_publicacion_antes, descripcion, descripcion_antes, fotos, datos";
 
 /** Los cambios pendientes y con error de un país, con el nombre de la publicación y lo que hay hoy en ella (para describir el antes). */
 async function leerPendientes(paisId: string, soloIds?: string[]): Promise<{ filas: Fila[]; error?: string }> {
   const supabase = createServiceClient();
   // `!publicacion_id`: la tabla tiene dos llaves hacia `dropi_publicaciones` (publicacion_id y nueva_publicacion_id, migración 0145) y sin decir
   // cuál, PostgREST rechaza el pedido por ambiguo.
-  const leer = (columnas: string) => {
-    const q = supabase.from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones!publicacion_id(nombre, precio_venta)` as "*").eq("pais_id", paisId).in("estado", ["pendiente", "error"]);
+  const leer = (columnas: string, descripcionDePub = false) => {
+    const q = supabase.from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones!publicacion_id(nombre, precio_venta${descripcionDePub ? ", descripcion, estado, estado_publicacion" : ""})` as "*").eq("pais_id", paisId).in("estado", ["pendiente", "error"]);
     return (soloIds ? q.in("id", soloIds) : q).order("creado_en").limit(200);
   };
+  // Con la migración 0151 se leen también archivar, descripción, fotos y publicar.
+  const nueva = await leer(`${COLUMNAS}, nombre_antes, ${COLUMNAS_0151}`, true);
+  if (!nueva.error) return { filas: (nueva.data ?? []) as unknown as Fila[] };
   // Sin las migraciones 0145, 0148 o 0149 faltan columnas: se lee con lo que haya.
   const intentos = [`${COLUMNAS}, nombre_antes`, COLUMNAS, "id, estado, error, intentos, publicacion_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes, creado_por_nombre, creado_en", "id, estado, error, intentos, publicacion_id, nombre, nombre_guia, creado_por_nombre, creado_en"];
   for (const columnas of intentos) {
@@ -54,8 +60,11 @@ async function leerPendientes(paisId: string, soloIds?: string[]): Promise<{ fil
 
 const pubDe = (f: Fila) => {
   const p = f.dropi_publicaciones;
-  return (Array.isArray(p) ? p[0] : p) as { nombre?: string; precio_venta?: number | string | null } | null;
+  return (Array.isArray(p) ? p[0] : p) as { nombre?: string; precio_venta?: number | string | null; descripcion?: string | null; estado?: string | null; estado_publicacion?: string | null } | null;
 };
+const TIPOS_COLA = ["cambio", "republicar", "apagar", "archivar", "crear"] as const;
+const tipoDe = (f: Fila) => ((TIPOS_COLA as readonly unknown[]).includes(f.tipo) ? (f.tipo as (typeof TIPOS_COLA)[number]) : "cambio");
+const cantidadFotos = (f: Fila) => (Array.isArray(f.fotos) ? f.fotos.length : 0);
 
 /** Los cambios que esperan «Aplicar en Dropi» en el país de la barra, con lo que pasaría al deshacer cada uno. Lo ve quien puede modificar el módulo. */
 export async function listarCambiosPendientes(): Promise<{ error?: string; cambios?: CambioPendienteVista[] }> {
@@ -67,14 +76,30 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
   if (error) return { error };
   return {
     cambios: filas.map((f): CambioPendienteVista => {
-      const tipo = f.tipo === "apagar" ? "apagar" : f.tipo === "republicar" ? "republicar" : "cambio";
+      const tipo = tipoDe(f);
       const pub = pubDe(f);
       const intentos = Number(f.intentos ?? 0);
       const lineas: string[] = [];
       let alDeshacer = "";
       let deshacible = true;
       let motivoNo: string | null = null;
-      if (tipo === "apagar") {
+      if (tipo === "archivar") {
+        const restaurar = f.restaurar === true;
+        lineas.push(restaurar ? "Sacar de Archivados en Dropi" : "Archivar en Dropi");
+        alDeshacer = "La publicación vuelve a estar como antes en el sistema. Dropi no se había tocado.";
+        if (intentos > 0) {
+          deshacible = false;
+          motivoNo = "Ya se intentó en Dropi: no se puede deshacer desde aquí.";
+        }
+      } else if (tipo === "crear") {
+        const d = normalizarDatosCrear(f.datos);
+        lineas.push(`Publicar en Dropi: «${d.nombre || pub?.nombre || "Publicación"}»${d.precio != null ? ` · $${d.precio.toFixed(2)}` : ""} · ${d.fotos.length} ${d.fotos.length === 1 ? "foto" : "fotos"}`);
+        alDeshacer = "Vuelve a «Sin publicar»: se queda guardada con todos sus datos, sin borrar nada.";
+        if (intentos > 0 || f.nuevo_dropi_id) {
+          deshacible = false;
+          motivoNo = "Ya se empezó a publicar en Dropi (puede existir el producto): no se puede deshacer desde aquí.";
+        }
+      } else if (tipo === "apagar") {
         lineas.push(`Apagar: sacar todo el stock${f.quitar_privados === true ? ", quitar la privatización" : ""} y archivar`);
         alDeshacer = "Vuelve a verse como antes en el sistema (sale de Archivados). Dropi no se había tocado.";
         if (intentos > 0) {
@@ -101,6 +126,12 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
           partes.push(precioAntes !== null ? `el precio vuelve a ${usd(precioAntes)}` : "el precio se queda como está (no estaba guardado el anterior)");
         }
         if (f.precio_sugerido != null) lineas.push(`Precio sugerido ${num(f.precio_sugerido_antes) !== null ? `${usd(Number(f.precio_sugerido_antes))} → ` : ""}${usd(Number(f.precio_sugerido))}`);
+        if (typeof f.descripcion === "string" && f.descripcion) {
+          const largo = f.descripcion.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().length;
+          lineas.push(`Descripción nueva (${largo} caracteres)`);
+          partes.push(f.descripcion_antes ? "la descripción vuelve a la anterior" : "la descripción deja de ser la nueva");
+        }
+        if (cantidadFotos(f) > 0) lineas.push(`${cantidadFotos(f)} ${cantidadFotos(f) === 1 ? "foto" : "fotos"} por subir`);
         alDeshacer = partes.length ? `En el sistema: ${partes.join(" y ")}.` : "Se quita de la cola.";
       }
       return {
@@ -134,7 +165,7 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   const { filas, error } = await leerPendientes(base.pais_id as string, [cambioId]);
   const f = filas[0];
   if (error || !f) return { error: "Ese cambio ya no está pendiente." };
-  const tipo = f.tipo === "apagar" ? "apagar" : f.tipo === "republicar" ? "republicar" : "cambio";
+  const tipo = tipoDe(f);
   const intentos = Number(f.intentos ?? 0);
   const pubId = f.publicacion_id as string;
   const pub = pubDe(f);
@@ -142,6 +173,8 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
 
   if (tipo === "apagar" && intentos > 0) return { error: "Ya se intentó en Dropi (el stock puede estar en cero): no se puede deshacer desde aquí." };
   if (tipo === "republicar" && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó en Dropi (puede haber un producto nuevo): no se puede deshacer desde aquí." };
+  if (tipo === "archivar" && intentos > 0) return { error: "Ya se intentó en Dropi: no se puede deshacer desde aquí." };
+  if (tipo === "crear" && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó a publicar en Dropi (puede existir el producto): no se puede deshacer desde aquí." };
 
   const restaurado: string[] = [];
   const antes: Record<string, string> = {};
@@ -163,9 +196,27 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
       despues["Precio"] = usd(precioAntes);
       restaurado.push(`el precio vuelve a ${usd(precioAntes)}`);
     }
+    // La descripción vuelve a la anterior solo si el sistema todavía tiene la del cambio (si alguien la volvió a tocar, no se pisa).
+    if (typeof f.descripcion === "string" && f.descripcion && pub?.descripcion === f.descripcion) {
+      cambios.descripcion = (f.descripcion_antes as string | null) ?? null;
+      antes["Descripción"] = "la nueva";
+      despues["Descripción"] = f.descripcion_antes ? "la anterior" : "sin descripción guardada";
+      restaurado.push(f.descripcion_antes ? "la descripción vuelve a la anterior" : "la descripción deja de ser la nueva");
+    }
     if (Object.keys(cambios).length) {
       const { error: errorPub } = await supabase.from("dropi_publicaciones").update({ ...cambios, actualizado_en: new Date().toISOString() }).eq("id", pubId);
       if (errorPub) return { error: "No se pudo devolver la publicación a como estaba." };
+    }
+  }
+
+  // «Archivar»: la publicación vuelve a como estaba antes de pedirlo (solo si sigue como la dejó el pedido).
+  if (tipo === "archivar") {
+    const volverA = { estado: (f.estado_antes as string | null) ?? null, estado_publicacion: (f.estado_publicacion_antes as string | null) ?? null };
+    const sigue = f.restaurar === true ? pub?.estado_publicacion !== "archivado" : pub?.estado_publicacion === "archivado" || pub?.estado === "archivado";
+    if (sigue && (volverA.estado || volverA.estado_publicacion)) {
+      const { error: errorPub } = await supabase.from("dropi_publicaciones").update({ ...(volverA.estado ? { estado: volverA.estado } : {}), estado_publicacion: volverA.estado_publicacion, actualizado_en: new Date().toISOString() }).eq("id", pubId);
+      if (errorPub) return { error: "No se pudo devolver la publicación a como estaba." };
+      restaurado.push(f.restaurar === true ? "vuelve a Archivados" : "sale de Archivados");
     }
   }
 
@@ -174,13 +225,22 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   const { error: errorCola } = await (tipo === "cambio" ? q : q.eq("intentos", 0));
   if (errorCola) return { error: "No se pudo quitar el cambio de la cola." };
   await registrarAuditoria({
-    accion: tipo === "apagar" ? "dropi_apagar_cancelado" : tipo === "republicar" ? "dropi_republicar_cancelado" : "dropi_cambio_deshecho",
+    accion: tipo === "apagar" ? "dropi_apagar_cancelado" : tipo === "republicar" ? "dropi_republicar_cancelado" : tipo === "archivar" ? "dropi_archivar_cancelado" : tipo === "crear" ? "dropi_crear_cancelado" : "dropi_cambio_deshecho",
     entidad: "dropi_publicaciones",
     entidadId: pubId,
     detalle: `${nombrePub} · deshecho antes de aplicarse en Dropi${restaurado.length ? `: ${restaurado.join(" y ")}` : ""}`,
     ...(Object.keys(antes).length ? { antes, despues } : {}),
   });
   revalidatePath(RUTA);
-  const resumen = tipo === "apagar" ? "vuelve a verse como antes" : tipo === "republicar" ? "se quitó de la cola" : restaurado.length ? restaurado.join(" y ") : "se quitó de la cola; el sistema se queda como está";
+  const resumen =
+    tipo === "apagar"
+      ? "vuelve a verse como antes"
+      : tipo === "republicar"
+        ? "se quitó de la cola"
+        : tipo === "crear"
+          ? "queda «Sin publicar», guardada con todos sus datos"
+          : restaurado.length
+            ? restaurado.join(" y ")
+            : "se quitó de la cola; el sistema se queda como está";
   return { detalle: `Deshecho: ${resumen}. Dropi no se tocó.` };
 }
