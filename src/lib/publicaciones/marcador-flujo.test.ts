@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal" } = {}) {
+function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
@@ -38,6 +38,8 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     const url = String(entrada);
     const metodo = (init.method ?? "GET").toUpperCase();
     // Una foto que el favorito baja de Storage para subirla a Dropi.
+    // Como el navegador con una copia guardada que no deja leer: la dirección tal cual falla; con «?r=…» sale bien.
+    if (opciones.cdnSinCache && url.startsWith("https://d39ru7awumhhs2.cloudfront.net/") && !url.includes("?r=")) throw new TypeError("Failed to fetch");
     if (url.startsWith("https://x.supabase.co/") || url.startsWith("https://d39ru7awumhhs2.cloudfront.net/")) return new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])], { type: "image/jpeg" }));
     const ruta = url.replace("https://api.dropi.pa/api", "");
     llamadas.push(`${metodo} ${ruta}`);
@@ -352,4 +354,12 @@ test("republicar: si en un intento falló la foto principal, el reintento sube j
   const g = d.productos.get(9001)!.gallery as Obj[];
   assert.equal(g.length, 2, "las dos fotos, sin repetir");
   assert.ok(g.some((f) => f.main && String(f.urlS3).endsWith("1779932274veganic.jpg")), "la principal quedó como principal");
+});
+
+test("republicar: si la foto del CDN falla por la caché del navegador, se pide otra vez con una dirección distinta", async () => {
+  const d = crearDropi({ cdnSinCache: true });
+  d.productos.set(10474, productoBase(10474));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474 }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(d.productos.get(9001)!.gallery.length, 1);
 });
