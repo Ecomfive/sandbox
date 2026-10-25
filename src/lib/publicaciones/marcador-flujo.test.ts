@@ -28,6 +28,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
+  const garantias = new Map<number, Obj[]>();
   let siguiente = 9001;
   const stockDe = (p: Obj) => Object.fromEntries((p.warehouse_product as Obj[]).map((w) => [w.warehouse_id, Number(w.stock)]));
   const responder = (objeto: unknown, status = 200) => new Response(JSON.stringify(typeof objeto === "object" && objeto !== null && "isSuccess" in objeto ? objeto : { isSuccess: status < 400, objects: objeto }), { status });
@@ -36,7 +37,7 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     const url = String(entrada);
     const metodo = (init.method ?? "GET").toUpperCase();
     // Una foto que el favorito baja de Storage para subirla a Dropi.
-    if (url.startsWith("https://x.supabase.co/")) return new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])], { type: "image/jpeg" }));
+    if (url.startsWith("https://x.supabase.co/") || url.startsWith("https://d39ru7awumhhs2.cloudfront.net/")) return new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])], { type: "image/jpeg" }));
     const ruta = url.replace("https://api.dropi.pa/api", "");
     llamadas.push(`${metodo} ${ruta}`);
     const cuerpo: Obj | null = typeof init.body === "string" ? JSON.parse(init.body) : null;
@@ -79,7 +80,11 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
       p.gallery.push({ id: p.gallery.length + 100, main: f.get("main") === "true", urlS3: `panama/products/${p.id}/1779999999${archivo.name}`, url: null, variation_id: null });
       return responder(true);
     }
-    if (metodo === "POST" && ruta === "/productwarranty/create") return responder(true);
+    if (metodo === "POST" && ruta === "/productwarranty/create") {
+      garantias.set(Number(cuerpo!.id), (cuerpo!.warranties as Obj[]).map((w) => ({ name: w.name, time: w.time, quantity_time: w.quantity, description: w.description || "NULL" })));
+      return responder(true);
+    }
+    if (metodo === "POST" && ruta === "/productwarranty/show") return responder(garantias.get(Number(cuerpo!.product_id)) ?? []);
     if (metodo === "POST" && m && m[2] === "/archiveProduct") {
       if (opciones.noArchiva) return responder({ isSuccess: false, message: "Tiene órdenes pendientes" }, 409);
       productos.get(Number(m[1]))!.archived = true;
@@ -91,7 +96,7 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     }
     return responder({ isSuccess: false, message: `Ruta no simulada: ${metodo} ${ruta}` }, 404);
   };
-  return { productos, llamadas, fetchFalso, stockDe };
+  return { productos, llamadas, fetchFalso, stockDe, garantias };
 }
 
 /** Pulsa el favorito con esos cambios y devuelve lo que la ventana recibió. */
@@ -303,4 +308,23 @@ test("fotos: si la subida solo acepta X-Authorization (como la pantalla de Dropi
   const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
   assert.equal(r.ok, true, String(r.error));
   assert.equal(d.productos.get(9001)!.gallery.length, 3);
+});
+
+test("republicar: crea el nuevo con sus fotos, le copia las garantías del viejo y archiva el viejo sin stock", async () => {
+  const d = crearDropi();
+  d.productos.set(8751, productoBase(8751));
+  d.garantias.set(8751, GARANTIAS_DROPI.map((g) => ({ name: g.name, time: "DIAS", quantity_time: 15, description: g.description || "NULL" })));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
+  const g = d.garantias.get(9001)!;
+  assert.deepEqual(g.map((x) => [x.name, x.quantity_time]), GARANTIAS_DROPI.map((x) => [x.name, 15]), "las cuatro garantías, con los días del viejo");
+  assert.equal(d.productos.get(9001)!.gallery.length, 1);
+  assert.equal(d.productos.get(8751)!.archived, true);
+  assert.deepEqual(d.stockDe(d.productos.get(8751)!), { 81: 0 });
+
+  // Un reintento no las vuelve a crear.
+  const llamadasAntes = d.llamadas.filter((l) => l === "POST /productwarranty/create").length;
+  await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001 }]);
+  assert.equal(d.llamadas.filter((l) => l === "POST /productwarranty/create").length, llamadasAntes);
 });

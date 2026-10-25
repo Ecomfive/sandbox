@@ -86,6 +86,12 @@ const CODIGO = [
   "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return f('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
   "var fs=fotosDe(o),mal=0;for(var i=fotosDe(n).length;i<fs.length;i++)if(!(await subir(id,fs[i])))mal++;",
   "if(mal)return f('Se creó el '+id+', pero no se pudieron copiar '+mal+' foto(s)'+porque()+'.');",
+  // Las garantías del viejo pasan al nuevo (25 oct 2026: el 11309 quedó sin ellas; en Dropi la casilla de cada garantía se marca solo
+  // si el producto la tiene guardada). Solo si el nuevo todavía no tiene ninguna, así un reintento no las repite.
+  "var gv=await pedir('/productwarranty/show','POST',{product_id:Number(c.producto)}),gn=await pedir('/productwarranty/show','POST',{product_id:id});",
+  "var lv=gv.ok&&Array.isArray(gv.j&&gv.j.objects)?gv.j.objects:[],ln=gn.ok&&Array.isArray(gn.j&&gn.j.objects)?gn.j.objects:[];",
+  "if(lv.length&&!ln.length){var gw=lv.filter(function(w){return w&&w.name}).map(function(w){return{name:w.name,time:w.time||w.type_time||'DIAS',quantity:Number(w.quantity_time!=null?w.quantity_time:w.quantity)||10,description:w.description&&w.description!=='NULL'?w.description:''}});",
+  "var gc=await pedir('/productwarranty/create','POST',{id:id,warranties:gw});if(!gc.ok)return f('Se creó el '+id+', pero no se le pudieron poner las garantías: '+motivo(gc))}",
   "var sn=stockDe(n),en={},hay=false;for(k in st)if((sn[k]||0)<st[k]){en[k]=st[k]-(sn[k]||0);hay=true}",
   "if(hay){var me=mover(n,bp,en,'Republicado desde el ID '+c.producto);if(me.error)return f(me.error);",
   "var pe=await pedir('/products/'+id,'PUT',me.cuerpo);if(!pe.ok)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+motivo(pe))}",
