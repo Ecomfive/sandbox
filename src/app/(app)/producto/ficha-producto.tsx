@@ -182,8 +182,9 @@ export function FichaProducto({
       }
     >
       {producto && (
-        // Los bloques en dos columnas que se llenan cada una por su lado (sin huecos), leyendo de izquierda a derecha en el orden
-        // pedido por Alcides (21 oct 2026): Producto, Asociaciones, Competencia, Compras, Código de barras, Envío… La actividad, al
+        // Los bloques en dos columnas que se llenan cada una por su lado (sin huecos), en el orden pedido por Alcides (24 oct 2026):
+        // a la izquierda lo del producto (Producto, Código de barras, Inventario, Asociaciones, Envío, Variantes o Componentes,
+        // Vencimiento); a la derecha lo comercial (Ventas en Dropi, Competencia, Compras, Resultado del test). La actividad, al
         // final y a todo el ancho. En pantallas angostas, una sola columna.
         <div className="@container min-h-0 flex-1 overflow-y-auto">
           <ExclusividadProducto key={`exclusividad-${producto.id}`} skuId={producto.id} />
@@ -219,11 +220,6 @@ export function FichaProducto({
               </dl>
               </div>
             </Seccion>
-            {producto.tipo !== "combo" && (
-              <Seccion icono={InteligenciaIcon} titulo="Competencia en Dropi">
-                <BloqueCompetencia key={producto.id} skuId={producto.id} />
-              </Seccion>
-            )}
             <Seccion icono={CatalogoIcon} titulo="Código de barras">
               <CodigoBarrasProducto
                 key={producto.id}
@@ -235,12 +231,6 @@ export function FichaProducto({
                 puedeEscribir={puedeEscribir}
               />
             </Seccion>
-            {/* Si salió de Test productos: cómo le fue, con las mismas barras de su ficha allá. */}
-            {producto.tests.length > 0 && (
-              <Seccion icono={TestIcon} titulo="Resultado del test">
-                <ResultadoTestProducto producto={producto} referencias={referenciasTest} />
-              </Seccion>
-            )}
             <Seccion icono={InventarioIcon} titulo="Inventario">
               {esTest ? (
                 <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo.</p>
@@ -252,8 +242,6 @@ export function FichaProducto({
                 </Link>
               ) : null}
             </Seccion>
-            </div>
-            <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 @3xl:border-t-0 @3xl:pt-0">
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
               {/* Sus publicaciones de Dropi como proveedor (Gestión de IDs Dropi): cómo se llama allá, en qué país y con qué ID. */}
               {producto.nombresDropi.length > 0 && (
@@ -309,16 +297,6 @@ export function FichaProducto({
                 </Link>
               )}
             </Seccion>
-            {producto.nombresDropi.length > 0 && (
-              <Seccion icono={VentasIcon} titulo="Ventas en Dropi">
-                <VentasDropiProducto key={producto.id} id={producto.id} />
-              </Seccion>
-            )}
-            {producto.tipo !== "combo" && (
-              <Seccion icono={ComprasIcon} titulo="Compras">
-                <ComprasProducto key={producto.id} id={producto.id} />
-              </Seccion>
-            )}
             <Seccion icono={EnvioIcon} titulo="Envío">
               <EnvioProductoBloque key={producto.id} id={producto.id} envio={producto.envio} puedeEscribir={puedeEscribir} />
             </Seccion>
@@ -345,6 +323,29 @@ export function FichaProducto({
                   diasAviso={producto.diasAvisoVencimiento}
                   puedeEscribir={puedeEscribir}
                 />
+              </Seccion>
+            )}
+            </div>
+            <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 @3xl:border-t-0 @3xl:pt-0">
+            {producto.nombresDropi.length > 0 && (
+              <Seccion icono={VentasIcon} titulo="Ventas en Dropi">
+                <VentasDropiProducto key={producto.id} id={producto.id} />
+              </Seccion>
+            )}
+            {producto.tipo !== "combo" && (
+              <Seccion icono={InteligenciaIcon} titulo="Competencia en Dropi">
+                <BloqueCompetencia key={producto.id} skuId={producto.id} />
+              </Seccion>
+            )}
+            {producto.tipo !== "combo" && (
+              <Seccion icono={ComprasIcon} titulo="Compras">
+                <ComprasProducto key={producto.id} id={producto.id} />
+              </Seccion>
+            )}
+            {/* Si salió de Test productos: cómo le fue, con las mismas barras de su ficha allá. */}
+            {producto.tests.length > 0 && (
+              <Seccion icono={TestIcon} titulo="Resultado del test">
+                <ResultadoTestProducto producto={producto} referencias={referenciasTest} />
               </Seccion>
             )}
             </div>
