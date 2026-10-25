@@ -313,12 +313,14 @@ test("fotos: si la subida solo acepta X-Authorization (como la pantalla de Dropi
 test("republicar: crea el nuevo con sus fotos, le copia las garantías del viejo y archiva el viejo sin stock", async () => {
   const d = crearDropi();
   d.productos.set(8751, productoBase(8751));
-  d.garantias.set(8751, GARANTIAS_DROPI.map((g) => ({ name: g.name, time: "DIAS", quantity_time: 15, description: g.description || "NULL" })));
+  // El viejo no tenía observaciones (Dropi antes lo aceptaba): el nuevo lleva «Ninguna», salvo «Orden diferente».
+  d.garantias.set(8751, GARANTIAS_DROPI.map((g) => ({ name: g.name, time: "DIAS", quantity_time: 15, description: "NULL" })));
   const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
   assert.equal(r.ok, true, String(r.error));
   assert.equal(r.nuevo, 9001);
   const g = d.garantias.get(9001)!;
   assert.deepEqual(g.map((x) => [x.name, x.quantity_time]), GARANTIAS_DROPI.map((x) => [x.name, 15]), "las cuatro garantías, con los días del viejo");
+  assert.deepEqual(g.map((x) => x.description), ["Ninguna", "Ninguna", "Ninguna", "NULL"]);
   assert.equal(d.productos.get(9001)!.gallery.length, 1);
   assert.equal(d.productos.get(8751)!.archived, true);
   assert.deepEqual(d.stockDe(d.productos.get(8751)!), { 81: 0 });
