@@ -53,6 +53,11 @@ const CODIGO = [
   "function pedir(r,m,b){return fetch(A+r,{method:m||'GET',headers:H,body:b?JSON.stringify(b):undefined}).then(function(x){return x.json().catch(function(){return null}).then(function(j){return{ok:x.ok&&!(j&&j.isSuccess===false),s:x.status,j:j}})},function(e){return{ok:false,s:0,j:{message:String(e&&e.message||e)}}})}",
   "function llano(h){return String(h==null?'':h).replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/\\s+/g,' ').trim()}",
   "function motivo(r){return r.s===401?'La sesión de Dropi venció: inicia sesión de nuevo en Dropi.':'Dropi respondió '+r.s+(r.j&&r.j.message?': '+r.j.message:'')+'.'}",
+  // El ID del producto que acaba de crear Dropi: lo busca en las formas en que puede venir la respuesta. Si no está, el error lleva
+  // lo que respondió Dropi (código, mensaje y las llaves de la respuesta, sin datos del producto), para saber qué pasó (25 oct 2026:
+  // la republicación del 8751 se detuvo sin ID y Dropi no había creado nada).
+  "function idCreado(j){var o=j&&j.objects,c=[o&&o.id,o&&o.product&&o.product.id,o&&o.product_id,Array.isArray(o)&&o[0]&&o[0].id,typeof o==='number'?o:null,j&&j.id,j&&j.product&&j.product.id,j&&j.data&&j.data.id];for(var i=0;i<c.length;i++){var n=Number(c[i]);if(n>0&&n<1e8&&Math.floor(n)===n)return n}return 0}",
+  "function sinId(g){var j=g.j,m=j&&(j.message||j.msg||j.error);return'Dropi no devolvió el ID del producto nuevo (respondió '+g.s+(m?': '+String(m).slice(0,150):'')+(j&&typeof j==='object'?'; llaves: '+Object.keys(j).slice(0,8).join(', ')+(j.objects&&typeof j.objects==='object'?' / objects: '+Object.keys(j.objects).slice(0,8).join(', '):''):'; sin cuerpo')+'). No se creó nada en el sistema.'}",
   REPUBLICAR_JS,
   APAGAR_JS,
   CREAR_JS,
@@ -67,7 +72,7 @@ const CODIGO = [
   "var id=Number(c.nuevo)||0,st=stockDe(o),k;",
   "if(!id){var r=nuevo(o,bp);if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
-  "id=Number(g.j&&g.j.objects&&g.j.objects.id);if(!id)return{ok:false,error:'Dropi no devolvió el ID del producto nuevo.'}}",
+  "id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)}}",
   "var f=function(e){return{ok:false,nuevo:id,error:e}};",
   "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return f('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
   "var fs=fotosDe(o),mal=0;for(var i=fotosDe(n).length;i<fs.length;i++)if(!(await subir(id,fs[i])))mal++;",
@@ -123,7 +128,7 @@ const CODIGO = [
   "var ls=cs.j&&(cs.j.objects!==undefined?cs.j.objects:cs.j);if(!Array.isArray(ls))return{ok:false,error:'Dropi no devolvió las categorías.'};",
   "var r=nuevoProducto(d,L.id,bp,ls);if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
-  "id=Number(g.j&&g.j.objects&&g.j.objects.id);if(!id)return{ok:false,error:'Dropi no devolvió el ID del producto nuevo.'};recien=true}",
+  "id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)};recien=true}",
   "var f=function(e){return{ok:false,nuevo:id,error:e}};",
   "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return f('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
   "var mal=await subirFotos(id,n,d.fotos,true);if(mal)return f('Se creó el '+id+', pero no se pudieron subir '+mal+' foto(s).');",

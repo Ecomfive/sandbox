@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean } = {}) {
+function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado" } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   let siguiente = 9001;
@@ -49,13 +49,15 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     }
     if (metodo === "POST" && ruta === "/products") {
       if (opciones.fallaCrear) return responder({ isSuccess: false, message: "Rechazado por Dropi" }, 400);
+      // Dropi dice que sí pero no crea nada ni da el ID (lo que pasó con el 8751 el 25 oct 2026).
+      if (opciones.respuestaCrear === "sinId") return responder({ isSuccess: true, status: 200, message: "Ok" });
       const id = siguiente++;
       productos.set(id, productoBase(id, {
         name: cuerpo!.name, description: cuerpo!.description, sale_price: String(cuerpo!.sale_price), suggested_price: String(cuerpo!.suggested_price), categories: cuerpo!.categories, sku: cuerpo!.sku,
         weight: String(cuerpo!.weight), length: String(cuerpo!.length), width: String(cuerpo!.width), height: String(cuerpo!.height), gallery: [],
         warehouse_product: opciones.stockAlCrear === false ? [] : (cuerpo!.warehouselected as Obj[]).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock, warehouse: BODEGA })),
       }));
-      return responder({ id });
+      return responder(opciones.respuestaCrear === "anidado" ? { product: { id } } : { id });
     }
     if (metodo === "PUT" && m && !m[2]) {
       const p = productos.get(Number(m[1]))!;
@@ -269,4 +271,19 @@ test("publicar: varios cambios juntos se aplican en orden y cada uno devuelve su
     { ...base, id: "x2", tipo: "crear", producto: 0, datos: completo },
   ]);
   assert.deepEqual(r.map((x) => [x.id, x.ok]), [["x1", true], ["x2", true]]);
+});
+
+test("crear: si Dropi responde bien pero sin ID, no sigue y el error dice lo que respondió", async () => {
+  const d = crearDropi({ respuestaCrear: "sinId" });
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /no devolvió el ID.*respondió 200: Ok; llaves: isSuccess, status, message/);
+  assert.equal(r.nuevo, undefined);
+});
+
+test("crear: el ID del producto nuevo también se lee si Dropi lo manda dentro de «product»", async () => {
+  const d = crearDropi({ respuestaCrear: "anidado" });
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
 });
