@@ -67,7 +67,7 @@ const CODIGO = [
   "var FE='';",
   // Se baja de su dirección y, si falla, de sus `alternas` (la misma foto en el CDN de Dropi).
   "function bajar(f){var us=[f.url].concat(Array.isArray(f.alternas)?f.alternas:[]),i=0;var otra=function(){if(i>=us.length)return Promise.resolve(null);var u=us[i++];",
-  "return fetch(u).then(function(x){if(!x.ok){FE='no se pudo bajar la foto '+f.nombre+' (respondió '+x.status+')';return otra()}return x.blob()},function(e){FE='no se pudo bajar la foto '+f.nombre+' ('+String(e&&e.message||e)+')';return otra()})};return otra()}",
+  "return fetch(u).then(function(x){if(!x.ok){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' (respondió '+x.status+')';return otra()}return x.blob()},function(e){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' ('+String(e&&e.message||e)+'; probadas '+us.length+' direcciones)';return otra()})};return otra()}",
   "function subir(id,f){return bajar(f).then(function(b){if(!b)return false;",
   "var mandar=function(h){var d=new FormData();d.append('files',new File([b],f.nombre,{type:b.type||'image/jpeg'}));d.append('id',String(id));d.append('main',f.main?'true':'false');",
   "return fetch(A+'/products/photos/upload',{method:'POST',headers:h,body:d}).then(function(x){return x.text().then(function(t){var j=null;try{j=JSON.parse(t)}catch(z){}var ok=x.ok&&!(j&&j.isSuccess===false);",

@@ -99,3 +99,11 @@ test("una foto sin urlS3 se intenta también desde el CDN de Dropi (en el favori
   assert.deepEqual(fotos[2].alternas, [`${CDN_FOTOS_DROPI}/panama/products/10474/6bca.png`]);
   igual(delFavorito.fotosDe(o), fotos);
 });
+
+test("si ninguna foto dice la carpeta del CDN, se usa la del país (en el favorito igual)", () => {
+  const o: Obj = { ...veganic, id: 10474, gallery: [{ id: 2, main: true, urlS3: null, url: "http://otro.example/x/6bc9.png", variation_id: null }] };
+  assert.deepEqual(fotosParaCopiar(o, "pa")[0].alternas, [`${CDN_FOTOS_DROPI}/panama/products/10474/6bc9.png`]);
+  assert.deepEqual(fotosParaCopiar(o)[0].alternas, []);
+  const conPais = new Function(`var P="pa";${ARMAR_JS};${REPUBLICAR_JS}; return fotosDe;`)() as (o: Obj) => Obj[];
+  igual(conPais(o), fotosParaCopiar(o, "pa"));
+});

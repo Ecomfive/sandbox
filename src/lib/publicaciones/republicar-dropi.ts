@@ -62,10 +62,13 @@ export function stockPorBodega(producto: Obj): Record<string, number> {
 }
 
 /** Las fotos del producto que se copian, la principal primero, con su dirección en el CDN (o la `url` completa si no tiene `urlS3`). */
-export function fotosParaCopiar(producto: Obj): { url: string; nombre: string; main: boolean; alternas: string[] }[] {
+/** La carpeta de las fotos de cada país en el CDN de Dropi, por si ninguna foto del producto la dice (25 oct 2026, el 10474). */
+export const CARPETA_FOTOS_PAIS: Record<string, string> = { pa: "panama/products/" };
+
+export function fotosParaCopiar(producto: Obj, pais?: string): { url: string; nombre: string; main: boolean; alternas: string[] }[] {
   const galeria = Array.isArray(producto.gallery) ? (producto.gallery as Obj[]) : [];
   // La carpeta de las fotos del país en el CDN («panama/products/»), sacada de una foto que sí tiene `urlS3`.
-  const carpeta = galeria.map((f) => /^(.*?products\/)\d+\//.exec(String(f.urlS3 ?? "").trim())?.[1]).find(Boolean) ?? null;
+  const carpeta = galeria.map((f) => /^(.*?products\/)\d+\//.exec(String(f.urlS3 ?? "").trim())?.[1]).find(Boolean) ?? (pais ? (CARPETA_FOTOS_PAIS[pais] ?? null) : null);
   return galeria
     .filter((f) => !f.variation_id)
     .map((f) => {
@@ -105,7 +108,9 @@ export const REPUBLICAR_JS = [
   "return Object.assign({},b,{quantity:Math.abs(q),type_movement:q>0?'ENTRADA':'SALIDA',concept:k})});",
   "if(!n)return{error:'Esa bodega no está en el producto.'};return{cuerpo:c}}",
   "function stockDe(o){var s={};(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).forEach(function(w){if(Number(w.stock)>0)s[String(w.warehouse_id)]=Number(w.stock)});return s}",
+  "var CARPETAS=" + JSON.stringify(CARPETA_FOTOS_PAIS) + ";",
   "function fotosDe(o){var g=Array.isArray(o.gallery)?o.gallery:[],ca=null;g.forEach(function(f){var m=/^(.*?products\\/)\\d+\\//.exec(String(f.urlS3!=null?f.urlS3:'').trim());if(!ca&&m&&m[1])ca=m[1]});",
+  "if(!ca&&typeof P==='string'&&CARPETAS[P])ca=CARPETAS[P];",
   "return g.filter(function(f){return!f.variation_id}).map(function(f){",
   "var s=String(f.urlS3!=null?f.urlS3:'').trim(),u=String(f.url!=null?f.url:'').trim(),url=s?CDN+'/'+encodeURI(s):(/^https?:\\/\\//i.test(u)?u:''),nombre=(s||u).split('/').pop()||'foto.jpg',al=[];",
   "if(!s&&url){var m=/^https?:\\/\\/[^/]+\\/(.+)$/i.exec(u),ru=m?m[1]:'';if(/products\\//.test(ru))al.push(CDN+'/'+ru);if(ca)al.push(CDN+'/'+ca+o.id+'/'+encodeURI(nombre))}",
