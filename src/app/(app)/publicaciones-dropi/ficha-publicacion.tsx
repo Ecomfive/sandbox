@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   TIPOS,
@@ -35,6 +35,7 @@ import { BotonApagarDropi, puedeApagar } from "./apagar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
+import { FotosPublicacion } from "./fotos-publicacion";
 
 interface Formulario {
   nombre: string;
@@ -487,6 +488,12 @@ function ContenidoFicha({
             </div>
             {p.relacionados.length > 0 && <p className="text-sm text-muted-foreground">Relacionado con: {p.relacionados.join(" · ")}</p>}
           </Seccion>
+
+          {!p.sinPublicar && (
+            <Seccion icono={FotosIcon} titulo="Fotos">
+              <FotosPublicacion key={p.id} id={p.id} />
+            </Seccion>
+          )}
 
           <Seccion icono={EstadoIcon} titulo="Estado">
             {!p.archivada && (

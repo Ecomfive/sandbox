@@ -143,7 +143,7 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
   if (!pais) return { error: "Ese país no está en el sistema o no lo puedes ver." };
   const leer = (columnas: string) =>
     createServiceClient().from("dropi_cambios_pendientes").select(`${columnas}, dropi_publicaciones!publicacion_id(nombre)` as "*").eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).order("creado_en").limit(MAX);
-  let r = await leer("id, tipo, restaurar, descripcion, fotos, datos, quitar_privados, nuevo_dropi_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
+  let r = await leer("id, publicacion_id, tipo, restaurar, descripcion, fotos, datos, quitar_privados, nuevo_dropi_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
   // Sin la migración 0151, sin archivar, publicar, descripción ni fotos; sin la 0148, sin apagados; sin la 0145, sin republicaciones.
   if (r.error) r = await leer("id, tipo, quitar_privados, nuevo_dropi_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
   if (r.error) r = await leer("id, tipo, nuevo_dropi_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, precio_antes, precio_sugerido_antes");
@@ -151,6 +151,21 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
   if (r.error) r = await leer("id, dropi_producto_id, nombre, nombre_guia");
   const { data, error } = r as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null };
   if (error) return { error: /does not exist|schema cache/i.test(error.message) ? "Falta correr en Supabase la migración 0137." : "No se pudieron leer los cambios pendientes." };
+  // «Republicar» sube las fotos copiadas en el sistema (migración 0153), la principal primero: así no depende del CDN de Dropi, que
+  // desde su pestaña no deja leerlas. Sin fotos copiadas (o sin la migración), el favorito las toma de Dropi como antes.
+  const deSistema = new Map<string, { url: string; nombre: string }[]>();
+  const republicar = (data ?? []).filter((f) => f.tipo === "republicar" && typeof f.publicacion_id === "string").map((f) => f.publicacion_id as string);
+  if (republicar.length) {
+    const fotos = await createServiceClient()
+      .from("dropi_publicacion_fotos")
+      .select("publicacion_id, nombre, url")
+      .in("publicacion_id", republicar)
+      .eq("en_dropi", true)
+      .order("principal", { ascending: false })
+      .order("orden");
+    for (const f of fotos.error ? [] : (fotos.data ?? []))
+      deSistema.set(f.publicacion_id as string, [...(deSistema.get(f.publicacion_id as string) ?? []), { url: f.url as string, nombre: f.nombre as string }]);
+  }
   return {
     pais: pais.nombre,
     cambios: (data ?? []).map((f) => ({
@@ -158,7 +173,7 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
       tipo: f.tipo === "republicar" ? ("republicar" as const) : f.tipo === "apagar" ? ("apagar" as const) : f.tipo === "archivar" ? ("archivar" as const) : f.tipo === "crear" ? ("crear" as const) : ("cambio" as const),
       restaurar: f.restaurar === true,
       descripcion: (f.descripcion as string | null | undefined) ?? null,
-      fotos: normalizarDatosCrear({ fotos: f.fotos }).fotos,
+      fotos: f.tipo === "republicar" ? (deSistema.get(f.publicacion_id as string) ?? []) : normalizarDatosCrear({ fotos: f.fotos }).fotos,
       datos: f.tipo === "crear" ? normalizarDatosCrear(f.datos) : null,
       quitarPrivados: f.quitar_privados === true,
       nuevo: num(f.nuevo_dropi_id),
