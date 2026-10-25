@@ -43,6 +43,7 @@ test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca 
   const hoy = "2026-10-22";
   assert.equal(r(base, hoy), true);
   assert.equal(r({ ...base, bodegaId: b280 }, hoy), false, "la B280 es de Dropi: no se republica");
+  assert.equal(r({ ...base, privada: true }, hoy), false, "una privada no se republica");
   assert.equal(r({ ...base, bodegaId: null }, hoy), false, "sin bodega conocida no se sabe");
   assert.equal(r({ ...base, ultimaVenta: "2026-10-05" }, hoy), false, "vendió hace menos de 30 días");
   assert.equal(r({ ...base, ultimaVenta: null, publicadaDesde: "2026-10-01" }, hoy), false, "nunca vendió pero es nueva");

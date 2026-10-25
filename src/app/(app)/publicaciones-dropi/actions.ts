@@ -652,6 +652,16 @@ export async function deshacerApagado(id: string, otrasIds: string[]): Promise<{
   return { detalle: `${deshacibles.length === 1 ? "Apagado deshecho" : `${deshacibles.length} apagados deshechos`}: Dropi no se tocó.${tocadas > 0 ? ` ${tocadas === 1 ? "Uno ya se había intentado en Dropi y no se pudo deshacer." : `${tocadas} ya se habían intentado en Dropi y no se pudieron deshacer.`}` : ""}` };
 }
 
+/** Privada si así está anotada o si Dropi la reporta privada en la última lectura de «Mis productos» (sin anotar). */
+async function esPrivada(p: { pais_id: string; dropi_id?: unknown; tipo_publicacion?: unknown }): Promise<boolean> {
+  if (p.tipo_publicacion === "privado") return true;
+  if (p.tipo_publicacion === "publico") return false;
+  const ids = String(p.dropi_id ?? "").split(/[^0-9]+/).filter(Boolean).map(Number);
+  if (!ids.length) return false;
+  const { data } = await createServiceClient().from("dropi_productos_proveedor").select("privado").eq("pais_id", p.pais_id).in("dropi_producto_id", ids);
+  return !!data?.length && data.every((d) => d.privado === true);
+}
+
 /**
  * «Republicar» en la ficha (pedido de Hernán, 23 oct 2026; migración 0145): nada se republica solo. Deja la republicación en la cola
  * de «Aplicar en Dropi», que crea el producto de nuevo en Dropi (datos, fotos y stock), le saca el stock al viejo y lo archiva; al
@@ -662,6 +672,7 @@ export async function republicarPublicacion(id: string): Promise<{ error?: strin
   const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
   if (antes.estado === "archivado" || antes.estado_publicacion === "archivado") return { error: "Está archivada: sácala de Archivados antes de republicarla." };
+  if (await esPrivada(antes)) return { error: "Es una publicación privada: las privadas no se republican." };
   const r = await encolarRepublicar(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
   if ("error" in r) return { error: r.error };
   if (!r.yaEstaba)
