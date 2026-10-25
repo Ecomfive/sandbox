@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
-import { origenDropi } from "@/lib/publicaciones/marcador-aplicar-dropi";
+import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-aplicar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
 type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string };
@@ -36,6 +36,13 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     const dropi = window.opener as Window | null;
     if (!puedeEscribir) return void setEstado({ tipo: "sin_dropi", mensaje: "Tu rol solo puede ver Gestión de IDs Dropi: no puede aplicar cambios." });
     if (!origen || !dropi) return void setEstado({ tipo: "sin_dropi", mensaje: "Esta ventana se abre con el favorito «Aplicar en Dropi», pulsado con Dropi abierto." });
+    // Un favorito viejo (otra versión, o de antes de las versiones) no aplica nada: puede llevar un error ya corregido.
+    const version = new URLSearchParams(window.location.search).get("v");
+    if (version !== VERSION_FAVORITO)
+      return void setEstado({
+        tipo: "sin_dropi",
+        mensaje: `Tu favorito «Aplicar en Dropi» está desactualizado (${version ? `versión ${version}` : "sin versión"}; la actual es la ${VERSION_FAVORITO}). Abre Gestión de IDs Dropi › «Cómo aplicar en Dropi», arrastra el favorito nuevo a la barra (reemplaza el viejo) y vuelve a pulsarlo con Dropi abierto. No se aplicó nada.`,
+      });
     const alRecibir = async (e: MessageEvent) => {
       if (e.origin !== origen || e.source !== dropi || !e.data) return;
       if (e.data.tipo === "progreso") setEstado((s) => (s.tipo === "aplicando" ? { ...s, hechos: Number(e.data.hechos) || 0 } : s));

@@ -5,7 +5,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { EnlaceIcon } from "@/lib/nav-icons";
-import { marcadorAplicarDropi } from "@/lib/publicaciones/marcador-aplicar-dropi";
+import { marcadorAplicarDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-aplicar-dropi";
 import { VentanaCambiosPendientes } from "./pendientes-dropi";
 
 const claseBoton = `inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted ${anilloFoco}`;
@@ -70,7 +70,7 @@ export function BarraAplicarDropi({ pendientes }: { pendientes: number }) {
                   ref={ref}
                   href="#"
                   draggable
-                  aria-label="Aplicar en Dropi: arrástralo a la barra de favoritos"
+                  aria-label={`Aplicar en Dropi, versión ${VERSION_FAVORITO}: arrástralo a la barra de favoritos`}
                   onClick={(e) => {
                     e.preventDefault();
                     mostrarToast("Arrastra «Aplicar en Dropi» a tu barra de favoritos y púlsalo con Dropi abierto.", "info");
@@ -79,13 +79,14 @@ export function BarraAplicarDropi({ pendientes }: { pendientes: number }) {
                 >
                   <EnlaceIcon className="h-3.5 w-3.5" aria-hidden="true" />
                   Aplicar en Dropi
+                  <span className="font-normal text-muted-foreground tabular-nums">v{VERSION_FAVORITO}</span>
                 </a>
               </Tooltip>{" "}
               a la barra de favoritos (Ctrl+Shift+B la muestra), o{" "}
               <button type="button" onClick={() => void copiar()} className="underline">
                 cópialo
               </button>{" "}
-              y pégalo como la dirección (URL) de un favorito nuevo. Solo la primera vez.
+              y pégalo como la dirección (URL) de un favorito nuevo. Repítelo cuando cambie la versión: la ventana avisa si tu favorito quedó viejo.
             </li>
             <li>Abre Dropi (app.dropi.pa) con la cuenta de proveedor de ECOMFIVE, en el mismo navegador donde usas esta plataforma.</li>
             <li>Pulsa el favorito en la pestaña de Dropi: se abre una ventana de la plataforma que aplica lo pendiente y dice cómo le fue a cada uno.</li>
