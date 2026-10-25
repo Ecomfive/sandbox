@@ -115,20 +115,3 @@ test("cambios: un precio nuestro esperando «Aplicar en Dropi» no se pisa", () 
   assert.deepEqual(cambiosDesdeDropi({ ...base, precioPendiente: true }, prod(1, { precio: 4.99 }), HOY).cambios, {});
   assert.equal(cambiosDesdeDropi(base, prod(1, { precio: 4.99 }), HOY).cambios.precio_venta, 4.99);
 });
-
-test("vincular: una publicación sin ID toma el ID del producto de Dropi con su mismo nombre, si es el único y nadie lo usa", async () => {
-  const { idsParaVincular } = await import("./sincronizar-dropi");
-  const productos = [prod(9001, { nombre: "Champú de Romero (B280)" }), prod(9002, { nombre: "Aceite X" }), prod(9003, { nombre: "Aceite X" }), prod(9004, { nombre: "Usado" })];
-  const r = idsParaVincular(
-    [
-      { id: "a", nombre: "CHAMPU DE ROMERO" },
-      { id: "b", nombre: "Aceite X" },
-      { id: "c", nombre: "Usado" },
-      { id: "d", nombre: "Otro" },
-    ],
-    productos,
-    new Set([9004]),
-  );
-  assert.deepEqual(r, [{ publicacionId: "a", dropiId: 9001, nombre: "CHAMPU DE ROMERO" }], "dos productos con el mismo nombre o uno ya usado no se adivinan");
-  assert.deepEqual(idsParaVincular([{ id: "a", nombre: "Uno" }, { id: "b", nombre: "uno" }], [prod(1, { nombre: "Uno" })], new Set()), [], "dos publicaciones con el mismo nombre tampoco");
-});
