@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-aplicar-dropi";
+import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
 type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string };
@@ -22,6 +23,18 @@ const claseSecundario = `inline-flex w-fit items-center rounded-md border border
  * cambios pendientes para que la persona pueda posponer los que no quiera (siguen pendientes para la próxima vez); «Aplicar en Dropi»
  * le manda solo los demás, recibe el avance y los resultados, y los guarda. La sesión de Dropi nunca llega aquí.
  */
+/** Baja por el servidor una foto del CDN de Dropi (`/api/publicaciones-dropi/foto`, que solo acepta ese CDN) y se la manda al favorito. */
+async function pasarFoto(dropi: Window, origen: string, id: unknown, url: unknown) {
+  if (typeof id !== "string" || typeof url !== "string" || !url.startsWith(`${CDN_FOTOS_DROPI}/`)) return;
+  try {
+    const r = await fetch(`/api/publicaciones-dropi/foto?u=${encodeURIComponent(url)}`, { cache: "no-store" });
+    if (!r.ok) return dropi.postMessage({ tipo: "foto", id, error: `${r.status}: ${(await r.text()).slice(0, 120)}` }, origen);
+    dropi.postMessage({ tipo: "foto", id, blob: await r.blob() }, origen);
+  } catch (e) {
+    dropi.postMessage({ tipo: "foto", id, error: String((e as Error)?.message ?? e) }, origen);
+  }
+}
+
 export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
   const iniciada = useRef(false);
@@ -45,6 +58,8 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
       });
     const alRecibir = async (e: MessageEvent) => {
       if (e.origin !== origen || e.source !== dropi || !e.data) return;
+      // El favorito pide una foto que el navegador no le deja bajar del CDN de Dropi: la baja el servidor y se la devuelve.
+      if (e.data.tipo === "foto") return void pasarFoto(dropi, origen, e.data.id, e.data.url);
       if (e.data.tipo === "progreso") setEstado((s) => (s.tipo === "aplicando" ? { ...s, hechos: Number(e.data.hechos) || 0 } : s));
       if (e.data.tipo !== "resultados") return;
       window.removeEventListener("message", alRecibir);

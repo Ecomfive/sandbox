@@ -66,11 +66,16 @@ const CODIGO = [
   // 2026: las republicaciones del 8751 y el 10474 crearon el producto nuevo y no pudieron copiar las fotos, sin saber el motivo).
   "var FE='';",
   // Se baja de su dirección y, si falla, de sus `alternas` (la misma foto en el CDN de Dropi).
-  // Cada dirección se pide sin la caché del navegador y, si falla, con un parámetro que la hace distinta: la pantalla de Dropi ya mostró esa
-  // foto como imagen y el navegador puede tener guardada una copia que no deja leer desde aquí (25 oct 2026, el 10474: «Failed to fetch»
-  // desde el CDN, que sí la entrega con CORS).
-  "function bajar(f){var bs=[f.url].concat(Array.isArray(f.alternas)?f.alternas:[]),us=[],i=0;bs.forEach(function(u){us.push(u);us.push(u+(u.indexOf('?')<0?'?':'&')+'r='+Date.now())});var otra=function(){if(i>=us.length)return Promise.resolve(null);var u=us[i++];",
-  "return fetch(u,{cache:'no-store',credentials:'omit'}).then(function(x){if(!x.ok){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' (respondió '+x.status+')';return otra()}return x.blob()},function(e){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' ('+String(e&&e.message||e)+'; probadas '+us.length+' direcciones)';return otra()})};return otra()}",
+  // Cada dirección se pide primero directo (sin la caché del navegador). El CDN de Dropi (CloudFront) guarda copias de las fotos sin la
+  // cabecera CORS y, según la compresión que pida el navegador, le toca una de esas y no la deja leer (25 oct 2026, el 10474 y luego
+  // todas): entonces la foto se le pide a la ventana de la plataforma, que la baja por el servidor con la sesión de la persona.
+  "function porVentana(u){return new Promise(function(ok){var k=String(Math.random()).slice(2),t=setTimeout(function(){fin(null,'la plataforma no respondió')},45000);",
+  "function fin(b,e){clearTimeout(t);window.removeEventListener('message',oye);if(!b&&e)FE='no se pudo bajar la foto por la plataforma ('+e+')';ok(b)}",
+  "function oye(e){if(e.origin!==O||e.source!==W||!e.data||e.data.tipo!=='foto'||e.data.id!==k)return;fin(e.data.blob instanceof Blob?e.data.blob:null,e.data.error||'sin foto')}",
+  "window.addEventListener('message',oye);W.postMessage({tipo:'foto',id:k,url:u},O)})}",
+  "function bajar(f){var us=[f.url].concat(Array.isArray(f.alternas)?f.alternas:[]),i=0;var otra=function(){if(i>=us.length)return Promise.resolve(null);var u=us[i++];",
+  "var cdn=u.indexOf(CDN+'/')===0,porV=function(){return cdn?porVentana(u).then(function(b){return b||otra()}):otra()};",
+  "return fetch(u,{cache:'no-store',credentials:'omit'}).then(function(x){if(!x.ok){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' (respondió '+x.status+')';return porV()}return x.blob()},function(e){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' ('+String(e&&e.message||e)+')';return porV()})};return otra()}",
   "function subir(id,f){return bajar(f).then(function(b){if(!b)return false;",
   "var mandar=function(h){var d=new FormData();d.append('files',new File([b],f.nombre,{type:b.type||'image/jpeg'}));d.append('id',String(id));d.append('main',f.main?'true':'false');",
   "return fetch(A+'/products/photos/upload',{method:'POST',headers:h,body:d}).then(function(x){return x.text().then(function(t){var j=null;try{j=JSON.parse(t)}catch(z){}var ok=x.ok&&!(j&&j.isSuccess===false);",
