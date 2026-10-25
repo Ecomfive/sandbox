@@ -17,14 +17,14 @@ import { DEF_PUBLICACIONES, estadoVinculo, type FilaPublicacion } from "./def-pu
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
 /** El color de cada tarjeta: el del ícono (sobre su fondo suave), el del número y el del borde cuando está filtrando. */
-const COLORES = {
+export const COLORES = {
   verde: { icono: "bg-success-soft text-success", numero: "text-success", activa: "border-success ring-success/30" },
   ambar: { icono: "bg-warning-soft text-warning", numero: "text-warning", activa: "border-warning ring-warning/30" },
   rojo: { icono: "bg-destructive-soft text-destructive", numero: "text-destructive", activa: "border-destructive ring-destructive/30" },
   azul: { icono: "bg-azul-soft text-azul", numero: "text-azul", activa: "border-azul ring-azul/30" },
   violeta: { icono: "bg-primario-suave text-primario", numero: "text-primario", activa: "border-primario ring-primario/30" },
 } as const;
-type Color = keyof typeof COLORES;
+export type Color = keyof typeof COLORES;
 
 interface Tarjeta {
   id: string;
