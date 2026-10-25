@@ -51,6 +51,10 @@ test("recomendaciones de optimización y su cumplimiento", () => {
   const tipos = recomendarOptimizacion(revs, false).map((r) => r.tipo);
   assert.deepEqual(tipos, ["optimizar_titulo", "mas_fotos", "agregar_video"]);
   assert.deepEqual(recomendarOptimizacion(revs, true), []);
+  // En una privada no se recomienda el título ni las fotos; lo demás sí.
+  const privada = recomendarOptimizacion(revs, false, true).map((r) => r.tipo);
+  assert.ok(!privada.includes("optimizar_titulo") && !privada.includes("mas_fotos"));
+  assert.deepEqual(privada, tipos.filter((t) => t !== "optimizar_titulo" && t !== "mas_fotos"));
   const t = { tipo: "optimizar_titulo", fecha: "2026-10-22", precioAntes: 4.99 };
   assert.equal(tareaCumplida(t, { cambioPrecio: null, comboPublicado: false, revisiones: revs }), null);
   const arreglado = revisarPublicacion({ ...base, titulo: "Faja lumbar para aliviar la ciática", fotos: 3 }, REGLAS_DEFECTO);

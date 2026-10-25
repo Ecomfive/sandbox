@@ -152,13 +152,21 @@ const TITULO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
 };
 
 /**
- * Las recomendaciones de optimización a partir de la revisión: una por cosa que arreglar en Dropi (el título junta sus cuatro
- * puntos). «Para qué sirve» sin confirmar cuenta para el título; «Sin datos» y «No aplica» no.
+ * Lo que no se recomienda en una publicación privada (pedido de Alcides, 24 oct 2026): el título y las fotos los ve solo el
+ * dropshipper a quien se privatizó, que ya conoce el producto. Una tarea abierta de estos tipos en una privada se da de baja.
  */
-export function recomendarOptimizacion(revs: Revision[], archivada: boolean): Recomendacion[] {
+export const NO_EN_PRIVADAS: TipoRecomendacion[] = ["optimizar_titulo", "mas_fotos"];
+
+/**
+ * Las recomendaciones de optimización a partir de la revisión: una por cosa que arreglar en Dropi (el título junta sus cuatro
+ * puntos). «Para qué sirve» sin confirmar cuenta para el título; «Sin datos» y «No aplica» no. En una privada, sin
+ * `NO_EN_PRIVADAS`.
+ */
+export function recomendarOptimizacion(revs: Revision[], archivada: boolean, privada = false): Recomendacion[] {
   if (archivada) return [];
   const out: Recomendacion[] = [];
   for (const [tipo, claves] of Object.entries(PUNTOS) as [TipoRecomendacion, Revision["clave"][]][]) {
+    if (privada && NO_EN_PRIVADAS.includes(tipo)) continue;
     const fallas = revs.filter((r) => claves.includes(r.clave) && (r.estado === "falta" || r.estado === "revisar"));
     if (!fallas.length) continue;
     out.push({
