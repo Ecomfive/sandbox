@@ -130,7 +130,7 @@ export function Ventana({
     modo === "lateral"
       ? `animate-entrar-derecha flex h-full w-full ${ancho === "xl" ? "max-w-3xl" : anchoClase} flex-col overflow-y-auto border-l border-border bg-card shadow-xl`
       : modo === "centro"
-        ? `animate-entrar-centro flex h-[92vh] w-full ${ancho === "xl" ? "max-w-6xl" : "max-w-4xl"} flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-2xl`
+        ? `animate-entrar-centro flex h-[92vh] w-full ${ancho === "xl" ? "max-w-7xl" : "max-w-4xl"} flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-2xl`
         : modo === "completa"
           ? "animate-entrar-centro flex h-full w-full flex-col overflow-y-auto bg-card"
           : `max-h-[90vh] w-full ${anchoClase} overflow-y-auto rounded-xl border border-border bg-card shadow-xl`;

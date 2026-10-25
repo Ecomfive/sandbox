@@ -116,38 +116,49 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
 
 /**
  * Las compras de una lista, cada una con su orden, fecha, etapa, unidades, costo por unidad y total; el país solo si la lista no
- * está ya agrupada por país. En pantalla ancha cada fila es la misma rejilla de columnas fijas, así las cifras quedan alineadas
- * entre filas y entre los grupos de cada país.
+ * está ya agrupada por país. Depende del ancho de la lista, no de la pantalla: angosta, cada compra son dos líneas (orden arriba,
+ * fecha y etapa abajo; unidades arriba y costo abajo, a la derecha); ancha (`@2xl`), una sola fila con columnas fijas. En los dos
+ * casos las cifras quedan alineadas entre filas y entre los grupos de cada país.
  */
 function ListaCompras({ compras, conPais }: { compras: CompraDeProducto[]; conPais: boolean }) {
   return (
-    <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-[13px]">
-      {compras.map((c) => (
-        <li
-          key={`${c.compraId}-${c.sku}`}
-          className={`flex flex-wrap items-center gap-x-3 gap-y-1 py-2 sm:grid sm:grid-cols-[7.5rem_6rem_minmax(0,1fr)_4.5rem_5rem_6rem] ${compraCuenta(c) ? "" : "opacity-60"}`}
-        >
-          <Link href={`/compras/lista?ver=todos&abrir=${c.compraId}`} className={`justify-self-start rounded font-medium hover:underline ${anilloFoco}`}>
-            {c.codigo ?? numeroOC(c.numero)}
-          </Link>
-          <span className="text-xs text-muted-foreground tabular-nums">{formatearFecha(c.fecha)}</span>
-          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
-            {conPais && c.pais && <span className="text-xs text-muted-foreground">{c.pais}</span>}
-            {c.variante && <span className="text-xs text-muted-foreground">{c.variante}</span>}
-          </span>
-          <strong className="ml-auto font-medium tabular-nums sm:ml-0 sm:text-right">{entero(c.unidades)} u.</strong>
-          {c.costoUnitario !== null ? (
-            <>
-              <span className="text-muted-foreground tabular-nums sm:text-right">{usd(c.costoUnitario)} c/u</span>
-              <span className="tabular-nums sm:text-right">{usd(c.total ?? 0)}</span>
-            </>
-          ) : (
-            <span className="text-muted-foreground sm:col-span-2 sm:text-right">sin costo</span>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="@container">
+      <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-[13px]">
+        {compras.map((c) => (
+          <li
+            key={`${c.compraId}-${c.sku}`}
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 @2xl:grid-cols-[7.5rem_6rem_minmax(0,1fr)_4.5rem_5.5rem_6.5rem] ${compraCuenta(c) ? "" : "opacity-60"}`}
+          >
+            <div className="flex min-w-0 flex-col items-start gap-1 @2xl:contents">
+              <Link href={`/compras/lista?ver=todos&abrir=${c.compraId}`} className={`rounded font-medium hover:underline @2xl:justify-self-start ${anilloFoco}`}>
+                {c.codigo ?? numeroOC(c.numero)}
+              </Link>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 @2xl:contents">
+                <span className="text-xs text-muted-foreground tabular-nums">{formatearFecha(c.fecha)}</span>
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
+                  {conPais && c.pais && <span className="text-xs text-muted-foreground">{c.pais}</span>}
+                  {c.variante && <span className="text-xs text-muted-foreground">{c.variante}</span>}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1 tabular-nums @2xl:contents">
+              <strong className="font-medium @2xl:text-right">{entero(c.unidades)} u.</strong>
+              <div className="flex gap-x-2 text-xs text-muted-foreground @2xl:contents @2xl:text-[13px]">
+                {c.costoUnitario !== null ? (
+                  <>
+                    <span className="@2xl:text-right">{usd(c.costoUnitario)} c/u</span>
+                    <span className="text-foreground @2xl:text-right">{usd(c.total ?? 0)}</span>
+                  </>
+                ) : (
+                  <span className="@2xl:col-span-2 @2xl:text-right">sin costo</span>
+                )}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
