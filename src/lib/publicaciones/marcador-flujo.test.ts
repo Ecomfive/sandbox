@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean } = {}) {
+function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
@@ -39,7 +39,8 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     const metodo = (init.method ?? "GET").toUpperCase();
     // Una foto que el favorito baja de Storage para subirla a Dropi.
     // Como el navegador con una copia guardada que no deja leer: la dirección tal cual falla; con «?r=…» sale bien.
-    if (opciones.cdnSinCache && url.startsWith("https://d39ru7awumhhs2.cloudfront.net/") && !url.includes("?r=")) throw new TypeError("Failed to fetch");
+    // El CDN de Dropi sin la cabecera CORS (lo que pasa de verdad desde la pestaña de Dropi): el navegador no deja leer la foto.
+    if (opciones.cdnBloqueado && url.startsWith("https://d39ru7awumhhs2.cloudfront.net/")) throw new TypeError("Failed to fetch");
     if (url.startsWith("https://x.supabase.co/") || url.startsWith("https://d39ru7awumhhs2.cloudfront.net/")) return new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])], { type: "image/jpeg" }));
     const ruta = url.replace("https://api.dropi.pa/api", "");
     llamadas.push(`${metodo} ${ruta}`);
@@ -104,16 +105,34 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     }
     return responder({ isSuccess: false, message: `Ruta no simulada: ${metodo} ${ruta}` }, 404);
   };
-  return { productos, llamadas, fetchFalso, stockDe, garantias };
+  return { productos, llamadas, fetchFalso, stockDe, garantias, fotoPorPlataforma: true };
 }
 
 /** Pulsa el favorito con esos cambios y devuelve lo que la ventana recibió. */
 async function aplicar(dropi: ReturnType<typeof crearDropi>, cambios: Obj[]): Promise<Obj[]> {
   const codigo = decodeURIComponent(marcadorAplicarDropi(ORIGEN).slice("javascript:".length));
   const mensajes: Obj[] = [];
-  const ventana = { postMessage: (m: Obj) => mensajes.push(m) };
+  const oyentes = new Set<(e: Obj) => unknown>();
+  // La ventana de la plataforma: guarda lo que recibe y, si el favorito le pide una foto, se la devuelve como lo hace la de verdad.
+  const ventana = {
+    postMessage: (m: Obj) => {
+      mensajes.push(m);
+      if (m.tipo === "foto")
+        setTimeout(() => {
+          const data = dropi.fotoPorPlataforma ? { tipo: "foto", id: m.id, blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff, 9])], { type: "image/jpeg" }) } : { tipo: "foto", id: m.id, error: "502: sin foto" };
+          for (const f of [...oyentes]) f({ origin: ORIGEN, source: ventana, data });
+        }, 0);
+    },
+  };
   let oyente: ((e: Obj) => Promise<void>) | null = null;
-  const ventanaGlobal = { open: () => ventana, addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => (oyente = f), removeEventListener: () => {} };
+  const ventanaGlobal = {
+    open: () => ventana,
+    addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => {
+      oyentes.add(f);
+      if (!oyente) oyente = f;
+    },
+    removeEventListener: (_t: string, f: (e: Obj) => unknown) => oyentes.delete(f),
+  };
   const localStorageFalso = { getItem: (k: string) => (k === "DROPI_token" ? JSON.stringify("tok") : k === "DROPI_LoginResult" ? JSON.stringify({ objects: { id: 2094, type_user: "SUPPLIER" } }) : null) };
   new Function("location", "localStorage", "window", "alert", "fetch", codigo)({ hostname: "app.dropi.pa" }, localStorageFalso, ventanaGlobal, (m: string) => assert.fail(`alert: ${m}`), dropi.fetchFalso);
   assert.ok(oyente, "el favorito debe quedar escuchando a la ventana");
@@ -356,10 +375,19 @@ test("republicar: si en un intento falló la foto principal, el reintento sube j
   assert.ok(g.some((f) => f.main && String(f.urlS3).endsWith("1779932274veganic.jpg")), "la principal quedó como principal");
 });
 
-test("republicar: si la foto del CDN falla por la caché del navegador, se pide otra vez con una dirección distinta", async () => {
-  const d = crearDropi({ cdnSinCache: true });
+test("republicar: si el navegador no deja bajar la foto del CDN, la pide a la plataforma y la sube", async () => {
+  const d = crearDropi({ cdnBloqueado: true });
   d.productos.set(10474, productoBase(10474));
   const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474 }]);
   assert.equal(r.ok, true, String(r.error));
   assert.equal(d.productos.get(9001)!.gallery.length, 1);
+});
+
+test("republicar: si la plataforma tampoco puede bajar la foto, el error lo dice", async () => {
+  const d = crearDropi({ cdnBloqueado: true });
+  d.fotoPorPlataforma = false;
+  d.productos.set(10474, productoBase(10474));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474 }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /no se pudo bajar la foto por la plataforma \(502: sin foto\)/);
 });
