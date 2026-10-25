@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, fieldClassSm } from "@/components/ui/field";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { useToast } from "@/components/ui/toast";
+import { VisorImagen } from "@/components/ui/visor-imagen";
 import { Ventana } from "@/components/ui/ventana";
 import { CheckIcon, CopiarIcon, EstadoIcon, EtiquetaIcon, InteligenciaIcon, ListaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { etiquetaTipoFoto, type AccionAnalisis, type Impacto, type TipoIA } from "@/lib/publicaciones/ia/asistente";
@@ -170,10 +171,14 @@ function Estatus({ ok, texto }: { ok: boolean; texto: string }) {
 
 function Encabezado({ vista, estado }: { vista: AsistenteVista; estado: EstadoIA }) {
   const c = vista.contexto;
+  const [ampliada, setAmpliada] = useState(false);
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-6 py-5" style={{ backgroundImage: "linear-gradient(135deg, var(--primario-suave), var(--card) 75%)" }}>
       {c.fotoUrl ? (
-        <img src={c.fotoUrl} alt="" className="h-16 w-16 shrink-0 rounded-xl border border-border bg-card object-cover shadow-sm" />
+        // Un clic la abre en grande, para leer la etiqueta (pedido de Alcides, 25 oct 2026).
+        <button type="button" onClick={() => setAmpliada(true)} aria-label={`Ver en grande la foto de ${c.nombre}`} className={`shrink-0 rounded-xl ${anilloFoco}`}>
+          <img src={c.fotoUrl} alt="" className="h-16 w-16 rounded-xl border border-border bg-card object-cover shadow-sm hover:opacity-90" />
+        </button>
       ) : (
         <span aria-hidden="true" className="h-16 w-16 shrink-0 rounded-xl border border-dashed border-border-control bg-card" />
       )}
@@ -194,6 +199,7 @@ function Encabezado({ vista, estado }: { vista: AsistenteVista; estado: EstadoIA
         </div>
         <AnilloNota cumple={c.nota.cumple} total={c.nota.total} />
       </div>
+      <VisorImagen src={ampliada ? c.fotoUrl : null} alt={c.nombre} onClose={() => setAmpliada(false)} />
     </header>
   );
 }
@@ -815,6 +821,7 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
   const [error, setError] = useState<string | null>(null);
   // Lo que la persona escribió en el cuadro de textos de cada foto informativa (sin guardar todavía).
   const [textosEditados, setTextosEditados] = useState<Record<number, string>>({});
+  const [ampliada, setAmpliada] = useState<{ url: string; titulo: string } | null>(null);
   const ocupado = planeando || generando !== null;
   const revFotos = vista.contexto.revisiones.find((r) => r.clave === "fotos");
   const { mostrarToast } = useToast();
@@ -875,6 +882,7 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
   const hechas = fotos.filter((f) => f.url).length;
   return (
     <div className="flex flex-col gap-5">
+      <VisorImagen src={ampliada?.url ?? null} alt={ampliada?.titulo ?? ""} onClose={() => setAmpliada(null)} />
       <div className="flex flex-wrap items-center gap-3">
         {!estado.texto && <SinClave cual="una IA de texto (decide qué fotos faltan)" />}
         {!estado.gemini && <SinClave cual="Gemini (genera las fotos)" />}
@@ -905,7 +913,9 @@ function PanelFotos({ publicacionId, estado, vista }: { publicacionId: string; e
               <li key={f.tipo} className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                 <div className="relative aspect-square bg-muted">
                   {f.url ? (
-                    <img src={f.url} alt={`${f.titulo}: foto generada`} loading="lazy" className="h-full w-full object-cover" />
+                    <button type="button" onClick={() => setAmpliada({ url: f.url!, titulo: f.titulo })} aria-label={`Ver en grande: ${f.titulo}`} className={`block h-full w-full ${anilloFoco}`}>
+                      <img src={f.url} alt={`${f.titulo}: foto generada`} loading="lazy" className="h-full w-full object-cover hover:opacity-90" />
+                    </button>
                   ) : (
                     <span className={`flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-xs text-muted-foreground ${generando === i ? "animate-pulse motion-reduce:animate-none" : ""}`}>
                       <ImagenIcono className="h-8 w-8 opacity-50" />
