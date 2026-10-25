@@ -6,6 +6,11 @@
 //   npx tsx scripts/vincular-skus-publicaciones.ts            → calcula huellas que falten e informa (no vincula)
 //   npx tsx scripts/vincular-skus-publicaciones.ts --aplicar  → además vincula las exactas
 
+// Desactivado (25 oct 2026, pedido de Alcides): las publicaciones de Panamá se trabajan desde el sistema y el vínculo con su producto
+// se confirma a mano en la ficha («Vincular y siguiente»). Este script ya no vincula en masa ni a mano: se detiene al arrancar.
+console.error("«vincular-skus-publicaciones.ts» está desactivado (25 oct 2026): el producto de cada publicación se vincula desde su ficha en Gestión de IDs Dropi.");
+process.exit(1);
+
 process.loadEnvFile(".env.local");
 import { createClient } from "@supabase/supabase-js";
 import { sugerirSku, prepararContexto, ETIQUETA_SUGERENCIA, type TipoSugerencia } from "../src/lib/publicaciones/vincular";
