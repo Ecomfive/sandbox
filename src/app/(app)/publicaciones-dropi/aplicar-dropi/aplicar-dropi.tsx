@@ -232,7 +232,10 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
   );
 }
 
-/** Los cambios que esperan para Dropi, cada uno con «Posponer»; «Aplicar en Dropi» manda solo los que no se pospusieron. */
+/**
+ * Los cambios que esperan para Dropi, cada uno con «Posponer». Todos vienen incluidos: «Aplicar todos en Dropi (N)» los manda de una
+ * vez (pedido de Alcides, 25 oct 2026); si se pospone alguno, el botón manda solo el resto e «Incluir todos de nuevo» los vuelve a sumar.
+ */
 function ElegirCambios({ cambios, alAplicar, cerrar }: { cambios: CambioParaDropi[]; alAplicar: (elegidos: CambioParaDropi[], pospuestos: number) => void; cerrar: ReactNode }) {
   const [pospuestos, setPospuestos] = useState<Set<string>>(new Set());
   const elegidos = cambios.filter((c) => !pospuestos.has(c.id));
@@ -277,8 +280,13 @@ function ElegirCambios({ cambios, alAplicar, cerrar }: { cambios: CambioParaDrop
           onClick={() => alAplicar(elegidos, pospuestos.size)}
           className={`inline-flex min-h-10 w-fit items-center rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40 ${anilloFoco}`}
         >
-          {`Aplicar en Dropi${elegidos.length ? ` (${elegidos.length})` : ""}`}
+          {pospuestos.size === 0 ? `Aplicar todos en Dropi (${cambios.length})` : `Aplicar en Dropi${elegidos.length ? ` (${elegidos.length})` : ""}`}
         </button>
+        {pospuestos.size > 0 && (
+          <button type="button" onClick={() => setPospuestos(new Set())} className={`inline-flex min-h-10 w-fit items-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
+            Incluir todos de nuevo
+          </button>
+        )}
         {cerrar}
       </div>
     </div>
