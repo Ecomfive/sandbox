@@ -41,6 +41,8 @@ interface Tarjeta {
   extra?: (abiertas: FilaPublicacion[], r: Reglas) => string | null;
   /** El color de esa línea: rojo (lo que alarma) o verde (lo que va bien, como lo que viene en camino). */
   extraColor?: "rojo" | "verde";
+  /** Un segundo número junto al grande, tras una barra: «/ 300» (el total) o «/ 6 en camino». */
+  junto?: (abiertas: FilaPublicacion[]) => { n: number; texto?: string; color?: "verde" };
 }
 
 /** Una tarjeta por cada acción calculada (21 oct 2026): cuenta y filtra por el campo «Acción». */
@@ -68,6 +70,7 @@ const TARJETAS: Tarjeta[] = [
     color: "verde",
     detalle: "Publicadas y activas según Dropi",
     cuenta: (f) => f.enDropi === "activo",
+    junto: (abiertas) => ({ n: abiertas.length }),
     atajo: { id: "activas", etiqueta: "Activas en Dropi", ayuda: "Filtrar la lista: activas en Dropi", filtro: seleccion("publicacion", "activo") },
   },
   { ...porAccion("margen_bajo", MargenIcon, "rojo"), extra: (abiertas, r) => {
@@ -122,18 +125,15 @@ const TARJETAS: Tarjeta[] = [
     color: "rojo",
     detalle: "Se vende y no tiene stock en Dropi",
     cuenta: (f) => f.ventas?.stockEstado === "sin_stock_vende",
-    // De los que no tienen stock, cuántos ya tienen mercancía en camino (las órdenes de Compras que salieron y no han llegado).
-    extra: (abiertas) => {
-      const n = abiertas.filter((f) => f.ventas?.stockEstado === "sin_stock_vende" && f.enCamino > 0).length;
-      return n ? `${n} con mercancía en camino` : null;
-    },
-    extraColor: "verde",
+    // De los que no tienen stock, cuántos ya tienen mercancía en camino (las órdenes de Compras que salieron y no han llegado):
+    // va junto al número, «9 / 6 en camino» (pedido de Alcides, 25 oct 2026), como el total de «Activas en Dropi».
+    junto: (abiertas) => ({ n: abiertas.filter((f) => f.ventas?.stockEstado === "sin_stock_vende" && f.enCamino > 0).length, texto: "en camino", color: "verde" }),
     atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: sin stock en Dropi y con ventas", filtro: seleccion("stockDropi", "sin_stock_vende") },
   },
 ];
 
 /** Una tarjeta del tablero: ícono de color, título y el número grande. Es un botón que pone o quita su filtro en la lista. */
-function TarjetaAccion({ t, valor, total, extra, detalle, def }: { t: Tarjeta; valor: number; total: number; extra: string | null; detalle: string; def: DefTabla<FilaPublicacion> }) {
+function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; valor: number; junto: { n: number; texto?: string; color?: "verde" } | null; extra: string | null; detalle: string; def: DefTabla<FilaPublicacion> }) {
   const [filtros, cambiarFiltros] = useFiltros(def);
   const activa = atajoActivo(filtros, t.atajo);
   const c = COLORES[t.color];
@@ -155,7 +155,12 @@ function TarjetaAccion({ t, valor, total, extra, detalle, def }: { t: Tarjeta; v
       </span>
       <span className="flex items-baseline gap-1">
         <span className={`text-3xl leading-none font-semibold tabular-nums ${c.numero}`}>{valor.toLocaleString("es-PA")}</span>
-        {t.id === "activas" && <span className="text-sm text-muted-foreground tabular-nums">/ {total.toLocaleString("es-PA")}</span>}
+        {junto && (
+          <span className={`text-sm tabular-nums ${junto.color === "verde" ? "font-medium text-success" : "text-muted-foreground"}`}>
+            / {junto.n.toLocaleString("es-PA")}
+            {junto.texto && ` ${junto.texto}`}
+          </span>
+        )}
       </span>
       <span className="text-xs text-muted-foreground">
         {detalle}
@@ -176,7 +181,7 @@ export function TableroAcciones({ publicaciones, reglas, def = DEF_PUBLICACIONES
   return (
     <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
       {TARJETAS.map((t) => (
-        <TarjetaAccion key={t.id} t={t} valor={abiertas.filter(t.cuenta).length} total={abiertas.length} extra={t.extra ? t.extra(abiertas, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas) : t.detalle} def={def} />
+        <TarjetaAccion key={t.id} t={t} valor={abiertas.filter(t.cuenta).length} junto={t.junto ? t.junto(abiertas) : null} extra={t.extra ? t.extra(abiertas, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas) : t.detalle} def={def} />
       ))}
     </section>
   );
