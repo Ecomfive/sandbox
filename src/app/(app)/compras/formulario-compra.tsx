@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, subirFotoCompraDesdeUrl, vistaPreviaCompra } from "./actions";
-import { numeroOC } from "./def-compras";
+import { numeroOC, otrosProductos } from "./def-compras";
 import { SelectorPais } from "./selector-pais";
 import { PastillaTienda, useTiendas } from "./tiendas";
 import { useRouter } from "next/navigation";
@@ -29,6 +29,7 @@ import {
   ComprasIcon,
   GastoIcon,
 } from "@/lib/nav-icons";
+import { ConMasProductos } from "./mas-productos";
 
 /** Casilla suelta (Factura, Financiamiento): sin `Campo` porque no lleva etiqueta arriba. */
 /** Una compra de Shen Zhen (el proveedor con portal): su ficha trae la nota que él lee. */
@@ -259,7 +260,9 @@ export function FormularioCompra({
             {editando && (
               <div className="flex flex-col gap-1">
                 <span className={labelClass}>Foto comercial</span>
-                <FotoAmpliable url={compra?.fotoComercial ?? null} nombre={compra?.lineas[0]?.nombre ?? "el producto"} tam="h-16 w-16" />
+                <ConMasProductos n={compra ? otrosProductos(compra.lineas) : 0}>
+                  <FotoAmpliable url={compra?.fotoComercial ?? null} nombre={compra?.lineas[0]?.nombre ?? "el producto"} tam="h-16 w-16" />
+                </ConMasProductos>
               </div>
             )}
             <CampoFoto
