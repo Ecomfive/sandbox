@@ -315,7 +315,7 @@ function ContenidoFicha({
 
   // «Republicar» (pedido de Hernán, 23 oct 2026): nada se republica solo; el botón lo deja para «Aplicar en Dropi». Solo con ID de
   // Dropi, sin archivar y de nuestra bodega (lo de la B280 es de Dropi).
-  const puedeRepublicar = conectado && !p.archivada && p.bodega?.id !== BODEGA_DROPI;
+  const puedeRepublicar = conectado && !p.archivada && p.bodega?.id !== BODEGA_DROPI && p.tipoDropi !== "privado";
   const republicacionPendiente = p.cambioDropi?.tipo === "republicar" && p.cambioDropi.estado !== "aplicado";
   function republicar() {
     if (!confirm(`Se va a crear en Dropi una publicación nueva igual a esta (datos, fotos y stock) y la del ID ${p.dropiId} queda archivada y sin stock. En el sistema se crea la nueva con el mismo producto vinculado y esta se archiva. Se hace al pulsar «Aplicar en Dropi» con Dropi abierto. ¿Seguir?`)) return;

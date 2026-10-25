@@ -107,11 +107,12 @@ export const BODEGA_DROPI = 280;
  * bodega conocida o sin datos de ventas de Dropi, no se sabe: no sale.
  */
 export function necesitaRepublicar(
-  p: { archivada: boolean; enDropi: EnDropi; bodegaId: number | null; hayVentas: boolean; ultimaVenta: string | null; publicadaDesde: string | null },
+  p: { archivada: boolean; enDropi: EnDropi; bodegaId: number | null; hayVentas: boolean; ultimaVenta: string | null; publicadaDesde: string | null; privada?: boolean },
   hoy: string,
   reglas: Pick<Reglas, "dias_republicar"> = REGLAS_DEFECTO,
 ): boolean {
-  if (p.archivada || p.enDropi !== "activo" || !p.hayVentas || p.bodegaId === null || p.bodegaId === BODEGA_DROPI) return false;
+  // Una privada no se republica (pedido de Alcides, 25 oct 2026): es de un solo dropshipper y republicarla le cambia el ID.
+  if (p.privada || p.archivada || p.enDropi !== "activo" || !p.hayVentas || p.bodegaId === null || p.bodegaId === BODEGA_DROPI) return false;
   const n = reglas.dias_republicar;
   // Vendió hace menos de N días: no.
   if (p.ultimaVenta && dias(p.ultimaVenta, hoy) < n) return false;
