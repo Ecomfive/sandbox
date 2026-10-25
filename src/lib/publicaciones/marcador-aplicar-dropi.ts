@@ -84,7 +84,9 @@ const CODIGO = [
   "id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)}}",
   "var f=function(e){return{ok:false,nuevo:id,error:e}};",
   "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return f('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
-  "var fs=fotosDe(o),mal=0;for(var i=fotosDe(n).length;i<fs.length;i++)if(!(await subir(id,fs[i])))mal++;",
+  // Sube las fotos que el nuevo no tiene, comparando por nombre (Dropi le antepone un número): contar cuántas tenía y seguir desde ahí
+  // repetía una y dejaba fuera la principal si en un intento anterior subió una del medio (25 oct 2026, el 11309).
+  "var fs=fotosDe(o),mal=0;for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i])))mal++;",
   "if(mal)return f('Se creó el '+id+', pero no se pudieron copiar '+mal+' foto(s)'+porque()+'.');",
   // Las garantías del viejo pasan al nuevo (25 oct 2026: el 11309 quedó sin ellas; en Dropi la casilla de cada garantía se marca solo
   // si el producto la tiene guardada). Solo si el nuevo todavía no tiene ninguna, así un reintento no las repite.

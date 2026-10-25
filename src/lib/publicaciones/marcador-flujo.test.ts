@@ -25,10 +25,11 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" } = {}) {
+function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal" } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
+  const fallo = { veces: 0, hecho: false };
   let siguiente = 9001;
   const stockDe = (p: Obj) => Object.fromEntries((p.warehouse_product as Obj[]).map((w) => [w.warehouse_id, Number(w.stock)]));
   const responder = (objeto: unknown, status = 200) => new Response(JSON.stringify(typeof objeto === "object" && objeto !== null && "isSuccess" in objeto ? objeto : { isSuccess: status < 400, objects: objeto }), { status });
@@ -73,6 +74,11 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     }
     if (metodo === "POST" && ruta === "/products/photos/upload") {
       if (opciones.fotos === "rechaza") return responder({ isSuccess: false, message: "Formato no permitido" }, 422);
+      if (opciones.fotos === "fallaLaPrincipal" && (init.body as FormData).get("main") === "true" && !fallo.hecho) {
+        fallo.veces++;
+        if (fallo.veces >= 2) fallo.hecho = true;
+        return responder({ isSuccess: false, message: "Error temporal" }, 500);
+      }
       if (opciones.fotos === "soloXAuth" && (init.headers as Record<string, string>).Authorization) return responder({ isSuccess: false, message: "Unauthorized" }, 401);
       const f = init.body as FormData;
       const p = productos.get(Number(f.get("id")))!;
@@ -329,4 +335,21 @@ test("republicar: crea el nuevo con sus fotos, le copia las garantías del viejo
   const llamadasAntes = d.llamadas.filter((l) => l === "POST /productwarranty/create").length;
   await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001 }]);
   assert.equal(d.llamadas.filter((l) => l === "POST /productwarranty/create").length, llamadasAntes);
+});
+
+test("republicar: si en un intento falló la foto principal, el reintento sube justo esa (no repite la otra)", async () => {
+  const d = crearDropi({ fotos: "fallaLaPrincipal" });
+  d.productos.set(8751, productoBase(8751, { gallery: [
+    { id: 1, main: true, urlS3: "panama/products/8751/1779932274veganic.jpg", url: null, variation_id: null },
+    { id: 2, main: false, urlS3: "panama/products/8751/1779932274veganic 4.png", url: null, variation_id: null },
+  ] }));
+  const [r1] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
+  assert.equal(r1.ok, false);
+  assert.equal(r1.nuevo, 9001);
+  assert.equal(d.productos.get(9001)!.gallery.length, 1, "en el primer intento solo subió la otra");
+  const [r2] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001 }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  const g = d.productos.get(9001)!.gallery as Obj[];
+  assert.equal(g.length, 2, "las dos fotos, sin repetir");
+  assert.ok(g.some((f) => f.main && String(f.urlS3).endsWith("1779932274veganic.jpg")), "la principal quedó como principal");
 });
