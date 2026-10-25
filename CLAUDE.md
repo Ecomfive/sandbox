@@ -566,7 +566,8 @@ convenciones técnicas del código.
   precio» o «Bajar precio frente a la competencia» (`decidirRecomendacion`) y cambiar el precio en la ficha (`actualizarPublicacion`)
   guardan el precio y lo encolan (`enviarPrecioADropi`). `armarGuardadoProducto` y `ARMAR_JS` cambian solo lo que trae el cambio,
   si el precio nuevo pasa al sugerido de Dropi (y no se pidió otro sugerido) suben el sugerido con la misma proporción que tenía sobre el precio anterior (igual al precio si eran iguales: Dropi no admite un sugerido menor), y el favorito comprueba precio y sugerido después de guardar. Al aplicarse un precio,
-  `guardarResultadosDropi` deja hechas las tareas de precio abiertas de esa publicación. La lectura diaria no pisa un precio
+  `guardarResultadosDropi` deja hechas las tareas de precio abiertas de esa publicación (y, desde el 24 oct 2026, al aplicarse el nombre, la descripción o
+  las fotos, las de `optimizar_titulo`, `mejorar_descripcion` y `mas_fotos`, `hecha_como = 'dropi'`: nadie pulsa «Ya lo hice»). La lectura diaria no pisa un precio
   pendiente (`precioPendiente`). **El sugerido va igual al precio** (decisión de Alcides, 23 oct 2026: el dropshipper no lo usa y, si es más alto, Dropi no le deja montar una orden por debajo): `enviarPrecioADropi` encola siempre `precioSugerido = precio`, la revisión `precio_sugerido` pide que sean iguales y aceptar «Igualar el precio sugerido al precio» encola el sugerido = `precio_venta`.
   **Si se elimina algo en Dropi, no se pierde historia** (22 oct 2026): en el sistema una publicación se **archiva, no se borra**
   (borrarla corta el vínculo ID de Dropi → producto del que dependen Ventas Dropi, Compras › Reponer y la competencia, y se van sus

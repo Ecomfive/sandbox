@@ -201,7 +201,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   const supabase = createServiceClient();
   const leerFilas = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).in("id", limpios.map((r) => r.id));
-  let lectura = await leerFilas("id, tipo, restaurar, descripcion, quitar_privados, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
+  let lectura = await leerFilas("id, tipo, restaurar, descripcion, fotos, quitar_privados, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
   if (lectura.error) lectura = await leerFilas("id, tipo, quitar_privados, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
   if (lectura.error) lectura = await leerFilas("id, tipo, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
   if (lectura.error) lectura = await leerFilas("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
@@ -322,15 +322,26 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         ? `ID ${f.dropi_producto_id} · ${[f.nombre ? `«${f.nombre}»` : "", f.nombre_guia ? `guía «${f.nombre_guia}»` : "", f.precio != null ? `precio $${Number(f.precio).toFixed(2)}` : "", f.precio_sugerido != null ? `sugerido $${Number(f.precio_sugerido).toFixed(2)}` : "", f.descripcion ? "descripción" : ""].filter(Boolean).join(" · ")} (desde Dropi)`
         : `ID ${f.dropi_producto_id} · ${r.error}`,
     });
-    // Un precio ya aplicado en Dropi deja hechas las tareas abiertas de subir o bajar el precio de esa publicación (migración 0128).
-    if (r.ok && f.precio != null)
-      await supabase
-        .from("dropi_publicaciones_decisiones")
-        .update({ hecha_en: ahora, hecha_por_nombre: usuario.nombre || usuario.email, hecha_como: "dropi", hecha_nota: `Aplicado en Dropi: $${Number(f.precio).toFixed(2)}` })
-        .eq("publicacion_id", f.publicacion_id as string)
-        .eq("decision", "aceptada")
-        .in("tipo", ["subir_precio", "igualar_precio"])
-        .is("hecha_en", null);
+    // Lo aplicado en Dropi deja hechas las tareas abiertas que pedían eso mismo en esa publicación (migración 0128): el precio, las
+    // de subir o bajar el precio; el nombre, la de optimizar el título; la descripción y las fotos, las suyas. Así nadie tiene que
+    // pulsar «Ya lo hice» después de «Aplicar en Dropi».
+    if (r.ok) {
+      const fotos = Array.isArray(f.fotos) ? f.fotos.length : 0;
+      const hechas: { tipos: string[]; nota: string }[] = [
+        ...(f.precio != null ? [{ tipos: ["subir_precio", "igualar_precio"], nota: `Aplicado en Dropi: $${Number(f.precio).toFixed(2)}` }] : []),
+        ...(f.nombre ? [{ tipos: ["optimizar_titulo"], nota: `Aplicado en Dropi: «${f.nombre}»` }] : []),
+        ...(f.descripcion ? [{ tipos: ["mejorar_descripcion"], nota: "Aplicado en Dropi: descripción nueva" }] : []),
+        ...(fotos ? [{ tipos: ["mas_fotos"], nota: `Aplicado en Dropi: ${fotos} ${fotos === 1 ? "foto" : "fotos"}` }] : []),
+      ];
+      for (const h of hechas)
+        await supabase
+          .from("dropi_publicaciones_decisiones")
+          .update({ hecha_en: ahora, hecha_por_nombre: usuario.nombre || usuario.email, hecha_como: "dropi", hecha_nota: h.nota })
+          .eq("publicacion_id", f.publicacion_id as string)
+          .eq("decision", "aceptada")
+          .in("tipo", h.tipos)
+          .is("hecha_en", null);
+    }
     if (r.ok) aplicados++;
     else errores++;
   }
