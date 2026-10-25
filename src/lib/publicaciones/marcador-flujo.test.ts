@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado" } = {}) {
+function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   let siguiente = 9001;
@@ -71,6 +71,8 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
       return responder(true);
     }
     if (metodo === "POST" && ruta === "/products/photos/upload") {
+      if (opciones.fotos === "rechaza") return responder({ isSuccess: false, message: "Formato no permitido" }, 422);
+      if (opciones.fotos === "soloXAuth" && (init.headers as Record<string, string>).Authorization) return responder({ isSuccess: false, message: "Unauthorized" }, 401);
       const f = init.body as FormData;
       const p = productos.get(Number(f.get("id")))!;
       const archivo = f.get("files") as File;
@@ -286,4 +288,19 @@ test("crear: el ID del producto nuevo también se lee si Dropi lo manda dentro d
   const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
   assert.equal(r.ok, true, String(r.error));
   assert.equal(r.nuevo, 9001);
+});
+
+test("fotos: si Dropi rechaza la subida, el error dice qué respondió", async () => {
+  const d = crearDropi({ fotos: "rechaza" });
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /no se pudieron subir 3 foto\(s\): Dropi no aceptó la foto .+ \(respondió 422: Formato no permitido\)/);
+  assert.equal(r.nuevo, 9001, "el producto ya creado se guarda para seguir desde ahí");
+});
+
+test("fotos: si la subida solo acepta X-Authorization (como la pantalla de Dropi), se reintenta así y sale bien", async () => {
+  const d = crearDropi({ fotos: "soloXAuth" });
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(d.productos.get(9001)!.gallery.length, 3);
 });
