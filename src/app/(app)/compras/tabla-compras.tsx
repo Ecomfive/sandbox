@@ -39,10 +39,12 @@ import {
   valorUnitario,
   colorAgente,
   colorProveedor,
+  otrosProductos,
   type FilaCompra,
 } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
 import { diasEntre, enGrupo, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
+import { ConMasProductos } from "./mas-productos";
 
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
 const ICONOS: Record<string, IconoComp> = {
@@ -230,13 +232,17 @@ function columnas(
               <img src={foto} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
             }
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={foto} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+            <ConMasProductos n={otrosProductos(c.lineas)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={foto} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
+            </ConMasProductos>
           </TarjetaEmergente>
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
-            <AdjuntoIcon className="h-3.5 w-3.5" />
-          </div>
+          <ConMasProductos n={otrosProductos(c.lineas)}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
+              <AdjuntoIcon className="h-3.5 w-3.5" />
+            </div>
+          </ConMasProductos>
         );
       },
     }),

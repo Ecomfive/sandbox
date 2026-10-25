@@ -9,7 +9,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon } from "@/lib/nav-icons";
-import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, valorUnitario, type FilaCompra } from "./def-compras";
+import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, otrosProductos, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
 import { PagosProveedorCompraBloque } from "./pagos-proveedor-compra";
 import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
@@ -19,6 +19,7 @@ import { FormularioCompra } from "./formulario-compra";
 import { ProductosCompra } from "./productos-compra";
 import { PastillaTienda } from "./tiendas";
 import { DatoGobernado, usePuedeAccion } from "./restricciones-contexto";
+import { ConMasProductos } from "./mas-productos";
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
@@ -64,7 +65,9 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
       <Seccion icono={ComprasIcon} titulo="Compra">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Dato etiqueta="Foto comercial">
-            <FotoAmpliable url={compra.fotoComercial} nombre={nombre} tam="h-32 w-32" />
+            <ConMasProductos n={otrosProductos(compra.lineas)}>
+              <FotoAmpliable url={compra.fotoComercial} nombre={nombre} tam="h-32 w-32" />
+            </ConMasProductos>
           </Dato>
           <Dato etiqueta="Foto real del producto">
             <FotoAmpliable url={compra.fotoUrl} nombre={nombre} tam="h-32 w-32" />

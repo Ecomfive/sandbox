@@ -281,6 +281,11 @@ export function compararPorCodigo(a: Pick<FilaCompra, "codigo" | "numero">, b: P
 export const tituloCompra = (c: Pick<FilaCompra, "numero">) => numeroOC(c.numero);
 
 /** «1.000 × Faja · Beige / S, 500 × Truly…» (hasta `max`, y «y N más»). */
+/** Cuántos productos más trae la compra además del primero (el de la foto comercial): distintos por su código. */
+export function otrosProductos(lineas: FilaCompra["lineas"]): number {
+  return Math.max(0, new Set(lineas.map((l) => l.codigo)).size - 1);
+}
+
 export function resumenLineas(lineas: FilaCompra["lineas"], max = 3): string {
   const partes = lineas.slice(0, max).map((l) => `${l.cantidad.toLocaleString("es-PA")} × ${l.nombre || l.codigo}`);
   return lineas.length > max ? `${partes.join(", ")} y ${lineas.length - max} más` : partes.join(", ");

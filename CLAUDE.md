@@ -1303,7 +1303,8 @@ convenciones técnicas del código.
   productos, la del producto con su mismo nombre (`productoDeCompra`); cada línea trae la suya (`lineas[].foto`, `ItemCompra.foto`:
   la del producto o la de otro con el mismo nombre, `fotoDeProducto`). Lógica pura en `src/lib/compras/foto-producto.ts` (con
   prueba) y carga en `cargarFotosDeProductos` (`fotos-productos-datos.ts`). La columna «Foto» de la lista muestra la comercial (o la
-  real si no hay); la ficha pone «Foto comercial» (solo se ve) al lado de «Foto real del producto», arriba de los productos.
+  real si no hay); con varios productos lleva «+N» en la esquina (`ConMasProductos`, `mas-productos.tsx`; `otrosProductos` = códigos distintos − 1;
+  25 oct 2026), también en la «Foto comercial» de la ficha; la ficha pone «Foto comercial» (solo se ve) al lado de «Foto real del producto», arriba de los productos.
   **Productos en la ficha:** el bloque «Productos» (`productos-compra.tsx`, solo compras de país) va **dentro del formulario**,
   en el bloque «Compra» justo debajo de Etiquetas (`FormularioCompra` recibe `productos` y `FichaCompra` se lo
   pasa con `incrustado`). Como está dentro del `<form>` pero guarda por su cuenta (cada campo, al salir de él), su contenedor
