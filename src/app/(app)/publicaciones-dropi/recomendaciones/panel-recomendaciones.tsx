@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- foto de Storage */
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { DECISIONES, TIPOS_RECOMENDACION, type GrupoRecomendacion, type Recomendacion, type TipoRecomendacion } from "@/lib/publicaciones/recomendaciones";
@@ -11,9 +11,47 @@ const GRUPOS: { id: GrupoRecomendacion; etiqueta: string }[] = [
   { id: "precio", etiqueta: "Precio y combo" },
   { id: "optimizacion", etiqueta: "Optimización en Dropi" },
 ];
-const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 import type { DecisionVista } from "../def-publicaciones";
 import { LineaDecision, ProveedorTareas, TareaRecomendacion, TarjetaRecomendacion } from "../recomendacion-publicacion";
+import { COLORES, type Color } from "../tablero-acciones";
+import { AnalisisCompetenciaIcon, EtiquetaIcon, LapizIcon, ListaIcon, MargenIcon, MarketingIcon, ProductoIcon, SinFotoIcon } from "@/lib/nav-icons";
+
+/** El ícono y el color de la tarjeta de cada tipo (los mismos tonos del tablero de Publicaciones). */
+const ASPECTO: Record<TipoRecomendacion, { icono: ComponentType<{ className?: string }>; color: Color }> = {
+  combo_x2: { icono: ProductoIcon, color: "violeta" },
+  subir_precio: { icono: MargenIcon, color: "verde" },
+  igualar_precio: { icono: AnalisisCompetenciaIcon, color: "rojo" },
+  optimizar_titulo: { icono: LapizIcon, color: "azul" },
+  mas_fotos: { icono: SinFotoIcon, color: "verde" },
+  agregar_video: { icono: MarketingIcon, color: "violeta" },
+  mejorar_descripcion: { icono: ListaIcon, color: "ambar" },
+  precio_sugerido: { icono: EtiquetaIcon, color: "ambar" },
+};
+
+/** Una tarjeta del tablero de tipos, como las de Publicaciones: ícono, nombre y el número grande; pulsarla filtra (y otra vez, quita). */
+function TarjetaTipo({ tipo, etiqueta, valor, activa, alPulsar }: { tipo: TipoRecomendacion; etiqueta: string; valor: number; activa: boolean; alPulsar: () => void }) {
+  const { icono: Icono, color } = ASPECTO[tipo];
+  const c = COLORES[color];
+  return (
+    <button
+      type="button"
+      aria-pressed={activa}
+      onClick={alPulsar}
+      className={`group flex min-w-0 flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${anilloFoco} ${
+        activa ? `ring-2 ${c.activa}` : "border-border"
+      }`}
+    >
+      <span className="flex items-center gap-3">
+        <span aria-hidden="true" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${c.icono}`}>
+          <Icono className="h-[18px] w-[18px]" />
+        </span>
+        <span className="min-w-0 text-xs leading-tight font-medium tracking-wide text-muted-foreground uppercase hyphens-auto">{etiqueta}</span>
+      </span>
+      <span className={`text-3xl leading-none font-semibold tabular-nums ${valor ? c.numero : "text-muted-foreground"}`}>{valor.toLocaleString("es-PA")}</span>
+      <span className="sr-only">{activa ? "Filtrando la lista." : `Filtrar: ${etiqueta.toLowerCase()}`}</span>
+    </button>
+  );
+}
 
 export interface PublicacionResumen {
   id: string;
@@ -77,14 +115,13 @@ export function PanelRecomendaciones({
 }) {
   const [vista, setVista] = useState<Vista>(verInicial);
   const [tipo, setTipo] = useState<TipoRecomendacion | null>(null);
-  const [grupo, setGrupo] = useState<GrupoRecomendacion | null>(null);
   const [soloMias, setSoloMias] = useState(false);
   const abiertas = decisiones
     .filter((d) => d.estado === "por_hacer" || d.estado === "atrasada")
     .sort((a, b) => (a.estado === b.estado ? (a.plazo ?? "").localeCompare(b.plazo ?? "") : a.estado === "atrasada" ? -1 : 1));
   const hechas = decisiones.filter((d) => d.estado === "hecha").sort((a, b) => (b.hechaEn ?? "").localeCompare(a.hechaEn ?? ""));
   const atrasadas = abiertas.filter((d) => d.estado === "atrasada").length;
-  const pasa = (t: string) => (tipo ? t === tipo : grupo ? grupoDe(t) === grupo : true);
+  const pasa = (t: string) => !tipo || t === tipo;
   const delTipo = <T extends { tipo: string }>(l: T[]) => l.filter((x) => pasa(x.tipo));
   const pendientesVisibles = sugeridas.filter((t) => pasa(t.rec.tipo));
   const abiertasVisibles = delTipo(abiertas).filter((d) => !soloMias || d.responsableId === contexto.yo);
@@ -116,30 +153,23 @@ export function PanelRecomendaciones({
             ))}
           </div>
 
-          <div role="group" aria-label="Filtrar por grupo" className="flex flex-wrap gap-2">
-            <button type="button" aria-pressed={grupo === null && tipo === null} className={chip(grupo === null && tipo === null)} onClick={() => (setGrupo(null), setTipo(null))}>
-              Todas
-            </button>
-            {GRUPOS.map((g) => (
-              <button key={g.id} type="button" aria-pressed={grupo === g.id} className={chip(grupo === g.id)} onClick={() => (setGrupo(grupo === g.id ? null : g.id), setTipo(null))}>
-                {g.etiqueta}
-              </button>
-            ))}
-          </div>
-          <div role="group" aria-label="Filtrar por tipo" className="flex flex-wrap gap-2">
-            {TIPOS_RECOMENDACION.filter((t) => !grupo || t.grupo === grupo).map((t) => (
-              <button key={t.valor} type="button" aria-pressed={tipo === t.valor} className={chip(tipo === t.valor)} onClick={() => setTipo(tipo === t.valor ? null : t.valor)}>
-                <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />
-                {t.etiqueta}
-                <span className="tabular-nums opacity-70">{cuenta(t.valor)}</span>
-              </button>
-            ))}
-            {vista === "por_hacer" && (
+          {GRUPOS.map((g) => (
+            <section key={g.id} aria-label={g.etiqueta} className="flex flex-col gap-2">
+              <h2 className="m-0 text-xs font-medium tracking-wide text-muted-foreground uppercase">{g.etiqueta}</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(11rem,1fr))]">
+                {TIPOS_RECOMENDACION.filter((t) => t.grupo === g.id).map((t) => (
+                  <TarjetaTipo key={t.valor} tipo={t.valor} etiqueta={t.etiqueta} valor={cuenta(t.valor)} activa={tipo === t.valor} alPulsar={() => setTipo(tipo === t.valor ? null : t.valor)} />
+                ))}
+              </div>
+            </section>
+          ))}
+          {vista === "por_hacer" && (
+            <div>
               <button type="button" aria-pressed={soloMias} className={chip(soloMias)} onClick={() => setSoloMias(!soloMias)}>
                 Mis tareas
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {faltaMigracion && (
             <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
