@@ -6,10 +6,14 @@
 // Lo llama el receptor (scripts/scraping-proveedores.ts recibir) al llegar una lectura `tipo: "nuestros"` y la tarea diaria (dropi-diario.ts).
 //
 // A mano, con una lectura guardada (por defecto solo informa; --aplicar escribe):
-//   npx tsx scripts/publicaciones-sincronizar-dropi.ts datos-privados/scraping/pa-nuestros-<fecha>.json [--aplicar]
+//   npx tsx scripts/publicaciones-sincronizar-dropi.ts datos-privados/scraping/pa-nuestros-<fecha>.json [--aplicar] [--todas-las-fotos]
+//
+// Además copia las fotos de cada publicación al sistema (migración 0153, `copiarFotosDropi`): hasta 300 por lectura (las demás, en la
+// siguiente); `--todas-las-fotos` quita el tope.
 
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { copiarFotosDropi } from "./publicaciones-copiar-fotos";
 import {
   bodegasEnOrden,
   cambiosDesdeDropi,
@@ -39,7 +43,7 @@ async function enTrozos<T>(filas: T[], n: number, f: (trozo: T[]) => Promise<voi
   for (let i = 0; i < filas.length; i += n) await f(filas.slice(i, i + n));
 }
 
-export async function guardarNuestrosProductos(supabase: SupabaseClient, l: LecturaNuestros, aplicar = true) {
+export async function guardarNuestrosProductos(supabase: SupabaseClient, l: LecturaNuestros, aplicar = true, maxFotos = 300) {
   const t0 = Date.now();
   const codigo = /^[a-z]{2}$/.test(l.pais) ? l.pais.toUpperCase() : "PA";
   const pais = revisar(await supabase.from("paises").select("id, nombre").eq("codigo", codigo).maybeSingle(), "País") as { id: string; nombre: string } | null;
@@ -141,6 +145,15 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   // Lo que Dropi ya no lista (eliminado) sale de la tabla: se reemplaza en cada lectura.
   revisar(await supabase.from("dropi_productos_proveedor").delete().eq("pais_id", pais.id).lt("leido_en", leidoEn), "Quitar los que ya no están");
 
+  // Las fotos de cada publicación al sistema (migración 0153): las que falten se copian del CDN de Dropi al bucket. Un problema aquí
+  // no tumba la lectura: queda en el resumen y se reintenta mañana.
+  let fotos: Awaited<ReturnType<typeof copiarFotosDropi>> | { error: string };
+  try {
+    fotos = await copiarFotosDropi(supabase, { id: pais.id, codigo }, l.productos, productos, pubs, maxFotos);
+  } catch (e) {
+    fotos = { error: String((e as Error)?.message ?? e) };
+  }
+
   // Desde el 24 oct 2026 (pedido de Hernán) el sistema manda: los productos se crean en el sistema y se mandan a Dropi, así que esta
   // lectura ya no crea, cambia ni archiva publicaciones (antes «Dropi manda»). Lo que no coincide solo se informa en el resumen.
   revisar(
@@ -155,19 +168,19 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     }),
     "Lectura",
   );
-  return { ...resumen, detalle };
+  return { ...resumen, fotos, detalle };
 }
 
 // Uso directo con un archivo guardado.
 if (process.argv[1]?.replace(/\\/g, "/").endsWith("scripts/publicaciones-sincronizar-dropi.ts")) {
   const [archivo, ...resto] = process.argv.slice(2);
   if (!archivo) {
-    console.log("Uso: npx tsx scripts/publicaciones-sincronizar-dropi.ts <lectura.json> [--aplicar]");
+    console.log("Uso: npx tsx scripts/publicaciones-sincronizar-dropi.ts <lectura.json> [--aplicar] [--todas-las-fotos]");
   } else {
     process.loadEnvFile(".env.local");
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const l = JSON.parse(readFileSync(archivo, "utf8")) as LecturaNuestros;
-    guardarNuestrosProductos(supabase, l, resto.includes("--aplicar")).then(
+    guardarNuestrosProductos(supabase, l, resto.includes("--aplicar"), resto.includes("--todas-las-fotos") ? Infinity : 300).then(
       (r) => console.dir(r, { depth: null, maxArrayLength: null }),
       (e) => {
         console.error(e);

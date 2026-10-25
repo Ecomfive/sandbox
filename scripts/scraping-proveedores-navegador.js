@@ -189,7 +189,7 @@ async function leerNuestrosProductos(puente) {
           private_stock: o.private_stock, private_product: o.private_product, created_at: o.created_at,
           warehouses: (o.warehouses || []).map((w) => ({ id: w.id, name: w.name, stock: w.stock })),
           variation_warehouses: (o.variation_warehouses || []).map((w) => ({ id: w.id, name: w.name, stock: w.stock })),
-          gallery: (o.gallery || []).map(() => ({})), categories: (o.categories || []).map((c) => ({ name: c.name })), archivado: archivo,
+          gallery: (o.gallery || []).map((g) => ({ urlS3: g.urlS3, url: g.url, main: g.main, variation_id: g.variation_id })), categories: (o.categories || []).map((c) => ({ name: c.name })), archivado: archivo,
         });
       }
       if (lista.length < 100) break;

@@ -391,3 +391,14 @@ test("republicar: si la plataforma tampoco puede bajar la foto, el error lo dice
   assert.equal(r.ok, false);
   assert.match(String(r.error), /no se pudo bajar la foto por la plataforma \(502: sin foto\)/);
 });
+
+test("republicar: con fotos copiadas en el sistema, sube esas (la primera como principal) y no toca el CDN de Dropi", async () => {
+  const d = crearDropi({ cdnBloqueado: true });
+  d.fotoPorPlataforma = false;
+  d.productos.set(10474, productoBase(10474));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474, fotos: [foto("1779932274anti.jpg"), foto("1779932275anti-2.png")] }]);
+  assert.equal(r.ok, true, String(r.error));
+  const g = d.productos.get(9001)!.gallery as Obj[];
+  assert.equal(g.length, 2);
+  assert.ok(g[0].main && String(g[0].urlS3).endsWith("1779932274anti.jpg"));
+});
