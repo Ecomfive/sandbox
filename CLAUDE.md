@@ -615,7 +615,9 @@ convenciones técnicas del código.
   resumen lo que no coincide (`distintasEnDropi`, `yaNoEstanEnDropi`, `nuevosEnDropiSinPublicacion`). Donde abajo diga «Dropi manda»,
   «la lectura pone en cada publicación…» o «Productos nuevos: la sincronización crea la publicación», ya no es así. **ClickUp está
   descontinuado**: todos los scripts que leían o importaban de ClickUp llaman a `clickupDescontinuado` (`scripts/clickup-descontinuado.mjs`) y
-  se detienen; no se trae nada de ClickUp a ningún módulo. **Estado y Tipo se eligen en la ficha** (24 oct 2026): `estado_publicacion` y
+  se detienen; no se trae nada de ClickUp a ningún módulo. **Única excepción a «la lectura no toca publicaciones»** (25 oct 2026, pedido de Alcides): una publicación **sin ID de Dropi** (no borrador)
+  cuyo producto ya está en la lectura con el mismo nombre (`nombreComparable`, sin tildes ni «(B280)»), único de los dos lados y sin otra publicación,
+  toma ese ID (`idsParaVincular`, `sincronizar-dropi.ts`, con prueba; auditoría «Sistema» `vincular_id_dropi`; `idsVinculados` en el resumen). **Estado y Tipo se eligen en la ficha** (24 oct 2026): `estado_publicacion` y
   `tipo_publicacion` van en `leerDatos` solo si vienen en el formulario, y lo anotado manda: en `automatico()` (`datos-publicaciones.ts`)
   `archivada` sale de lo anotado si hay estado y `tipoDropi` = el anotado o, sin anotar, lo de Dropi; `tipoEnDropi` guarda lo que reporta Dropi
   (se muestra debajo como referencia y lo usa el grupo de «Apagar en Dropi»). Elegir «Archivado» pone también `estado` = archivado y otro estado

@@ -221,3 +221,44 @@ export function cambiosDesdeDropi(
   }
   return { cambios, detalle };
 }
+
+/** El nombre para comparar una publicación con un producto de Dropi: sin tildes, mayúsculas, signos ni la marca «(B280)». */
+export function nombreComparable(nombre: string): string {
+  return nombre
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\(\s*b\s*\d+\s*\)/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Las publicaciones sin ID de Dropi que ya están en Dropi (pedido de Alcides, 25 oct 2026): un producto de la lectura de «Mis
+ * productos» que ninguna publicación usa y que tiene el mismo nombre que una publicación sin ID le da su ID. Solo si el nombre
+ * es igual (sin tildes ni mayúsculas) y la pareja es única de los dos lados: con dos candidatos no se adivina.
+ */
+export function idsParaVincular(
+  sinId: { id: string; nombre: string }[],
+  productos: Iterable<Pick<ProductoProveedor, "id" | "nombre">>,
+  usados: Set<number>,
+): { publicacionId: string; dropiId: number; nombre: string }[] {
+  const libres = new Map<string, number[]>();
+  for (const p of productos) {
+    if (usados.has(p.id)) continue;
+    const clave = nombreComparable(p.nombre);
+    if (clave) libres.set(clave, [...(libres.get(clave) ?? []), p.id]);
+  }
+  const porNombre = new Map<string, string[]>();
+  for (const pub of sinId) {
+    const clave = nombreComparable(pub.nombre);
+    if (clave) porNombre.set(clave, [...(porNombre.get(clave) ?? []), pub.id]);
+  }
+  const out: { publicacionId: string; dropiId: number; nombre: string }[] = [];
+  for (const pub of sinId) {
+    const clave = nombreComparable(pub.nombre);
+    const ids = libres.get(clave);
+    if (ids?.length === 1 && porNombre.get(clave)?.length === 1) out.push({ publicacionId: pub.id, dropiId: ids[0], nombre: pub.nombre });
+  }
+  return out;
+}

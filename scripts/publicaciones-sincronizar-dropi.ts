@@ -3,6 +3,8 @@
 // `dropi_productos_proveedor` (de ahí salen «Sin stock», los días de inventario y Reponer). **No toca las publicaciones** (24 oct 2026,
 // pedido de Hernán: el sistema manda; los productos se crean en el sistema y se mandan a Dropi). Lo que en Dropi no coincide con una
 // publicación (precio, nombre, bodega, tipo, estado, productos sin publicación o que ya no están) solo se informa en el resumen.
+// Única excepción (25 oct 2026, pedido de Alcides): una publicación **sin ID de Dropi** cuyo producto ya está en Dropi (mismo nombre,
+// único y sin otra publicación) toma ese ID (`idsParaVincular`); solo llena el ID vacío, no cambia nada más.
 // Lo llama el receptor (scripts/scraping-proveedores.ts recibir) al llegar una lectura `tipo: "nuestros"` y la tarea diaria (dropi-diario.ts).
 //
 // A mano, con una lectura guardada (por defecto solo informa; --aplicar escribe):
@@ -15,6 +17,7 @@ import {
   cambiosDesdeDropi,
   codigoBodega,
   idsDeDropi,
+  idsParaVincular,
   normalizarProductoProveedor,
   productoPrincipal,
   productosNuevos,
@@ -94,6 +97,13 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     );
     if (r.detalle.length) cambios.push({ id: pub.id, nombre: pub.nombre, dropiId: p.id, ...r });
   }
+  // Publicaciones sin ID que ya están en Dropi: toman el ID del producto con su mismo nombre (y ese producto deja de contar como libre).
+  const vincular = idsParaVincular(
+    pubs.filter((x) => !idsDeDropi(x.dropi_id).length && x.estado_publicacion !== "borrador").map((x) => ({ id: x.id, nombre: x.nombre })),
+    productos.values(),
+    usados,
+  );
+  vincular.forEach((v) => usados.add(v.dropiId));
   // Producto nuevo en Dropi → su publicación, con su bodega, precio y tipo (como «Producto nuevo», para vincularlo a Producto).
   const nuevos = productosNuevos(productos.values(), usados, anteriores);
   const sinPublicacion = [...productos.values()].filter((p) => !p.archivado && !usados.has(p.id) && !nuevos.includes(p)).map((p) => `${p.id} ${p.nombre}`);
@@ -115,6 +125,7 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     yaNoEstanEnDropi: desaparecidas.map((d) => `${d.dropiId} ${d.nombre}`),
     nuevosEnDropiSinPublicacion: nuevos.map((p) => `${p.id} ${p.nombre} (${p.bodegas.length ? codigoBodega(bodegasEnOrden(p.bodegas)[0].id) : "sin bodega"})`),
     enDropiSinPublicacion: sinPublicacion,
+    idsVinculados: vincular.map((v) => `${v.dropiId} ${v.nombre}`),
     aplicado: aplicar,
   };
   const detalle = cambios.map((c) => `${c.nombre} (${c.dropiId}): ${c.detalle.join("; ")}`);
@@ -140,6 +151,26 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   await enTrozos(filas, 500, async (t) => void revisar(await supabase.from("dropi_productos_proveedor").upsert(t, { onConflict: "pais_id,dropi_producto_id" }), "Guardar productos"));
   // Lo que Dropi ya no lista (eliminado) sale de la tabla: se reemplaza en cada lectura.
   revisar(await supabase.from("dropi_productos_proveedor").delete().eq("pais_id", pais.id).lt("leido_en", leidoEn), "Quitar los que ya no están");
+
+  // Las publicaciones sin ID que ya están en Dropi toman su ID (solo si siguen sin ID: nadie lo puso mientras tanto).
+  for (const v of vincular) {
+    const r = revisar(
+      await supabase.from("dropi_publicaciones").update({ dropi_id: String(v.dropiId) }).eq("id", v.publicacionId).or("dropi_id.is.null,dropi_id.eq.").select("id"),
+      "Vincular ID",
+    ) as { id: string }[];
+    if (!r.length) continue;
+    revisar(
+      await supabase.from("historial_auditoria").insert({
+        usuario_id: null,
+        usuario_nombre: "Sistema",
+        accion: "vincular_id_dropi",
+        entidad: "dropi_publicaciones",
+        entidad_id: v.publicacionId,
+        detalle: `ID de Dropi ${v.dropiId}: estaba en Dropi con el mismo nombre («${v.nombre}») y la publicación no tenía ID`,
+      }),
+      "Auditoría del ID",
+    );
+  }
 
   // Desde el 24 oct 2026 (pedido de Hernán) el sistema manda: los productos se crean en el sistema y se mandan a Dropi, así que esta
   // lectura ya no crea, cambia ni archiva publicaciones (antes «Dropi manda»). Lo que no coincide solo se informa en el resumen.
