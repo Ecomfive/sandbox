@@ -62,8 +62,8 @@ test("mover stock: salida del viejo con su concepto, entrada en el nuevo aunque 
 
 test("las fotos: la principal primero, desde el CDN de Dropi (con los espacios codificados)", () => {
   assert.deepEqual(fotosParaCopiar(veganic), [
-    { url: `${CDN_FOTOS_DROPI}/panama/products/8751/1779932274veganic.jpg`, nombre: "1779932274veganic.jpg", main: true },
-    { url: `${CDN_FOTOS_DROPI}/panama/products/8751/1779932274veganic%204.png`, nombre: "1779932274veganic 4.png", main: false },
+    { url: `${CDN_FOTOS_DROPI}/panama/products/8751/1779932274veganic.jpg`, nombre: "1779932274veganic.jpg", main: true, alternas: [] },
+    { url: `${CDN_FOTOS_DROPI}/panama/products/8751/1779932274veganic%204.png`, nombre: "1779932274veganic 4.png", main: false, alternas: [] },
   ]);
   assert.deepEqual(stockPorBodega(veganic), { "81": 224 });
 });
@@ -86,4 +86,16 @@ test("el favorito republica solo lo que viene marcado «republicar» y sube foto
   assert.ok(codigo.includes("/archiveProduct"));
   // El código entero se puede leer como JavaScript.
   assert.doesNotThrow(() => new Function(codigo));
+});
+
+test("una foto sin urlS3 se intenta también desde el CDN de Dropi (en el favorito igual)", () => {
+  const o: Obj = { ...veganic, id: 10474, gallery: [
+    { id: 1, main: true, urlS3: "panama/products/10474/a.jpg", url: null, variation_id: null },
+    { id: 2, main: false, urlS3: null, url: "https://dropi-bucket.s3.amazonaws.com/panama/products/10474/6bc9.png", variation_id: null },
+    { id: 3, main: false, urlS3: "", url: "https://otro.example/x/6bca.png", variation_id: null },
+  ] };
+  const fotos = fotosParaCopiar(o);
+  assert.deepEqual(fotos[1].alternas, [`${CDN_FOTOS_DROPI}/panama/products/10474/6bc9.png`]);
+  assert.deepEqual(fotos[2].alternas, [`${CDN_FOTOS_DROPI}/panama/products/10474/6bca.png`]);
+  igual(delFavorito.fotosDe(o), fotos);
 });
