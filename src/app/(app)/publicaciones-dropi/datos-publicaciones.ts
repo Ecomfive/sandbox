@@ -5,7 +5,7 @@ import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/cr
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion, revisionVencida } from "@/lib/publicaciones/publicacion";
-import { estadoTarea, etiquetaRecomendacion, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { estadoTarea, etiquetaRecomendacion, NO_EN_PRIVADAS, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
@@ -388,8 +388,19 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
     const comboPublicado = !!combo && publicados.has(combo.id);
     // Las tareas abiertas que los datos ya muestran hechas.
+    const privada = f.tipoDropi === "privado";
     for (const d of f.decisiones) {
       if (d.estado !== "por_hacer" && d.estado !== "atrasada") continue;
+      // Título y fotos no se trabajan en una privada: la tarea abierta se da de baja.
+      if (privada && NO_EN_PRIVADAS.includes(d.tipo as (typeof NO_EN_PRIVADAS)[number])) {
+        d.hechaEn = new Date().toISOString();
+        d.hechaComo = "manual";
+        d.hechaPor = "Sistema";
+        d.hechaNota = "Dada de baja: no se trabaja en una publicación privada";
+        d.estado = "hecha";
+        cumplidas.push({ d, nombre: f.nombre });
+        continue;
+      }
       const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado, revisiones: f.revisiones });
       if (!c) continue;
       d.hechaEn = c.fecha ? `${c.fecha.slice(0, 10)}T12:00:00Z` : new Date().toISOString();
@@ -416,7 +427,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       },
       r,
     );
-    f.recomendaciones = pendientes([...recs, ...recomendarOptimizacion(f.revisiones, f.archivada)], f.decisiones, hoy);
+    f.recomendaciones = pendientes([...recs, ...recomendarOptimizacion(f.revisiones, f.archivada, privada)], f.decisiones, hoy);
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
