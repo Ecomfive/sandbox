@@ -62,15 +62,26 @@ export function stockPorBodega(producto: Obj): Record<string, number> {
 }
 
 /** Las fotos del producto que se copian, la principal primero, con su dirección en el CDN (o la `url` completa si no tiene `urlS3`). */
-export function fotosParaCopiar(producto: Obj): { url: string; nombre: string; main: boolean }[] {
+export function fotosParaCopiar(producto: Obj): { url: string; nombre: string; main: boolean; alternas: string[] }[] {
   const galeria = Array.isArray(producto.gallery) ? (producto.gallery as Obj[]) : [];
+  // La carpeta de las fotos del país en el CDN («panama/products/»), sacada de una foto que sí tiene `urlS3`.
+  const carpeta = galeria.map((f) => /^(.*?products\/)\d+\//.exec(String(f.urlS3 ?? "").trim())?.[1]).find(Boolean) ?? null;
   return galeria
     .filter((f) => !f.variation_id)
     .map((f) => {
       const s3 = String(f.urlS3 ?? "").trim();
       const u = String(f.url ?? "").trim();
       const url = s3 ? `${CDN_FOTOS_DROPI}/${encodeURI(s3)}` : /^https?:\/\//i.test(u) ? u : "";
-      return { url, nombre: (s3 || u).split("/").pop() || "foto.jpg", main: f.main === true };
+      const nombre = (s3 || u).split("/").pop() || "foto.jpg";
+      // Sin `urlS3`, la dirección de Dropi puede no dejarse bajar desde su pantalla (25 oct 2026: una foto del 10474 dio «Failed
+      // to fetch»): se prueba también la misma ruta en el CDN y la carpeta del producto en el CDN.
+      const alternas: string[] = [];
+      if (!s3 && url) {
+        const ruta = /^https?:\/\/[^/]+\/(.+)$/i.exec(u)?.[1] ?? "";
+        if (/products\//.test(ruta)) alternas.push(`${CDN_FOTOS_DROPI}/${ruta}`);
+        if (carpeta) alternas.push(`${CDN_FOTOS_DROPI}/${carpeta}${producto.id}/${encodeURI(nombre)}`);
+      }
+      return { url, nombre, main: f.main === true, alternas: alternas.filter((a, i) => a !== url && alternas.indexOf(a) === i) };
     })
     .filter((f) => f.url)
     .sort((a, b) => Number(b.main) - Number(a.main));
@@ -94,8 +105,10 @@ export const REPUBLICAR_JS = [
   "return Object.assign({},b,{quantity:Math.abs(q),type_movement:q>0?'ENTRADA':'SALIDA',concept:k})});",
   "if(!n)return{error:'Esa bodega no está en el producto.'};return{cuerpo:c}}",
   "function stockDe(o){var s={};(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).forEach(function(w){if(Number(w.stock)>0)s[String(w.warehouse_id)]=Number(w.stock)});return s}",
-  "function fotosDe(o){return(Array.isArray(o.gallery)?o.gallery:[]).filter(function(f){return!f.variation_id}).map(function(f){",
-  "var s=String(f.urlS3!=null?f.urlS3:'').trim(),u=String(f.url!=null?f.url:'').trim();",
-  "return{url:s?CDN+'/'+encodeURI(s):(/^https?:\\/\\//i.test(u)?u:''),nombre:(s||u).split('/').pop()||'foto.jpg',main:f.main===true}",
+  "function fotosDe(o){var g=Array.isArray(o.gallery)?o.gallery:[],ca=null;g.forEach(function(f){var m=/^(.*?products\\/)\\d+\\//.exec(String(f.urlS3!=null?f.urlS3:'').trim());if(!ca&&m&&m[1])ca=m[1]});",
+  "return g.filter(function(f){return!f.variation_id}).map(function(f){",
+  "var s=String(f.urlS3!=null?f.urlS3:'').trim(),u=String(f.url!=null?f.url:'').trim(),url=s?CDN+'/'+encodeURI(s):(/^https?:\\/\\//i.test(u)?u:''),nombre=(s||u).split('/').pop()||'foto.jpg',al=[];",
+  "if(!s&&url){var m=/^https?:\\/\\/[^/]+\\/(.+)$/i.exec(u),ru=m?m[1]:'';if(/products\\//.test(ru))al.push(CDN+'/'+ru);if(ca)al.push(CDN+'/'+ca+o.id+'/'+encodeURI(nombre))}",
+  "return{url:url,nombre:nombre,main:f.main===true,alternas:al.filter(function(a,i){return a!==url&&al.indexOf(a)===i})}",
   "}).filter(function(f){return f.url}).sort(function(a,b){return Number(b.main)-Number(a.main)})}",
 ].join("");
