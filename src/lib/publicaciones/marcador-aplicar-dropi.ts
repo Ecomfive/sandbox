@@ -161,7 +161,7 @@ const CODIGO = [
   "if(c.guia!==null&&n.name_in_guide!==c.guia)return{ok:false,error:'Dropi sigue mostrando en la guía «'+n.name_in_guide+'».'};",
   "if(Array.isArray(c.fotos)&&c.fotos.length){var mal=await subirFotos(c.producto,n,c.fotos,false);if(mal)return{ok:false,error:'No se pudieron subir '+mal+' foto(s) a Dropi.'}}",
   "return{ok:true}}",
-  "var W=window.open(O+'/publicaciones-dropi/aplicar-dropi?p='+P,'aplicar-dropi','width=560,height=760');",
+  "var W=window.open(O+'/publicaciones-dropi/aplicar-dropi?p='+P+'&v='+__VERSION__,'aplicar-dropi','width=560,height=760');",
   "if(!W){alert('El navegador bloqueó la ventana: permite las ventanas emergentes de Dropi y vuelve a pulsar.');return}",
   "window.addEventListener('message',async function f(e){",
   "if(e.origin!==O||e.source!==W||!e.data||e.data.tipo!=='pendientes')return;window.removeEventListener('message',f);",
@@ -174,11 +174,22 @@ const CODIGO = [
   "})();",
 ].join("");
 
+/**
+ * La versión del favorito (pedido de Alcides, 25 oct 2026): sale del propio código (FNV-1a de 32 bits, en hexadecimal), así cambia
+ * sola cada vez que cambia el favorito. El favorito la manda al abrir la ventana (`&v=`) y la ventana la compara con esta: si no es
+ * la misma, el favorito guardado es viejo y hay que volver a arrastrarlo. Un favorito anterior a esto no manda ninguna.
+ */
+export const VERSION_FAVORITO = (() => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < CODIGO.length; i++) h = Math.imul(h ^ CODIGO.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, "0").slice(0, 6);
+})();
+
 /** El favorito para la plataforma en ese origen (`https://…`, o `http://localhost` para probar), con el prefijo `javascript:`. */
 export function marcadorAplicarDropi(origen: string): string {
   const o = new URL(origen);
   if (o.protocol !== "https:" && !(o.protocol === "http:" && (o.hostname === "localhost" || o.hostname === "127.0.0.1"))) throw new Error("El origen del favorito debe ser https.");
-  return `javascript:${encodeURIComponent(CODIGO.replace("__ORIGEN__", JSON.stringify(o.origin)))}`;
+  return `javascript:${encodeURIComponent(CODIGO.replace("__ORIGEN__", JSON.stringify(o.origin)).replace("__VERSION__", JSON.stringify(VERSION_FAVORITO)))}`;
 }
 
 /** El origen de la pestaña de Dropi de un país («pa» → https://app.dropi.pa), el único al que la ventana le habla. */

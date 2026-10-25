@@ -45,3 +45,11 @@ test("el favorito lleva el origen de la plataforma, abre la ventana de aplicar y
   assert.equal(origenDropi("pa"), "https://app.dropi.pa");
   assert.equal(origenDropi("xyz"), null);
 });
+
+test("versión: el favorito manda su versión al abrir la ventana y cambia si cambia el código", async () => {
+  const { marcadorAplicarDropi, VERSION_FAVORITO } = await import("./marcador-aplicar-dropi");
+  assert.match(VERSION_FAVORITO, /^[0-9a-f]{6}$/);
+  const codigo = decodeURIComponent(marcadorAplicarDropi("https://plataforma.example").slice("javascript:".length));
+  assert.ok(!codigo.includes("__VERSION__") && !codigo.includes("__ORIGEN__"));
+  assert.ok(codigo.includes(`'&v='+"${VERSION_FAVORITO}"`), "la ventana se abre con &v=<versión>");
+});
