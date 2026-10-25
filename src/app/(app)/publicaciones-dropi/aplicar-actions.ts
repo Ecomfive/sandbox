@@ -191,7 +191,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       ok: r.ok === true,
       // «apagar»: si además quedó archivado (Dropi no archiva con órdenes pendientes: queda pendiente y se reintenta).
       archivado: r.archivado === true,
-      error: typeof r.error === "string" ? r.error.slice(0, 300) : "Sin detalle",
+      error: typeof r.error === "string" ? r.error.slice(0, 500) : "Sin detalle",
       // «crear»: un aviso que no impidió publicar (por ejemplo, las garantías que Dropi no dejó poner).
       aviso: typeof r.aviso === "string" ? r.aviso.slice(0, 300) : null,
       // El ID del producto que creó una republicación (aunque haya fallado un paso después).
