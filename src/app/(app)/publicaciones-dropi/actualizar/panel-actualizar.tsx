@@ -64,6 +64,9 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   const [elegidos, setElegidos] = useState<ClaveLector[]>(["proveedor", "ventas"]);
   const [error, setError] = useState<string | null>(null);
   const detener = useRef(false);
+  // Mientras arranca (antes de que el servidor responda) los botones ya no sirven: un doble clic arrancaba dos.
+  const arrancando = useRef(false);
+  const [empezando, setEmpezando] = useState(false);
 
   const revisarSesion = useCallback(async (abrir: boolean) => {
     const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais: "pa", abrir }, abrir ? 45000 : 10000);
@@ -117,11 +120,18 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   }
 
   async function actualizar(lectores: ClaveLector[]) {
+    if (arrancando.current || (corriendo && !corriendo.terminado)) return;
+    arrancando.current = true;
+    setEmpezando(true);
     setError(null);
     detener.current = false;
     const partes = PARTES.filter((p) => lectores.includes(p.lector)).map((p) => p.clave);
     const r = await empezarActualizacion(partes).catch(() => ({ error: "No se pudo empezar la actualización.", id: undefined, subidas: undefined }));
-    if (r.error || !r.id || !r.subidas) return setError(r.error ?? "No se pudo empezar la actualización.");
+    setEmpezando(false);
+    if (r.error || !r.id || !r.subidas) {
+      arrancando.current = false;
+      return setError(r.error ?? "No se pudo empezar la actualización.");
+    }
     const id = r.id;
     setCorriendo({ id, pedidas: partes, pasos: Object.fromEntries(partes.map((p) => [p, { estado: "espera", detalle: "En espera" }])), avance: "Revisando la sesión de Dropi…", esperandoSesion: false, terminado: null });
 
@@ -164,6 +174,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
     }
     const fin = await terminarActualizacion(id, detener.current).catch(() => ({ estado: undefined }));
     setCorriendo((c) => (c ? { ...c, avance: "", esperandoSesion: false, terminado: fin.estado ?? "con_fallos" } : c));
+    arrancando.current = false;
     router.refresh();
   }
 
@@ -175,7 +186,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
     );
 
   const estadoPa = sesionPa ? (sesionPa.pestana ? sesionValida("pa", sesionPa) : "sin_pestana") : null;
-  const ocupado = !!corriendo && !corriendo.terminado;
+  const ocupado = empezando || (!!corriendo && !corriendo.terminado);
   const hechos = corriendo ? corriendo.pedidas.filter((p) => ["listo", "error"].includes(corriendo.pasos[p]?.estado ?? "")).length : 0;
 
   return (

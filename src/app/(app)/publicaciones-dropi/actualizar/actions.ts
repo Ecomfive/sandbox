@@ -34,6 +34,17 @@ export async function empezarActualizacion(partes: unknown): Promise<{ error?: s
   const pedidas = (Array.isArray(partes) ? partes : []).filter(esParte);
   if (!pedidas.length) return { error: "Elige al menos una parte." };
   const supabase = createServiceClient();
+  // Una sola a la vez (26 oct 2026: un doble clic arrancó dos y el CRM no alcanzó). Una que quedó «corriendo» hace más de 40
+  // minutos (se cerró la pestaña a medias) ya no bloquea.
+  const { data: enCurso } = await supabase
+    .from("dropi_actualizaciones")
+    .select("inicio")
+    .eq("estado", "corriendo")
+    .gte("inicio", new Date(Date.now() - 40 * 60000).toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (enCurso)
+    return { error: `Ya hay una actualización en curso (empezó a las ${new Date(enCurso.inicio as string).toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit", timeZone: "America/Panama" })}). Espera a que termine.` };
   const { data, error } = await supabase
     .from("dropi_actualizaciones")
     .insert({ iniciado_por: usuario.id, iniciado_por_nombre: usuario.nombre || usuario.email, origen: "manual", pedidas })
