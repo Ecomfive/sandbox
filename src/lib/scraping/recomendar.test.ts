@@ -52,6 +52,9 @@ test("ya lo tenemos: testeado, en Producto o enviado a Selección, aunque se ven
   assert.match(recomendar({ ...base, yaVisto: { tipo: "producto", nombre: "SKU ABC" } }).porQue, /^Ya está en Producto: SKU ABC\.$/);
   assert.match(recomendar({ ...base, ventas30: 80, yaVisto: { tipo: "compra", nombre: "Aceite de batana" } }).porQue, /Ya se compró: Aceite de batana\.$/);
   assert.equal(recomendar({ ...base, yaVisto: { tipo: "publicacion", nombre: "Shilajit" } }).tipo, "tenemos");
+  const m = recomendar({ ...base, ventas30: 500, marcadoYaLoTenemos: "Se parece a «Drenaje Linfático» (ya comprado)" });
+  assert.equal(m.tipo, "tenemos");
+  assert.match(m.porQue, /Lo marcaron como «Ya lo tenemos»: Se parece a «Drenaje Linfático» \(ya comprado\)\.$/);
 });
 
 test("sin señales: no se movió", () => {

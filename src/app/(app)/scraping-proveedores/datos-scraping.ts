@@ -30,6 +30,10 @@ interface FilaProducto {
   ultima_vez: string;
   creado_en_dropi: string | null;
   foto_huella?: string | null;
+  /** «Ya lo tenemos» (migración 0156). */
+  descartado_en?: string | null;
+  descartado_por?: string | null;
+  descartado_motivo?: string | null;
 }
 
 interface FilaHistorial {
@@ -173,7 +177,7 @@ export async function cargarScraping(supabase: SupabaseClient): Promise<DatosScr
     const repetidoEn = [...(repetidosEn.get(d.id) ?? [])];
     const seleccion = enSeleccion.get(d.id) ?? null;
     const nuevoHaceDias = esNuevo(d.primera_vez, inicioDe.get(d.proveedor_id) ?? d.primera_vez, ahora);
-    const rec = recomendar({ estado, motivo: d.motivo_desaparicion, ventas30, repetidoEn, yaVisto: visto, parecidos: parecidosDe, enSeleccion: !!seleccion, nuevoHaceDias });
+    const rec = recomendar({ estado, motivo: d.motivo_desaparicion, ventas30, repetidoEn, yaVisto: visto, parecidos: parecidosDe, enSeleccion: !!seleccion, nuevoHaceDias, marcadoYaLoTenemos: d.descartado_en ? (d.descartado_motivo ?? "") : null });
     return {
       id: d.id,
       proveedorId: prov.id,
@@ -209,6 +213,7 @@ export async function cargarScraping(supabase: SupabaseClient): Promise<DatosScr
       repetidoEn,
       privados: privadosDe.get(d.id) ?? [],
       seleccion,
+      marcado: d.descartado_en ? { en: d.descartado_en, por: d.descartado_por ?? null, motivo: d.descartado_motivo ?? null } : null,
     };
   });
   // Lo más vendido primero.

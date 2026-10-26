@@ -71,6 +71,32 @@ export async function registrarDatosProveedor(formData: FormData): Promise<{ err
   return {};
 }
 
+/**
+ * «Ya lo tenemos» (migración 0156, pedido de Hernán, 26 oct 2026): saca un producto de la lista de recomendados porque ya lo
+ * tenemos (o se parece demasiado a algo nuestro), con el motivo; `marcar = false` lo devuelve a la lista.
+ */
+export async function marcarYaLoTenemos(id: string, marcar: boolean, motivo: string | null): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura("scraping-proveedores");
+  if (!UUID.test(id)) return { error: "Producto no válido." };
+  const supabase = createServiceClient();
+  const { data: p } = await supabase.from("scraping_productos").select("id, nombre").eq("id", id).maybeSingle();
+  if (!p) return { error: "El producto ya no está." };
+  const texto = typeof motivo === "string" ? motivo.trim().slice(0, 300) : "";
+  const { error } = await supabase
+    .from("scraping_productos")
+    .update(marcar ? { descartado_en: new Date().toISOString(), descartado_por: usuario.nombre || usuario.email, descartado_motivo: texto || null } : { descartado_en: null, descartado_por: null, descartado_motivo: null })
+    .eq("id", id);
+  if (error) return { error: /descartado/.test(error.message) ? "Falta correr en Supabase la migración 0156." : "No se pudo guardar." };
+  await registrarAuditoria({
+    accion: marcar ? "scraping_ya_lo_tenemos" : "scraping_volver_a_lista",
+    entidad: "scraping_productos",
+    entidadId: id,
+    detalle: `${p.nombre}${marcar && texto ? ` · ${texto}` : ""}`,
+  });
+  revalidatePath(RUTA);
+  return {};
+}
+
 /** «Buscar ahora»: deja pedida una búsqueda completa (la corre el equipo con la sesión de Dropi). */
 export async function pedirBusqueda(proveedorId: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("scraping-proveedores");

@@ -425,7 +425,13 @@ convenciones técnicas del código.
   que se parece sin ser igual (60 % del nombre, 2 palabras en común y alguna de 5 letras o más que no sea genérica, `GENERICAS`;
   o una foto cercana): `FilaScraping.parecidos`, insignia «Parecido a algo nuestro», tarjeta, sección en la ficha y frase en el
   porqué (no cambia la recomendación). Ya no hay envío en lote a Selección: se envía
-  desde la ficha. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
+  desde la ficha. **Versión sencilla** (26 oct 2026, boceto «Versión 2»): colores del sistema (Testear en `bg-primario-suave
+  text-primario`, `CLASE_RECOMENDACION`), tablero de 5 tarjetas con `COLORES` de `tablero-acciones.tsx` (Para testear, Se están
+  vendiendo, Nuevos, Parecidos a lo nuestro, En varios proveedores), un botón por país con cuántos hay para testear (`Paises`,
+  filtro `pais`), filas con 4 columnas y la lista como reporte: `DEF_SCRAPING.cerrados` oculta «Ya lo tenemos» y «Sin señales».
+  **«Ya lo tenemos»** (migración 0156: `scraping_productos.descartado_en/_por/_motivo`; `marcarYaLoTenemos`, `actions.ts`;
+  `BotonYaLoTenemos` en la fila y en la ficha, con `motivoYaLoTenemos` = a qué se parece): `recomendar` lo deja en «tenemos» con
+  `marcadoYaLoTenemos`; «Volver a la lista» lo deshace; las búsquedas diarias no tocan esas columnas. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
   dropshipper por país), «Descubrir proveedores» desde el catálogo de cada país y TuWinner.
   Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`
   manual o dropi), `scraping_busquedas` (con `duracion_ms`), `scraping_productos` (último precio y stock, `estado` activo o

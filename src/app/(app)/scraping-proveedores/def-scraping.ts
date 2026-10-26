@@ -7,6 +7,20 @@ import type { DefTabla } from "@/lib/tabla/motor";
 export const PAISES_DROPI: Record<string, string> = { mx: "México", co: "Colombia", ec: "Ecuador", pa: "Panamá", cr: "Costa Rica", cl: "Chile", pe: "Perú", gt: "Guatemala", py: "Paraguay", ar: "Argentina" };
 export const nombrePais = (codigo: string) => PAISES_DROPI[codigo] ?? codigo.toUpperCase();
 
+/** Los colores de cada recomendación, los del sistema (Testear en el morado de los paneles). */
+export const CLASE_RECOMENDACION: Record<Recomendacion, string> = {
+  testear: "bg-primario-suave text-primario",
+  mirar: "bg-warning-soft text-warning",
+  tenemos: "bg-muted text-muted-foreground",
+  sin_senales: "bg-muted text-muted-foreground",
+};
+
+/** Lo que se anota al sacar un producto con «Ya lo tenemos»: a qué se parece de lo nuestro, si hay algo. */
+export function motivoYaLoTenemos(f: FilaScraping): string {
+  const p = f.parecidos[0];
+  return p ? `Se parece a «${p.nombre}» (${p.detalle})` : "Marcado a mano";
+}
+
 /** Señales para las tarjetas: se vendió esta semana, es nuevo. */
 export type Senal = "vende_semana" | "nuevo";
 export const SENALES: { valor: Senal; etiqueta: string }[] = [
@@ -96,6 +110,8 @@ export interface FilaScraping {
   privados: { id: string; nombre: string; precio: number | null; stock: number | null; parecido: number; seguro: boolean }[];
   /** Su fila en Selección de productos, si ya se envió. */
   seleccion: { numero: number; estado: string } | null;
+  /** Si alguien lo sacó de la lista con «Ya lo tenemos» (migración 0156). */
+  marcado: { en: string; por: string | null; motivo: string | null } | null;
 }
 
 export const ESTADOS: { valor: EstadoScraping; etiqueta: string }[] = [
@@ -133,6 +149,14 @@ export const formatoNumero = (n: number | null) => (n === null ? "—" : n.toLoc
 export const DEF_SCRAPING: DefTabla<FilaScraping> = {
   clave: "scraping-productos",
   vistaInicial: { agrupar: "recomendacion" },
+  // La lista es el reporte de qué testear: «Ya lo tenemos» y «Sin señales» van ocultos, detrás de un botón.
+  cerrados: {
+    etiqueta: "Ya lo tenemos y sin señales",
+    esCerrado: (f) => f.recomendacion === "tenemos" || f.recomendacion === "sin_senales",
+    campoEstado: "recomendacion",
+    valoresCerrados: ["tenemos", "sin_senales"],
+    ocultosPorDefecto: true,
+  },
   campos: [
     {
       id: "recomendacion",

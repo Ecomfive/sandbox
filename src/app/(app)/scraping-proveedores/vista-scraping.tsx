@@ -20,8 +20,8 @@ import { formatearFechaHora } from "@/lib/formato";
 import { CalendarioIcon, CatalogoIcon, HistorialIcon, InteligenciaIcon, ProductoIcon } from "@/lib/nav-icons";
 import { ETIQUETA_REFERENCIA } from "@/lib/scraping/cruces";
 import { RECOMENDACIONES } from "@/lib/scraping/recomendar";
-import { agregarProveedor, obtenerHistorialProducto, pedirBusqueda, registrarDatosProveedor, type EventoProducto } from "./actions";
-import { MOTIVO, formatoNumero, formatoPrecio, formatoUsd, nombrePais, type FilaScraping } from "./def-scraping";
+import { agregarProveedor, marcarYaLoTenemos, obtenerHistorialProducto, pedirBusqueda, registrarDatosProveedor, type EventoProducto } from "./actions";
+import { CLASE_RECOMENDACION, MOTIVO, formatoNumero, formatoPrecio, formatoUsd, motivoYaLoTenemos, nombrePais, type FilaScraping } from "./def-scraping";
 
 export interface ProveedorResumen {
   id: string;
@@ -177,11 +177,14 @@ function CeldaCambio({ antes, ahora, formato }: { antes: number | null; ahora: n
 export function FichaProducto({
   fila,
   puedeEnviar,
+  puedeEscribir = false,
   alCerrar,
   alEnviar,
 }: {
   fila: FilaScraping | null;
   puedeEnviar: boolean;
+  /** Puede sacarlo de la lista con «Ya lo tenemos» (o devolverlo). */
+  puedeEscribir?: boolean;
   alCerrar: () => void;
   alEnviar: (ids: string[]) => void;
 }) {
@@ -223,10 +226,14 @@ export function FichaProducto({
           {rec && (
             <Seccion icono={InteligenciaIcon} titulo="Recomendación">
               <div className="flex flex-col gap-2 rounded-xl bg-muted/60 px-4 py-3">
-                <span className="w-fit rounded-full px-2.5 py-0.5 text-xs font-bold text-white" style={{ background: rec.color }}>
-                  {rec.etiqueta}
-                </span>
+                <span className={`w-fit rounded-full px-2.5 py-0.5 text-xs font-bold ${CLASE_RECOMENDACION[fila.recomendacion]}`}>{rec.etiqueta}</span>
                 <p className="m-0 text-sm leading-relaxed">{fila.porQue}</p>
+                {fila.marcado && (
+                  <p className="m-0 text-xs text-muted-foreground">
+                    Lo sacó de la lista {fila.marcado.por ?? "alguien"} el {formatearFechaHora(fila.marcado.en)}.
+                  </p>
+                )}
+                {puedeEscribir && <BotonYaLoTenemos fila={fila} />}
                 <p className="m-0 text-xs text-muted-foreground">
                   {fila.proveedor} · {nombrePais(fila.pais)} · ventas estimadas: {formatoNumero(fila.ventas30)} u. en 30 días, {formatoNumero(fila.ventas7)} en 7 (lo que bajó el stock)
                 </p>
@@ -406,6 +413,33 @@ function CamposCifras({ faltante, invalido, prefijo }: { faltante: string | null
         </Campo>
       ))}
     </div>
+  );
+}
+
+/**
+ * «Ya lo tenemos»: saca el producto de la lista de recomendados (queda en «Ya lo tenemos», con a qué se parece de lo nuestro); si
+ * ya estaba marcado, «Volver a la lista» lo devuelve.
+ */
+export function BotonYaLoTenemos({ fila, compacto = false }: { fila: FilaScraping; compacto?: boolean }) {
+  const [pendiente, iniciar] = useTransition();
+  const { mostrarToast } = useToast();
+  const marcar = !fila.marcado;
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      className={compacto ? "min-h-9 px-3 text-xs" : ""}
+      disabled={pendiente}
+      aria-label={compacto ? `${marcar ? "Ya lo tenemos" : "Volver a la lista"}: ${fila.nombre}` : undefined}
+      onClick={() =>
+        iniciar(async () => {
+          const r = await marcarYaLoTenemos(fila.id, marcar, marcar ? motivoYaLoTenemos(fila) : null).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+          mostrarToast(r.error ?? (marcar ? "Fuera de la lista: ya lo tenemos" : "De vuelta en la lista"), r.error ? "destructive" : "success");
+        })
+      }
+    >
+      {pendiente ? "Un momento…" : marcar ? "Ya lo tenemos" : "Volver a la lista"}
+    </Button>
   );
 }
 

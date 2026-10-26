@@ -59,6 +59,8 @@ export interface DatosRecomendacion {
   /** Lo nuestro que se parece sin ser igual (para revisarlo antes de testear). */
   parecidos?: { tipo: TipoReferencia; nombre: string }[];
   enSeleccion: boolean;
+  /** Si alguien lo sacó de la lista con «Ya lo tenemos» (migración 0156): con qué lo tenemos. */
+  marcadoYaLoTenemos?: string | null;
   /** Hace cuántos días apareció si es nuevo (`esNuevo`), o null. */
   nuevoHaceDias: number | null;
 }
@@ -88,6 +90,8 @@ export function recomendar(d: DatosRecomendacion): { tipo: Recomendacion; porQue
     return t.charAt(0).toUpperCase() + t.slice(1);
   };
 
+  if (d.marcadoYaLoTenemos !== undefined && d.marcadoYaLoTenemos !== null)
+    return { tipo: "tenemos", porQue: frase(`Lo marcaron como «Ya lo tenemos»${d.marcadoYaLoTenemos ? `: ${d.marcadoYaLoTenemos}` : ""}.`) };
   if (d.yaVisto || d.enSeleccion) {
     const que = d.yaVisto
       ? { test: `Ya se testeó: ${d.yaVisto.nombre}.`, producto: `Ya está en Producto: ${d.yaVisto.nombre}.`, compra: `Ya se compró: ${d.yaVisto.nombre}.`, publicacion: `Ya lo vendemos en Dropi: ${d.yaVisto.nombre}.` }[d.yaVisto.tipo]
