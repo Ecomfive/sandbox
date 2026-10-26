@@ -1716,6 +1716,9 @@ final se dice cuáles se usaron.
 
 ## Trabajo pendiente conocido
 
+- [PLAN-EXTENSION-ANUNCIOS.md](PLAN-EXTENSION-ANUNCIOS.md): plan de acción (**pendiente, no se ejecuta todavía**, 26 oct 2026) para una extensión
+  propia que lea la Biblioteca de anuncios de Meta (días activos, versiones, tienda, saturación por producto), la guarde en el sistema y alimente Selección,
+  Análisis de competencia, Gestión de IDs Dropi y el Generador de landings. Nace del análisis de AdGrab.
 - [RENDIMIENTO-PENDIENTE.md](RENDIMIENTO-PENDIENTE.md): diagnóstico de
   rendimiento de navegación entre páginas, con plan de arreglo priorizado.
   Los puntos 1 (Pedidos Dropi: el resumen se agrega en Postgres, migración 0037),
