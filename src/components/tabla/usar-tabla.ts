@@ -29,25 +29,35 @@ export function useTablaInteractiva<F>(
   // La lupa: busca en todos los textos de la fila (código, nombre…), también entre las cerradas.
   const [busqueda, setBusqueda] = useState("");
   const q = normalizar(busqueda.trim());
-  const hayFiltros = filtros.some(filtroActivo) || q !== "";
+  // Buscar por imagen: los ids encontrados, de más a menos parecido (null = sin esa búsqueda).
+  const [porImagen, setPorImagen] = useState<string[] | null>(null);
+  const hayFiltros = filtros.some(filtroActivo) || q !== "" || porImagen !== null;
   const agrupado = vista.agrupar !== null;
 
   const resultado = useMemo(() => {
     // Al buscar se busca en todas, abiertas y cerradas (antes, en una tabla con «Cerrados» exclusivo, buscar dejaba solo las
     // cerradas y no se encontraba una compra abierta).
-    const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados, q !== "");
-    if (!q) return r;
-    const textos = def.campos.filter((c) => c.tipo === "texto");
-    const coincide = (fila: F) => textos.some((c) => c.tipo === "texto" && normalizar(c.valor(fila)).includes(q));
-    return { ...r, filas: r.filas.filter(coincide) };
-  }, [def, filas, filtros, vista.mostrarCerrados, q]);
+    const r = aplicarVista(def, filas, filtros, vista.mostrarCerrados, q !== "" || porImagen !== null);
+    let resultado = r;
+    if (q) {
+      const textos = def.campos.filter((c) => c.tipo === "texto");
+      const coincide = (fila: F) => textos.some((c) => c.tipo === "texto" && normalizar(c.valor(fila)).includes(q));
+      resultado = { ...r, filas: r.filas.filter(coincide) };
+    }
+    if (porImagen && def.imagen) {
+      const idDe = def.imagen.id;
+      const orden = new Map(porImagen.map((id, i) => [id, i]));
+      resultado = { ...resultado, filas: resultado.filas.filter((f) => orden.has(idDe(f))).sort((a, b) => (orden.get(idDe(a)) ?? 0) - (orden.get(idDe(b)) ?? 0)) };
+    }
+    return resultado;
+  }, [def, filas, filtros, vista.mostrarCerrados, q, porImagen]);
   const { limiteSinFiltros, paginarSiempre = false } = opciones;
   // Las filas por página las puede elegir cada persona (50, 100, 500 o todas); sin elección, las de la tabla.
   const [filasElegidas] = useFilasPorPagina();
   const porPagina = opciones.porPagina === undefined ? undefined : tamanoDePagina(filasElegidas, opciones.porPagina);
 
   // Página pedida: vale solo mientras no cambien los filtros, los cerrados, los grupos ni las filas por página; si cambian, se vuelve a la 1.
-  const firmaPagina = JSON.stringify([filtros, vista.mostrarCerrados, vista.agrupar, q, porPagina]);
+  const firmaPagina = JSON.stringify([filtros, vista.mostrarCerrados, vista.agrupar, q, porPagina, porImagen]);
   const [paginaPedida, setPaginaPedida] = useState<{ firma: string; pagina: number }>({ firma: "", pagina: 1 });
   const paginado = porPagina !== undefined && (paginarSiempre || (!hayFiltros && !agrupado));
   // Agrupada, las páginas siguen el orden de los grupos (una fila con varios valores cuenta una vez, en el primero).
@@ -98,6 +108,8 @@ export function useTablaInteractiva<F>(
     cambiarFiltros,
     busqueda,
     setBusqueda,
+    porImagen,
+    setPorImagen,
     vista,
     cambiarVista,
     hayFiltros,

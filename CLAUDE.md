@@ -1498,6 +1498,19 @@ convenciones técnicas del código.
   quita el parámetro de la dirección y lo que la persona tenía queda guardado como
   «Antes del enlace». Compartir vistas con nombre para todo el equipo pediría una
   tabla en Supabase: no existe todavía.
+- **Buscar por imagen** (26 oct 2026, pedido de Jhokser). La lupa de la barra de herramientas trae al lado una **cámara** (`BotonBuscar` › `BotonImagen`) en las listas que
+  declaran `imagen: { ambito, id }` en su `DefTabla` (hoy **Producto**, **Gestión de IDs Dropi** y **Scraping de proveedores**; otra lista se suma agregando esa línea):
+  abre `VentanaBuscarImagen` (`src/components/buscar-imagen/`), donde se pega (Ctrl+V), se arrastra o se sube una foto; el navegador la reduce (`comprimirImagen`, ~170 KB) y
+  `buscarPorImagen` (`src/lib/imagen/buscar-actions.ts`) la busca **en todas las partes que la persona puede abrir** (Producto, Gestión de IDs, Scraping y Análisis de
+  competencia; `AMBITOS`, con el módulo de cada una) y en el país de la barra. Dos pasos (lógica pura con prueba en `buscar.ts` e `ia-imagen.ts`): (1) **huella** de la foto
+  (dHash de 64 bits, `huellaFoto`, la misma de Producto y Scraping) contra `foto_huella` de cada candidato, hasta 18 bits (`MAX_DISTANCIA`; ≤ 5 «Misma foto», ≤ 10 «Muy
+  parecida»); (2) con «Confirmar con IA» (por defecto, `pedirIA` con visión: la misma OpenAI o Claude del Asistente de IA, operación `busqueda_imagen` en «Consumo de IA»): la
+  IA dice qué producto es la foto, se suman los candidatos que se llaman parecido (`porNombre`: así aparece el mismo producto con otra foto) y compara la foto con la de
+  los 8 mejores (`pedidoVerificar`) y dice «Es el mismo producto / Parecido / Distinto» con su motivo; todo lo que devuelve se vuelve a validar. Sin IA conectada o si falla,
+  queda lo de la huella con un aviso. Los candidatos de cada parte se cargan de la base (`candidatos-datos.ts`, en memoria 3 minutos: `conTtl`, solo datos que no son de
+  una persona) y la imagen **no se guarda**. En una lista con `imagen`, «Filtrar esta lista» deja solo lo encontrado de su parte (`useTablaInteractiva`: `porImagen`, de más a
+  menos parecido; busca también entre las filas cerradas) y un chip «Por imagen ×» lo quita. **Pendiente**: la cámara en el buscador de Ctrl K, en Selección, Test productos,
+  Compras e Inventario, y una función SQL que compare las huellas en la base (hoy se comparan en el servidor; con decenas de miles de fotos conviene pasarlo a Postgres).
 - **Descargar lo que se ve.** Toda tabla con barra de herramientas trae el botón
   «Descargar»: un CSV (con BOM para Excel) de las filas que dejan los filtros, en
   el orden de la pantalla, armado en el navegador con la `DefTabla`
