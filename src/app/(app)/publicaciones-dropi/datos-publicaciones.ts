@@ -383,7 +383,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const cumplidas: { d: DecisionVista; nombre: string }[] = [];
   for (const f of filas) {
     // Republicar: necesita la bodega de la fila (se conoce después de armarla).
-    if (necesitaRepublicar({ archivada: f.archivada, enDropi: f.enDropi, bodegaId: f.bodega?.id ?? null, hayVentas: !!f.ventas, ultimaVenta: f.ventas?.ultimaVenta ?? null, publicadaDesde: f.ventas?.primeraVenta ?? f.fechaPublicacion, privada: f.tipoDropi === "privado", stock: f.stockProveedor ?? f.ventas?.stock ?? null, netas30: f.ventas?.netas30 ?? null }, hoy, r))
+    if (necesitaRepublicar({ archivada: f.archivada, enDropi: f.enDropi, bodegaId: f.bodega?.id ?? null, hayVentas: !!f.ventas, ultimaVenta: f.ventas?.ultimaVenta ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, privada: f.tipoDropi === "privado", stock: f.stockProveedor ?? f.ventas?.stock ?? null, netas30: f.ventas?.netas30 ?? null }, hoy, r))
       f.acciones = [...f.acciones, "republicar"];
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
     const comboPublicado = !!combo && publicados.has(combo.id);

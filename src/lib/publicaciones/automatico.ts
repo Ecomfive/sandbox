@@ -120,7 +120,8 @@ export function necesitaRepublicar(
   // su único pedido en 30 días se canceló). Sin netas en 30 días, sale si lleva al menos esos días publicada.
   if (n === 30 && p.netas30 != null) {
     if (p.netas30 > 0) return false;
-    return !!p.publicadaDesde && dias(p.publicadaDesde, hoy) >= n;
+    // Y más de N días publicada (la fecha de publicación en Dropi; si no se sabe, la de su primera venta).
+    return !!p.publicadaDesde && dias(p.publicadaDesde, hoy) > n;
   }
   // Vendió hace menos de N días: no.
   if (p.ultimaVenta && dias(p.ultimaVenta, hoy) < n) return false;

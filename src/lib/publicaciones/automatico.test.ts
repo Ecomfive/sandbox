@@ -50,6 +50,8 @@ test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca 
   assert.equal(r({ ...base, ultimaVenta: "2026-10-04", netas30: 0 }, hoy), true, "su único pedido se canceló");
   assert.equal(r({ ...base, ultimaVenta: "2026-10-04", netas30: 2 }, hoy), false, "vendió en 30 días");
   assert.equal(r({ ...base, netas30: 0, publicadaDesde: "2026-10-10" }, hoy), false, "lleva menos de 30 días publicada");
+  assert.equal(r({ ...base, netas30: 0, publicadaDesde: "2026-09-22" }, hoy), false, "30 días justos: todavía no");
+  assert.equal(r({ ...base, netas30: 0, publicadaDesde: "2026-09-21" }, hoy), true, "31 días: sí");
   assert.equal(r({ ...base, bodegaId: null }, hoy), false, "sin bodega conocida no se sabe");
   assert.equal(r({ ...base, ultimaVenta: "2026-10-05" }, hoy), false, "vendió hace menos de 30 días");
   assert.equal(r({ ...base, ultimaVenta: null, publicadaDesde: "2026-10-01" }, hoy), false, "nunca vendió pero es nueva");
