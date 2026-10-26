@@ -256,7 +256,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     const b = await supabase.from("dropi_publicaciones").select("id, datos_dropi").in("id", idsBorrador);
     if (!b.error) for (const x of b.data ?? []) datosBorradores.set(x.id as string, x.datos_dropi);
   }
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoPorSku, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoYCotizando, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -271,6 +271,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarProductosProveedor(supabase, paisId),
     cargarCambiosDropi(supabase, paisId),
   ]);
+  const { camino: enCaminoPorSku, cotizando: cotizandoPorSku } = enCaminoYCotizando;
   const r = reglas.reglas;
   // Los componentes de los compuestos vinculados (packs y combos): lo que viene en camino de un compuesto es lo de sus componentes.
   const combos = [...new Set(datos.map((d) => d.sku_maestro_id as string | null).filter((id): id is string => !!id && skus.get(id)?.tipo === "combo"))];
@@ -352,6 +353,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
       sugerencia: sugerencias.get(d.id) ?? null,
       enCamino: camino?.unidades ?? 0,
+      // Lo que todavía se cotiza (01 - Cotizar y 02 - Cotizado) del producto; de un compuesto, lo de sus componentes.
+      enCotizacion: compuesto ? (componentesDe.get(d.sku_maestro_id as string) ?? []).reduce((t, c) => t + (cotizandoPorSku.get(c.id) ?? 0), 0) : d.sku_maestro_id ? (cotizandoPorSku.get(d.sku_maestro_id as string) ?? 0) : 0,
       componentesCamino: compuesto?.componentes ?? null,
       llegadaCamino: camino?.llegada ?? null,
       sinFechaCamino: camino?.sinFecha ?? 0,

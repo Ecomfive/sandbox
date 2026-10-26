@@ -29,6 +29,12 @@ export interface EnCaminoPais {
 /** Las etapas en que la mercancía ya está pedida (se produce, viaja o llegó al puerto) aunque todavía no tenga fecha de envío. */
 export const ETAPAS_EN_MARCHA = ["produccion", "tracking", "arribo_mercancia"];
 
+/** Las etapas en que la orden todavía se está cotizando (01 - Cotizar y 02 - Cotizado): se sabe cuánto se piensa pedir, pero aún no se pidió. */
+export const ETAPAS_COTIZANDO = ["cotizar", "cotizado"];
+
+/** Una orden que todavía se cotiza: abierta, sin llegar, en Cotizar o Cotizado y que no cuenta ya como en camino. */
+export const lineaCotizando = (l: LineaEnCamino): boolean => !l.anulada && !l.fechaLlegada && ETAPAS_COTIZANDO.includes(l.etapa) && !lineaEnCamino(l);
+
 /** Una línea está en camino: orden abierta, sin llegar, que ya salió o ya está en producción, tracking o arribo. */
 export const lineaEnCamino = (l: LineaEnCamino): boolean =>
   !l.anulada && !ETAPAS_CERRADAS.includes(l.etapa) && !l.fechaLlegada && (!!l.fechaEnvio || ETAPAS_EN_MARCHA.includes(l.etapa));

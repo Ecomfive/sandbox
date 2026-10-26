@@ -22,9 +22,15 @@ function Dato({ titulo, valor, detalle, tono }: { titulo: string; valor: string;
  * «Viene mercancía en camino» (26 oct 2026): las unidades que vienen, cuándo llegan y si falta una fecha. Sale siempre que haya algo en camino, tenga o no
  * stock y tenga o no datos de ventas (antes solo salía con ventas y sin stock, y un producto nuevo no lo mostraba).
  */
-export function AvisoEnCamino({ enCamino, llegada = null, sinFecha = 0, sinEnvio = 0, de = null }: { enCamino: number; llegada?: string | null; sinFecha?: number; sinEnvio?: number; /** De un compuesto: de qué componente es lo que viene. */ de?: string | null }) {
-  if (!(enCamino > 0)) return null;
+export function AvisoEnCamino({ enCamino, llegada = null, sinFecha = 0, sinEnvio = 0, de = null, enCotizacion = 0 }: { enCamino: number; llegada?: string | null; sinFecha?: number; sinEnvio?: number; /** De un compuesto: de qué componente es lo que viene. */ de?: string | null; /** Unidades en órdenes que todavía se cotizan: aún no vienen. */ enCotizacion?: number }) {
+  const cotiza = enCotizacion > 0 && (
+    <p className="m-0 text-sm font-medium text-warning">
+      En cotización: {entero(enCotizacion)} {enCotizacion === 1 ? "unidad" : "unidades"} (todavía no se pide: aún no viene)
+    </p>
+  );
+  if (!(enCamino > 0)) return cotiza || null;
   return (
+    <>
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-success">
       <span>
         Viene mercancía en camino: {entero(enCamino)} {enCamino === 1 ? "unidad" : "unidades"}
@@ -33,6 +39,8 @@ export function AvisoEnCamino({ enCamino, llegada = null, sinFecha = 0, sinEnvio
       </span>
       {sinFecha > 0 && <Badge tone="warning">{llegada ? (sinEnvio > 0 ? "Parte aún sin fecha de envío" : "Parte sin fecha de llegada") : sinEnvio >= sinFecha ? "Aún sin fecha de envío" : "Aún sin fecha de llegada"}</Badge>}
     </p>
+    {cotiza}
+    </>
   );
 }
 

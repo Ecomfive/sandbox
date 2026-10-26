@@ -638,7 +638,7 @@ function ContenidoFicha({
           )}
 
           <Seccion icono={InventarioIcon} titulo="Stock">
-            <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} de={p.componentesCamino ? detalleCompuesto(p.componentesCamino) : null} />
+            <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} de={p.componentesCamino ? detalleCompuesto(p.componentesCamino) : null} enCotizacion={p.enCotizacion} />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>
