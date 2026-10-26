@@ -210,6 +210,7 @@ export const STOCK_DROPI = [
 
 /** Cómo se filtra y agrupa la lista: las archivadas en Dropi van ocultas (botón «Archivados»); lo que necesita cada una está en las tarjetas de arriba. */
 export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
+  imagen: { ambito: "publicacion", id: (f) => f.id },
   clave: "publicaciones-dropi",
   campos: [
     // Lo que necesita cada publicación, calculado (21 oct 2026): reemplaza el «Estado» del flujo de trabajo y la revisión cada 28

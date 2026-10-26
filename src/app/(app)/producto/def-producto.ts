@@ -127,6 +127,7 @@ export interface ReferenciasTest {
 
 /** Cómo se filtra y agrupa la lista de productos. */
 export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
+  imagen: { ambito: "producto", id: (f) => f.id },
   clave: "producto",
   campos: [
     { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => `${p.codigo} ${p.nombre} ${p.codigoBarras ?? ""}` },

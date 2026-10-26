@@ -147,6 +147,7 @@ export const formatoNumero = (n: number | null) => (n === null ? "—" : n.toLoc
 
 /** Filtros, agrupación y descarga de la lista de productos de los proveedores referentes. */
 export const DEF_SCRAPING: DefTabla<FilaScraping> = {
+  imagen: { ambito: "scraping", id: (f) => f.id },
   clave: "scraping-productos",
   vistaInicial: { agrupar: "recomendacion" },
   // La lista es el reporte de qué testear: «Ya lo tenemos» y «Sin señales» van ocultos, detrás de un botón.

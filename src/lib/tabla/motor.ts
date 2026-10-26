@@ -87,6 +87,11 @@ export interface DefTabla<F> {
   csvAntes?: { etiqueta: string; valor: (fila: F) => string | number | null }[];
   /** Vista con la que arranca quien aún no eligió una (por ejemplo, agrupada por extracto). */
   vistaInicial?: { agrupar: string; orden?: "asc" | "desc" };
+  /**
+   * Buscar por imagen (26 oct 2026): con esto, la lupa de la barra de herramientas trae una cámara que busca una foto pegada en el sistema y deja en la lista
+   * solo lo encontrado. `ambito` es qué parte del sistema es la lista y `id` dice cómo se identifica cada fila (el id de lo que tiene la foto).
+   */
+  imagen?: { ambito: "producto" | "publicacion" | "scraping" | "competencia"; id: (fila: F) => string };
 }
 
 export type ValorFiltro =
