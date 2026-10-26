@@ -36,6 +36,7 @@ import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
+import { PublicacionesDelProducto } from "./mismo-producto";
 
 interface Formulario {
   nombre: string;
@@ -138,6 +139,8 @@ export function FichaPublicacion({
   anterior,
   siguiente,
   alCerrar,
+  mismoProducto = [],
+  alAbrirOtra,
 }: {
   publicacion: FilaPublicacion | undefined;
   codigoPais: string;
@@ -155,6 +158,9 @@ export function FichaPublicacion({
   decisionesDisponibles: boolean;
   /** Categorías y bodegas que ofrece el formulario de los datos para Dropi de una publicación «Sin publicar». */
   opcionesCrear: OpcionesCrear;
+  /** Las demás publicaciones del mismo producto (mismo SKU vinculado), públicas y privadas, y cómo abrir una. */
+  mismoProducto?: FilaPublicacion[];
+  alAbrirOtra?: (id: string) => void;
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
@@ -176,6 +182,8 @@ export function FichaPublicacion({
       anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
+      mismoProducto={mismoProducto}
+      alAbrirOtra={alAbrirOtra}
     />
   );
 }
@@ -194,6 +202,8 @@ function ContenidoFicha({
   anterior,
   siguiente,
   alCerrar,
+  mismoProducto,
+  alAbrirOtra,
 }: {
   p: FilaPublicacion;
   codigoPais: string;
@@ -208,6 +218,8 @@ function ContenidoFicha({
   anterior?: () => void;
   siguiente?: () => void;
   alCerrar: () => void;
+  mismoProducto: FilaPublicacion[];
+  alAbrirOtra?: (id: string) => void;
 }) {
   const { mostrarToast } = useToast();
   const [d, setD] = useState<Formulario>(desde(p));
@@ -428,6 +440,13 @@ function ContenidoFicha({
             <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} alAbrirProducto={setProductoAbierto} />
           </Seccion>
         </div>
+        {p.sku && alAbrirOtra && (
+          <div className="border-b border-border px-5 py-5">
+            <Seccion icono={ProductoIcon} titulo="Otras publicaciones del producto">
+              <PublicacionesDelProducto otras={mismoProducto} alAbrir={alAbrirOtra} />
+            </Seccion>
+          </div>
+        )}
 
         <RecomendacionesFicha p={p} puedeEscribir={puedeEscribir} disponible={decisionesDisponibles} />
         {!p.archivada && <OptimizacionFicha p={p} puedeEscribir={puedeEscribir} />}

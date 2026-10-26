@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -107,6 +107,11 @@ export function TablaPublicaciones({
     if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
   }, [abierta]);
   const [orden, setOrden] = useState<string[]>([]);
+  // Las demás publicaciones del mismo producto que la abierta (mismo SKU vinculado), para su sección en la ficha.
+  const mismoProducto = useMemo(() => {
+    const actual = abierta ? publicaciones.find((p) => p.id === abierta) : undefined;
+    return actual?.sku ? publicaciones.filter((p) => p.id !== actual.id && p.sku?.id === actual.sku!.id) : [];
+  }, [abierta, publicaciones]);
   const i = abierta ? orden.indexOf(abierta) : -1;
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador (en el
   // servidor no hay `document`).
@@ -165,6 +170,8 @@ export function TablaPublicaciones({
         anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}
+        mismoProducto={mismoProducto}
+        alAbrirOtra={setAbierta}
       />
     </ProveedorSkusMaestros>
     </ProveedorTareas>
