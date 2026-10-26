@@ -1,4 +1,4 @@
-// «Privatizar en Dropi» (pedido de Jhokser, 26 oct 2026; migración 0154): dejarle un producto a un solo dropshipper. Es lo que se hace a mano
+// «Privatizar en Dropi» (pedido de Jhokser, 26 oct 2026; migración 0155): dejarle un producto a un solo dropshipper. Es lo que se hace a mano
 // con los productos «P-MA …»: un producto privado aparte (con su propio ID), con el correo del dropshipper asignado y las unidades que se le
 // reservan, que salen del stock del público. El favorito «Aplicar en Dropi» lo hace desde la pestaña de Dropi, con lo mismo que hace la pantalla
 // de Dropi (leído de su código el 26 oct 2026, componente «Editar mis productos»):

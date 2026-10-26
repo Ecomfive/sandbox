@@ -16,7 +16,7 @@
  * (concepto «stock»), con `quitarPrivados` quita la privatización, comprueba que quedó en cero e intenta archivar. Si Dropi no deja
  * archivar (órdenes pendientes) devuelve `ok: true, archivado: false`: queda pendiente y el próximo «Aplicar en Dropi» solo repite el archivado.
  *
- * Un cambio de tipo «privatizar» (26 oct 2026, migración 0154; `privatizar`, con `PRIVATIZAR_JS`) deja un producto a un solo dropshipper: comprueba
+ * Un cambio de tipo «privatizar» (26 oct 2026, migración 0155; `privatizar`, con `PRIVATIZAR_JS`) deja un producto a un solo dropshipper: comprueba
  * su correo en Dropi, crea el producto privado (copia del público), le pone fotos, garantías y stock, se lo asigna en «Productos privados» y le
  * saca esas unidades al público. Devuelve el ID nuevo aunque falle un paso después, y si ya le sacó el stock al público (`salida`).
  */

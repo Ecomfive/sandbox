@@ -101,7 +101,7 @@ function EstadoCrear({ c }: { c: CambioDropiVista }) {
   );
 }
 
-/** Cómo va una privatización (migración 0154): hecha (con el ID del producto privado), pendiente o con error (se sigue desde donde quedó). */
+/** Cómo va una privatización (migración 0155): hecha (con el ID del producto privado), pendiente o con error (se sigue desde donde quedó). */
 function EstadoPrivatizar({ c }: { c: CambioDropiVista }) {
   const p = c.privatizacion;
   const quien = p ? `${p.dropshipper || p.correo} (${p.correo})` : "el dropshipper";

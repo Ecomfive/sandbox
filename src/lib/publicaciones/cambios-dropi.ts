@@ -17,7 +17,7 @@ export interface CambioDropiVista {
   /**
    * «cambio» = nombre, precios, descripción y/o fotos; «republicar» = crear el producto de nuevo en Dropi (migración 0145); «apagar» = sacar el
    * stock y archivar (0148); «archivar» = archivar o sacar de Archivados (0151); «crear» = publicar una publicación nueva en Dropi (0151);
-   * «privatizar» = dejarle unidades del producto a un dropshipper en un producto privado nuevo (0154).
+   * «privatizar» = dejarle unidades del producto a un dropshipper en un producto privado nuevo (0155).
    */
   tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar";
   /** «privatizar»: a quién, cuántas unidades y bajo qué nombre. */
@@ -263,7 +263,7 @@ export async function encolarCrear(
 }
 
 /**
- * «Privatizar en Dropi» (pedido de Jhokser, 26 oct 2026; migración 0154): deja en la cola que se cree en Dropi un producto privado del público de
+ * «Privatizar en Dropi» (pedido de Jhokser, 26 oct 2026; migración 0155): deja en la cola que se cree en Dropi un producto privado del público de
  * `pub` y se le asigne a un dropshipper con unas unidades que salen del público. Va en la publicación pública. Si ya había una privatización
  * esperando para el mismo correo, no se agrega otra (`yaEstaba`); a otro correo sí (se puede privatizar a varios).
  */
@@ -277,7 +277,7 @@ export async function encolarPrivatizar(
   if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
   const falta = (m: string) => /tipo|column|does not exist|schema cache|datos/i.test(m);
   const previo = await supabase.from("dropi_cambios_pendientes").select("id, datos").eq("publicacion_id", pub.id).eq("tipo", "privatizar").in("estado", ["pendiente", "error"]);
-  if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0154." : "No se pudo dejar la privatización para Dropi." };
+  if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0155." : "No se pudo dejar la privatización para Dropi." };
   const igual = (previo.data ?? []).find((f) => normalizarDatosPrivatizar(f.datos).correo === datos.correo);
   if (igual) return { id: igual.id as string, yaEstaba: true };
   const { data, error } = await supabase
@@ -285,7 +285,7 @@ export async function encolarPrivatizar(
     .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "privatizar", nombre: datos.nombre, datos, creado_por: por.id, creado_por_nombre: por.nombre })
     .select("id")
     .single();
-  if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0154." : "No se pudo dejar la privatización para Dropi." };
+  if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0155." : "No se pudo dejar la privatización para Dropi." };
   return { id: data.id as string, yaEstaba: false };
 }
 

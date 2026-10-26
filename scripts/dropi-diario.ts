@@ -87,11 +87,7 @@ async function cargar() {
     fallos.push("stock");
   }
 
-  // Cada carga vuelve a guardar en bruto los pedidos de 30 días: de cada pedido se deja solo la copia más reciente (sin la
-  // migración 0133, solo avisa; la tabla crece hasta correrla).
-  const { data: borradas, error: el } = await supabase.rpc("dropi_staging_ordenes_limpiar");
-  if (el) console.warn(`\nAviso: no se limpiaron las copias viejas de staging_ordenes_dropi (${el.message}). Falta la migración 0133.`);
-  else console.log(`\nCopias viejas de pedidos borradas de staging: ${borradas}.`);
+  // Las copias viejas de los pedidos en bruto las borra `ingerirPedidos` (dropi-ingerir-ordenes.ts) después de guardarlos.
 
   await marcarSesion(true, fallos.length ? `Actualización diaria con fallos: ${fallos.join(", ")}` : "Actualización diaria");
   if (fallos.length) {

@@ -684,7 +684,7 @@ export async function republicarPublicacion(id: string): Promise<{ error?: strin
 }
 
 /**
- * «Privatizar en Dropi» en la ficha (pedido de Jhokser, 26 oct 2026; migración 0154): deja pendiente que «Aplicar en Dropi» le deje un producto
+ * «Privatizar en Dropi» en la ficha (pedido de Jhokser, 26 oct 2026; migración 0155): deja pendiente que «Aplicar en Dropi» le deje un producto
  * a un solo dropshipper. En Dropi crea un producto privado nuevo («P-XX …», copia del público), le asigna el correo en «Productos privados» con
  * las unidades que se le reservan y se las saca al público. Cuando Dropi lo confirma, el sistema crea la publicación privada (`guardarResultadosDropi`).
  * El nombre del privado, el público de origen y la bodega se vuelven a calcular y comprobar aquí: el navegador no decide a qué producto se toca.

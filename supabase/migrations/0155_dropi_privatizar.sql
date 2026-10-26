@@ -5,7 +5,7 @@
 -- privado, le pone fotos, garantías y stock, se lo asigna al dropshipper en «Productos privados» y le saca esas unidades al público. Al terminar, el
 -- sistema crea la publicación privada (`nueva_publicacion_id`, migración 0145) con su ID de Dropi, `privatizado_a` y `privatizado_email`.
 -- Código: src/lib/publicaciones/privatizar-dropi.ts, cambios-dropi.ts (encolarPrivatizar), marcador-aplicar-dropi.ts, aplicar-actions.ts.
--- Reversa: supabase/rollbacks/0154_rollback.sql
+-- Reversa: supabase/rollbacks/0155_rollback.sql
 
 -- «privatizar» como un tipo más de cambio (se busca la restricción por lo que dice, no por su nombre).
 do $$
