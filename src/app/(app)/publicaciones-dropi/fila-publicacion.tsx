@@ -119,7 +119,8 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
  * compuesto (pack o combo), lo que viene de sus componentes y de cuál es.
  */
 function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
-  const viene = f.ventas !== null && f.ventas.stock <= 0 && f.enCamino > 0;
+  // Sale siempre que haya algo en camino (26 oct 2026): antes pedía datos de ventas y cero stock, y un producto nuevo o con unidades no lo mostraba.
+  const viene = f.enCamino > 0;
   const de = f.componentesCamino ? detalleCompuesto(f.componentesCamino) : null;
   return (
     <Celda

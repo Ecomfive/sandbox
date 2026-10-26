@@ -19,28 +19,28 @@ function Dato({ titulo, valor, detalle, tono }: { titulo: string; valor: string;
 }
 
 /**
+ * «Viene mercancía en camino» (26 oct 2026): las unidades que vienen, cuándo llegan y si falta una fecha. Sale siempre que haya algo en camino, tenga o no
+ * stock y tenga o no datos de ventas (antes solo salía con ventas y sin stock, y un producto nuevo no lo mostraba).
+ */
+export function AvisoEnCamino({ enCamino, llegada = null, sinFecha = 0, sinEnvio = 0, de = null }: { enCamino: number; llegada?: string | null; sinFecha?: number; sinEnvio?: number; /** De un compuesto: de qué componente es lo que viene. */ de?: string | null }) {
+  if (!(enCamino > 0)) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-success">
+      <span>
+        Viene mercancía en camino: {entero(enCamino)} {enCamino === 1 ? "unidad" : "unidades"}
+        {de && <> {de}</>}
+        {llegada && <> · llega aprox. {fecha(llegada)}</>}
+      </span>
+      {sinFecha > 0 && <Badge tone="warning">{llegada ? (sinEnvio > 0 ? "Parte aún sin fecha de envío" : "Parte sin fecha de llegada") : sinEnvio >= sinFecha ? "Aún sin fecha de envío" : "Aún sin fecha de llegada"}</Badge>}
+    </p>
+  );
+}
+
+/**
  * Las ventas en Dropi de una publicación: netas de 30 días contra los 30 anteriores, stock y para
  * cuántos días alcanza, cancelaciones y devoluciones, última venta y las netas de los últimos 12 meses en barras.
  */
-export function VentasEnDropi({
-  v,
-  corte,
-  enCamino = 0,
-  llegada = null,
-  sinFecha = 0,
-  sinEnvio = 0,
-  de = null,
-}: {
-  v: VentasPublicacion;
-  corte: string;
-  /** Unidades del producto vinculado que vienen en camino, la llegada más próxima y las unidades sin fecha. */
-  enCamino?: number;
-  llegada?: string | null;
-  sinFecha?: number;
-  sinEnvio?: number;
-  /** De un compuesto: de qué componente es lo que viene («de Hair Growth capsulas · alcanza para 480 packs»). */
-  de?: string | null;
-}) {
+export function VentasEnDropi({ v, corte }: { v: VentasPublicacion; corte: string }) {
   const meses = mesesEntre(restarDias(`${corte.slice(0, 7)}-15`, 335), corte);
   const valores = meses.map((m) => ({ mes: m, netas: v.porMes[m] ?? 0 }));
   const max = Math.max(1, ...valores.map((x) => x.netas));
@@ -58,16 +58,6 @@ export function VentasEnDropi({
         <Dato titulo="Devueltas o rechazadas" valor={pct(v.pctDevolucion)} tono={v.pedidas >= 30 && (v.pctDevolucion ?? 0) > 0.2 ? "aviso" : undefined} detalle={`última venta: ${fecha(v.ultimaVenta)}`} />
       </dl>
       {v.stockEstado === "sin_stock_vende" && <p className="text-sm font-medium text-destructive">Se está vendiendo y no tiene stock en Dropi.</p>}
-      {v.stock <= 0 && enCamino > 0 && (
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-success">
-          <span>
-            Viene mercancía en camino: {entero(enCamino)} {enCamino === 1 ? "unidad" : "unidades"}
-            {de && <> {de}</>}
-            {llegada && <> · llega aprox. {fecha(llegada)}</>}
-          </span>
-          {sinFecha > 0 && <Badge tone="warning">{llegada ? (sinEnvio > 0 ? "Parte aún sin fecha de envío" : "Parte sin fecha de llegada") : sinEnvio >= sinFecha ? "Aún sin fecha de envío" : "Aún sin fecha de llegada"}</Badge>}
-        </p>
-      )}
       {v.stockEstado === "se_acaba" && <p className="text-sm font-medium text-warning">Al ritmo de los últimos 30 días, el stock alcanza para menos de {DIAS_REPONER} días.</p>}
       <figure className="m-0 flex flex-col gap-1.5">
         <figcaption className="text-xs text-muted-foreground">Unidades netas por mes</figcaption>
