@@ -35,8 +35,9 @@ import {
 type Pestana = "analisis" | "titulos" | "texto" | "fotos";
 type Icono = ComponentType<{ className?: string }>;
 
-const botonClaro = `inline-flex h-9 items-center gap-1.5 rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
 const botonNeon = `boton-neon inline-flex h-10 items-center justify-center gap-2 border border-transparent px-4 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md`;
+// «Resolver con IA» de las recomendaciones: el mismo morado difuminado del «Asistente de IA», a la altura de los otros botones de la tarjeta.
+const botonNeonChico = `boton-neon inline-flex h-9 items-center justify-center gap-1.5 border border-transparent px-3 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-40 ${anilloFoco} !rounded-md`;
 const botonChico = `inline-flex h-8 items-center gap-1.5 rounded-md border border-border-control bg-card px-2.5 text-xs font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
 
 const fechaHora = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" });
@@ -70,7 +71,7 @@ export function BotonAsistenteIA({ publicacionId, tipo = "analisis", principal =
   const [abierto, setAbierto] = useState(false);
   return (
     <>
-      <button type="button" className={principal ? botonNeon : botonClaro} onClick={() => setAbierto(true)}>
+      <button type="button" className={principal ? botonNeon : botonNeonChico} onClick={() => setAbierto(true)}>
         <SugerenciaIcon aria-hidden="true" className="h-4 w-4" />
         {principal ? "Asistente de IA" : "Resolver con IA"}
       </button>
