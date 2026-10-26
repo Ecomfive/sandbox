@@ -32,6 +32,7 @@ import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { InsigniaConectado } from "./insignia-conectado";
 import { BotonApagarDropi, puedeApagar } from "./apagar-dropi";
+import { BotonPrivatizarDropi, puedePrivatizar } from "./privatizar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
@@ -416,6 +417,8 @@ function ContenidoFicha({
               )}
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
               {!sinGuardar && puedeArchivar && puedeApagar(p) && <BotonApagarDropi p={p} deshabilitado={pendiente} />}
+              {/* «Privatizar en Dropi»: dejarle unidades de este producto a un solo dropshipper, en un producto privado nuevo. */}
+              {!sinGuardar && puedeArchivar && puedePrivatizar(p) && <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />}
               {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente && (
                 <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={archivar}>
                   {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}

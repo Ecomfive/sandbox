@@ -15,10 +15,15 @@
  * Un cambio de tipo «apagar» (23 oct 2026, migración 0148; `apagar`, con `APAGAR_JS`) hace lo que Nicole a mano: saca todo el stock
  * (concepto «stock»), con `quitarPrivados` quita la privatización, comprueba que quedó en cero e intenta archivar. Si Dropi no deja
  * archivar (órdenes pendientes) devuelve `ok: true, archivado: false`: queda pendiente y el próximo «Aplicar en Dropi» solo repite el archivado.
+ *
+ * Un cambio de tipo «privatizar» (26 oct 2026, migración 0155; `privatizar`, con `PRIVATIZAR_JS`) deja un producto a un solo dropshipper: comprueba
+ * su correo en Dropi, crea el producto privado (copia del público), le pone fotos, garantías y stock, se lo asigna en «Productos privados» y le
+ * saca esas unidades al público. Devuelve el ID nuevo aunque falle un paso después, y si ya le sacó el stock al público (`salida`).
  */
 
 import { APAGAR_JS } from "./apagar-dropi";
 import { CREAR_JS } from "./crear-dropi";
+import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
 
 /** El armado del guardado de Dropi, en JavaScript simple para el favorito (el mismo de `armarGuardadoProducto`). */
@@ -59,6 +64,7 @@ const CODIGO = [
   "function idCreado(j){var o=j&&j.objects,c=[o&&o.id,o&&o.product&&o.product.id,o&&o.product_id,Array.isArray(o)&&o[0]&&o[0].id,typeof o==='number'?o:null,j&&j.id,j&&j.product&&j.product.id,j&&j.data&&j.data.id];for(var i=0;i<c.length;i++){var n=Number(c[i]);if(n>0&&n<1e8&&Math.floor(n)===n)return n}return 0}",
   "function sinId(g){var j=g.j,m=j&&(j.message||j.msg||j.error);return'Dropi no devolvió el ID del producto nuevo (respondió '+g.s+(m?': '+String(m).slice(0,150):'')+(j&&typeof j==='object'?'; llaves: '+Object.keys(j).slice(0,8).join(', ')+(j.objects&&typeof j.objects==='object'?' / objects: '+Object.keys(j.objects).slice(0,8).join(', '):''):'; sin cuerpo')+'). No se creó nada en el sistema.'}",
   REPUBLICAR_JS,
+  PRIVATIZAR_JS,
   APAGAR_JS,
   CREAR_JS,
   // Una foto: se baja del CDN de Dropi y se sube al producto nuevo como lo hace la pantalla de Dropi. Si la subida falla se reintenta
@@ -168,7 +174,50 @@ const CODIGO = [
   "if(w.name!==d.nombre)return f('Dropi muestra el nombre «'+w.name+'» en el '+id+'.');",
   "if(nf<d.fotos.length)return f('El '+id+' tiene '+nf+' foto(s) en Dropi y se esperaban '+d.fotos.length+'.');",
   "return{ok:true,nuevo:id,stock:tn,fotos:nf,aviso:aviso}}",
+  // Privatizar (26 oct 2026): comprobar el correo, crear el producto privado, ponerle fotos, garantías y stock, asignárselo al dropshipper en
+  // «Productos privados» y sacarle esas unidades al público. Cada paso que ya está hecho se salta, así un reintento sigue desde donde quedó:
+  // el ID del privado vuelve en `nuevo` aunque falle un paso después, y `salida` avisa que al público ya se le sacó el stock (no se saca dos veces).
+  "async function privatizar(c,bp){",
+  "var d=c.datos;if(!d||!d.correo||!(d.unidades>0)||!d.bodega)return{ok:false,error:'El cambio no trae los datos de la privatización.'};",
+  "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
+  "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
+  "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
+  "var id=Number(c.nuevo)||0,salida=d.salida===true,bod=String(d.bodega),k;",
+  "var fin=function(e){return{ok:false,nuevo:id||undefined,salida:salida,error:e}};",
+  "var e0=errorOrigen(o,bp,d);if(e0)return fin(e0);",
+  "var ur=await pedir('/users/existemail/'+encodeURIComponent(d.correo)+'/false'),u=ur.j&&ur.j.objects;",
+  "if(!ur.ok||!u||!u.id)return fin('Dropi no tiene una cuenta con el correo '+d.correo+': revisa que sea el correo con el que el dropshipper entra a Dropi.');",
+  "if(u.role_user&&u.role_user.name==='SUPPLIER')return fin('El correo '+d.correo+' es de un proveedor: solo se puede privatizar a un dropshipper.');",
+  "if(!id){var r=privado(o,bp,d);if(r.error)return fin(r.error);",
+  "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return fin(motivo(g));",
+  "id=idCreado(g.j);if(!id)return fin(sinId(g))}",
+  "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return fin('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
+  // Las fotos y las garantías del público pasan al privado; si algo de eso falla, solo se avisa (Dropi no las exige a un producto privado).
+  "var fs=Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o),mal=0,avisos=[];",
+  "for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i])))mal++;",
+  "if(mal)avisos.push('No se pudieron copiar '+mal+' foto(s)'+porque()+': súbelas a mano al ID '+id+'.');",
+  "var gv=await pedir('/productwarranty/show','POST',{product_id:Number(c.producto)}),gn=await pedir('/productwarranty/show','POST',{product_id:id});",
+  "var lv=gv.ok&&Array.isArray(gv.j&&gv.j.objects)?gv.j.objects:[],ln=gn.ok&&Array.isArray(gn.j&&gn.j.objects)?gn.j.objects:[];",
+  "if(lv.length&&!ln.length){var gw=lv.filter(function(w){return w&&w.name}).map(function(w){return{name:w.name,time:w.time||w.type_time||'DIAS',quantity:Number(w.quantity_time!=null?w.quantity_time:w.quantity)||10,description:w.description&&w.description!=='NULL'&&String(w.description).trim()?w.description:(w.name==='Different order'?'':'Ninguna')}});",
+  "var gc=await pedir('/productwarranty/create','POST',{id:id,warranties:gw});if(!gc.ok)avisos.push('Las garantías no se pudieron poner: '+motivo(gc)+' Revísalas en el ID '+id+'.')}",
+  // El stock del privado: las unidades que se le reservan, en la bodega elegida (si Dropi no las tomó al crearlo).
+  "var sn=stockDe(n),t=sn[bod]||0;",
+  "if(t<d.unidades){var mv={};mv[bod]=d.unidades-t;var me=mover(n,bp,mv,'Privatizado a '+d.correo);if(me.error)return fin(me.error);",
+  "var pe=await pedir('/products/'+id,'PUT',me.cuerpo);if(!pe.ok)return fin('Se creó el '+id+', pero no se le pudo poner el stock: '+motivo(pe));",
+  "var b2=await pedir('/products/'+id);if(b2.ok&&b2.j&&b2.j.objects)n=b2.j.objects}",
+  "if(!yaAsignado(n,Number(u.id))){var as=asignacion(n,bp,u,d);if(as.error)return fin(as.error);",
+  "var pa=await pedir('/products/'+id,'PUT',as.cuerpo);if(!pa.ok)return fin('Se creó el '+id+', pero no se le pudo asignar a '+d.correo+': '+motivo(pa))}",
+  "if(!salida){var ms=salidaPublico(o,bp,d,id);if(ms.error)return fin(ms.error);",
+  "var ps=await pedir('/products/'+c.producto,'PUT',ms.cuerpo);if(!ps.ok)return fin('El '+id+' quedó asignado a '+d.correo+', pero no se le pudo sacar el stock al '+c.producto+': '+motivo(ps));salida=true}",
+  "var v=await pedir('/products/'+id),w=v.j&&v.j.objects;if(!v.ok||!w)return fin('Se privatizó, pero no se pudo comprobar en Dropi.');",
+  "var sw=stockDe(w),tn=sw[bod]||0;",
+  "if(w.privated_product!==true)return fin('Dropi no muestra el '+id+' como producto privado.');",
+  "if(w.name!==d.nombre)return fin('Dropi muestra el nombre «'+w.name+'» en el '+id+'.');",
+  "if(!yaAsignado(w,Number(u.id)))return fin('Dropi no muestra la reserva para '+d.correo+' en el '+id+'.');",
+  "if(tn<d.unidades)return fin('El '+id+' tiene '+tn+' unidades en Dropi y se esperaban '+d.unidades+'.');",
+  "return{ok:true,nuevo:id,stock:tn,salida:true,aviso:avisos.length?avisos.join(' '):null}}",
   "async function aplicar(c,bp){",
+  "if(c.tipo==='privatizar')return privatizar(c,bp);",
   "if(c.tipo==='apagar')return apagar(c,bp);",
   "if(c.tipo==='republicar')return republicar(c,bp);",
   "if(c.tipo==='archivar')return archivar(c);",

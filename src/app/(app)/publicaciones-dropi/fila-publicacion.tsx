@@ -12,6 +12,7 @@ import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { archivarPublicacion } from "./actions";
 import { BotonApagarFila } from "./apagar-dropi";
+import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { LlegadaCamino } from "./llegada-camino";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
@@ -141,7 +142,7 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
     { nombre: "En Dropi" },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[6.5rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[9rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
           {c.nombre}
@@ -220,6 +221,12 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 Apagado pendiente
               </span>
             )}
+            {f.privatizaciones.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
+                <Punto clase="bg-destructive" texto="Privatización pendiente en Dropi" />
+                {f.privatizaciones.length === 1 ? `Privatización pendiente · ${f.privatizaciones[0].dropshipper || f.privatizaciones[0].correo}` : `${f.privatizaciones.length} privatizaciones pendientes`}
+              </span>
+            )}
           </span>
         </span>
       </span>
@@ -274,9 +281,10 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
       <div className="min-w-0 flex-1">{fila}</div>
       {/* Una duplicada no sale de Archivados: en su lugar, un espacio del mismo ancho para que las filas no se corran. */}
       {f.duplicadaDe ? (
-        <span aria-hidden="true" className="mr-3 w-[4.75rem] shrink-0" />
+        <span aria-hidden="true" className="mr-3 w-[7.25rem] shrink-0" />
       ) : (
         <>
+          <BotonPrivatizarFila f={f} />
           <BotonApagarFila f={f} />
           <BotonArchivarFila f={f} />
         </>

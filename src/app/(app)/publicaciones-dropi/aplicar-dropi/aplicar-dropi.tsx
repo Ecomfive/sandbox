@@ -7,7 +7,7 @@ import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-apli
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
-type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string };
+type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean };
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "sin_dropi"; mensaje: string }
@@ -96,7 +96,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     dropi.postMessage(
       {
         tipo: "pendientes",
-        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos }) => ({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos })),
+        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar }) => ({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos: tipo === "privatizar" ? privatizar : datos })),
       },
       origen,
     );
@@ -168,8 +168,10 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
                               : "Archivado en Dropi"
                             : c.tipo === "crear"
                               ? `Publicada en Dropi con el ID ${r.nuevo ?? "—"}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
-                              : "Cambiado en Dropi"
-                      : c.tipo === "crear" && r.nuevo
+                              : c.tipo === "privatizar"
+                                ? `Privatizada: producto privado ID ${r.nuevo ?? "—"} para ${c.privatizar?.dropshipper || c.privatizar?.correo}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
+                                : "Cambiado en Dropi"
+                      : (c.tipo === "crear" || c.tipo === "privatizar") && r.nuevo
                         ? `Se creó el ID ${r.nuevo} en Dropi, pero falló un paso: ${r.error ?? "sin detalle"} Se sigue desde ahí en el próximo «Aplicar en Dropi».`
                         : `No se pudo: ${r.error ?? "sin detalle"}`
                     : "Sin respuesta de Dropi"}
@@ -206,6 +208,20 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
           {d ? `${d.fotos.length} fotos · ${d.bodegas.reduce((t, b) => t + b.unidades, 0)} unidades` : ""}
         </span>
         <span className="text-xs text-muted-foreground">{c.nuevo ? `Ya creado como ID ${c.nuevo}: sigue desde ahí` : "Producto nuevo: se crea en Dropi con sus fotos, garantías y stock"}</span>
+      </>
+    );
+  }
+  if (c.tipo === "privatizar") {
+    const d = c.privatizar;
+    return (
+      <>
+        <span className="font-medium">Privatizar: {c.publicacion}</span>
+        <span className="text-xs tabular-nums">
+          {d ? `A ${d.dropshipper || d.correo} (${d.correo}) · ${d.unidades.toLocaleString("es-PA")} u. · $${d.precio.toFixed(2)} · «${d.nombre}»` : ""}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          ID {c.producto} (público){c.nuevo ? ` · ya creado el privado ID ${c.nuevo}: sigue desde ahí` : ": se crea el privado en Dropi, se le asigna el correo y se le sacan las unidades al público"}
+        </span>
       </>
     );
   }
@@ -285,7 +301,7 @@ function ElegirCambios({ cambios, alAplicar, cerrar }: { cambios: CambioParaDrop
               <button
                 type="button"
                 aria-pressed={pospuesto}
-                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.tipo === "republicar" ? `republicar ${c.publicacion}` : c.tipo === "archivar" ? `${c.restaurar ? "sacar de Archivados" : "archivar"} ${c.publicacion}` : c.tipo === "crear" ? `publicar ${c.datos?.nombre || c.publicacion}` : (c.nombre ?? c.publicacion)}`}
+                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.tipo === "republicar" ? `republicar ${c.publicacion}` : c.tipo === "archivar" ? `${c.restaurar ? "sacar de Archivados" : "archivar"} ${c.publicacion}` : c.tipo === "crear" ? `publicar ${c.datos?.nombre || c.publicacion}` : c.tipo === "privatizar" ? `privatizar ${c.publicacion} a ${c.privatizar?.dropshipper || c.privatizar?.correo}` : (c.nombre ?? c.publicacion)}`}
                 onClick={() => alternar(c.id)}
                 className={`inline-flex min-h-9 shrink-0 items-center rounded-md border px-3 py-1.5 text-xs font-medium ${anilloFoco} ${pospuesto ? "border-foreground bg-accent text-foreground" : "border-border bg-card hover:bg-muted"}`}
               >

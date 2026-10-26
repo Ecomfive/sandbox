@@ -516,7 +516,7 @@ convenciones técnicas del código.
   mismo: se hace el cambio en el sistema → queda **pendiente** en `dropi_cambios_pendientes` (se ve en la lista de cambios pendientes y se puede «Deshacer»,
   que deja el sistema como estaba) → el favorito «Aplicar en Dropi» lo manda a Dropi y la ventana deja «Posponer» cada uno. Nada habla con Dropi por otro
   camino. Ya van por la cola: **nombre, precio y sugerido, descripción y fotos** (un `cambio`), **archivar y sacar de Archivados** (`archivar`), **apagar**,
-  **republicar** y **publicar una publicación nueva** (`crear`). **Un proceso nuevo del módulo que cambie algo en Dropi** se agrega así, sin saltarse nada:
+  **republicar**, **publicar una publicación nueva** (`crear`) y **privatizar** (`privatizar`). **Un proceso nuevo del módulo que cambie algo en Dropi** se agrega así, sin saltarse nada:
   (1) su `tipo` en la restricción de `dropi_cambios_pendientes` (migración, con reversa y prueba en PGlite); (2) su `encolarX` en `cambios-dropi.ts` (un solo cambio
   pendiente por publicación si es una acción, y «cancelarse» con su contrario); (3) su función en el código del favorito (`marcador-aplicar-dropi.ts`, que se
   comprueba de punta a punta contra un Dropi simulado en `marcador-flujo.test.ts`: lee el producto, comprueba que es del proveedor, hace el cambio, lo vuelve
@@ -524,6 +524,29 @@ convenciones técnicas del código.
   (`aplicar-actions.ts`), `DetalleCambio` (`aplicar-dropi.tsx`), `listarCambiosPendientes` y `deshacerCambioPendiente` (`pendientes-actions.ts`, solo mientras Dropi
   no se haya tocado: `intentos = 0`), `EstadoCambioDropi` (ficha) y su etiqueta en `auditoria-cambios.ts`; (5) su línea en el Centro de ayuda. La acción de la
   pantalla cambia el sistema **y** encola, y devuelve el detalle («queda pendiente: pulsa «Aplicar en Dropi»»); si falta un dato que Dropi exige, no encola.
+  **Privatizar en Dropi** (26 oct 2026, pedido de Jhokser; migración 0155, `src/lib/publicaciones/privatizar-dropi.ts`, con prueba): dejarle un producto a un solo
+  dropshipper, como los «P-MA …» (un producto privado aparte, con su propio ID, con el correo del dropshipper asignado y las unidades que se le reservan,
+  que salen del público). Un quinto cambio de la cola (`tipo = 'privatizar'`) que va en la publicación **pública** y lleva en `datos` (`DatosPrivatizar`) el
+  correo de Dropi del dropshipper, su nombre, el dropshipper del CRM si se eligió, las iniciales del «P-XX», las unidades, la bodega (ID de Dropi), el precio y
+  el nombre del privado (`nombrePrivado`: «P-XX » + el nombre del público sin su prefijo, cortado en una palabra a 40 caracteres) y `salida`. El botón
+  «Privatizar en Dropi» (candado, `privatizar-dropi.tsx`: `BotonPrivatizarDropi` en la ficha y `BotonPrivatizarFila` junto al de apagar; `puedePrivatizar`: pública,
+  con ID, ya publicada, no archivada y con stock en una bodega de ECOMFIVE) abre una ventana que pide **lo que Dropi necesita**: nombre y correo del dropshipper (con
+  búsqueda en el CRM, `buscarDropshippersParaPrivatizar`, solo para quien abre el CRM y de dropshippers del país), iniciales (salen de su nombre), precio de venta (el del
+  público por defecto; el sugerido va igual), unidades y bodega (con el stock de la última lectura de «Mis productos»). `privatizarPublicacion` (`actions.ts`) vuelve a
+  calcular el nombre, comprueba bodega y stock, que no sea ya privada ni archivada ni borrador, y que ese correo no tenga ya una privada del mismo producto; encola
+  (`encolarPrivatizar`: varios correos a la vez, no el mismo dos veces, índice único por publicación y correo) y la lista de cambios pendientes (`Deshacer`) y la fila
+  («Privatización pendiente») lo muestran. **Qué hace el favorito** (`privatizar`/`PRIVATIZAR_JS`, leído del código de la pantalla de Dropi el 26 oct 2026):
+  `GET api/users/existemail/<correo>/false` (Dropi no deja privatizar a un proveedor; da el `id` y el usuario), `POST api/products` con el cuerpo del público,
+  `privated_product: true`, sin ID, sin reservas ni porcentajes y con el stock solo en la bodega elegida (Dropi no deja asignar el correo al crear: «crea el producto,
+  luego podrás modificarlo»), fotos y garantías del público (si fallan solo avisa), stock con una entrada si Dropi no lo tomó, `PUT` con
+  `private_product_inventories: [{ user_id, user, email, stock, change: true, … }]` (la suma reservada no puede pasar el stock), salida de las unidades del público
+  (concepto «Privatizado en el ID …») y relee todo para comprobar. Cada paso hecho se salta en un reintento: el ID del privado vuelve en `nuevo` aunque falle un paso y
+  `salida` queda guardada en `datos` para no sacar dos veces el stock al público. Al confirmarse, `guardarResultadosDropi` (`crearPrivada`) crea la publicación privada en el
+  sistema (`tipo_publicacion = 'privado'`, `privatizado_a`, `privatizado_email`, `dropshipper_id`, ID de Dropi, precio, mismo producto vinculado) y la enlaza con la
+  pública en `relacionados`. Deshacer: mientras no exista el privado en Dropi (`nuevo_dropi_id` vacío) se quita de la cola y el sistema no cambia (hasta entonces la
+  publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
+  manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
+  rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
   **Archivar y sacar de Archivados** (`archivarPublicacion`): cambian la publicación al instante y encolan `archivar` (`restaurar` = sacarla): `archiveProduct` /
   `unarchive` de Dropi, **solo eso** (no saca stock: eso es «Apagar»). El estado de antes (`estado_antes`, `estado_publicacion_antes`) se guarda para devolverla al
   deshacer; el contrario de uno pendiente lo cancela (Dropi nunca se tocó). Sin ID de Dropi o «Sin publicar», solo cambia el sistema.
