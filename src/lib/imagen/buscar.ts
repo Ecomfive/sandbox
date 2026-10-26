@@ -131,12 +131,13 @@ export const MAX_DISTANCIA_SIN_IA = 10;
 export const MAX_DISTANCIA_CONFIRMADA = 5;
 
 /**
- * Ni la huella (más de 10 bits) ni el nombre (menos de la mitad de las palabras que dijo la IA) respaldan a un candidato: si la IA igual lo dio por «mismo» o
+ * Ni la huella (más de 10 bits) ni el nombre (no llegó por las palabras que dijo la IA) respaldan a un candidato: si la IA igual lo dio por «mismo» o
  * «parecido», se baja a «distinto». Evita el falso positivo de un frasco verde contra una manzana verde, que la IA llegó a dar por el mismo producto.
  */
 export function sinRespaldo(c: Coincidencia): boolean {
   const huellaCerca = c.distancia !== null && c.distancia <= MAX_DISTANCIA_SIN_IA;
-  const nombreCerca = (c.afinidad ?? 0) >= 0.5;
+  // `porNombre` ya exige 2 palabras en común: haber llegado por el nombre es respaldo suficiente.
+  const nombreCerca = c.afinidad !== null;
   return !huellaCerca && !nombreCerca;
 }
 
