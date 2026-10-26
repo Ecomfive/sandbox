@@ -107,7 +107,7 @@ export const BODEGA_DROPI = 280;
  * bodega conocida o sin datos de ventas de Dropi, no se sabe: no sale.
  */
 export function necesitaRepublicar(
-  p: { archivada: boolean; enDropi: EnDropi; bodegaId: number | null; hayVentas: boolean; ultimaVenta: string | null; publicadaDesde: string | null; privada?: boolean; stock?: number | null },
+  p: { archivada: boolean; enDropi: EnDropi; bodegaId: number | null; hayVentas: boolean; ultimaVenta: string | null; publicadaDesde: string | null; privada?: boolean; stock?: number | null; netas30?: number | null },
   hoy: string,
   reglas: Pick<Reglas, "dias_republicar"> = REGLAS_DEFECTO,
 ): boolean {
@@ -116,6 +116,13 @@ export function necesitaRepublicar(
   if (p.stock != null && p.stock <= 0) return false;
   if (p.privada || p.archivada || p.enDropi !== "activo" || !p.hayVentas || p.bodegaId === null || p.bodegaId === BODEGA_DROPI) return false;
   const n = reglas.dias_republicar;
+  // Con la regla en 30 días, cuentan las ventas netas (un pedido cancelado, rechazado o devuelto no es venta; 25 oct 2026, PUB-0132:
+  // su único pedido en 30 días se canceló). Sin netas en 30 días, sale si lleva al menos esos días publicada.
+  if (n === 30 && p.netas30 != null) {
+    if (p.netas30 > 0) return false;
+    // Y más de N días publicada (la fecha de publicación en Dropi; si no se sabe, la de su primera venta).
+    return !!p.publicadaDesde && dias(p.publicadaDesde, hoy) > n;
+  }
   // Vendió hace menos de N días: no.
   if (p.ultimaVenta && dias(p.ultimaVenta, hoy) < n) return false;
   // Nunca vendió: solo si ya lleva N días publicada (si no se sabe desde cuándo, no).
