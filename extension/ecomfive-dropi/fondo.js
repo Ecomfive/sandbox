@@ -15,6 +15,7 @@ const ORIGEN = { pa: "https://app.dropi.pa", mx: "https://app.dropi.mx" };
 const LECTORES = {
   proveedor: { pais: "pa", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
+  catalogo_mx: { pais: "mx", archivo: "lectores/catalogo.js", funcion: "leerCatalogo", estado: "__catalogo", archivos: ["catalogo"] },
 };
 // Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi».
 const SUBIDA = /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/upload\/sign\/wms-compras\/tmp-dropi-panel\/[0-9a-f-]{36}\/[a-z]+\.json\?token=/;

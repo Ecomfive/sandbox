@@ -45,6 +45,9 @@ test("la sesión de Panamá tiene que ser la de proveedor ECOMFIVE y no estar po
   assert.equal(sesionValida("pa", { ...base, tienda: "OTRA" }, ahora), "otra_cuenta");
   assert.equal(sesionValida("pa", { ...base, vence: "2026-10-26T15:00:30Z" }, ahora), "vencida");
   assert.equal(CUENTAS.pa.origen, "https://app.dropi.pa");
+  // México: cualquier cuenta que no sea de proveedor (la de proveedor no ve el catálogo).
+  assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "ok");
+  assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "SUPPLIER", tienda: "X", vence: null }, ahora), "otra_cuenta");
 });
 
 test("qué lectores corren según lo elegido, y quién ve el botón", () => {

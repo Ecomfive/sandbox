@@ -431,7 +431,15 @@ convenciones técnicas del código.
   filtro `pais`), filas con 4 columnas y la lista como reporte: `DEF_SCRAPING.cerrados` oculta «Ya lo tenemos» y «Sin señales».
   **«Ya lo tenemos»** (migración 0156: `scraping_productos.descartado_en/_por/_motivo`; `marcarYaLoTenemos`, `actions.ts`;
   `BotonYaLoTenemos` en la fila y en la ficha, con `motivoYaLoTenemos` = a qué se parece): `recomendar` lo deja en «tenemos» con
-  `marcadoYaLoTenemos`; «Volver a la lista» lo deshace; las búsquedas diarias no tocan esas columnas. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
+  `marcadoYaLoTenemos`; «Volver a la lista» lo deshace; las búsquedas diarias no tocan esas columnas.
+  **Descubrir proveedores** (migración 0157, 26 oct 2026, primero México): en `/scraping-proveedores/proveedores` (`descubrir.tsx`,
+  `descubrir-actions.ts`), «Leer el catálogo de México» (solo `puedeActualizarDropi`) usa la extensión: lector `catalogo_mx`
+  (`extension/ecomfive-dropi/lectores/catalogo.js`, extensión 0.2.0; sesión de México = cualquier cuenta que no sea de proveedor,
+  `CUENTAS.mx.tipoUsuario` null) lee todo `products/v4/index` del país y sube `[id, proveedor, stock, creado, precio, nombre,
+  foto]`; `procesarDescubrir` resume por proveedor con `descubrir` (`src/lib/scraping/descubrir.ts`, con prueba: ventas estimadas =
+  lo que bajó el stock contra la foto anterior guardada en Storage `wms-compras/scraping-catalogo/<país>.json`, nuevos en 30 días,
+  productos, stock y 3 destacados) en `scraping_descubrir_lecturas` / `scraping_descubrir_proveedores`; «Seguir»
+  (`seguirProveedor`) lo agrega a `scraping_proveedores` con `enlaceProveedor` y su primera búsqueda pedida. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
   dropshipper por país), «Descubrir proveedores» desde el catálogo de cada país y TuWinner.
   Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`
   manual o dropi), `scraping_busquedas` (con `duracion_ms`), `scraping_productos` (último precio y stock, `estado` activo o

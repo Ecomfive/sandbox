@@ -11,12 +11,13 @@ export const puedeActualizarDropi = (u: { email: string | null | undefined }) =>
 export type CodigoPaisDropi = "pa" | "mx";
 
 /** Las cuentas de Dropi: cada país es un dominio distinto (app.dropi.pa, app.dropi.mx), así que las dos sesiones conviven. */
-export const CUENTAS: Record<CodigoPaisDropi, { nombre: string; cuenta: string; tipoUsuario: string; tienda: string | null; origen: string }> = {
+export const CUENTAS: Record<CodigoPaisDropi, { nombre: string; cuenta: string; tipoUsuario: string | null; tienda: string | null; origen: string }> = {
   pa: { nombre: "Panamá", cuenta: "cuenta de proveedor ECOMFIVE", tipoUsuario: "SUPPLIER", tienda: "ECOMFIVE", origen: "https://app.dropi.pa" },
-  mx: { nombre: "México", cuenta: "cuenta de dropshipper", tipoUsuario: "DROPSHIPPER", tienda: null, origen: "https://app.dropi.mx" },
+  // Cualquier cuenta que no sea de proveedor (una de proveedor no ve el catálogo).
+  mx: { nombre: "México", cuenta: "cuenta de dropshipper", tipoUsuario: null, tienda: null, origen: "https://app.dropi.mx" },
 };
 
-export type ClaveLector = "proveedor" | "ventas";
+export type ClaveLector = "proveedor" | "ventas" | "catalogo_mx";
 
 /**
  * Los lectores de la extensión (copias de scripts/dropi-diario-navegador.js y scripts/ventas-dropi-navegador.js, que siguen
@@ -25,6 +26,8 @@ export type ClaveLector = "proveedor" | "ventas";
 export const LECTORES: Record<ClaveLector, { pais: CodigoPaisDropi; archivo: string; funcion: string; estado: string; archivos: string[] }> = {
   proveedor: { pais: "pa", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
+  // «Descubrir proveedores» (Scraping de proveedores): todo el catálogo de México, con la sesión de dropshipper.
+  catalogo_mx: { pais: "mx", archivo: "lectores/catalogo.js", funcion: "leerCatalogo", estado: "__catalogo", archivos: ["catalogo"] },
 };
 
 export type ClaveParte = "pedidos" | "cartera" | "retiros" | "stock" | "ventas";
@@ -62,7 +65,8 @@ export const lectoresDe = (partes: ClaveParte[]): ClaveLector[] => (["proveedor"
 export function sesionValida(pais: CodigoPaisDropi, s: { hay: boolean; tipoUsuario: string | null; tienda: string | null; vence: string | null } | null, ahora = Date.now()): "ok" | "sin_sesion" | "otra_cuenta" | "vencida" {
   if (!s || !s.hay) return "sin_sesion";
   const c = CUENTAS[pais];
-  if (s.tipoUsuario !== c.tipoUsuario || (c.tienda && s.tienda !== c.tienda)) return "otra_cuenta";
+  if (c.tipoUsuario ? s.tipoUsuario !== c.tipoUsuario : s.tipoUsuario === "SUPPLIER") return "otra_cuenta";
+  if (c.tienda && s.tienda !== c.tienda) return "otra_cuenta";
   if (s.vence && new Date(s.vence).getTime() <= ahora + 60_000) return "vencida";
   return "ok";
 }
