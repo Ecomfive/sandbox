@@ -54,7 +54,7 @@ test("Marketing sigue en el riel aunque todavía no tenga páginas", () => {
 });
 
 test("CRM en Clientes e Inteligencia competitiva en Investigación", () => {
-  assert.deepEqual(hrefs("Clientes"), ["/crm-dropshippers"]);
+  assert.deepEqual(hrefs("Clientes"), ["/crm-dropshippers", "/crm-dropshippers/bandeja"]);
   assert.deepEqual(hrefs("Investigación"), ["/inteligencia-competitiva", "/analisis-competencia"]);
   assert.ok(!hrefs("Operación").includes("/filtro-productos"));
 });

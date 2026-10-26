@@ -867,6 +867,20 @@ convenciones técnicas del código.
   `SHOPIFY_CLIENT_SECRET`; el permiso dura 24 h y se guarda en memoria) o un token fijo de una app vieja (`SHOPIFY_ADMIN_TOKEN`);
   permisos `write_products`, `read_products`, `read_publications`, `write_publications`; versión `SHOPIFY_API_VERSION` o 2026-10.
   **Pendiente:** Claude (textos), con `BotonPendiente`. Las reseñas son de clientes reales: la IA no las inventa.
+- **CRM Dropshippers › Bandeja de WhatsApp** (`/crm-dropshippers/bandeja`, módulo `crm-dropshippers`, migración 0158, 26 oct 2026).
+  WhatsApp **directo al sistema con la API oficial de Meta (Cloud API), sin Chatwoot** (decisión de Hernán): Nicole (Atención) contesta
+  desde aquí sin el celular. Meta avisa cada mensaje y cada estado al webhook `src/app/api/whatsapp/webhook/route.ts` (firma
+  `X-Hub-Signature-256` con `WHATSAPP_APP_SECRET`, la misma `firmaValida` de Instagram; `GET` de verificación con
+  `WHATSAPP_VERIFY_TOKEN`); `src/lib/whatsapp/extraer.ts` (con prueba) lo interpreta y `guardar.ts` lo guarda con la función
+  `whatsapp_registrar_entrante` (registra el número de la empresa si es nuevo, abre o reabre la conversación número + teléfono E.164,
+  guarda el mensaje sin repetir por `wa_id` y solo entonces suma un no leído) y enlaza el dropshipper por `contacto_telefono`. Tablas:
+  `whatsapp_numeros` (área atencion/comercial: Atención ve los suyos, Comercial también los de Atención, `areasVisibles`),
+  `whatsapp_conversaciones` y `whatsapp_mensajes` (entrante, saliente o nota privada; estados que nunca retroceden, `ORDEN_ESTADO`).
+  El envío (`src/lib/whatsapp/api.ts`, Graph API `WHATSAPP_API_VERSION` o v23.0, token `WHATSAPP_TOKEN`) solo con la ventana de 24 h
+  abierta (`ventana.ts`, con prueba; fuera de ella hacen falta plantillas, pendiente); errores de Meta en español (`errorEnEspanol`).
+  Fotos, audios y documentos se sirven por `/api/whatsapp/media/[id]` (id del mensaje, revisa el área; Meta los guarda ~30 días:
+  copiarlos a Storage es pendiente). La bandeja (`bandeja.tsx`) se refresca cada 8 s con la pestaña visible. Guía de Meta:
+  [WHATSAPP-META.md](WHATSAPP-META.md). Boceto del rediseño del CRM: https://claude.ai/artifact/KsHUH4WKPkcFpqYsdFjESf
 - **Testing Lab › Instagram** (`/instagram`, módulo `instagram`, migración 0106, 14 oct 2026). Una fuente más de Fuentes: lo que el
   equipo ve en Instagram y comparte **por mensaje directo con la cuenta de fuentes** (`@ecomfive.fuentes`, cuenta profesional ligada
   al Business Manager) cae solo en `instagram_capturas`. Meta llama al webhook **`/api/instagram/webhook`**
