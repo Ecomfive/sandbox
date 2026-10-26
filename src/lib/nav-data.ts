@@ -88,7 +88,10 @@ const AREAS: NavSection[] = [
   {
     title: "Clientes",
     frentes: true,
-    items: [{ label: "CRM Dropshippers", href: "/crm-dropshippers", dropi: true, frente: "proveeduria" }],
+    items: [
+      { label: "CRM Dropshippers", href: "/crm-dropshippers", dropi: true, frente: "proveeduria" },
+      { label: "Bandeja de WhatsApp", href: "/crm-dropshippers/bandeja", frente: "proveeduria" },
+    ],
   },
   {
     title: "Investigación",

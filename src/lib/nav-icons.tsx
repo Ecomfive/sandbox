@@ -421,6 +421,15 @@ export function ArrastrarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Un globo de chat: la bandeja de WhatsApp del CRM. */
+export function ChatIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5.1A8 8 0 1 1 21 12Z" />
+    </Icon>
+  );
+}
+
 export function NotificacionesIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
@@ -1073,6 +1082,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/productos-test": TestIcon,
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,
+  "/crm-dropshippers/bandeja": ChatIcon,
   "/inteligencia-competitiva": InteligenciaIcon,
   "/analisis-competencia": AnalisisCompetenciaIcon,
   "/pedidos-dropi": PedidoIcon,

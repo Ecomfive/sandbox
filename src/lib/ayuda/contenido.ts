@@ -515,6 +515,28 @@ export const GUIAS: GuiaModulo[] = [
     ruta: "/crm-dropshippers",
     resumen: "La ficha de cada dropshipper con su historial, casos, notas y desempeño.",
     secciones: [
+      {
+        titulo: "Bandeja de WhatsApp",
+        pasos: [
+          "En el menú, Clientes › «Bandeja de WhatsApp» (/crm-dropshippers/bandeja): los chats de los dropshippers con los números de WhatsApp de la empresa, para contestar desde el sistema sin el celular. Conectado directo a WhatsApp (API oficial de Meta), sin Chatwoot.",
+          "A la izquierda, las conversaciones: «Sin responder» (escribieron y nadie contestó), «Mías» (las que llevas tú) y «Todas»; con varios números, se elige cuál ver. El número rojo son los mensajes sin leer; al abrir la conversación quedan leídos. La bandeja se actualiza sola cada pocos segundos.",
+          "Al centro, el chat: «Responder por WhatsApp» manda el mensaje al dropshipper (Ctrl + Enter también envía) y «Nota privada» deja una nota que solo ve el equipo (en ámbar, nunca sale por WhatsApp). Cada mensaje que mandas dice quién lo mandó y si quedó Enviado, Entregado o Leído; si WhatsApp no lo entregó, dice por qué.",
+          "Regla de las 24 horas de WhatsApp: se le puede responder con texto libre hasta 24 h después de su último mensaje (la franja verde dice cuánto queda). Pasado ese plazo, WhatsApp solo permite escribirle con una plantilla aprobada por Meta (próximamente); las notas privadas sí se pueden dejar.",
+          "Las fotos, audios, videos y documentos que mandan se ven ahí mismo. WhatsApp los guarda unos 30 días: lo importante, descárgalo o pásalo al caso.",
+          "«Tomar» deja la conversación a tu cargo (sale en «Mías»); si nadie la llevaba, la toma sola quien responde. «Marcar resuelta» la saca de «Sin responder»; si el dropshipper vuelve a escribir, se reabre sola.",
+          "A la derecha, el dropshipper: su estado, sus cuentas, sus casos abiertos y «Abrir su ficha». La conversación se enlaza sola con el dropshipper del CRM que tiene ese WhatsApp. Si dice «No está en el CRM», agrégalo o pon ese número en su ficha: queda enlazada con su próximo mensaje.",
+          "Quién ve qué: Atención (CRM Dropshippers) ve los números de Atención; Comercial (CRM comercial) ve también los suyos. Todo el historial queda guardado en el sistema, aunque un número se pierda.",
+        ],
+      },
+      {
+        titulo: "Conectar un número de WhatsApp (una vez, administración)",
+        pasos: [
+          "Hace falta la API oficial de WhatsApp (WhatsApp Cloud API) de Meta: una app de Meta tipo Empresa con el producto WhatsApp, la cuenta de WhatsApp Business de la empresa y el número agregado ahí.",
+          "En el servidor (Vercel) van cuatro datos, nunca en el código: WHATSAPP_TOKEN (token permanente de un usuario del sistema de Meta con permisos de WhatsApp), WHATSAPP_APP_SECRET (secreto de la app), WHATSAPP_VERIFY_TOKEN (una palabra que se inventa) y, si hace falta, WHATSAPP_API_VERSION.",
+          "En la app de Meta › WhatsApp › Configuración › Webhook: URL https://<dominio del sistema>/api/whatsapp/webhook, el mismo token de verificación, y suscribir el campo «messages».",
+          "El número aparece en la bandeja solo cuando llega su primer mensaje (con el nombre «WhatsApp +507…»); su nombre y su área (Atención o Comercial) se cambian en la base. La guía completa está en WHATSAPP-META.md.",
+        ],
+      },
       { titulo: "Uso", pasos: ["Directorio: busca y abre la ficha de un dropshipper.", "Registra interacciones y casos; con @ avisas a un compañero.", "Vínculos: une a cada dropshipper con su usuario de Dropi para ver su desempeño.", "«Ventas en Dropi» de la ficha muestra lo que vendió en Dropi por sus cuentas vinculadas (de Desempeño › Ventas Dropi): netas de los últimos 30 días y de siempre, % no efectivo (cancelado, rechazado o devuelto), última orden, netas por mes y qué productos vende. Las fichas con la etiqueta «Creado desde Dropi» se crearon solas a partir de quienes compran en Dropi Panamá, con su nombre, correo, teléfono y cuenta de Dropi; las que dicen «Revisar: ¿cuenta interna?» pueden ser cuentas de ECOMFIVE."] },
     ],
   },
@@ -599,6 +621,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-26", titulo: "CRM: Bandeja de WhatsApp", texto: "Nueva pantalla en Clientes › «Bandeja de WhatsApp»: los chats de los dropshippers con el número de la empresa, para contestar desde el sistema sin el celular. Se ven los que están sin responder, se responde por WhatsApp o se deja una nota privada para el equipo, se ven las fotos y documentos que mandan, y al lado está el dropshipper con sus casos. Funciona en cuanto se conecte el número en Meta.", modulo: "crm-dropshippers", href: "/crm-dropshippers/bandeja" },
   { fecha: "2026-10-26", titulo: "Buscar por imagen en las listas", texto: "En Producto, Gestión de IDs Dropi y Scraping de proveedores, al lado de la lupa hay una cámara. Pega una foto (Ctrl+V), arrástrala o súbela y el sistema busca los productos que se ven igual en Producto, Gestión de IDs Dropi, Scraping de proveedores y Análisis de competencia (lo que tu rol pueda abrir). Con «Confirmar con IA» (activado por defecto) la IA también reconoce el mismo producto aunque la foto sea distinta y dice si es el mismo, parecido o distinto; lo que la IA ve como otro producto no se muestra (la ventana avisa cuántos se quitaron). «Filtrar esta lista» deja en la lista solo lo encontrado; el chip «Por imagen ×» lo quita. La foto no se guarda.", modulo: "producto", href: "/producto" },
   { fecha: "2026-10-26", titulo: "Gestión de IDs Dropi: también se ve lo que está por cotizar", texto: "Si un producto tiene una orden en «01 - Cotizar» o «02 - Cotizado», la columna «En camino» de Gestión de IDs Dropi dice «N en cotización» (en ámbar, para que no se confunda con lo que ya viene) y, debajo, la etapa en que está con su color de Compras y el número de orden («01 - Cotizar · OC-1258»; si hay varias, la más avanzada), y la ficha lo suma en el bloque «Stock» como «En cotización». Lo que ya viene en camino sigue aparte, y si hay de las dos cosas salen las dos. El Backlog no cuenta.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-26", titulo: "Mercancía en camino: ahora cuenta combos y órdenes sin productos vinculados", texto: "En Gestión de IDs Dropi y en la ficha de Producto, «En camino» ahora suma lo que viene de los productos de un combo y una orden de un combo suma también a sus componentes. Además, una orden que todavía no tiene productos vinculados en Compras se cuenta para el producto que se llama igual. «En camino» ahora sale siempre que haya algo en camino: antes solo salía si la publicación tenía ventas registradas y 0 unidades en Dropi, así que un producto nuevo o con algunas unidades no lo mostraba. Si una publicación sigue sin mostrar lo que viene, revisa que esté vinculada a su producto y que la orden tenga ese producto en «Productos» (o se llame igual que él).", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
