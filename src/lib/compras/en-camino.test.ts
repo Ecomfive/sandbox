@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { enCaminoPorPais, faltaParaLlegada, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
+import { detalleCompuesto, enCaminoDeCompuesto, enCaminoPorPais, faltaParaLlegada, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
 
 const l = (extra: Partial<LineaEnCamino>): LineaEnCamino => ({ pais: "Panamá", unidades: 100, etapa: "tracking", fechaEnvio: "2026-10-01", fechaLlegada: null, anulada: false, ...extra });
 
@@ -63,6 +63,23 @@ test("el resumen toma la llegada más próxima y cuenta lo que no tiene fecha", 
   assert.deepEqual(resumenLlegada([{ unidades: 500, llegada: null, sinEnvio: true }, { unidades: 20, llegada: null, sinEnvio: false }]), { unidades: 520, llegada: null, sinFecha: 520, sinEnvio: 500 });
   assert.equal(faltaParaLlegada({ fechaEnvio: null }), "envio");
   assert.equal(faltaParaLlegada({ fechaEnvio: "2026-10-01" }), "via");
+});
+
+test("un compuesto: lo que viene de sus componentes, con la llegada más próxima y de cuál es", () => {
+  const por = new Map([
+    ["caps", { unidades: 960, llegada: null, sinFecha: 960, sinEnvio: 0 }],
+    ["a", { unidades: 500, llegada: "2026-11-20", sinFecha: 0, sinEnvio: 0 }],
+    ["b", { unidades: 300, llegada: "2026-11-12", sinFecha: 100, sinEnvio: 100 }],
+  ]);
+  const pack = enCaminoDeCompuesto([{ id: "caps", nombre: "Hair Growth capsulas", cantidad: 2 }], por);
+  assert.deepEqual([pack.unidades, pack.llegada, pack.sinFecha], [960, null, 960]);
+  assert.equal(detalleCompuesto(pack.componentes), "de Hair Growth capsulas · alcanza para 480 packs");
+  const combo = enCaminoDeCompuesto([{ id: "a", nombre: "Truly Soft Serve", cantidad: 1 }, { id: "b", nombre: "Truly Buns", cantidad: 1 }], por);
+  assert.deepEqual([combo.unidades, combo.llegada, combo.sinFecha, combo.sinEnvio], [800, "2026-11-12", 100, 100]);
+  assert.equal(detalleCompuesto(combo.componentes), "500 de Truly Soft Serve y 300 de Truly Buns");
+  const soloUno = enCaminoDeCompuesto([{ id: "a", nombre: "Truly Soft Serve", cantidad: 1 }, { id: "x", nombre: "Otro", cantidad: 1 }], por);
+  assert.equal(detalleCompuesto(soloUno.componentes), "de Truly Soft Serve");
+  assert.equal(detalleCompuesto(enCaminoDeCompuesto([{ id: "x", nombre: "Otro", cantidad: 2 }], por).componentes), null);
 });
 
 test("la fecha corta lleva el año solo si no es el actual", () => {

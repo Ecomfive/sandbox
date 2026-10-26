@@ -108,6 +108,49 @@ export function resumenLlegada(ordenes: { unidades: number; llegada: string | nu
   return { unidades, llegada, sinFecha, sinEnvio };
 }
 
+/** Un componente de un compuesto (pack o combo) y lo que viene en camino de él. */
+export interface ComponenteEnCamino {
+  id: string;
+  nombre: string;
+  /** Cuántas unidades del componente lleva cada pack. */
+  porPack: number;
+  unidades: number;
+}
+
+/**
+ * Lo que viene en camino de un compuesto (pack o combo, pedido de Hernán, 26 oct 2026): un compuesto no se compra, se compran sus
+ * componentes; así que es lo que viene de ellos, sumado, con la llegada más próxima. `porProducto` es lo que viene de cada producto
+ * (`cargarEnCamino`).
+ */
+export function enCaminoDeCompuesto(componentes: { id: string; nombre: string; cantidad: number }[], porProducto: Map<string, ResumenLlegada>): ResumenLlegada & { componentes: ComponenteEnCamino[] } {
+  const lista = componentes.map((c) => ({ id: c.id, nombre: c.nombre, porPack: Math.max(1, c.cantidad), unidades: porProducto.get(c.id)?.unidades ?? 0, r: porProducto.get(c.id) }));
+  let llegada: string | null = null;
+  for (const c of lista) if (c.r?.llegada && (llegada === null || c.r.llegada < llegada)) llegada = c.r.llegada;
+  return {
+    unidades: lista.reduce((t, c) => t + c.unidades, 0),
+    llegada,
+    sinFecha: lista.reduce((t, c) => t + (c.r?.sinFecha ?? 0), 0),
+    sinEnvio: lista.reduce((t, c) => t + (c.r?.sinEnvio ?? 0), 0),
+    componentes: lista.map(({ r: _r, ...c }) => (void _r, c)),
+  };
+}
+
+/**
+ * De qué componente es lo que viene en camino de un compuesto, en una línea: «de Hair Growth capsulas · alcanza para 480 packs» (un
+ * pack de un solo producto) o «500 de Truly Soft Serve y 300 de Truly Buns» (un combo). `null` si no viene nada.
+ */
+export function detalleCompuesto(componentes: ComponenteEnCamino[]): string | null {
+  const n = (x: number) => x.toLocaleString("es-PA");
+  const vienen = componentes.filter((c) => c.unidades > 0);
+  if (!vienen.length) return null;
+  if (vienen.length === 1) {
+    const c = vienen[0];
+    const packs = Math.floor(c.unidades / c.porPack);
+    return `de ${c.nombre}${componentes.length === 1 && c.porPack > 1 ? ` · alcanza para ${n(packs)} ${packs === 1 ? "pack" : "packs"}` : ""}`;
+  }
+  return vienen.map((c) => `${n(c.unidades)} de ${c.nombre}`).join(" y ");
+}
+
 /** Qué falta para saber cuándo llega una orden sin fecha de llegada: su fecha de envío, o (ya enviada) su vía de envío o su fecha límite. */
 export const faltaParaLlegada = (c: { fechaEnvio: string | null }): "envio" | "via" => (c.fechaEnvio ? "via" : "envio");
 

@@ -6,6 +6,7 @@ import {
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
+import type { ComponenteEnCamino } from "@/lib/compras/en-camino";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
 import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
@@ -87,8 +88,10 @@ export interface FilaPublicacion {
   deClickup: boolean;
   /** El producto de Producto vinculado. */
   sku: SkuResumen | null;
-  /** Unidades de su producto vinculado que vienen en camino (órdenes que ya salieron y no han llegado) en este país; 0 si no hay. */
+  /** Unidades de su producto vinculado que vienen en camino (órdenes que ya salieron y no han llegado) en este país; 0 si no hay. Si el producto es un compuesto (pack o combo), las de sus componentes. */
   enCamino: number;
+  /** Si el producto vinculado es un compuesto: sus componentes y lo que viene en camino de cada uno; `null` si no lo es. */
+  componentesCamino: ComponenteEnCamino[] | null;
   /** La llegada más próxima de lo que viene en camino («2026-11-12»): la fecha límite de la compra o la estimada; null si ninguna tiene. */
   llegadaCamino: string | null;
   /** Unidades en camino de órdenes que todavía no tienen fecha de llegada (faltan datos en Compras). */

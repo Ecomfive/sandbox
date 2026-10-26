@@ -22,7 +22,25 @@ function Dato({ titulo, valor, detalle, tono }: { titulo: string; valor: string;
  * Las ventas en Dropi de una publicación: netas de 30 días contra los 30 anteriores, stock y para
  * cuántos días alcanza, cancelaciones y devoluciones, última venta y las netas de los últimos 12 meses en barras.
  */
-export function VentasEnDropi({ v, corte, enCamino = 0, llegada = null, sinFecha = 0, sinEnvio = 0 }: { v: VentasPublicacion; corte: string; /** Unidades del producto vinculado que vienen en camino, la llegada más próxima y las unidades sin fecha. */ enCamino?: number; llegada?: string | null; sinFecha?: number; sinEnvio?: number }) {
+export function VentasEnDropi({
+  v,
+  corte,
+  enCamino = 0,
+  llegada = null,
+  sinFecha = 0,
+  sinEnvio = 0,
+  de = null,
+}: {
+  v: VentasPublicacion;
+  corte: string;
+  /** Unidades del producto vinculado que vienen en camino, la llegada más próxima y las unidades sin fecha. */
+  enCamino?: number;
+  llegada?: string | null;
+  sinFecha?: number;
+  sinEnvio?: number;
+  /** De un compuesto: de qué componente es lo que viene («de Hair Growth capsulas · alcanza para 480 packs»). */
+  de?: string | null;
+}) {
   const meses = mesesEntre(restarDias(`${corte.slice(0, 7)}-15`, 335), corte);
   const valores = meses.map((m) => ({ mes: m, netas: v.porMes[m] ?? 0 }));
   const max = Math.max(1, ...valores.map((x) => x.netas));
@@ -44,6 +62,7 @@ export function VentasEnDropi({ v, corte, enCamino = 0, llegada = null, sinFecha
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-success">
           <span>
             Viene mercancía en camino: {entero(enCamino)} {enCamino === 1 ? "unidad" : "unidades"}
+            {de && <> {de}</>}
             {llegada && <> · llega aprox. {fecha(llegada)}</>}
           </span>
           {sinFecha > 0 && <Badge tone="warning">{llegada ? (sinEnvio > 0 ? "Parte aún sin fecha de envío" : "Parte sin fecha de llegada") : sinEnvio >= sinFecha ? "Aún sin fecha de envío" : "Aún sin fecha de llegada"}</Badge>}
