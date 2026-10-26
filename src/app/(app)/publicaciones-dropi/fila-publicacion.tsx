@@ -121,18 +121,31 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
 function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
   // Sale siempre que haya algo en camino (26 oct 2026): antes pedía datos de ventas y cero stock, y un producto nuevo o con unidades no lo mostraba.
   const viene = f.enCamino > 0;
+  // Lo que todavía se cotiza (01 - Cotizar y 02 - Cotizado): se sabe cuánto se piensa pedir, aún no viene.
+  const cotiza = f.enCotizacion > 0;
   const de = f.componentesCamino ? detalleCompuesto(f.componentesCamino) : null;
   return (
     <Celda
       nombre="En camino"
       alinear="derecha"
-      principal={viene ? <span className="font-medium tabular-nums text-success">{entero(f.enCamino)} en camino</span> : <span className="text-muted-foreground">—</span>}
+      principal={
+        viene ? (
+          <span className="font-medium tabular-nums text-success">{entero(f.enCamino)} en camino</span>
+        ) : cotiza ? (
+          <span className="font-medium tabular-nums text-warning">{entero(f.enCotizacion)} por cotizar</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )
+      }
       apoyo={
         viene ? (
           <span className="flex flex-wrap items-center gap-1.5 whitespace-normal font-medium text-success lg:justify-end">
             <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} />
             {de && <span className="w-full font-normal text-muted-foreground lg:text-right">{de}</span>}
+            {cotiza && <span className="w-full font-normal text-warning lg:text-right">+ {entero(f.enCotizacion)} por cotizar</span>}
           </span>
+        ) : cotiza ? (
+          <span className="text-muted-foreground">aún no viene</span>
         ) : undefined
       }
     />

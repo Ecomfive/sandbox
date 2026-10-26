@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { detalleCompuesto, enCaminoDeCompuesto, enCaminoPorPais, faltaParaLlegada, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
+import { detalleCompuesto, enCaminoDeCompuesto, enCaminoPorPais, faltaParaLlegada, lineaCotizando, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
 
 const l = (extra: Partial<LineaEnCamino>): LineaEnCamino => ({ pais: "Panamá", unidades: 100, etapa: "tracking", fechaEnvio: "2026-10-01", fechaLlegada: null, anulada: false, ...extra });
 
@@ -85,4 +85,19 @@ test("un compuesto: lo que viene de sus componentes, con la llegada más próxim
 test("la fecha corta lleva el año solo si no es el actual", () => {
   assert.equal(llegadaCorta("2026-11-05", "2026-10-22"), "5 nov");
   assert.equal(llegadaCorta("2027-01-09", "2026-10-22"), "9 ene 2027");
+});
+
+test("una orden en Cotizar o Cotizado cuenta como «en cotización», no como en camino; con fecha de envío o en producción ya viene", () => {
+  const base = { pais: null, unidades: 1, fechaEnvio: null, fechaLlegada: null, anulada: false };
+  assert.equal(lineaCotizando({ ...base, etapa: "cotizar" }), true);
+  assert.equal(lineaCotizando({ ...base, etapa: "cotizado" }), true);
+  assert.equal(lineaEnCamino({ ...base, etapa: "cotizar" }), false);
+  // Ya salió (aunque siga en Cotizado): viene en camino, no se cuenta dos veces.
+  assert.equal(lineaCotizando({ ...base, etapa: "cotizado", fechaEnvio: "2026-10-01" }), false);
+  assert.equal(lineaEnCamino({ ...base, etapa: "cotizado", fechaEnvio: "2026-10-01" }), true);
+  // Backlog, producción, anuladas y llegadas no.
+  assert.equal(lineaCotizando({ ...base, etapa: "backlog" }), false);
+  assert.equal(lineaCotizando({ ...base, etapa: "produccion" }), false);
+  assert.equal(lineaCotizando({ ...base, etapa: "cotizar", anulada: true }), false);
+  assert.equal(lineaCotizando({ ...base, etapa: "cotizar", fechaLlegada: "2026-10-02" }), false);
 });

@@ -4,7 +4,7 @@ import type { UsuarioActual } from "@/lib/auth";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { indexar } from "@/lib/scraping/cruces";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
-import { lineaEnCamino } from "./en-camino";
+import { ETAPAS_COTIZANDO, lineaCotizando, lineaEnCamino } from "./en-camino";
 import { repartirEnCamino, type Aporte, type ComponenteDeCombo, type LineaDeOrden } from "./en-camino-productos";
 import { productoDeCompra } from "./foto-producto";
 
@@ -25,9 +25,11 @@ export interface OrdenEnCaminoDatos {
 }
 
 export interface EnCaminoDatos {
-  /** Las unidades que cada orden le aporta a cada producto (con variantes y combos: `repartirEnCamino`). */
+  /** Las unidades que cada orden en camino le aporta a cada producto (con variantes y combos: `repartirEnCamino`). */
   porProducto: Map<string, Aporte[]>;
-  /** Las órdenes que vienen en camino, por id. */
+  /** Lo mismo de las órdenes que todavía se están cotizando (01 - Cotizar y 02 - Cotizado): aún no vienen en camino. */
+  cotizando: Map<string, Aporte[]>;
+  /** Las órdenes en camino y las que se cotizan, por id. */
   ordenes: Map<string, OrdenEnCaminoDatos>;
 }
 
@@ -67,22 +69,23 @@ type FilaCompra = {
  * Si algo falla, nada.
  */
 export async function cargarEnCaminoDatos(supabase: SupabaseClient, usuario: UsuarioActual, paisId: string | null): Promise<EnCaminoDatos> {
-  const vacio: EnCaminoDatos = { porProducto: new Map(), ordenes: new Map() };
+  const vacio: EnCaminoDatos = { porProducto: new Map(), cotizando: new Map(), ordenes: new Map() };
   let consulta = supabase
     .from("wms_compras")
     .select("id, numero, tipo, nombre, qty_total, pais_id, etapa, fecha_limite, via_envio, fecha_envio, fecha_llegada, anulada_en, asignado_a, creado_por, responsable_nombre, creador_nombre, paises(codigo, nombre)")
     .is("anulada_en", null)
     .is("fecha_llegada", null)
     .not("etapa", "in", "(completado,descartado)")
-    // Ya salió, o ya está en producción, tracking o arribo (pedida aunque todavía no tenga fecha de envío).
-    .or("fecha_envio.not.is.null,etapa.in.(produccion,tracking,arribo_mercancia)");
+    // Ya salió, o ya está en producción, tracking o arribo (pedida aunque todavía no tenga fecha de envío); y las que se están cotizando.
+    .or(`fecha_envio.not.is.null,etapa.in.(produccion,tracking,arribo_mercancia,${ETAPAS_COTIZANDO.join(",")})`);
   if (paisId) consulta = consulta.eq("pais_id", paisId);
   const { data: compras, error } = await consulta.limit(5000);
   if (error || !compras?.length) return vacio;
   const limites = restriccionesDe(usuario.afinado.compras);
+  const comoLinea = (c: FilaCompra) => ({ pais: null, unidades: 1, etapa: c.etapa, fechaEnvio: c.fecha_envio, fechaLlegada: c.fecha_llegada, anulada: !!c.anulada_en });
   const abiertas = (compras as unknown as FilaCompra[]).filter(
     (c) =>
-      lineaEnCamino({ pais: null, unidades: 1, etapa: c.etapa, fechaEnvio: c.fecha_envio, fechaLlegada: c.fecha_llegada, anulada: !!c.anulada_en }) &&
+      (lineaEnCamino(comoLinea(c)) || lineaCotizando(comoLinea(c))) &&
       puedeVerPais(usuario.paisesPermitidos, uno(c.paises)?.codigo ?? null) &&
       dentroDelAlcance(limites.alcance, { asignadoId: c.asignado_a, creadoPorId: c.creado_por, responsableNombre: c.responsable_nombre, creadorNombre: c.creador_nombre }, usuario),
   );
@@ -109,7 +112,8 @@ export async function cargarEnCaminoDatos(supabase: SupabaseClient, usuario: Usu
       // Sin el cruce por nombre, esas órdenes siguen sin contarse: lo demás carga igual.
     }
   }
-  if (!lineas.length) return { porProducto: new Map(), ordenes: new Map(abiertas.map((c) => [c.id, aOrden(c)])) };
+  const ordenes = new Map(abiertas.map((c) => [c.id, aOrden(c)]));
+  if (!lineas.length) return { porProducto: new Map(), cotizando: new Map(), ordenes };
 
   // Variantes (suman a su producto) y combos (de qué se arman, para que una orden de un combo traiga también sus componentes).
   const padres = new Map<string, string>();
@@ -131,7 +135,13 @@ export async function cargarEnCaminoDatos(supabase: SupabaseClient, usuario: Usu
     }
     pendientes = [...new Set(siguientes)];
   }
-  return { porProducto: repartirEnCamino(lineas, padres, componentes), ordenes: new Map(abiertas.map((c) => [c.id, aOrden(c)])) };
+  // Lo que viene en camino y lo que todavía se cotiza se reparten por separado.
+  const cotizandoIds = new Set(abiertas.filter((c) => !lineaEnCamino(comoLinea(c))).map((c) => c.id));
+  return {
+    porProducto: repartirEnCamino(lineas.filter((l) => !cotizandoIds.has(l.compraId)), padres, componentes),
+    cotizando: repartirEnCamino(lineas.filter((l) => cotizandoIds.has(l.compraId)), padres, componentes),
+    ordenes,
+  };
 }
 
 function aOrden(c: FilaCompra): OrdenEnCaminoDatos {

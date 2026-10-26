@@ -90,6 +90,8 @@ export interface FilaPublicacion {
   sku: SkuResumen | null;
   /** Unidades de su producto vinculado que vienen en camino (órdenes que ya salieron y no han llegado) en este país; 0 si no hay. Si el producto es un compuesto (pack o combo), las de sus componentes. */
   enCamino: number;
+  /** Unidades del producto vinculado que están en órdenes todavía en cotización (01 - Cotizar y 02 - Cotizado): se sabe cuánto se piensa pedir, aún no viene. */
+  enCotizacion: number;
   /** Si el producto vinculado es un compuesto: sus componentes y lo que viene en camino de cada uno; `null` si no lo es. */
   componentesCamino: ComponenteEnCamino[] | null;
   /** La llegada más próxima de lo que viene en camino («2026-11-12»): la fecha límite de la compra o la estimada; null si ninguna tiene. */
@@ -278,6 +280,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },
     { id: "stockDropi", etiqueta: "Stock en Dropi", tipo: "seleccion", valores: (f) => uno(f.ventas?.stockEstado ?? null), opciones: () => STOCK_DROPI, etiquetaSinValor: "Sin datos de Dropi", agrupable: true, ordenGrupos: STOCK_DROPI.map((s) => s.valor) },
     { id: "enCamino", etiqueta: "Mercancía en camino (unidades)", tipo: "numero", valor: (f) => f.enCamino },
+    { id: "enCotizacion", etiqueta: "En cotización (unidades)", tipo: "numero", valor: (f) => f.enCotizacion },
     // «Sin stock» del tablero (25 oct 2026, pedido de Alcides): toda publicación activa en Dropi con 0 unidades, venda o no.
     { id: "sinStock", etiqueta: "Sin stock", tipo: "seleccion", valores: (f) => [sinStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sin stock" }, { valor: "no", etiqueta: "Con stock" }] },
     // Primero la lectura de «Mis productos» (más reciente que la carga de ventas).
