@@ -361,6 +361,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       publicarPendiente: cambiosDropi.creando.has(d.id as string),
       datosDropi: d.estado_publicacion === "borrador" ? normalizarDatosCrear(datosBorradores.get(d.id as string) ?? null) : null,
       archivadoPendiente: cambiosDropi.archivando.has(d.id as string) ? (cambiosDropi.archivando.get(d.id as string) ? "restaurar" : "archivar") : null,
+      privatizaciones: cambiosDropi.privatizando.get(d.id as string) ?? [],
       duplicadaDe: null,
       grupo: [],
     };

@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { APAGAR_JS, armarApagado, CONCEPTO_APAGAR, grupoDe, nombreDelPublico, privadasDe, type PublicacionParaApagar } from "./apagar-dropi";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
+import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
-const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${APAGAR_JS}; return { apagado };`)() as { apagado: (o: Obj, bp: Obj[], q: boolean) => Obj };
+const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${PRIVATIZAR_JS};${APAGAR_JS}; return { apagado };`)() as { apagado: (o: Obj, bp: Obj[], q: boolean) => Obj };
 const igual = (a: unknown, b: unknown) => assert.deepEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
 
 const bp = [{ id: 81, name: "Proveedor Ecomfive", address: "Ave Centenario, Costa del Este", warehouse_white_brand: false }];
@@ -62,10 +63,13 @@ test("apagar el público: salida de todo el stock con el concepto «stock» y si
 });
 
 test("apagar un privado: además de sacar el stock, deja sin privatización; sin quitarlas, las deja", () => {
-  const privado = producto({ id: 11178, private_product_inventories: [{ stock: 5, deleted_at: null, email: "a@b.c" }] });
+  const privado = producto({ id: 11178, private_product_inventories: [{ id: 77, product_id: 11178, user_id: 5, stock: 5, deleted_at: null, email: "a@b.c" }] });
   const con = armarApagado(privado, bp, true);
   assert.ok("cuerpo" in con && con.cuerpo);
-  assert.deepEqual(con.cuerpo!.private_product_inventories, []);
+  // Como lo hace la pantalla de Dropi: la reserva no se borra de la lista, va marcada como quitada.
+  const quitadas = con.cuerpo!.private_product_inventories as Obj[];
+  assert.equal(quitadas.length, 1);
+  assert.deepEqual([quitadas[0].id, quitadas[0].user_id, quitadas[0].deleted_at, quitadas[0].change, quitadas[0].email], [77, 5, true, true, "a@b.c"]);
   assert.equal(con.privadas, 1);
   const sin = armarApagado(privado, bp, false);
   assert.ok("cuerpo" in sin && sin.cuerpo);
@@ -78,7 +82,7 @@ test("si ya está en cero solo se archiva (nada que guardar); si queda solo la p
   assert.equal(cero.cuerpo, null);
   const soloPrivada = armarApagado(producto({ warehouse_product: [], private_product_inventories: [{ stock: 2, deleted_at: null }] }), bp, true);
   assert.ok("cuerpo" in soloPrivada && soloPrivada.cuerpo);
-  assert.deepEqual(soloPrivada.cuerpo!.private_product_inventories, []);
+  assert.equal((soloPrivada.cuerpo!.private_product_inventories as Obj[])[0].deleted_at, true);
   assert.equal(soloPrivada.unidades, 0);
   // Una privatización ya borrada no cuenta.
   const borrada = armarApagado(producto({ warehouse_product: [], private_product_inventories: [{ stock: 2, deleted_at: "2026-10-01" }] }), bp, true);

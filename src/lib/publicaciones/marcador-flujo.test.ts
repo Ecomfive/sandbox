@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean } = {}) {
+function crearDropi(opciones: { usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
@@ -47,6 +47,12 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     const cuerpo: Obj | null = typeof init.body === "string" ? JSON.parse(init.body) : null;
     if (metodo === "GET" && ruta === "/users/2094") return responder({ id: 2094, warehouses: [BODEGA] });
     if (metodo === "GET" && ruta === "/categories") return responder(opciones.categorias ?? [{ id: 4, name: "Belleza", parent_category: 0 }, { id: 7, name: "Salud", parent_category: 0 }]);
+    // La cuenta de Dropi de un correo (para privatizar): `existemail`.
+    const em = ruta.match(/^\/users\/existemail\/([^/]+)\/false$/);
+    if (metodo === "GET" && em) {
+      const u = (opciones.usuarios ?? {})[decodeURIComponent(em[1])];
+      return u ? responder(structuredClone(u)) : responder({ isSuccess: false, message: "No existe ese correo" }, 404);
+    }
     const m = ruta.match(/^\/products\/(\d+)(\/[A-Za-z]+)?$/);
     if (metodo === "GET" && m && !m[2]) {
       const p = productos.get(Number(m[1]));
@@ -58,7 +64,7 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
       if (opciones.respuestaCrear === "sinId") return responder({ isSuccess: true, status: 200, message: "Ok" });
       const id = siguiente++;
       productos.set(id, productoBase(id, {
-        name: cuerpo!.name, description: cuerpo!.description, sale_price: String(cuerpo!.sale_price), suggested_price: String(cuerpo!.suggested_price), categories: cuerpo!.categories, sku: cuerpo!.sku,
+        privated_product: cuerpo!.privated_product === true, name: cuerpo!.name, description: cuerpo!.description, sale_price: String(cuerpo!.sale_price), suggested_price: String(cuerpo!.suggested_price), categories: cuerpo!.categories, sku: cuerpo!.sku,
         weight: String(cuerpo!.weight), length: String(cuerpo!.length), width: String(cuerpo!.width), height: String(cuerpo!.height), gallery: [],
         warehouse_product: opciones.stockAlCrear === false ? [] : (cuerpo!.warehouselected as Obj[]).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock, warehouse: BODEGA })),
       }));
@@ -66,6 +72,22 @@ function crearDropi(opciones: { stockAlCrear?: boolean; noArchiva?: boolean; cat
     }
     if (metodo === "PUT" && m && !m[2]) {
       const p = productos.get(Number(m[1]))!;
+      // «Productos privados»: la reserva nueva (`change`) se agrega; una con `deleted_at` y `change` se quita; no se puede reservar más que el stock.
+      const reservas = (cuerpo!.private_product_inventories as Obj[] | undefined) ?? [];
+      if (reservas.some((x) => x.change === true)) {
+        if (opciones.fallaAsignar) return responder({ isSuccess: false, message: "Error al asignar" }, 500);
+        for (const x of reservas.filter((y) => y.change === true)) {
+          const viva = (p.private_product_inventories as Obj[]).find((y) => y.user_id === x.user_id && !y.deleted_at);
+          if (x.deleted_at) {
+            if (viva) viva.deleted_at = "2026-10-26";
+          } else if (!viva) {
+            const stock = (p.warehouse_product as Obj[]).reduce((t, w) => t + Number(w.stock), 0);
+            const ya = (p.private_product_inventories as Obj[]).filter((y) => !y.deleted_at).reduce((t, y) => t + Number(y.stock), 0);
+            if (ya + Number(x.stock) > stock) return responder({ isSuccess: false, message: "La cantidad en stock es menor" }, 422);
+            p.private_product_inventories.push({ id: 500 + p.private_product_inventories.length, product_id: p.id, user_id: x.user_id, email: x.email, stock: x.stock, deleted_at: null });
+          }
+        }
+      }
       Object.assign(p, { name: cuerpo!.name, description: cuerpo!.description, sale_price: String(cuerpo!.sale_price), suggested_price: String(cuerpo!.suggested_price), name_in_guide: cuerpo!.name_in_guide });
       for (const w of cuerpo!.warehouselected as Obj[]) {
         if (!w.type_movement) continue;
@@ -401,4 +423,116 @@ test("republicar: con fotos copiadas en el sistema, sube esas (la primera como p
   const g = d.productos.get(9001)!.gallery as Obj[];
   assert.equal(g.length, 2);
   assert.ok(g[0].main && String(g[0].urlS3).endsWith("1779932274anti.jpg"));
+});
+
+// ─── Privatizar (26 oct 2026) ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+const maria = { id: 5521, email: "maria@correo.com", name: "María Álvarez", role_user: { name: "DROPSHIPPER" } };
+const privatizacion = { correo: "maria@correo.com", dropshipper: "María Álvarez", dropshipperId: null, iniciales: "MA", unidades: 50, bodega: 81, precio: 5.5, nombre: "P-MA Aceite Veganic", origen: "4f0d6f56-1b68-4f4a-a5c0-7a1b0e3f9c11", salida: false };
+const publicoVeganic = () => productoBase(8406, { warehouse_product: [{ warehouse_id: 81, stock: 300, warehouse: BODEGA }] });
+
+test("privatizar: crea el producto privado, le pone fotos y stock, se lo asigna al dropshipper y le saca las unidades al público", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(8406, publicoVeganic());
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
+  assert.equal(r.salida, true);
+  const privado = d.productos.get(9001)!;
+  assert.equal(privado.privated_product, true);
+  assert.equal(privado.name, "P-MA Aceite Veganic");
+  assert.equal(privado.sale_price, "5.5");
+  assert.deepEqual(d.stockDe(privado), { 81: 50 });
+  assert.equal(privado.gallery.length, 1, "la foto del público pasa al privado");
+  const reservas = privado.private_product_inventories as Obj[];
+  assert.deepEqual(reservas.map((x) => [x.user_id, x.email, x.stock, x.deleted_at]), [[5521, "maria@correo.com", 50, null]]);
+  // El público pierde esas unidades y sigue igual en lo demás.
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 250 });
+  assert.equal(d.productos.get(8406)!.privated_product, false);
+  assert.ok(d.llamadas.includes("GET /users/existemail/maria%40correo.com/false"));
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 1);
+});
+
+test("privatizar: un correo que no existe en Dropi, o que es de un proveedor, se dice antes de crear nada", async () => {
+  const d = crearDropi({ usuarios: { "prov@correo.com": { ...maria, id: 7, role_user: { name: "SUPPLIER" } } } });
+  d.productos.set(8406, publicoVeganic());
+  let [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /no tiene una cuenta con el correo maria@correo.com/);
+  [r] = await aplicar(d, [{ ...base, id: "v2", tipo: "privatizar", producto: 8406, datos: { ...privatizacion, correo: "prov@correo.com" } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /es de un proveedor/);
+  assert.equal(d.productos.size, 1);
+  assert.ok(!d.llamadas.includes("POST /products"));
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 300 });
+});
+
+test("privatizar: si el público no tiene tantas unidades, no crea nada", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(8406, publicoVeganic());
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: { ...privatizacion, unidades: 301 } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /solo tiene 300 unidades/);
+  assert.equal(d.productos.size, 1);
+});
+
+test("privatizar: no se privatiza un producto que ya es privado ni uno que no es de este proveedor", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(8406, { ...publicoVeganic(), privated_product: true });
+  d.productos.set(5, productoBase(5, { user_id: 1 }));
+  let [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  assert.match(String(r.error), /ya es privado/);
+  [r] = await aplicar(d, [{ ...base, id: "v2", tipo: "privatizar", producto: 5, datos: privatizacion }]);
+  assert.match(String(r.error), /no es de este proveedor/);
+});
+
+test("privatizar: si falla la asignación, el privado ya creado se guarda y el reintento sigue desde ahí sin sacar el stock dos veces", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria }, fallaAsignar: true });
+  d.productos.set(8406, publicoVeganic());
+  const [r1] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  assert.equal(r1.ok, false);
+  assert.equal(r1.nuevo, 9001, "el ID del privado ya creado vuelve aunque falle un paso");
+  assert.equal(r1.salida, false, "al público todavía no se le sacó nada");
+  assert.match(String(r1.error), /no se le pudo asignar a maria@correo.com/);
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 300 });
+  // La asignación vuelve a funcionar: el reintento no crea otro producto.
+  const siguiente = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  siguiente.productos.set(8406, d.productos.get(8406)!);
+  siguiente.productos.set(9001, d.productos.get(9001)!);
+  const [r2] = await aplicar(siguiente, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, nuevo: 9001, datos: privatizacion }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal(r2.nuevo, 9001);
+  assert.ok(!siguiente.llamadas.includes("POST /products"));
+  assert.deepEqual(siguiente.stockDe(siguiente.productos.get(8406)!), { 81: 250 });
+  // Otro reintento con la salida ya hecha (el aviso `salida` que guarda el sistema): no vuelve a sacar stock del público ni a asignar.
+  const llamadas = siguiente.llamadas.length;
+  const [r3] = await aplicar(siguiente, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, nuevo: 9001, datos: { ...privatizacion, salida: true } }]);
+  assert.equal(r3.ok, true, String(r3.error));
+  assert.deepEqual(siguiente.stockDe(siguiente.productos.get(8406)!), { 81: 250 });
+  assert.equal(siguiente.llamadas.slice(llamadas).filter((l) => l.startsWith("PUT ")).length, 0);
+});
+
+test("privatizar: dos dropshippers distintos del mismo público, cada uno con su producto privado", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria, "sofia@correo.com": { ...maria, id: 6001, email: "sofia@correo.com" } } });
+  d.productos.set(8406, publicoVeganic());
+  const r = await aplicar(d, [
+    { ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion },
+    { ...base, id: "v2", tipo: "privatizar", producto: 8406, datos: { ...privatizacion, correo: "sofia@correo.com", iniciales: "SO", nombre: "P-SO Aceite Veganic", unidades: 100 } },
+  ]);
+  assert.deepEqual(r.map((x) => [x.ok, x.nuevo]), [[true, 9001], [true, 9002]]);
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 150 });
+  assert.deepEqual((d.productos.get(9002)!.private_product_inventories as Obj[]).map((x) => x.user_id), [6001]);
+});
+
+test("apagar un privado: la reserva del correo se quita (va marcada como quitada) y queda sin stock y archivado", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(8406, publicoVeganic());
+  await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  const [r] = await aplicar(d, [{ ...base, id: "a1", tipo: "apagar", producto: 9001, quitarPrivados: true }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.archivado, true);
+  const privado = d.productos.get(9001)!;
+  assert.deepEqual(d.stockDe(privado), { 81: 0 });
+  assert.ok((privado.private_product_inventories as Obj[]).every((x) => x.deleted_at));
+  assert.equal(privado.archived, true);
 });

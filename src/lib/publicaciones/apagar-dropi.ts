@@ -8,6 +8,7 @@
 // Aquí van las piezas puras (sin base ni red), con prueba que también compara la versión en JavaScript del favorito.
 
 import { armarGuardadoProducto } from "./dropi-guardado";
+import { reservasQuitadas } from "./privatizar-dropi";
 import { armarMovimientoStock, stockPorBodega } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
@@ -74,11 +75,12 @@ export function armarApagado(producto: Obj, bodegasProveedor: Obj[], quitarPriva
   const r = unidades ? armarMovimientoStock(producto, bodegasProveedor, movimientos, CONCEPTO_APAGAR) : armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null });
   if ("error" in r) return r;
   const cuerpo: Obj = { ...r.cuerpo };
-  if (quitar) cuerpo.private_product_inventories = [];
+  // Como lo hace la pantalla de Dropi al borrar un correo de «Productos privados»: la reserva va marcada como quitada (`deleted_at` y `change`).
+  if (quitar) cuerpo.private_product_inventories = reservasQuitadas(producto.private_product_inventories);
   return { cuerpo, unidades, privadas };
 }
 
-/** Lo mismo en JavaScript simple para el favorito (va después de `REPUBLICAR_JS`, que define `mover` y `stockDe`). La prueba compara los dos. */
+/** Lo mismo en JavaScript simple para el favorito (va después de `REPUBLICAR_JS`, que define `mover` y `stockDe`, y de `PRIVATIZAR_JS`, que define `reservasQuitadas`). La prueba compara los dos. */
 export const APAGAR_JS = [
   "function apagado(o,bp,q){",
   "var pr={};bp.forEach(function(p){pr[Number(p.id)]=1});",
@@ -88,6 +90,6 @@ export const APAGAR_JS = [
   "var pi=(Array.isArray(o.private_product_inventories)?o.private_product_inventories:[]).filter(function(p){return!p.deleted_at}).length;",
   "var qt=q&&pi>0;if(!un&&!qt)return{cuerpo:null,unidades:0,privadas:pi};",
   "var r=un?mover(o,bp,mv," + JSON.stringify(CONCEPTO_APAGAR) + "):armar(o,bp,{nombre:null,nombreGuia:null});if(r.error)return r;",
-  "var c=Object.assign({},r.cuerpo);if(qt)c.private_product_inventories=[];",
+  "var c=Object.assign({},r.cuerpo);if(qt)c.private_product_inventories=reservasQuitadas(o.private_product_inventories);",
   "return{cuerpo:c,unidades:un,privadas:pi}}",
 ].join("");

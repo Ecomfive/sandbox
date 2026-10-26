@@ -6,8 +6,10 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
-import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
-import { encolarApagar, encolarArchivar, encolarCrear, encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
+import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
+import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
+import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
+import { faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -679,4 +681,73 @@ export async function republicarPublicacion(id: string): Promise<{ error?: strin
     await registrarAuditoria({ accion: "dropi_republicar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»` });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
+}
+
+/**
+ * «Privatizar en Dropi» en la ficha (pedido de Jhokser, 26 oct 2026; migración 0154): deja pendiente que «Aplicar en Dropi» le deje un producto
+ * a un solo dropshipper. En Dropi crea un producto privado nuevo («P-XX …», copia del público), le asigna el correo en «Productos privados» con
+ * las unidades que se le reservan y se las saca al público. Cuando Dropi lo confirma, el sistema crea la publicación privada (`guardarResultadosDropi`).
+ * El nombre del privado, el público de origen y la bodega se vuelven a calcular y comprobar aquí: el navegador no decide a qué producto se toca.
+ */
+export async function privatizarPublicacion(id: string, crudo: unknown): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (antes.estado === "archivado" || antes.estado_publicacion === "archivado") return { error: "Está archivada: sácala de Archivados antes de privatizarla." };
+  if (antes.estado_publicacion === "borrador") return { error: "Todavía no está publicada en Dropi: publícala antes de privatizarla." };
+  if (antes.duplicada_de) return { error: "Es una duplicada: se privatiza la publicación que vale." };
+  if (await esPrivada(antes)) return { error: "Es una publicación privada: se privatiza la pública." };
+  const ids = idsDeDropi((antes.dropi_id as string | null) ?? null);
+  if (!ids.length) return { error: "La publicación no tiene ID de Dropi." };
+  const supabase = createServiceClient();
+  const pedido = normalizarDatosPrivatizar({ ...(typeof crudo === "object" && crudo !== null ? crudo : {}), origen: id, salida: false });
+  const d = { ...pedido, nombre: pedido.iniciales ? nombrePrivado(pedido.iniciales, antes.nombre) : "" };
+  // El stock que Dropi mostró en la última lectura de «Mis productos», en la bodega elegida (la comprobación de verdad la hace el favorito en Dropi).
+  const { data: lectura } = await supabase.from("dropi_productos_proveedor").select("bodegas").eq("pais_id", antes.pais_id).eq("dropi_producto_id", ids[0]).maybeSingle();
+  const bodegas = Array.isArray(lectura?.bodegas) ? (lectura!.bodegas as { id: number; stock: number }[]) : null;
+  if (bodegas && !bodegas.some((b) => Number(b.id) === d.bodega)) return { error: "Esa bodega no tiene stock de este producto en Dropi." };
+  if (d.bodega === BODEGA_DROPI) return { error: "El stock de la bodega de Dropi (B280) no se mueve desde aquí." };
+  const disponible = bodegas ? Number(bodegas.find((b) => Number(b.id) === d.bodega)?.stock ?? 0) : null;
+  const faltan = faltantesPrivatizar(d, disponible);
+  if (faltan.length) return { error: faltan[0] };
+  // Un dropshipper no recibe dos veces el mismo producto: si ya tiene su privada (sin archivar), se avisa.
+  const { data: privadas } = await supabase.from("dropi_publicaciones").select("id, numero, nombre, privatizado_email, estado, estado_publicacion").eq("pais_id", antes.pais_id).not("privatizado_email", "is", null).limit(5000);
+  const base = nombreDelPublico(antes.nombre);
+  const ya = (privadas ?? []).find(
+    (x) => String(x.privatizado_email ?? "").toLowerCase() === d.correo && nombreDelPublico(String(x.nombre ?? "")) === base && x.estado !== "archivado" && x.estado_publicacion !== "archivado",
+  );
+  if (ya) return { error: `${d.correo} ya tiene este producto privado: ${numeroPublicacion(ya.numero as number | null)} (${ya.nombre}).` };
+  const r = await encolarPrivatizar(supabase, { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, d, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  if ("error" in r) return { error: r.error };
+  if (!r.yaEstaba)
+    await registrarAuditoria({
+      accion: "dropi_privatizar_pendiente",
+      entidad: "dropi_publicaciones",
+      entidadId: id,
+      detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: privatizar ${d.unidades} u. a ${d.dropshipper} (${d.correo}) como «${d.nombre}» · pendiente para «Aplicar en Dropi»`,
+    });
+  revalidatePath(RUTA);
+  return { detalle: r.yaEstaba ? "Ya estaba pendiente para ese correo: pulsa «Aplicar en Dropi» con Dropi abierto." : "Privatización pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
+}
+
+/**
+ * Dropshippers del CRM para llenar la privatización (nombre y correo) al escribir parte de su nombre, tienda o correo. Solo los que venden en el país
+ * de la publicación y solo para quien puede abrir el CRM (los correos de los dropshippers son de ese módulo).
+ */
+export async function buscarDropshippersParaPrivatizar(publicacionId: string, consulta: string): Promise<{ resultados: { id: string; nombre: string; correo: string; tienda: string }[] }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!usuario.modulos.includes("crm-dropshippers")) return { resultados: [] };
+  const pub = await publicacionPermitida(publicacionId, usuario.paisesPermitidos);
+  if (!pub) return { resultados: [] };
+  // Nada de comodines ni signos del filtro: solo letras, números, espacios, @, punto y guion.
+  const t = String(consulta ?? "").normalize("NFC").replace(/[^\p{L}\p{N}@. -]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  if (t.length < 2) return { resultados: [] };
+  const supabase = createServiceClient();
+  const leer = (columna: string) =>
+    supabase.from("dropshippers").select("id, nombre, contacto_email, tienda, dropshipper_paises!inner(pais_id)").eq("dropshipper_paises.pais_id", pub.pais_id).ilike(columna, `%${t}%`).limit(8);
+  const [porNombre, porCorreo, porTienda] = await Promise.all([leer("nombre"), leer("contacto_email"), leer("tienda")]);
+  const vistos = new Map<string, { id: string; nombre: string; correo: string; tienda: string }>();
+  for (const f of [...(porNombre.data ?? []), ...(porCorreo.data ?? []), ...(porTienda.data ?? [])] as Record<string, unknown>[])
+    if (!vistos.has(f.id as string)) vistos.set(f.id as string, { id: f.id as string, nombre: String(f.nombre ?? ""), correo: String(f.contacto_email ?? ""), tienda: String(f.tienda ?? "") });
+  return { resultados: [...vistos.values()].slice(0, 8) };
 }

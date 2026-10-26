@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DatosCrearDropi, FotoCrear } from "./crear-dropi";
 import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
+import { normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
 import { idsDeDropi } from "./sincronizar-dropi";
 
 export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazado";
@@ -15,9 +16,12 @@ export interface CambioDropiVista {
   id: string;
   /**
    * «cambio» = nombre, precios, descripción y/o fotos; «republicar» = crear el producto de nuevo en Dropi (migración 0145); «apagar» = sacar el
-   * stock y archivar (0148); «archivar» = archivar o sacar de Archivados (0151); «crear» = publicar una publicación nueva en Dropi (0151).
+   * stock y archivar (0148); «archivar» = archivar o sacar de Archivados (0151); «crear» = publicar una publicación nueva en Dropi (0151);
+   * «privatizar» = dejarle unidades del producto a un dropshipper en un producto privado nuevo (0154).
    */
-  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear";
+  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar";
+  /** «privatizar»: a quién, cuántas unidades y bajo qué nombre. */
+  privatizacion: Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre"> | null;
   /** «archivar»: true = sacarlo de Archivados. */
   restaurar: boolean;
   /** «cambio»: la descripción nueva y cuántas fotos se suben. */
@@ -258,6 +262,33 @@ export async function encolarCrear(
   return { id: data.id as string, yaEstaba: false };
 }
 
+/**
+ * «Privatizar en Dropi» (pedido de Jhokser, 26 oct 2026; migración 0154): deja en la cola que se cree en Dropi un producto privado del público de
+ * `pub` y se le asigne a un dropshipper con unas unidades que salen del público. Va en la publicación pública. Si ya había una privatización
+ * esperando para el mismo correo, no se agrega otra (`yaEstaba`); a otro correo sí (se puede privatizar a varios).
+ */
+export async function encolarPrivatizar(
+  supabase: SupabaseClient,
+  pub: { id: string; pais_id: string; dropi_id: string | null },
+  datos: DatosPrivatizar,
+  por: { id: string; nombre: string },
+): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
+  const productoId = idsDeDropi(pub.dropi_id)[0];
+  if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
+  const falta = (m: string) => /tipo|column|does not exist|schema cache|datos/i.test(m);
+  const previo = await supabase.from("dropi_cambios_pendientes").select("id, datos").eq("publicacion_id", pub.id).eq("tipo", "privatizar").in("estado", ["pendiente", "error"]);
+  if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0154." : "No se pudo dejar la privatización para Dropi." };
+  const igual = (previo.data ?? []).find((f) => normalizarDatosPrivatizar(f.datos).correo === datos.correo);
+  if (igual) return { id: igual.id as string, yaEstaba: true };
+  const { data, error } = await supabase
+    .from("dropi_cambios_pendientes")
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "privatizar", nombre: datos.nombre, datos, creado_por: por.id, creado_por_nombre: por.nombre })
+    .select("id")
+    .single();
+  if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0154." : "No se pudo dejar la privatización para Dropi." };
+  return { id: data.id as string, yaEstaba: false };
+}
+
 /** El cambio de nombre (y el de la guía) para Dropi; se junta con un cambio de precio pendiente si lo hay. */
 export async function encolarCambioNombre(
   supabase: SupabaseClient,
@@ -310,7 +341,15 @@ export async function enviarNombreADropi(
 export async function cargarCambiosDropi(
   supabase: SupabaseClient,
   paisId: string,
-): Promise<{ porPublicacion: Map<string, CambioDropiVista>; pendientes: number; apagando: Map<string, number>; archivando: Map<string, boolean>; creando: Map<string, number> }> {
+): Promise<{
+  porPublicacion: Map<string, CambioDropiVista>;
+  pendientes: number;
+  apagando: Map<string, number>;
+  archivando: Map<string, boolean>;
+  creando: Map<string, number>;
+  /** Privatizaciones esperando por publicación pública (pendientes o con error), con a quién y cuántas unidades. */
+  privatizando: Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre">[]>;
+}> {
   const porPublicacion = new Map<string, CambioDropiVista>();
   // Las publicaciones con un apagado esperando (pendiente, a medias o con error): en el sistema ya se ven como apagadas. El valor es cuántas
   // veces se intentó en Dropi: con 0, Dropi todavía no se tocó y el apagado se puede deshacer sin consecuencias.
@@ -318,25 +357,31 @@ export async function cargarCambiosDropi(
   // Archivar (true = sacar de Archivados) y publicar (veces que se intentó) pendientes: la fila los muestra.
   const archivando = new Map<string, boolean>();
   const creando = new Map<string, number>();
+  const privatizando = new Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre">[]>();
   const leer = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
-  let r = await leer("id, publicacion_id, tipo, restaurar, descripcion, fotos, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
+  let r = await leer("id, publicacion_id, tipo, restaurar, descripcion, fotos, datos, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   // Sin la migración 0151, sin archivar, descripción ni fotos; sin la 0145, sin republicaciones; sin la 0139, sin precios.
   if (r.error) r = await leer("id, publicacion_id, tipo, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, error, creado_en, aplicado_en");
   const { data, error } = r as unknown as { data: Record<string, unknown>[] | null; error: unknown };
-  if (error) return { porPublicacion, pendientes: 0, apagando, archivando, creando };
+  if (error) return { porPublicacion, pendientes: 0, apagando, archivando, creando, privatizando };
   let pendientes = 0;
   for (const f of data ?? []) {
     if (f.estado === "pendiente") pendientes++;
+    if (f.tipo === "privatizar" && (f.estado === "pendiente" || f.estado === "error")) {
+      const d = normalizarDatosPrivatizar(f.datos);
+      privatizando.set(f.publicacion_id as string, [...(privatizando.get(f.publicacion_id as string) ?? []), { correo: d.correo, dropshipper: d.dropshipper, unidades: d.unidades, nombre: d.nombre }]);
+    }
     if (f.tipo === "apagar" && (f.estado === "pendiente" || f.estado === "error")) apagando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
     if (f.tipo === "archivar" && (f.estado === "pendiente" || f.estado === "error") && !archivando.has(f.publicacion_id as string)) archivando.set(f.publicacion_id as string, f.restaurar === true);
     if (f.tipo === "crear" && (f.estado === "pendiente" || f.estado === "error")) creando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
     if (porPublicacion.has(f.publicacion_id as string)) continue;
     porPublicacion.set(f.publicacion_id as string, {
       id: f.id as string,
-      tipo: f.tipo === "republicar" ? "republicar" : f.tipo === "apagar" ? "apagar" : f.tipo === "archivar" ? "archivar" : f.tipo === "crear" ? "crear" : "cambio",
+      tipo: f.tipo === "republicar" ? "republicar" : f.tipo === "apagar" ? "apagar" : f.tipo === "archivar" ? "archivar" : f.tipo === "crear" ? "crear" : f.tipo === "privatizar" ? "privatizar" : "cambio",
+      privatizacion: f.tipo === "privatizar" ? (({ correo, dropshipper, unidades, nombre }) => ({ correo, dropshipper, unidades, nombre }))(normalizarDatosPrivatizar(f.datos)) : null,
       restaurar: f.restaurar === true,
       descripcion: (f.descripcion as string | null | undefined) ?? null,
       fotos: Array.isArray(f.fotos) ? f.fotos.length : 0,
@@ -351,5 +396,5 @@ export async function cargarCambiosDropi(
       aplicadoEn: (f.aplicado_en as string | null) ?? null,
     });
   }
-  return { porPublicacion, pendientes, apagando, archivando, creando };
+  return { porPublicacion, pendientes, apagando, archivando, creando, privatizando };
 }

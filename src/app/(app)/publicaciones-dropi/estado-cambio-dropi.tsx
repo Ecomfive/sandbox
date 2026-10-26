@@ -11,6 +11,7 @@ export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
   if (c.tipo === "apagar") return <EstadoApagar c={c} />;
   if (c.tipo === "archivar") return <EstadoArchivar c={c} />;
   if (c.tipo === "crear") return <EstadoCrear c={c} />;
+  if (c.tipo === "privatizar") return <EstadoPrivatizar c={c} />;
   const guia = c.nombreGuia ? ` · guía «${c.nombreGuia}»` : "";
   // Qué lleva el cambio: el nombre, el precio y/o el precio sugerido.
   const que = [
@@ -96,6 +97,28 @@ function EstadoCrear({ c }: { c: CambioDropiVista }) {
       {c.estado === "error"
         ? `No se pudo publicar en Dropi${c.nuevoDropiId ? ` (ya se creó el ID ${c.nuevoDropiId})` : ""}: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
         : "Publicación pendiente en Dropi: pulsa «Aplicar en Dropi» con Dropi abierto."}
+    </span>
+  );
+}
+
+/** Cómo va una privatización (migración 0154): hecha (con el ID del producto privado), pendiente o con error (se sigue desde donde quedó). */
+function EstadoPrivatizar({ c }: { c: CambioDropiVista }) {
+  const p = c.privatizacion;
+  const quien = p ? `${p.dropshipper || p.correo} (${p.correo})` : "el dropshipper";
+  const que = p ? `${p.unidades.toLocaleString("es-PA")} u. como «${p.nombre}»` : "";
+  if (c.estado === "aplicado")
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-success">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+        Privatizada en Dropi el {fecha(c.aplicadoEn ?? c.creadoEn)} a {quien}{c.nuevoDropiId ? `: ID privado ${c.nuevoDropiId}` : ""}{que ? ` · ${que}` : ""}.
+      </span>
+    );
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-destructive">
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+      {c.estado === "error"
+        ? `No se pudo privatizar a ${quien}${c.nuevoDropiId ? ` (ya se creó el ID ${c.nuevoDropiId})` : ""}: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
+        : `Privatización pendiente a ${quien}${que ? ` (${que})` : ""}: pulsa «Aplicar en Dropi» con Dropi abierto.`}
     </span>
   );
 }
