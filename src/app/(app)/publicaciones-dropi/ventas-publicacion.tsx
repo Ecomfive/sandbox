@@ -2,6 +2,8 @@
 
 import { Badge } from "@/components/ui/badge";
 import { mesesEntre, restarDias, DIAS_REPONER, type VentasPublicacion } from "@/lib/publicaciones/ventas";
+import type { EtapaCotizacion } from "@/lib/compras/en-camino";
+import { EtapaCotizando } from "./llegada-camino";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
@@ -22,10 +24,32 @@ function Dato({ titulo, valor, detalle, tono }: { titulo: string; valor: string;
  * «Viene mercancía en camino» (26 oct 2026): las unidades que vienen, cuándo llegan y si falta una fecha. Sale siempre que haya algo en camino, tenga o no
  * stock y tenga o no datos de ventas (antes solo salía con ventas y sin stock, y un producto nuevo no lo mostraba).
  */
-export function AvisoEnCamino({ enCamino, llegada = null, sinFecha = 0, sinEnvio = 0, de = null, enCotizacion = 0 }: { enCamino: number; llegada?: string | null; sinFecha?: number; sinEnvio?: number; /** De un compuesto: de qué componente es lo que viene. */ de?: string | null; /** Unidades en órdenes que todavía se cotizan: aún no vienen. */ enCotizacion?: number }) {
+export function AvisoEnCamino({
+  enCamino,
+  llegada = null,
+  sinFecha = 0,
+  sinEnvio = 0,
+  de = null,
+  enCotizacion = 0,
+  etapaCotizacion = null,
+}: {
+  enCamino: number;
+  llegada?: string | null;
+  sinFecha?: number;
+  sinEnvio?: number;
+  /** De un compuesto: de qué componente es lo que viene. */
+  de?: string | null;
+  /** Unidades en órdenes que todavía se cotizan: aún no vienen. */
+  enCotizacion?: number;
+  /** En qué etapa están (01 - Cotizar o 02 - Cotizado) y en qué órdenes. */
+  etapaCotizacion?: EtapaCotizacion | null;
+}) {
   const cotiza = enCotizacion > 0 && (
-    <p className="m-0 text-sm font-medium text-warning">
-      En cotización: {entero(enCotizacion)} {enCotizacion === 1 ? "unidad" : "unidades"} (todavía no se pide: aún no viene)
+    <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-warning">
+      <span>
+        En cotización: {entero(enCotizacion)} {enCotizacion === 1 ? "unidad" : "unidades"} (todavía no se pide: aún no viene)
+      </span>
+      {etapaCotizacion && <EtapaCotizando c={etapaCotizacion} />}
     </p>
   );
   if (!(enCamino > 0)) return cotiza || null;

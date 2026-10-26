@@ -32,6 +32,22 @@ export const ETAPAS_EN_MARCHA = ["produccion", "tracking", "arribo_mercancia"];
 /** Las etapas en que la orden todavía se está cotizando (01 - Cotizar y 02 - Cotizado): se sabe cuánto se piensa pedir, pero aún no se pidió. */
 export const ETAPAS_COTIZANDO = ["cotizar", "cotizado"];
 
+/** En qué etapa está lo que se cotiza de un producto (la más avanzada de sus órdenes) y cuáles son esas órdenes (pedido de Hernán, 26 oct 2026). */
+export interface EtapaCotizacion {
+  etapa: string;
+  ordenes: number[];
+}
+
+/** Junta la etapa de varias órdenes o productos en cotización (los componentes de un compuesto, por ejemplo): la más avanzada y las órdenes sin repetir. */
+export function juntarEtapaCotizacion(lista: (EtapaCotizacion | null | undefined)[]): EtapaCotizacion | null {
+  const hay = lista.filter((c): c is EtapaCotizacion => !!c);
+  if (!hay.length) return null;
+  return {
+    etapa: hay.map((c) => c.etapa).sort((a, b) => ETAPAS_COTIZANDO.indexOf(b) - ETAPAS_COTIZANDO.indexOf(a))[0],
+    ordenes: [...new Set(hay.flatMap((c) => c.ordenes))].sort((a, b) => a - b),
+  };
+}
+
 /** Una orden que todavía se cotiza: abierta, sin llegar, en Cotizar o Cotizado y que no cuenta ya como en camino. */
 export const lineaCotizando = (l: LineaEnCamino): boolean => !l.anulada && !l.fechaLlegada && ETAPAS_COTIZANDO.includes(l.etapa) && !lineaEnCamino(l);
 

@@ -1,5 +1,16 @@
 import { Badge } from "@/components/ui/badge";
-import { llegadaCorta } from "@/lib/compras/en-camino";
+import { llegadaCorta, type EtapaCotizacion } from "@/lib/compras/en-camino";
+import { colorEtapa, etiquetaEtapa } from "../compras/def-compras";
+
+/** La etapa en que está lo que se cotiza, con su color de Compras («01 - Cotizar»), y sus órdenes («OC-1258»). */
+export function EtapaCotizando({ c }: { c: EtapaCotizacion }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
+      <span className="tabular-nums">{c.ordenes.map((n) => `OC-${n}`).join(", ")}</span>
+    </span>
+  );
+}
 
 /**
  * Cuándo llega lo que viene en camino, para la fila y la ficha de una publicación: la fecha aproximada («12 nov») o, si todavía no se

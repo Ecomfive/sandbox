@@ -15,7 +15,7 @@ import { archivarPublicacion } from "./actions";
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
-import { LlegadaCamino } from "./llegada-camino";
+import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
@@ -132,7 +132,7 @@ function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
         viene ? (
           <span className="font-medium tabular-nums text-success">{entero(f.enCamino)} en camino</span>
         ) : cotiza ? (
-          <span className="font-medium tabular-nums text-warning">{entero(f.enCotizacion)} por cotizar</span>
+          <span className="font-medium tabular-nums text-warning">{entero(f.enCotizacion)} en cotización</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         )
@@ -142,10 +142,15 @@ function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
           <span className="flex flex-wrap items-center gap-1.5 whitespace-normal font-medium text-success lg:justify-end">
             <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} />
             {de && <span className="w-full font-normal text-muted-foreground lg:text-right">{de}</span>}
-            {cotiza && <span className="w-full font-normal text-warning lg:text-right">+ {entero(f.enCotizacion)} por cotizar</span>}
+            {cotiza && (
+              <span className="flex w-full flex-wrap items-center gap-1.5 font-normal text-warning lg:justify-end">
+                + {entero(f.enCotizacion)} en cotización
+                {f.etapaCotizacion && <EtapaCotizando c={f.etapaCotizacion} />}
+              </span>
+            )}
           </span>
         ) : cotiza ? (
-          <span className="text-muted-foreground">aún no viene</span>
+          <span className="flex flex-wrap items-center gap-1.5 whitespace-normal lg:justify-end">{f.etapaCotizacion ? <EtapaCotizando c={f.etapaCotizacion} /> : "aún no viene"}</span>
         ) : undefined
       }
     />

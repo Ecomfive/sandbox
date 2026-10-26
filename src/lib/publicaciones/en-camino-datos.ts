@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
-import { llegadaDeCompra, resumenLlegada, type ResumenLlegada } from "@/lib/compras/en-camino";
+import { juntarEtapaCotizacion, llegadaDeCompra, resumenLlegada, type EtapaCotizacion, type ResumenLlegada } from "@/lib/compras/en-camino";
 import { cargarEnCaminoDatos } from "@/lib/compras/en-camino-datos";
 import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
 
@@ -13,12 +13,22 @@ import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
  * que todavía se cotizan (01 - Cotizar y 02 - Cotizado): se sabe cuánto se piensa pedir pero aún no viene. Respeta el alcance de Compras de la
  * persona (Usuarios y roles › Afinar). Solo unidades y fechas: no trae costos. Si algo falla, un mapa vacío.
  */
-export async function cargarEnCamino(supabase: SupabaseClient, paisId: string, usuario: UsuarioActual): Promise<{ camino: Map<string, ResumenLlegada>; cotizando: Map<string, number> }> {
+export async function cargarEnCamino(
+  supabase: SupabaseClient,
+  paisId: string,
+  usuario: UsuarioActual,
+): Promise<{ camino: Map<string, ResumenLlegada>; cotizando: Map<string, number>; etapasCotizando: Map<string, EtapaCotizacion> }> {
   const resumen = new Map<string, ResumenLlegada>();
   const { porProducto, cotizando: enCotizacion, ordenes } = await cargarEnCaminoDatos(supabase, usuario, paisId);
   // Lo que todavía se cotiza (01 - Cotizar y 02 - Cotizado): unidades por producto, aparte de lo que ya viene en camino.
   const cotizando = new Map([...enCotizacion].map(([sku, aportes]) => [sku, aportes.reduce((t, a) => t + a.unidades, 0)]));
-  if (!porProducto.size) return { camino: resumen, cotizando };
+  // Y en qué etapa está (la más avanzada) y en qué órdenes, para decirlo junto a las unidades (pedido de Hernán, 26 oct 2026).
+  const etapasCotizando = new Map<string, EtapaCotizacion>();
+  for (const [sku, aportes] of enCotizacion) {
+    const etapa = juntarEtapaCotizacion(aportes.map((a) => ordenes.get(a.compraId)).filter((o) => !!o).map((o) => ({ etapa: o!.etapa, ordenes: [o!.numero] })));
+    if (etapa) etapasCotizando.set(sku, etapa);
+  }
+  if (!porProducto.size) return { camino: resumen, cotizando, etapasCotizando };
   const tiempos = await cargarTiempos();
   const llegadaDe = new Map([...ordenes.values()].map((o) => [o.id, llegadaDeCompra(tiempos, { fechaLimite: o.fechaLimite, fechaEnvio: o.fechaEnvio, vias: o.viaEnvio, clave: claveTransito(o.tipo, o.paisId) })?.fecha ?? null]));
   for (const [sku, aportes] of porProducto) {
@@ -27,5 +37,5 @@ export async function cargarEnCamino(supabase: SupabaseClient, paisId: string, u
       resumenLlegada(aportes.map((a) => ({ unidades: a.unidades, llegada: llegadaDe.get(a.compraId) ?? null, sinEnvio: !ordenes.get(a.compraId)?.fechaEnvio }))),
     );
   }
-  return { camino: resumen, cotizando };
+  return { camino: resumen, cotizando, etapasCotizando };
 }

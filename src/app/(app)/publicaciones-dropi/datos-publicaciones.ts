@@ -9,7 +9,7 @@ import { estadoTarea, etiquetaRecomendacion, NO_EN_PRIVADAS, pendientes, recomen
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
-import { enCaminoDeCompuesto } from "@/lib/compras/en-camino";
+import { enCaminoDeCompuesto, juntarEtapaCotizacion } from "@/lib/compras/en-camino";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
 import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
@@ -271,7 +271,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarProductosProveedor(supabase, paisId),
     cargarCambiosDropi(supabase, paisId),
   ]);
-  const { camino: enCaminoPorSku, cotizando: cotizandoPorSku } = enCaminoYCotizando;
+  const { camino: enCaminoPorSku, cotizando: cotizandoPorSku, etapasCotizando } = enCaminoYCotizando;
   const r = reglas.reglas;
   // Los componentes de los compuestos vinculados (packs y combos): lo que viene en camino de un compuesto es lo de sus componentes.
   const combos = [...new Set(datos.map((d) => d.sku_maestro_id as string | null).filter((id): id is string => !!id && skus.get(id)?.tipo === "combo"))];
@@ -355,6 +355,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       enCamino: camino?.unidades ?? 0,
       // Lo que todavía se cotiza (01 - Cotizar y 02 - Cotizado) del producto; de un compuesto, lo de sus componentes.
       enCotizacion: compuesto ? (componentesDe.get(d.sku_maestro_id as string) ?? []).reduce((t, c) => t + (cotizandoPorSku.get(c.id) ?? 0), 0) : d.sku_maestro_id ? (cotizandoPorSku.get(d.sku_maestro_id as string) ?? 0) : 0,
+      etapaCotizacion: compuesto
+        ? juntarEtapaCotizacion((componentesDe.get(d.sku_maestro_id as string) ?? []).map((c) => etapasCotizando.get(c.id)))
+        : d.sku_maestro_id
+          ? (etapasCotizando.get(d.sku_maestro_id as string) ?? null)
+          : null,
       componentesCamino: compuesto?.componentes ?? null,
       llegadaCamino: camino?.llegada ?? null,
       sinFechaCamino: camino?.sinFecha ?? 0,

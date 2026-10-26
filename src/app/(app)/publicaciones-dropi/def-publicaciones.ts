@@ -6,7 +6,7 @@ import {
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
 import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencias";
-import type { ComponenteEnCamino } from "@/lib/compras/en-camino";
+import type { ComponenteEnCamino, EtapaCotizacion } from "@/lib/compras/en-camino";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
 import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
@@ -92,6 +92,8 @@ export interface FilaPublicacion {
   enCamino: number;
   /** Unidades del producto vinculado que están en órdenes todavía en cotización (01 - Cotizar y 02 - Cotizado): se sabe cuánto se piensa pedir, aún no viene. */
   enCotizacion: number;
+  /** En qué etapa está lo que se cotiza (la más avanzada: 01 - Cotizar o 02 - Cotizado) y en qué órdenes; `null` si no hay. */
+  etapaCotizacion: EtapaCotizacion | null;
   /** Si el producto vinculado es un compuesto: sus componentes y lo que viene en camino de cada uno; `null` si no lo es. */
   componentesCamino: ComponenteEnCamino[] | null;
   /** La llegada más próxima de lo que viene en camino («2026-11-12»): la fecha límite de la compra o la estimada; null si ninguna tiene. */

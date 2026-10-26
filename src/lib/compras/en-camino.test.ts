@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { detalleCompuesto, enCaminoDeCompuesto, enCaminoPorPais, faltaParaLlegada, lineaCotizando, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
+import { detalleCompuesto, enCaminoDeCompuesto, juntarEtapaCotizacion, enCaminoPorPais, faltaParaLlegada, lineaCotizando, lineaEnCamino, llegadaCorta, llegadaDeCompra, resumenLlegada, type LineaEnCamino } from "./en-camino";
 
 const l = (extra: Partial<LineaEnCamino>): LineaEnCamino => ({ pais: "Panamá", unidades: 100, etapa: "tracking", fechaEnvio: "2026-10-01", fechaLlegada: null, anulada: false, ...extra });
 
@@ -80,6 +80,12 @@ test("un compuesto: lo que viene de sus componentes, con la llegada más próxim
   const soloUno = enCaminoDeCompuesto([{ id: "a", nombre: "Truly Soft Serve", cantidad: 1 }, { id: "x", nombre: "Otro", cantidad: 1 }], por);
   assert.equal(detalleCompuesto(soloUno.componentes), "de Truly Soft Serve");
   assert.equal(detalleCompuesto(enCaminoDeCompuesto([{ id: "x", nombre: "Otro", cantidad: 2 }], por).componentes), null);
+});
+
+test("la etapa de lo que se cotiza: la más avanzada y las órdenes sin repetir", () => {
+  assert.equal(juntarEtapaCotizacion([null, undefined]), null);
+  assert.deepEqual(juntarEtapaCotizacion([{ etapa: "cotizar", ordenes: [1258] }, { etapa: "cotizado", ordenes: [1257, 1258] }]), { etapa: "cotizado", ordenes: [1257, 1258] });
+  assert.deepEqual(juntarEtapaCotizacion([{ etapa: "cotizar", ordenes: [9, 3] }]), { etapa: "cotizar", ordenes: [3, 9] });
 });
 
 test("la fecha corta lleva el año solo si no es el actual", () => {
