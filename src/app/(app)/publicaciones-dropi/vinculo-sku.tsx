@@ -90,7 +90,7 @@ export function VinculoSku({
                   e.preventDefault();
                   alAbrirProducto(p.sku!.id);
                 }}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                className="rounded-md border border-azul/30 bg-azul-soft px-3 py-1.5 text-xs font-medium text-azul hover:border-azul"
               >
                 Abrir en Producto
               </Link>

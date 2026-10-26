@@ -208,7 +208,7 @@ export function BotonApagarDropi({ p, deshabilitado }: { p: FilaPublicacion; des
   return (
     <>
       {/* Con el apagado pendiente, el mismo lugar ofrece deshacerlo (mientras Dropi no se haya tocado). */}
-      <BotonAccion icono={p.apagadoPendiente ? DeshacerIcon : ApagarIcon} disabled={deshabilitado} onClick={() => setAbierta(true)}>
+      <BotonAccion icono={p.apagadoPendiente ? DeshacerIcon : ApagarIcon} tono={p.apagadoPendiente ? "alerta" : "peligro"} disabled={deshabilitado} onClick={() => setAbierta(true)}>
         {p.apagadoPendiente ? "Deshacer apagado" : "Apagar en Dropi"}
       </BotonAccion>
       {abierta && (p.apagadoPendiente ? <VentanaDeshacerApagado p={p} abierta alCerrar={() => setAbierta(false)} /> : <VentanaApagarDropi p={p} abierta alCerrar={() => setAbierta(false)} />)}

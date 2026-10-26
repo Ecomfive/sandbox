@@ -27,7 +27,17 @@ export function ProveedorTareas({ children, ...valor }: Tareas & { children: Rea
 
 const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 const botonClaro = `inline-flex h-9 items-center rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
-const botonOscuro = `inline-flex h-9 items-center rounded-md bg-foreground px-3 text-sm font-medium text-background hover:bg-foreground/85 disabled:opacity-50 ${anilloFoco}`;
+// Las tres decisiones con su color (pedido de Alcides, 25 oct 2026): aceptar en verde, rechazar en rojo suave y posponer en ámbar suave.
+const botonAceptar = `inline-flex h-9 items-center rounded-md bg-success px-3 text-sm font-medium text-background hover:bg-success/85 disabled:opacity-50 ${anilloFoco}`;
+const botonRechazar = `inline-flex h-9 items-center rounded-md border border-destructive/40 bg-destructive-soft px-3 text-sm font-medium text-destructive hover:border-destructive disabled:opacity-50 ${anilloFoco}`;
+const botonPosponer = `inline-flex h-9 items-center rounded-md border border-warning/40 bg-warning-soft px-3 text-sm font-medium text-warning hover:border-warning disabled:opacity-50 ${anilloFoco}`;
+const botonHecho = `inline-flex h-9 items-center rounded-md border border-success/40 bg-success-soft px-3 text-sm font-medium text-success hover:border-success disabled:opacity-50 ${anilloFoco}`;
+/** El botón de confirmar lleva el color fuerte de la decisión. */
+const CONFIRMAR: Record<Decision, string> = {
+  aceptada: botonAceptar,
+  rechazada: `inline-flex h-9 items-center rounded-md bg-destructive px-3 text-sm font-medium text-background hover:bg-destructive/85 disabled:opacity-50 ${anilloFoco}`,
+  pospuesta: `inline-flex h-9 items-center rounded-md bg-warning px-3 text-sm font-medium text-background hover:bg-warning/85 disabled:opacity-50 ${anilloFoco}`,
+};
 
 const TEXTO_CONFIRMAR: Record<Decision, string> = { aceptada: "Aceptar", rechazada: "Rechazar", pospuesta: "Posponer" };
 const TOAST: Record<Decision, string> = { aceptada: "Recomendación aceptada", rechazada: "Recomendación rechazada", pospuesta: "Recomendación pospuesta" };
@@ -81,13 +91,13 @@ export function TarjetaRecomendacion({ publicacionId, rec, puedeDecidir, respons
       {puedeDecidir && !eligiendo && (
         <div className="flex flex-wrap gap-2 pt-1">
           {tipoIADeRecomendacion(rec.tipo) && <BotonAsistenteIA publicacionId={publicacionId} tipo={tipoIADeRecomendacion(rec.tipo)!} />}
-          <button type="button" className={botonOscuro} onClick={() => setEligiendo("aceptada")}>
+          <button type="button" className={botonAceptar} onClick={() => setEligiendo("aceptada")}>
             Aceptar
           </button>
-          <button type="button" className={botonClaro} onClick={() => setEligiendo("rechazada")}>
+          <button type="button" className={botonRechazar} onClick={() => setEligiendo("rechazada")}>
             Rechazar
           </button>
-          <button type="button" className={botonClaro} onClick={() => setEligiendo("pospuesta")}>
+          <button type="button" className={botonPosponer} onClick={() => setEligiendo("pospuesta")}>
             Posponer
           </button>
         </div>
@@ -145,7 +155,7 @@ export function TarjetaRecomendacion({ publicacionId, rec, puedeDecidir, respons
             </p>
           )}
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={botonOscuro} disabled={pendiente || faltaNota} onClick={confirmar}>
+            <button type="button" className={CONFIRMAR[eligiendo]} disabled={pendiente || faltaNota} onClick={confirmar}>
               {pendiente ? "Guardando..." : TEXTO_CONFIRMAR[eligiendo]}
             </button>
             <button type="button" className={botonClaro} disabled={pendiente} onClick={() => setEligiendo(null)}>
@@ -209,7 +219,7 @@ export function TareaRecomendacion({ d, producto, puedeMarcar }: { d: DecisionVi
       {abierta && puedeMarcar && !abierto && (
         <div className="flex flex-wrap gap-2 pt-1">
           {tipoIADeRecomendacion(d.tipo) && <BotonAsistenteIA publicacionId={d.publicacionId} tipo={tipoIADeRecomendacion(d.tipo)!} />}
-          <button type="button" className={botonClaro} onClick={() => setAbierto(true)}>
+          <button type="button" className={botonHecho} onClick={() => setAbierto(true)}>
             Ya lo hice
           </button>
         </div>
@@ -240,7 +250,7 @@ export function TareaRecomendacion({ d, producto, puedeMarcar }: { d: DecisionVi
             </p>
           )}
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={botonOscuro} disabled={pendiente} onClick={marcar}>
+            <button type="button" className={botonAceptar} disabled={pendiente} onClick={marcar}>
               {pendiente ? "Guardando..." : "Marcar como hecha"}
             </button>
             <button type="button" className={botonClaro} disabled={pendiente} onClick={() => setAbierto(false)}>

@@ -116,6 +116,9 @@ function Selector({ valor, lista, cambiar, nombre, vacio = "—" }: { valor: str
   );
 }
 
+
+/** Un botón de acción que espera «Aplicar en Dropi» (apagado) se ve en azul suave y no en gris: sigue siendo una acción en curso. */
+const PENDIENTE_EN_COLOR = "disabled:!border-azul/30 disabled:!bg-azul-soft disabled:!text-azul";
 /**
  * Ficha de una publicación: el panel a la derecha que se abre al pulsar su fila. **La ficha ya es el formulario**: se cambia
  * un dato y arriba aparecen «Guardar cambios» y «Cancelar»; al guardar, la ficha sigue abierta. Utilidad y
@@ -373,7 +376,7 @@ function ContenidoFicha({
             <div className="flex flex-wrap gap-2">
               {sinGuardar && (
                 <>
-                  <button type="submit" disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:bg-foreground/85 disabled:opacity-50">
+                  <button type="submit" disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-2 text-sm font-medium text-background hover:bg-success/85 disabled:opacity-50">
                     <CheckIcon className="h-4 w-4" />
                     {pendiente ? "Guardando..." : "Guardar cambios"}
                   </button>
@@ -384,24 +387,24 @@ function ContenidoFicha({
                 </>
               )}
               {!sinGuardar && puedeArchivar && p.sinPublicar && (
-                <BotonAccion icono={CheckIcon} disabled={pendiente || p.publicarPendiente} onClick={publicar}>
+                <BotonAccion icono={CheckIcon} tono="exito" className={PENDIENTE_EN_COLOR} disabled={pendiente || p.publicarPendiente} onClick={publicar}>
                   {publicando ? "Un momento..." : p.publicarPendiente ? "Publicación pendiente" : "Publicar en Dropi"}
                 </BotonAccion>
               )}
               {!sinGuardar && puedeArchivar && p.sinPublicar && !p.publicarPendiente && (
-                <BotonAccion icono={PapeleraIcon} disabled={pendiente} onClick={eliminar}>
+                <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
                   {eliminando ? "Un momento..." : "Eliminar borrador"}
                 </BotonAccion>
               )}
               {!sinGuardar && puedeArchivar && puedeRepublicar && !p.sinPublicar && (
-                <BotonAccion icono={ActualizarIcon} disabled={pendiente || republicacionPendiente} onClick={republicar}>
+                <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || republicacionPendiente} onClick={republicar}>
                   {republicando ? "Un momento..." : republicacionPendiente ? "Republicación pendiente" : "Republicar"}
                 </BotonAccion>
               )}
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
               {!sinGuardar && puedeArchivar && puedeApagar(p) && <BotonApagarDropi p={p} deshabilitado={pendiente} />}
               {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente && (
-                <BotonAccion icono={ArchivarIcon} disabled={pendiente} onClick={archivar}>
+                <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={archivar}>
                   {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
                 </BotonAccion>
               )}
