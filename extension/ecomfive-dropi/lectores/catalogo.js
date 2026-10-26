@@ -49,7 +49,8 @@ async function leerCatalogo(subida) {
       }
       estado.paginas++;
       estado.productos = productos.size;
-      if (objetos.length < 100) break;
+      // Dropi México devuelve páginas de menos de 100 aunque haya más (filtra después de paginar): se sigue hasta una vacía.
+      if (!objetos.length) break;
       await espera(1300);
     }
     estado.fase = "subida";

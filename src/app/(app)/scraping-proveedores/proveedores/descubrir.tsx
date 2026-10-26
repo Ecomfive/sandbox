@@ -157,7 +157,9 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
           <h2 id="descubrir" className="m-0 text-lg font-bold">
             Descubrir proveedores
           </h2>
-          <p className="m-0 text-sm text-muted-foreground">Del catálogo completo de Dropi de cada país: los proveedores que más mueven stock y más publican novedades. Síguelos con un clic.</p>
+          <p className="m-0 text-sm text-muted-foreground">
+            Del catálogo completo de Dropi de cada país: los proveedores que más mueven stock y más publican novedades. Síguelos con un clic. «Recién publicados»: los que no estaban en la lectura anterior (en la primera, los del 10 % más nuevo del catálogo).
+          </p>
         </div>
         <span className="flex flex-wrap items-center gap-2">
           <span className="inline-flex min-h-9 items-center rounded-full border border-primario bg-primario px-4 text-sm font-semibold text-white">México</span>
@@ -207,7 +209,7 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
               <tr className={claseFilaEncabezado}>
                 <th className={claseEncabezadoColumna}>Proveedor</th>
                 <th className={`${claseEncabezadoColumna} text-right`}>Ventas estimadas</th>
-                <th className={`${claseEncabezadoColumna} text-right`}>Nuevos · 30 días</th>
+                <th className={`${claseEncabezadoColumna} text-right`}>Recién publicados</th>
                 <th className={`${claseEncabezadoColumna} text-right`}>Productos</th>
                 <th className={`${claseEncabezadoColumna} text-right`}>Stock</th>
                 <th className={claseEncabezadoColumna}>

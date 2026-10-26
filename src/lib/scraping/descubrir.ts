@@ -1,8 +1,10 @@
 // Scraping de proveedores › «Descubrir proveedores» (pedido de Hernán, 26 oct 2026): con todo el catálogo de Dropi de un país (lo lee
 // la extensión «Ecomfive · Dropi» con la sesión de dropshipper de ese país), qué proveedores conviene seguir como referentes: los
 // que más mueven stock (lo que bajó desde la lectura anterior, como las ventas estimadas de Scraping), los que más publican
-// novedades (productos creados en los últimos 30 días: están testeando) y los más grandes. La primera lectura de un país no tiene
-// con qué comparar: las ventas se ven desde la segunda. Sin base ni red, con prueba.
+// novedades (están testeando) y los más grandes. La primera lectura de un país no tiene con qué comparar: las ventas se ven desde la
+// segunda. Dropi México no manda la fecha de creación de los productos (26 oct 2026): «recién publicados» son, en la primera
+// lectura, los del 10 % más nuevo del catálogo por ID (los IDs crecen con el tiempo) y, desde la segunda, los que no estaban en la
+// anterior; si algún día viene la fecha, los creados en los últimos 30 días. Sin base ni red, con prueba.
 
 /** Un producto del catálogo, compacto: [id, proveedor, stock, creado «AAAA-MM-DD» o "", precio, nombre, foto (urlS3 o url)]. */
 export type ProductoCatalogo = [number, number, number, string, number | null, string, string | null];
@@ -23,7 +25,7 @@ export interface ProveedorDescubierto {
   dropiId: number;
   nombre: string;
   productos: number;
-  /** Creados en Dropi en los últimos 30 días. */
+  /** Recién publicados: los que no estaban en la lectura anterior (en la primera, los del 10 % más nuevo del catálogo). */
   nuevos30: number;
   stock: number;
   /** Lo que bajó el stock desde la lectura anterior (null en la primera lectura). */
@@ -40,6 +42,10 @@ export const fotoDe = (l: LecturaCatalogo): FotoCatalogo => Object.fromEntries(l
 /** El resumen por proveedor, del más interesante al menos: ventas estimadas, luego novedades, luego tamaño. */
 export function descubrir(l: LecturaCatalogo, anterior: FotoCatalogo | null): ProveedorDescubierto[] {
   const desde30 = new Date(Date.parse(l.leido) - 30 * 86_400_000).toISOString().slice(0, 10);
+  const conFecha = l.productos.some((p) => !!p[3]);
+  // El ID desde el que un producto está entre el 10 % más nuevo del catálogo (cuando no hay fechas ni lectura anterior).
+  const ids = l.productos.map((p) => p[0]).sort((a, b) => b - a);
+  const corteId = ids.length ? ids[Math.max(0, Math.ceil(ids.length * 0.1) - 1)] : 0;
   const por = new Map<number, ProveedorDescubierto & { mov: { nombre: string; foto: string | null; ventas: number | null; creado: string | null; orden: number }[] }>();
   for (const [id, prov, stock, creado, , nombre, foto] of l.productos) {
     const p =
@@ -50,7 +56,7 @@ export function descubrir(l: LecturaCatalogo, anterior: FotoCatalogo | null): Pr
     por.set(prov, p);
     p.productos++;
     p.stock += Math.max(0, stock);
-    const nuevo = !!creado && creado >= desde30;
+    const nuevo = anterior ? !anterior[String(id)] : conFecha ? !!creado && creado >= desde30 : id >= corteId;
     if (nuevo) p.nuevos30++;
     const antes = anterior?.[String(id)];
     const bajo = antes && antes[0] === prov && stock < antes[1] ? antes[1] - stock : 0;
@@ -58,7 +64,7 @@ export function descubrir(l: LecturaCatalogo, anterior: FotoCatalogo | null): Pr
       p.ventas = (p.ventas ?? 0) + bajo;
       p.conVentas++;
     }
-    if (bajo > 0 || (!anterior && nuevo)) p.mov.push({ nombre, foto, ventas: anterior ? bajo : null, creado: creado || null, orden: anterior ? bajo : Date.parse(creado || "1970-01-01") });
+    if (bajo > 0 || (!anterior && nuevo)) p.mov.push({ nombre, foto, ventas: anterior ? bajo : null, creado: creado || null, orden: anterior ? bajo : conFecha ? Date.parse(creado || "1970-01-01") : id });
   }
   return [...por.values()]
     .map(({ mov, ...p }) => ({ ...p, destacados: mov.sort((a, b) => b.orden - a.orden).slice(0, 3).map(({ orden: _o, ...d }) => (void _o, d)) }))

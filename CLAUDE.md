@@ -437,7 +437,7 @@ convenciones técnicas del código.
   (`extension/ecomfive-dropi/lectores/catalogo.js`, extensión 0.2.0; sesión de México = cualquier cuenta que no sea de proveedor,
   `CUENTAS.mx.tipoUsuario` null) lee todo `products/v4/index` del país y sube `[id, proveedor, stock, creado, precio, nombre,
   foto]`; `procesarDescubrir` resume por proveedor con `descubrir` (`src/lib/scraping/descubrir.ts`, con prueba: ventas estimadas =
-  lo que bajó el stock contra la foto anterior guardada en Storage `wms-compras/scraping-catalogo/<país>.json`, nuevos en 30 días,
+  lo que bajó el stock contra la foto anterior guardada en Storage `wms-compras/scraping-catalogo/<país>.json`; «recién publicados» = los que no estaban en la lectura anterior y, en la primera, el 10 % más nuevo del catálogo por ID (Dropi México no manda `created_at` en `v4/index`; el lector sigue hasta una página vacía porque las páginas vienen con menos de 100),
   productos, stock y 3 destacados) en `scraping_descubrir_lecturas` / `scraping_descubrir_proveedores`; «Seguir»
   (`seguirProveedor`) lo agrega a `scraping_proveedores` con `enlaceProveedor` y su primera búsqueda pedida. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
   dropshipper por país), «Descubrir proveedores» desde el catálogo de cada país y TuWinner.
