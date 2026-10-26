@@ -46,7 +46,8 @@ export interface VentasDropiPais {
  */
 export async function obtenerVentasDropiProducto(id: string): Promise<{ paises: VentasDropiPais[] } | { error: string }> {
   const usuario = await getUsuarioActual();
-  if (!usuario || !(usuario.modulos.includes("producto") || usuario.modulos.includes("inventario"))) return { error: "No tienes acceso." };
+  // También Gestión de IDs Dropi: la ficha de una publicación muestra las ventas de todo su producto (25 oct 2026).
+  if (!usuario || !(usuario.modulos.includes("producto") || usuario.modulos.includes("inventario") || usuario.modulos.includes("publicaciones-dropi"))) return { error: "No tienes acceso." };
   if (!ES_ID(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
   const { data: variantes } = await supabase.from("skus_maestros").select("id").eq("padre_id", id);

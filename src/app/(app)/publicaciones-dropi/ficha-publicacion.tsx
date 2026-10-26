@@ -37,6 +37,7 @@ import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
 import { PublicacionesDelProducto } from "./mismo-producto";
+import { VentasDropiProducto } from "../producto/ventas-dropi-producto";
 
 interface Formulario {
   nombre: string;
@@ -622,6 +623,13 @@ function ContenidoFicha({
           {p.ventas && corteVentas && (
             <Seccion icono={MargenIcon} titulo="Ventas en Dropi">
               <VentasEnDropi v={p.ventas} corte={corteVentas} enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} />
+            </Seccion>
+          )}
+
+          {/* Las ventas de todo el producto vinculado, con todos sus IDs de Dropi (activos, archivados, públicos y privados), como en Producto. */}
+          {p.sku && corteVentas && (
+            <Seccion icono={MargenIcon} titulo="Ventas del producto en Dropi (todos sus IDs)">
+              <VentasDropiProducto key={p.sku.id} id={p.sku.id} />
             </Seccion>
           )}
 
