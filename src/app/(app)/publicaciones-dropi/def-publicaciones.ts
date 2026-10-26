@@ -156,6 +156,12 @@ export interface FilaPublicacion {
  * Dropi reporta sus ventas); «no_aparece» si tiene ID pero la lectura no lo trae; null sin ID o sin forma de saberlo.
  */
 export type ConexionDropi = "conectado" | "no_aparece";
+/** Activa en Dropi y con 0 unidades (la lectura de «Mis productos» manda sobre la carga de ventas). Sin datos de stock, no. */
+export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas">): boolean {
+  const stock = f.stockProveedor ?? f.ventas?.stock ?? null;
+  return !f.archivada && f.enDropi === "activo" && stock !== null && stock <= 0;
+}
+
 export function conexionDropi(f: Pick<FilaPublicacion, "dropiId" | "bodegasDropi" | "leidoProveedor" | "ventas">): ConexionDropi | null {
   if (!f.dropiId.trim()) return null;
   if (f.bodegasDropi !== null) return "conectado";
@@ -267,6 +273,8 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },
     { id: "stockDropi", etiqueta: "Stock en Dropi", tipo: "seleccion", valores: (f) => uno(f.ventas?.stockEstado ?? null), opciones: () => STOCK_DROPI, etiquetaSinValor: "Sin datos de Dropi", agrupable: true, ordenGrupos: STOCK_DROPI.map((s) => s.valor) },
     { id: "enCamino", etiqueta: "Mercancía en camino (unidades)", tipo: "numero", valor: (f) => f.enCamino },
+    // «Sin stock» del tablero (25 oct 2026, pedido de Alcides): toda publicación activa en Dropi con 0 unidades, venda o no.
+    { id: "sinStock", etiqueta: "Sin stock", tipo: "seleccion", valores: (f) => [sinStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sin stock" }, { valor: "no", etiqueta: "Con stock" }] },
     // Primero la lectura de «Mis productos» (más reciente que la carga de ventas).
     { id: "stockDropiNum", etiqueta: "Stock en Dropi (unidades)", tipo: "numero", valor: (f) => f.stockProveedor ?? f.ventas?.stock ?? null },
     {
