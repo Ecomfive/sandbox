@@ -1,4 +1,4 @@
-﻿@AGENTS.md
+@AGENTS.md
 
 # Sistema Gestión de Plataformas Ecomfive
 
@@ -810,6 +810,10 @@ convenciones técnicas del código.
   Envíos) y esperando a Shen Zhen (> `DIAS_ESPERA_COTIZAR` 5 en Por cotizar, por `proveedor_pedidos.creado_en`; avisos sin confirmar).
   Lo carga `cargarTareasChin` (`tareas-datos.ts`; países permitidos, montos solo si los ve). `marcarVistoChin(pedidoIds)` pone
   `leida_en`. Componente `compras/tablero-chin/que-hacer-chin.tsx` (6 a la vista, «Ver las N tareas»).
+  **Buscador y país** (26 oct 2026, pedido de Hernán y Francis): arriba de las pestañas del portal (el de Shen Zhen y el Tablero)
+  `BarraFiltroPortal` (`src/components/proveedor/filtro-portal.tsx`, contexto `FiltroPortalProveedor` / `useFiltroPortal`; lógica pura en
+  `src/lib/proveedor/filtro.ts`, con prueba: cada palabra en el nombre, su traducción o el código, sin acentos) filtra todas las pestañas y sus
+  contadores; el Registro de pagos lo lee del contexto (ya no tiene botones de país propios). Vacío por el filtro → `SinResultados`.
   **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Shen Zhen**
   (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
   sigue el Tablero). Trae el mismo `PortalChin` en español con `soloLectura` (sin botones, sin selector ni «Salir» y sin marcar «Lo nuevo» como

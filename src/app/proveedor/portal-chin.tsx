@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { IdiomaProveedor, Traducido, useIdioma } from "@/components/proveedor/idioma-contexto";
+import { BarraFiltroPortal, FiltroPortalProveedor, SinResultados, useFiltroPortal } from "@/components/proveedor/filtro-portal";
 import { Foto, Pestanas, Producto, TONO, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
 import type { CambioRegistro } from "@/components/proveedor/registro-pagos";
 import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
@@ -14,6 +15,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { cambioDeUnidades, unitarioDesdeTotal } from "@/lib/proveedor/cotizacion";
 import { clavePlazo, type PedidoPortal } from "@/lib/proveedor/datos";
 import { hoyPanama } from "@/lib/proveedor/fechas";
+import { paisesDe } from "@/lib/proveedor/filtro";
 import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import type { Idioma } from "@/lib/proveedor/textos";
@@ -61,7 +63,9 @@ export interface DatosPortalChin {
 export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPortalChin & DesdeEcomfive & { idioma: Idioma; soloLectura?: boolean }) {
   return (
     <IdiomaProveedor idioma={idioma} traducciones={datos.traducciones}>
-      <PortalChinContenido {...datos} soloLectura={soloLectura} />
+      <FiltroPortalProveedor>
+        <PortalChinContenido {...datos} soloLectura={soloLectura} />
+      </FiltroPortalProveedor>
     </IdiomaProveedor>
   );
 }
@@ -83,7 +87,13 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
     if (!soloLectura && avisos.length) void marcarVistoPorProveedor();
   }, [avisos.length, soloLectura]);
 
-  const de = (e: PedidoPortal["etapa"]) => lista.filter((p) => p.etapa === e);
+  // El buscador y el país filtran todas las pestañas (también sus contadores y el Registro de pagos).
+  const { pasa, activo } = useFiltroPortal();
+  const de = (e: PedidoPortal["etapa"]) => lista.filter((p) => p.etapa === e && pasa(p.producto, p.referencia, p.paisCodigo));
+  const paises = useMemo(() => paisesDe([...lista.map((p) => p.paisCodigo), ...(pagos?.filas ?? []).map((f) => f.paisCodigo)]), [lista, pagos]);
+  const filasPagos = (pagos?.filas ?? []).filter((f) => pasa(String(f.valores.producto ?? ""), f.referencia, f.paisCodigo));
+  /** La pestaña, o el aviso de que el filtro la dejó vacía. */
+  const conFiltro = (n: number, contenido: ReactNode) => (activo && n === 0 ? <SinResultados /> : contenido);
   const cambiar = (id: string, cambios: Partial<PedidoPortal>) => setLista((xs) => xs.map((p) => (p.id === id ? { ...p, ...cambios } : p)));
 
   const cuerpo = (
@@ -108,16 +118,19 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
           { clave: "cotizado" as const, titulo: t.tabCotizado, cuenta: de("cotizado").length },
           { clave: "produccion" as const, titulo: t.tabProduccion, cuenta: de("produccion").length },
           { clave: "enviado" as const, titulo: t.tabEnviado, cuenta: de("enviado").length },
-          ...(pagos ? [{ clave: "pagos" as const, titulo: t.tabPagos, cuenta: pagos.filas.filter((f) => Number(f.valores.sin_pagar ?? 0) > 0).length }] : []),
+          ...(pagos ? [{ clave: "pagos" as const, titulo: t.tabPagos, cuenta: filasPagos.filter((f) => Number(f.valores.sin_pagar ?? 0) > 0).length }] : []),
         ]}
         valor={tab}
         alCambiar={setTab}
       />
 
-      {tab === "cotizar" && <PorCotizar pedidos={de("por_cotizar")} alCotizar={soloLectura ? null : setCotizando} />}
-      {tab === "cotizado" && <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={soloLectura ? null : setCotizando} />}
-      {tab === "produccion" && <EnProduccion pedidos={de("produccion")} hoy={hoy} diasAnticipo={cuenta.diasAnticipo} soloLectura={soloLectura} alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })} />}
-      {tab === "enviado" && <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />}
+      <BarraFiltroPortal paises={paises} />
+
+      {tab === "cotizar" && conFiltro(de("por_cotizar").length, <PorCotizar pedidos={de("por_cotizar")} alCotizar={soloLectura ? null : setCotizando} />)}
+      {tab === "cotizado" && conFiltro(de("cotizado").length, <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={soloLectura ? null : setCotizando} />)}
+      {tab === "produccion" &&
+        conFiltro(de("produccion").length, <EnProduccion pedidos={de("produccion")} hoy={hoy} diasAnticipo={cuenta.diasAnticipo} soloLectura={soloLectura} alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })} />)}
+      {tab === "enviado" && conFiltro(de("enviado").length, <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />)}
       {tab === "pagos" && pagos && (soloLectura && pagosEcomfive ? pagosEcomfive : <PagosChin resumen={pagos.resumen} filas={pagos.filas} cambios={pagos.cambios} soloLectura={soloLectura} />)}
 
       {cotizando && (
