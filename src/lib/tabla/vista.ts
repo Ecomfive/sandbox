@@ -82,13 +82,16 @@ export function aplicarVista<F>(
   filas: F[],
   filtros: Filtro[],
   mostrarCerrados: boolean,
-  /** La lupa busca en todas: abiertas y cerradas juntas, también donde el botón «Cerrados» las aísla (`exclusivo`). */
+  /**
+   * La lupa: donde el botón «Cerrados» las aísla (`exclusivo`, Compras), busca en abiertas y cerradas juntas. Donde el botón solo las
+   * agrega (Gestión de IDs Dropi), la búsqueda respeta el botón: con «Archivados» apagado no aparece una archivada (25 oct 2026).
+   */
   todas = false,
 ): ResultadoVista<F> {
   const cerrados = def.cerrados;
   const forzadoPorFiltro = !mostrarCerrados && filtroPideCerrados(def, filtros);
   const cerradosVisibles = !cerrados || mostrarCerrados || forzadoPorFiltro;
-  const base = !cerrados || todas
+  const base = !cerrados || (todas && cerrados.exclusivo)
     ? filas
     : cerrados.exclusivo
       ? filas.filter((fila) => cerrados.esCerrado(fila) === cerradosVisibles)
