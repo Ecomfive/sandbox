@@ -138,8 +138,8 @@ test("con la IA se quita lo que dijo que es otro producto y lo lejano sin confir
 test("sin respaldo de huella ni de nombre, lo que la IA da por parecido se baja a distinto", () => {
   const c = (distancia: number | null, afinidad: number | null) => ({ ...cand("x", "X", null), distancia, nivel: null, veredicto: null, motivo: null, afinidad });
   assert.equal(sinRespaldo(c(16, null)), true);
-  assert.equal(sinRespaldo(c(null, 0.25)), true);
+  assert.equal(sinRespaldo(c(null, null)), true);
   assert.equal(sinRespaldo(c(8, null)), false);
-  assert.equal(sinRespaldo(c(null, 0.5)), false);
-  assert.equal(sinRespaldo(c(17, 0.75)), false);
+  assert.equal(sinRespaldo(c(null, 0.33)), false);
+  assert.equal(sinRespaldo(c(17, 0.67)), false);
 });
