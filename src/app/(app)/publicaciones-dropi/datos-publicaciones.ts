@@ -9,6 +9,7 @@ import { estadoTarea, etiquetaRecomendacion, NO_EN_PRIVADAS, pendientes, recomen
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
+import { enCaminoDeCompuesto } from "@/lib/compras/en-camino";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
 import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
@@ -271,6 +272,18 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarCambiosDropi(supabase, paisId),
   ]);
   const r = reglas.reglas;
+  // Los componentes de los compuestos vinculados (packs y combos): lo que viene en camino de un compuesto es lo de sus componentes.
+  const combos = [...new Set(datos.map((d) => d.sku_maestro_id as string | null).filter((id): id is string => !!id && skus.get(id)?.tipo === "combo"))];
+  const componentesDe = new Map<string, { id: string; nombre: string; cantidad: number }[]>();
+  if (combos.length) {
+    const { data: comps } = await supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad, skus_maestros!sku_maestro_componentes_componente_id_fkey(nombre)").in("combo_id", combos);
+    for (const c of comps ?? []) {
+      const s = c.skus_maestros as unknown as { nombre: string } | { nombre: string }[] | null;
+      const nombre = (Array.isArray(s) ? s[0]?.nombre : s?.nombre) ?? "Componente";
+      componentesDe.set(c.combo_id as string, [...(componentesDe.get(c.combo_id as string) ?? []), { id: c.componente_id as string, nombre, cantidad: Number(c.cantidad) }]);
+    }
+  }
+  const compuestoDe = new Map(combos.map((id) => [id, enCaminoDeCompuesto(componentesDe.get(id) ?? [], enCaminoPorSku)]));
   // La revisión de optimización: con lo que muestra Dropi (el primer ID que esté en el catálogo); si no se leyó, el título guardado.
   const revisionDe = (d: Fila): Pick<FilaPublicacion, "revisiones" | "nota" | "tituloDropi"> => {
     const cat = idsDropi(d).map((id) => enDropiCatalogo.get(id)).find((x) => !!x) ?? null;
@@ -299,7 +312,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const filas: FilaPublicacion[] = datos.map((d): FilaPublicacion => {
     const estado = d.estado as string;
     const proxima = (d.proxima_revision as string | null) ?? null;
-    const camino = d.sku_maestro_id ? enCaminoPorSku.get(d.sku_maestro_id as string) : undefined;
+    const compuesto = d.sku_maestro_id ? compuestoDe.get(d.sku_maestro_id as string) : undefined;
+    const camino = compuesto ?? (d.sku_maestro_id ? enCaminoPorSku.get(d.sku_maestro_id as string) : undefined);
     const prov = proveedor ? productoPrincipal(idsDropi(d), proveedor.productos) : null;
     const original = duplicadaDe.get(d.id);
     const fila: FilaPublicacion = {
@@ -338,6 +352,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       sku: d.sku_maestro_id ? (skus.get(d.sku_maestro_id as string) ?? null) : null,
       sugerencia: sugerencias.get(d.id) ?? null,
       enCamino: camino?.unidades ?? 0,
+      componentesCamino: compuesto?.componentes ?? null,
       llegadaCamino: camino?.llegada ?? null,
       sinFechaCamino: camino?.sinFecha ?? 0,
       sinEnvioCamino: camino?.sinEnvio ?? 0,

@@ -20,6 +20,7 @@ import {
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
+import { detalleCompuesto } from "@/lib/compras/en-camino";
 import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { actualizarPublicacion, archivarPublicacion, eliminarBorrador, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
@@ -637,7 +638,7 @@ function ContenidoFicha({
           )}
 
           <Seccion icono={InventarioIcon} titulo="Stock">
-            <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} />
+            <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} de={p.componentesCamino ? detalleCompuesto(p.componentesCamino) : null} />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>
@@ -693,6 +694,23 @@ function ContenidoFicha({
           {p.sku && p.sku.tipo !== "combo" && (
             <Seccion icono={ComprasIcon} titulo="En camino">
               <EnCaminoProducto key={`${p.sku.id}-${codigoPais}`} id={p.sku.id} pais={codigoPais} nombrePais={nombrePais} />
+            </Seccion>
+          )}
+
+          {/* De un compuesto (pack o combo) viene en camino lo de sus componentes: cada uno con sus órdenes, del país seleccionado. */}
+          {p.sku && p.componentesCamino && p.componentesCamino.length > 0 && (
+            <Seccion icono={ComprasIcon} titulo="En camino de sus componentes">
+              <div className="flex flex-col gap-4">
+                {p.componentesCamino.map((c) => (
+                  <div key={c.id} className="flex flex-col gap-1.5">
+                    <p className="m-0 text-sm font-medium">
+                      {c.nombre}
+                      <span className="font-normal text-muted-foreground"> · {c.porPack} por pack</span>
+                    </p>
+                    <EnCaminoProducto key={`${c.id}-${codigoPais}`} id={c.id} pais={codigoPais} nombrePais={nombrePais} />
+                  </div>
+                ))}
+              </div>
             </Seccion>
           )}
 

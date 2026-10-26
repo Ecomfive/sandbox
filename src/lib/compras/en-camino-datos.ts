@@ -60,7 +60,7 @@ type FilaCompra = {
  * puede ver. Respeta el alcance de Compras de la persona (Usuarios y roles › Afinar). Solo unidades y fechas: no trae costos.
  *
  * Además de las líneas de producto de cada orden (`wms_compra_items`):
- *  - una **variante** suma a su producto y un **combo** suma a sus componentes y al revés (`repartirEnCamino`);
+ *  - una **variante** suma a su producto y una orden de un **combo** suma también a sus componentes (`repartirEnCamino`; lo que viene de un combo publicado es lo de sus componentes: `enCaminoDeCompuesto`);
  *  - una orden **sin ninguna línea de producto** (todavía no se vinculó en Compras) se cuenta con su cantidad total (`qty_total`) para el
  *    producto que se llama igual que ella (el mismo cruce de nombre que usa Compras para mostrar su foto): antes esas órdenes no aparecían
  *    en ningún lado.
@@ -111,7 +111,7 @@ export async function cargarEnCaminoDatos(supabase: SupabaseClient, usuario: Usu
   }
   if (!lineas.length) return { porProducto: new Map(), ordenes: new Map(abiertas.map((c) => [c.id, aOrden(c)])) };
 
-  // Variantes (suman a su producto) y combos (de qué se arman), de los productos que aparecen y de sus componentes.
+  // Variantes (suman a su producto) y combos (de qué se arman, para que una orden de un combo traiga también sus componentes).
   const padres = new Map<string, string>();
   const componentes: ComponenteDeCombo[] = [];
   const vistos = new Set<string>();
@@ -131,25 +131,6 @@ export async function cargarEnCaminoDatos(supabase: SupabaseClient, usuario: Usu
     }
     pendientes = [...new Set(siguientes)];
   }
-  // Los combos que se arman con productos que aparecen en las órdenes (la orden es del simple y se vende el combo).
-  const productos = [...new Set(lineas.map((l) => l.skuId).filter(Boolean))];
-  for (const ids of trozos(productos, 100)) {
-    const { data: combos } = await supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad").in("componente_id", ids);
-    for (const c of combos ?? []) {
-      const ya = componentes.some((x) => x.comboId === c.combo_id && x.componenteId === c.componente_id);
-      if (!ya) componentes.push({ comboId: c.combo_id as string, componenteId: c.componente_id as string, cantidad: Number(c.cantidad) });
-    }
-  }
-  // Un combo con varios componentes necesita todos: se traen los que falten de los combos encontrados.
-  const combosVistos = new Set(componentes.map((c) => c.comboId));
-  for (const ids of trozos([...combosVistos], 100)) {
-    const { data: combos } = await supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad").in("combo_id", ids);
-    for (const c of combos ?? []) {
-      const ya = componentes.some((x) => x.comboId === c.combo_id && x.componenteId === c.componente_id);
-      if (!ya) componentes.push({ comboId: c.combo_id as string, componenteId: c.componente_id as string, cantidad: Number(c.cantidad) });
-    }
-  }
-
   return { porProducto: repartirEnCamino(lineas, padres, componentes), ordenes: new Map(abiertas.map((c) => [c.id, aOrden(c)])) };
 }
 

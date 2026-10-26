@@ -10,6 +10,7 @@ import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publ
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
+import { detalleCompuesto } from "@/lib/compras/en-camino";
 import { archivarPublicacion } from "./actions";
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
@@ -113,16 +114,27 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
   );
 }
 
-/** La mercancía que viene en camino de un producto sin stock: las unidades arriba y la fecha de llegada abajo, en su propia columna. */
+/**
+ * La mercancía que viene en camino de un producto sin stock: las unidades arriba y la fecha de llegada abajo, en su propia columna. De un
+ * compuesto (pack o combo), lo que viene de sus componentes y de cuál es.
+ */
 function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
   // Sale siempre que haya algo en camino (26 oct 2026): antes pedía datos de ventas y cero stock, y un producto nuevo o con unidades no lo mostraba.
   const viene = f.enCamino > 0;
+  const de = f.componentesCamino ? detalleCompuesto(f.componentesCamino) : null;
   return (
     <Celda
       nombre="En camino"
       alinear="derecha"
       principal={viene ? <span className="font-medium tabular-nums text-success">{entero(f.enCamino)} en camino</span> : <span className="text-muted-foreground">—</span>}
-      apoyo={viene ? <span className="flex flex-wrap items-center gap-1.5 whitespace-normal font-medium text-success lg:justify-end"><LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} /></span> : undefined}
+      apoyo={
+        viene ? (
+          <span className="flex flex-wrap items-center gap-1.5 whitespace-normal font-medium text-success lg:justify-end">
+            <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} />
+            {de && <span className="w-full font-normal text-muted-foreground lg:text-right">{de}</span>}
+          </span>
+        ) : undefined
+      }
     />
   );
 }
