@@ -7,7 +7,7 @@ import { detectarImagen } from "@/lib/seguridad/imagen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { huellaFoto } from "@/lib/wms/huella-foto";
 import { pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/proveedor";
-import { AMBITOS, depurar, elegirParaComparar, ordenar, porHuella, porNombre, unirCoincidencias, type Ambito, type Coincidencia } from "./buscar";
+import { AMBITOS, depurar, elegirParaComparar, ordenar, porHuella, sinRespaldo, porNombre, unirCoincidencias, type Ambito, type Coincidencia } from "./buscar";
 import { cargarCandidatos } from "./candidatos-datos";
 import { leerDescripcion, leerVerificacion, MAX_CANDIDATOS_IA, pedidoDescribir, pedidoVerificar } from "./ia-imagen";
 
@@ -86,7 +86,7 @@ export async function buscarPorImagen(imagen: string, opciones: { ambitos?: Ambi
             conIA = true;
             for (const r of resultados) {
               const c = aComparar[r.n - 1];
-              c.veredicto = r.veredicto;
+              c.veredicto = r.veredicto !== "distinto" && sinRespaldo(c) ? "distinto" : r.veredicto;
               c.motivo = r.motivo;
             }
           } else aviso = "La IA no pudo comparar las fotos: se muestran las parecidas por la huella.";

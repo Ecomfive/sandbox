@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { leerDescripcion, leerVerificacion, pedidoVerificar } from "./ia-imagen";
-import { depurar, elegirParaComparar, nivelDeDistancia, ordenar, porHuella, porNombre, unirCoincidencias, type Candidato } from "./buscar";
+import { sinRespaldo, depurar, elegirParaComparar, nivelDeDistancia, ordenar, porHuella, porNombre, unirCoincidencias, type Candidato } from "./buscar";
 
 const cand = (id: string, nombre: string, huella: string | null, ambito: Candidato["ambito"] = "producto", foto: string | null = "https://x/f.jpg"): Candidato => ({
   ambito, id, nombre, foto, huella, detalle: id, href: `/x/${id}`,
@@ -130,7 +130,16 @@ test("con la IA se quita lo que dijo que es otro producto y lo lejano sin confir
   const f = (id: string, distancia: number | null, veredicto: "mismo" | "distinto" | null) => ({ ...cand(id, id, null), distancia, nivel: null, veredicto, motivo: null, afinidad: null });
   const lista = [f("a", 4, "mismo"), f("b", 6, "distinto"), f("c", 15, null), f("d", 9, null), f("e", null, null)];
   const con = depurar(lista, true);
-  assert.deepEqual(con.visibles.map((x) => x.id), ["a", "d"]);
-  assert.equal(con.descartadas, 3);
+  assert.deepEqual(con.visibles.map((x) => x.id), ["a"]);
+  assert.equal(con.descartadas, 4);
   assert.deepEqual(depurar(lista, false).visibles.map((x) => x.id), ["a", "c", "d", "e"]);
+});
+
+test("sin respaldo de huella ni de nombre, lo que la IA da por parecido se baja a distinto", () => {
+  const c = (distancia: number | null, afinidad: number | null) => ({ ...cand("x", "X", null), distancia, nivel: null, veredicto: null, motivo: null, afinidad });
+  assert.equal(sinRespaldo(c(16, null)), true);
+  assert.equal(sinRespaldo(c(null, 0.25)), true);
+  assert.equal(sinRespaldo(c(8, null)), false);
+  assert.equal(sinRespaldo(c(null, 0.5)), false);
+  assert.equal(sinRespaldo(c(17, 0.75)), false);
 });
