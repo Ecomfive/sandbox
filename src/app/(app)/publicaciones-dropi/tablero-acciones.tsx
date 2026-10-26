@@ -12,7 +12,7 @@ import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicacione
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 const tiposDe = (g: GrupoRecomendacion) => TIPOS_RECOMENDACION.filter((t) => t.grupo === g).map((t) => t.valor);
-import { DEF_PUBLICACIONES, estadoVinculo, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, estadoVinculo, sinStock, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
@@ -119,16 +119,15 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     id: "sin-stock",
-    // Según el stock que reporta Dropi: sin stock y con ventas en los últimos 30 días.
+    // Toda publicación activa en Dropi sin unidades, venda o no (25 oct 2026: antes solo las que además vendieron en 30 días).
     titulo: "Sin stock",
     icono: InventarioIcon,
     color: "rojo",
-    detalle: "Se vende y no tiene stock en Dropi",
-    cuenta: (f) => f.ventas?.stockEstado === "sin_stock_vende",
-    // De los que no tienen stock, cuántos ya tienen mercancía en camino (las órdenes de Compras que salieron y no han llegado):
-    // va junto al número, «9 / 6 en camino» (pedido de Alcides, 25 oct 2026), como el total de «Activas en Dropi».
-    junto: (abiertas) => ({ n: abiertas.filter((f) => f.ventas?.stockEstado === "sin_stock_vende" && f.enCamino > 0).length, texto: "en camino", color: "verde" }),
-    atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: sin stock en Dropi y con ventas", filtro: seleccion("stockDropi", "sin_stock_vende") },
+    detalle: "Activas en Dropi con 0 unidades",
+    cuenta: (f) => sinStock(f),
+    // De las que no tienen stock, cuántas ya tienen mercancía en camino: va junto al número, «9 / 6 en camino».
+    junto: (abiertas) => ({ n: abiertas.filter((f) => sinStock(f) && f.enCamino > 0).length, texto: "en camino", color: "verde" }),
+    atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: activas en Dropi sin stock", filtro: seleccion("sinStock", "si") },
   },
 ];
 
