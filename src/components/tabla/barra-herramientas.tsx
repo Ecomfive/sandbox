@@ -75,7 +75,14 @@ export function BarraHerramientas<F>({
     >
       {extra && <div className="flex items-center gap-2">{extra}</div>}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {def.campos.some((c) => c.tipo === "texto") && <BotonBuscar valor={tabla.busqueda} alCambiar={tabla.setBusqueda} nombreFilas={nombreFilas} />}
+        {def.campos.some((c) => c.tipo === "texto") && (
+          <BotonBuscar
+            valor={tabla.busqueda}
+            alCambiar={tabla.setBusqueda}
+            nombreFilas={nombreFilas}
+            imagen={def.imagen ? { ambito: def.imagen.ambito, activa: tabla.porImagen !== null, alFiltrar: tabla.setPorImagen, alQuitar: () => tabla.setPorImagen(null) } : undefined}
+          />
+        )}
         <MenuVistas
           def={def}
           estado={{
