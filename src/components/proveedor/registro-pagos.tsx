@@ -2,11 +2,12 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { CAMPOS_CALCULADOS, COLUMNA_HOJA, TIPO_CAMPO, totalesRegistro, type CampoRegistro, type FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import type { Textos } from "@/lib/proveedor/textos";
+import { SinResultados, useFiltroPortal } from "./filtro-portal";
 import { useIdioma } from "./idioma-contexto";
 import { Vacio, dinero } from "./piezas-proveedor";
 
@@ -42,15 +43,20 @@ export interface CambioRegistro {
  * «Registro de pagos» (23 oct 2026, como el artefacto que aprobó Hernán): el título, tres tarjetas (lo que falta de anticipos y de
  * saldos, y los últimos cambios) y la tabla con las columnas de la hoja «payment record» de Shen Zhen, antes el producto (foto, nombre,
  * código y país). Con `guardar`, cualquier celda se cambia tocándola (Shen Zhen en su portal, Ecomfive en el Tablero de Shen Zhen): las que se
- * editan van en morado y las calculadas en gris (se pueden fijar a mano y, vacías, vuelven a calcularse). Se filtra por país (Shen Zhen
- * lleva una hoja por país) y la última fila suma lo que falta.
+ * editan van en morado y las calculadas en gris (se pueden fijar a mano y, vacías, vuelven a calcularse). Lo filtran el buscador y el país del
+ * portal (`useFiltroPortal`) y la última fila suma lo que falta.
  */
 export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: FilaRegistro[]; guardar?: Guardar; pista: string; cambios?: CambioRegistro[] }) {
   const { t, tr } = useIdioma();
-  const paises = useMemo(() => [...new Set(filas.map((f) => f.paisCodigo ?? "—"))].sort(), [filas]);
-  const [pais, setPais] = useState<string | null>(null);
+  // El buscador y el país son los del portal (arriba de las pestañas).
+  const { filtro, pasa, activo } = useFiltroPortal();
   const [cuantas, setCuantas] = useState(POR_TANDA);
-  const visibles = pais ? filas.filter((f) => (f.paisCodigo ?? "—") === pais) : filas;
+  const [filtroAntes, setFiltroAntes] = useState(filtro);
+  if (filtroAntes !== filtro) {
+    setFiltroAntes(filtro);
+    setCuantas(POR_TANDA);
+  }
+  const visibles = filas.filter((f) => pasa(String(f.valores.producto ?? ""), f.referencia, f.paisCodigo));
   // Los totales son de todas las filas del país; a la vista van las más nuevas, de a 100 (cada celda es un botón).
   const totales = totalesRegistro(visibles);
   const aLaVista = visibles.slice(0, cuantas);
@@ -96,28 +102,8 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border px-4 py-3">
-          {paises.length > 1 ? (
-            <span role="group" aria-label={t.colDestino} className="flex flex-wrap gap-1.5">
-              {[null, ...paises].map((p) => (
-                <button
-                  key={p ?? "todos"}
-                  type="button"
-                  aria-pressed={pais === p}
-                  onClick={() => {
-                    setPais(p);
-                    setCuantas(POR_TANDA);
-                  }}
-                  className={`min-h-8 rounded-full border px-3.5 text-xs font-semibold ${pais === p ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"} ${anilloFoco}`}
-                >
-                  {p ?? t.todosPaises}
-                </button>
-              ))}
-            </span>
-          ) : (
-            <span />
-          )}
-          {guardar && (
+        {guardar && (
+          <div className="flex flex-wrap items-center justify-end gap-2.5 border-b border-border px-4 py-3">
             <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-primario/40 bg-primario-suave" />
@@ -128,11 +114,17 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
                 {t.leyCalculada}
               </span>
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {visibles.length === 0 ? (
-          <Vacio>{t.registroVacio}</Vacio>
+          activo ? (
+            <div className="p-3">
+              <SinResultados />
+            </div>
+          ) : (
+            <Vacio>{t.registroVacio}</Vacio>
+          )
         ) : (
           <div className="max-h-[720px] overflow-auto">
             <table className="w-full min-w-[1320px] border-collapse text-[13px]">
