@@ -157,6 +157,11 @@ export function VentanaBuscarImagen({
               </p>
             )}
             {respuesta.aviso && <p className="m-0 text-warning">{respuesta.aviso}</p>}
+            {respuesta.descartadas > 0 && (
+              <p className="m-0 text-xs text-muted-foreground">
+                {respuesta.descartadas === 1 ? "Se quitó 1 resultado" : `Se quitaron ${respuesta.descartadas} resultados`} que la IA vio como otro producto o que se parecen solo de lejos.
+              </p>
+            )}
             {respuesta.coincidencias.length === 0 ? (
               <p className="m-0 font-medium">No se encontró nada parecido en {respuesta.ambitos.map(etiquetaAmbito).join(", ")}.</p>
             ) : (

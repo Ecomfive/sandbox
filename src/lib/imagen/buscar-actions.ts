@@ -7,7 +7,7 @@ import { detectarImagen } from "@/lib/seguridad/imagen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { huellaFoto } from "@/lib/wms/huella-foto";
 import { pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/proveedor";
-import { AMBITOS, ordenar, porHuella, porNombre, unirCoincidencias, type Ambito, type Coincidencia } from "./buscar";
+import { AMBITOS, depurar, elegirParaComparar, ordenar, porHuella, porNombre, unirCoincidencias, type Ambito, type Coincidencia } from "./buscar";
 import { cargarCandidatos } from "./candidatos-datos";
 import { leerDescripcion, leerVerificacion, MAX_CANDIDATOS_IA, pedidoDescribir, pedidoVerificar } from "./ia-imagen";
 
@@ -24,6 +24,8 @@ export interface RespuestaBusquedaImagen {
   aviso: string | null;
   /** Dónde se buscó. */
   ambitos: Ambito[];
+  /** Cuántos se quitaron de la lista por ser otro producto (según la IA) o parecerse solo de lejos. */
+  descartadas: number;
 }
 
 /** La imagen llega ya reducida desde el navegador (JPG, PNG o WebP de ~170 KB, como data URL); aquí se revisa por su contenido, no por lo que declara. */
@@ -74,11 +76,8 @@ export async function buscarPorImagen(imagen: string, opciones: { ambitos?: Ambi
         descripcion = desc.producto || null;
         coincidencias = unirCoincidencias(coincidencias, desc.seguro ? porNombre(desc.palabras, candidatos) : []);
       }
-      // 2) Comparar las fotos de los mejores candidatos: primero los de huella más cercana, después los de nombre.
-      const aComparar = coincidencias
-        .filter((c) => !!c.foto)
-        .sort((a, b) => (a.distancia ?? 99) - (b.distancia ?? 99))
-        .slice(0, MAX_CANDIDATOS_IA);
+      // 2) Comparar las fotos de los mejores candidatos: las casi iguales por huella y los que más se llaman como dijo la IA.
+      const aComparar = elegirParaComparar(coincidencias, MAX_CANDIDATOS_IA);
       if (aComparar.length) {
         const v = await pedirIA(pedidoVerificar(imagen, aComparar.map((c) => ({ nombre: c.nombre, foto: c.foto as string }))), false, consumo);
         if ("texto" in v) {
@@ -96,12 +95,13 @@ export async function buscarPorImagen(imagen: string, opciones: { ambitos?: Ambi
     }
   }
 
-  const salida = ordenar(coincidencias)
+  const { visibles, descartadas } = depurar(coincidencias, conIA);
+  const salida = ordenar(visibles)
     .slice(0, TOPE_RESULTADOS)
     .map((c): CoincidenciaVista => {
       const { huella: _huella, ...resto } = c;
       void _huella;
       return resto;
     });
-  return { coincidencias: salida, descripcion, conIA, aviso, ambitos };
+  return { coincidencias: salida, descripcion, conIA, aviso, ambitos, descartadas };
 }
