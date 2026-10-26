@@ -48,7 +48,8 @@ export function pedidoVerificar(imagenBuscada: string, candidatos: { nombre: str
     instrucciones:
       "Eres un revisor de catálogo. Te muestro una foto buscada (la primera imagen) y las fotos de varios productos candidatos (las demás, en el mismo orden de la lista). " +
       "Decides si cada candidato es EL MISMO PRODUCTO que la foto buscada (mismo artículo, aunque cambie el ángulo, el fondo o el empaque), uno PARECIDO (misma clase de " +
-      "producto pero otro modelo, color o tamaño) o DISTINTO. Respondes SOLO un JSON, sin texto antes ni después.",
+      "producto pero otro modelo, color o tamaño) o DISTINTO. Si la foto buscada no muestra un producto comercial claro (una ilustración, un dibujo, un objeto cualquiera), todos son DISTINTO. " +
+      "Nunca digas que son el mismo si no ves el mismo envase, marca o diseño en las dos fotos. Respondes SOLO un JSON, sin texto antes ni después.",
     texto:
       `Candidatos (el n.º es el orden de sus fotos, después de la foto buscada):\n${lista}\n\n` +
       'Responde: {"resultados":[{"n":1,"veredicto":"mismo|parecido|distinto","motivo":"una frase corta que diga en qué se parecen o en qué se distinguen"}]} con todos los candidatos.',

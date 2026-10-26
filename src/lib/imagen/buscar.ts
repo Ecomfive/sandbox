@@ -127,6 +127,19 @@ export function unirCoincidencias(...listas: Coincidencia[][]): Coincidencia[] {
 /** Hasta dónde una foto por huella se considera lo bastante cerca como para mostrarse sin que la IA la haya confirmado. */
 export const MAX_DISTANCIA_SIN_IA = 10;
 
+/** Con la IA, una foto que nadie comparó solo se muestra si es casi idéntica. */
+export const MAX_DISTANCIA_CONFIRMADA = 5;
+
+/**
+ * Ni la huella (más de 10 bits) ni el nombre (menos de la mitad de las palabras que dijo la IA) respaldan a un candidato: si la IA igual lo dio por «mismo» o
+ * «parecido», se baja a «distinto». Evita el falso positivo de un frasco verde contra una manzana verde, que la IA llegó a dar por el mismo producto.
+ */
+export function sinRespaldo(c: Coincidencia): boolean {
+  const huellaCerca = c.distancia !== null && c.distancia <= MAX_DISTANCIA_SIN_IA;
+  const nombreCerca = (c.afinidad ?? 0) >= 0.5;
+  return !huellaCerca && !nombreCerca;
+}
+
 /**
  * Cuáles se le muestran a la IA (pocos, porque más sube el costo y la confunde): primero las fotos casi iguales (huella ≤ 10 bits), después los que se llaman
  * parecido a lo que ella dijo (los de más palabras en común) y, si sobra lugar, las demás fotos por huella.
@@ -149,7 +162,7 @@ export function elegirParaComparar(coincidencias: Coincidencia[], max: number): 
 export function depurar(coincidencias: Coincidencia[], conIA: boolean): { visibles: Coincidencia[]; descartadas: number } {
   const visibles = coincidencias.filter((c) => {
     if (c.veredicto === "distinto") return false;
-    if (conIA && !c.veredicto) return c.distancia !== null && c.distancia <= MAX_DISTANCIA_SIN_IA;
+    if (conIA && !c.veredicto) return c.distancia !== null && c.distancia <= MAX_DISTANCIA_CONFIRMADA;
     return true;
   });
   return { visibles, descartadas: coincidencias.length - visibles.length };
