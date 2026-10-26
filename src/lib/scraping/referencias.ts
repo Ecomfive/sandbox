@@ -4,21 +4,44 @@ import { indexar, repetidos, type IndiceReferencias, type ItemRepetible, type Re
 
 const fecha = (iso: string | null) => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }) : null);
 
+const ETAPA: Record<string, string> = {
+  backlog: "Backlog",
+  cotizar: "Cotizar",
+  cotizado: "Cotizado",
+  produccion: "En producción",
+  tracking: "En camino",
+  arribo_mercancia: "Arribo",
+  completado: "Completada",
+};
+
 /**
- * Lo ya visto para los cruces de Testing Lab: todos los tests de Test productos (de todos los países: un producto testeado en
- * otro país también cuenta) y todos los productos de Producto (sin variantes), con la huella de su foto si la tienen.
+ * Lo nuestro, para los cruces de Testing Lab: todos los tests de Test productos (de todos los países: un producto testeado en otro
+ * país también cuenta), todos los productos de Producto (sin variantes), los productos de las compras no anuladas (Compras: «ya
+ * se compró») y las publicaciones de Gestión de IDs Dropi (sin las duplicadas: «ya lo vendemos»), con la huella de su foto si la
+ * tienen. Las dos últimas desde el 26 oct 2026 (pedido de Hernán); sin sus tablas, solo se omiten.
  */
 export async function cargarReferencias(supabase: SupabaseClient): Promise<IndiceReferencias> {
-  const [tests, productos, paises] = await Promise.all([
+  const [tests, productos, paises, compras, items, publicaciones] = await Promise.all([
     traerTodasConError<{ id: string; nombre: string; fecha_test: string | null; estado: string | null; test_numero: number | null; pais_id: string }>((a, b) =>
       supabase.from("wms_productos_test").select("id, nombre, fecha_test, estado, test_numero, pais_id").order("id").range(a, b),
     ),
-    traerTodasConError<{ id: string; codigo: string; nombre: string; foto_huella: string | null }>((a, b) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, foto_huella").is("padre_id", null).order("id").range(a, b),
+    traerTodasConError<{ id: string; codigo: string; nombre: string; foto_huella: string | null; padre_id: string | null }>((a, b) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, foto_huella, padre_id").order("id").range(a, b),
     ),
-    supabase.from("paises").select("id, nombre"),
+    supabase.from("paises").select("id, nombre, codigo"),
+    traerTodasConError<{ id: string; numero: number | null; etapa: string; pais_id: string; sku_maestro_id: string | null; anulada_en: string | null }>((a, b) =>
+      supabase.from("wms_compras").select("id, numero, etapa, pais_id, sku_maestro_id, anulada_en").is("anulada_en", null).order("id").range(a, b),
+    ),
+    traerTodasConError<{ compra_id: string; sku_maestro_id: string }>((a, b) => supabase.from("wms_compra_items").select("compra_id, sku_maestro_id").order("id").range(a, b)),
+    traerTodasConError<{ id: string; numero: number | null; nombre: string; dropi_id: string | null; foto_huella: string | null; estado: string | null; pais_id: string; duplicada_de?: string | null }>((a, b) =>
+      supabase.from("dropi_publicaciones").select("*").order("id").range(a, b),
+    ),
   ]);
-  const pais = new Map((paises.data ?? []).map((p) => [p.id, p.nombre]));
+  const pais = new Map((paises.data ?? []).map((p) => [p.id, p.nombre as string]));
+  const codigoPais = new Map((paises.data ?? []).map((p) => [p.id, String(p.codigo ?? "").toUpperCase()]));
+  const skus = new Map((productos.data ?? []).map((p) => [p.id, p]));
+  // La huella de una variante sin foto propia es la de su producto.
+  const huellaDe = (id: string) => skus.get(id)?.foto_huella ?? (skus.get(id)?.padre_id ? (skus.get(skus.get(id)!.padre_id!)?.foto_huella ?? null) : null);
   const refs: Referencia[] = [
     ...(tests.data ?? []).map((t) => ({
       tipo: "test" as const,
@@ -27,8 +50,35 @@ export async function cargarReferencias(supabase: SupabaseClient): Promise<Indic
       huella: null,
       detalle: [t.test_numero ? `Test #${t.test_numero}` : null, fecha(t.fecha_test), t.estado, pais.get(t.pais_id)].filter(Boolean).join(" · "),
     })),
-    ...(productos.data ?? []).map((p) => ({ tipo: "producto" as const, id: p.id, nombre: p.nombre, huella: p.foto_huella, detalle: `SKU ${p.codigo}` })),
+    ...(productos.data ?? []).filter((p) => !p.padre_id).map((p) => ({ tipo: "producto" as const, id: p.id, nombre: p.nombre, huella: p.foto_huella, detalle: `SKU ${p.codigo}` })),
   ];
+  // Compras: un producto por compra (el de la compra y los de sus líneas).
+  const productosDe = new Map<string, Set<string>>();
+  for (const c of compras.error ? [] : (compras.data ?? [])) if (c.sku_maestro_id) productosDe.set(c.id, new Set([c.sku_maestro_id]));
+  for (const it of items.error ? [] : (items.data ?? [])) productosDe.set(it.compra_id, new Set([...(productosDe.get(it.compra_id) ?? []), it.sku_maestro_id]));
+  for (const c of compras.error ? [] : (compras.data ?? []))
+    for (const skuId of productosDe.get(c.id) ?? []) {
+      const sku = skus.get(skuId);
+      if (!sku) continue;
+      refs.push({
+        tipo: "compra",
+        id: c.id,
+        nombre: sku.nombre,
+        huella: huellaDe(skuId),
+        detalle: [c.numero ? `OC-${c.numero}` : null, ETAPA[c.etapa] ?? c.etapa, pais.get(c.pais_id), `SKU ${sku.codigo}`].filter(Boolean).join(" · "),
+      });
+    }
+  // Gestión de IDs Dropi: lo que publicamos (las duplicadas no cuentan).
+  for (const p of publicaciones.error ? [] : (publicaciones.data ?? [])) {
+    if (p.duplicada_de) continue;
+    refs.push({
+      tipo: "publicacion",
+      id: p.id,
+      nombre: p.nombre,
+      huella: p.foto_huella ?? null,
+      detalle: [p.numero ? `PUB-${String(p.numero).padStart(4, "0")}` : null, p.dropi_id ? `ID ${p.dropi_id}` : null, codigoPais.get(p.pais_id), p.estado === "archivado" ? "archivada" : null].filter(Boolean).join(" · "),
+    });
+  }
   return indexar(refs);
 }
 

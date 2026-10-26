@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { indexar, motivoYaVisto, repetidos, todasLasCoincidencias, yaVisto } from "./cruces";
+import { indexar, motivoYaVisto, parecidos, repetidos, todasLasCoincidencias, yaVisto } from "./cruces";
 
 const indice = indexar([
   { tipo: "test", id: "t1", nombre: "Crema ChillFlex Alivia Músculos", huella: null, detalle: "Test #3 · 12 mar 2026 · winner" },
@@ -43,4 +43,28 @@ test("todas las coincidencias de un nombre", () => {
     { tipo: "producto", id: "c", nombre: "Magnesium Complex", huella: null, detalle: "" },
   ]);
   assert.deepEqual(todasLasCoincidencias("Turmeric Curcumin", null, i).map((c) => c.id).sort(), ["a", "b"]);
+});
+
+test("lo comprado y lo publicado en Dropi también cuentan como nuestro, y se nombran antes que la ficha de Producto", () => {
+  const idx = indexar([
+    { tipo: "producto", id: "p9", nombre: "Aceite de batana para el cabello", huella: null, detalle: "SKU BATANA" },
+    { tipo: "compra", id: "c9", nombre: "Aceite de batana para el cabello", huella: null, detalle: "OC-1207 · En camino · Panamá · SKU BATANA" },
+    { tipo: "publicacion", id: "d9", nombre: "Shilajit Gold Gummies", huella: null, detalle: "PUB-0309 · ID 7588 · PA" },
+  ]);
+  const c = yaVisto("Aceite de Batana para el Cabello 60 ml", null, idx);
+  assert.equal(c?.tipo, "compra");
+  assert.match(motivoYaVisto(c!), /^Ya se compró: «Aceite de batana para el cabello» \(OC-1207/);
+  assert.equal(yaVisto("Gomitas Shilajit Gold Gummies", null, idx)?.tipo, "publicacion");
+});
+
+test("parecidos: lo que se parece sin ser igual (lo igual no sale aquí)", () => {
+  const idx = indexar([
+    { tipo: "producto", id: "p1", nombre: "Magnesio Complex 12 en 1 Totaria 120 capsulas", huella: null, detalle: "SKU MAG-120" },
+    { tipo: "compra", id: "c1", nombre: "Gomitas de colágeno sabor fresa", huella: null, detalle: "OC-1300" },
+  ]);
+  const p = parecidos("Magnesio Complex Totaria 90 cp", null, idx);
+  assert.equal(p.length, 1);
+  assert.equal(p[0].nombre, "Magnesio Complex 12 en 1 Totaria 120 capsulas");
+  assert.deepEqual(parecidos("Magnesio Complex 12 en 1 Totaria 120 capsulas", null, idx), []); // es igual: lo da yaVisto
+  assert.deepEqual(parecidos("Lámpara de luna 3D", null, idx), []);
 });

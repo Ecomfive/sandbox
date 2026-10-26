@@ -11,6 +11,7 @@ import { KpiFiltro } from "@/components/ui/kpi-filtro";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { BuscarIcon, CalendarioIcon, CatalogoIcon, ChevronRightIcon, HistorialIcon, InteligenciaIcon, InventarioIcon, PersonaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { ETIQUETA_REFERENCIA } from "@/lib/scraping/cruces";
 import { RECOMENDACIONES } from "@/lib/scraping/recomendar";
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -63,7 +64,8 @@ function Cruces({ f }: { f: FilaScraping }) {
   const marcas: { texto: string; clase: string; ayuda?: string }[] = [];
   if (f.repetidoEn.length) marcas.push({ texto: `En ${f.repetidoEn.length + 1} proveedores`, clase: "bg-destructive-soft text-destructive", ayuda: `También: ${f.repetidoEn.join(", ")}` });
   if (f.nuevo) marcas.push({ texto: "Nuevo", clase: "bg-azul-soft text-azul" });
-  if (f.yaVisto) marcas.push({ texto: f.yaVisto.tipo === "test" ? "Ya testeado" : "En Producto", clase: "bg-muted text-muted-foreground", ayuda: f.yaVisto.motivo });
+  if (f.yaVisto) marcas.push({ texto: ETIQUETA_REFERENCIA[f.yaVisto.tipo], clase: "bg-muted text-muted-foreground", ayuda: f.yaVisto.motivo });
+  else if (f.parecidos.length) marcas.push({ texto: "Parecido a algo nuestro", clase: "bg-warning-soft text-warning", ayuda: f.parecidos.map((p) => `${p.nombre} (${ETIQUETA_REFERENCIA[p.tipo]}: ${p.detalle})`).join(" · ") });
   if (f.seleccion) marcas.push({ texto: `En Selección · SEL-${String(f.seleccion.numero).padStart(4, "0")}`, clase: "bg-azul-soft text-azul" });
   if (f.estado === "privado") marcas.push({ texto: "Privado", clase: "bg-warning-soft text-warning" });
   if (f.estado === "desaparecido") marcas.push({ texto: `Desapareció · ${MOTIVO[f.motivo ?? "desconocido"]}`, clase: "bg-warning-soft text-warning" });
@@ -207,7 +209,8 @@ export function VistaScraping({
         <KpiFiltro compacta def={DEF_SCRAPING} tono="success" titulo="Se están vendiendo" valor={cuenta((f) => f.ventas7 > 0 && f.estado !== "desaparecido")} subtexto="bajó el stock esta semana" atajo={{ id: "vende", etiqueta: "Se vende", ayuda: "Filtrar: bajó el stock esta semana", filtro: { campo: "senal", valor: { tipo: "seleccion", valores: ["vende_semana"] } } }} />
         <KpiFiltro compacta def={DEF_SCRAPING} tono="destructive" titulo="En varios proveedores" valor={cuenta((f) => f.repetidoEn.length > 0)} subtexto="mismo producto en otros lados" atajo={{ id: "prioridad", etiqueta: "En varios", ayuda: "Filtrar: en varios proveedores", filtro: { campo: "cruce", valor: { tipo: "seleccion", valores: ["prioridad"] } } }} />
         <KpiFiltro compacta def={DEF_SCRAPING} tono="info" titulo="Nuevos" valor={cuenta((f) => f.nuevo)} subtexto="en los últimos 14 días" atajo={{ id: "nuevo", etiqueta: "Nuevos", ayuda: "Filtrar: nuevos", filtro: { campo: "senal", valor: { tipo: "seleccion", valores: ["nuevo"] } } }} />
-        <KpiFiltro compacta def={DEF_SCRAPING} titulo="Ya los tenemos" valor={cuenta((f) => f.recomendacion === "tenemos")} subtexto="testeados, en Producto o en Selección" atajo={{ id: "tenemos", etiqueta: "Ya los tenemos", ayuda: "Filtrar: ya los tenemos", filtro: { campo: "recomendacion", valor: { tipo: "seleccion", valores: ["tenemos"] } } }} />
+        <KpiFiltro compacta def={DEF_SCRAPING} tono="warning" titulo="Parecidos a lo nuestro" valor={cuenta((f) => !f.yaVisto && f.parecidos.length > 0)} subtexto="revísalos antes de testear" atajo={{ id: "parecido", etiqueta: "Parecidos", ayuda: "Filtrar: parecidos a algo nuestro", filtro: { campo: "cruce", valor: { tipo: "seleccion", valores: ["parecido"] } } }} />
+        <KpiFiltro compacta def={DEF_SCRAPING} titulo="Ya los tenemos" valor={cuenta((f) => f.recomendacion === "tenemos")} subtexto="testeados, en Producto, comprados o en Dropi" atajo={{ id: "tenemos", etiqueta: "Ya los tenemos", ayuda: "Filtrar: ya los tenemos", filtro: { campo: "recomendacion", valor: { tipo: "seleccion", valores: ["tenemos"] } } }} />
         <KpiFiltro compacta def={DEF_SCRAPING} tono="warning" titulo="Desaparecieron" valor={cuenta((f) => f.estado === "desaparecido")} subtexto={`${cuenta((f) => f.motivo === "agotado")} agotados · ${cuenta((f) => f.motivo === "privatizado")} privatizados`} atajo={{ id: "desaparecido", etiqueta: "Desaparecidos", ayuda: "Filtrar: desaparecidos", filtro: { campo: "estado", valor: { tipo: "seleccion", valores: ["desaparecido"] } } }} />
       </KpiGrid>
 

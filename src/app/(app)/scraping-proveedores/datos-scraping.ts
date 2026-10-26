@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aDolares, monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
-import { motivoYaVisto, yaVisto } from "@/lib/scraping/cruces";
+import { motivoYaVisto, parecidos, yaVisto } from "@/lib/scraping/cruces";
 import { esNuevo, recomendar, ventasEstimadas, type EventoStock } from "@/lib/scraping/recomendar";
 import { cargarReferencias, cargarRepetidos } from "@/lib/scraping/referencias";
 import { traerTodasConError } from "@/lib/supabase/paginar";
@@ -168,10 +168,12 @@ export async function cargarScraping(supabase: SupabaseClient): Promise<DatosScr
       const v = yaVisto(d.nombre, d.foto_huella ?? null, indice);
       return v ? { tipo: v.tipo, nombre: v.nombre, motivo: motivoYaVisto(v) } : null;
     })();
+    // Lo parecido solo importa si no hay uno igual.
+    const parecidosDe = visto ? [] : parecidos(d.nombre, d.foto_huella ?? null, indice).map((p) => ({ tipo: p.tipo, nombre: p.nombre, detalle: p.detalle, parecido: p.parecido, porFoto: p.porFoto }));
     const repetidoEn = [...(repetidosEn.get(d.id) ?? [])];
     const seleccion = enSeleccion.get(d.id) ?? null;
     const nuevoHaceDias = esNuevo(d.primera_vez, inicioDe.get(d.proveedor_id) ?? d.primera_vez, ahora);
-    const rec = recomendar({ estado, motivo: d.motivo_desaparicion, ventas30, repetidoEn, yaVisto: visto, enSeleccion: !!seleccion, nuevoHaceDias });
+    const rec = recomendar({ estado, motivo: d.motivo_desaparicion, ventas30, repetidoEn, yaVisto: visto, parecidos: parecidosDe, enSeleccion: !!seleccion, nuevoHaceDias });
     return {
       id: d.id,
       proveedorId: prov.id,
@@ -203,6 +205,7 @@ export async function cargarScraping(supabase: SupabaseClient): Promise<DatosScr
       precioUsd: aDolares(n(d.precio), moneda, tasas.porUsd),
       precioSugeridoUsd: aDolares(n(d.precio_sugerido), moneda, tasas.porUsd),
       yaVisto: visto,
+      parecidos: parecidosDe,
       repetidoEn,
       privados: privadosDe.get(d.id) ?? [],
       seleccion,

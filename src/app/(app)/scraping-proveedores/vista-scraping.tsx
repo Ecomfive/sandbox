@@ -18,6 +18,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
 import { CalendarioIcon, CatalogoIcon, HistorialIcon, InteligenciaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { ETIQUETA_REFERENCIA } from "@/lib/scraping/cruces";
 import { RECOMENDACIONES } from "@/lib/scraping/recomendar";
 import { agregarProveedor, obtenerHistorialProducto, pedirBusqueda, registrarDatosProveedor, type EventoProducto } from "./actions";
 import { MOTIVO, formatoNumero, formatoPrecio, formatoUsd, nombrePais, type FilaScraping } from "./def-scraping";
@@ -125,7 +126,7 @@ export function Marcas({ fila }: { fila: FilaScraping }) {
       {fila.yaVisto && (
         <Tooltip texto={fila.yaVisto.motivo}>
           <span tabIndex={0} className="rounded-[5px] bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {fila.yaVisto.tipo === "test" ? "Ya testeado" : "Ya en Producto"}
+            {ETIQUETA_REFERENCIA[fila.yaVisto.tipo]}
           </span>
         </Tooltip>
       )}
@@ -230,6 +231,30 @@ export function FichaProducto({
                   {fila.proveedor} · {nombrePais(fila.pais)} · ventas estimadas: {formatoNumero(fila.ventas30)} u. en 30 días, {formatoNumero(fila.ventas7)} en 7 (lo que bajó el stock)
                 </p>
               </div>
+            </Seccion>
+          )}
+          {(fila.yaVisto || fila.parecidos.length > 0) && (
+            <Seccion icono={CatalogoIcon} titulo={fila.yaVisto ? "Ya lo tenemos" : "Se parece a algo nuestro"}>
+              <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-md border border-border p-0 text-sm">
+                {fila.yaVisto && (
+                  <li className="flex flex-col gap-0.5 px-3 py-2">
+                    <span className="font-semibold">
+                      Igual · {ETIQUETA_REFERENCIA[fila.yaVisto.tipo]}: {fila.yaVisto.nombre}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{fila.yaVisto.motivo}</span>
+                  </li>
+                )}
+                {fila.parecidos.map((p) => (
+                  <li key={`${p.tipo}-${p.nombre}`} className="flex flex-col gap-0.5 px-3 py-2">
+                    <span className="font-medium">
+                      Parecido · {ETIQUETA_REFERENCIA[p.tipo]}: {p.nombre}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {p.detalle} · {p.porFoto ? "foto parecida" : `${Math.round(p.parecido * 100)} % del nombre`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </Seccion>
           )}
           <Seccion icono={ProductoIcon} titulo="Producto">

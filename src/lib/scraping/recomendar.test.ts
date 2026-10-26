@@ -28,10 +28,13 @@ test("ventas estimadas: suma lo que baja el stock entre búsquedas; la reposici�
 test("testear: se vende fuerte, o se vende y lo tiene otro proveedor, y no lo tenemos", () => {
   const a = recomendar({ ...base, ventas30: 120 });
   assert.equal(a.tipo, "testear");
-  assert.equal(a.porQue, "Bajó ~120 u. de stock en 30 días. No está en Test productos ni en Producto.");
+  assert.equal(a.porQue, "Bajó ~120 u. de stock en 30 días. No está en Test productos, Producto, Compras ni en Dropi.");
   const b = recomendar({ ...base, ventas30: 25, repetidoEn: ["Hyper Moda", "Atma"], nuevoHaceDias: 9 });
   assert.equal(b.tipo, "testear");
-  assert.equal(b.porQue, "Bajó ~25 u. de stock en 30 días, también lo tienen Hyper Moda y Atma, apareció hace 9 días. No está en Test productos ni en Producto.");
+  assert.equal(b.porQue, "Bajó ~25 u. de stock en 30 días, también lo tienen Hyper Moda y Atma, apareció hace 9 días. No está en Test productos, Producto, Compras ni en Dropi.");
+  const c = recomendar({ ...base, ventas30: 90, parecidos: [{ tipo: "compra", nombre: "Magnesio Complex 60 cap" }] });
+  assert.equal(c.tipo, "testear");
+  assert.equal(c.porQue, "Bajó ~90 u. de stock en 30 días. No es igual a nada nuestro, pero se parece a «Magnesio Complex 60 cap» (ya comprado): revísalo antes de testear.");
 });
 
 test("mirar de cerca: se mueve algo, está en otro proveedor o es nuevo y ya bajó", () => {
@@ -47,6 +50,8 @@ test("ya lo tenemos: testeado, en Producto o enviado a Selección, aunque se ven
   assert.match(r.porQue, /Ya se testeó: Test #12\.$/);
   assert.equal(recomendar({ ...base, enSeleccion: true }).tipo, "tenemos");
   assert.match(recomendar({ ...base, yaVisto: { tipo: "producto", nombre: "SKU ABC" } }).porQue, /^Ya está en Producto: SKU ABC\.$/);
+  assert.match(recomendar({ ...base, ventas30: 80, yaVisto: { tipo: "compra", nombre: "Aceite de batana" } }).porQue, /Ya se compró: Aceite de batana\.$/);
+  assert.equal(recomendar({ ...base, yaVisto: { tipo: "publicacion", nombre: "Shilajit" } }).tipo, "tenemos");
 });
 
 test("sin señales: no se movió", () => {

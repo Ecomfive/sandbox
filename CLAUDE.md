@@ -417,7 +417,14 @@ convenciones técnicas del código.
   (una frase) en la ficha (`FichaProducto` de `vista-scraping.tsx`, que ahora solo guarda las piezas compartidas). Los
   proveedores van en `/scraping-proveedores/proveedores` (`vista-proveedores.tsx`: tabla con país, productos, nuevos, ventas
   estimadas, para testear, órdenes y última búsqueda; ficha con sus cifras, «Anotar cifras» —antes «Actualizar datos»— y «Buscar
-  ahora»; «Agregar proveedor» acepta el enlace de cualquier `app.dropi.<país>`). Ya no hay envío en lote a Selección: se envía
+  ahora»; «Agregar proveedor» acepta el enlace de cualquier `app.dropi.<país>`). **Lo nuestro** (26 oct 2026, pedido de Hernán: «que no
+  testeemos algo que ya tenemos o ya compramos»): `cargarReferencias` (`referencias.ts`, la usan también Selección y Sugerencias)
+  suma a Test productos y Producto los productos de las compras no anuladas (`tipo: "compra"`, detalle «OC-… · etapa · país ·
+  SKU») y las publicaciones de Gestión de IDs Dropi sin duplicadas (`tipo: "publicacion"`); `yaVisto` prefiere compra >
+  publicación > test > producto (`PREFERENCIA`) y lo igual va a «Ya lo tenemos»; `parecidos` (`cruces.ts`, con prueba) da lo
+  que se parece sin ser igual (60 % del nombre, 2 palabras en común y alguna de 5 letras o más que no sea genérica, `GENERICAS`;
+  o una foto cercana): `FilaScraping.parecidos`, insignia «Parecido a algo nuestro», tarjeta, sección en la ficha y frase en el
+  porqué (no cambia la recomendación). Ya no hay envío en lote a Selección: se envía
   desde la ficha. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
   dropshipper por país), «Descubrir proveedores» desde el catálogo de cada país y TuWinner.
   Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`

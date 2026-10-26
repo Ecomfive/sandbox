@@ -2,14 +2,17 @@
 // me vayas recomendando»). Dropi no muestra las ventas de otros proveedores, así que se estiman con lo que BAJA el stock entre una
 // búsqueda y la siguiente (una subida es una reposición: no cuenta). Con eso, los cruces (ya testeado, ya en Producto, enviado a
 // Selección) y en cuántos proveedores aparece, cada producto queda en Testear, Mirar de cerca, Ya lo tenemos o Sin señales, con una
-// frase de por qué. Sin base ni React, con prueba.
+// frase de por qué. Lo nuestro igual (testeado, en Producto, comprado o en Dropi) lo deja en «Ya lo tenemos»; lo parecido no cambia
+// la recomendación pero se nombra en el porqué, para revisarlo antes de testear. Sin base ni React, con prueba.
+
+import { ETIQUETA_REFERENCIA, type TipoReferencia } from "./cruces";
 
 export type Recomendacion = "testear" | "mirar" | "tenemos" | "sin_senales";
 
 export const RECOMENDACIONES: { valor: Recomendacion; etiqueta: string; color: string; detalle: string }[] = [
   { valor: "testear", etiqueta: "Testear", color: "#18181b", detalle: "Se vende y todavía no lo tenemos" },
   { valor: "mirar", etiqueta: "Mirar de cerca", color: "#b45309", detalle: "Se mueve, pero falta ver si es tendencia" },
-  { valor: "tenemos", etiqueta: "Ya lo tenemos", color: "#71717a", detalle: "Ya testeado, en Producto o en Selección" },
+  { valor: "tenemos", etiqueta: "Ya lo tenemos", color: "#71717a", detalle: "Ya testeado, en Producto, comprado, en Dropi o en Selección" },
   { valor: "sin_senales", etiqueta: "Sin señales", color: "#a1a1aa", detalle: "No se movió en 30 días" },
 ];
 
@@ -52,7 +55,9 @@ export interface DatosRecomendacion {
   ventas30: number;
   /** Los otros proveedores o fuentes donde aparece el mismo producto. */
   repetidoEn: string[];
-  yaVisto: { tipo: "test" | "producto"; nombre: string } | null;
+  yaVisto: { tipo: TipoReferencia; nombre: string } | null;
+  /** Lo nuestro que se parece sin ser igual (para revisarlo antes de testear). */
+  parecidos?: { tipo: TipoReferencia; nombre: string }[];
   enSeleccion: boolean;
   /** Hace cuántos días apareció si es nuevo (`esNuevo`), o null. */
   nuevoHaceDias: number | null;
@@ -84,10 +89,15 @@ export function recomendar(d: DatosRecomendacion): { tipo: Recomendacion; porQue
   };
 
   if (d.yaVisto || d.enSeleccion) {
-    const que = d.yaVisto ? (d.yaVisto.tipo === "test" ? `Ya se testeó: ${d.yaVisto.nombre}.` : `Ya está en Producto: ${d.yaVisto.nombre}.`) : "Ya se envió a Selección.";
+    const que = d.yaVisto
+      ? { test: `Ya se testeó: ${d.yaVisto.nombre}.`, producto: `Ya está en Producto: ${d.yaVisto.nombre}.`, compra: `Ya se compró: ${d.yaVisto.nombre}.`, publicacion: `Ya lo vendemos en Dropi: ${d.yaVisto.nombre}.` }[d.yaVisto.tipo]
+      : "Ya se envió a Selección.";
     return { tipo: "tenemos", porQue: frase(que) };
   }
-  const falta = "No está en Test productos ni en Producto.";
+  const p = d.parecidos?.[0];
+  const falta = p
+    ? `No es igual a nada nuestro, pero se parece a «${p.nombre}» (${ETIQUETA_REFERENCIA[p.tipo].toLowerCase()}): revísalo antes de testear.`
+    : "No está en Test productos, Producto, Compras ni en Dropi.";
   const vendeFuerte = d.ventas30 >= UMBRALES.testear || (d.repetidoEn.length > 0 && d.ventas30 >= UMBRALES.testearRepetido);
   if (vendeFuerte && d.estado !== "desaparecido") return { tipo: "testear", porQue: frase(falta) };
   if (d.ventas30 >= UMBRALES.mirar || d.repetidoEn.length > 0 || (nuevoHace !== null && d.ventas30 > 0) || (d.estado === "desaparecido" && d.motivo === "agotado" && d.ventas30 > 0))

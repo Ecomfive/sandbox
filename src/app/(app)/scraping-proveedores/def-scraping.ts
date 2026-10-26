@@ -1,4 +1,5 @@
 import { monedaDePais } from "@/lib/moneda/tipo-cambio";
+import type { TipoReferencia } from "@/lib/scraping/cruces";
 import { RECOMENDACIONES, type Recomendacion } from "@/lib/scraping/recomendar";
 import type { DefTabla } from "@/lib/tabla/motor";
 
@@ -21,12 +22,15 @@ export function senalesDe(f: FilaScraping): Senal[] {
 
 export type EstadoScraping = "activo" | "privado" | "desaparecido";
 export type Movimiento = "subio" | "bajo" | "precio" | "nuevo";
-export type Cruce = "prioridad" | "ya_testeado" | "en_producto" | "en_seleccion";
+export type Cruce = "prioridad" | "ya_testeado" | "en_producto" | "ya_comprado" | "en_dropi" | "parecido" | "en_seleccion";
 
 export const CRUCES: { valor: Cruce; etiqueta: string }[] = [
   { valor: "prioridad", etiqueta: "Prioridad (en varios proveedores)" },
   { valor: "ya_testeado", etiqueta: "Ya testeado" },
   { valor: "en_producto", etiqueta: "Ya en Producto" },
+  { valor: "ya_comprado", etiqueta: "Ya comprado (Compras)" },
+  { valor: "en_dropi", etiqueta: "Lo vendemos en Dropi" },
+  { valor: "parecido", etiqueta: "Parecido a algo nuestro" },
   { valor: "en_seleccion", etiqueta: "Enviado a Selección" },
 ];
 
@@ -35,6 +39,9 @@ export function crucesDe(f: FilaScraping): Cruce[] {
   if (f.repetidoEn.length) c.push("prioridad");
   if (f.yaVisto?.tipo === "test") c.push("ya_testeado");
   if (f.yaVisto?.tipo === "producto") c.push("en_producto");
+  if (f.yaVisto?.tipo === "compra") c.push("ya_comprado");
+  if (f.yaVisto?.tipo === "publicacion") c.push("en_dropi");
+  if (!f.yaVisto && f.parecidos.length) c.push("parecido");
   if (f.seleccion) c.push("en_seleccion");
   return c;
 }
@@ -80,7 +87,9 @@ export interface FilaScraping {
   precioUsd: number | null;
   precioSugeridoUsd: number | null;
   /** Ya se testeó (Test productos) o ya está en Producto: con qué y el motivo para la nota. */
-  yaVisto: { tipo: "test" | "producto"; nombre: string; motivo: string } | null;
+  yaVisto: { tipo: TipoReferencia; nombre: string; motivo: string } | null;
+  /** Lo nuestro que se parece sin ser igual (Test, Producto, Compras o Gestión de IDs Dropi), el más parecido primero. */
+  parecidos: { tipo: TipoReferencia; nombre: string; detalle: string; parecido: number; porFoto: boolean }[];
   /** Otros proveedores o fuentes donde aparece el mismo producto (prioridad si hay alguno). */
   repetidoEn: string[];
   /** Los privados vinculados a este producto (solo en uno publicado). */
@@ -178,6 +187,7 @@ export const DEF_SCRAPING: DefTabla<FilaScraping> = {
     { etiqueta: "SKU", valor: (f) => f.sku },
     { etiqueta: "Vinculado a", valor: (f) => f.vinculo?.nombre ?? null },
     { etiqueta: "Ya visto", valor: (f) => f.yaVisto?.motivo ?? null },
+    { etiqueta: "Se parece a", valor: (f) => f.parecidos.map((p) => `${p.nombre} (${p.detalle})`).join(" | ") || null },
     { etiqueta: "También en", valor: (f) => f.repetidoEn.join(", ") || null },
   ],
 };
