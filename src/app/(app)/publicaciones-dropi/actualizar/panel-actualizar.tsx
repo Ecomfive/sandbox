@@ -181,7 +181,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   if (!disponible)
     return (
       <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-        Falta correr en Supabase la migración 0154 para usar «Actualizar Dropi».
+        Falta correr en Supabase la migración 0154 para usar «Actualizar datos».
       </p>
     );
 
@@ -196,7 +196,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           <Link href="/publicaciones-dropi" className="w-fit text-sm text-muted-foreground hover:text-foreground">
             ← Gestión de IDs Dropi
           </Link>
-          <h1 className="m-0 text-2xl font-bold">{ocupado ? "Actualizando Dropi…" : "Actualizar Dropi"}</h1>
+          <h1 className="m-0 text-2xl font-bold">{ocupado ? "Actualizando datos…" : "Actualizar datos"}</h1>
           <p className="m-0 text-sm text-muted-foreground">
             Trae de Dropi los pedidos, la cartera, los retiros, el stock y las ventas. Solo lee: no crea ni cambia nada en Dropi ni en tus publicaciones.
           </p>
@@ -375,7 +375,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           Historial
         </h2>
         {corridas.length === 0 ? (
-          <span className="text-sm text-muted-foreground">Todavía no se usó «Actualizar Dropi».</span>
+          <span className="text-sm text-muted-foreground">Todavía no se usó «Actualizar datos».</span>
         ) : (
           <ul className="m-0 flex list-none flex-col divide-y divide-border p-0">
             {corridas.slice(0, 10).map((c) => {

@@ -1,5 +1,23 @@
 import { monedaDePais } from "@/lib/moneda/tipo-cambio";
+import { RECOMENDACIONES, type Recomendacion } from "@/lib/scraping/recomendar";
 import type { DefTabla } from "@/lib/tabla/motor";
+
+/** Los países de Dropi (el dominio app.dropi.<código>). */
+export const PAISES_DROPI: Record<string, string> = { mx: "México", co: "Colombia", ec: "Ecuador", pa: "Panamá", cr: "Costa Rica", cl: "Chile", pe: "Perú", gt: "Guatemala", py: "Paraguay", ar: "Argentina" };
+export const nombrePais = (codigo: string) => PAISES_DROPI[codigo] ?? codigo.toUpperCase();
+
+/** Señales para las tarjetas: se vendió esta semana, es nuevo. */
+export type Senal = "vende_semana" | "nuevo";
+export const SENALES: { valor: Senal; etiqueta: string }[] = [
+  { valor: "vende_semana", etiqueta: "Bajó el stock esta semana" },
+  { valor: "nuevo", etiqueta: "Nuevo (menos de 14 días)" },
+];
+export function senalesDe(f: FilaScraping): Senal[] {
+  const s: Senal[] = [];
+  if (f.ventas7 > 0 && f.estado !== "desaparecido") s.push("vende_semana");
+  if (f.nuevo) s.push("nuevo");
+  return s;
+}
 
 export type EstadoScraping = "activo" | "privado" | "desaparecido";
 export type Movimiento = "subio" | "bajo" | "precio" | "nuevo";
@@ -21,9 +39,14 @@ export function crucesDe(f: FilaScraping): Cruce[] {
   return c;
 }
 
-/** Un producto del proveedor elegido, listo para la tabla (lo arma la página). */
+/** Un producto de un proveedor referente, listo para la lista (lo arma `cargarScraping`). */
 export interface FilaScraping {
   id: string;
+  proveedorId: string;
+  /** El nombre del proveedor. */
+  proveedor: string;
+  /** El país de Dropi del proveedor («mx», «co»…): la moneda de sus precios. */
+  pais: string;
   dropiId: number;
   sku: string | null;
   nombre: string;
@@ -43,8 +66,16 @@ export interface FilaScraping {
   ultimaVez: string;
   primeraVez: string;
   creadoEnDropi: string | null;
+  /** Visto por primera vez hace menos de 14 días. */
+  nuevo: boolean;
   /** Stock en cada búsqueda de las últimas 4 semanas (de la más vieja a la más nueva). */
   serie: number[];
+  /** Ventas estimadas: lo que bajó el stock en 30 y en 7 días (las reposiciones no cuentan). */
+  ventas30: number;
+  ventas7: number;
+  /** Qué hacer con el producto y por qué (`recomendar`). */
+  recomendacion: Recomendacion;
+  porQue: string;
   /** Precio y sugerido pasados a dólares con el tipo de cambio del día (`null` si no hay tasa). */
   precioUsd: number | null;
   precioSugeridoUsd: number | null;
@@ -89,10 +120,24 @@ export const formatoUsd = (valor: number | null) =>
 
 export const formatoNumero = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-MX"));
 
-/** Filtros, agrupación y descarga de la tabla de productos de un proveedor. */
+/** Filtros, agrupación y descarga de la lista de productos de los proveedores referentes. */
 export const DEF_SCRAPING: DefTabla<FilaScraping> = {
   clave: "scraping-productos",
+  vistaInicial: { agrupar: "recomendacion" },
   campos: [
+    {
+      id: "recomendacion",
+      etiqueta: "Recomendación",
+      tipo: "seleccion",
+      valores: (f) => [f.recomendacion],
+      opciones: () => RECOMENDACIONES,
+      agrupable: true,
+      ordenGrupos: RECOMENDACIONES.map((r) => r.valor),
+    },
+    { id: "senal", etiqueta: "Señales", tipo: "seleccion", valores: (f) => senalesDe(f), opciones: () => SENALES },
+    { id: "pais", etiqueta: "País", tipo: "seleccion", valores: (f) => [nombrePais(f.pais)], agrupable: true },
+    { id: "proveedor", etiqueta: "Proveedor", tipo: "seleccion", valores: (f) => [f.proveedor], agrupable: true },
+    { id: "ventas30", etiqueta: "Ventas estimadas (30 días)", tipo: "numero", valor: (f) => f.ventas30 },
     {
       id: "estado",
       etiqueta: "Estado",
@@ -124,6 +169,11 @@ export const DEF_SCRAPING: DefTabla<FilaScraping> = {
     { id: "creado", etiqueta: "Creado en Dropi", tipo: "fecha", valor: (f) => f.creadoEnDropi?.slice(0, 10) ?? null },
   ],
   csvAntes: [
+    { etiqueta: "Proveedor", valor: (f) => f.proveedor },
+    { etiqueta: "País", valor: (f) => nombrePais(f.pais) },
+    { etiqueta: "Recomendación", valor: (f) => RECOMENDACIONES.find((r) => r.valor === f.recomendacion)?.etiqueta ?? f.recomendacion },
+    { etiqueta: "Por qué", valor: (f) => f.porQue },
+    { etiqueta: "Ventas estimadas 30 días", valor: (f) => f.ventas30 },
     { etiqueta: "ID Dropi", valor: (f) => f.dropiId },
     { etiqueta: "SKU", valor: (f) => f.sku },
     { etiqueta: "Vinculado a", valor: (f) => f.vinculo?.nombre ?? null },

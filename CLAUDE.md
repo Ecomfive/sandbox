@@ -406,6 +406,20 @@ convenciones técnicas del código.
   `enviado_a_compras`. Las piezas visuales comunes (insignias redondas, indicadores, botones de barra, marco de
   tabla) viven en `src/components/panel/piezas-panel.tsx` y las usa también el CRM.
 - **Testing Lab › Scraping de proveedores** (`/scraping-proveedores`, módulo `scraping-proveedores`, migración 0105, 14 oct 2026).
+  **Rediseño del 26 oct 2026** (pedido de Hernán; boceto aprobado https://claude.ai/artifact/3LFJ3vrW1e72unXf453jZJ), como Gestión
+  de IDs Dropi: `/scraping-proveedores` es UNA lista (`lista-scraping.tsx`, `ListaDatos` variante «filas») con los productos de
+  TODOS los proveedores activos de todos los países (`cargarScraping`, `datos-scraping.ts`), agrupada por recomendación
+  (`DEF_SCRAPING.vistaInicial`), con 6 tarjetas `KpiFiltro` (Para testear, Se están vendiendo, En varios proveedores, Nuevos, Ya
+  los tenemos, Desaparecieron). **Ventas estimadas** = lo que BAJÓ el stock entre búsquedas en 30/7 días (`ventasEstimadas`, las
+  subidas son reposición) y **recomendación** (`recomendar`, `src/lib/scraping/recomendar.ts`, con prueba; umbrales en `UMBRALES`):
+  «Ya lo tenemos» si ya se testeó, está en Producto o en Selección; «Testear» si bajó ≥60 u. en 30 días (o ≥20 y está en otro
+  proveedor); «Mirar de cerca» si ≥10, en otro proveedor, nuevo con movimiento o agotado; si no, «Sin señales»; con `porQue`
+  (una frase) en la ficha (`FichaProducto` de `vista-scraping.tsx`, que ahora solo guarda las piezas compartidas). Los
+  proveedores van en `/scraping-proveedores/proveedores` (`vista-proveedores.tsx`: tabla con país, productos, nuevos, ventas
+  estimadas, para testear, órdenes y última búsqueda; ficha con sus cifras, «Anotar cifras» —antes «Actualizar datos»— y «Buscar
+  ahora»; «Agregar proveedor» acepta el enlace de cualquier `app.dropi.<país>`). Ya no hay envío en lote a Selección: se envía
+  desde la ficha. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
+  dropshipper por país), «Descubrir proveedores» desde el catálogo de cada país y TuWinner.
   Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`
   manual o dropi), `scraping_busquedas` (con `duracion_ms`), `scraping_productos` (último precio y stock, `estado` activo o
   desaparecido con `motivo_desaparicion`, privado con `vinculado_a`/`vinculo_parecido`/`vinculo_seguro`) y

@@ -98,7 +98,7 @@ export function TablaPublicaciones({
   actualizadoDropi?: string | null;
   /** Lo que espera para Dropi y el favorito «Aplicar en Dropi» (`BarraAplicarDropi`, la arma la página). */
   barraDropi?: ReactNode;
-  /** El botón «Actualizar Dropi» arriba de «Agregar» (26 oct 2026: por ahora solo para Hernán). */
+  /** El botón «Actualizar datos» arriba de «Agregar» (26 oct 2026: por ahora solo para Hernán). */
   actualizarDropi?: boolean;
 }) {
   const verVentas = corteVentas !== null;
@@ -145,7 +145,7 @@ export function TablaPublicaciones({
               <path d="M21 12a9 9 0 1 1-3-6.7" />
               <path d="M21 3v6h-6" />
             </svg>
-            Actualizar Dropi
+            Actualizar datos
           </Link>
         </div>
       ) : (

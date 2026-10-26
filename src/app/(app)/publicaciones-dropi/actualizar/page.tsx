@@ -7,7 +7,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPanel } from "./datos";
 import { PanelActualizarDropi } from "./panel-actualizar";
 
-export const metadata = { title: "Actualizar Dropi" };
+export const metadata = { title: "Actualizar datos" };
 
 export const dynamic = "force-dynamic";
 // Procesar los pedidos o las ventas de Dropi (acciones de esta página) puede tardar unos minutos.
@@ -23,7 +23,7 @@ export default async function ActualizarDropiPage() {
   const panel = await cargarPanel(createServiceClient());
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Actualizar Dropi" oculto />
+      <EncabezadoPagina titulo="Actualizar datos" oculto />
       <PanelActualizarDropi {...panel} />
     </Pagina>
   );
