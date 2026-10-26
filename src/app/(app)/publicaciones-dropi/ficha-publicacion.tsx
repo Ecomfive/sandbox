@@ -499,21 +499,7 @@ function ContenidoFicha({
           )}
 
           <Seccion icono={EstadoIcon} titulo="Estado">
-            {!p.archivada && (
-              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-                {(p.acciones.length ? p.acciones : (["al_dia"] as const)).map((v) => {
-                  const o = ACCIONES.find((x) => x.valor === v);
-                  return o ? (
-                    <li key={v} className="flex flex-wrap items-center gap-2">
-                      <Badge color={o.color}>{o.etiqueta}</Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {v === "bajar_precio" && p.competidorMasBarato ? `${p.competidorMasBarato.proveedor} lo vende a ${usd(p.competidorMasBarato.precio)}` : o.detalle}
-                      </span>
-                    </li>
-                  ) : null;
-                })}
-              </ul>
-            )}
+            {/* Lo que pide la publicación (margen bajo, ventas en caída, republicar…) ya va en la cabecera de la ficha: aquí no se repite. */}
             <div className="grid gap-3 sm:grid-cols-2">
               {/* Se eligen aquí (24 oct 2026, el sistema manda; antes salían de Dropi). Debajo, lo que reporta Dropi, solo de referencia. */}
               <div className="flex min-w-0 flex-col gap-1">
