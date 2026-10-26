@@ -6,7 +6,7 @@ import type { EntradaTexto } from "@/lib/publicaciones/ia/openai";
 import type { Veredicto } from "./buscar";
 
 /** Cuántas fotos de candidatos se le muestran a la IA de una vez (más sube el costo y la confunde). */
-export const MAX_CANDIDATOS_IA = 8;
+export const MAX_CANDIDATOS_IA = 10;
 
 /** 1.er pedido: qué producto es la foto y con qué palabras se llamaría en una tienda. */
 export function pedidoDescribir(imagen: string): EntradaTexto {
