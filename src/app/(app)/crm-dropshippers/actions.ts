@@ -120,7 +120,7 @@ export async function registrarInteraccion(formData: FormData): Promise<{ error?
       autorNombre: autor,
       titulo: `${autor} te mencionó en una nota de ${d ? `${d.nombre}${d.codigo ? ` (${d.codigo})` : ""}` : "un dropshipper"}`,
       texto: nota,
-      href: `/crm-dropshippers/directorio?abrir=${dropshipper_id}`,
+      href: `/crm-dropshippers?abrir=${dropshipper_id}`,
     });
   }
   revalidatePath("/crm-dropshippers", "layout");

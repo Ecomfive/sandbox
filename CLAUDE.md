@@ -881,6 +881,16 @@ convenciones técnicas del código.
   Fotos, audios y documentos se sirven por `/api/whatsapp/media/[id]` (id del mensaje, revisa el área; Meta los guarda ~30 días:
   copiarlos a Storage es pendiente). La bandeja (`bandeja.tsx`) se refresca cada 8 s con la pestaña visible. Guía de Meta:
   [WHATSAPP-META.md](WHATSAPP-META.md). Boceto del rediseño del CRM: https://claude.ai/artifact/KsHUH4WKPkcFpqYsdFjESf
+- **CRM Dropshippers rediseñado** (26 oct 2026, al estilo de Gestión de IDs Dropi). `/crm-dropshippers` es la lista
+  (`lista-dropshippers.tsx`): `TableroCrm` (`tablero-crm.tsx`, tarjetas que cuentan y filtran con atajos sobre `DEF_DROPSHIPPERS`,
+  colores `COLORES` del tablero de Gestión de IDs), `ListaDatos` con `FilaDropshipperLista` (`fila-dropshipper.tsx`) y la ficha en
+  `Ventana` (`ficha-dropshipper.tsx`), cuyo contenido es `ContenidoFichaDropshipper` de `ficha-lateral.tsx` (la misma que usa el
+  Ranking). Campos nuevos para filtrar: `whatsapp` (sin_responder/con_chat/sin_chat), `casos`, `actividad` (este_mes, reciente,
+  sin_pedir ≥30 días, sin_pedidos) y `cuenta`. Cada fila trae su chat (`FilaDropshipper.whatsapp`, `cargarChats` en `datos-crm.ts`:
+  la conversación más reciente en los números de las áreas de la persona). La ficha muestra los últimos mensajes
+  (`conversacion-whatsapp.tsx`, `ultimosMensajesDropshipper`, sin marcarlos leídos). Pestañas: Dropshippers, Bandeja de WhatsApp,
+  Casos, Ranking (`/crm-dropshippers/ranking`, la portada anterior con `ResumenCrm`) y Vínculos; `/crm-dropshippers/directorio`
+  redirige a la lista con `?abrir=`/`?buscar=` (buscar abre la ficha del que se llama así).
 - **Testing Lab › Instagram** (`/instagram`, módulo `instagram`, migración 0106, 14 oct 2026). Una fuente más de Fuentes: lo que el
   equipo ve en Instagram y comparte **por mensaje directo con la cuenta de fuentes** (`@ecomfive.fuentes`, cuenta profesional ligada
   al Business Manager) cae solo en `instagram_capturas`. Meta llama al webhook **`/api/instagram/webhook`**

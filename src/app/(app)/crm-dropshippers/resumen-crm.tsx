@@ -66,7 +66,7 @@ export function ResumenCrm({
             <Indicador
               titulo="Dropshippers activos"
               valor={resumen.activos.toLocaleString("es-CR")}
-              href="/crm-dropshippers/directorio"
+              href="/crm-dropshippers"
               detalle={
                 <>
                   <Delta valor={resumen.activosDeltaMes} sufijo="" /> {resumen.activosDeltaMes !== null && "vs mes anterior · "}de {resumen.totalDropshippers}
@@ -99,7 +99,7 @@ export function ResumenCrm({
               titulo="Sin pedir en 30 días"
               punto="peligro"
               valor={resumen.sinPedir30.toLocaleString("es-CR")}
-              href="/crm-dropshippers/directorio"
+              href="/crm-dropshippers"
               detalle="en riesgo de inactivarse"
             />
           </div>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { diasEntre, type FilaCaso, type FilaDropshipper, type ResumenCrm } from "./def-crm";
+import type { AreaCrm } from "@/lib/crm/areas";
+import { diasEntre, type ChatDropshipper, type FilaCaso, type FilaDropshipper, type ResumenCrm } from "./def-crm";
 
 export interface DatosCrm {
   dropshippers: FilaDropshipper[];
@@ -20,11 +21,47 @@ type Relacion<T> = T | T[] | null;
 const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
 
 /**
+ * El chat de WhatsApp de cada dropshipper (migración 0158) en los números de las áreas que ve la persona: la conversación más
+ * reciente y la suma de no leídos de todas. Sin la migración (o sin áreas), ninguno.
+ */
+async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<Map<string, ChatDropshipper>> {
+  const chats = new Map<string, ChatDropshipper>();
+  if (!areas.length) return chats;
+  const { data, error } = await supabase
+    .from("whatsapp_conversaciones")
+    .select("id, dropshipper_id, estado, no_leidos, ultimo_texto, ultimo_mensaje_en, ultimo_de, whatsapp_numeros!inner(area)")
+    .not("dropshipper_id", "is", null)
+    .in("whatsapp_numeros.area", areas)
+    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
+    .limit(2000);
+  if (error) return chats;
+  for (const c of data ?? []) {
+    const id = c.dropshipper_id as string;
+    const sinResponder = c.estado === "abierta" && (Number(c.no_leidos) > 0 || c.ultimo_de === "entrante");
+    const antes = chats.get(id);
+    if (antes) {
+      antes.noLeidos += Number(c.no_leidos ?? 0);
+      antes.sinResponder ||= sinResponder;
+      continue;
+    }
+    chats.set(id, {
+      conversacionId: c.id as string,
+      noLeidos: Number(c.no_leidos ?? 0),
+      ultimoTexto: (c.ultimo_texto as string | null) ?? null,
+      ultimoMensajeEn: (c.ultimo_mensaje_en as string | null) ?? null,
+      ultimoDe: (c.ultimo_de as ChatDropshipper["ultimoDe"]) ?? null,
+      sinResponder,
+    });
+  }
+  return chats;
+}
+
+/**
  * Lo que necesita el CRM para dibujarse: la base. Las sumas por
  * dropshipper (pedidos y ventas del mes, último pedido, casos abiertos) las hace Postgres en la vista
  * `crm_dropshippers_resumen` (migración 0062), no JavaScript.
  */
-export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string): Promise<DatosCrm> {
+export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, areasWhatsapp: AreaCrm[] = []): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
@@ -40,7 +77,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
       .order("nombre")
       .limit(2000);
 
-  const [conCuentas, { data: sumas }, { data: casosBd }] = await Promise.all([
+  const [conCuentas, { data: sumas }, { data: casosBd }, chats] = await Promise.all([
     consultaDropshippers(true),
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
     supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos").eq("pais_id", paisId),
@@ -52,6 +89,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
       .eq("pais_id", paisId)
       .order("abierto_en", { ascending: false })
       .limit(500),
+    cargarChats(supabase, areasWhatsapp),
   ]);
 
   // Plan B: si la migración 0065 (cuentas vinculadas) todavía no se corrió, el directorio se lee sin ellas.
@@ -107,6 +145,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string):
       notas: d.notas,
       // La serie de seis meses de la ficha se pide al abrirla cuando haya pedidos reales (fase siguiente).
       pedidosPorMes: [],
+      whatsapp: chats.get(d.id) ?? null,
     };
   });
 

@@ -83,6 +83,17 @@ export const etiquetaEstadoCaso = etiquetaDe(ESTADOS_CASO);
 export const etiquetaCanal = etiquetaDe(CANALES);
 export const etiquetaTipo = etiquetaDe(TIPOS_INTERACCION);
 
+/** El chat de WhatsApp del dropshipper (Bandeja de WhatsApp, migración 0158): su conversación más reciente y lo que falta leer. */
+export interface ChatDropshipper {
+  conversacionId: string;
+  noLeidos: number;
+  ultimoTexto: string | null;
+  ultimoMensajeEn: string | null;
+  ultimoDe: "entrante" | "saliente" | "nota" | null;
+  /** Escribió y nadie le contestó: la conversación está abierta y tiene no leídos o su mensaje es el último. */
+  sinResponder: boolean;
+}
+
 /** Un dropshipper con lo que se ve en el directorio, el ranking y su ficha. */
 export interface FilaDropshipper {
   id: string;
@@ -122,6 +133,8 @@ export interface FilaDropshipper {
   notas: string | null;
   /** Pedidos de los últimos seis meses, del más antiguo al más reciente. */
   pedidosPorMes: number[];
+  /** Su chat de WhatsApp en los números que ve esta persona; null si no hay (o falta la migración 0158). */
+  whatsapp: ChatDropshipper | null;
 }
 
 export interface FilaCaso {
@@ -185,6 +198,29 @@ export function montoCorto(valor: number, codigoPais: string): string {
   if (valor >= 1_000_000) return `${simbolo}${nf(valor / 1_000_000, 2)} M`;
   if (valor >= 1_000) return `${simbolo}${nf(valor / 1_000, valor >= 100_000 ? 0 : 1)} mil`;
   return `${simbolo}${nf(valor, 0)}`;
+}
+
+export const DIAS_SIN_PEDIR = 30;
+
+/** Cómo está su chat de WhatsApp, para filtrar y para la tarjeta «Sin responder». */
+export const CHAT = [
+  { valor: "sin_responder", etiqueta: "Sin responder" },
+  { valor: "con_chat", etiqueta: "Con chat" },
+  { valor: "sin_chat", etiqueta: "Sin chat" },
+] as const;
+export const estadoChat = (d: FilaDropshipper) => (!d.whatsapp ? "sin_chat" : d.whatsapp.sinResponder ? "sin_responder" : "con_chat");
+
+/** Cómo va con los pedidos: pidió este mes, lleva 30 días o más sin pedir, nunca pidió o pidió hace poco. */
+export const ACTIVIDAD = [
+  { valor: "este_mes", etiqueta: "Pidió este mes" },
+  { valor: "reciente", etiqueta: "Pidió hace poco" },
+  { valor: "sin_pedir", etiqueta: `Sin pedir ${DIAS_SIN_PEDIR} días o más` },
+  { valor: "sin_pedidos", etiqueta: "Nunca pidió" },
+] as const;
+export function actividad(d: FilaDropshipper, hoy = new Date().toISOString().slice(0, 10)): string {
+  if (d.pedidosMes > 0) return "este_mes";
+  if (!d.ultimoPedido) return "sin_pedidos";
+  return diasEntre(d.ultimoPedido, hoy) >= DIAS_SIN_PEDIR ? "sin_pedir" : "reciente";
 }
 
 /** Directorio: se agrupa por estado y «Inactivos» es lo cerrado (oculto por defecto). */
@@ -264,6 +300,44 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       valores: (d) => [d.ciudad ?? SIN_VALOR],
       etiquetaSinValor: "Sin ciudad",
       agrupable: true,
+    },
+    {
+      id: "whatsapp",
+      etiqueta: "WhatsApp",
+      tipo: "seleccion",
+      valores: (d) => [estadoChat(d)],
+      opciones: () => CHAT.map((c) => ({ valor: c.valor, etiqueta: c.etiqueta })),
+      agrupable: true,
+      ordenGrupos: CHAT.map((c) => c.valor),
+    },
+    {
+      id: "casos",
+      etiqueta: "Casos",
+      tipo: "seleccion",
+      valores: (d) => [d.casosAbiertos > 0 ? "con_casos" : "sin_casos"],
+      opciones: () => [
+        { valor: "con_casos", etiqueta: "Con casos abiertos" },
+        { valor: "sin_casos", etiqueta: "Sin casos abiertos" },
+      ],
+    },
+    {
+      id: "actividad",
+      etiqueta: "Pedidos",
+      tipo: "seleccion",
+      valores: (d) => [actividad(d)],
+      opciones: () => ACTIVIDAD.map((a) => ({ valor: a.valor, etiqueta: a.etiqueta })),
+      agrupable: true,
+      ordenGrupos: ACTIVIDAD.map((a) => a.valor),
+    },
+    {
+      id: "cuenta",
+      etiqueta: "Cuenta vinculada",
+      tipo: "seleccion",
+      valores: (d) => [d.cuentas.length ? "con_cuenta" : "sin_cuenta"],
+      opciones: () => [
+        { valor: "con_cuenta", etiqueta: "Con cuenta vinculada" },
+        { valor: "sin_cuenta", etiqueta: "Sin cuenta vinculada" },
+      ],
     },
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (d) => `${d.nombre} ${d.codigo} ${d.tiendas.join(" ")}` },
     { id: "contacto", etiqueta: "Correo o teléfono", tipo: "texto", valor: (d) => `${d.email ?? ""} ${d.telefono ?? ""}` },

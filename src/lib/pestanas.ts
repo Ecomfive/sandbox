@@ -32,9 +32,10 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Diccionario de patrones bancarios", href: "/extractos/patrones" },
   ],
   "/crm-dropshippers": [
-    { etiqueta: "Resumen", href: "/crm-dropshippers" },
-    { etiqueta: "Dropshippers", href: "/crm-dropshippers/directorio" },
+    { etiqueta: "Dropshippers", href: "/crm-dropshippers" },
+    { etiqueta: "Bandeja de WhatsApp", href: "/crm-dropshippers/bandeja" },
     { etiqueta: "Casos", href: "/crm-dropshippers/casos" },
+    { etiqueta: "Ranking", href: "/crm-dropshippers/ranking" },
     { etiqueta: "Vínculos", href: "/crm-dropshippers/vinculos" },
   ],
   "/inventario": [

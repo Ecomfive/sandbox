@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { enviarTextoWhatsapp } from "@/lib/whatsapp/api";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
-import { cargarBandeja, cargarConversacion, conversacionPermitida, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper } from "./datos-bandeja";
+import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
@@ -27,6 +27,37 @@ export async function obtenerBandeja(): Promise<{ numeros: NumeroVista[]; conver
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   return (await cargarBandeja(createServiceClient(), u)) ?? { error: "Falta correr la migración 0158 (WhatsApp)." };
+}
+
+/**
+ * Los últimos mensajes del dropshipper por WhatsApp, para su ficha del CRM: su conversación más reciente en los números que ve la
+ * persona. Solo mira: no la marca leída (eso pasa al abrirla en la bandeja). `null` si nunca escribió.
+ */
+export async function ultimosMensajesDropshipper(
+  dropshipperId: string,
+): Promise<{ conversacionId: string; numero: string; mensajes: MensajeVista[]; ultimoEntranteEn: string | null; noLeidos: number } | null | { error: string }> {
+  const u = await usuarioBandeja(false);
+  if (!u) return { error: "No tienes acceso." };
+  if (!/^[0-9a-f-]{36}$/i.test(dropshipperId)) return null;
+  const supabase = createServiceClient();
+  const { data: c, error } = await supabase
+    .from("whatsapp_conversaciones")
+    .select("id, no_leidos, ultimo_entrante_en, whatsapp_numeros!inner(nombre, area)")
+    .eq("dropshipper_id", dropshipperId)
+    .in("whatsapp_numeros.area", areasDe(u))
+    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !c) return null;
+  const numero = c.whatsapp_numeros as unknown as { nombre: string } | { nombre: string }[];
+  const { mensajes } = await cargarConversacion(supabase, c.id as string, null);
+  return {
+    conversacionId: c.id as string,
+    numero: (Array.isArray(numero) ? numero[0]?.nombre : numero?.nombre) ?? "WhatsApp",
+    mensajes: mensajes.slice(-4),
+    ultimoEntranteEn: (c.ultimo_entrante_en as string | null) ?? null,
+    noLeidos: Number(c.no_leidos ?? 0),
+  };
 }
 
 /** Los mensajes de una conversación y su dropshipper. Al abrirla (o mientras está abierta) queda leída. */

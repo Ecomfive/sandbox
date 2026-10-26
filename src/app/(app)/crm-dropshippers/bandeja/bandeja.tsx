@@ -454,15 +454,15 @@ export function Bandeja({
                   <p className="m-0 text-[13px] text-muted-foreground">Ninguno.</p>
                 )}
               </div>
-              <Link href={`/crm-dropshippers/directorio?abrir=${chat.dropshipper.id}`} className={`text-[13px] font-medium text-primario hover:underline ${anilloFoco}`}>
+              <Link href={`/crm-dropshippers?abrir=${chat.dropshipper.id}`} className={`text-[13px] font-medium text-primario hover:underline ${anilloFoco}`}>
                 Abrir su ficha →
               </Link>
             </>
           ) : !sel.dropshipperId ? (
             <div className="flex flex-col gap-2 text-[13px]">
               <p className="m-0 text-muted-foreground">Este WhatsApp no está en el CRM. Si es un dropshipper, agrégalo (o pon este número en su ficha) y la conversación queda enlazada con el próximo mensaje.</p>
-              <Link href={`/crm-dropshippers/directorio?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.telefono)}`} className={`font-medium text-primario hover:underline ${anilloFoco}`}>
-                Buscar en el directorio →
+              <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.telefono)}`} className={`font-medium text-primario hover:underline ${anilloFoco}`}>
+                Buscarlo en el CRM →
               </Link>
             </div>
           ) : null}

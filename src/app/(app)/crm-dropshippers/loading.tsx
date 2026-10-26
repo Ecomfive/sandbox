@@ -3,12 +3,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CargandoDropshippers() {
   return (
-    <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <Skeleton className="h-28 w-full rounded-xl" />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Skeleton className="h-80 w-full rounded-xl" />
-        <Skeleton className="h-80 w-full rounded-xl" />
+    <Pagina ancho="ancha" className="flex flex-col gap-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+        ))}
       </div>
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-[480px] w-full rounded-xl" />
     </Pagina>
   );
 }

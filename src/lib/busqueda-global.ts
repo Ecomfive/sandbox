@@ -148,7 +148,7 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
               etiquetaTipo: "Dropshipper",
               titulo: d.nombre,
               detalle: d.estado,
-              href: `/crm-dropshippers/directorio?buscar=${encodeURIComponent(d.nombre)}`,
+              href: `/crm-dropshippers?buscar=${encodeURIComponent(d.nombre)}`,
             });
           }
         })
