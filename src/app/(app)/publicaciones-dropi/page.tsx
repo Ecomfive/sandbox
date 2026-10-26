@@ -3,6 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { puedeActualizarDropi } from "@/lib/dropi-actualizar/partes";
 import { getPaisActual } from "@/lib/pais";
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { BarraAplicarDropi } from "./barra-aplicar-dropi";
@@ -62,6 +63,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         abrirInicial={typeof abrir === "string" ? abrir : null}
         actualizadoDropi={datos.leidoProveedor ? fechaHoraLectura(datos.leidoProveedor) : null}
         barraDropi={puedeEscribir ? <BarraAplicarDropi pendientes={datos.pendientesDropi} /> : null}
+        actualizarDropi={puedeEscribir && puedeActualizarDropi(usuario)}
       />
     </Pagina>
   );

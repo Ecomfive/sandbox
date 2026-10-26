@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import { anilloFoco } from "@/components/ui/field";
 import { ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
@@ -71,6 +73,7 @@ export function TablaPublicaciones({
   abrirInicial = null,
   actualizadoDropi = null,
   barraDropi = null,
+  actualizarDropi = false,
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
@@ -95,6 +98,8 @@ export function TablaPublicaciones({
   actualizadoDropi?: string | null;
   /** Lo que espera para Dropi y el favorito «Aplicar en Dropi» (`BarraAplicarDropi`, la arma la página). */
   barraDropi?: ReactNode;
+  /** El botón «Actualizar Dropi» arriba de «Agregar» (26 oct 2026: por ahora solo para Hernán). */
+  actualizarDropi?: boolean;
 }) {
   const verVentas = corteVentas !== null;
   const def = DEF_PUBLICACIONES;
@@ -129,7 +134,23 @@ export function TablaPublicaciones({
           ? `Stock y bodegas leídos de Dropi: ${actualizadoDropi}.`
           : "Todavía no se actualizó desde Dropi: las bodegas aparecen con la primera lectura de «Mis productos»."}
       </p>
-      {barraDropi}
+      {actualizarDropi ? (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          {barraDropi ?? <span />}
+          <Link
+            href="/publicaciones-dropi/actualizar"
+            className={`inline-flex min-h-10 items-center gap-2 rounded-lg border border-border-control bg-card px-3.5 text-sm font-semibold hover:bg-muted ${anilloFoco}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-3-6.7" />
+              <path d="M21 3v6h-6" />
+            </svg>
+            Actualizar Dropi
+          </Link>
+        </div>
+      ) : (
+        barraDropi
+      )}
       <ListaDatos
         def={def}
         filas={publicaciones}

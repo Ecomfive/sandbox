@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ecomfive · Dropi</title>
+<style>
+  body { margin: 0; width: 340px; font: 14px/1.4 system-ui, sans-serif; color: #18181b; background: #fff; }
+  header { display: flex; gap: 10px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #e4e4e7; }
+  .logo { width: 32px; height: 32px; border-radius: 8px; background: #18181b; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  main { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+  .cuenta { border: 1px solid #e4e4e7; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .muted { color: #52525b; font-size: 12px; }
+  .ok { color: #15803d; font-weight: 600; font-size: 12px; }
+  .mal { color: #b91c1c; font-weight: 600; font-size: 12px; }
+  button { min-height: 44px; border-radius: 10px; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+  .principal { background: #18181b; color: #fff; border: 0; }
+  .secundario { background: #fff; color: #18181b; border: 1px solid #d4d4d8; }
+  footer { padding: 10px 16px 14px; border-top: 1px solid #e4e4e7; font-size: 12px; color: #52525b; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo" aria-hidden="true">E</span>
+  <div><div style="font-weight:700">Ecomfive · Dropi</div><div class="muted" id="version"></div></div>
+</header>
+<main>
+  <div class="cuenta">
+    <div><div style="font-weight:600">Panamá · proveedor</div><div class="muted" id="detalle-pa">Revisando…</div></div>
+    <span id="estado-pa" class="muted"></span>
+  </div>
+  <button type="button" class="principal" id="panel">Abrir «Actualizar Dropi» en el sistema</button>
+  <button type="button" class="secundario" id="abrir-pa">Abrir Dropi Panamá</button>
+</main>
+<footer>Solo lee Dropi. La sesión de Dropi no sale de su pestaña: al sistema solo le llegan los datos.</footer>
+<script src="popup.js"></script>
+</body>
+</html>
