@@ -25,7 +25,7 @@ import { actualizarPublicacion, archivarPublicacion, eliminarBorrador, publicarE
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
-import { VentasEnDropi } from "./ventas-publicacion";
+import { AvisoEnCamino, VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, BODEGA_DROPI, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
@@ -625,7 +625,7 @@ function ContenidoFicha({
 
           {p.ventas && corteVentas && (
             <Seccion icono={MargenIcon} titulo="Ventas en Dropi">
-              <VentasEnDropi v={p.ventas} corte={corteVentas} enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} />
+              <VentasEnDropi v={p.ventas} corte={corteVentas} />
             </Seccion>
           )}
 
@@ -637,6 +637,7 @@ function ContenidoFicha({
           )}
 
           <Seccion icono={InventarioIcon} titulo="Stock">
+            <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1">
                 <span aria-hidden="true" className={labelClassSm}>Dónde está</span>

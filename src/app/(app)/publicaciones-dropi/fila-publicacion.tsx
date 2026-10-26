@@ -115,7 +115,8 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
 
 /** La mercancía que viene en camino de un producto sin stock: las unidades arriba y la fecha de llegada abajo, en su propia columna. */
 function CeldaEnCamino({ f }: { f: FilaPublicacion }) {
-  const viene = f.ventas !== null && f.ventas.stock <= 0 && f.enCamino > 0;
+  // Sale siempre que haya algo en camino (26 oct 2026): antes pedía datos de ventas y cero stock, y un producto nuevo o con unidades no lo mostraba.
+  const viene = f.enCamino > 0;
   return (
     <Celda
       nombre="En camino"
