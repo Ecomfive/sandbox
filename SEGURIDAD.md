@@ -15,15 +15,14 @@ momento: `npm run test:seguridad` (pruebas del sanitizador y de las imágenes) y
 
 ## Verificación en dos pasos (27 oct 2026)
 
-Después de la contraseña se pide un segundo código, en cada ingreso: el de una **app autenticadora** (TOTP, el MFA nativo de Supabase Auth: al verificarlo la
-sesión sube a `aal2`) o uno de **6 dígitos por correo** (vence en 10 minutos, se guarda solo su huella HMAC con `SEGUNDO_PASO_SECRETO`, 5 intentos contados de
-forma atómica, un código por minuto y cinco por hora). El gate vive en `getUsuarioSesion` (`src/lib/auth.ts`): sin el segundo paso no hay sesión para páginas,
-acciones ni rutas de API; solo `/login/verificar` usa la sesión sin él (`getUsuarioSesionBruta`). Con el código del correo queda una cookie `ecom_2fa` httpOnly,
-firmada y atada al id de **esa** sesión de Supabase: un ingreso nuevo vuelve a pedirlo. Las cuentas del portal del proveedor (Shen Zhen) están fuera.
-**Encendido:** `SEGUNDO_PASO=activo` y `SEGUNDO_PASO_SECRETO` (32 caracteres o más) en Vercel; sin las dos, nada cambia. **Interruptor de emergencia:** poner
-`SEGUNDO_PASO=desactivado` y volver a desplegar. Antes de encenderlo hay que comprobar que el correo sale de verdad (`RESEND_API_KEY` y `RESEND_FROM` con un
-dominio verificado: el remitente de prueba de Resend solo manda al dueño de la cuenta). **Límite conocido:** quien tenga la contraseña y el correo de una persona tiene
-los dos pasos; la app autenticadora es la mejor protección, pero el correo sigue siendo una vía de entrada. Migración `0166`.
+Después de la contraseña se pide, en cada ingreso, el código de una **app autenticadora** (TOTP, el MFA nativo de Supabase Auth: al verificarlo, la sesión sube
+a `aal2`, que Supabase firma dentro del token). Quien aún no la tiene la activa en el mismo ingreso (`/login/verificar`). El gate vive en `getUsuarioSesion`
+(`src/lib/auth.ts`): sin `aal2` no hay sesión para páginas, acciones ni rutas de API; solo `/login/verificar` usa la sesión sin él (`getUsuarioSesionBruta`). Las cuentas del
+portal del proveedor (Shen Zhen) están fuera. No hay tablas ni migración. **Encendido:** `SEGUNDO_PASO=activo` en Vercel y volver a desplegar. **Interruptor de
+emergencia:** `SEGUNDO_PASO=desactivado` y volver a desplegar. **Celular perdido:** un administrador usa «Restablecer verificación» en la ficha de la persona (Usuarios y
+roles; `restablecerSegundoPaso`, con auditoría): le quita la app y en su próximo ingreso activa una nueva. Sus sesiones abiertas siguen hasta que venzan. **Límite conocido:** no
+hay códigos de recuperación ni código por correo (se quitó hasta tener un dominio de correo verificado); mientras tanto, la recuperación depende de que haya al menos un
+administrador que pueda entrar. Quien quite su app desde «Seguridad de la cuenta» la vuelve a activar en su siguiente ingreso.
 
 ## Hallazgos y estado
 

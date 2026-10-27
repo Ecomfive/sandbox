@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
-import { CandadoIcon, EscudoIcon } from "@/lib/nav-icons";
+import { CandadoIcon } from "@/lib/nav-icons";
 import { confirmarActivacionTotp, desactivarTotp, iniciarActivacionTotp } from "./actions";
 
 /**
- * La verificación en dos pasos de la propia persona (27 oct 2026). Siempre cuenta el código por correo (llega al ingresar, sin activar nada);
- * aquí se activa o se quita la app autenticadora (Google Authenticator, Authy, 1Password…), que es más segura que el correo.
+ * La verificación en dos pasos de la propia persona (27 oct 2026): aquí se activa o se cambia la app autenticadora (Google Authenticator, Authy,
+ * 1Password…). Con la verificación encendida es obligatoria: quien la quite la vuelve a activar en su próximo ingreso. Si pierde el celular, un
+ * administrador le restablece la verificación (Usuarios y roles).
  */
-export function SeguridadCuenta({ conTotp, correo, segundoPasoObligatorio }: { conTotp: boolean; correo: string; segundoPasoObligatorio: boolean }) {
+export function SeguridadCuenta({ conTotp, segundoPasoObligatorio }: { conTotp: boolean; segundoPasoObligatorio: boolean }) {
   const { mostrarToast } = useToast();
   const [activa, setActiva] = useState(conTotp);
   const [pendiente, empezar] = useTransition();
@@ -144,11 +145,6 @@ export function SeguridadCuenta({ conTotp, correo, segundoPasoObligatorio }: { c
         )}
       </Seccion>
 
-      <Seccion icono={EscudoIcon} titulo="Código por correo">
-        <p className="m-0 text-sm">
-          Se manda a <span className="font-medium">{correo}</span>. Si pierdes tu celular, así entras sin la app.
-        </p>
-      </Seccion>
     </div>
   );
 }
