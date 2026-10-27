@@ -17,6 +17,8 @@ export interface IdDropiVentas {
   netas30: number;
   netasTotal: number;
   ultimaVenta: string | null;
+  /** Su stock en Dropi: el de la última lectura de «Mis productos» o, si no aparece ahí, el de la carga de ventas. */
+  stock: number;
 }
 
 /** Las ventas en Dropi de un producto en un país: todos sus IDs de Dropi juntos. */
@@ -111,7 +113,7 @@ export async function obtenerVentasDropiProducto(id: string): Promise<{ paises: 
       ultimaVenta: v.ultimaVenta,
       meses: primerMes ? mesesEntre(primerMes, corte).map((mes) => ({ mes, netas: v.porMes[mes] ?? 0 })) : [],
       ids: resumen
-        .map((r) => ({ id: r.id, nombre: r.nombre, archivado: r.lista === "archivado", privado: r.privado, netas30: r.netas30, netasTotal: r.netasTotal, ultimaVenta: r.ultimaVenta }))
+        .map((r) => ({ id: r.id, nombre: r.nombre, archivado: r.lista === "archivado", privado: r.privado, netas30: r.netas30, netasTotal: r.netasTotal, ultimaVenta: r.ultimaVenta, stock: r.stock }))
         .sort((a, b) => b.netasTotal - a.netasTotal),
     });
   }

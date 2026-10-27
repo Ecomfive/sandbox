@@ -57,17 +57,36 @@ function VentasDePais({ v, conPais }: { v: VentasDropiPais; conPais: boolean }) 
           <p className="m-0 text-xs text-muted-foreground">* mes en curso · datos hasta el {fecha(v.corte)}</p>
         </figure>
       )}
-      <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-        {v.ids.map((i) => (
-          <li key={i.id} className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 truncate">
-              <span className="tabular-nums text-muted-foreground">ID {i.id}</span> {i.nombre}
-              {(i.archivado || i.privado) && <span className="text-xs text-muted-foreground"> · {[i.privado && "privado", i.archivado && "archivado"].filter(Boolean).join(", ")}</span>}
-            </span>
-            <span className="shrink-0 tabular-nums">{entero(i.netasTotal)}</span>
-          </li>
-        ))}
-      </ul>
+      {/* Cada ID con su stock en Dropi (27 oct 2026, pedido de Hernán) y lo que vendió en total. Sin stock, en rojo. */}
+      <div className="flex flex-col gap-1 text-sm">
+        <div aria-hidden="true" className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
+          <span>ID de Dropi</span>
+          <span className="flex shrink-0 gap-4">
+            <span className="w-16 text-right">Stock</span>
+            <span className="w-16 text-right">Netas</span>
+          </span>
+        </div>
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {v.ids.map((i) => (
+            <li key={i.id} className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate">
+                <span className="tabular-nums text-muted-foreground">ID {i.id}</span> {i.nombre}
+                {(i.archivado || i.privado) && <span className="text-xs text-muted-foreground"> · {[i.privado && "privado", i.archivado && "archivado"].filter(Boolean).join(", ")}</span>}
+              </span>
+              <span className="flex shrink-0 gap-4 tabular-nums">
+                <span className={`w-16 text-right ${i.stock > 0 ? "" : i.archivado ? "text-muted-foreground" : "font-medium text-destructive"}`}>
+                  <span className="sr-only">Stock: </span>
+                  {i.stock > 0 ? entero(i.stock) : i.archivado ? "0" : "Sin stock"}
+                </span>
+                <span className="w-16 text-right">
+                  <span className="sr-only">Netas en total: </span>
+                  {entero(i.netasTotal)}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
