@@ -48,10 +48,14 @@ export interface ProductoSinPublicacion {
   parecidas: Parecida[];
 }
 
+/** Las palabras del nombre completo (las palabras clave quitan «PACK-2», «x2»…, que aquí sí cuentan para desempatar). */
+const palabrasDe = (nombre: string) => nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).length;
+
 /** Las publicaciones del país que más se parecen por nombre (las que siguen activas primero cuando se parecen igual). */
 export function parecidasA(nombre: string, publicaciones: PublicacionParaCruzar[], limite = MAX_PARECIDAS): Parecida[] {
   const palabras = palabrasClave(nombre);
   if (!palabras.length) return [];
+  const total = palabrasDe(nombre);
   const out: (Parecida & { sobran: number })[] = [];
   for (const p of publicaciones) {
     const otras = palabrasClave(p.nombre);
@@ -60,7 +64,7 @@ export function parecidasA(nombre: string, publicaciones: PublicacionParaCruzar[
     // Dos palabras en común (o todas, si el nombre más corto tiene una sola): «Crema» sola no hace parecidas a dos cremas.
     const comunes = Math.round(parecido * Math.min(palabras.length, otras.length));
     if (parecido < UMBRAL_PARECIDA || comunes < Math.min(2, palabras.length, otras.length)) continue;
-    out.push({ id: p.id, numero: p.numero, nombre: p.nombre, dropiId: p.dropiId, archivada: p.archivada, parecido, sobran: Math.abs(otras.length - palabras.length) });
+    out.push({ id: p.id, numero: p.numero, nombre: p.nombre, dropiId: p.dropiId, archivada: p.archivada, parecido, sobran: Math.abs(palabrasDe(p.nombre) - total) });
   }
   // Si se parecen igual, primero la que no tiene palabras de más («Yerba Magic» antes que «Yerba Magic PACK-2»), luego las activas.
   return out
