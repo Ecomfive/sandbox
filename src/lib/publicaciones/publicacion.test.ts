@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { deClickup, ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, idsDropi, leerTareaGcc, margenBajo, numeroPublicacion, revisionVencida, UBICACIONES, type TareaClickup } from "./publicacion";
+import { deClickup, ESTADOS, ESTADOS_REPOSICION, ESTADOS_VENTA, fulfillmentFijo, idsDropi, leerTareaGcc, margenBajo, numeroPublicacion, revisionVencida, UBICACIONES, type TareaClickup } from "./publicacion";
 
 test("deClickup: reconoce lo de ClickUp sin importar emojis, acentos ni espacios", () => {
   assert.equal(deClickup(ESTADOS_VENTA, "Más Vendidos✅ +500"), "mas_vendidos");
@@ -84,4 +84,13 @@ test("numeroPublicacion: PUB- con cuatro cifras; sin número, un guion", () => {
   assert.equal(numeroPublicacion(1234), "PUB-1234");
   assert.equal(numeroPublicacion(12345), "PUB-12345");
   assert.equal(numeroPublicacion(null), "—");
+});
+
+test("fulfillmentFijo: $1.50 solo en Panamá; en otro país se escribe en la ficha", () => {
+  assert.equal(fulfillmentFijo("PA"), 1.5);
+  assert.equal(fulfillmentFijo("pa"), 1.5);
+  assert.equal(fulfillmentFijo("CR"), null);
+  assert.equal(fulfillmentFijo("MX"), null);
+  assert.equal(fulfillmentFijo(""), null);
+  assert.equal(fulfillmentFijo(null), null);
 });

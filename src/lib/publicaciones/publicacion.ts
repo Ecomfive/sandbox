@@ -61,10 +61,12 @@ export const etiqueta = (lista: OpcionPublicacion[], valor: string | null | unde
 export const numeroPublicacion = (n: number | null | undefined): string => (n === null || n === undefined ? "—" : `PUB-${String(n).padStart(4, "0")}`);
 
 /**
- * El fulfillment de todas las publicaciones (pedido de Hernán, 27 oct 2026; migración 0160): fijo, no se edita en la ficha ni al
- * crear. Lo pone el servidor al guardar y es el valor por defecto de la base.
+ * El fulfillment de las publicaciones de Panamá (pedido de Hernán, 27 oct 2026; migraciones 0160 y 0161): fijo, no se edita en la
+ * ficha ni al crear; lo pone el servidor al guardar. En otro país se escribe como antes.
  */
-export const FULFILLMENT_DROPI = 1.5;
+export const FULFILLMENT_PANAMA = 1.5;
+/** El fulfillment fijo del país (código «PA», «CR»…), o null si en ese país se escribe en la ficha. */
+export const fulfillmentFijo = (codigoPais: string | null | undefined): number | null => (String(codigoPais ?? "").trim().toUpperCase() === "PA" ? FULFILLMENT_PANAMA : null);
 /** Margen bajo el que se marca con un punto rojo (30 %). */
 export const MARGEN_BAJO = 0.3;
 /** El margen está por debajo del mínimo (sin margen calculado no cuenta). */
@@ -196,7 +198,7 @@ export function leerTareaGcc(t: TareaClickup): PublicacionImportada {
     privatizado_email: textoCampo(c("Email"))?.toLowerCase() ?? null,
     precio_venta: numero(c("Precio de Venta")),
     costo_mercancia: numero(c("Costo Mercancía")),
-    fulfillment: FULFILLMENT_DROPI,
+    fulfillment: FULFILLMENT_PANAMA,
     coste_real: numero(c("Coste Real")),
     estado_venta: elegir(ESTADOS_VENTA, "Estado de Venta"),
     ubicacion: elegir(UBICACIONES, "Donde está"),
