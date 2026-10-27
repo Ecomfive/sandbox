@@ -7,7 +7,7 @@ import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
 import { MAX_NOMBRE_CREAR, PRECIO_MINIMO, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
-import { UBICACIONES } from "@/lib/publicaciones/publicacion";
+import { FULFILLMENT_DROPI, UBICACIONES } from "@/lib/publicaciones/publicacion";
 import { crearPublicacion } from "./actions";
 import { CamposDatosDropi } from "./campos-datos-dropi";
 
@@ -96,7 +96,8 @@ export function CrearPublicacionPanel({ paisId, opciones }: { paisId: string; op
               <input id="pub-costo" name="costo_mercancia" type="number" min={0} step="0.01" placeholder="Ej: 1.16" className={`${fieldClass} w-full tabular-nums`} />
             </Campo>
             <Campo etiqueta="Fulfillment" id="pub-fulfillment">
-              <input id="pub-fulfillment" name="fulfillment" type="number" min={0} step="0.01" placeholder="Ej: 1.50" className={`${fieldClass} w-full tabular-nums`} />
+              <input id="pub-fulfillment" value={FULFILLMENT_DROPI.toFixed(2)} disabled className={`${fieldClass} w-full tabular-nums disabled:cursor-not-allowed disabled:bg-muted`} />
+              <span className="text-xs text-muted-foreground">Igual en todas las publicaciones</span>
             </Campo>
           </Seccion>
           {publicar ? (
