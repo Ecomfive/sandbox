@@ -88,7 +88,12 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
           const r = await pedirExtension<{ version: string }>({ tipo: "hola" }, 1500);
           if (vivo) setExtension(versionVieja(r.version) ? "vieja" : "lista");
           return;
-        } catch {
+        } catch (e) {
+          // La extensión se recargó con esta página abierta: hay que recargar la página (mismo aviso que una versión vieja).
+          if (e instanceof Error && e.message === "EXTENSION_ACTUALIZADA") {
+            if (vivo) setExtension("vieja");
+            return;
+          }
           await esperar(500);
         }
       }

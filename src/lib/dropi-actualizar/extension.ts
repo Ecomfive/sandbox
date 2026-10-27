@@ -48,6 +48,7 @@ export function pedirExtension<T>(msg: MensajeExtension, esperaMs = 20000): Prom
       clearTimeout(reloj);
       window.removeEventListener("message", alRecibir);
       const r = e.data.resp as { error?: string } | undefined;
+      // «EXTENSION_ACTUALIZADA»: la extensión se recargó con la página abierta (el panel pide recargar la página).
       if (r && typeof r === "object" && "error" in r && r.error) mal(new Error(String(r.error)));
       else ok(r as T);
     };

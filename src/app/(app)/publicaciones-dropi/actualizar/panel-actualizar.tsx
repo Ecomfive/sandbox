@@ -9,7 +9,7 @@ import { CUENTAS, GRUPOS, LECTORES, PARTES, lectoresDe, sesionValida, type Clave
 import { archivosSubidos, empezarActualizacion, marcarPartesConError, procesarParte, subidasDeLector, terminarActualizacion } from "./actions";
 import type { Corrida, UltimaParte } from "./datos";
 
-type EstadoExtension = "buscando" | "lista" | "no_instalada";
+type EstadoExtension = "buscando" | "lista" | "no_instalada" | "recargar";
 type EstadoPaso = "espera" | "leyendo" | "procesando" | "listo" | "error";
 interface Paso {
   estado: EstadoPaso;
@@ -90,7 +90,12 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           setExtension("lista");
           await revisarSesion(false).catch(() => null);
           return;
-        } catch {
+        } catch (e) {
+          // La extensión se recargó con esta página abierta: el puente viejo ya no llega a ella.
+          if (e instanceof Error && e.message === "EXTENSION_ACTUALIZADA") {
+            if (vivo) setExtension("recargar");
+            return;
+          }
           await esperar(500);
         }
       }
@@ -294,6 +299,17 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
           {error}
         </p>
+      )}
+
+      {extension === "recargar" && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4 text-sm">
+          <span>
+            <span className="font-semibold">La extensión «Ecomfive · Dropi» se actualizó.</span> Recarga esta página para seguir.
+          </span>
+          <button type="button" className={botonPrincipal} onClick={() => window.location.reload()}>
+            Recargar
+          </button>
+        </div>
       )}
 
       {extension === "no_instalada" && (
