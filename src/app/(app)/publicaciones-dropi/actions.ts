@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ESTADOS_PUBLICACION, FULFILLMENT_DROPI, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { ESTADOS_PUBLICACION, fulfillmentFijo, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
@@ -61,13 +61,21 @@ async function sinStockEnDropi(paisId: string, dropiId: string | null): Promise<
   return ventas?.length ? sinStockParaArchivar(suma(ventas, "stock")) : false;
 }
 
-/** Lee y valida los datos de la ficha (crear o guardar). Devuelve el error como valor. */
-function leerDatos(f: FormData): Datos | { error: string } {
+/** El fulfillment fijo del país de la publicación (Panamá), o null si se escribe en la ficha. */
+async function fulfillmentDelPais(supabase: ReturnType<typeof createServiceClient>, paisId: string): Promise<number | null> {
+  const { data } = await supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle();
+  return fulfillmentFijo(data?.codigo as string | undefined);
+}
+
+/** Lee y valida los datos de la ficha (crear o guardar). `fijo`: el fulfillment del país, si no se escribe. Devuelve el error como valor. */
+function leerDatos(f: FormData, fijo: number | null): Datos | { error: string } {
   const nombre = texto(f, "nombre", 300);
   if (!nombre) return { error: "Escribe el nombre del producto." };
   const precio = numero(f, "precio_venta");
   const costo = numero(f, "costo_mercancia");
-  if ([precio, costo].includes(undefined)) return { error: "Un precio o costo no es válido." };
+  // En Panamá el fulfillment es fijo (27 oct 2026) y no viene del formulario.
+  const fulfillment = fijo ?? numero(f, "fulfillment");
+  if ([precio, costo, fulfillment].includes(undefined)) return { error: "Un precio o costo no es válido." };
   const email = texto(f, "privatizado_email", 200).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "El correo del dropshipper no es válido." };
   const resp = texto(f, "responsable_id", 64);
@@ -82,8 +90,7 @@ function leerDatos(f: FormData): Datos | { error: string } {
     privatizado_email: email || null,
     precio_venta: precio ?? null,
     costo_mercancia: costo ?? null,
-    // El fulfillment es fijo (27 oct 2026): no viene del formulario.
-    fulfillment: FULFILLMENT_DROPI,
+    fulfillment: fulfillment ?? null,
     // «Coste real» ya no se usa (21 oct 2026): no va aquí, así guardar la ficha no borra el dato que quedó en la base.
     // «Estado de venta» ya no se edita (lo reemplazan las ventas de Dropi de 30 días): no va aquí, así guardar la ficha no
     // borra el dato que quedó en la base.
@@ -197,7 +204,7 @@ async function leerDatosDropi(f: FormData, supabase: ReturnType<typeof createSer
 
 /** «Agregar» › «Publicar en Dropi»: la publicación nace «Sin publicar» con todo lo que Dropi pide y queda pendiente para «Aplicar en Dropi». */
 async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof requireModuloEscritura>>, paisId: string, supabase: ReturnType<typeof createServiceClient>): Promise<{ error?: string }> {
-  const basicos = leerDatos(f);
+  const basicos = leerDatos(f, await fulfillmentDelPais(supabase, paisId));
   if ("error" in basicos) return basicos;
   // Sin las columnas de la migración 0151 no se puede dejar pendiente: se avisa antes de crear nada (ninguna publicación se borra).
   const lista = await supabase.from("dropi_cambios_pendientes").select("datos").limit(1);
@@ -237,7 +244,7 @@ async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof
  * de los que Dropi exige. No queda pendiente para Dropi: se completa desde su ficha y se publica con «Publicar en Dropi», o se elimina.
  */
 async function crearComoBorrador(f: FormData, usuario: Awaited<ReturnType<typeof requireModuloEscritura>>, paisId: string, supabase: ReturnType<typeof createServiceClient>): Promise<{ error?: string }> {
-  const basicos = leerDatos(f);
+  const basicos = leerDatos(f, await fulfillmentDelPais(supabase, paisId));
   if ("error" in basicos) return basicos;
   const precio = typeof basicos.precio_venta === "number" ? basicos.precio_venta : null;
   const datos = await leerDatosDropi(f, supabase, { nombre: String(basicos.nombre), precio, publicacionId: null });
@@ -274,7 +281,7 @@ export async function crearPublicacion(f: FormData): Promise<{ error?: string }>
   // Un producto nuevo se publica en Dropi desde aquí (pedido de Jhokser, 24 oct 2026); «Ya está en Dropi» solo la anota.
   if (texto(f, "modo", 12) === "publicar") return crearParaPublicar(f, usuario, paisId, supabase);
   if (texto(f, "modo", 12) === "borrador") return crearComoBorrador(f, usuario, paisId, supabase);
-  const datos = leerDatos(f);
+  const datos = leerDatos(f, await fulfillmentDelPais(supabase, paisId));
   if ("error" in datos) return datos;
   const repetido = await idDropiRepetido(paisId, (datos.dropi_id as string | null) ?? null, null);
   if (repetido) return { error: repetido };
@@ -312,7 +319,7 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   const id = texto(f, "id", 64);
   const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
-  const datos = leerDatos(f);
+  const datos = leerDatos(f, await fulfillmentDelPais(createServiceClient(), antes.pais_id));
   if ("error" in datos) return datos;
   // Una «Sin publicar» (migración 0151) no existe en Dropi: no tiene ID, y deja de ser borrador solo al publicarla (y viceversa).
   const sinPublicar = antes.estado_publicacion === "borrador";
