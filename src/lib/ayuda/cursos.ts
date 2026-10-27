@@ -216,7 +216,7 @@ export const CURSOS: Curso[] = [
         parrafos: [
           "Cada fila es un producto que Ecomfive tiene publicado en Dropi como proveedor, en el país de la barra de arriba, con su foto, su ID de Dropi, su SKU y su número propio (PUB-0001…), que es distinto al ID de Dropi y no cambia.",
           "Ya no hay estados que marcar a mano: lo que necesita cada publicación lo calcula el sistema (margen bajo, ventas en caída, competidor más barato, republicar, sin stock…). Los archivados se ven con el botón «Archivados».",
-          "Arriba, el tablero de acciones cuenta lo que espera una decisión (Margen bajo, Ventas en caída, Competidor más barato, Republicar, Sin vincular producto, Sin stock, Poco stock, Pausadas sin stock…). Pulsa una tarjeta para filtrar la lista y otra vez para quitar el filtro.",
+          "Arriba, el tablero de acciones cuenta lo que espera una decisión (Margen bajo, Ventas en caída, Competidor más barato, Republicar, Sin vincular producto, Sin stock, Poco stock…). Pulsa una tarjeta para filtrar la lista y otra vez para quitar el filtro.",
         ],
       },
       {
@@ -230,7 +230,7 @@ export const CURSOS: Curso[] = [
         titulo: "Archivar, pausar y los botones de cada fila",
         parrafos: [
           "Una publicación con ID de Dropi no se elimina: se archiva. Cada fila tiene siempre los mismos cinco botones, en este orden: Republicar, Privatizar, Apagar, Pausar y Archivar. El que no se puede usar se ve apagado y, al pasar el cursor, dice por qué.",
-          "Si una publicación se queda sin stock, puedes archivarla del todo o pausarla con «Pausar por falta de stock». En Dropi las dos la archivan (la competencia no ve que se agotó), pero la pausada sigue a la vista en la tarjeta «Pausadas sin stock».",
+          "Si una publicación se queda sin stock, puedes archivarla del todo o pausarla con «Pausar por falta de stock». En Dropi las dos la archivan (la competencia no ve que se agotó), pero la pausada sigue en la lista y en la tarjeta «Sin stock».",
           "Cuando Dropi le vuelve a ver unidades a una pausada, la fila dice «Volvió el stock: reactivar» en verde: el botón de pausa pasa a «Reactivar» y la saca de Archivados.",
         ],
       },
