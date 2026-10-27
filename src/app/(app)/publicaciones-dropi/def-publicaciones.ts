@@ -172,6 +172,14 @@ export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "sto
   return !f.archivada && f.enDropi === "activo" && stock !== null && stock <= 0;
 }
 
+/** Por debajo de cuántas unidades una publicación que vende tiene «Poco stock» (pedido de Hernán, 27 oct 2026). */
+export const POCO_STOCK = 100;
+/** Activa en Dropi, con ventas en los últimos 30 días y de 1 a 99 unidades (las de 0 van en «Sin stock»). */
+export function pocoStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas">): boolean {
+  const stock = f.stockProveedor ?? f.ventas?.stock ?? null;
+  return !f.archivada && f.enDropi === "activo" && stock !== null && stock > 0 && stock < POCO_STOCK && (f.ventas?.netas30 ?? 0) > 0;
+}
+
 /** No se puede archivar porque no tiene stock en Dropi (27 oct 2026). La misma cuenta que hace el servidor en `archivarPublicacion`. */
 export function noSeArchivaSinStock(f: Pick<FilaPublicacion, "archivada" | "stockProveedor" | "stockPrivadoProveedor" | "ventas">): boolean {
   return !f.archivada && sinStockParaArchivar(f.stockProveedor ?? f.ventas?.stock ?? null, f.stockProveedor === null ? null : f.stockPrivadoProveedor);
@@ -292,6 +300,8 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "enCotizacion", etiqueta: "En cotización (unidades)", tipo: "numero", valor: (f) => f.enCotizacion },
     // «Sin stock» del tablero (25 oct 2026, pedido de Alcides): toda publicación activa en Dropi con 0 unidades, venda o no.
     { id: "sinStock", etiqueta: "Sin stock", tipo: "seleccion", valores: (f) => [sinStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sin stock" }, { valor: "no", etiqueta: "Con stock" }] },
+    // «Poco stock» del tablero (27 oct 2026, pedido de Hernán): vende y le quedan menos de 100 unidades.
+    { id: "pocoStock", etiqueta: "Poco stock", tipo: "seleccion", valores: (f) => [pocoStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Poco stock" }, { valor: "no", etiqueta: "Stock suficiente o sin ventas" }] },
     // Primero la lectura de «Mis productos» (más reciente que la carga de ventas).
     { id: "stockDropiNum", etiqueta: "Stock en Dropi (unidades)", tipo: "numero", valor: (f) => f.stockProveedor ?? f.ventas?.stock ?? null },
     {
