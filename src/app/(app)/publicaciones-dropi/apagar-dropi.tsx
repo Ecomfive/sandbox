@@ -1,15 +1,17 @@
 "use client";
 
+import { BotonIconoFila } from "./boton-icono-fila";
+import { motivoApagar } from "@/lib/publicaciones/botones-fila";
+
 import { useState, useTransition } from "react";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { ApagarIcon, DeshacerIcon } from "@/lib/nav-icons";
 import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
 import { apagarPublicacion, deshacerApagado } from "./actions";
-import type { FilaPublicacion } from "./def-publicaciones";
+import { estadoBotones, type FilaPublicacion } from "./def-publicaciones";
 
 type Paso = { id: string; nombre: string; dropiId: string; tipo: "publico" | "privado" | null; stock: number | null; correo: string };
 
@@ -217,26 +219,16 @@ export function BotonApagarDropi({ p, deshabilitado }: { p: FilaPublicacion; des
 }
 
 /**
- * El ícono «Apagar en Dropi» de cada fila de la lista, junto al de archivar: abre la misma ventana que la ficha. Una publicación que no se
- * puede apagar deja un espacio del mismo ancho, para que las filas no se corran.
+ * El ícono «Apagar en Dropi» de cada fila de la lista, junto al de archivar: abre la misma ventana que la ficha. Si no se puede apagar,
+ * va apagado y dice por qué.
  */
 export function BotonApagarFila({ f }: { f: FilaPublicacion }) {
   const [abierta, setAbierta] = useState(false);
-  if (!puedeApagar(f)) return <span aria-hidden="true" className="mr-1 w-9 shrink-0" />;
+  // Siempre se ve (27 oct 2026): si no se puede apagar, va apagado y dice por qué.
   const texto = f.apagadoPendiente ? "Deshacer apagado" : "Apagar en Dropi";
-  const Icono = f.apagadoPendiente ? DeshacerIcon : ApagarIcon;
   return (
     <>
-      <Tooltip texto={texto}>
-        <button
-          type="button"
-          onClick={() => setAbierta(true)}
-          aria-label={`${texto}: ${f.nombre}`}
-          className={`mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${anilloFoco}`}
-        >
-          <Icono className="h-4 w-4" />
-        </button>
-      </Tooltip>
+      <BotonIconoFila texto={texto} motivo={motivoApagar(estadoBotones(f))} icono={f.apagadoPendiente ? DeshacerIcon : ApagarIcon} nombre={f.nombre} onClick={() => setAbierta(true)} />
       {abierta && (f.apagadoPendiente ? <VentanaDeshacerApagado p={f} abierta alCerrar={() => setAbierta(false)} /> : <VentanaApagarDropi p={f} abierta alCerrar={() => setAbierta(false)} />)}
     </>
   );

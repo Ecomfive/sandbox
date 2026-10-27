@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   fulfillmentFijo,
@@ -23,10 +23,12 @@ import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
 import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
+import { BotonAccionApagado } from "./boton-icono-fila";
+import { motivoApagar, motivoArchivar, motivoPausar, motivoPrivatizar, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
 import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, pausarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
-import { conexionDropi, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, estadoBotones, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { AvisoEnCamino, VentasEnDropi } from "./ventas-publicacion";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
@@ -265,6 +267,7 @@ function ContenidoFicha({
   // Sin stock en Dropi no se archiva (27 oct 2026): «Archivar» queda apagado y, al pulsarlo, dice por qué.
   // Sin stock, además de «Archivar» se puede pausar (27 oct 2026), si está en Dropi. Una pausada se reactiva con «Reactivar».
   const sePausa = puedePausar(p);
+  const botones = estadoBotones(p);
   const estaPausada = pausada(p);
   const reactivarYa = paraReactivar(p);
   const campoId = useRef<HTMLInputElement>(null);
@@ -439,28 +442,45 @@ function ContenidoFicha({
                   {eliminando ? "Un momento..." : p.sinPublicar ? "Eliminar borrador" : "Eliminar"}
                 </BotonAccion>
               )}
-              {!sinGuardar && puedeArchivar && sePuedeRepublicar && (
-                <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || yaRepublicando} onClick={republicar}>
-                  {republicando ? "Un momento..." : yaRepublicando ? "Republicación pendiente" : "Republicar"}
-                </BotonAccion>
-              )}
+              {/* Republicar, Apagar, Privatizar, Pausar y Archivar siempre se ven: si no se pueden usar, van apagados y dicen por qué (27 oct 2026). */}
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+                (sePuedeRepublicar ? (
+                  <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || yaRepublicando} onClick={republicar}>
+                    {republicando ? "Un momento..." : yaRepublicando ? "Republicación pendiente" : "Republicar"}
+                  </BotonAccion>
+                ) : (
+                  <BotonAccionApagado icono={ActualizarIcon} texto="Republicar" motivo={motivoRepublicar(botones) ?? "No disponible"} />
+                ))}
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
-              {!sinGuardar && puedeArchivar && puedeApagar(p) && <BotonApagarDropi p={p} deshabilitado={pendiente} />}
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+                (puedeApagar(p) ? <BotonApagarDropi p={p} deshabilitado={pendiente} /> : <BotonAccionApagado icono={ApagarIcon} texto="Apagar en Dropi" motivo={motivoApagar(botones) ?? "No disponible"} />)}
               {/* «Privatizar en Dropi»: dejarle unidades de este producto a un solo dropshipper, en un producto privado nuevo. */}
-              {!sinGuardar && puedeArchivar && puedePrivatizar(p) && <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />}
-              {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente &&
-                (
-                  <>
-                    {sePausa && (
-                      <BotonAccion icono={PausaIcon} tono="info" disabled={pendiente} onClick={() => archivar(true)}>
-                        {archivando ? "Un momento..." : "Pausar por falta de stock"}
-                      </BotonAccion>
-                    )}
-                    <BotonAccion icono={estaPausada ? ReactivarIcon : ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={() => archivar()}>
-                      {archivando ? "Un momento..." : estaPausada ? "Reactivar" : p.archivada ? "Sacar de Archivados" : "Archivar"}
-                    </BotonAccion>
-                  </>
-                )}
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+                (puedePrivatizar(p) ? (
+                  <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
+                ) : (
+                  <BotonAccionApagado icono={CandadoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
+                ))}
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+                (estaPausada ? (
+                  <BotonAccion icono={ReactivarIcon} tono="exito" disabled={pendiente} onClick={() => archivar()}>
+                    {archivando ? "Un momento..." : "Reactivar"}
+                  </BotonAccion>
+                ) : sePausa ? (
+                  <BotonAccion icono={PausaIcon} tono="info" disabled={pendiente} onClick={() => archivar(true)}>
+                    {archivando ? "Un momento..." : "Pausar por falta de stock"}
+                  </BotonAccion>
+                ) : (
+                  <BotonAccionApagado icono={PausaIcon} texto="Pausar por falta de stock" motivo={motivoPausar(botones) ?? "No disponible"} />
+                ))}
+              {!sinGuardar && puedeArchivar &&
+                (motivoArchivar(botones) === null ? (
+                  <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={() => archivar()}>
+                    {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
+                  </BotonAccion>
+                ) : (
+                  <BotonAccionApagado icono={ArchivarIcon} texto={p.archivada ? "Sacar de Archivados" : "Archivar"} motivo={motivoArchivar(botones)!} />
+                ))}
             </div>
             {error && (
               <p role="alert" className="text-sm text-destructive">
