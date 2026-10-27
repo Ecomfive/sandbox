@@ -16,7 +16,8 @@ import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
-import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, noSeArchivaSinStock, type FilaPublicacion } from "./def-publicaciones";
+import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
 const COLUMNAS_CON_VENTAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
@@ -38,8 +39,8 @@ const ConPunto = ({ color, texto }: { color: string | undefined; texto: string }
 );
 
 /**
- * Cómo está en Dropi, en poco espacio: el logo de Dropi con un punto del color del estado (verde = activo). El nombre del estado
- * sale al pasar el cursor y lo leen los lectores de pantalla; sin ID o sin datos de Dropi, el logo se ve apagado.
+ * Cómo está en Dropi, en poco espacio: el logo de Dropi con un punto del color del estado (verde = activo, rojo = no conectado). El
+ * nombre del estado sale al pasar el cursor y lo leen los lectores de pantalla; sin ID o sin datos de Dropi, el logo se ve apagado.
  */
 function IconoEnDropi({ estado }: { estado: { valor: string; etiqueta: string; color: string } }) {
   const apagado = estado.valor === "sin_id" || estado.valor === "sin_datos";
@@ -72,21 +73,25 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
   const archivar = !f.archivada;
+  // Sin stock en Dropi no se archiva (27 oct 2026): el botón queda apagado, pero recibe el clic y el foco para decir por qué.
+  const sinStock = archivar && noSeArchivaSinStock(f);
   function cambiar() {
+    if (sinStock) return mostrarToast(MOTIVO_SIN_STOCK, "destructive");
     empezar(async () => {
       const r = await archivarPublicacion(f.id, archivar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       mostrarToast(r.error ?? r.detalle ?? (archivar ? "Publicación archivada" : "Publicación fuera de Archivados"), r.error ? "destructive" : undefined);
     });
   }
-  const texto = archivar ? "Archivar publicación" : "Sacar de Archivados";
+  const texto = sinStock ? "Sin stock: no se archiva" : archivar ? "Archivar publicación" : "Sacar de Archivados";
   return (
     <Tooltip texto={texto}>
       <button
         type="button"
         onClick={cambiar}
         disabled={pendiente}
+        aria-disabled={sinStock || undefined}
         aria-label={`${texto}: ${f.nombre}`}
-        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 ${anilloFoco}`}
+        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors disabled:opacity-50 ${sinStock ? "cursor-not-allowed opacity-40" : "hover:bg-muted hover:text-foreground"} ${anilloFoco}`}
       >
         <ArchivarIcon className="h-4 w-4" />
       </button>

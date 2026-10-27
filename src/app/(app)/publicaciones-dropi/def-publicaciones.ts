@@ -10,6 +10,7 @@ import type { ComponenteEnCamino, EtapaCotizacion } from "@/lib/compras/en-camin
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
 import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
+import { sinStockParaArchivar } from "@/lib/publicaciones/archivar";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { Revision } from "@/lib/publicaciones/optimizacion";
@@ -169,6 +170,11 @@ export type ConexionDropi = "conectado" | "no_aparece";
 export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas">): boolean {
   const stock = f.stockProveedor ?? f.ventas?.stock ?? null;
   return !f.archivada && f.enDropi === "activo" && stock !== null && stock <= 0;
+}
+
+/** No se puede archivar porque no tiene stock en Dropi (27 oct 2026). La misma cuenta que hace el servidor en `archivarPublicacion`. */
+export function noSeArchivaSinStock(f: Pick<FilaPublicacion, "archivada" | "stockProveedor" | "stockPrivadoProveedor" | "ventas">): boolean {
+  return !f.archivada && sinStockParaArchivar(f.stockProveedor ?? f.ventas?.stock ?? null, f.stockProveedor === null ? null : f.stockPrivadoProveedor);
 }
 
 export function conexionDropi(f: Pick<FilaPublicacion, "dropiId" | "bodegasDropi" | "leidoProveedor" | "ventas">): ConexionDropi | null {

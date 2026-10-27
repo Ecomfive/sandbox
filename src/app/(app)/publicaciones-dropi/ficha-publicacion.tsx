@@ -25,7 +25,8 @@ import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
-import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, noSeArchivaSinStock, type FilaPublicacion } from "./def-publicaciones";
+import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 import { AvisoEnCamino, VentasEnDropi } from "./ventas-publicacion";
 import { ACCIONES, BODEGA_DROPI, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { OptimizacionFicha } from "./optimizacion-publicacion";
@@ -260,6 +261,8 @@ function ContenidoFicha({
   const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
   const conectado = p.dropiId.trim() !== "";
   const idBloqueado = conectado && !editandoId;
+  // Sin stock en Dropi no se archiva (27 oct 2026): «Archivar» queda apagado y, al pulsarlo, dice por qué.
+  const sinStockArchivar = noSeArchivaSinStock(p);
   const campoId = useRef<HTMLInputElement>(null);
   // Al desbloquear con el lápiz, el cursor entra en el campo.
   useEffect(() => {
@@ -331,6 +334,7 @@ function ContenidoFicha({
   // Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se archiva, y se puede sacar de Archivados.
   function archivar() {
     const archivarla = !p.archivada;
+    if (archivarla && sinStockArchivar) return setError(MOTIVO_SIN_STOCK);
     setError(null);
     setArchivando(true);
     empezar(async () => {
@@ -429,11 +433,18 @@ function ContenidoFicha({
               {!sinGuardar && puedeArchivar && puedeApagar(p) && <BotonApagarDropi p={p} deshabilitado={pendiente} />}
               {/* «Privatizar en Dropi»: dejarle unidades de este producto a un solo dropshipper, en un producto privado nuevo. */}
               {!sinGuardar && puedeArchivar && puedePrivatizar(p) && <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />}
-              {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente && (
-                <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={archivar}>
-                  {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
-                </BotonAccion>
-              )}
+              {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente &&
+                (sinStockArchivar ? (
+                  <Tooltip texto="Sin stock: no se archiva">
+                    <BotonAccion icono={ArchivarIcon} aria-disabled="true" className="cursor-not-allowed !border-transparent !bg-muted !text-muted-foreground" onClick={archivar}>
+                      Archivar
+                    </BotonAccion>
+                  </Tooltip>
+                ) : (
+                  <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={archivar}>
+                    {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
+                  </BotonAccion>
+                ))}
             </div>
             {error && (
               <p role="alert" className="text-sm text-destructive">

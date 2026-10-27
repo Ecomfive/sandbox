@@ -12,9 +12,10 @@ export type EnDropi = "activo" | "archivado" | "no_aparece" | "sin_id" | "sin_da
 export const EN_DROPI: { valor: EnDropi; etiqueta: string; color: string }[] = [
   { valor: "activo", etiqueta: "Activo en Dropi", color: "#30a46c" },
   { valor: "archivado", etiqueta: "Archivado en Dropi", color: "#8d8d8d" },
-  { valor: "no_aparece", etiqueta: "No aparece en Dropi", color: "#f76808" },
+  // Lo que no está conectado con Dropi lleva el punto rojo (pedido de Hernán, 27 oct 2026: antes «Sin datos» salía gris y «No aparece», naranja).
+  { valor: "no_aparece", etiqueta: "No aparece en Dropi", color: "#e5484d" },
   { valor: "sin_id", etiqueta: "Sin ID de Dropi", color: "#e5484d" },
-  { valor: "sin_datos", etiqueta: "Sin datos de Dropi", color: "#b4b4b4" },
+  { valor: "sin_datos", etiqueta: "Sin datos de Dropi", color: "#e5484d" },
 ];
 
 export function enDropi(p: { tieneId: boolean; hayCarga: boolean; dropi: { activo: boolean } | null }): EnDropi {
