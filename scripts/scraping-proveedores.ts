@@ -16,6 +16,7 @@ process.loadEnvFile(".env.local");
 import http from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { huellaFoto } from "../src/lib/wms/huella-foto";
 import { guardarCompetencia } from "./competencia-guardar";
@@ -223,11 +224,20 @@ export async function calcularHuellas(filtro: string, tabla = "scraping_producto
   return hechas;
 }
 
+/**
+ * La copia de cada lectura en datos-privados/scraping/. La lectura viene de la página de Dropi, así que el nombre del archivo se arma
+ * solo con valores revisados (país de dos letras, tipo conocido o ID numérico y la hora de este equipo) y se comprueba que quede dentro
+ * de la carpeta (auditoría 27 oct 2026: antes una lectura con «..» podía escribir cualquier .json del equipo).
+ */
 function guardarCopia(l: Lectura) {
-  mkdirSync("datos-privados/scraping", { recursive: true });
-  const ruta = `datos-privados/scraping/${l.pais}-${l.tipo ?? l.dropiId}-${l.inicio.slice(0, 19).replace(/:/g, "")}.json`;
+  const pais = typeof l.pais === "string" && /^[a-z]{2}$/.test(l.pais) ? l.pais : "xx";
+  const que = l.tipo === "competencia" || l.tipo === "nuestros" ? l.tipo : Number.isInteger(l.dropiId) ? String(l.dropiId) : "lectura";
+  const carpeta = path.resolve("datos-privados", "scraping");
+  const ruta = path.join(carpeta, `${pais}-${que}-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.json`);
+  if (!ruta.startsWith(carpeta + path.sep)) throw new Error("Ruta de la copia no válida.");
+  mkdirSync(carpeta, { recursive: true });
   writeFileSync(ruta, JSON.stringify(l));
-  return ruta;
+  return path.relative(process.cwd(), ruta);
 }
 
 function tokenValido(valor: string): boolean {

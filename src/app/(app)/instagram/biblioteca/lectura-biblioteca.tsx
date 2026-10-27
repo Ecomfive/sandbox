@@ -12,7 +12,7 @@ import { numeroInstagram } from "../def-instagram";
 import { guardarLecturaBiblioteca, vincularAnunciosACaptura } from "../biblioteca-actions";
 import { VolverAInstagram } from "../volver-a-instagram";
 
-type Estado = { tipo: "leyendo" } | { tipo: "sin_lectura" } | { tipo: "listo"; r: ResultadoLecturaBiblioteca };
+type Estado = { tipo: "inicio" } | { tipo: "confirmar"; d: string } | { tipo: "leyendo" } | { tipo: "sin_lectura" } | { tipo: "listo"; r: ResultadoLecturaBiblioteca };
 
 const caja = "rounded-lg border border-border bg-card px-4 py-3 text-sm";
 const PASOS = ["Recibiendo la lectura", "Reconociendo los anuncios", "Contando los del mismo copy", "Guardando en las capturas"];
@@ -23,35 +23,51 @@ const plural = (n: number, uno: string, varios: string) => `${n.toLocaleString("
  * Recibe la lectura de la Biblioteca de anuncios que dejó el marcador en el fragmento de la dirección, la guarda (cuenta los anuncios
  * de la misma página con el mismo copy de cada captura) y muestra qué capturas se completaron. Lo que ninguna captura reconoció se
  * puede vincular a mano. El fragmento se borra de la dirección en cuanto se lee, para que recargar la página no vuelva a guardar lo mismo.
+ * Antes de guardar pregunta «¿Guardar la lectura?»: la dirección puede venir de cualquier página, no solo del marcador (auditoría 27 oct 2026).
  */
 export function LecturaBiblioteca({ puedeEscribir }: { puedeEscribir: boolean }) {
-  const [estado, setEstado] = useState<Estado>({ tipo: "leyendo" });
+  const [estado, setEstado] = useState<Estado>({ tipo: "inicio" });
   // Al llegar la respuesta la barra se completa un instante antes de mostrar el resultado.
   const [terminado, setTerminado] = useState(false);
   const iniciada = useRef(false);
+
+  function guardar(d: string) {
+    setEstado({ tipo: "leyendo" });
+    void guardarLecturaBiblioteca(d)
+      .catch((): ResultadoLecturaBiblioteca => ({ error: "No se pudo guardar la lectura." }))
+      .then(async (r) => {
+        setTerminado(true);
+        // Las capturas que ya estaban abiertas en otra pestaña se actualizan solas.
+        if (!r.error) avisarActualizacionInstagram();
+        await esperar(450);
+        setEstado({ tipo: "listo", r });
+      });
+  }
 
   useEffect(() => {
     if (iniciada.current) return;
     iniciada.current = true;
     const d = window.location.hash.match(/[#&]d=([A-Za-z0-9_-]+)/)?.[1];
     window.history.replaceState(null, "", window.location.pathname);
-    const resultado: Promise<Estado> =
-      d && puedeEscribir
-        ? guardarLecturaBiblioteca(d)
-            .catch((): ResultadoLecturaBiblioteca => ({ error: "No se pudo guardar la lectura." }))
-            .then((r): Estado => ({ tipo: "listo", r }))
-        : Promise.resolve<Estado>({ tipo: "sin_lectura" });
-    void resultado.then(async (e) => {
-      // Sin nada que esperar (no llegó nada o no hay permiso) se muestra al instante.
-      if (e.tipo !== "listo") return setEstado(e);
-      setTerminado(true);
-      // Las capturas que ya estaban abiertas en otra pestaña se actualizan solas.
-      if (!e.r.error) avisarActualizacionInstagram();
-      await esperar(450);
-      setEstado(e);
-    });
+    // Sin nada que guardar (no llegó nada o no hay permiso) se muestra al instante.
+    void Promise.resolve().then(() => setEstado(d && puedeEscribir ? { tipo: "confirmar", d } : { tipo: "sin_lectura" }));
   }, [puedeEscribir]);
 
+  if (estado.tipo === "inicio") return null;
+  if (estado.tipo === "confirmar") {
+    const { d } = estado;
+    return (
+      <div className="flex flex-col gap-3">
+        <p className={`${caja} m-0`}>Llegó una lectura de la Biblioteca de anuncios. ¿Guardarla en las capturas de Instagram?</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={() => guardar(d)}>
+            Guardar lectura
+          </Button>
+          <VolverAInstagram />
+        </div>
+      </div>
+    );
+  }
   if (estado.tipo === "leyendo") return <ProgresoEstimado pasos={PASOS} estimadoMs={5000} terminado={terminado} etiqueta="Guardando la lectura de la Biblioteca" />;
   if (estado.tipo === "sin_lectura") {
     return (

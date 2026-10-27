@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Ecomfive · Dropi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Trae de Dropi al sistema Ecomfive los pedidos, la cartera, los retiros, el stock y las ventas («Actualizar Dropi»). Solo lee Dropi.",
   "permissions": ["scripting", "storage"],
   "host_permissions": ["https://app.dropi.pa/*", "https://app.dropi.mx/*"],
   "background": { "service_worker": "fondo.js" },
   "content_scripts": [
     {
-      "matches": ["https://mom-beta-proveduria.vercel.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "matches": ["https://mom-beta-proveduria.vercel.app/*"],
       "js": ["puente.js"],
       "run_at": "document_start"
     }

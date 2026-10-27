@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { anilloFoco } from "@/components/ui/field";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { avisarActualizacionInstagram } from "@/lib/instagram/canal";
@@ -10,7 +11,8 @@ import { enlaceDeApp, type Plataforma } from "@/lib/instagram/plataformas";
 import { etiquetaPlataforma, numeroInstagram } from "../def-instagram";
 import { compartirDesdeCelular, type ResultadoCompartido } from "../compartir-actions";
 
-type Estado = { tipo: "guardando" } | { tipo: "sin_datos" } | { tipo: "listo"; r: ResultadoCompartido };
+type Compartido = { title: string; text: string; url: string };
+type Estado = { tipo: "inicio" } | { tipo: "confirmar"; compartido: Compartido } | { tipo: "guardando" } | { tipo: "sin_datos" } | { tipo: "listo"; r: ResultadoCompartido };
 
 const caja = "rounded-lg border border-border bg-card px-4 py-3 text-sm";
 const PASOS = ["Recibiendo lo compartido", "Abriendo el enlace", "Leyendo el texto y las cifras", "Guardando el archivo", "Terminando la captura"];
@@ -42,12 +44,25 @@ function Acciones({ plataforma }: { plataforma?: Plataforma }) {
 /**
  * Guarda lo que llegó de la hoja de «Compartir en…» de Instagram y dice en qué captura quedó. Los datos compartidos se borran de la
  * dirección en cuanto se leen: recargar la página no vuelve a guardar lo mismo (y la acción tampoco lo duplica en los siguientes minutos).
+ * Si la página se abrió desde un enlace de otra página (`directo` falso), primero pregunta «¿Guardar esto en Fuentes?».
  */
-export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolean }) {
-  const [estado, setEstado] = useState<Estado>({ tipo: "guardando" });
+export function CompartirDesdeCelular({ puedeEscribir, directo }: { puedeEscribir: boolean; directo: boolean }) {
+  const [estado, setEstado] = useState<Estado>({ tipo: "inicio" });
   // Al llegar la respuesta la barra se completa un instante antes de mostrar el resultado.
   const [terminado, setTerminado] = useState(false);
   const iniciada = useRef(false);
+
+  function guardar(compartido: Compartido) {
+    setEstado({ tipo: "guardando" });
+    void compartirDesdeCelular(compartido)
+      .catch((): ResultadoCompartido => ({ error: "No se pudo guardar. Inténtalo de nuevo." }))
+      .then(async (r) => {
+        setTerminado(true);
+        if (!r.error) avisarActualizacionInstagram();
+        await esperar(450);
+        setEstado({ tipo: "listo", r });
+      });
+  }
 
   useEffect(() => {
     if (iniciada.current) return;
@@ -55,22 +70,34 @@ export function CompartirDesdeCelular({ puedeEscribir }: { puedeEscribir: boolea
     const p = new URLSearchParams(window.location.search);
     const compartido = { title: p.get("title") ?? "", text: p.get("text") ?? "", url: p.get("url") ?? "" };
     window.history.replaceState(null, "", window.location.pathname);
-    const resultado: Promise<Estado> =
-      puedeEscribir && (compartido.title || compartido.text || compartido.url)
-        ? compartirDesdeCelular(compartido)
-            .catch((): ResultadoCompartido => ({ error: "No se pudo guardar. Inténtalo de nuevo." }))
-            .then((r): Estado => ({ tipo: "listo", r }))
-        : Promise.resolve<Estado>({ tipo: "sin_datos" });
-    void resultado.then(async (e) => {
-      // Sin nada que esperar (no llegó nada o no hay permiso) se muestra al instante.
-      if (e.tipo !== "listo") return setEstado(e);
-      setTerminado(true);
-      if (!e.r.error) avisarActualizacionInstagram();
-      await esperar(450);
-      setEstado(e);
+    // Sin nada que guardar (no llegó nada o no hay permiso) se muestra al instante. El estado cambia después del efecto, no dentro.
+    void Promise.resolve().then(() => {
+      if (!puedeEscribir || !(compartido.title || compartido.text || compartido.url)) setEstado({ tipo: "sin_datos" });
+      else if (directo) guardar(compartido);
+      else setEstado({ tipo: "confirmar", compartido });
     });
-  }, [puedeEscribir]);
+  }, [puedeEscribir, directo]);
 
+  if (estado.tipo === "inicio") return null;
+  if (estado.tipo === "confirmar") {
+    const { compartido } = estado;
+    return (
+      <div className="flex flex-col gap-3">
+        <div className={`${caja} flex flex-col gap-1`}>
+          <span className="font-medium">¿Guardar esto en Fuentes?</span>
+          <span className="break-all text-muted-foreground">{(compartido.url || compartido.text || compartido.title).slice(0, 300)}</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={() => guardar(compartido)}>
+            Guardar
+          </Button>
+          <Link href="/instagram" className={enlaceBoton}>
+            Cancelar
+          </Link>
+        </div>
+      </div>
+    );
+  }
   if (estado.tipo === "guardando") return <ProgresoEstimado pasos={PASOS} estimadoMs={9000} terminado={terminado} etiqueta="Guardando lo compartido en Fuentes" />;
   if (estado.tipo === "sin_datos") {
     return (

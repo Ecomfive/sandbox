@@ -1,4 +1,5 @@
-// «Ecomfive · Dropi» › el puente en las páginas del sistema (mom-beta-proveduria.vercel.app; localhost para probar): el panel
+// «Ecomfive · Dropi» › el puente en las páginas del sistema (solo mom-beta-proveduria.vercel.app; desde el 27 oct 2026 ya no en
+// localhost, para que ninguna página local pueda usar la sesión de Dropi): el panel
 // «Actualizar Dropi» le habla por window.postMessage con el canal «ecomfive-dropi», el puente se lo pasa a la extensión (fondo.js)
 // y le devuelve la respuesta. Solo mensajes de la misma página. La sesión de Dropi nunca pasa por aquí.
 (() => {

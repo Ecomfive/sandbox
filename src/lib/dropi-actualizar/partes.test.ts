@@ -18,20 +18,25 @@ test("la extensión conoce los mismos lectores que el panel (archivo, función, 
   }
 });
 
-test("la extensión solo sube a la carpeta temporal del sistema en Supabase", () => {
+test("la extensión solo sube a la carpeta temporal del sistema en SU proyecto de Supabase", () => {
   const fuente = /const SUBIDA = \/(.+)\/;/.exec(ext("fondo.js"))![1];
   const subida = new RegExp(fuente);
   const id = "01a17000-1234-7abc-8def-0123456789ab";
-  assert.ok(subida.test(`https://abcdefgh.supabase.co/storage/v1/object/upload/sign/wms-compras/tmp-dropi-panel/${id}/pedidos.json?token=xyz`));
-  assert.ok(!subida.test(`https://abcdefgh.supabase.co/storage/v1/object/upload/sign/otro-bucket/tmp-dropi-panel/${id}/pedidos.json?token=xyz`));
+  const sistema = "https://bcpndbpxbcfruivgizjn.supabase.co";
+  assert.ok(subida.test(`${sistema}/storage/v1/object/upload/sign/wms-compras/tmp-dropi-panel/${id}/pedidos.json?token=xyz`));
+  // Otro proyecto de Supabase con la misma carpeta ya no pasa (auditoría 27 oct 2026).
+  assert.ok(!subida.test(`https://abcdefgh.supabase.co/storage/v1/object/upload/sign/wms-compras/tmp-dropi-panel/${id}/pedidos.json?token=xyz`));
+  assert.ok(!subida.test(`${sistema}/storage/v1/object/upload/sign/otro-bucket/tmp-dropi-panel/${id}/pedidos.json?token=xyz`));
   assert.ok(!subida.test(`https://evil.example.com/storage/v1/object/upload/sign/wms-compras/tmp-dropi-panel/${id}/pedidos.json?token=xyz`));
-  assert.ok(!subida.test(`https://abcdefgh.supabase.co/storage/v1/object/upload/sign/wms-compras/tmp-dropi-panel/../x/pedidos.json?token=xyz`));
+  assert.ok(!subida.test(`${sistema}/storage/v1/object/upload/sign/wms-compras/tmp-dropi-panel/../x/pedidos.json?token=xyz`));
 });
 
 test("el puente solo va en las páginas del sistema y la extensión solo entra a Dropi", () => {
   const m = JSON.parse(ext("manifest.json")) as { host_permissions: string[]; content_scripts: { matches: string[] }[]; permissions: string[] };
   assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.mx/*"]);
-  assert.ok(m.content_scripts[0].matches.includes("https://mom-beta-proveduria.vercel.app/*"));
+  // Solo la página del sistema: ninguna página de localhost puede usar la sesión de Dropi (auditoría 27 oct 2026).
+  assert.deepEqual(m.content_scripts[0].matches, ["https://mom-beta-proveduria.vercel.app/*"]);
+  assert.ok(ext("fondo.js").includes(`remitente.origin !== SISTEMA`));
   assert.ok(!m.permissions.includes("tabs") && !m.permissions.includes("cookies"));
 });
 
