@@ -15,6 +15,7 @@ import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { MODULO_DIRECCION } from "@/lib/crm/areas";
 import { PESTANAS_SOLO_ADMIN, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
@@ -60,7 +61,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
   const favoritos = usuario ? favoritosDeSesion : [];
   const areas = construirAreas(plataformasPais);
-  const pestanasOcultas = usuario ? [...pestanasOcultasDe(usuario.afinado), ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN)] : [];
+  const pestanasOcultas = usuario
+    ? [
+        ...pestanasOcultasDe(usuario.afinado),
+        ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
+        // Los KPIs de atención son del CEO (módulo crm-direccion).
+        ...(usuario.modulos.includes(MODULO_DIRECCION) ? [] : ["/crm-dropshippers/kpis"]),
+      ]
+    : [];
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
 
   return (

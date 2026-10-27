@@ -537,7 +537,17 @@ export const GUIAS: GuiaModulo[] = [
           "Las fotos, audios, videos y documentos que mandan se ven ahí mismo. WhatsApp los guarda unos 30 días: lo importante, descárgalo o pásalo al caso.",
           "«Tomar» deja la conversación a tu cargo (sale en «Mías»); si nadie la llevaba, la toma sola quien responde. «Marcar resuelta» la saca de «Sin responder»; si el dropshipper vuelve a escribir, se reabre sola.",
           "A la derecha, el dropshipper: su estado, sus cuentas, sus casos abiertos y «Abrir su ficha». La conversación se enlaza sola con el dropshipper del CRM que tiene ese WhatsApp. Si dice «No está en el CRM», agrégalo o pon ese número en su ficha: queda enlazada con su próximo mensaje.",
-          "Quién ve qué: Atención (CRM Dropshippers) ve los números de Atención; Comercial (CRM comercial) ve también los suyos. Todo el historial queda guardado en el sistema, aunque un número se pierda.",
+          "Quién ve qué: Atención (CRM Dropshippers) ve los números de Atención; Comercial (CRM comercial) ve también los suyos; Dirección (CRM dirección, el CEO) ve todo, incluidos sus propios chats, que nadie más ve. Todo el historial queda guardado en el sistema, aunque un número se pierda.",
+          "Si el número sigue también en la app WhatsApp Business del celular (coexistencia), lo que se responde desde el celular aparece en la bandeja como «Desde el celular» y cuenta en los KPIs.",
+        ],
+      },
+      {
+        titulo: "KPIs de atención (CEO)",
+        pasos: [
+          "Pestaña «KPIs de atención» del CRM (/crm-dropshippers/kpis), solo para quien tiene «CRM: dirección (CEO)». Se elige el periodo: 7, 30 o 90 días.",
+          "Arriba: el tiempo de respuesta (mediana: desde que el dropshipper escribe hasta la primera respuesta), qué parte se respondió en 15 minutos, las consultas sin responder y las conversaciones.",
+          "Una consulta es el primer mensaje del dropshipper después de una respuesta del equipo: si manda tres mensajes seguidos cuenta como una. Las notas privadas no cuentan.",
+          "Debajo, lo mismo por número de WhatsApp, por persona del equipo (quién respondió y qué tan rápido) y por día.",
         ],
       },
       {
@@ -545,8 +555,8 @@ export const GUIAS: GuiaModulo[] = [
         pasos: [
           "Hace falta la API oficial de WhatsApp (WhatsApp Cloud API) de Meta: una app de Meta tipo Empresa con el producto WhatsApp, la cuenta de WhatsApp Business de la empresa y el número agregado ahí.",
           "En el servidor (Vercel) van cuatro datos, nunca en el código: WHATSAPP_TOKEN (token permanente de un usuario del sistema de Meta con permisos de WhatsApp), WHATSAPP_APP_SECRET (secreto de la app), WHATSAPP_VERIFY_TOKEN (una palabra que se inventa) y, si hace falta, WHATSAPP_API_VERSION.",
-          "En la app de Meta › WhatsApp › Configuración › Webhook: URL https://<dominio del sistema>/api/whatsapp/webhook, el mismo token de verificación, y suscribir el campo «messages».",
-          "El número aparece en la bandeja solo cuando llega su primer mensaje (con el nombre «WhatsApp +507…»); su nombre y su área (Atención o Comercial) se cambian en la base. La guía completa está en WHATSAPP-META.md.",
+          "En la app de Meta › WhatsApp › Configuración › Webhook: URL https://<dominio del sistema>/api/whatsapp/webhook, el mismo token de verificación, y suscribir el campo «messages» (y «smb_message_echoes» si el número sigue en la app del celular).",
+          "El número aparece en la bandeja solo cuando llega su primer mensaje (con el nombre «WhatsApp +507…»); su nombre y su área (Atención, Comercial o Dirección) se cambian en la base. La guía completa está en WHATSAPP-META.md.",
         ],
       },
       {
@@ -642,6 +652,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-27", titulo: "KPIs de atención y chats del CEO en el CRM", texto: "El CRM tiene una pestaña nueva, «KPIs de atención», para el CEO: tiempo de respuesta, cuánto se responde en 15 minutos, consultas sin responder y volumen por número, por persona y por día. Los números de WhatsApp pueden ser de un área nueva, Dirección, cuyos chats solo ve el CEO. Y si un número sigue también en la app del celular, lo que se responde desde ahí aparece en la bandeja.", modulo: "crm-dropshippers", href: "/crm-dropshippers/kpis" },
   { fecha: "2026-10-27", titulo: "Permisos más estrictos en Compras, WMS, WhatsApp y Notificaciones", texto: "Lo que se limita en Usuarios y roles ahora se respeta también en los rincones que faltaban: quien solo ve sus compras no abre el Tablero de Shen Zhen ni los pagos de compras ajenas; quien tiene «Monto» oculto no lo ve en «Copiar cotización» ni en la bitácora de Notificaciones; las fichas WMS, bodegas, ubicaciones y patrones de extractos respetan los países de cada persona; y en la bandeja de WhatsApp solo se escribe en el área donde se tiene permiso de edición. Con los roles de hoy nadie nota el cambio.", modulo: "usuarios", href: "/usuarios" },
   { fecha: "2026-10-27", titulo: "Actualizar datos retoma la actualización a medias", texto: "Si la página de «Actualizar datos» se cerró o se recargó mientras actualizaba, al volver a abrirla la retoma sola: vuelve la barra, se ve lo que está haciendo y guarda lo que ya se había leído. Mientras actualiza, el navegador pregunta antes de cerrar la página. La extensión pasa a 0.2.2: recárgala en chrome://extensions.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/actualizar" },
   { fecha: "2026-10-27", titulo: "Seguridad: arreglos de la auditoría", texto: "Instagram solo guarda lo que mandan las cuentas del equipo, y lo que llega desde un enlace pide confirmar antes de guardarse. La extensión «Ecomfive · Dropi» pasa a la versión 0.2.1: solo funciona en la página del sistema y solo sube al sistema. Hay que recargarla en Chrome (chrome://extensions, botón de recargar).", modulo: "instagram", href: "/instagram" },

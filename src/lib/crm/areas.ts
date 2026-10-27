@@ -3,13 +3,16 @@
  *  - Atención (módulo `crm-dropshippers`): casos, pedidos y sus propias notas.
  *  - Comercial (módulo `crm-comercial`): además sus notas privadas, sus seguimientos y la captación. Ve también lo de
  *    Atención.
+ *  - Dirección (módulo `crm-direccion`, el CEO, 27 oct 2026): sus propios chats, que nadie más ve, y además todo lo de
+ *    Comercial y Atención, más los KPIs de la bandeja.
  * Sin dependencias de servidor a propósito: se usa en acciones, páginas y en las pruebas.
  */
 
-export type AreaCrm = "comercial" | "atencion";
+export type AreaCrm = "direccion" | "comercial" | "atencion";
 
 export const MODULO_COMERCIAL = "crm-comercial";
 export const MODULO_ATENCION = "crm-dropshippers";
+export const MODULO_DIRECCION = "crm-direccion";
 
 export interface PermisosCrm {
   modulos: string[];
@@ -25,21 +28,29 @@ export interface AccesoCrm {
   comercial: boolean;
   /** Puede crear y editar en Comercial. */
   escribeComercial: boolean;
+  /** El CEO: ve todas las áreas, sus chats privados y los KPIs. */
+  direccion: boolean;
+  /** Puede escribir en los chats de Dirección. */
+  escribeDireccion: boolean;
 }
 
 export function accesoCrm(u: PermisosCrm): AccesoCrm {
   const atencion = u.modulos.includes(MODULO_ATENCION);
   const comercial = u.modulos.includes(MODULO_COMERCIAL);
+  const direccion = u.modulos.includes(MODULO_DIRECCION);
   return {
     atencion,
     escribeAtencion: atencion && !u.modulosSoloLectura.includes(MODULO_ATENCION),
     comercial,
     escribeComercial: comercial && !u.modulosSoloLectura.includes(MODULO_COMERCIAL),
+    direccion,
+    escribeDireccion: direccion && !u.modulosSoloLectura.includes(MODULO_DIRECCION),
   };
 }
 
-/** Áreas cuyo contenido puede ver esta persona. */
+/** Áreas cuyo contenido puede ver esta persona: Dirección ve las tres; Comercial, la suya y Atención; Atención, solo la suya. */
 export function areasVisibles(acceso: AccesoCrm): AreaCrm[] {
+  if (acceso.direccion) return ["direccion", "comercial", "atencion"];
   return acceso.comercial ? ["comercial", "atencion"] : ["atencion"];
 }
 
@@ -59,6 +70,7 @@ export function areaParaNota(acceso: AccesoCrm, pedida: string | null | undefine
  * Atención, en cualquiera de las dos (como `areaParaNota`). Auditoría del 27 oct 2026: antes bastaba escribir en alguna área.
  */
 export function escribeEnArea(acceso: AccesoCrm, area: AreaCrm): boolean {
+  if (area === "direccion") return acceso.escribeDireccion;
   return area === "comercial" ? acceso.escribeComercial : acceso.escribeAtencion || acceso.escribeComercial;
 }
 

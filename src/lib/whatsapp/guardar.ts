@@ -5,8 +5,9 @@ import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante
 /**
  * Guarda los mensajes que llegan por el webhook (migración 0158): cada uno en su conversación (número de la empresa + teléfono del
  * dropshipper), sin repetir los avisos que Meta manda dos veces, y enlazado con el dropshipper del CRM que tiene ese WhatsApp.
+ * Con `desdeCelular` son los que el equipo mandó desde la app del celular (coexistencia, migración 0164): se guardan como salientes.
  */
-export async function guardarEntrantes(mensajes: MensajeEntrante[]): Promise<void> {
+export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular = false): Promise<void> {
   if (!mensajes.length) return;
   const supabase = createServiceClient();
   // El dropshipper de cada teléfono: el CRM guarda el WhatsApp en formato internacional (src/lib/crm/telefono.ts).
@@ -15,11 +16,11 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[]): Promise<voi
   const dropshipperDe = new Map((data ?? []).map((d) => [d.contacto_telefono as string, d.id as string]));
   for (const m of [...mensajes].sort((a, b) => a.momento.localeCompare(b.momento))) {
     const telefono = normalizarTelefono(m.telefono)?.e164 ?? m.telefono;
-    const { error } = await supabase.rpc("whatsapp_registrar_entrante", {
+    const { error } = await supabase.rpc(desdeCelular ? "whatsapp_registrar_saliente_celular" : "whatsapp_registrar_entrante", {
       p_phone_number_id: m.phoneNumberId,
       p_numero: m.numeroEmpresa,
       p_telefono: telefono,
-      p_nombre_perfil: m.nombre,
+      ...(desdeCelular ? {} : { p_nombre_perfil: m.nombre }),
       p_dropshipper_id: dropshipperDe.get(telefono) ?? null,
       p_wa_id: m.waId,
       p_tipo: m.tipo,
@@ -30,7 +31,7 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[]): Promise<voi
       p_momento: m.momento,
       p_resumen: resumenMensaje(m.tipo, m.texto),
     });
-    if (error) console.error("WhatsApp: no se pudo guardar un mensaje", m.waId, error.message);
+    if (error) console.error(`WhatsApp: no se pudo guardar un mensaje${desdeCelular ? " mandado desde el celular" : ""}`, m.waId, error.message);
   }
 }
 

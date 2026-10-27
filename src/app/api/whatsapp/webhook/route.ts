@@ -39,12 +39,14 @@ export async function POST(request: Request) {
   } catch {
     return new NextResponse("Bad Request", { status: 400 });
   }
-  const { mensajes, estados } = extraerAviso(aviso);
-  if (mensajes.length || estados.length) {
+  const { mensajes, estados, ecos } = extraerAviso(aviso);
+  if (mensajes.length || estados.length || ecos.length) {
     after(async () => {
       await guardarEntrantes(mensajes);
+      // Lo que se respondió desde la app del celular (coexistencia), para que la bandeja y los KPIs lo cuenten.
+      await guardarEntrantes(ecos, true);
       await guardarEstados(estados);
     });
   }
-  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length });
+  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length });
 }

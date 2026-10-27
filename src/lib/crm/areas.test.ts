@@ -44,3 +44,13 @@ test("en la bandeja, con Comercial en solo lectura no se escribe en conversacion
   assert.equal(escribeEnArea(comercial, "comercial"), true);
   assert.equal(escribeEnArea(comercial, "atencion"), true);
 });
+
+test("Dirección (CEO) ve las tres áreas y solo ella escribe en la suya", () => {
+  const ceo = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial", "crm-direccion"], modulosSoloLectura: [] });
+  assert.deepEqual(areasVisibles(ceo), ["direccion", "comercial", "atencion"]);
+  assert.equal(escribeEnArea(ceo, "direccion"), true);
+  assert.equal(areasVisibles(comercial).includes("direccion"), false);
+  assert.equal(areasVisibles(atencion).includes("direccion"), false);
+  assert.equal(escribeEnArea(comercial, "direccion"), false);
+  assert.equal(escribeEnArea(atencion, "direccion"), false);
+});
