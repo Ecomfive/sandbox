@@ -83,8 +83,8 @@ test("estados de lo que mandó el equipo: en español, y el motivo si falló", (
 });
 
 test("lo que no es de WhatsApp o viene incompleto se ignora sin romper", () => {
-  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [] });
-  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [] });
+  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [], ecos: [] });
+  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [], ecos: [] });
   assert.deepEqual(extraerAviso(aviso({ metadata: {}, messages: [{ from: "1", id: "x", type: "text", text: { body: "hola" } }] })).mensajes, []);
   assert.deepEqual(extraerAviso(aviso({ metadata: META, messages: [{ id: "sin-remitente", type: "text" }] })).mensajes, []);
 });
@@ -98,4 +98,31 @@ test("la ventana de 24 h: cuánto queda desde el último mensaje del dropshipper
   assert.equal(textoVentana("2026-10-25T19:59:00Z", ahora), null);
   assert.match(errorEnEspanol(131047, "x"), /24 h/);
   assert.equal(errorEnEspanol(null, "Algo"), "WhatsApp no lo envió: Algo");
+});
+
+test("coexistencia: lo que el equipo manda desde el celular llega como eco, con el teléfono del dropshipper", () => {
+  const { mensajes, ecos } = extraerAviso({
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "WABA",
+        changes: [
+          {
+            field: "smb_message_echoes",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: META,
+              message_echoes: [{ from: "50760000000", to: "50761112233", id: "wamid.E", timestamp: "1793040060", type: "text", text: { body: "Sí, ya salió hoy." } }],
+            },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(mensajes.length, 0);
+  assert.equal(ecos.length, 1);
+  assert.equal(ecos[0].telefono, "+50761112233");
+  assert.equal(ecos[0].numeroEmpresa, "+50760000000");
+  assert.equal(ecos[0].texto, "Sí, ya salió hoy.");
+  assert.equal(ecos[0].waId, "wamid.E");
 });

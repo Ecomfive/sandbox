@@ -29,6 +29,17 @@ bloquear. Los nombres de los menús de Meta cambian seguido: si algo no se llama
    `WHATSAPP_VERIFY_TOKEN`. Meta la verifica en el momento. Luego, en «Campos del webhook», **suscribir `messages`**.
 7. **Publicar la app (modo Activo).** Con Instagram, en modo Desarrollo se verificaba el webhook pero no llegaban mensajes reales.
 
+## Varios números y coexistencia (27 oct 2026)
+
+- Se pueden conectar varios números a la misma cuenta (2 sin verificar el negocio, unos 20 con el negocio verificado). Cada uno entra
+  solo con su primer mensaje; después se le pone nombre y área (`atencion`, `comercial` o `direccion`) en `whatsapp_numeros`:
+  `update whatsapp_numeros set nombre = 'CEO', area = 'direccion' where numero = '+507…';`
+- **Coexistencia** (el número sigue en la app WhatsApp Business del celular y además en la API; disponible en Panamá): se conecta
+  por el registro integrado de Meta (Embedded Signup), escaneando un código desde la app. Requisitos: app Business 2.24.17 o más nueva
+  y abrirla al menos cada 14 días. En el webhook, suscribir también **`smb_message_echoes`**: así lo que se responde desde el celular
+  llega a la bandeja como «Desde el celular» (migración 0164) y cuenta en los KPIs. El historial que Meta importa al conectar
+  (campo `history`) todavía no se guarda.
+
 ## Cómo saber que funciona
 
 - Escribirle al número desde otro WhatsApp: la conversación aparece en la bandeja en segundos (se refresca cada 8 s).

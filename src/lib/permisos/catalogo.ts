@@ -52,6 +52,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     modulos: [
       { clave: "crm-dropshippers", etiqueta: "CRM Dropshippers" },
       { clave: "crm-comercial", etiqueta: "CRM: área comercial" },
+      { clave: "crm-direccion", etiqueta: "CRM: dirección (CEO)" },
     ],
   },
   {

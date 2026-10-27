@@ -929,6 +929,11 @@ convenciones técnicas del código.
   Fotos, audios y documentos se sirven por `/api/whatsapp/media/[id]` (id del mensaje, revisa el área; Meta los guarda ~30 días:
   copiarlos a Storage es pendiente). La bandeja (`bandeja.tsx`) se refresca cada 8 s con la pestaña visible. Guía de Meta:
   [WHATSAPP-META.md](WHATSAPP-META.md). Boceto del rediseño del CRM: https://claude.ai/artifact/KsHUH4WKPkcFpqYsdFjESf
+  **Dirección y KPIs** (migración 0164, 27 oct 2026): área `direccion` (módulo `crm-direccion`, el CEO) para números cuyos chats solo ve
+  él; `areasVisibles` le da las tres áreas. Coexistencia: el webhook guarda los `smb_message_echoes` (lo mandado desde la app del celular)
+  como salientes con `whatsapp_registrar_saliente_celular` (autor «Desde el celular»). Pestaña **KPIs de atención**
+  (`/crm-dropshippers/kpis`, oculta sin `crm-direccion` en el layout): la función `whatsapp_kpis(p_desde, p_areas)` devuelve por número,
+  por persona y por día las consultas (primer entrante tras un saliente), sin responder y la mediana hasta la primera respuesta.
 - **CRM Dropshippers rediseñado** (26 oct 2026, al estilo de Gestión de IDs Dropi). `/crm-dropshippers` es la lista
   (`lista-dropshippers.tsx`): `TableroCrm` (`tablero-crm.tsx`, tarjetas que cuentan y filtran con atajos sobre `DEF_DROPSHIPPERS`,
   colores `COLORES` del tablero de Gestión de IDs), `ListaDatos` con `FilaDropshipperLista` (`fila-dropshipper.tsx`) y la ficha en
