@@ -207,24 +207,31 @@ export const CURSOS: Curso[] = [
   {
     id: "publicaciones-dropi",
     titulo: "Gestión de IDs Dropi",
-    descripcion: "Las publicaciones de Ecomfive en Dropi: tablero de acciones, margen, revisión y vínculo con Producto.",
+    descripcion: "Las publicaciones de Ecomfive en Dropi: tablero de acciones, margen, archivar o pausar sin stock y vínculo con Producto.",
     modulo: "publicaciones-dropi",
-    minutos: 7,
+    minutos: 9,
     lecciones: [
       {
         titulo: "La lista y el tablero de acciones",
         parrafos: [
           "Cada fila es un producto que Ecomfive tiene publicado en Dropi como proveedor, en el país de la barra de arriba, con su foto, su ID de Dropi, su SKU y su número propio (PUB-0001…), que es distinto al ID de Dropi y no cambia.",
-          "La lista arranca agrupada por estado: Producto nuevo, Revisar precio y venta, Verificar con dropshipper, Validar bajar precio, Bajar precio y Al día. Los archivados se ven con el botón «Archivados».",
-          "Arriba, el tablero de acciones cuenta lo que espera una decisión (los estados del flujo, Revisión vencida, Margen bajo, Sin vincular producto y Sin stock). Pulsa una tarjeta para filtrar la lista y otra vez para quitar el filtro.",
+          "Ya no hay estados que marcar a mano: lo que necesita cada publicación lo calcula el sistema (margen bajo, ventas en caída, competidor más barato, republicar, sin stock…). Los archivados se ven con el botón «Archivados».",
+          "Arriba, el tablero de acciones cuenta lo que espera una decisión (Margen bajo, Ventas en caída, Competidor más barato, Republicar, Sin vincular producto, Sin stock, Poco stock, Pausadas sin stock…). Pulsa una tarjeta para filtrar la lista y otra vez para quitar el filtro.",
         ],
       },
       {
-        titulo: "Margen y revisión",
+        titulo: "Margen y ficha",
         parrafos: [
           "La utilidad bruta es el precio de venta menos el costo de producto y el fulfillment; el margen bruto es esa utilidad dividida entre el precio. Se calculan solos, y un punto rojo avisa que el margen está por debajo de 30 %.",
-          "Cada producto se revisa cada 28 días: la próxima revisión sale de la última y un punto ámbar avisa que ya pasó. El filtro «Revisión vencida» muestra lo que toca revisar.",
-          "En la ficha cambias el estado, el precio y los costos, la venta, dónde está, la reposición, la privatización y las notas, y guardas con «Guardar cambios». Si cambias el precio, «Último cambio de precio» pasa a hoy.",
+          "En la ficha cambias el nombre en Dropi, el precio y los costos, el Estado y el Tipo, y guardas con «Guardar cambios». Lo que cambia algo en Dropi (nombre, precio, archivar…) queda pendiente y se aplica con el favorito «Aplicar en Dropi»; mientras Dropi no se haya tocado, se puede deshacer. Lo que se quiera anotar va como comentario en la Actividad.",
+        ],
+      },
+      {
+        titulo: "Archivar, pausar y los botones de cada fila",
+        parrafos: [
+          "Una publicación con ID de Dropi no se elimina: se archiva. Cada fila tiene siempre los mismos cinco botones, en este orden: Republicar, Privatizar, Apagar, Pausar y Archivar. El que no se puede usar se ve apagado y, al pasar el cursor, dice por qué.",
+          "Si una publicación se queda sin stock, puedes archivarla del todo o pausarla con «Pausar por falta de stock». En Dropi las dos la archivan (la competencia no ve que se agotó), pero la pausada sigue a la vista en la tarjeta «Pausadas sin stock».",
+          "Cuando Dropi le vuelve a ver unidades a una pausada, la fila dice «Volvió el stock: reactivar» en verde: el botón de pausa pasa a «Reactivar» y la saca de Archivados.",
         ],
       },
       {
@@ -240,6 +247,8 @@ export const CURSOS: Curso[] = [
       { pregunta: "¿Qué es el número PUB-0001 de una publicación?", opciones: ["El ID que pone Dropi", "Un número propio del sistema, distinto al ID de Dropi, que no cambia", "El SKU del producto"], correcta: 1 },
       { pregunta: "¿Qué indica el punto rojo en el margen bruto?", opciones: ["Que el margen está por debajo de 30 %", "Que no tiene stock", "Que la revisión está vencida"], correcta: 0 },
       { pregunta: "Una publicación «2x1» se vincula con…", opciones: ["El producto simple", "Su compuesto en Producto", "Ningún producto"], correcta: 1 },
+      { pregunta: "Una publicación se quedó sin stock y no quieres que la competencia lo vea, pero la vas a reponer. ¿Qué haces?", opciones: ["La elimino", "La pauso con «Pausar por falta de stock»", "La dejo activa con 0 unidades"], correcta: 1 },
+      { pregunta: "Un botón de la fila se ve apagado. ¿Cómo sabes por qué?", opciones: ["Pasando el cursor sobre él", "Preguntando a un administrador", "No se puede saber"], correcta: 0 },
       { pregunta: "¿Cómo ves lo que espera una decisión?", opciones: ["Pulsando una tarjeta del tablero de acciones", "Descargando la lista", "Abriendo cada ficha una por una"], correcta: 0 },
     ],
   },
