@@ -249,6 +249,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     supabase.from("dropi_publicaciones").select("id, duplicada_de").eq("pais_id", paisId).not("duplicada_de", "is", null).order("id").range(desde, hasta),
   );
   const duplicadaDe = new Map(duplicadasR.error ? [] : (duplicadasR.data ?? []).map((n) => [n.id, n.duplicada_de as string]));
+  // Las pausadas por falta de stock (migración 0165) van aparte, igual: sin la migración, ninguna.
+  const pausadasR = await traerTodasConError<{ id: string; pausada_en: string | null }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones").select("id, pausada_en").eq("pais_id", paisId).not("pausada_en", "is", null).order("id").range(desde, hasta),
+  );
+  const pausadaEn = new Map(pausadasR.error ? [] : (pausadasR.data ?? []).map((n) => [n.id, n.pausada_en as string]));
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
@@ -389,6 +394,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       archivadoPendiente: cambiosDropi.archivando.has(d.id as string) ? (cambiosDropi.archivando.get(d.id as string) ? "restaurar" : "archivar") : null,
       privatizaciones: cambiosDropi.privatizando.get(d.id as string) ?? [],
       duplicadaDe: null,
+      pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       grupo: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.

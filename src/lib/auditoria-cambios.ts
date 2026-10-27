@@ -56,6 +56,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   scraping_volver_a_lista: "Lo devolvió a la lista de Scraping",
   marcar_publicacion_duplicada: "La marcó como duplicada",
   desarchivar_publicacion_dropi: "Sacó la publicación de Archivados",
+  pausar_publicacion_dropi: "Pausó la publicación por falta de stock (archivada en Dropi)",
+  reactivar_publicacion_dropi: "Reactivó la publicación pausada (fuera de Archivados)",
   vincular_sku_publicacion: "Vinculó el producto",
   desvincular_sku_publicacion: "Quitó el producto vinculado",
   generar_imagen_landing: "Generó una imagen con Gemini",

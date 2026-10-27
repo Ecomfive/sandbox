@@ -486,6 +486,26 @@ export function ArchivarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Pausar: dos barras dentro de un círculo, para «Pausar por falta de stock» (archivada en Dropi mientras se repone). */
+export function PausaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 9v6M14 9v6" />
+    </Icon>
+  );
+}
+
+/** Reactivar: un triángulo de «seguir» dentro de un círculo, para sacar de Archivados una publicación pausada. */
+export function ReactivarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.5v7l5.5-3.5z" />
+    </Icon>
+  );
+}
+
 /** Deshacer: una flecha curva que vuelve hacia atrás. */
 export function DeshacerIcon(props: SVGProps<SVGSVGElement>) {
   return (

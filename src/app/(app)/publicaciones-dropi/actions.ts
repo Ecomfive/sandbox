@@ -15,7 +15,7 @@ import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosC
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
-import { MOTIVO_SIN_STOCK, sinStockParaArchivar } from "@/lib/publicaciones/archivar";
+import { MOTIVO_CON_STOCK, MOTIVO_SIN_STOCK, sinStockParaArchivar } from "@/lib/publicaciones/archivar";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -617,6 +617,20 @@ export async function vincularSkuPublicacion(id: string, skuId: string | null): 
  * desde la lista de cambios pendientes. Una publicación sin ID de Dropi, o que aún no se publica, solo cambia en el sistema.
  */
 export async function archivarPublicacion(id: string, archivar: boolean): Promise<{ error?: string; detalle?: string }> {
+  return archivarOPausar(id, archivar === true, false);
+}
+
+/**
+ * «Pausar por falta de stock» (pedido de Alcides, 27 oct 2026; migración 0165): una publicación sin stock no se archiva, pero se pausa. En
+ * Dropi es lo mismo que «Archivar» (pendiente para «Aplicar en Dropi», para que la competencia no vea que se agotó); en el sistema queda en
+ * Archivados con `pausada_en`, y la tarjeta «Pausadas sin stock» la sigue mostrando, con aviso cuando Dropi le vuelve a ver unidades. Se
+ * reactiva con «Sacar de Archivados».
+ */
+export async function pausarPublicacion(id: string): Promise<{ error?: string; detalle?: string }> {
+  return archivarOPausar(id, true, true);
+}
+
+async function archivarOPausar(id: string, archivar: boolean, pausar: boolean): Promise<{ error?: string; detalle?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
@@ -630,8 +644,18 @@ export async function archivarPublicacion(id: string, archivar: boolean): Promis
   const estadoAntes = { estado: (antes.estado as string | null) ?? null, estado_publicacion: (antes.estado_publicacion as string | null) ?? null };
   // Una «Sin publicar» se archiva sin dejar de ser un borrador (al sacarla de Archivados vuelve a estar sin publicar, no «Activa»).
   const esBorrador = antes.estado_publicacion === "borrador";
-  // Sin stock en Dropi no se archiva (pedido de Hernán, 27 oct 2026); sacar de Archivados siempre se puede.
-  if (archivar && !esBorrador && (await sinStockEnDropi(antes.pais_id, (antes.dropi_id as string | null) ?? null))) return { error: MOTIVO_SIN_STOCK };
+  if (pausar) {
+    // Se pausa solo lo que ya está en Dropi y se quedó sin stock; con stock, es «Archivar».
+    if (esBorrador || !String(antes.dropi_id ?? "").trim()) return { error: "Solo se pausa una publicación que ya está en Dropi." };
+    if (antes.estado === "archivado" || antes.estado_publicacion === "archivado") return { error: "Ya está en Archivados." };
+    if (!(await sinStockEnDropi(antes.pais_id, (antes.dropi_id as string | null) ?? null))) return { error: MOTIVO_CON_STOCK };
+    const marca = await supabase.from("dropi_publicaciones").update({ pausada_en: new Date().toISOString() }).eq("id", id);
+    if (marca.error) return { error: "Falta correr en Supabase la migración 0165." };
+  } else if (archivar && !esBorrador && (await sinStockEnDropi(antes.pais_id, (antes.dropi_id as string | null) ?? null))) {
+    // Sin stock en Dropi no se archiva (pedido de Hernán, 27 oct 2026): se pausa. Sacar de Archivados siempre se puede.
+    return { error: MOTIVO_SIN_STOCK };
+  }
+  const estabaPausada = !!antes.pausada_en;
   let cambios: Record<string, string | null> = archivar
     ? esBorrador
       ? { estado: "archivado" }
@@ -648,15 +672,18 @@ export async function archivarPublicacion(id: string, archivar: boolean): Promis
       cambios = { estado: r.cancelo.estado ?? (archivar ? "archivado" : "al_dia"), estado_publicacion: r.cancelo.estado_publicacion ?? (archivar ? "archivado" : "activo") };
       detalle = "Se canceló el cambio que esperaba para Dropi: Dropi no se tocó.";
     } else {
-      detalle = `${archivar ? "Archivar" : "Sacar de Archivados"} queda pendiente en Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
+      detalle = `${pausar ? "Pausar (archivar en Dropi)" : archivar ? "Archivar" : estabaPausada ? "Reactivar (sacar de Archivados)" : "Sacar de Archivados"} queda pendiente en Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
       if (!r.yaEstaba)
         await registrarAuditoria({ accion: archivar ? "dropi_archivar_pendiente" : "dropi_restaurar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${dropi}: pendiente para «Aplicar en Dropi»` });
     }
   }
   const { error } = await supabase.from("dropi_publicaciones").update({ ...cambios, actualizado_en: new Date().toISOString() }).eq("id", id);
-  if (error) return { error: archivar ? "No se pudo archivar la publicación." : "No se pudo sacar de Archivados." };
+  if (error) return { error: pausar ? "No se pudo pausar la publicación." : archivar ? "No se pudo archivar la publicación." : "No se pudo sacar de Archivados." };
+  // Pausada es «con `pausada_en` y en Archivados»: al sacarla deja de contar sola (y si se deshace, vuelve a contar). Archivarla del todo
+  // le quita la marca.
+  if (archivar && !pausar && estabaPausada) await supabase.from("dropi_publicaciones").update({ pausada_en: null }).eq("id", id);
   await registrarAuditoria({
-    accion: archivar ? "archivar_publicacion_dropi" : "desarchivar_publicacion_dropi",
+    accion: pausar ? "pausar_publicacion_dropi" : archivar ? "archivar_publicacion_dropi" : estabaPausada ? "reactivar_publicacion_dropi" : "desarchivar_publicacion_dropi",
     entidad: "dropi_publicaciones",
     entidadId: id,
     detalle: `${antes.nombre}${antes.dropi_id ? ` · ID Dropi ${antes.dropi_id}` : ""}`,

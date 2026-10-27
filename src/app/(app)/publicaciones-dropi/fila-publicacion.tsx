@@ -5,19 +5,19 @@ import { useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ArchivarIcon, ChevronRightIcon, DropiIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, ChevronRightIcon, DropiIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
-import { archivarPublicacion, republicarPublicacion } from "./actions";
+import { archivarPublicacion, pausarPublicacion, republicarPublicacion } from "./actions";
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
-import { conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, noSeArchivaSinStock, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
@@ -68,22 +68,37 @@ function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: st
 
 /**
  * «Archivar» de la fila (o «Sacar de Archivados» si ya lo está). Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se
- * archiva, y se puede deshacer.
+ * archiva, y se puede deshacer. Sin stock no se archiva: se pausa (27 oct 2026), y una pausada se reactiva con el mismo botón.
  */
 function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
   const archivar = !f.archivada;
-  // Sin stock en Dropi no se archiva (27 oct 2026): el botón queda apagado, pero recibe el clic y el foco para decir por qué.
-  const sinStock = archivar && noSeArchivaSinStock(f);
+  const pausar = archivar && puedePausar(f);
+  const estaPausada = pausada(f);
+  const reactivarYa = paraReactivar(f);
+  // Sin stock y sin poder pausarse (sin ID, por ejemplo): el botón queda apagado, pero recibe el clic y el foco para decir por qué.
+  const sinStock = archivar && !pausar && noSeArchivaSinStock(f);
   function cambiar() {
     if (sinStock) return mostrarToast(MOTIVO_SIN_STOCK, "destructive");
     empezar(async () => {
-      const r = await archivarPublicacion(f.id, archivar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
-      mostrarToast(r.error ?? r.detalle ?? (archivar ? "Publicación archivada" : "Publicación fuera de Archivados"), r.error ? "destructive" : undefined);
+      const r = await (pausar ? pausarPublicacion(f.id) : archivarPublicacion(f.id, archivar)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const hecho = pausar ? "Publicación pausada" : archivar ? "Publicación archivada" : estaPausada ? "Publicación reactivada" : "Publicación fuera de Archivados";
+      mostrarToast(r.error ?? r.detalle ?? hecho, r.error ? "destructive" : undefined);
     });
   }
-  const texto = sinStock ? "Sin stock: no se archiva" : archivar ? "Archivar publicación" : "Sacar de Archivados";
+  const texto = sinStock
+    ? "Sin stock: no se archiva"
+    : pausar
+      ? "Pausar por falta de stock"
+      : archivar
+        ? "Archivar publicación"
+        : estaPausada
+          ? reactivarYa
+            ? "Reactivar: volvió el stock"
+            : "Reactivar publicación"
+          : "Sacar de Archivados";
+  const Icono = pausar ? PausaIcon : estaPausada ? ReactivarIcon : ArchivarIcon;
   return (
     <Tooltip texto={texto}>
       <button
@@ -92,9 +107,11 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
         disabled={pendiente}
         aria-disabled={sinStock || undefined}
         aria-label={`${texto}: ${f.nombre}`}
-        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors disabled:opacity-50 ${sinStock ? "cursor-not-allowed opacity-40" : "hover:bg-muted hover:text-foreground"} ${anilloFoco}`}
+        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${
+          sinStock ? "cursor-not-allowed text-muted-foreground opacity-40" : reactivarYa ? "text-success hover:bg-success-soft" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        } ${anilloFoco}`}
       >
-        <ArchivarIcon className="h-4 w-4" />
+        <Icono className="h-4 w-4" />
       </button>
     </Tooltip>
   );
@@ -285,10 +302,16 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {f.publicarPendiente ? "Publicación pendiente" : "Sin publicar"}
               </span>
             )}
+            {pausada(f) && (
+              <span className={`inline-flex items-center gap-1.5 font-medium ${paraReactivar(f) ? "text-success" : ""}`}>
+                <Punto clase={paraReactivar(f) ? "bg-success" : "bg-azul"} texto={paraReactivar(f) ? "Volvió el stock" : "Pausada por falta de stock"} />
+                {paraReactivar(f) ? "Volvió el stock: reactivar" : "Pausada sin stock"}
+              </span>
+            )}
             {f.archivadoPendiente && !f.apagadoPendiente && (
               <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
                 <Punto clase="bg-destructive" texto="Pendiente en Dropi" />
-                {f.archivadoPendiente === "restaurar" ? "Salir de Archivados pendiente" : "Archivar pendiente"}
+                {f.archivadoPendiente === "restaurar" ? (pausada(f) ? "Reactivar pendiente" : "Salir de Archivados pendiente") : pausada(f) ? "Pausar pendiente" : "Archivar pendiente"}
               </span>
             )}
             {f.apagadoPendiente && (
