@@ -5,7 +5,7 @@
 // Sin base ni red.
 
 /** Quién ve «Actualizar Dropi» mientras se prueba («que solo me aparezca a mí por ahora», Hernán, 26 oct 2026). */
-export const CORREOS_ACTUALIZAR_DROPI = ["hernan@ecomfive.io"];
+export const CORREOS_ACTUALIZAR_DROPI = ["hernan@ecomfive.io", "aandrade@ecomfive.io"];
 export const puedeActualizarDropi = (u: { email: string | null | undefined }) => CORREOS_ACTUALIZAR_DROPI.includes(String(u.email ?? "").trim().toLowerCase());
 
 export type CodigoPaisDropi = "pa" | "mx";
