@@ -7,12 +7,12 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ActualizarIcon, AnalisisCompetenciaIcon, PausaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 const tiposDe = (g: GrupoRecomendacion) => TIPOS_RECOMENDACION.filter((t) => t.grupo === g).map((t) => t.valor);
-import { DEF_PUBLICACIONES, POCO_STOCK, estadoVinculo, paraReactivar, pausada, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, POCO_STOCK, estadoVinculo, paraReactivar, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
@@ -125,8 +125,15 @@ const TARJETAS: Tarjeta[] = [
     titulo: "Sin stock",
     icono: InventarioIcon,
     color: "rojo",
-    detalle: "Activas en Dropi con 0 unidades",
+    detalle: "Activas en Dropi con 0 unidades, y las pausadas",
+    // Cuenta también las pausadas por falta de stock, que están archivadas en Dropi (27 oct 2026).
+    todas: true,
     cuenta: (f) => sinStock(f),
+    extra: (todas) => {
+      const n = todas.filter(paraReactivar).length;
+      return n ? `${n.toLocaleString("es-PA")} pausadas para reactivar: volvió el stock` : null;
+    },
+    extraColor: "verde",
     // De las que no tienen stock, cuántas ya tienen mercancía en camino: va junto al número, «9 / 6 en camino».
     junto: (abiertas) => ({ n: abiertas.filter((f) => sinStock(f) && f.enCamino > 0).length, texto: "en camino", color: "verde" }),
     atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: activas en Dropi sin stock", filtro: seleccion("sinStock", "si") },
@@ -141,30 +148,6 @@ const TARJETAS: Tarjeta[] = [
     cuenta: (f) => pocoStock(f),
     junto: (abiertas) => ({ n: abiertas.filter((f) => pocoStock(f) && f.enCamino > 0).length, texto: "en camino", color: "verde" }),
     atajo: { id: "poco-stock", etiqueta: "Poco stock", ayuda: `Filtrar la lista: venden y tienen menos de ${POCO_STOCK} unidades`, filtro: seleccion("pocoStock", "si") },
-  },
-  {
-    id: "pausadas",
-    // Las pausadas por falta de stock (27 oct 2026, pedido de Alcides): archivadas en Dropi para que la competencia no vea que se agotaron,
-    // pero a la vista hasta reponerlas. Junto al número, en verde, las que Dropi ya ve con unidades: hay que reactivarlas.
-    titulo: "Pausadas sin stock",
-    icono: PausaIcon,
-    color: "azul",
-    detalle: "Archivadas en Dropi mientras se reponen",
-    todas: true,
-    cuenta: (f) => pausada(f),
-    junto: (todas) => ({ n: todas.filter(paraReactivar).length, texto: "para reactivar", color: "verde" }),
-    extra: (todas) => {
-      const n = todas.filter((f) => pausada(f) && !paraReactivar(f) && f.enCamino > 0).length;
-      return n ? `${n.toLocaleString("es-PA")} con mercancía en camino` : null;
-    },
-    extraColor: "verde",
-    atajo: {
-      id: "pausadas",
-      etiqueta: "Pausadas sin stock",
-      ayuda: "Filtrar la lista: pausadas por falta de stock",
-      filtro: seleccion("pausada", "reactivar", "pausada"),
-      ademas: [seleccion("publicacion", "archivado")],
-    },
   },
 ];
 
