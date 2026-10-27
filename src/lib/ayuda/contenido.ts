@@ -64,6 +64,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Ventas estimadas", definicion: "En Scraping de proveedores: lo que bajó el stock de un producto de otro proveedor entre una búsqueda y la siguiente, sumado en 30 (o 7) días. Dropi no muestra las ventas de otros proveedores, así que es una estimación; una subida de stock es una reposición y no cuenta.", modulos: ["scraping-proveedores"] },
   { termino: "Bodega en Dropi", definicion: "Dónde guarda Dropi el stock de un producto nuestro: «Proveedor Ecomfive» (nuestra bodega) o «Bodega Dropi Panamá» (la de Dropi; esos productos llevan «(B280)» en el nombre). Cada bodega tiene un código con su ID de Dropi: B81 = Proveedor Ecomfive, B280 = Bodega Dropi Panamá. Sale de «Mis productos» de Dropi y se ve en Gestión de IDs Dropi junto al ID de cada producto, con las unidades de cada bodega.", modulos: ["publicaciones-dropi"] },
   { termino: "PUB-0001", definicion: "El número propio que el sistema le pone a cada publicación de Dropi. Es distinto al ID de Dropi y no cambia: sirve para buscarla y nombrarla.", modulos: ["publicaciones-dropi"] },
+  { termino: "Tiempo activo", definicion: "En Rendimiento del equipo: los minutos de un día en que la persona estaba usando el sistema (mouse o teclado en los últimos 5 minutos, con la pestaña a la vista). Un hueco de más de 5 minutos cuenta como pausa.", modulos: ["rendimiento"] },
   { termino: "Pausada sin stock", definicion: "En Gestión de IDs Dropi: una publicación que se quedó sin stock y se archivó en Dropi con «Pausar por falta de stock» (la competencia no ve que se agotó) pero que el sistema sigue mostrando en la lista y en la tarjeta «Sin stock» hasta reponerla. Cuando Dropi le vuelve a ver unidades dice «Volvió el stock: reactivar» y se reactiva con un clic.", modulos: ["publicaciones-dropi"] },
   { termino: "En Dropi sin publicación", definicion: "En Gestión de IDs Dropi: un producto activo en nuestra cuenta de Dropi que no es de ninguna publicación del sistema (alguien lo publicó o republicó directo en Dropi). Se ve en la lista que abre «N productos en Dropi sin publicación», donde se le crea su publicación o se vincula a una que todavía no tiene ID.", modulos: ["publicaciones-dropi"] },
   { termino: "Portal del proveedor", definicion: "El portal donde Shen Zhen (proveedor y agente) ve sus compras sin entrar al sistema: cotiza, sube fotos, marca envíos y anota los pagos que recibe y su llegada, en chino. Desde Ecomfive se ve en Compras › Tablero de Shen Zhen.", modulos: ["compras"] },
@@ -609,6 +610,30 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "rendimiento",
+    titulo: "Rendimiento del equipo",
+    ruta: "/rendimiento",
+    resumen: "La jornada de cada persona en el sistema: a qué hora empezó y terminó, cuánto tiempo estuvo activa, sus pausas y qué hizo en cada hora. Solo la ven los administradores.",
+    secciones: [
+      {
+        titulo: "Cómo se mide",
+        pasos: [
+          "Mientras una persona tiene el sistema abierto y lo está usando (mouse o teclado en los últimos 5 minutos, con la pestaña a la vista), cada minuto queda anotado con la página en que estaba. Varias pestañas en el mismo minuto cuentan una vez.",
+          "Entrada es el primer minuto (o la primera acción) del día y salida el último; tiempo activo son los minutos anotados. Un hueco de más de 5 minutos es una pausa.",
+          "Lo que hizo sale de lo que guardó en el sistema (la misma actividad de las fichas): cambios, archivos, vínculos, comentarios que dejan registro…",
+          "El tiempo trabajando fuera del sistema (dentro de Dropi, WhatsApp u otra pestaña) todavía no se cuenta. Se mide desde el 27 oct 2026: antes no hay datos.",
+        ],
+      },
+      {
+        titulo: "Uso",
+        pasos: [
+          "Arriba se elige el día (Día anterior, Día siguiente, Hoy o una fecha). La tabla «El equipo» trae a cada persona con su entrada, salida, tiempo activo, pausas, acciones y la página donde pasó más tiempo; las que no usaron el sistema salen al final, en gris.",
+          "Pulsa un nombre para ver su día hora por hora: cuántos minutos estuvo activa, en qué páginas y qué guardó (con la hora de cada cosa), y la lista de sus pausas.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "puestos",
     titulo: "Puestos y organigrama",
     ruta: "/puestos",
@@ -648,6 +673,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-27", titulo: "Nuevo: Rendimiento del equipo", texto: "En Equipo › Rendimiento, los administradores ven la jornada de cada persona en el sistema: entrada, salida, tiempo activo, pausas y qué hizo en cada hora (páginas y lo que guardó). Se mide desde hoy.", modulo: "rendimiento", href: "/rendimiento" },
   { fecha: "2026-10-27", titulo: "KPIs de atención y chats del CEO en el CRM", texto: "El CRM tiene una pestaña nueva, «KPIs de atención», para el CEO: tiempo de respuesta, cuánto se responde en 15 minutos, consultas sin responder y volumen por número, por persona y por día. Los números de WhatsApp pueden ser de un área nueva, Dirección, cuyos chats solo ve el CEO. Y si un número sigue también en la app del celular, lo que se responde desde ahí aparece en la bandeja.", modulo: "crm-dropshippers", href: "/crm-dropshippers/kpis" },
   { fecha: "2026-10-27", titulo: "Permisos más estrictos en Compras, WMS, WhatsApp y Notificaciones", texto: "Lo que se limita en Usuarios y roles ahora se respeta también en los rincones que faltaban: quien solo ve sus compras no abre el Tablero de Shen Zhen ni los pagos de compras ajenas; quien tiene «Monto» oculto no lo ve en «Copiar cotización» ni en la bitácora de Notificaciones; las fichas WMS, bodegas, ubicaciones y patrones de extractos respetan los países de cada persona; y en la bandeja de WhatsApp solo se escribe en el área donde se tiene permiso de edición. Con los roles de hoy nadie nota el cambio.", modulo: "usuarios", href: "/usuarios" },
   { fecha: "2026-10-27", titulo: "Actualizar datos retoma la actualización a medias", texto: "Si la página de «Actualizar datos» se cerró o se recargó mientras actualizaba, al volver a abrirla la retoma sola: vuelve la barra, se ve lo que está haciendo y guarda lo que ya se había leído. Mientras actualiza, el navegador pregunta antes de cerrar la página. La extensión pasa a 0.2.2: recárgala en chrome://extensions.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/actualizar" },

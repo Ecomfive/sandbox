@@ -30,5 +30,6 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/analisis-competencia": "analisis-competencia",
   "/usuarios": "usuarios",
   "/puestos": "puestos",
+  "/rendimiento": "rendimiento",
   "/notificaciones": "notificaciones",
 };
