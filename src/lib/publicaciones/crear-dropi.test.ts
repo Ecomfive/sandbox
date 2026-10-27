@@ -51,7 +51,7 @@ test("lo que Dropi exige: nada falta cuando todo está", () => {
 
 test("lo que Dropi exige: cada dato obligatorio avisa cuando falta", () => {
   const f = faltantesCrearDropi(datosCrearVacios());
-  for (const parte of [/nombre/, /peso/, /largo/, /ancho/, /alto/, /categor/, /descripci/, /precio de venta/, /precio sugerido/, /bodega/, /im[aá]genes/]) {
+  for (const parte of [/nombre/, /SKU/, /peso/, /largo/, /ancho/, /alto/, /categor/, /descripci/, /precio de venta/, /precio sugerido/, /bodega/, /im[aá]genes/]) {
     assert.ok(f.some((m) => parte.test(m)), `debería avisar ${parte}: ${f.join(" | ")}`);
   }
 });
@@ -68,6 +68,9 @@ test("lo que Dropi exige: límites del peso, de la descripción, del stock, de l
   assert.match(con({ precio: 0.05, precioSugerido: 0.05 }).join(), /precio de venta/);
   assert.match(con({ precio: 10, precioSugerido: 9 }).join(), /sugerido no puede ser menor/);
   assert.match(con({ nombre: "x".repeat(41) }).join(), /40 caracteres/);
+  // El SKU es obligatorio aquí (27 oct 2026): es el código del producto vinculado.
+  assert.match(con({ sku: null }).join(), /Falta el SKU/);
+  assert.match(con({ sku: "  " }).join(), /Falta el SKU/);
 });
 
 test("el texto de la descripción se cuenta sin etiquetas", () => {
@@ -126,7 +129,7 @@ test("no se crea: con datos que faltan, con una categoría que Dropi no tiene o 
 });
 
 test("el favorito arma exactamente lo mismo que el sistema", () => {
-  const casos: DatosCrearDropi[] = [completo, { ...completo, nombreGuia: null, sku: null, codigoBarras: "7501031311309" }, { ...completo, categorias: ["Belleza", "Salud y Bienestar"] }, { ...completo, categorias: ["Mascotas"] }, { ...completo, bodegas: [{ id: 280, unidades: 120 }] }];
+  const casos: DatosCrearDropi[] = [completo, { ...completo, nombreGuia: null, codigoBarras: "7501031311309" }, { ...completo, categorias: ["Belleza", "Salud y Bienestar"] }, { ...completo, categorias: ["Mascotas"] }, { ...completo, bodegas: [{ id: 280, unidades: 120 }] }];
   for (const d of casos) {
     const sistema = armarProductoCrear(d, 2094, bp, categorias);
     igual(delFavorito.nuevoProducto(d, 2094, bp, categorias), sistema);
