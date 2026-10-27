@@ -26,8 +26,7 @@ import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, pausarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
-import { conexionDropi, noSeArchivaSinStock, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
-import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
+import { conexionDropi, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { AvisoEnCamino, VentasEnDropi } from "./ventas-publicacion";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
@@ -264,9 +263,8 @@ function ContenidoFicha({
   const conectado = p.dropiId.trim() !== "";
   const idBloqueado = conectado && !editandoId;
   // Sin stock en Dropi no se archiva (27 oct 2026): «Archivar» queda apagado y, al pulsarlo, dice por qué.
-  // Sin stock no se archiva (27 oct 2026): se pausa, si está en Dropi. Una pausada se reactiva con «Sacar de Archivados».
+  // Sin stock, además de «Archivar» se puede pausar (27 oct 2026), si está en Dropi. Una pausada se reactiva con «Reactivar».
   const sePausa = puedePausar(p);
-  const sinStockArchivar = !sePausa && noSeArchivaSinStock(p);
   const estaPausada = pausada(p);
   const reactivarYa = paraReactivar(p);
   const campoId = useRef<HTMLInputElement>(null);
@@ -340,10 +338,8 @@ function ContenidoFicha({
   }
 
   // Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se archiva, y se puede sacar de Archivados.
-  function archivar() {
+  function archivar(pausarla = false) {
     const archivarla = !p.archivada;
-    if (archivarla && sinStockArchivar) return setError(MOTIVO_SIN_STOCK);
-    const pausarla = archivarla && sePausa;
     setError(null);
     setArchivando(true);
     empezar(async () => {
@@ -453,21 +449,18 @@ function ContenidoFicha({
               {/* «Privatizar en Dropi»: dejarle unidades de este producto a un solo dropshipper, en un producto privado nuevo. */}
               {!sinGuardar && puedeArchivar && puedePrivatizar(p) && <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />}
               {!sinGuardar && puedeArchivar && !p.duplicadaDe && !p.apagadoPendiente &&
-                (sinStockArchivar ? (
-                  <Tooltip texto="Sin stock: no se archiva">
-                    <BotonAccion icono={ArchivarIcon} aria-disabled="true" className="cursor-not-allowed !border-transparent !bg-muted !text-muted-foreground" onClick={archivar}>
-                      Archivar
+                (
+                  <>
+                    {sePausa && (
+                      <BotonAccion icono={PausaIcon} tono="info" disabled={pendiente} onClick={() => archivar(true)}>
+                        {archivando ? "Un momento..." : "Pausar por falta de stock"}
+                      </BotonAccion>
+                    )}
+                    <BotonAccion icono={estaPausada ? ReactivarIcon : ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={() => archivar()}>
+                      {archivando ? "Un momento..." : estaPausada ? "Reactivar" : p.archivada ? "Sacar de Archivados" : "Archivar"}
                     </BotonAccion>
-                  </Tooltip>
-                ) : sePausa ? (
-                  <BotonAccion icono={PausaIcon} tono="info" disabled={pendiente} onClick={archivar}>
-                    {archivando ? "Un momento..." : "Pausar por falta de stock"}
-                  </BotonAccion>
-                ) : (
-                  <BotonAccion icono={estaPausada ? ReactivarIcon : ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={archivar}>
-                    {archivando ? "Un momento..." : estaPausada ? "Reactivar" : p.archivada ? "Sacar de Archivados" : "Archivar"}
-                  </BotonAccion>
-                ))}
+                  </>
+                )}
             </div>
             {error && (
               <p role="alert" className="text-sm text-destructive">

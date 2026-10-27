@@ -17,8 +17,7 @@ import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
-import { conexionDropi, noSeArchivaSinStock, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
-import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
+import { conexionDropi, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
 const COLUMNAS_CON_VENTAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
@@ -68,7 +67,8 @@ function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: st
 
 /**
  * «Archivar» de la fila (o «Sacar de Archivados» si ya lo está). Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se
- * archiva, y se puede deshacer. Sin stock no se archiva: se pausa (27 oct 2026), y una pausada se reactiva con el mismo botón.
+ * archiva, y se puede deshacer. Sin stock, el botón de la fila pausa (27 oct 2026; «Archivar» del todo queda en la ficha), y una pausada
+ * se reactiva con el mismo botón.
  */
 function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
   const { mostrarToast } = useToast();
@@ -77,19 +77,14 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
   const pausar = archivar && puedePausar(f);
   const estaPausada = pausada(f);
   const reactivarYa = paraReactivar(f);
-  // Sin stock y sin poder pausarse (sin ID, por ejemplo): el botón queda apagado, pero recibe el clic y el foco para decir por qué.
-  const sinStock = archivar && !pausar && noSeArchivaSinStock(f);
   function cambiar() {
-    if (sinStock) return mostrarToast(MOTIVO_SIN_STOCK, "destructive");
     empezar(async () => {
       const r = await (pausar ? pausarPublicacion(f.id) : archivarPublicacion(f.id, archivar)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       const hecho = pausar ? "Publicación pausada" : archivar ? "Publicación archivada" : estaPausada ? "Publicación reactivada" : "Publicación fuera de Archivados";
       mostrarToast(r.error ?? r.detalle ?? hecho, r.error ? "destructive" : undefined);
     });
   }
-  const texto = sinStock
-    ? "Sin stock: no se archiva"
-    : pausar
+  const texto = pausar
       ? "Pausar por falta de stock"
       : archivar
         ? "Archivar publicación"
@@ -105,10 +100,9 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
         type="button"
         onClick={cambiar}
         disabled={pendiente}
-        aria-disabled={sinStock || undefined}
         aria-label={`${texto}: ${f.nombre}`}
         className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${
-          sinStock ? "cursor-not-allowed text-muted-foreground opacity-40" : reactivarYa ? "text-success hover:bg-success-soft" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          reactivarYa ? "text-success hover:bg-success-soft" : "text-muted-foreground hover:bg-muted hover:text-foreground"
         } ${anilloFoco}`}
       >
         <Icono className="h-4 w-4" />
