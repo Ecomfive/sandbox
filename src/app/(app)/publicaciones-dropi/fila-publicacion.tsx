@@ -109,7 +109,7 @@ function CeldaVentas({ f }: { f: FilaPublicacion }) {
           {entero(v.netas30)} {v.netas30 === 1 ? "venta" : "ventas"} en 30 días
         </span>
       }
-      apoyo={<span className="tabular-nums">{v.stock > 0 ? `Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}` : "Sin stock"}</span>}
+      apoyo={v.stock > 0 ? <span className="tabular-nums">{`Stock ${entero(v.stock)}${v.diasInventario !== null ? ` · ${entero(v.diasInventario)} días` : ""}`}</span> : <span className="font-medium text-destructive">Sin stock</span>}
     />
   );
 }
