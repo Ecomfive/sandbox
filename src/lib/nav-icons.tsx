@@ -1055,6 +1055,16 @@ export function PuestosIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Un reloj con una línea que sube: Rendimiento del equipo (la jornada de cada persona). */
+export function RendimientoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </IconoLucide>
+  );
+}
+
 export function UsuariosIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconoLucide {...props}>
@@ -1118,6 +1128,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/productos": MargenIcon,
   "/usuarios": UsuariosIcon,
   "/puestos": PuestosIcon,
+  "/rendimiento": RendimientoIcon,
   "/wms-productos": TiendaIcon,
   "/wms-productos-dropi": CatalogoIcon,
   "/notificaciones": NotificacionesIcon,
