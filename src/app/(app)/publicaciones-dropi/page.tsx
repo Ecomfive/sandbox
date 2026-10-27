@@ -64,6 +64,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         actualizadoDropi={datos.leidoProveedor ? fechaHoraLectura(datos.leidoProveedor) : null}
         barraDropi={puedeEscribir ? <BarraAplicarDropi pendientes={datos.pendientesDropi} /> : null}
         actualizarDropi={puedeEscribir && puedeActualizarDropi(usuario)}
+        sinPublicacion={datos.sinPublicacion}
       />
     </Pagina>
   );
