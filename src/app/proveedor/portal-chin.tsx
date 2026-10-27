@@ -294,7 +294,7 @@ function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar
         <Vacio>{t.cotizarVacio}</Vacio>
       ) : (
         <Tabla>
-          <Cabecera columnas={[{ texto: t.colProducto }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colNota }, ...(alCotizar ? [{ texto: "" }] : [])]} />
+          <Cabecera columnas={[{ texto: t.colProducto }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colNota }, { texto: "" }]} />
           <tbody>
             {pedidos.map((p) => (
               <tr key={p.id}>
@@ -305,13 +305,11 @@ function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar
                 <td className={claseTdLista}>{viaTexto(p, idioma)}</td>
                 <td className={`${claseTdLista} text-right tabular-nums`}>{numero(p.unidades)}</td>
                 <td className={`${claseTdLista} max-w-[22rem] whitespace-normal text-muted-foreground`}>{tr(p.notaParaProveedor)}</td>
-                {alCotizar && (
-                  <td className={`${claseTdLista} text-right`}>
-                    <button type="button" className={botonPrincipal} onClick={() => alCotizar(p)} aria-label={`${t.cotizar}: ${tr(p.producto)}`}>
-                      {t.cotizar}
-                    </button>
-                  </td>
-                )}
+                <td className={`${claseTdLista} text-right`}>
+                  <button type="button" className={botonPrincipal} disabled={!alCotizar} onClick={() => alCotizar?.(p)} aria-label={`${t.cotizar}: ${tr(p.producto)}`}>
+                    {t.cotizar}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -339,7 +337,7 @@ function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fo
               { texto: t.colTotal, derecha: true },
               { texto: t.colFotoReal },
               { texto: t.colEstado },
-              ...(alCorregir ? [{ texto: "" }] : []),
+              { texto: "" },
             ]}
           />
           <tbody>
@@ -369,13 +367,11 @@ function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fo
                   <td className={claseTdLista}>
                     <Badge tone="warning">{t.esperaEcomfive}</Badge>
                   </td>
-                  {alCorregir && (
-                    <td className={`${claseTdLista} text-right`}>
-                      <button type="button" className={botonNormal} onClick={() => alCorregir(p)} aria-label={`${t.corregir}: ${tr(p.producto)}`}>
-                        {t.corregir}
-                      </button>
-                    </td>
-                  )}
+                  <td className={`${claseTdLista} text-right`}>
+                    <button type="button" className={botonNormal} disabled={!alCorregir} onClick={() => alCorregir?.(p)} aria-label={`${t.corregir}: ${tr(p.producto)}`}>
+                      {t.corregir}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -416,7 +412,8 @@ function EnProduccion({
               { texto: t.colUnidades, derecha: true },
               { texto: t.colTotal, derecha: true },
               { texto: t.colConfirmado },
-              ...(soloLectura ? [] : [{ texto: t.colFechaEnvio }, { texto: "" }]),
+              { texto: t.colFechaEnvio },
+              { texto: "" },
             ]}
           />
           <tbody>
@@ -469,36 +466,30 @@ function FilaProduccion({
       <td className={`${claseTdLista} text-right tabular-nums`}>{numero(p.unidades)}</td>
       <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(p.montoTotal)}</td>
       <td className={`${claseTdLista} tabular-nums`}>{p.confirmadoEn ? fecha(diaPanama(p.confirmadoEn)) : "—"}</td>
-      {!soloLectura && (
-        <>
-          <td className={claseTdLista}>
-            <input type="date" value={f} max={hoy} onChange={(e) => setF(e.target.value)} disabled={confirmar} aria-label={`${t.colFechaEnvio}: ${tr(p.producto)}`} className={`h-8 rounded-md border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`} />
-          </td>
-          <td className={`${claseTdLista} text-right`}>
-            {confirmar ? (
-              <span className="inline-flex gap-1.5">
-                <button type="button" className={botonNormal} disabled={ocupado} onClick={() => setConfirmar(false)}>
-                  {t.no}
-                </button>
-                <button type="button" className={botonPrincipal} disabled={ocupado} onClick={enviar}>
-                  {ocupado ? t.guardando : t.salioEl(fecha(f))}
-                </button>
-              </span>
-            ) : (
-              <span className="inline-flex gap-1.5">
-                {alEditar && (
-                  <button type="button" className={botonNormal} onClick={() => alEditar(p)} aria-label={`${t.editarCotizacion}: ${tr(p.producto)}`}>
-                    {t.editarCotizacion}
-                  </button>
-                )}
-                <button type="button" className={botonPrincipal} disabled={!f} onClick={() => setConfirmar(true)}>
-                  {t.marcarEnviado}
-                </button>
-              </span>
-            )}
-          </td>
-        </>
-      )}
+      <td className={claseTdLista}>
+        <input type="date" value={f} max={hoy} onChange={(e) => setF(e.target.value)} disabled={confirmar || soloLectura} aria-label={`${t.colFechaEnvio}: ${tr(p.producto)}`} className={`h-8 rounded-md border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`} />
+      </td>
+      <td className={`${claseTdLista} text-right`}>
+        {confirmar ? (
+          <span className="inline-flex gap-1.5">
+            <button type="button" className={botonNormal} disabled={ocupado} onClick={() => setConfirmar(false)}>
+              {t.no}
+            </button>
+            <button type="button" className={botonPrincipal} disabled={ocupado} onClick={enviar}>
+              {ocupado ? t.guardando : t.salioEl(fecha(f))}
+            </button>
+          </span>
+        ) : (
+          <span className="inline-flex gap-1.5">
+            <button type="button" className={botonNormal} disabled={!alEditar} onClick={() => alEditar?.(p)} aria-label={`${t.editarCotizacion}: ${tr(p.producto)}`}>
+              {t.editarCotizacion}
+            </button>
+            <button type="button" className={botonPrincipal} disabled={!f || soloLectura} onClick={() => setConfirmar(true)}>
+              {t.marcarEnviado}
+            </button>
+          </span>
+        )}
+      </td>
     </tr>
   );
 }

@@ -828,8 +828,10 @@ convenciones técnicas del código.
   contadores; el Registro de pagos lo lee del contexto (ya no tiene botones de país propios). Vacío por el filtro → `SinResultados`.
   **Ya no hay página «Portal del proveedor»** (22 oct 2026, pedido de Hernán): el lado de Ecomfive es **Compras › Tablero de Shen Zhen**
   (`/compras/tablero-chin`, pestaña `tablero-chin` de `CATALOGO_COMPRAS`, `requirePestana`; en `PESTANAS_POR_MODULO` Compras va primero y le
-  sigue el Tablero). Trae el mismo `PortalChin` en español con `soloLectura` (sin botones, sin selector ni «Salir» y sin marcar «Lo nuevo» como
-  visto) y **una sola pestaña de pagos** (23 oct 2026, pedido de Hernán): la «Pagos» del portal, que en el Tablero muestra `pagosEcomfive`
+  sigue el Tablero). Trae el mismo `PortalChin` en español con `soloLectura` (sin selector ni «Salir» y sin marcar «Lo nuevo» como
+  visto). **Es un reflejo del portal** (regla de Hernán, 27 oct 2026: Francis tiene que ver lo que ve Shen Zhen para dar su opinión): las mismas
+  columnas y botones (Cotizar, Corregir, Editar cotización, fecha de envío, Marcar enviado), **apagados** (`disabled`) con `soloLectura`; un
+  cambio nuevo del portal se ve también en el Tablero, nunca se esconde con `soloLectura`. Lo único distinto es «Pagos»: **una sola pestaña de pagos** (23 oct 2026, pedido de Hernán): la «Pagos» del portal, que en el Tablero muestra `pagosEcomfive`
   (`compras/tablero-chin/pagos-ecomfive.tsx`, el Registro de pagos que edita Ecomfive: modificar Compras y ver sus montos) en vez de la vista de
   Shen Zhen; `tabInicial`/`alCambiarTab` llevan `?ver=pagos`. Ya no hay pestaña «Pagos a Shen Zhen» arriba. Y, para un administrador, los botones «Cuenta de Shen Zhen» (`CuentasProveedor`: todas sus cuentas, clave nueva, desactivar) y a su
   lado «Crear cuenta» (`CrearCuentaProveedor`; ambos en `cuenta-proveedor.tsx` + `cuenta-actions.ts`, cada uno en una `Ventana`; se
