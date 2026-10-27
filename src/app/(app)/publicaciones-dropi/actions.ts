@@ -15,7 +15,7 @@ import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosC
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
-import { MOTIVO_CON_STOCK, MOTIVO_SIN_STOCK, sinStockParaArchivar } from "@/lib/publicaciones/archivar";
+import { MOTIVO_CON_STOCK, sinStockParaArchivar } from "@/lib/publicaciones/archivar";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -47,8 +47,8 @@ const numero = (f: FormData, k: string): number | null | undefined => {
 type Datos = Record<string, string | number | boolean | null>;
 
 /**
- * Si una publicación no se puede archivar por no tener stock en Dropi (27 oct 2026): la última lectura de «Mis productos» de sus IDs
- * o, sin ella, la carga de Ventas Dropi; es la misma cuenta que hace la pantalla (`noSeArchivaSinStock`). Sin ID o sin datos, se deja.
+ * Si una publicación no tiene stock en Dropi, para poder pausarla (27 oct 2026): la última lectura de «Mis productos» de sus IDs o, sin
+ * ella, la carga de Ventas Dropi; es la misma cuenta que hace la pantalla (`puedePausar`). Sin ID o sin datos, no se sabe: false.
  */
 async function sinStockEnDropi(paisId: string, dropiId: string | null): Promise<boolean> {
   const ids = idsDeDropi(dropiId);
@@ -377,7 +377,6 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
   if ("estado_publicacion" in datos && datos.estado_publicacion !== ((antes.estado_publicacion as string | null) ?? null)) {
     const archivar = datos.estado_publicacion === "archivado";
     if (!archivar && antes.duplicada_de) return { error: "Es un duplicado de otra publicación con el mismo ID de Dropi: usa esa." };
-    if (archivar && !sinPublicar && (await sinStockEnDropi(antes.pais_id, (antes.dropi_id as string | null) ?? null))) return { error: MOTIVO_SIN_STOCK };
     if (archivar) datos.estado = "archivado";
     else if (antes.estado === "archivado") datos.estado = "al_dia";
   }
@@ -651,9 +650,6 @@ async function archivarOPausar(id: string, archivar: boolean, pausar: boolean): 
     if (!(await sinStockEnDropi(antes.pais_id, (antes.dropi_id as string | null) ?? null))) return { error: MOTIVO_CON_STOCK };
     const marca = await supabase.from("dropi_publicaciones").update({ pausada_en: new Date().toISOString() }).eq("id", id);
     if (marca.error) return { error: "Falta correr en Supabase la migración 0165." };
-  } else if (archivar && !esBorrador && (await sinStockEnDropi(antes.pais_id, (antes.dropi_id as string | null) ?? null))) {
-    // Sin stock en Dropi no se archiva (pedido de Hernán, 27 oct 2026): se pausa. Sacar de Archivados siempre se puede.
-    return { error: MOTIVO_SIN_STOCK };
   }
   const estabaPausada = !!antes.pausada_en;
   let cambios: Record<string, string | null> = archivar
