@@ -151,7 +151,7 @@ function Detalle({ persona }: { persona: PersonaDelDia }) {
           <ol className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
             {j.horas.map((h) => (
               <li key={h.hora} className="grid gap-3 px-4 py-4 sm:grid-cols-[5rem_minmax(0,1fr)]">
-                <span className="text-sm font-semibold tabular-nums">{`${h.hora}:00`}</span>
+                <span className="text-sm font-semibold tabular-nums">{`${h.hora % 12 || 12}:00 ${h.hora < 12 ? "a. m." : "p. m."}`}</span>
                 <div className="flex min-w-0 flex-col gap-2">
                   <div className="flex items-center gap-3">
                     <span aria-hidden="true" className="h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
