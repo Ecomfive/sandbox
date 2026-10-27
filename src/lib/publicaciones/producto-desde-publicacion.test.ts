@@ -37,3 +37,18 @@ test("los componentes que se sugieren salen del nombre: un simple por cada parte
   assert.deepEqual(sugerirComponentes("Combo Crema + Shilajit", simples).map((x) => x.componenteId), ["b"]);
   assert.deepEqual(sugerirComponentes("", simples), []);
 });
+
+test("entre varios productos igual de parecidos, el nombre completo desempata (los números y las palabras cortas cuentan)", () => {
+  const simples = [
+    { id: "g", codigo: "SHILAJIT/GOLD", nombre: "Shilajit GOLD Gomitas" },
+    { id: "c", codigo: "SHILAJIT/CAPSULA", nombre: "Shilajit en Capsula (8 en 1)" },
+    { id: "r", codigo: "SHILAJIT/RESINA", nombre: "Shilajit 50g Resina Pura" },
+    { id: "o", codigo: "OXIDO/NITRICO", nombre: "Óxido Nítrico" },
+  ];
+  assert.deepEqual(sugerirComponentes("Oxido Nítrico + Shilajit 8 EN 1 Regalo", simples), [
+    { componenteId: "o", cantidad: 1 },
+    { componenteId: "c", cantidad: 1 },
+  ]);
+  // Sin nada que desempate, no se elige.
+  assert.deepEqual(sugerirComponentes("Combo Shilajit + Óxido Nítrico", simples.slice(0, 1).concat([{ id: "x", codigo: "SHILAJIT/X", nombre: "Shilajit Extra" }, simples[3]])).map((x) => x.componenteId), ["o"]);
+});
