@@ -21,6 +21,9 @@ import { FichaPublicacion } from "./ficha-publicacion";
 import { EncabezadoFilasPublicacion, FilaPublicacionLista } from "./fila-publicacion";
 import { ProveedorTareas } from "./recomendacion-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
+import { AvisoSinPublicacion } from "./sin-publicacion";
+import type { ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
+import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 
 const NOMBRE: NombreFilas = { singular: "publicación", plural: "publicaciones" };
 const ICONOS: Record<string, IconoComp> = {
@@ -74,6 +77,7 @@ export function TablaPublicaciones({
   actualizadoDropi = null,
   barraDropi = null,
   actualizarDropi = false,
+  sinPublicacion = [],
 }: {
   publicaciones: FilaPublicacion[];
   opcionesSku: OpcionSkuMaestro[];
@@ -100,6 +104,8 @@ export function TablaPublicaciones({
   barraDropi?: ReactNode;
   /** El botón «Actualizar datos» arriba de «Agregar» (26 oct 2026: por ahora solo para Hernán). */
   actualizarDropi?: boolean;
+  /** Lo activo en Dropi que no es de ninguna publicación del país («N productos en Dropi sin publicación»). */
+  sinPublicacion?: ProductoSinPublicacion[];
 }) {
   const verVentas = corteVentas !== null;
   const def = DEF_PUBLICACIONES;
@@ -118,6 +124,11 @@ export function TablaPublicaciones({
     return actual?.sku ? publicaciones.filter((p) => p.id !== actual.id && p.sku?.id === actual.sku!.id) : [];
   }, [abierta, publicaciones]);
   const i = abierta ? orden.indexOf(abierta) : -1;
+  // A qué publicación se le puede poner el ID de un producto que está en Dropi sin publicación: las que aún no tienen ID (no un borrador).
+  const sinId = useMemo(
+    () => publicaciones.filter((p) => !idsDeDropi(p.dropiId).length && p.estadoPublicacion !== "borrador").map((p) => ({ id: p.id, numero: p.numero, nombre: p.nombre })),
+    [publicaciones],
+  );
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador (en el
   // servidor no hay `document`).
   const enNavegador = useSyncExternalStore(
@@ -129,10 +140,13 @@ export function TablaPublicaciones({
     <ProveedorTareas {...tareas}>
     <ProveedorSkusMaestros opciones={opcionesSku}>
       <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
-      <p className="-mb-2 text-xs text-muted-foreground">
-        {actualizadoDropi
-          ? `Stock y bodegas leídos de Dropi: ${actualizadoDropi}.`
-          : "Todavía no se actualizó desde Dropi: las bodegas aparecen con la primera lectura de «Mis productos»."}
+      <p className="-mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span>
+          {actualizadoDropi
+            ? `Stock y bodegas leídos de Dropi: ${actualizadoDropi}.`
+            : "Todavía no se actualizó desde Dropi: las bodegas aparecen con la primera lectura de «Mis productos»."}
+        </span>
+        <AvisoSinPublicacion productos={sinPublicacion} sinId={sinId} puedeEscribir={puedeEscribir} />
       </p>
       {actualizarDropi ? (
         <div className="flex flex-wrap items-end justify-between gap-3">

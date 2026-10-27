@@ -11,6 +11,7 @@ import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-d
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { enCaminoDeCompuesto, juntarEtapaCotizacion } from "@/lib/compras/en-camino";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
+import { enDropiSinPublicacion, type ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
 import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
 import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
@@ -207,6 +208,8 @@ export interface DatosPublicaciones {
   leidoProveedor: string | null;
   /** Cuántos cambios del sistema esperan para aplicarse en Dropi (migración 0137). */
   pendientesDropi: number;
+  /** Lo activo en Dropi (última lectura de «Mis productos») que no es de ninguna publicación del país, sin envíos ni seguros. */
+  sinPublicacion: ProductoSinPublicacion[];
   reglas: ReglasGuardadas;
   /** Todas las decisiones del país (la más nueva primero), para la pestaña Recomendaciones. */
   decisiones: DecisionVista[];
@@ -456,5 +459,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
   const opcionesCrear = opcionesParaCrear(proveedor?.productos.values() ?? []);
-  return { filas, opcionesCrear, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, pendientesDropi: cambiosDropi.pendientes, reglas, decisiones, conTareas, personas };
+  const sinPublicacion = proveedor
+    ? enDropiSinPublicacion(
+        proveedor.productos.values(),
+        filas.map((f) => ({ id: f.id, numero: f.numero, nombre: f.nombre, dropiId: f.dropiId, archivada: f.archivada })),
+      )
+    : [];
+  return { filas, opcionesCrear, opcionesSku, corteVentas: ventas?.corte ?? null, leidoProveedor: proveedor?.leidoEn ?? null, pendientesDropi: cambiosDropi.pendientes, sinPublicacion, reglas, decisiones, conTareas, personas };
 }
