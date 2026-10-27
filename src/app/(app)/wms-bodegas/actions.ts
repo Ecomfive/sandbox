@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { puedeVerBodega, puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ETIQUETA_TIPO_BODEGA, TIPOS_BODEGA, type TipoBodega } from "./def-bodegas";
 
@@ -22,9 +23,11 @@ function leerDatos(formData: FormData): { nombre: string; tipo: TipoBodega; dire
 
 /** «Agregar»: una bodega más además de las 6 fuentes. Devuelve el error como valor (la ficha lo muestra sin cerrarse). */
 export async function crearBodega(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const paisId = texto(formData.get("pais_id"), 64);
   if (!UUID.test(paisId)) return { error: "País no válido." };
+  // Solo en un país que la persona tiene (auditoría del 27 oct 2026).
+  if (!(await puedeVerPaisId(createServiceClient(), usuario.paisesPermitidos, paisId))) return { error: SIN_ACCESO_PAIS };
   const datos = leerDatos(formData);
   if ("error" in datos) return datos;
 
@@ -45,13 +48,14 @@ export async function crearBodega(formData: FormData): Promise<{ error?: string 
 
 /** Guarda los datos de una bodega desde su ficha. El código de las 6 fuentes no se toca. */
 export async function actualizarBodega(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const id = texto(formData.get("id"), 64);
   if (!UUID.test(id)) return { error: "Bodega no válida." };
   const datos = leerDatos(formData);
   if ("error" in datos) return datos;
 
   const supabase = createServiceClient();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: antes } = await supabase.from("wms_bodegas").select("nombre, tipo, direccion, contacto").eq("id", id).single();
   if (!antes) return { error: "La bodega ya no existe." };
 
@@ -76,9 +80,10 @@ export async function actualizarBodega(formData: FormData): Promise<{ error?: st
 
 /** Desactiva o reactiva una bodega. No se borra: el stock y los movimientos futuros dependen de ella. */
 export async function cambiarEstadoBodega(id: string, activa: boolean): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Bodega no válida." };
   const supabase = createServiceClient();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: actual } = await supabase.from("wms_bodegas").select("nombre, activa").eq("id", id).single();
   if (!actual) return { error: "La bodega ya no existe." };
   if (actual.activa === activa) return {};
@@ -97,8 +102,9 @@ export async function cambiarEstadoBodega(id: string, activa: boolean): Promise<
 
 /** La actividad de una bodega para su ficha. Es una lectura: basta poder abrir el módulo. */
 export async function obtenerHistorialBodega(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Bodega no válida." };
+  if (!(await puedeVerBodega(createServiceClient(), usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await createServiceClient()
     .from("historial_auditoria")
     .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")

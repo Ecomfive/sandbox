@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { puedeVerFilaDePais, puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ETIQUETA_PUBLICACION, garantiasPorDefecto, validarProductoDropi, type Bodega, type ProductoDropiDatos } from "@/lib/wms/producto-dropi";
 
@@ -38,10 +39,12 @@ export async function prepararSubidaMedioDropi(nombre: string): Promise<{ ruta: 
 
 /** Agrega una bodega a la lista del país (la ficha las ofrece en la pestaña Stock). */
 export async function crearBodegaWms(paisId: string, nombre: string): Promise<{ bodega: Bodega } | { error: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const limpio = typeof nombre === "string" ? nombre.trim().slice(0, 120) : "";
   if (!limpio) return { error: "Escribe el nombre de la bodega." };
   if (typeof paisId !== "string" || !UUID.test(paisId)) return { error: "País no válido." };
+  // Solo en un país que la persona tiene (auditoría del 27 oct 2026).
+  if (!(await puedeVerPaisId(createServiceClient(), usuario.paisesPermitidos, paisId))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await createServiceClient().from("wms_bodegas").insert({ pais_id: paisId, nombre: limpio }).select("id, nombre").single();
   if (error?.code === "23505") return { error: "Ya existe una bodega con ese nombre." };
   if (error || !data) return { error: error?.message ?? "No se pudo crear la bodega." };
@@ -122,6 +125,8 @@ export async function guardarProductoDropi(entrada: { id: string | null; paisId:
   if (id === null && !UUID.test(entrada.paisId)) return { error: "País no válido." };
 
   const supabase = createServiceClient();
+  const permitido = id ? await puedeVerFilaDePais(supabase, usuario.paisesPermitidos, "wms_dropi_productos", id) : await puedeVerPaisId(supabase, usuario.paisesPermitidos, entrada.paisId);
+  if (!permitido) return { error: SIN_ACCESO_PAIS };
   const maestro = await resolverSkuMaestro(supabase, datos.sku_maestro_id);
   let productoId = id;
   let antes: { nombre: string; publicacion: string } | null = null;
@@ -192,8 +197,9 @@ function stockPorBodega(d: Pick<ProductoDropiDatos, "tipo" | "stock" | "variacio
 export async function obtenerProductoDropi(
   id: string
 ): Promise<{ producto: ProductoDropiDatos; numero: number; archivado: boolean; actualizadoEn: string } | { error: string }> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
+  if (!(await puedeVerFilaDePais(createServiceClient(), usuario.paisesPermitidos, "wms_dropi_productos", id))) return { error: SIN_ACCESO_PAIS };
   const { data: p, error } = await createServiceClient()
     .from("wms_dropi_productos")
     .select("*, wms_dropi_producto_medios(id, ruta, nombre_archivo, tipo, posicion)")
@@ -246,9 +252,10 @@ export async function obtenerProductoDropi(
 
 /** Archiva el producto (sale de «Activos» y pasa a «Archivados») o lo devuelve a activos. No borra nada. */
 export async function archivarProductoDropi(id: string, archivar: boolean): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
+  if (!(await puedeVerFilaDePais(supabase, usuario.paisesPermitidos, "wms_dropi_productos", id))) return { error: SIN_ACCESO_PAIS };
   const { data: producto } = await supabase.from("wms_dropi_productos").select("nombre, archivado").eq("id", id).single();
   if (!producto) return { error: "El producto ya no existe." };
   if (producto.archivado === archivar) return {};
@@ -267,8 +274,9 @@ export async function archivarProductoDropi(id: string, archivar: boolean): Prom
 
 /** Los ajustes de stock de un producto (la sección «Historial de existencia» de su ficha). */
 export async function obtenerHistorialExistenciaDropi(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
+  if (!(await puedeVerFilaDePais(createServiceClient(), usuario.paisesPermitidos, "wms_dropi_productos", id))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await createServiceClient()
     .from("historial_auditoria")
     .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
@@ -286,6 +294,7 @@ export async function duplicarProductoDropi(id: string): Promise<{ id: string } 
   const usuario = await requireModuloEscritura(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
+  if (!(await puedeVerFilaDePais(supabase, usuario.paisesPermitidos, "wms_dropi_productos", id))) return { error: SIN_ACCESO_PAIS };
 
   const { data: origen } = await supabase.from("wms_dropi_productos").select("*").eq("id", id).single();
   if (!origen) return { error: "El producto ya no existe." };
@@ -309,9 +318,10 @@ export async function duplicarProductoDropi(id: string): Promise<{ id: string } 
 }
 
 export async function eliminarProductoDropi(id: string): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
+  if (!(await puedeVerFilaDePais(supabase, usuario.paisesPermitidos, "wms_dropi_productos", id))) return { error: SIN_ACCESO_PAIS };
   const { data: producto } = await supabase.from("wms_dropi_productos").select("nombre").eq("id", id).single();
   const { data: medios } = await supabase.from("wms_dropi_producto_medios").select("ruta").eq("producto_id", id);
   const { error } = await supabase.from("wms_dropi_productos").delete().eq("id", id);
@@ -324,8 +334,9 @@ export async function eliminarProductoDropi(id: string): Promise<{ error?: strin
 
 /** La actividad de un producto para su ficha. Es una lectura: basta poder abrir el módulo. */
 export async function obtenerHistorialProductoDropi(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
+  if (!(await puedeVerFilaDePais(createServiceClient(), usuario.paisesPermitidos, "wms_dropi_productos", id))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await createServiceClient()
     .from("historial_auditoria")
     .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")

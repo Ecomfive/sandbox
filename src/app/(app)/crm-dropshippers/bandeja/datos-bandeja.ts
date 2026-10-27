@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { accesoCrm, areasVisibles, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { accesoCrm, areasVisibles, escribeEnArea, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
 export interface NumeroVista {
@@ -110,6 +110,8 @@ export async function conversacionPermitida(
   supabase: SupabaseClient,
   id: string,
   usuario: PermisosCrm,
+  /** Para mandar, anotar, resolver o tomar: además, poder escribir en el área del número (auditoría del 27 oct 2026). */
+  escribe = false,
 ): Promise<{ id: string; telefono: string; dropshipperId: string | null; asignadaA: string | null; ultimoEntranteEn: string | null; phoneNumberId: string } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data } = await supabase
@@ -119,6 +121,7 @@ export async function conversacionPermitida(
     .maybeSingle();
   const numero = uno(data?.whatsapp_numeros as Uno<{ phone_number_id: string; area: AreaCrm }>);
   if (!data || !numero || !areasDe(usuario).includes(numero.area)) return null;
+  if (escribe && !escribeEnArea(accesoCrm(usuario), numero.area)) return null;
   return {
     id: data.id as string,
     telefono: data.telefono as string,

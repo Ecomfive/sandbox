@@ -17,8 +17,9 @@ import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { agenteDeLista, ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, proveedorDeLista, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
-import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, dentroDelAlcance, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
+import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
 import { fotoDeProducto, fotosPorNombre } from "@/lib/compras/foto-producto";
+import { sinAccesoACompras, sinAccesoALinea, SIN_ACCESO_PAIS } from "./acceso-compras";
 import { leerMetricasDescripcion, metricasDeTest, precioUnidad, textoLogistica, type Cotizacion, type TestParaCotizacion } from "@/lib/compras/cotizacion";
 
 const ETAPAS_VALIDAS: Set<string> = new Set(ETAPAS_COMPRA.map((e) => e.valor));
@@ -29,13 +30,10 @@ const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 // --- Países permitidos (migración 0087) -----------------------------------------------------------------------------
 // Quien tiene países limitados solo ve y cambia las compras de esos países (y las de Importadora si la tiene). La lista
 // ya llega filtrada (`cargarCompras`), pero cada acción lo vuelve a comprobar: el servidor no se fía de lo que pide la página.
-const SIN_ACCESO_PAIS = "No tienes acceso a las compras de ese país.";
-type CompraPais = { id: string; tipo: string; paises: { codigo: string } | { codigo: string }[] | null };
-const codigoDe = (c: CompraPais) => (c.tipo === "importacion" ? null : ((Array.isArray(c.paises) ? c.paises[0] : c.paises)?.codigo ?? null));
+// (El acceso por compra vive en ./acceso-compras: lo comparten «Pagos a Shen Zhen» y el Tablero de Shen Zhen.)
 
 // --- Lo afinado en Usuarios y roles (pestañas, acciones, campos y alcance de Compras) ---------------------------------------
 // La pantalla ya esconde lo que la persona no puede ver o hacer, pero cada acción lo vuelve a comprobar aquí: es la barrera real.
-const SIN_ACCESO_COMPRA = "No tienes acceso a esta compra.";
 const SIN_PERMISO_DATO = "Tu rol no puede cambiar este dato.";
 
 /** Lo que tiene limitado la persona dentro de Compras. */
@@ -48,31 +46,6 @@ async function accionBloqueadaEnCompras(accion: string): Promise<string | null> 
   return accionPermitidaEnCompras(await restriccionesActuales(), accion) ? null : MENSAJE_ACCION_BLOQUEADA;
 }
 
-/**
- * El error si la persona no puede ver alguna de esas compras: por su país (si lo tiene limitado) o porque su rol solo le deja las que
- * tiene asignadas o creó; null si puede.
- */
-async function sinAccesoACompras(ids: string[]): Promise<string | null> {
-  const usuario = await getUsuarioActual();
-  const permitidos = usuario?.paisesPermitidos ?? null;
-  const alcance = restriccionesDe(usuario?.afinado.compras).alcance;
-  if ((permitidos === null && !ES_ALCANCE_LIMITADO(alcance)) || ids.length === 0) return null;
-  const { data } = await createServiceClient().from("wms_compras").select("id, tipo, paises(codigo), asignado_a, creado_por, responsable_nombre, creador_nombre").in("id", ids);
-  const filas = (data ?? []) as unknown as (CompraPais & { asignado_a: string | null; creado_por: string | null; responsable_nombre: string | null; creador_nombre: string | null })[];
-  if (filas.length !== new Set(ids).size) return "Compra no válida.";
-  if (permitidos !== null && !filas.every((c) => puedeVerPais(permitidos, codigoDe(c)))) return SIN_ACCESO_PAIS;
-  if (usuario && ES_ALCANCE_LIMITADO(alcance)) {
-    const dentro = filas.every((c) => dentroDelAlcance(alcance, { asignadoId: c.asignado_a, creadoPorId: c.creado_por, responsableNombre: c.responsable_nombre, creadorNombre: c.creador_nombre }, usuario));
-    if (!dentro) return SIN_ACCESO_COMPRA;
-  }
-  return null;
-}
-/** Lo mismo, para una línea de producto de una compra. */
-async function sinAccesoALinea(itemId: string): Promise<string | null> {
-  if ((await getUsuarioActual())?.paisesPermitidos == null) return null;
-  const { data } = await createServiceClient().from("wms_compra_items").select("compra_id").eq("id", itemId).maybeSingle();
-  return data ? sinAccesoACompras([data.compra_id as string]) : "Producto no válido.";
-}
 
 /** «a, b ,c» → ["a", "b", "c"] (sin vacíos ni repetidos). */
 const listaDeTexto = (texto: string | null): string[] => [...new Set((texto ?? "").split(",").map((x) => x.trim()).filter(Boolean))];
@@ -1498,6 +1471,14 @@ export async function guardarColorTienda(nombre: string, color: string): Promise
 export async function renombrarTienda(antes: string, despues: string): Promise<{ error?: string; compras?: number; nombre?: string }> {
   await requireModuloEscritura("compras");
   if ((await getUsuarioActual())?.paisesPermitidos != null) return { error: "Renombrar una tienda cambia las compras de todos los países: pídeselo a quien los ve todos." };
+  // Cambia la tienda de muchas compras a la vez: pide poder editar «Tienda», poder «Cambiar varias a la vez» y ver todas las compras
+  // (auditoría del 27 oct 2026: antes no se revisaba nada de esto).
+  {
+    const r = await restriccionesActuales();
+    if (!celdaEditable(r, "tienda")) return { error: SIN_PERMISO_DATO };
+    if (!accionPermitidaEnCompras(r, "lote")) return { error: MENSAJE_ACCION_BLOQUEADA };
+    if (ES_ALCANCE_LIMITADO(r.alcance)) return { error: "Renombrar una tienda cambia compras que no son tuyas: pídeselo a quien ve todas." };
+  }
   const viejo = String(antes ?? "").trim();
   const escrito = String(despues ?? "").replace(/,/g, " ").trim().replace(/\s+/g, " ").slice(0, 60);
   if (!viejo || !escrito) return { error: "Escribe el nombre nuevo de la tienda." };
@@ -1656,7 +1637,8 @@ export async function obtenerCotizacionCompra(compraId: string): Promise<{ cotiz
   const fotoSku = skus.find((s) => s?.foto_url)?.foto_url;
   const nombre = skus.map((s) => s?.nombre).filter(Boolean).join(" + ") || String(c.nombre ?? "");
   const cantidad = c.qty_total === null ? null : Number(c.qty_total);
-  const monto = c.monto_total === null ? null : Number(c.monto_total);
+  // Quien tiene «Monto» oculto tampoco lo ve en la cotización copiada (auditoría del 27 oct 2026).
+  const monto = c.monto_total === null || campoOculto(restriccionesDe(usuario.afinado.compras), "monto") ? null : Number(c.monto_total);
   return {
     cotizacion: {
       producto: nombre,

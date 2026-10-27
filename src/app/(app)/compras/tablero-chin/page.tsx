@@ -12,6 +12,7 @@ import { traducirTextos } from "@/lib/proveedor/traducir";
 import { cargarTareasChin } from "@/lib/proveedor/tareas-datos";
 import { cargarCambiosRegistro, cargarRegistro } from "@/lib/proveedor/registro-datos";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sinAccesoAlTablero } from "../acceso-compras";
 import { campoOculto, restriccionesDe } from "../permisos-compras";
 import type { CuentaPortal } from "./cuenta-proveedor";
 import { QueHacerChin } from "./que-hacer-chin";
@@ -30,6 +31,18 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   const usuario = await requirePestana("compras", "tablero-chin");
   const { ver } = await searchParams;
   const supabase = createServiceClient();
+  // Es el espejo del portal: todos los pedidos de Shen Zhen. Quien solo ve sus compras no lo abre (auditoría del 27 oct 2026).
+  const sinTablero = sinAccesoAlTablero(usuario);
+  if (sinTablero) {
+    return (
+      <Pagina ancho="ancha" className="flex flex-col gap-6">
+        <EncabezadoPagina titulo="Tablero de Shen Zhen" oculto />
+        <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          {sinTablero}
+        </p>
+      </Pagina>
+    );
+  }
 
   const { data: proveedor, error: errorProveedor } = await supabase.from("proveedores").select("id").eq("activo", true).order("creado_en").limit(1).maybeSingle();
   const espejo = proveedor ? await cargarEspejo(supabase, proveedor.id as string) : null;

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { puedeVerFilaDePais, puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ETIQUETA_ESTADO_PRODUCTO, validarProducto, type ProductoDatos } from "@/lib/wms/producto";
 
@@ -160,6 +161,9 @@ export async function guardarProductoWms(entrada: { id: string | null; paisId: s
   if (id !== null && !UUID.test(id)) return { error: "Producto no válido." };
 
   const supabase = createServiceClient();
+  // Solo productos de los países que la persona tiene (auditoría del 27 oct 2026).
+  const permitido = id ? await puedeVerFilaDePais(supabase, usuario.paisesPermitidos, "wms_productos", id) : await puedeVerPaisId(supabase, usuario.paisesPermitidos, entrada.paisId);
+  if (!permitido) return { error: SIN_ACCESO_PAIS };
   let productoId = id;
   let antes: { titulo: string; estado: string } | null = null;
 
@@ -212,6 +216,7 @@ export async function duplicarProductoWms(id: string): Promise<{ id: string } | 
   const usuario = await requireModuloEscritura("wms-productos");
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
+  if (!(await puedeVerFilaDePais(supabase, usuario.paisesPermitidos, "wms_productos", id))) return { error: SIN_ACCESO_PAIS };
 
   const { data: origen, error } = await supabase.from("wms_productos").select("*").eq("id", id).single();
   if (error || !origen) return { error: "El producto ya no existe." };
@@ -254,9 +259,10 @@ export async function duplicarProductoWms(id: string): Promise<{ id: string } | 
 
 /** Borra el producto con sus variantes, inventario y medios (en cascada) y los archivos que nadie más usa. */
 export async function eliminarProductoWms(id: string): Promise<{ error?: string }> {
-  await requireModuloEscritura("wms-productos");
+  const usuario = await requireModuloEscritura("wms-productos");
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
+  if (!(await puedeVerFilaDePais(supabase, usuario.paisesPermitidos, "wms_productos", id))) return { error: SIN_ACCESO_PAIS };
 
   const { data: producto } = await supabase.from("wms_productos").select("titulo").eq("id", id).single();
   const { data: medios } = await supabase.from("wms_producto_medios").select("ruta").eq("producto_id", id);
@@ -271,8 +277,9 @@ export async function eliminarProductoWms(id: string): Promise<{ error?: string 
 
 /** La actividad de un producto para su ficha. Es una lectura: basta poder abrir el módulo. */
 export async function obtenerHistorialProductoWms(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
-  await requireModulo("wms-productos");
+  const usuario = await requireModulo("wms-productos");
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Producto no válido." };
+  if (!(await puedeVerFilaDePais(createServiceClient(), usuario.paisesPermitidos, "wms_productos", id))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await createServiceClient()
     .from("historial_auditoria")
     .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")

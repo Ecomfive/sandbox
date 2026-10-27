@@ -3,6 +3,7 @@ import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
+import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   ESTADOS_PRODUCTO,
@@ -35,7 +36,8 @@ export default async function WmsProductoPage({ params }: { params: Promise<{ id
     )
     .eq("id", id)
     .maybeSingle();
-  if (!p) notFound();
+  // Solo un producto de un país que la persona tiene (auditoría del 27 oct 2026).
+  if (!p || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, p.pais_id as string))) notFound();
 
   type Fila = Record<string, unknown>;
   const filasVariantes = ((p.wms_producto_variantes ?? []) as Fila[]).sort((a, b) => Number(a.posicion) - Number(b.posicion));

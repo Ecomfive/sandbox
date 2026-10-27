@@ -5,6 +5,7 @@ import { cuotasDe, estadoCuota, type EstadoCuota, type Pago, type TipoCuota } fr
 import { hoyPanama } from "@/lib/proveedor/fechas";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sinAccesoACompras } from "./acceso-compras";
 import { campoOculto, restriccionesDe } from "./permisos-compras";
 
 export interface PagosProveedorCompra {
@@ -21,6 +22,8 @@ export async function obtenerPagosProveedorCompra(compraId: string): Promise<Pag
   if (!esUuid(compraId)) return null;
   // Quien no ve los montos de Compras tampoco ve esto.
   if (campoOculto(restriccionesDe(usuario.afinado.compras), "monto")) return null;
+  // Solo de una compra que la persona puede ver (su país y su alcance; auditoría del 27 oct 2026).
+  if (await sinAccesoACompras([compraId], usuario)) return null;
   const supabase = createServiceClient();
   const { data: p } = await supabase
     .from("proveedor_pedidos")
