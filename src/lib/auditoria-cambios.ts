@@ -17,6 +17,8 @@ export function calcularCambios(
 }
 
 export const ETIQUETA_ACCION: Record<string, string> = {
+  activar_segundo_paso_totp: "Activó la app autenticadora",
+  desactivar_segundo_paso_totp: "Quitó la app autenticadora",
   cambiar_categoria_producto: "Cambió la categoría",
   confirmar_categoria_producto: "Confirmó la categoría",
   clasificar_categorias: "Clasificó por categoría",

@@ -313,6 +313,17 @@ convenciones técnicas del código.
   lo puede abrir: en un Client Component con `usePuedeAbrir("modulo")` (`src/components/modulos-contexto.tsx`, lo provee el layout de
   `(app)`), en un Server Component con `usuario.modulos.includes(...)`. Un enlace nuevo a otro módulo debe hacer lo mismo. Las acciones
   del servidor siguen devolviendo `{ error }` o lanzando: eso es defensa, no pantalla.
+- **Verificación en dos pasos al ingresar** (27 oct 2026, pedido de Jhokser; migración 0166; detalle y riesgos en [SEGURIDAD.md](SEGURIDAD.md)). Después de la contraseña se pide
+  un código **en cada ingreso**: el de una **app autenticadora** (TOTP nativo de Supabase: `mfa.enroll`/`challengeAndVerify`, la sesión sube a `aal2`; se activa en
+  `/cuenta/seguridad`, «Seguridad de la cuenta» en `MenuCuenta`, que abre cualquiera con sesión) o uno de **6 dígitos por correo** (Resend, `enviarCorreo`; tabla
+  `segundo_paso_codigos` con solo la huella HMAC, 10 min, 5 intentos contados por `segundo_paso_sumar_intento`, 1 por minuto y 5 por hora). Quien no tiene app recibe el código por
+  correo al poner la contraseña; quien la tiene puede pedirlo si no la tiene a la mano. **El gate está en `getUsuarioSesion`** (`src/lib/auth.ts`): sin segundo paso no hay
+  sesión para páginas, acciones ni rutas; `getUsuarioSesionBruta` (sin gate) solo la usan `/login` y `/login/verificar`. Con el código del correo se deja la cookie
+  `ecom_2fa` (httpOnly, firmada, atada al `session_id` del JWT: un ingreso nuevo la invalida). Lógica pura y pruebas en `src/lib/seguridad/segundo-paso.ts`; lo que toca base,
+  cookies y correo en `segundo-paso-servidor.ts`. **Está apagada por defecto**: se enciende con `SEGUNDO_PASO=activo` y `SEGUNDO_PASO_SECRETO` (≥ 32 caracteres) en Vercel, **después
+  de comprobar que el correo sale** (dominio verificado en Resend: sin él, nadie recibiría el código); interruptor de emergencia: `SEGUNDO_PASO=desactivado` y volver a desplegar.
+  Las cuentas del portal del proveedor (`cuentaDeProveedor`) no la usan. **Una lectura nueva de la sesión** pasa por `getUsuarioSesion`/`getUsuarioActual`, nunca por
+  `createSessionClient().auth.getUser()` directo (se saltaría el gate; `subirAvatar` ya se corrigió).
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo

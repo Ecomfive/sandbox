@@ -13,6 +13,18 @@ momento: `npm run test:seguridad` (pruebas del sanitizador y de las imágenes) y
 - **Las tablas tienen RLS activado y sin políticas** (migración `0063`): solo el servidor puede tocarlas. Nadie puede
   llamar directo a la API de Supabase con la clave pública, ni con sesión ni sin ella.
 
+## Verificación en dos pasos (27 oct 2026)
+
+Después de la contraseña se pide un segundo código, en cada ingreso: el de una **app autenticadora** (TOTP, el MFA nativo de Supabase Auth: al verificarlo la
+sesión sube a `aal2`) o uno de **6 dígitos por correo** (vence en 10 minutos, se guarda solo su huella HMAC con `SEGUNDO_PASO_SECRETO`, 5 intentos contados de
+forma atómica, un código por minuto y cinco por hora). El gate vive en `getUsuarioSesion` (`src/lib/auth.ts`): sin el segundo paso no hay sesión para páginas,
+acciones ni rutas de API; solo `/login/verificar` usa la sesión sin él (`getUsuarioSesionBruta`). Con el código del correo queda una cookie `ecom_2fa` httpOnly,
+firmada y atada al id de **esa** sesión de Supabase: un ingreso nuevo vuelve a pedirlo. Las cuentas del portal del proveedor (Shen Zhen) están fuera.
+**Encendido:** `SEGUNDO_PASO=activo` y `SEGUNDO_PASO_SECRETO` (32 caracteres o más) en Vercel; sin las dos, nada cambia. **Interruptor de emergencia:** poner
+`SEGUNDO_PASO=desactivado` y volver a desplegar. Antes de encenderlo hay que comprobar que el correo sale de verdad (`RESEND_API_KEY` y `RESEND_FROM` con un
+dominio verificado: el remitente de prueba de Resend solo manda al dueño de la cuenta). **Límite conocido:** quien tenga la contraseña y el correo de una persona tiene
+los dos pasos; la app autenticadora es la mejor protección, pero el correo sigue siendo una vía de entrada. Migración `0166`.
+
 ## Hallazgos y estado
 
 | Gravedad | Hallazgo | Estado |
