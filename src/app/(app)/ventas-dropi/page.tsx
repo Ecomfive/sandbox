@@ -7,6 +7,7 @@ import { cargarStockProveedor, stockVigente } from "@/lib/publicaciones/proveedo
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { agruparProductos, resumirProductos, restarDias, totalesPorDia, totalesPorMes, type ProductoDropi, type VentaDia } from "@/lib/publicaciones/ventas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { traerDineroPorMes, traerVentasDiarias } from "@/lib/publicaciones/ventas-compactas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { TableroVentas, type DineroVentas, type DropshipperVentas, type ProductoVentas } from "./tablero-ventas";
 
@@ -42,11 +43,13 @@ export default async function VentasDropiPage() {
   const corte = new Date(new Date(carga.corte as string).getTime() - 5 * 3600e3).toISOString().slice(0, 10);
   const [productosR, diasR, dsR, pubsR, dineroR, cargaDineroR, stockActual] = await Promise.all([
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_productos").select("dropi_producto_id, nombre, lista, privado, variable, stock, primera_venta, ultima_venta").eq("pais_id", pais.id).order("dropi_producto_id").range(d, h)),
-    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_diarias").select("dropi_producto_id, dia, pedidas, ordenes, canceladas, rechazadas, devueltas").eq("pais_id", pais.id).order("dropi_producto_id").order("dia").range(d, h)),
+    // Rendimiento (27 oct 2026, migración 0163): los últimos 90 días día por día y lo anterior sumado por mes; las cuentas dan lo mismo.
+    traerVentasDiarias(supabase, pais.id, corte),
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_dropshippers").select("dropi_usuario_id, nombre, pedidas, ordenes, no_efectivas, netas_30d, productos, ultima_orden").eq("pais_id", pais.id).order("dropi_usuario_id").range(d, h)),
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_publicaciones").select("dropi_id, skus_maestros(codigo, nombre)").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h)),
     // La plata (migración 0130): sin la migración o sin carga, la página sigue solo con las unidades.
-    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_dinero").select("dropi_producto_id, dia, entregadas, unidades, ganancia, comision, coste, descuentos").eq("pais_id", pais.id).order("dropi_producto_id").order("dia").range(d, h)),
+    // Sumada por producto y mes en la base (migración 0163): aquí solo se usa por mes.
+    traerDineroPorMes(supabase, pais.id),
     supabase.from("dropi_ventas_dinero_cargas").select("hasta, ordenes, fuente").eq("pais_id", pais.id).order("cargado_en", { ascending: false }).limit(1).maybeSingle(),
     // El stock de la última lectura de «Mis productos» de Dropi (migración 0131): manda sobre el de la carga, que puede tener días.
     cargarStockProveedor(supabase, pais.id),

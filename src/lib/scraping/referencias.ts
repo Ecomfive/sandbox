@@ -34,7 +34,8 @@ export async function cargarReferencias(supabase: SupabaseClient): Promise<Indic
     ),
     traerTodasConError<{ compra_id: string; sku_maestro_id: string }>((a, b) => supabase.from("wms_compra_items").select("compra_id, sku_maestro_id").order("id").range(a, b)),
     traerTodasConError<{ id: string; numero: number | null; nombre: string; dropi_id: string | null; foto_huella: string | null; estado: string | null; pais_id: string; duplicada_de?: string | null }>((a, b) =>
-      supabase.from("dropi_publicaciones").select("*").order("id").range(a, b),
+      // Solo lo que se usa (rendimiento, 27 oct 2026): antes «*» traía también los datos para Dropi y otros jsonb pesados.
+      supabase.from("dropi_publicaciones").select("id, numero, nombre, dropi_id, foto_huella, estado, pais_id, duplicada_de").order("id").range(a, b),
     ),
   ]);
   const pais = new Map((paises.data ?? []).map((p) => [p.id, p.nombre as string]));

@@ -1741,7 +1741,10 @@ convenciones técnicas del código.
 
 - **Rendimiento** (27 oct 2026): las funciones de Vercel van en **Oregón (`pdx1`, `vercel.json` › `regions`)**, la misma región que la base
   de Supabase (us-west-2): antes corrían en Washington (`iad1`) y cada consulta cruzaba EE. UU. No quitar esa línea. Índices de la
-  migración 0162; `obtenerPendientesHoy` se guarda 45 s por país; la presencia late cada 60 s. Diagnóstico y lo que falta:
+  migración 0162; `obtenerPendientesHoy` se guarda 45 s por país; la presencia late cada 60 s. Segunda tanda (migración 0163): las
+  ventas de Dropi se leen ya resumidas (`ventas-compactas.ts`: 90 días día por día y lo anterior por mes; el dinero por mes) y «Hoy»
+  suma ventas e inventario por día en la base (`ordenes_por_dia`, `movimientos_por_dia`; antes se cortaba en 1000 filas). **No
+  vuelvas a pedir filas sin `range`/paginar para sumarlas: Supabase entrega como mucho 1000.** Diagnóstico y lo que falta:
   `RENDIMIENTO-PENDIENTE.md`.
 
 ## Dónde vive cada cosa

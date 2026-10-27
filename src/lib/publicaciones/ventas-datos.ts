@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarStockProveedor, stockVigente } from "./proveedor-datos";
 import { resumirProductos, type ResumenProducto } from "./ventas";
+import { traerVentasDiarias } from "./ventas-compactas";
 
 /**
  * La última carga de ventas de Dropi del país (migración 0120), resumida por producto de Dropi: para mostrar las ventas de
@@ -18,7 +19,11 @@ export async function cargarResumenVentas(
   try {
     const [productos, dias, actual] = await Promise.all([
       traerTodasLasFilas<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_productos").select("dropi_producto_id, nombre, lista, privado, variable, stock, primera_venta, ultima_venta").eq("pais_id", paisId).order("dropi_producto_id").range(d, h)),
-      traerTodasLasFilas<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_diarias").select("dropi_producto_id, dia, pedidas, ordenes, canceladas, rechazadas, devueltas").eq("pais_id", paisId).order("dropi_producto_id").order("dia").range(d, h)),
+      // Lo anterior a 90 días ya viene sumado por mes desde la base (migración 0163): las cuentas dan lo mismo con menos filas.
+      traerVentasDiarias(supabase, paisId, corte).then((r) => {
+        if (r.error) throw r.error;
+        return r.data ?? [];
+      }),
       cargarStockProveedor(supabase, paisId),
     ]);
     const resumen = resumirProductos(

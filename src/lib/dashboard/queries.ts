@@ -1,7 +1,46 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { diasDelPeriodo, type Periodo } from "./periodo";
 
 const corto = (fecha: string) => `${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`;
+
+/**
+ * Las ventas (monto y cantidad de órdenes) de cada día de un rango, sumadas en la base (`ordenes_por_dia`, migración 0163). Antes se
+ * pedían las filas sin paginar y Supabase entrega como mucho 1000: en 30 días de Panamá había 9.436 órdenes y «Hoy» sumaba 1.000
+ * (corregido el 27 oct 2026). Sin la migración, se traen todas las filas paginando (exacto, pero más lento).
+ */
+async function ventasPorDia(supabase: SupabaseClient, paisId: string, desde: string, hasta: string): Promise<{ fecha: string; monto: number; ordenes: number }[]> {
+  const r = await supabase.rpc("ordenes_por_dia", { p_pais: paisId, p_desde: desde, p_hasta: hasta });
+  if (!r.error) return (r.data ?? []).map((x: { fecha: string; monto: number; ordenes: number }) => ({ fecha: String(x.fecha), monto: Number(x.monto), ordenes: Number(x.ordenes) }));
+  const filas = await traerTodasLasFilas<{ fecha: string; monto: number }>((d, h) =>
+    supabase.from("ordenes").select("fecha, monto").eq("pais_id", paisId).gte("fecha", desde).lte("fecha", hasta).order("id").range(d, h),
+  ).catch(() => []);
+  const dia = new Map<string, { fecha: string; monto: number; ordenes: number }>();
+  for (const o of filas) {
+    const x = dia.get(String(o.fecha)) ?? { fecha: String(o.fecha), monto: 0, ordenes: 0 };
+    dia.set(x.fecha, x);
+    x.monto += Number(o.monto);
+    x.ordenes += 1;
+  }
+  return [...dia.values()];
+}
+
+/** Las entradas y salidas de inventario de cada día de un rango, sumadas en la base (`movimientos_por_dia`, migración 0163); sin ella, paginando. */
+async function movimientosPorDia(supabase: SupabaseClient, paisId: string, desde: string, hasta: string): Promise<{ fecha: string; entradas: number; salidas: number }[]> {
+  const r = await supabase.rpc("movimientos_por_dia", { p_pais: paisId, p_desde: desde, p_hasta: hasta });
+  if (!r.error) return (r.data ?? []).map((x: { fecha: string; entradas: number; salidas: number }) => ({ fecha: String(x.fecha), entradas: Number(x.entradas), salidas: Number(x.salidas) }));
+  const filas = await traerTodasLasFilas<{ fecha: string; tipo: string; cantidad: number }>((d, h) =>
+    supabase.from("movimientos_inventario").select("fecha, tipo, cantidad").eq("pais_id", paisId).gte("fecha", desde).lte("fecha", hasta).order("id").range(d, h),
+  ).catch(() => []);
+  const dia = new Map<string, { fecha: string; entradas: number; salidas: number }>();
+  for (const m of filas) {
+    const x = dia.get(String(m.fecha)) ?? { fecha: String(m.fecha), entradas: 0, salidas: 0 };
+    dia.set(x.fecha, x);
+    if (m.tipo === "entrada") x.entradas += Number(m.cantidad);
+    else x.salidas += Number(m.cantidad);
+  }
+  return [...dia.values()];
+}
 
 export interface PuntoInventario {
   fecha: string; // dd/mm
@@ -23,19 +62,9 @@ export async function getSerieInventarioComparada(
   paisId: string,
   periodo: Periodo
 ): Promise<SerieInventarioComparada> {
-  const [{ data: actuales }, { data: comparacion }] = await Promise.all([
-    supabase
-      .from("movimientos_inventario")
-      .select("fecha, tipo, cantidad")
-      .eq("pais_id", paisId)
-      .gte("fecha", periodo.desde)
-      .lte("fecha", periodo.hasta),
-    supabase
-      .from("movimientos_inventario")
-      .select("tipo, cantidad")
-      .eq("pais_id", paisId)
-      .gte("fecha", periodo.compararDesde)
-      .lte("fecha", periodo.compararHasta),
+  const [actuales, comparacion] = await Promise.all([
+    movimientosPorDia(supabase, paisId, periodo.desde, periodo.hasta),
+    movimientosPorDia(supabase, paisId, periodo.compararDesde, periodo.compararHasta),
   ]);
 
   const porDia = new Map<string, PuntoInventario>();
@@ -44,23 +73,20 @@ export async function getSerieInventarioComparada(
   }
   let totalEntradas = 0;
   let totalSalidas = 0;
-  for (const m of actuales ?? []) {
-    const punto = porDia.get(String(m.fecha));
+  for (const m of actuales) {
+    const punto = porDia.get(m.fecha);
     if (!punto) continue;
-    if (m.tipo === "entrada") {
-      punto.entradas += Number(m.cantidad);
-      totalEntradas += Number(m.cantidad);
-    } else {
-      punto.salidas += Number(m.cantidad);
-      totalSalidas += Number(m.cantidad);
-    }
+    punto.entradas += m.entradas;
+    punto.salidas += m.salidas;
+    totalEntradas += m.entradas;
+    totalSalidas += m.salidas;
   }
 
   let totalEntradasComparacion = 0;
   let totalSalidasComparacion = 0;
-  for (const m of comparacion ?? []) {
-    if (m.tipo === "entrada") totalEntradasComparacion += Number(m.cantidad);
-    else totalSalidasComparacion += Number(m.cantidad);
+  for (const m of comparacion) {
+    totalEntradasComparacion += m.entradas;
+    totalSalidasComparacion += m.salidas;
   }
 
   return {
@@ -92,19 +118,9 @@ export async function getSerieVentasComparada(
   paisId: string,
   periodo: Periodo
 ): Promise<SerieVentasComparada> {
-  const [{ data: actuales }, { data: comparacion }, { data: primeraOrden }] = await Promise.all([
-    supabase
-      .from("ordenes")
-      .select("fecha, monto")
-      .eq("pais_id", paisId)
-      .gte("fecha", periodo.desde)
-      .lte("fecha", periodo.hasta),
-    supabase
-      .from("ordenes")
-      .select("fecha, monto")
-      .eq("pais_id", paisId)
-      .gte("fecha", periodo.compararDesde)
-      .lte("fecha", periodo.compararHasta),
+  const [actuales, comparacion, { data: primeraOrden }] = await Promise.all([
+    ventasPorDia(supabase, paisId, periodo.desde, periodo.hasta),
+    ventasPorDia(supabase, paisId, periodo.compararDesde, periodo.compararHasta),
     supabase.from("ordenes").select("fecha").eq("pais_id", paisId).order("fecha", { ascending: true }).limit(1),
   ]);
 
@@ -114,20 +130,17 @@ export async function getSerieVentasComparada(
   const montoPorDiaActual = new Map<string, number>(diasActual.map((f) => [f, 0]));
   let totalActual = 0;
   let totalOrdenesActual = 0;
-  for (const o of actuales ?? []) {
-    montoPorDiaActual.set(String(o.fecha), (montoPorDiaActual.get(String(o.fecha)) ?? 0) + Number(o.monto));
-    totalActual += Number(o.monto);
-    totalOrdenesActual += 1;
+  for (const o of actuales) {
+    montoPorDiaActual.set(o.fecha, (montoPorDiaActual.get(o.fecha) ?? 0) + o.monto);
+    totalActual += o.monto;
+    totalOrdenesActual += o.ordenes;
   }
 
   const montoPorDiaComparacion = new Map<string, number>(diasComparacion.map((f) => [f, 0]));
   let totalComparacion = 0;
-  for (const o of comparacion ?? []) {
-    montoPorDiaComparacion.set(
-      String(o.fecha),
-      (montoPorDiaComparacion.get(String(o.fecha)) ?? 0) + Number(o.monto)
-    );
-    totalComparacion += Number(o.monto);
+  for (const o of comparacion) {
+    montoPorDiaComparacion.set(o.fecha, (montoPorDiaComparacion.get(o.fecha) ?? 0) + o.monto);
+    totalComparacion += o.monto;
   }
 
   const primeraFecha = primeraOrden?.[0]?.fecha ? String(primeraOrden[0].fecha) : null;

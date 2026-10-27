@@ -94,3 +94,17 @@ Segunda tanda (pendiente): ventas diarias, eventos de Compras y Scraping agregad
 quitar `select("*")`/jsonb que no se usan (`referencias.ts`); el punto 4 de arriba (límite a rangos personalizados); series de «Hoy»
 cortadas en 1000 filas.
 
+## Segunda tanda del 27 oct 2026 (migración `0163_rendimiento_tanda2.sql`)
+
+1. **Ventas de Dropi resumidas en la base** (`src/lib/publicaciones/ventas-compactas.ts`): `dropi_ventas_diarias_compactas` da los
+   últimos 90 días día por día y lo anterior sumado por mes; `dropi_ventas_dinero_por_mes` da el dinero por mes. Lo usan Gestión de IDs
+   Dropi y Compras › Reponer (`cargarResumenVentas`) y Ventas Dropi. Panamá: 19.310 → 6.896 filas de ventas (−64 %) y el dinero de
+   17.092 a una fila por producto y mes. Comprobado con los datos reales: los 473 productos dan exactamente lo mismo.
+2. **«Hoy» cortado en 1000 filas (error corregido):** las series de ventas e inventario pedían las filas sin paginar; en 30 días de
+   Panamá había 9.436 órdenes y la gráfica sumaba 1.000 (~11 %). Ahora `ordenes_por_dia` y `movimientos_por_dia` suman por día en la
+   base (con índice `ordenes (pais_id, fecha)`); sin la migración, se pagina (exacto pero lento).
+3. **Compras › Tablero y Tiempos:** los eventos se piden solo de `etapa` y `estado` (lo único que se usa): 12.253 → ~9.100.
+4. **Scraping:** las publicaciones se piden solo con las columnas que se usan (antes `select("*")` con los jsonb para Dropi).
+
+Pendiente (tercera tanda): `crm_sincronizar_ordenes` solo lo nuevo (corre en la carga diaria, no al abrir páginas); los eventos de
+Compras y el historial de Scraping resumidos en SQL si crecen; límite a rangos personalizados (ya no urge: «Hoy» suma en la base).
