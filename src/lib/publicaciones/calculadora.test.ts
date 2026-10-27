@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calcularMargen, leerMonto, precioParaMargen, textoWhatsapp } from "./calculadora";
+import { calcularMargen, leerMonto, precioParaMargen, productosPorSku, textoWhatsapp, type PublicacionParaCalculo } from "./calculadora";
 
 test("la cuenta de la referencia: Vinagre de Manzana a $8.99 con costo $3.14 y fulfillment $1.50 → $4.35 y 48 %", () => {
   const r = calcularMargen({ costo: 3.14, fulfillment: 1.5, precio: 8.99 })!;
@@ -32,4 +32,25 @@ test("el mensaje para WhatsApp: nombre en negrita con su ID y una línea por dat
     ["*Vinagre de Manzana 150 Capsulas* · ID 8515", "Coste real: $2.62", "Costo de mercancía: $3.14", "Fulfillment: $1.50", "Precio de venta: $8.99", "Utilidad: $4.35", "Margen: 48 %"].join("\n"),
   );
   assert.equal(textoWhatsapp({ nombre: "" }, d, r).split("\n")[0], "*Cálculo de margen*");
+});
+
+test("la lista de la calculadora es por SKU: un producto con público y privadas sale una vez, con los datos del público", () => {
+  const sku = (id: string, codigo: string) => ({ id, codigo, nombre: `Producto ${codigo}` });
+  const pub = (numero: number, dropiId: string, skuP: ReturnType<typeof sku> | null, extra: Partial<PublicacionParaCalculo> = {}): PublicacionParaCalculo => ({
+    numero, dropiId, archivada: false, duplicadaDe: null, sinPublicar: false, tipoDropi: "publico", sku: skuP, ...extra,
+  });
+  const a = sku("a", "ACEITE/OREGANO");
+  const b = sku("b", "BOLSO/NAYLA");
+  const lista = [
+    pub(30, "9001", a, { tipoDropi: "privado" }),
+    pub(12, "7001", a),
+    pub(40, "7002", a),
+    pub(5, "8000", b, { archivada: true }),
+    pub(6, "8001", null),
+    pub(7, "", b, { sinPublicar: true }),
+  ];
+  const r = productosPorSku(lista);
+  assert.deepEqual(r.map((x) => [x.sku.codigo, x.representante.dropiId]), [["ACEITE/OREGANO", "7001"]]);
+  // Un SKU que solo tiene una privada la usa como representante.
+  assert.equal(productosPorSku([pub(30, "9001", a, { tipoDropi: "privado" })])[0].representante.dropiId, "9001");
 });
