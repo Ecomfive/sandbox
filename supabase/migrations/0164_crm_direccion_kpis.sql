@@ -114,14 +114,18 @@ as $$
     where n.activo and n.area = any(p_areas)
   ),
   por_persona as (
-    select coalesce(p.autor_nombre, 'Sin nombre') as persona,
-      count(*) as enviados,
-      (select count(*) from consultas k where k.autor_nombre = coalesce(p.autor_nombre, 'Sin nombre')) as respondidas,
-      (select round(percentile_cont(0.5) within group (order by k.minutos)::numeric, 1) from consultas k where k.autor_nombre = coalesce(p.autor_nombre, 'Sin nombre')) as mediana_min,
-      (select count(*) from consultas k where k.autor_nombre = coalesce(p.autor_nombre, 'Sin nombre') and k.minutos <= 15) as en_15_min
-    from periodo p
-    where p.direccion = 'saliente'
-    group by coalesce(p.autor_nombre, 'Sin nombre')
+    select e.persona, e.enviados,
+      count(k.pregunta_en) as respondidas,
+      round(percentile_cont(0.5) within group (order by k.minutos)::numeric, 1) as mediana_min,
+      count(*) filter (where k.minutos <= 15) as en_15_min
+    from (
+      select coalesce(autor_nombre, 'Sin nombre') as persona, count(*) as enviados
+      from periodo
+      where direccion = 'saliente'
+      group by 1
+    ) e
+    left join consultas k on k.autor_nombre = e.persona
+    group by e.persona, e.enviados
   ),
   por_dia as (
     select (k.pregunta_en at time zone 'America/Panama')::date as dia,
