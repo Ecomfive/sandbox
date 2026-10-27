@@ -44,6 +44,11 @@ export function CrearProductoPanel({
   incrustada,
   alGuardar,
   alCambiarEnviando,
+  nombreInicial,
+  codigoInicial,
+  fotoInicial,
+  comoCompuesto,
+  sinVariantes,
 }: {
   opcionesSimples: OpcionSkuMaestro[];
   /** Se abre sola con `?nuevo=1` en la dirección. */
@@ -61,6 +66,15 @@ export function CrearProductoPanel({
   /** Además de lo propio, al crearse sin error (cerrar la ventana que la contiene). */
   alGuardar?: () => void;
   alCambiarEnviando?: (enviando: boolean) => void;
+  /** Gestión de IDs Dropi: el producto de una publicación (su nombre, su SKU y su foto) para que no haya que volver a escribirlos. */
+  nombreInicial?: string;
+  codigoInicial?: string;
+  /** La foto de la publicación (en `wms-productos/publicaciones/…`): al crear el producto se COPIA a su carpeta. */
+  fotoInicial?: string | null;
+  /** Se abre ya como compuesto (un pack o combo) aunque todavía no haya un componente elegido. */
+  comoCompuesto?: boolean;
+  /** Sin el bloque de variantes (quien crea desde Gestión de IDs Dropi no tiene los permisos de Producto para ellas). */
+  sinVariantes?: boolean;
 }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
@@ -132,11 +146,13 @@ export function CrearProductoPanel({
           compuestoInicial && !(abrirConNuevo && compuestoUsado.current) && opcionesSimples.some((o) => o.id === compuestoInicial.componenteId) ? compuestoInicial : null;
         compuestoUsado.current = true;
         setComponenteInicial(inicial);
-        setTipo(inicial ? "combo" : "simple");
-        setNombre("");
-        setFoto(null);
-        setCodigo("");
-        setSkuTocado(false);
+        setTipo(inicial || comoCompuesto ? "combo" : "simple");
+        setNombre(nombreInicial ?? "");
+        setFoto(fotoInicial ?? null);
+        setCodigo(codigoInicial ?? "");
+        setSkuTocado(!!codigoInicial);
+        // Con nombre pero sin SKU, se sugiere el SKU como al escribir el nombre.
+        if (nombreInicial && !codigoInicial) void sugerir(nombreInicial);
         setConVariantes(false);
         setOrigenBarras(null);
         setVueltaEnvio((v) => v + 1);
@@ -180,7 +196,7 @@ export function CrearProductoPanel({
             <CampoFoto
               nombreCampo="foto_url"
               etiqueta="Foto del producto"
-              valorInicial={null}
+              valorInicial={fotoInicial ?? null}
               alCambiarSubiendo={setSubiendoFoto}
               prepararSubida={prepararSubidaFotoNuevoProducto}
               subirDesdeUrl={subirFotoNuevoProductoDesdeUrl}
@@ -329,7 +345,7 @@ export function CrearProductoPanel({
             </Seccion>
           )}
 
-          {!combo && (
+          {!combo && !sinVariantes && (
             <Seccion icono={ProductoIcon} titulo="Variantes">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={conVariantes} onChange={(e) => setConVariantes(e.target.checked)} className="h-4 w-4" />

@@ -221,7 +221,18 @@ async function leerDatosDropi(
 }
 
 /** «Agregar» › «Publicar en Dropi»: la publicación nace «Sin publicar» con todo lo que Dropi pide y queda pendiente para «Aplicar en Dropi». */
-async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof requireModuloEscritura>>, paisId: string, supabase: ReturnType<typeof createServiceClient>): Promise<{ error?: string }> {
+/** Lo que devuelve crear una publicación nueva: con su id y lo que se necesita para ofrecer crear su producto (pack o combo) si no se eligió uno. */
+export interface PublicacionCreada {
+  error?: string;
+  id?: string;
+  nombre?: string;
+  sku?: string | null;
+  fotos?: string[];
+  /** true si no se eligió un producto de Producto: se puede ofrecer crearlo. */
+  sinProducto?: boolean;
+}
+
+async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof requireModuloEscritura>>, paisId: string, supabase: ReturnType<typeof createServiceClient>): Promise<PublicacionCreada> {
   const basicos = leerDatos(f, await fulfillmentDelPais(supabase, paisId));
   if ("error" in basicos) return basicos;
   // Sin las columnas de la migración 0151 no se puede dejar pendiente: se avisa antes de crear nada (ninguna publicación se borra).
@@ -256,14 +267,14 @@ async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof
   revalidatePath(RUTA);
   if ("error" in r) return { error: `Se guardó como «Sin publicar», pero no quedó pendiente para Dropi: ${r.error} Ábrela y pulsa «Publicar en Dropi».` };
   await registrarAuditoria({ accion: "dropi_crear_pendiente", entidad: "dropi_publicaciones", entidadId: data.id, detalle: `${datos.nombre}: pendiente para «Aplicar en Dropi»` });
-  return {};
+  return resumenCreada(data.id as string, datos, producto);
 }
 
 /**
  * «Guardar como borrador» (pedido de Jhokser, 24 oct 2026): la publicación se guarda «Sin publicar» con lo que se haya llenado, aunque falten datos
  * de los que Dropi exige. No queda pendiente para Dropi: se completa desde su ficha y se publica con «Publicar en Dropi», o se elimina.
  */
-async function crearComoBorrador(f: FormData, usuario: Awaited<ReturnType<typeof requireModuloEscritura>>, paisId: string, supabase: ReturnType<typeof createServiceClient>): Promise<{ error?: string }> {
+async function crearComoBorrador(f: FormData, usuario: Awaited<ReturnType<typeof requireModuloEscritura>>, paisId: string, supabase: ReturnType<typeof createServiceClient>): Promise<PublicacionCreada> {
   const basicos = leerDatos(f, await fulfillmentDelPais(supabase, paisId));
   if ("error" in basicos) return basicos;
   const precio = typeof basicos.precio_venta === "number" ? basicos.precio_venta : null;
@@ -291,11 +302,16 @@ async function crearComoBorrador(f: FormData, usuario: Awaited<ReturnType<typeof
   const falta = faltantesCrearDropi(datos);
   await registrarAuditoria({ accion: "crear_borrador_dropi", entidad: "dropi_publicaciones", entidadId: data.id, detalle: `${datos.nombre} · borrador${falta.length ? ` (faltan ${falta.length} datos para Dropi)` : " (completo)"}` });
   revalidatePath(RUTA);
-  return {};
+  return resumenCreada(data.id as string, datos, producto);
+}
+
+/** Lo que la ficha necesita para ofrecer crear el producto (pack o combo) de la publicación recién creada. */
+function resumenCreada(id: string, datos: { nombre: string; sku: string | null; fotos: { url: string }[] }, producto: unknown): PublicacionCreada {
+  return { id, nombre: datos.nombre, sku: datos.sku, fotos: datos.fotos.map((x) => x.url), sinProducto: !producto };
 }
 
 /** «Agregar»: una publicación nueva en el país de la barra. */
-export async function crearPublicacion(f: FormData): Promise<{ error?: string }> {
+export async function crearPublicacion(f: FormData): Promise<PublicacionCreada> {
   const usuario = await requireModuloEscritura(MODULO);
   const paisId = texto(f, "pais_id", 64);
   const supabase = createServiceClient();

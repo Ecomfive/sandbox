@@ -13,6 +13,7 @@ import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { crearProducto } from "../producto/actions";
 import { CrearProductoPanel } from "../producto/crear-producto-panel";
 import { vincularSkuPublicacion } from "./actions";
+import { CrearProductoDePublicacion } from "./crear-producto-de-publicacion";
 import type { FilaPublicacion } from "./def-publicaciones";
 
 function Producto({ sku, pequeño = false }: { sku: SkuResumen; pequeño?: boolean }) {
@@ -49,7 +50,8 @@ export function VinculoSku({
   alAbrirProducto: (id: string) => void;
 }) {
   const { mostrarToast } = useToast();
-  const puedeCrearProducto = usePuedeAbrir("producto");
+  // «Abrir en Producto» solo para quien abre Producto; crear el producto de la publicación, en cambio, lo hace quien edita esta lista (Nicole).
+  const puedeAbrirProducto = usePuedeAbrir("producto");
   const opcionesSku = useOpcionesSkuMaestro();
   const [pendiente, empezar] = useTransition();
   const [elegido, setElegido] = useState<OpcionSkuMaestro | null>(null);
@@ -81,7 +83,7 @@ export function VinculoSku({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Producto sku={p.sku} />
           <span className="flex gap-1.5">
-            {puedeCrearProducto && (
+            {puedeAbrirProducto && (
               <Link
                 href={`/producto?abrir=${p.sku.id}`}
                 onClick={(e) => {
@@ -143,12 +145,13 @@ export function VinculoSku({
             Es un pack de {s.pack}: falta su compuesto en Producto. Créalo (con {s.pack} × {s.sku.codigo}) y vincúlalo aquí.
           </p>
           <Producto sku={s.sku} pequeño />
-          {puedeCrearProducto && puedeEscribir && (
+          {puedeEscribir && (
             // La ficha «Nuevo producto» se abre aquí encima (sin salir de Gestión de IDs Dropi), ya como compuesto con el pack armado
             // (N × el simple); al crearlo queda vinculado a esta publicación.
             <CrearProductoPanel
               opcionesSimples={opcionesSku.filter((o) => !o.compuesto)}
               compuestoInicial={{ componenteId: s.sku.id, cantidad: s.pack ?? 1 }}
+              sinVariantes
               mensajeExito="Compuesto creado"
               action={async (datos) => {
                 const r = await crearProducto(datos);
@@ -185,6 +188,20 @@ export function VinculoSku({
       )}
       {(!s || s.tipo === "ninguno") && <p className="text-sm text-muted-foreground">No se encontró un producto parecido en Producto.</p>}
       {buscador}
+      {/* El producto no existe todavía (un pack o un combo nuevo): se crea desde aquí, con el nombre, el SKU y la misma foto de la publicación. */}
+      {puedeEscribir && !(s?.tipo === "falta_compuesto" && s.sku) && (
+        <CrearProductoDePublicacion
+          publicacionId={p.id}
+          nombre={p.nombre}
+          sku={p.datosDropi?.sku}
+          fotos={[...(p.datosDropi?.fotos ?? []).map((f) => f.url), p.fotoUrl]}
+          boton={(abrir) => (
+            <button type="button" onClick={abrir} className="w-fit text-xs font-medium underline underline-offset-2">
+              No existe: crear el producto (pack, combo o simple)
+            </button>
+          )}
+        />
+      )}
       {cambiando && (
         <Button type="button" variant="ghost" className="w-fit text-xs" onClick={() => setCambiando(false)}>
           Cancelar

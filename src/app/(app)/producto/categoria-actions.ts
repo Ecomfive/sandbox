@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { requireAlgunModulo, requireModuloEscritura } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { rutaLegible } from "@/lib/categorias/taxonomia";
 import { sugerirPorParecidos, type SugerenciaCategoria } from "@/lib/categorias/sugerir";
@@ -26,7 +26,8 @@ export interface OpcionCategoria {
  * «… Cuidado de la piel > Cremas hidratantes faciales»). Las más generales primero. Basta poder abrir Producto.
  */
 export async function buscarCategorias(texto: string): Promise<OpcionCategoria[]> {
-  await requireModulo(MODULO);
+  // También desde Gestión de IDs Dropi: ahí se crean los productos que sus publicaciones necesitan.
+  await requireAlgunModulo([MODULO, "publicaciones-dropi"]);
   // Solo letras, números y espacios: lo escrito no se arma crudo dentro del filtro.
   const palabras = String(texto ?? "")
     .normalize("NFC")
@@ -100,7 +101,7 @@ const PREFIJO_FOTOS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object
  * que aparecen en el nombre de una categoría de la taxonomía. Basta poder abrir Producto. Sin la migración 0113, nada.
  */
 export async function sugerirCategoria(nombre: string, foto: string | null): Promise<SugerenciaCategoria[]> {
-  await requireModulo(MODULO);
+  await requireAlgunModulo([MODULO, "publicaciones-dropi"]);
   const texto = String(nombre ?? "").trim().slice(0, 200);
   const supabase = createServiceClient();
 
