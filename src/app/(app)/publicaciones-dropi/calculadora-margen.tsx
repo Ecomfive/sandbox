@@ -4,8 +4,7 @@ import { useId, useMemo, useState } from "react";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { calcularMargen, leerMonto, precioParaMargen, textoWhatsapp } from "@/lib/publicaciones/calculadora";
-import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
+import { calcularMargen, leerMonto, precioParaMargen, productosPorSku, textoWhatsapp } from "@/lib/publicaciones/calculadora";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import type { FilaPublicacion } from "./def-publicaciones";
 
@@ -14,11 +13,11 @@ const ETIQUETA_NIVEL: Record<string, string> = { critico: "crítico", bajo: "baj
 const monto = (n: number | null) => (n === null ? "" : n.toFixed(2));
 const usd = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 const pct = (n: number) => `${Math.round(n * 100)} %`;
-const etiquetaOpcion = (p: FilaPublicacion) => `${numeroPublicacion(p.numero)} · ${p.nombre}${p.dropiId ? ` · ID ${p.dropiId}` : ""}`;
+const etiquetaOpcion = (sku: { codigo: string; nombre: string }) => `${sku.codigo} · ${sku.nombre}`;
 
 /**
- * Gestión de IDs Dropi › Calculadora de margen (27 oct 2026, pedido de Hernán): se elige una publicación (o se escribe un producto
- * nuevo), se ponen el costo de mercancía, el fulfillment y el precio de venta, y sale la utilidad y el margen con el color de las
+ * Gestión de IDs Dropi › Calculadora de margen (27 oct 2026, pedido de Hernán): se elige un producto por su SKU (o se escribe uno
+ * nuevo; la lista es por SKU, no por publicación ni por ID de Dropi, pedido de Jhokser), se ponen el costo de mercancía, el fulfillment y el precio de venta, y sale la utilidad y el margen con el color de las
  * reglas. «Copiar para WhatsApp» deja el resultado en el portapapeles, listo para pegarlo en un chat. No guarda nada.
  */
 export function CalculadoraMargen({ publicaciones, reglas }: { publicaciones: FilaPublicacion[]; reglas: Reglas }) {
@@ -44,9 +43,12 @@ export function CalculadoraMargen({ publicaciones, reglas }: { publicaciones: Fi
 function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones: FilaPublicacion[]; reglas: Reglas; alCerrar: () => void }) {
   const { mostrarToast } = useToast();
   const id = useId();
-  const opciones = useMemo(() => publicaciones.filter((p) => !p.archivada).map((p) => ({ etiqueta: etiquetaOpcion(p), p })), [publicaciones]);
+  // Un producto por SKU; sus datos salen de su publicación pública al día (`productosPorSku`).
+  const opciones = useMemo(() => productosPorSku(publicaciones).map((x) => ({ etiqueta: etiquetaOpcion(x.sku), codigo: x.sku.codigo, nombre: x.sku.nombre, p: x.representante })), [publicaciones]);
   const [buscar, setBuscar] = useState("");
   const [elegida, setElegida] = useState<FilaPublicacion | null>(null);
+  // El nombre con el que se llenó al elegir: el coste real solo vale mientras no se cambie el producto.
+  const [nombreElegido, setNombreElegido] = useState("");
   const [nombre, setNombre] = useState("");
   const [idDropi, setIdDropi] = useState("");
   const [costo, setCosto] = useState("");
@@ -55,10 +57,13 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
 
   function elegir(texto: string) {
     setBuscar(texto);
-    const o = opciones.find((x) => x.etiqueta === texto);
+    const t = texto.trim().toLowerCase();
+    // Vale la opción completa o solo el código del SKU.
+    const o = opciones.find((x) => x.etiqueta === texto) ?? opciones.find((x) => x.codigo.toLowerCase() === t);
     if (!o) return;
     setElegida(o.p);
-    setNombre(o.p.nombre);
+    setNombreElegido(o.nombre);
+    setNombre(o.nombre);
     setIdDropi(o.p.dropiId);
     setCosto(monto(o.p.costoMercancia));
     setFulfillment(monto(o.p.fulfillment));
@@ -70,7 +75,7 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
   const nivel = resultado ? nivelMargen(resultado.margen, reglas) : null;
   const paraMinimo = precioParaMargen(datos.costo, datos.fulfillment, reglas.margen_minimo);
   // El coste real (lo que costó la última compra) solo se incluye si la publicación elegida lo tiene y no se cambió el producto.
-  const costeReal = elegida && elegida.nombre === nombre ? elegida.costeReal : null;
+  const costeReal = elegida && nombreElegido === nombre ? elegida.costeReal : null;
   const mensaje = resultado ? textoWhatsapp({ nombre, idDropi, costeReal }, datos, resultado) : null;
 
   async function copiar() {
@@ -88,14 +93,14 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-pub`} className={labelClass}>
-            Publicación <span className="font-normal text-muted-foreground">(opcional: llena los datos)</span>
+            SKU del producto <span className="font-normal text-muted-foreground">(opcional: llena los datos)</span>
           </label>
           <input
             id={`${id}-pub`}
             list={`${id}-lista`}
             value={buscar}
             onChange={(e) => elegir(e.target.value)}
-            placeholder="Busca por nombre, PUB o ID de Dropi"
+            placeholder="Busca por SKU o nombre del producto"
             className={fieldClass}
             data-enfocar
           />
