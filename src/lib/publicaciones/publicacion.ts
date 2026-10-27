@@ -60,6 +60,11 @@ export const etiqueta = (lista: OpcionPublicacion[], valor: string | null | unde
 /** El correlativo propio de una publicación (migración 0123), distinto al ID de Dropi: «PUB-0012». Sin la migración, «—». */
 export const numeroPublicacion = (n: number | null | undefined): string => (n === null || n === undefined ? "—" : `PUB-${String(n).padStart(4, "0")}`);
 
+/**
+ * El fulfillment de todas las publicaciones (pedido de Hernán, 27 oct 2026; migración 0160): fijo, no se edita en la ficha ni al
+ * crear. Lo pone el servidor al guardar y es el valor por defecto de la base.
+ */
+export const FULFILLMENT_DROPI = 1.5;
 /** Margen bajo el que se marca con un punto rojo (30 %). */
 export const MARGEN_BAJO = 0.3;
 /** El margen está por debajo del mínimo (sin margen calculado no cuenta). */
@@ -191,7 +196,7 @@ export function leerTareaGcc(t: TareaClickup): PublicacionImportada {
     privatizado_email: textoCampo(c("Email"))?.toLowerCase() ?? null,
     precio_venta: numero(c("Precio de Venta")),
     costo_mercancia: numero(c("Costo Mercancía")),
-    fulfillment: numero(c("Fulfillment")),
+    fulfillment: FULFILLMENT_DROPI,
     coste_real: numero(c("Coste Real")),
     estado_venta: elegir(ESTADOS_VENTA, "Estado de Venta"),
     ubicacion: elegir(UBICACIONES, "Donde está"),
