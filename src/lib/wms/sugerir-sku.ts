@@ -3,7 +3,8 @@
 // «2x1»), y se toman las 3 primeras que quedan. Después va **lo que distingue** a ese producto de otro igual (21 oct 2026): la cantidad de
 // cápsulas, tabletas o gomitas, el color y la talla que diga el nombre («ACEITE/OREGANO/CAPSULAS/300/VERDE», «BOLSO/NAYLA/GRAN/PURPURA»), para
 // que no haga falta un /2 y /3 que no dicen nada. Una variante agrega sus valores («/ROJO/M»). Es solo una sugerencia: la persona puede
-// borrarla y escribir otro; el sistema no deja repetir un SKU.
+// borrarla y escribir otro; el sistema no deja repetir un SKU. **Un producto compuesto (pack o combo) siempre empieza por COMBO**
+// (27 oct 2026, pedido de Jhokser): «COMBO/OXIDO/NITRICO/SHILAJIT»; las palabras «combo» y «pack» del nombre no se repiten.
 
 const RELLENO = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "o", "u", "para", "con", "sin", "en", "por", "a", "al", "un", "una", "x", "dr", "dra", "mr", "mrs"]);
 
@@ -57,15 +58,24 @@ export const palabraSku = (t: string) =>
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 
-/** El SKU sugerido para un nombre de producto (vacío si el nombre no tiene palabras útiles). */
-export function sugerirSku(nombre: string, maxPalabras = 3): string {
+/** La palabra con que empieza el SKU de todo producto compuesto (pack o combo). */
+export const PREFIJO_COMPUESTO = "COMBO";
+
+/** El SKU sugerido para un nombre de producto (vacío si el nombre no tiene palabras útiles). Con `compuesto`, empieza por COMBO. */
+export function sugerirSku(nombre: string, maxPalabras = 3, opciones: { compuesto?: boolean } = {}): string {
+  const compuesto = opciones.compuesto === true;
+  // Sin nombre no hay nada que sugerir (ni siquiera «COMBO»).
+  if (!String(nombre ?? "").trim()) return "";
   const palabras = separar(nombre)
     .filter((p) => !RELLENO.has(palabraSku(p).toLowerCase()))
     // Medidas, cantidades y números («9g», «50ML», «2x1», «1000»): no identifican el producto.
     .filter((p) => !/^\d/.test(p))
     .map(palabraSku)
-    .filter((p) => p.length >= 2);
+    .filter((p) => p.length >= 2)
+    // En un compuesto, «combo», «pack» y «x2» ya los dice el prefijo.
+    .filter((p) => !compuesto || (p !== PREFIJO_COMPUESTO && p !== "PACK" && !/^X\d{1,2}$/.test(p)));
   const base = palabras.slice(0, maxPalabras);
+  if (compuesto) base.unshift(PREFIJO_COMPUESTO);
   if (base.length === 0) return "";
   // Lo que distingue al producto va después de su nombre, salvo que el nombre ya lo diga.
   const codigo = [...base, ...distintivosDeNombre(nombre).filter((d) => !base.includes(d))].join("/");

@@ -107,9 +107,10 @@ export function CrearProductoPanel({
   const [skuOcupado, setSkuOcupado] = useState<string | null>(null);
   // Si la persona escribió el SKU a mano: entonces el sistema ya no lo cambia por su sugerencia.
   const [skuTocado, setSkuTocado] = useState(false);
-  async function sugerir(desde: string) {
+  // Un compuesto (pack o combo) sugiere un SKU que empieza por COMBO; `esCombo` se pasa cuando el tipo cambia en el mismo momento.
+  async function sugerir(desde: string, esCombo: boolean = combo) {
     if (!desde.trim()) return;
-    const { codigo: sugerido } = await sugerirSkuLibre(desde);
+    const { codigo: sugerido } = await sugerirSkuLibre(desde, esCombo);
     if (sugerido) {
       setCodigo(sugerido);
       setSkuOcupado(null);
@@ -159,7 +160,7 @@ export function CrearProductoPanel({
         setCodigo(codigoInicial ?? "");
         setSkuTocado(!!codigoInicial);
         // Con nombre pero sin SKU, se sugiere el SKU como al escribir el nombre.
-        if (nombreInicial && !codigoInicial) void sugerir(nombreInicial);
+        if (nombreInicial && !codigoInicial) void sugerir(nombreInicial, iniciales.length > 0 || !!comoCompuesto);
         setConVariantes(false);
         setOrigenBarras(null);
         setVueltaEnvio((v) => v + 1);
@@ -192,7 +193,11 @@ export function CrearProductoPanel({
                 titulo="Tipo"
                 nombre="tipo"
                 valor={tipo}
-                alCambiar={setTipo}
+                alCambiar={(v) => {
+                  setTipo(v);
+                  // Al pasar de Simple a Compuesto (o al revés) el SKU sugerido cambia con él, si nadie lo escribió a mano.
+                  if (!skuTocado && nombre.trim()) void sugerir(nombre, v === "combo");
+                }}
                 opciones={[
                   { valor: "simple", etiqueta: "Simple", detalle: "un solo producto" },
                   { valor: "combo", etiqueta: "Compuesto", detalle: "lleva otros productos" },
@@ -268,7 +273,7 @@ export function CrearProductoPanel({
                   type="button"
                   onClick={() => {
                     setSkuTocado(false);
-                    void sugerir(nombre);
+                    void sugerir(nombre, combo);
                   }}
                   className="mt-1 rounded text-xs font-medium text-primario hover:underline"
                 >
