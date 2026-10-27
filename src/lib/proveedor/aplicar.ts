@@ -84,7 +84,8 @@ async function revisarFoto(supabase: Supabase, cuenta: CuentaProveedor, p: Pedid
 /**
  * Cotizar (o corregir la cotización mientras Ecomfive no decide): unidades (las de la caja), costo por unidad o total, foto real y
  * comentario. La compra pasa a «Cotizado» con esas unidades y ese monto en un solo cambio (así el espejo conserva las unidades que
- * pidió Ecomfive para mostrar «pediste 1,000»).
+ * pidió Ecomfive para mostrar «pediste 1,000»). Ya en producción (Ecomfive confirmó otras unidades y falta su costo) también se edita,
+ * pero la compra sigue en producción (27 oct 2026). Cada cotización queda en la Actividad (campo `cotizacion`, antes → después).
  */
 export async function aplicarCotizacion(
   cuenta: CuentaProveedor,
@@ -94,7 +95,8 @@ export async function aplicarCotizacion(
   const supabase = createServiceClient();
   const p = await pedidoDe(supabase, cuenta, pedidoId);
   if ("error" in p) return p;
-  if (!puedePasar("proveedor", p.etapa, "cotizado")) return { error: "Este pedido ya no se puede cotizar: Ecomfive ya decidió." };
+  const enProduccion = p.etapa === "produccion";
+  if (!puedePasar("proveedor", p.etapa, enProduccion ? "produccion" : "cotizado")) return { error: "Este pedido ya no se puede cotizar: Ecomfive ya decidió." };
   const cot = validarCotizacion(entrada);
   if ("error" in cot) return cot;
   const comentario = typeof entrada.comentario === "string" ? entrada.comentario.trim().slice(0, MAX_COMENTARIO) : "";
@@ -112,15 +114,22 @@ export async function aplicarCotizacion(
   }
   const { error: errorCompra } = await supabase
     .from("wms_compras")
-    .update({ qty_total: cot.unidades, monto_total: cot.montoTotal, etapa: "cotizado", actualizado_en: new Date().toISOString() })
+    .update({ qty_total: cot.unidades, monto_total: cot.montoTotal, ...(enProduccion ? {} : { etapa: "cotizado" }), actualizado_en: new Date().toISOString() })
     .eq("id", p.compra_id);
   if (errorCompra) return { error: "No se pudo guardar la cotización." };
 
-  await anotarEtapa(supabase, cuenta, p.compra_id, compra.etapa as string, "cotizado");
+  if (!enProduccion) await anotarEtapa(supabase, cuenta, p.compra_id, compra.etapa as string, "cotizado");
   const resumen = `${entero(cot.unidades)} u. · ${dinero(cot.costoUnitario)} por unidad · ${dinero(cot.montoTotal)}`;
+  // El historial del pedido: lo que había (si ya había unidades) y lo que quedó.
+  const qtyAntes = compra.qty_total == null ? null : Number(compra.qty_total);
+  const montoAntes = compra.monto_total == null ? 0 : Number(compra.monto_total);
+  const antes = p.etapa === "por_cotizar" || qtyAntes == null ? null : `${entero(qtyAntes)} u.${montoAntes > 0 ? ` · ${dinero(montoAntes)}` : ""}`;
+  await supabase
+    .from("wms_compra_eventos")
+    .insert({ compra_id: p.compra_id, campo: "cotizacion", valor_antes: antes, valor_despues: `${entero(cot.unidades)} u. · ${dinero(cot.montoTotal)}`, autor: autorDe(cuenta), origen: "proveedor" });
   const { data: nota } = await supabase
     .from("wms_compra_comentarios")
-    .insert({ compra_id: p.compra_id, autor: autorDe(cuenta), texto: `Cotización de ${cuenta.proveedor.nombre}: ${resumen}${comentario ? `\n${comentario}` : ""}` })
+    .insert({ compra_id: p.compra_id, autor: autorDe(cuenta), texto: `${enProduccion ? "Cotización corregida en producción" : "Cotización"} de ${cuenta.proveedor.nombre}: ${resumen}${comentario ? `\n${comentario}` : ""}` })
     .select("id")
     .single();
   if (foto && nota) {
@@ -133,13 +142,13 @@ export async function aplicarCotizacion(
   // La foto anterior, si se reemplazó.
   if (foto && p.foto_real_ruta && p.foto_real_ruta !== entrada.fotoRuta) await supabase.storage.from(BUCKET_PROVEEDOR).remove([p.foto_real_ruta]);
 
-  const corrigio = p.etapa === "cotizado";
+  const corrigio = p.etapa === "cotizado" || enProduccion;
   await avisarAEcomfive(
     supabase,
     cuenta,
     p,
     "cotizacion",
-    `${cuenta.proveedor.nombre} ${corrigio ? "corrigió la cotización de" : "cotizó"} ${p.producto}`,
+    `${cuenta.proveedor.nombre} ${corrigio ? "corrigió la cotización de" : "cotizó"} ${p.producto}${enProduccion ? " (ya en producción)" : ""}`,
     `${resumen}${foto ? " · subió la foto real" : ""}${comentario ? ` · «${comentario}»` : ""}`,
   );
   return {};

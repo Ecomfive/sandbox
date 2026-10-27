@@ -810,6 +810,18 @@ convenciones técnicas del código.
   Envíos) y esperando a Shen Zhen (> `DIAS_ESPERA_COTIZAR` 5 en Por cotizar, por `proveedor_pedidos.creado_en`; avisos sin confirmar).
   Lo carga `cargarTareasChin` (`tareas-datos.ts`; países permitidos, montos solo si los ve). `marcarVistoChin(pedidoIds)` pone
   `leida_en`. Componente `compras/tablero-chin/que-hacer-chin.tsx` (6 a la vista, «Ver las N tareas»).
+  **Editar la cotización en producción, historial y fecha de confirmación** (27 oct 2026, pedido de Francis): Ecomfive a veces confirma otra
+  cantidad (le cotizaron 1,000, confirma 500) y pasa la compra a producción; Shen Zhen pone el monto de lo confirmado con «Editar cotización»
+  en «En producción» (paso `editarEnProduccion` de `permisos-proveedor.ts`; `aplicarCotizacion` no cambia la etapa si ya está en producción, y
+  `prepararSubidaFotoReal` acepta la foto). Toda cotización deja un evento `cotizacion` (antes → después) en `wms_compra_eventos`.
+  **Historial** del pedido: «Historial» bajo el código de cada producto abre `VentanaHistorial` (`portal-chin.tsx`), que pide
+  `historialPedidoProveedor` (`proveedor/actions.ts`, traduce nota y registro de pagos al chino) o `historialPedidoEcomfive`
+  (`compras/tablero-chin/historial-actions.ts`: Compras, países permitidos, sin montos si los tiene ocultos). Sale de la Actividad de la compra
+  (`cargarHistorialPedido`, `historial-datos.ts`) filtrada por `historialDePedido` (`src/lib/proveedor/historial.ts`, con prueba): solo
+  cotización, unidades, monto, cantidad de las líneas (sin el SKU), etapas visibles en el portal, envío, llegada, nota y registro de pagos;
+  al proveedor lo de Ecomfive le sale «Ecomfive», sin nombres. **Confirmado**: `PedidoPortal.confirmadoEn` = la última vez que la compra
+  pasó a `produccion` (`cargarConfirmaciones`, solo de los pedidos en producción y enviados, de 100 en 100), columna en «En producción» y
+  «Enviado».
   **Buscador y país** (26 oct 2026, pedido de Hernán y Francis): arriba de las pestañas del portal (el de Shen Zhen y el Tablero)
   `BarraFiltroPortal` (`src/components/proveedor/filtro-portal.tsx`, contexto `FiltroPortalProveedor` / `useFiltroPortal`; lógica pura en
   `src/lib/proveedor/filtro.ts`, con prueba: cada palabra en el nombre, su traducción o el código, sin acentos) filtra todas las pestañas y sus

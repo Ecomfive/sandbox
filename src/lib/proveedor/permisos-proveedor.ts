@@ -17,6 +17,8 @@ export const PASOS: Readonly<Record<string, Paso>> = {
   // Corregir una cotización mientras Ecomfive no decide.
   recotizar: { lado: "proveedor", de: "cotizado", a: ["cotizado"] },
   decidir: { lado: "ecomfive", de: "cotizado", a: ["produccion", "descartado"] },
+  // Editar la cotización ya confirmada (Ecomfive confirmó otras unidades y falta el costo de esas): sigue en producción (27 oct 2026).
+  editarEnProduccion: { lado: "proveedor", de: "produccion", a: ["produccion"] },
   enviar: { lado: "proveedor", de: "produccion", a: ["enviado"] },
   llegada: { lado: "ecomfive", de: "enviado", a: ["llegado"] },
 };
