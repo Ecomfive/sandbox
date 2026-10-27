@@ -13,11 +13,13 @@ import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
 import { archivarPublicacion, pausarPublicacion, republicarPublicacion } from "./actions";
+import { BotonIconoFila } from "./boton-icono-fila";
+import { motivoArchivar, motivoPausar, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
-import { conexionDropi, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, estadoBotones, paraReactivar, pausada, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
 const COLUMNAS_CON_VENTAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
@@ -66,62 +68,68 @@ function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: st
 }
 
 /**
- * «Archivar» de la fila (o «Sacar de Archivados» si ya lo está). Ninguna publicación se elimina (regla de Hernán, 23 oct 2026): se
- * archiva, y se puede deshacer. Sin stock, el botón de la fila pausa (27 oct 2026; «Archivar» del todo queda en la ficha), y una pausada
- * se reactiva con el mismo botón.
+ * «Pausar por falta de stock» de la fila (27 oct 2026), o «Reactivar» si ya está pausada. Siempre se ve: apagado, dice por qué.
+ */
+function BotonPausarFila({ f }: { f: FilaPublicacion }) {
+  const { mostrarToast } = useToast();
+  const [pendiente, empezar] = useTransition();
+  const estaPausada = pausada(f);
+  const reactivarYa = paraReactivar(f);
+  function cambiar() {
+    empezar(async () => {
+      const r = await (estaPausada ? archivarPublicacion(f.id, false) : pausarPublicacion(f.id)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      mostrarToast(r.error ?? r.detalle ?? (estaPausada ? "Publicación reactivada" : "Publicación pausada"), r.error ? "destructive" : undefined);
+    });
+  }
+  return (
+    <BotonIconoFila
+      texto={estaPausada ? (reactivarYa ? "Reactivar: volvió el stock" : "Reactivar publicación") : "Pausar por falta de stock"}
+      motivo={motivoPausar(estadoBotones(f))}
+      icono={estaPausada ? ReactivarIcon : PausaIcon}
+      nombre={f.nombre}
+      onClick={cambiar}
+      ocupado={pendiente}
+      clase={reactivarYa ? "text-success hover:bg-success-soft" : undefined}
+    />
+  );
+}
+
+/**
+ * «Archivar» de la fila (o «Sacar de Archivados» si ya lo está). Ninguna publicación con ID de Dropi se elimina (regla de Hernán, 23 oct
+ * 2026): se archiva, y se puede deshacer. Siempre se ve, también sin stock (27 oct 2026).
  */
 function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
   const archivar = !f.archivada;
-  const pausar = archivar && puedePausar(f);
-  const estaPausada = pausada(f);
-  const reactivarYa = paraReactivar(f);
   function cambiar() {
     empezar(async () => {
-      const r = await (pausar ? pausarPublicacion(f.id) : archivarPublicacion(f.id, archivar)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
-      const hecho = pausar ? "Publicación pausada" : archivar ? "Publicación archivada" : estaPausada ? "Publicación reactivada" : "Publicación fuera de Archivados";
-      mostrarToast(r.error ?? r.detalle ?? hecho, r.error ? "destructive" : undefined);
+      const r = await archivarPublicacion(f.id, archivar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      mostrarToast(r.error ?? r.detalle ?? (archivar ? "Publicación archivada" : "Publicación fuera de Archivados"), r.error ? "destructive" : undefined);
     });
   }
-  const texto = pausar
-      ? "Pausar por falta de stock"
-      : archivar
-        ? "Archivar publicación"
-        : estaPausada
-          ? reactivarYa
-            ? "Reactivar: volvió el stock"
-            : "Reactivar publicación"
-          : "Sacar de Archivados";
-  const Icono = pausar ? PausaIcon : estaPausada ? ReactivarIcon : ArchivarIcon;
   return (
-    <Tooltip texto={texto}>
-      <button
-        type="button"
-        onClick={cambiar}
-        disabled={pendiente}
-        aria-label={`${texto}: ${f.nombre}`}
-        className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${
-          reactivarYa ? "text-success hover:bg-success-soft" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-        } ${anilloFoco}`}
-      >
-        <Icono className="h-4 w-4" />
-      </button>
-    </Tooltip>
+    <BotonIconoFila
+      texto={archivar ? "Archivar publicación" : "Sacar de Archivados"}
+      motivo={motivoArchivar(estadoBotones(f))}
+      icono={ArchivarIcon}
+      nombre={f.nombre}
+      onClick={cambiar}
+      ocupado={pendiente}
+    />
   );
 }
 
 /**
  * «Republicar» desde la fila, sin abrir la ficha (pedido de Hernán, 27 oct 2026): pide confirmar y lo deja pendiente para «Aplicar en Dropi»,
- * como el botón de la ficha. Si ya está pendiente, el ícono va en rojo y no se puede volver a pedir. Donde no se ofrece, deja el hueco para que
- * las filas no se corran.
+ * como el botón de la ficha. Si ya está pendiente, el ícono va en rojo y no se puede volver a pedir. Donde no se ofrece, va apagado
+ * y dice por qué.
  */
 function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
   const { mostrarToast } = useToast();
   const [enviando, empezar] = useTransition();
   const [confirmando, setConfirmando] = useState(false);
-  if (!puedeRepublicar(f)) return <span aria-hidden="true" className="mr-1 w-9 shrink-0" />;
-  const yaPendiente = republicacionPendiente(f);
+  const yaPendiente = puedeRepublicar(f) && republicacionPendiente(f);
   // Pide el precio del producto nuevo antes de dejarlo pendiente (27 oct 2026).
   function republicar(precio: number) {
     empezar(async () => {
@@ -130,22 +138,18 @@ function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
       if (!r.error) setConfirmando(false);
     });
   }
-  const texto = yaPendiente ? "Republicación pendiente" : "Republicar en Dropi";
   return (
     <>
-    {confirmando && <ConfirmarRepublicar p={f} enviando={enviando} alCerrar={() => setConfirmando(false)} alConfirmar={republicar} />}
-    <Tooltip texto={texto}>
-      <button
-        type="button"
+      {confirmando && <ConfirmarRepublicar p={f} enviando={enviando} alCerrar={() => setConfirmando(false)} alConfirmar={republicar} />}
+      <BotonIconoFila
+        texto={yaPendiente ? "Republicación pendiente" : "Republicar en Dropi"}
+        motivo={yaPendiente ? null : motivoRepublicar(estadoBotones(f))}
+        icono={ActualizarIcon}
+        nombre={f.nombre}
         onClick={() => !yaPendiente && setConfirmando(true)}
-        disabled={enviando}
-        aria-disabled={yaPendiente || undefined}
-        aria-label={`${texto}: ${f.nombre}`}
-        className={`mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${yaPendiente ? "cursor-default text-destructive" : "text-muted-foreground hover:bg-muted hover:text-foreground"} ${anilloFoco}`}
-      >
-        <ActualizarIcon className="h-4 w-4" />
-      </button>
-    </Tooltip>
+        ocupado={enviando}
+        clase={yaPendiente ? "cursor-default text-destructive" : undefined}
+      />
     </>
   );
 }
@@ -229,7 +233,7 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
     { nombre: "En Dropi" },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[11.5rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[14rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
           {c.nombre}
@@ -372,17 +376,14 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
   return (
     <div className="flex items-center">
       <div className="min-w-0 flex-1">{fila}</div>
-      {/* Una duplicada no sale de Archivados: en su lugar, un espacio del mismo ancho para que las filas no se corran. */}
-      {f.duplicadaDe ? (
-        <span aria-hidden="true" className="mr-3 w-[9.75rem] shrink-0" />
-      ) : (
-        <>
-          <BotonRepublicarFila f={f} />
-          <BotonPrivatizarFila f={f} />
-          <BotonApagarFila f={f} />
-          <BotonArchivarFila f={f} />
-        </>
-      )}
+      {/* Siempre los mismos cinco botones, en el mismo orden; los que no aplican van apagados y dicen por qué (27 oct 2026). */}
+      <div className="mr-3 flex shrink-0 items-center gap-1">
+        <BotonRepublicarFila f={f} />
+        <BotonPrivatizarFila f={f} />
+        <BotonApagarFila f={f} />
+        <BotonPausarFila f={f} />
+        <BotonArchivarFila f={f} />
+      </div>
     </div>
   );
 }

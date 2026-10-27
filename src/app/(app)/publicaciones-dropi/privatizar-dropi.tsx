@@ -1,11 +1,13 @@
 "use client";
 
+import { BotonIconoFila } from "./boton-icono-fila";
+import { motivoPrivatizar } from "@/lib/publicaciones/botones-fila";
+
 import { useEffect, useRef, useState, useTransition } from "react";
 import { BotonAccion } from "@/components/ui/boton-accion";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { CandadoIcon } from "@/lib/nav-icons";
@@ -13,7 +15,7 @@ import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
 import { faltantesPrivatizar, inicialesDe, limpiarIniciales, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { buscarDropshippersParaPrivatizar, privatizarPublicacion } from "./actions";
-import type { FilaPublicacion } from "./def-publicaciones";
+import { estadoBotones, type FilaPublicacion } from "./def-publicaciones";
 
 /** Las bodegas de ECOMFIVE con stock de este producto en Dropi (la B280 es de Dropi y no se mueve desde aquí), de más a menos stock. */
 const bodegasConStock = (p: FilaPublicacion) => (p.bodegasDropi ?? []).filter((b) => b.id !== BODEGA_DROPI && b.stock > 0).sort((a, b) => b.stock - a.stock);
@@ -215,22 +217,13 @@ export function BotonPrivatizarDropi({ p, deshabilitado }: { p: FilaPublicacion;
   );
 }
 
-/** El ícono «Privatizar en Dropi» de cada fila, junto al de apagar: abre la misma ventana. Si no se puede privatizar, deja un espacio del mismo ancho. */
+/** El ícono «Privatizar en Dropi» de cada fila, junto al de apagar: abre la misma ventana. Si no se puede privatizar, va apagado y dice por qué. */
 export function BotonPrivatizarFila({ f }: { f: FilaPublicacion }) {
   const [abierta, setAbierta] = useState(false);
-  if (!puedePrivatizar(f)) return <span aria-hidden="true" className="mr-1 w-9 shrink-0" />;
+  // Siempre se ve (27 oct 2026): si no se puede privatizar, va apagado y dice por qué.
   return (
     <>
-      <Tooltip texto="Privatizar en Dropi">
-        <button
-          type="button"
-          onClick={() => setAbierta(true)}
-          aria-label={`Privatizar en Dropi: ${f.nombre}`}
-          className={`mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${anilloFoco}`}
-        >
-          <CandadoIcon className="h-4 w-4" />
-        </button>
-      </Tooltip>
+      <BotonIconoFila texto="Privatizar en Dropi" motivo={motivoPrivatizar(estadoBotones(f))} icono={CandadoIcon} nombre={f.nombre} onClick={() => setAbierta(true)} />
       {abierta && <VentanaPrivatizar p={f} alCerrar={() => setAbierta(false)} />}
     </>
   );

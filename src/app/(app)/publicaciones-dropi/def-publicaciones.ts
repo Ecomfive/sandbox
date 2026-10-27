@@ -11,6 +11,7 @@ import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
 import { ACCIONES, BODEGA_DROPI, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
 import { listaParaReactivar, sePuedePausar } from "@/lib/publicaciones/archivar";
+import type { EstadoBotones } from "@/lib/publicaciones/botones-fila";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { Revision } from "@/lib/publicaciones/optimizacion";
@@ -384,3 +385,21 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
   ],
 };
 
+
+/** Lo que necesitan los botones de la fila para decir por qué están apagados (`botones-fila.ts`). */
+export function estadoBotones(f: FilaPublicacion): EstadoBotones {
+  return {
+    dropiId: f.dropiId,
+    archivada: f.archivada,
+    sinPublicar: f.sinPublicar,
+    apagadoPendiente: f.apagadoPendiente,
+    duplicada: !!f.duplicadaDe,
+    pausada: pausada(f),
+    archivadaEnDropi: f.enDropi === "archivado",
+    tipo: f.tipoDropi,
+    bodegaId: f.bodega?.id ?? null,
+    stock: stockDe(f),
+    privado: privadoDe(f),
+    stockPropio: (f.bodegasDropi ?? []).some((b) => b.id !== BODEGA_DROPI && b.stock > 0),
+  };
+}
