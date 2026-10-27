@@ -48,6 +48,7 @@ export function CrearProductoPanel({
   codigoInicial,
   fotoInicial,
   comoCompuesto,
+  componentesSugeridos,
   sinVariantes,
 }: {
   opcionesSimples: OpcionSkuMaestro[];
@@ -73,13 +74,16 @@ export function CrearProductoPanel({
   fotoInicial?: string | null;
   /** Se abre ya como compuesto (un pack o combo) aunque todavía no haya un componente elegido. */
   comoCompuesto?: boolean;
+  /** Los componentes que se sugieren por el nombre de la publicación (el simple de cada parte del combo): la ficha avisa que se revisen. */
+  componentesSugeridos?: CompuestoInicial[];
   /** Sin el bloque de variantes (quien crea desde Gestión de IDs Dropi no tiene los permisos de Producto para ellas). */
   sinVariantes?: boolean;
 }) {
   const [tipo, setTipo] = useState("simple");
   const combo = tipo === "combo";
   // El compuesto de la dirección se usa al abrir la primera vez; después «Agregar» abre la ficha en blanco como siempre.
-  const [componenteInicial, setComponenteInicial] = useState<CompuestoInicial | null>(null);
+  const [componenteInicial, setComponenteInicial] = useState<CompuestoInicial[]>([]);
+  const [sugeridos, setSugeridos] = useState(false);
   const compuestoUsado = useRef(false);
   // El código de barras (decisión de Hernán, 8 oct 2026): lo normal es que el producto venga sin código, así que viene marcado
   // «Interno» (también en un compuesto); si trae el del fabricante, se elige y se escribe.
@@ -142,11 +146,14 @@ export function CrearProductoPanel({
       boton={boton}
       abrirConNuevo={abrirConNuevo}
       alAbrir={() => {
-        const inicial =
+        const unico =
           compuestoInicial && !(abrirConNuevo && compuestoUsado.current) && opcionesSimples.some((o) => o.id === compuestoInicial.componenteId) ? compuestoInicial : null;
         compuestoUsado.current = true;
-        setComponenteInicial(inicial);
-        setTipo(inicial || comoCompuesto ? "combo" : "simple");
+        const delNombre = unico ? [] : (componentesSugeridos ?? []).filter((c) => opcionesSimples.some((o) => o.id === c.componenteId));
+        const iniciales = unico ? [unico] : delNombre;
+        setComponenteInicial(iniciales);
+        setSugeridos(delNombre.length > 0);
+        setTipo(iniciales.length || comoCompuesto ? "combo" : "simple");
         setNombre(nombreInicial ?? "");
         setFoto(fotoInicial ?? null);
         setCodigo(codigoInicial ?? "");
@@ -364,6 +371,12 @@ export function CrearProductoPanel({
             <Seccion icono={ProductoIcon} titulo="Componentes">
               {opcionesSimples.length > 0 ? (
                 <div id="campo-componentes">
+                  {sugeridos && (
+                    <p role="status" className="m-0 mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+                      <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning" />
+                      Sugeridos por el nombre: revisa que sean los productos y las cantidades correctos.
+                    </p>
+                  )}
                   <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} inicial={componenteInicial} alCambiar={setElegidos} />
                 </div>
               ) : (
