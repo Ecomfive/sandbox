@@ -1,9 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useOpcionesSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
-import { fotoParaProducto, pareceCompuesto } from "@/lib/publicaciones/producto-desde-publicacion";
+import { fotoParaProducto, pareceCompuesto, sugerirComponentes } from "@/lib/publicaciones/producto-desde-publicacion";
 import { crearProducto } from "../producto/actions";
 import { CrearProductoPanel } from "../producto/crear-producto-panel";
 import { vincularSkuPublicacion } from "./actions";
@@ -35,9 +35,13 @@ export function CrearProductoDePublicacion({
 }) {
   const { mostrarToast } = useToast();
   const opcionesSku = useOpcionesSkuMaestro();
+  const simples = useMemo(() => opcionesSku.filter((o) => !o.compuesto), [opcionesSku]);
+  // Un simple por cada parte del nombre del combo (o el del pack con su cantidad): la persona los revisa y los cambia.
+  const sugeridos = useMemo(() => sugerirComponentes(nombre, simples), [nombre, simples]);
   return (
     <CrearProductoPanel
-      opcionesSimples={opcionesSku.filter((o) => !o.compuesto)}
+      opcionesSimples={simples}
+      componentesSugeridos={sugeridos}
       nombreInicial={nombre.slice(0, 200)}
       codigoInicial={(sku ?? "").replace(/\s/g, "").slice(0, 60)}
       fotoInicial={fotoParaProducto(fotos)}

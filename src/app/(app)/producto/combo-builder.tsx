@@ -20,14 +20,15 @@ export function ComboBuilder({
 }: {
   opciones: OpcionSkuMaestro[];
   nombreProducto: string;
-  /** El primer componente ya elegido (un pack de Dropi: N × el simple). */
-  inicial?: { componenteId: string; cantidad: number } | null;
+  /** Los componentes ya elegidos al abrir: un pack de Dropi (N × el simple) o los que se sugieren por el nombre de un combo. */
+  inicial?: { componenteId: string; cantidad: number } | { componenteId: string; cantidad: number }[] | null;
   /** Cada vez que cambian los productos elegidos (para saber si es un pack de uno solo o de varios distintos). */
   alCambiar?: (ids: string[]) => void;
 }) {
-  const [filas, setFilas] = useState<{ clave: number; id: string | null; cantidad: string }[]>(() => [
-    { clave: 0, id: inicial?.componenteId ?? null, cantidad: String(inicial?.cantidad ?? 1) },
-  ]);
+  const [filas, setFilas] = useState<{ clave: number; id: string | null; cantidad: string }[]>(() => {
+    const lista = inicial ? (Array.isArray(inicial) ? inicial : [inicial]) : [];
+    return lista.length ? lista.map((c, i) => ({ clave: i, id: c.componenteId, cantidad: String(c.cantidad) })) : [{ clave: 0, id: null, cantidad: "1" }];
+  });
   const elegidos = new Set(filas.map((f) => f.id).filter(Boolean));
   const clavesElegidas = [...elegidos].join(",");
   useEffect(() => {
