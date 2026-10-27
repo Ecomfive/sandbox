@@ -8,9 +8,16 @@
     if (e.source !== window || e.origin !== location.origin) return;
     const d = e.data;
     if (!d || d.canal !== CANAL || d.dir !== "pedido" || typeof d.id !== "string") return;
-    chrome.runtime.sendMessage(d.msg, (resp) => {
-      const error = chrome.runtime.lastError;
-      window.postMessage({ canal: CANAL, dir: "respuesta", id: d.id, resp: error ? { error: error.message } : resp }, location.origin);
-    });
+    const responder = (resp) => window.postMessage({ canal: CANAL, dir: "respuesta", id: d.id, resp }, location.origin);
+    try {
+      chrome.runtime.sendMessage(d.msg, (resp) => {
+        const error = chrome.runtime.lastError;
+        responder(error ? { error: error.message } : resp);
+      });
+    } catch {
+      // La extensión se recargó o se actualizó y esta página quedó con el puente viejo («Extension context invalidated», 27 oct 2026):
+      // se avisa en vez de quedarse sin respuesta; al recargar la página entra el puente nuevo.
+      responder({ error: "EXTENSION_ACTUALIZADA" });
+    }
   });
 })();
