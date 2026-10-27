@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
 import { CUENTAS, GRUPOS, LECTORES, PARTES, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
-import { empezarActualizacion, marcarPartesConError, procesarParte, terminarActualizacion } from "./actions";
+import { archivosSubidos, empezarActualizacion, marcarPartesConError, procesarParte, subidasDeLector, terminarActualizacion } from "./actions";
 import type { Corrida, UltimaParte } from "./datos";
 
 type EstadoExtension = "buscando" | "lista" | "no_instalada";
@@ -32,6 +32,8 @@ const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-PA", { hour: 
 const boton = `inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold disabled:opacity-50 ${anilloFoco}`;
 const botonSecundario = `${boton} border border-border-control bg-card hover:bg-muted`;
 const botonPrincipal = `${boton} bg-foreground text-background hover:bg-foreground/85`;
+// Lo mismo que usa el servidor: una que lleva más de 40 minutos «corriendo» ya no se retoma ni bloquea.
+const VIGENCIA_MS = 40 * 60000;
 
 /** Lo que dice la barra mientras un lector trabaja en la pestaña de Dropi. */
 function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
@@ -52,7 +54,8 @@ function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
 /**
  * El panel «Actualizar Dropi» (boceto aprobado el 26 oct 2026): las cuentas de Dropi con su sesión, qué se actualiza y cuándo fue
  * la última vez, y el botón que lo corre con la extensión «Ecomfive · Dropi». Mientras corre: el avance de cada parte y, si falta
- * iniciar sesión, la pestaña de Dropi al frente y un aviso; al entrar, sigue sola.
+ * iniciar sesión, la pestaña de Dropi al frente y un aviso; al entrar, sigue sola. La que manda es esta página: si se recarga (o se
+ * recarga la extensión) a medias, al volver la retoma sola con la barra y lo que está haciendo (27 oct 2026, pedido de Hernán).
  */
 export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponible: boolean; corridas: Corrida[]; ultima: Partial<Record<ClaveParte, UltimaParte>> }) {
   const router = useRouter();
@@ -67,6 +70,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   // Mientras arranca (antes de que el servidor responda) los botones ya no sirven: un doble clic arrancaba dos.
   const arrancando = useRef(false);
   const [empezando, setEmpezando] = useState(false);
+  const retomada = useRef(false);
 
   const revisarSesion = useCallback(async (abrir: boolean) => {
     const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais: "pa", abrir }, abrir ? 45000 : 10000);
@@ -132,29 +136,43 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       arrancando.current = false;
       return setError(r.error ?? "No se pudo empezar la actualización.");
     }
-    const id = r.id;
-    setCorriendo({ id, pedidas: partes, pasos: Object.fromEntries(partes.map((p) => [p, { estado: "espera", detalle: "En espera" }])), avance: "Revisando la sesión de Dropi…", esperandoSesion: false, terminado: null });
+    setCorriendo({ id: r.id, pedidas: partes, pasos: Object.fromEntries(partes.map((p) => [p, { estado: "espera", detalle: "En espera" }])), avance: "Revisando la sesión de Dropi…", esperandoSesion: false, terminado: null });
+    await correr(r.id, partes, r.subidas, [], false);
+  }
 
+  /**
+   * Corre (o retoma) una actualización: por cada lector, lee en Dropi con la extensión y guarda cada parte. Al retomar se saltan las
+   * partes que ya quedaron guardadas; si la extensión ya subió lo leído, se guarda sin volver a leer; si la pestaña de Dropi sigue
+   * leyendo, se espera; y si no, se vuelve a lanzar la lectura con direcciones de subida nuevas.
+   */
+  async function correr(id: string, partes: ClaveParte[], subidas: Partial<Record<ClaveLector, Record<string, string>>>, hechas: ClaveParte[], retomando: boolean) {
     for (const lector of lectoresDe(partes)) {
       if (detener.current) break;
-      const suyas = PARTES.filter((p) => p.lector === lector && partes.includes(p.clave)).map((p) => p.clave);
-      if (!(await asegurarSesion())) break;
-      for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
+      const suyas = PARTES.filter((p) => p.lector === lector && partes.includes(p.clave) && !hechas.includes(p.clave)).map((p) => p.clave);
+      if (!suyas.length) continue;
       let fallo: string | null = null;
+      // Al retomar: ¿la extensión ya subió todo lo de este lector? Entonces solo falta guardarlo.
+      const subidos = retomando ? ((await archivosSubidos(id).catch(() => null))?.archivos ?? []) : [];
+      const yaLeido = retomando && LECTORES[lector].archivos.every((a) => subidos.includes(a));
       try {
-        await pedirExtension({ tipo: "lanzar", lector, subida: r.subidas[lector] ?? {} }, 45000);
-        for (;;) {
-          await esperar(3000);
-          if (detener.current) {
-            fallo = "Detenida.";
-            break;
+        if (!yaLeido) {
+          // Al retomar: ¿la pestaña de Dropi sigue leyendo? Entonces se espera sin lanzar otra lectura.
+          const previo = retomando ? await pedirExtension<AvanceLector | null>({ tipo: "avance", lector }).catch(() => null) : null;
+          if (!previo || previo.fin) {
+            if (!(await asegurarSesion())) break;
+            let subida = subidas[lector];
+            if (!subida) {
+              const s = await subidasDeLector(id, lector).catch(() => ({ error: "No se pudo preparar la subida.", subida: undefined }));
+              if (s.error || !s.subida) throw new Error(s.error ?? "No se pudo preparar la subida.");
+              subida = s.subida;
+            }
+            for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
+            await pedirExtension({ tipo: "lanzar", lector, subida }, 45000);
+          } else {
+            for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
+            ponerAvance(textoAvance(lector, previo));
           }
-          const a = await pedirExtension<AvanceLector | null>({ tipo: "avance", lector }).catch(() => null);
-          ponerAvance(textoAvance(lector, a));
-          if (a?.fin) {
-            if (a.error) fallo = a.error;
-            break;
-          }
+          fallo = await esperarLector(lector);
         }
       } catch (e) {
         fallo = e instanceof Error ? e.message : String(e);
@@ -177,6 +195,55 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
     arrancando.current = false;
     router.refresh();
   }
+
+  /** Espera a que el lector termine en la pestaña de Dropi, mostrando lo que va leyendo. Devuelve el error o null. */
+  async function esperarLector(lector: ClaveLector): Promise<string | null> {
+    let perdido = 0;
+    for (;;) {
+      await esperar(3000);
+      if (detener.current) return "Detenida.";
+      const a = await pedirExtension<AvanceLector | null>({ tipo: "avance", lector }).catch(() => null);
+      // Sin respuesta de la pestaña durante un minuto (se cerró o se recargó Dropi): se corta en vez de esperar para siempre.
+      perdido = a ? 0 : perdido + 1;
+      if (perdido >= 20) return "Se perdió la pestaña de Dropi mientras se leía: vuelve a pulsar «Actualizar».";
+      if (a) ponerAvance(textoAvance(lector, a));
+      if (a?.fin) return a.error ?? null;
+    }
+  }
+
+  // Al abrir la página con una actualización todavía en curso (se recargó a medias), se retoma: barra, lo que hace y lo que falta.
+  useEffect(() => {
+    if (extension !== "lista" || retomada.current || arrancando.current) return;
+    const c = corridas.find((x) => x.estado === "corriendo" && Date.now() - new Date(x.inicio).getTime() < VIGENCIA_MS);
+    if (!c) return;
+    retomada.current = true;
+    arrancando.current = true;
+    detener.current = false;
+    const hechas = c.pedidas.filter((p) => c.partes[p]?.estado === "listo" || c.partes[p]?.estado === "error");
+    const pasos = Object.fromEntries(
+      c.pedidas.map((p): [ClaveParte, Paso] => {
+        const x = c.partes[p];
+        if (x?.estado === "listo") return [p, { estado: "listo", detalle: x.resumen ?? "Listo" }];
+        if (x?.estado === "error") return [p, { estado: "error", detalle: x.error ?? "No se pudo" }];
+        return [p, { estado: "espera", detalle: "En espera" }];
+      }),
+    );
+    void Promise.resolve().then(() => {
+      setCorriendo({ id: c.id, pedidas: c.pedidas, pasos, avance: `Retomando la actualización de las ${hora(c.inicio)}…`, esperandoSesion: false, terminado: null });
+      void correr(c.id, c.pedidas, {}, hechas, true);
+    });
+    // `correr` usa el estado más reciente por sus propios setters; solo importa que la extensión ya respondió.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extension, corridas]);
+
+  // Mientras corre, cerrar o recargar la página la interrumpe: el navegador pregunta antes.
+  const enMarcha = !!corriendo && !corriendo.terminado;
+  useEffect(() => {
+    if (!enMarcha) return;
+    const avisar = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [enMarcha]);
 
   if (!disponible)
     return (

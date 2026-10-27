@@ -54,15 +54,52 @@ export async function empezarActualizacion(partes: unknown): Promise<{ error?: s
   const id = data.id as string;
   const subidas: Partial<Record<ClaveLector, Record<string, string>>> = {};
   for (const lector of lectoresDe(pedidas)) {
-    const urls: Record<string, string> = {};
-    for (const archivo of LECTORES[lector].archivos) {
-      const { data: s, error: e } = await supabase.storage.from(BUCKET).createSignedUploadUrl(`${CARPETA}/${id}/${archivo}.json`, { upsert: true });
-      if (e || !s) return { error: `No se pudo preparar la subida (${e?.message ?? "sin detalle"}).` };
-      urls[archivo] = s.signedUrl;
-    }
+    const urls = await firmarSubidas(supabase, id, lector);
+    if (typeof urls === "string") return { error: urls };
     subidas[lector] = urls;
   }
   return { id, subidas };
+}
+
+/** Las direcciones de subida de un lector (o el error como texto). */
+async function firmarSubidas(supabase: ReturnType<typeof createServiceClient>, id: string, lector: ClaveLector): Promise<Record<string, string> | string> {
+  const urls: Record<string, string> = {};
+  for (const archivo of LECTORES[lector].archivos) {
+    const { data: s, error: e } = await supabase.storage.from(BUCKET).createSignedUploadUrl(`${CARPETA}/${id}/${archivo}.json`, { upsert: true });
+    if (e || !s) return `No se pudo preparar la subida (${e?.message ?? "sin detalle"}).`;
+    urls[archivo] = s.signedUrl;
+  }
+  return urls;
+}
+
+/** Una actualización que sigue en curso (para retomarla) o null. */
+async function enCurso(supabase: ReturnType<typeof createServiceClient>, id: string) {
+  if (!UUID.test(id)) return null;
+  const { data } = await supabase.from("dropi_actualizaciones").select("estado, pedidas").eq("id", id).maybeSingle();
+  return data && data.estado === "corriendo" ? { pedidas: (data.pedidas as string[]).filter(esParte) } : null;
+}
+
+/**
+ * Para retomar una actualización que quedó a medias (27 oct 2026: se recargó la página o la extensión y se perdió el avance):
+ * qué archivos ya subió la extensión.
+ */
+export async function archivosSubidos(id: string): Promise<{ error?: string; archivos?: string[] }> {
+  await usuarioPermitido();
+  const supabase = createServiceClient();
+  if (!(await enCurso(supabase, id))) return { error: "Esa actualización ya terminó." };
+  const { data } = await supabase.storage.from(BUCKET).list(`${CARPETA}/${id}`, { limit: 100 });
+  return { archivos: (data ?? []).map((a) => a.name.replace(/\.json$/, "")) };
+}
+
+/** Direcciones de subida nuevas para volver a leer un lector de una actualización que sigue en curso (las primeras se perdieron al recargar). */
+export async function subidasDeLector(id: string, lector: string): Promise<{ error?: string; subida?: Record<string, string> }> {
+  await usuarioPermitido();
+  const supabase = createServiceClient();
+  const c = await enCurso(supabase, id);
+  if (!c) return { error: "Esa actualización ya terminó." };
+  if (!Object.hasOwn(LECTORES, lector) || !lectoresDe(c.pedidas).includes(lector as ClaveLector)) return { error: "Pedido no válido." };
+  const urls = await firmarSubidas(supabase, id, lector as ClaveLector);
+  return typeof urls === "string" ? { error: urls } : { subida: urls };
 }
 
 async function bajar<T>(supabase: ReturnType<typeof createServiceClient>, id: string, archivo: string): Promise<T> {
