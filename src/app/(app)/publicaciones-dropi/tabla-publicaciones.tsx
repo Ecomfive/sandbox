@@ -21,6 +21,7 @@ import { FichaPublicacion } from "./ficha-publicacion";
 import { EncabezadoFilasPublicacion, FilaPublicacionLista } from "./fila-publicacion";
 import { ProveedorTareas } from "./recomendacion-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
+import { CalculadoraMargen } from "./calculadora-margen";
 import { AvisoSinPublicacion } from "./sin-publicacion";
 import type { ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
@@ -148,23 +149,25 @@ export function TablaPublicaciones({
         </span>
         <AvisoSinPublicacion productos={sinPublicacion} sinId={sinId} puedeEscribir={puedeEscribir} />
       </p>
-      {actualizarDropi ? (
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          {barraDropi ?? <span />}
-          <Link
-            href="/publicaciones-dropi/actualizar"
-            className={`inline-flex min-h-10 items-center gap-2 rounded-lg border border-border-control bg-card px-3.5 text-sm font-semibold hover:bg-muted ${anilloFoco}`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-3-6.7" />
-              <path d="M21 3v6h-6" />
-            </svg>
-            Actualizar datos
-          </Link>
+      {/* Arriba de la lista: lo que espera para Dropi a la izquierda; la calculadora de margen (27 oct 2026, todos) y «Actualizar datos» a la derecha. */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        {barraDropi ?? <span />}
+        <div className="flex flex-wrap gap-2">
+          <CalculadoraMargen publicaciones={publicaciones} reglas={reglas} />
+          {actualizarDropi && (
+            <Link
+              href="/publicaciones-dropi/actualizar"
+              className={`inline-flex min-h-10 items-center gap-2 rounded-lg border border-border-control bg-card px-3.5 text-sm font-semibold hover:bg-muted ${anilloFoco}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-3-6.7" />
+                <path d="M21 3v6h-6" />
+              </svg>
+              Actualizar datos
+            </Link>
+          )}
         </div>
-      ) : (
-        barraDropi
-      )}
+      </div>
       <ListaDatos
         def={def}
         filas={publicaciones}
