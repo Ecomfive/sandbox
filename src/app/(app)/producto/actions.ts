@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
-import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { requireAlgunModulo, requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { mensajeBloqueos } from "@/lib/wms/eliminar-producto";
 import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
@@ -25,6 +25,8 @@ import { eventoVisible } from "@/lib/auditoria-visible";
 import { getUsuarioActual } from "@/lib/auth";
 
 const MODULO = "producto";
+/** Quién puede crear un producto: Producto y Gestión de IDs Dropi (sus publicaciones necesitan su producto, p. ej. un pack o un combo). */
+const CREAR_PRODUCTO = ["producto", "publicaciones-dropi"];
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 const texto = (formData: FormData, campo: string) => String(formData.get(campo) ?? "").trim();
 
@@ -35,7 +37,7 @@ const texto = (formData: FormData, campo: string) => String(formData.get(campo) 
  * producción Next.js oculta el mensaje de una excepción de una acción.
  */
 export async function crearProducto(formData: FormData): Promise<{ error?: string; id?: string }> {
-  const usuario = await requireModuloEscritura(MODULO);
+  const usuario = await requireAlgunModulo(CREAR_PRODUCTO, true);
   const nombre = texto(formData, "nombre");
   const codigo = texto(formData, "codigo");
   const tipo = texto(formData, "tipo");
@@ -72,6 +74,8 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   const errorSku = await errorDeSku(codigo, null);
   if (errorSku) return { error: errorSku };
   if (tipo !== "simple" && tipo !== "combo") return { error: "Elige si es simple o compuesto." };
+  // Las variantes se crean con los permisos de Producto: desde Gestión de IDs Dropi se crea el producto sin ellas.
+  if (texto(formData, "variantes") && (!usuario.modulos.includes(MODULO) || usuario.modulosSoloLectura.includes(MODULO))) return { error: "Las variantes se crean desde Producto." };
   if (clase !== "fisico" && clase !== "test") return { error: "Elige si es físico o de prueba (test)." };
   if (manejaVencimiento && tipo === "combo") return { error: "Un producto compuesto no maneja vencimiento: sale de sus componentes." };
   if (diasAviso !== null && (!Number.isInteger(diasAviso) || diasAviso < 1 || diasAviso > 3650)) return { error: "Los días de aviso deben ser un número entre 1 y 3650." };
@@ -178,6 +182,21 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
       }
     } else {
       await supabase.storage.from(BUCKET_FOTOS).remove([origen]);
+    }
+  } else if (fotoSubida && fotoSubida.startsWith(`${PREFIJO_FOTOS}publicaciones/`) && !fotoSubida.includes("..") && !fotoSubida.includes("?")) {
+    // La foto de una publicación de Gestión de IDs Dropi (el pack o combo que se crea desde ahí usa la misma): se COPIA a la carpeta del
+    // producto, revisada por su contenido; la publicación sigue con la suya.
+    const origen = fotoSubida.slice(PREFIJO_FOTOS.length);
+    const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(origen);
+    const imagen = archivo ? detectarImagen(new Uint8Array(await archivo.slice(0, 64).arrayBuffer())) : null;
+    if (archivo && imagen) {
+      const destino = `productos/${data.id}/${Date.now()}-de-publicacion.${imagen.extension}`;
+      const { error: errorCopia } = await supabase.storage.from(BUCKET_FOTOS).upload(destino, archivo, { contentType: imagen.tipo });
+      if (!errorCopia) {
+        await supabase.from("skus_maestros").update({ foto_url: PREFIJO_FOTOS + destino }).eq("id", data.id);
+        await guardarHuella(supabase, data.id, archivo);
+        conFoto = true;
+      }
     }
   }
   // Un pack (el compuesto de UN solo producto, de cualquier cantidad de unidades: 2, 3, 6, 12…) sin foto propia toma la del producto original: se COPIA a
@@ -357,7 +376,7 @@ export async function vincularProductoASku(formData: FormData) {
  * seguidos).
  */
 export async function reservarCodigoBarrasInterno(): Promise<{ codigo?: string; error?: string }> {
-  await requireModuloEscritura(MODULO);
+  await requireAlgunModulo(CREAR_PRODUCTO, true);
   const { data, error } = await createServiceClient().rpc("wms_generar_codigo_barras");
   if (error || !data) return { error: "No se pudo generar el código de barras." };
   return { codigo: String(data) };
@@ -684,7 +703,7 @@ const PREFIJO_FOTOS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object
  * pasa a su carpeta (`crearProducto`). Devuelve el error como valor.
  */
 export async function prepararSubidaFotoNuevoProducto(nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
-  await requireModuloEscritura(MODULO);
+  await requireAlgunModulo(CREAR_PRODUCTO, true);
   const nombre = String(nombreArchivo ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "foto";
   const ruta = `productos/nuevos/${crypto.randomUUID()}/${Date.now()}-${nombre}`;
   const { data, error } = await createServiceClient().storage.from(BUCKET_FOTOS).createSignedUploadUrl(ruta);
@@ -694,7 +713,7 @@ export async function prepararSubidaFotoNuevoProducto(nombreArchivo: string): Pr
 
 /** La foto de un producto que se está creando, desde una imagen de internet (arrastrada a la ficha). Devuelve su ruta. */
 export async function subirFotoNuevoProductoDesdeUrl(direccion: string): Promise<{ ruta: string } | { error: string }> {
-  await requireModuloEscritura(MODULO);
+  await requireAlgunModulo(CREAR_PRODUCTO, true);
   const descarga = await descargarPublico(String(direccion ?? "").trim(), 5 * 1024 * 1024);
   if ("error" in descarga) return descarga;
   const imagen = detectarImagen(descarga.bytes.slice(0, 64));
@@ -728,7 +747,7 @@ async function guardarHuella(supabase: SupabaseClient, id: string, archivo: Blob
  * nombre de su producto). Devuelve el error como valor.
  */
 export async function buscarPosiblesDuplicados(nombre: string, foto: string | null): Promise<{ duplicados: PosibleDuplicado[] } | { error: string }> {
-  await requireModulo(MODULO);
+  await requireAlgunModulo(CREAR_PRODUCTO);
   const texto = String(nombre ?? "").trim().slice(0, 200);
   const supabase = createServiceClient();
 
@@ -837,7 +856,7 @@ async function errorDeSku(codigo: string, excepto: string | null): Promise<strin
 
 /** Para el campo SKU mientras se escribe: si está libre o quién lo tiene. */
 export async function revisarSku(codigo: string, excepto: string | null = null): Promise<{ error?: string }> {
-  await requireModulo(MODULO);
+  await requireAlgunModulo(CREAR_PRODUCTO);
   if (excepto !== null && !ES_ID(excepto)) return {};
   const error = await errorDeSku(String(codigo ?? "").trim(), excepto);
   return error ? { error } : {};
@@ -889,7 +908,7 @@ export async function subirFotoProductoDesdeUrl(id: string, direccion: string): 
 
 /** El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. */
 export async function sugerirSkuLibre(nombre: string): Promise<{ codigo: string }> {
-  await requireModulo(MODULO);
+  await requireAlgunModulo(CREAR_PRODUCTO);
   const base = sugerirSku(String(nombre ?? "").slice(0, 200));
   if (!base) return { codigo: "" };
   const { data } = await createServiceClient().from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);

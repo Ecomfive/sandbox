@@ -248,6 +248,19 @@ export async function requireModuloEscritura(clave: string): Promise<UsuarioActu
   return usuario;
 }
 
+/**
+ * Acceso (con `escritura`, de escritura) a **alguno** de los módulos dados. Para lo que se puede hacer desde dos módulos: crear un producto
+ * desde Producto o desde Gestión de IDs Dropi (donde Nicole, sin acceso a Producto, crea los que necesitan sus publicaciones).
+ * Como `requireModuloEscritura`, es la barrera real dentro de cada server action.
+ */
+export async function requireAlgunModulo(claves: string[], escritura = false): Promise<UsuarioActual> {
+  const usuario = await getUsuarioActual();
+  if (!usuario) throw new Error("No hay sesión activa.");
+  const permitido = claves.some((c) => usuario.modulos.includes(c) && (!escritura || !usuario.modulosSoloLectura.includes(c)));
+  if (!permitido) throw new Error(escritura ? "No tienes permiso para esto." : "No tienes acceso a este módulo.");
+  return usuario;
+}
+
 /** Lo que dice el error cuando una acción está bloqueada para el rol (o la persona) dentro de un módulo que sí abre. */
 export const MENSAJE_ACCION_BLOQUEADA = "Tu rol no puede hacer esto en este módulo.";
 
