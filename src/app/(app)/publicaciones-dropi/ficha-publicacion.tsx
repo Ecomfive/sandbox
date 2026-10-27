@@ -12,7 +12,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
-  FULFILLMENT_DROPI,
+  fulfillmentFijo,
   TIPOS,
   UBICACIONES,
   numeroPublicacion,
@@ -53,6 +53,7 @@ interface Formulario {
   privatizado_email: string;
   precio_venta: string;
   costo_mercancia: string;
+  fulfillment: string;
   coste_real: string;
   estado_venta: string;
   ubicacion: string;
@@ -75,6 +76,7 @@ const desde = (p: FilaPublicacion): Formulario => ({
   privatizado_email: p.privatizadoEmail,
   precio_venta: t(p.precioVenta),
   costo_mercancia: t(p.costoMercancia),
+  fulfillment: t(p.fulfillment),
   coste_real: t(p.costeReal),
   estado_venta: p.estadoVenta ?? "",
   ubicacion: p.ubicacion ?? "",
@@ -270,8 +272,10 @@ function ContenidoFicha({
   const sinGuardar = JSON.stringify(d) !== base;
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
 
+  // En Panamá el fulfillment es fijo (27 oct 2026): se ve, pero no se escribe.
+  const fijo = fulfillmentFijo(codigoPais);
   const precio = n(d.precio_venta);
-  const utilidad = precio === null ? null : precio - (n(d.costo_mercancia) ?? 0) - FULFILLMENT_DROPI;
+  const utilidad = precio === null ? null : precio - (n(d.costo_mercancia) ?? 0) - (fijo ?? n(d.fulfillment) ?? 0);
   const margen = precio && utilidad !== null ? utilidad / precio : null;
 
   const salir = (accion: () => void) => {
@@ -619,8 +623,14 @@ function ContenidoFicha({
               </label>
               <label className="flex min-w-0 flex-col gap-1">
                 <span className={labelClassSm}>Fulfillment</span>
-                <input value={FULFILLMENT_DROPI.toFixed(2)} disabled className={`${fieldClass} w-full tabular-nums disabled:cursor-not-allowed disabled:bg-muted`} />
-                <span className="text-xs text-muted-foreground">Igual en todas las publicaciones</span>
+                {fijo !== null ? (
+                  <>
+                    <input value={fijo.toFixed(2)} disabled className={`${fieldClass} w-full tabular-nums disabled:cursor-not-allowed disabled:bg-muted`} />
+                    <span className="text-xs text-muted-foreground">Igual en todas las de Panamá</span>
+                  </>
+                ) : (
+                  <input type="number" min={0} step="0.01" value={d.fulfillment} onChange={(e) => cambiar({ fulfillment: e.target.value })} placeholder="Ej: 1.50" className={`${fieldClass} w-full tabular-nums`} />
+                )}
               </label>
             </div>
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">

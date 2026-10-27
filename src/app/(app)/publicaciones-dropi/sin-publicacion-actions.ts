@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
-import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
+import { fulfillmentFijo, numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { esServicioDropi } from "@/lib/publicaciones/sin-publicacion";
 import { idsDeDropi, ubicacionDeProducto, type BodegaDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
@@ -60,7 +60,7 @@ async function contexto() {
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pais.id))) return { error: "No tienes acceso a este país." } as const;
-  return { usuario, supabase, paisId: pais.id } as const;
+  return { usuario, supabase, paisId: pais.id, codigoPais: pais.codigo } as const;
 }
 
 /**
@@ -71,7 +71,7 @@ async function contexto() {
 export async function crearDesdeDropi(dropiId: number, copiarDe: string | null): Promise<{ error?: string; id?: string; detalle?: string }> {
   const ctx = await contexto();
   if ("error" in ctx) return { error: ctx.error };
-  const { usuario, supabase, paisId } = ctx;
+  const { usuario, supabase, paisId, codigoPais } = ctx;
   const r = await productoDeDropi(supabase, paisId, dropiId);
   if ("error" in r) return { error: r.error };
   const p = r.producto;
@@ -92,6 +92,8 @@ export async function crearDesdeDropi(dropiId: number, copiarDe: string | null):
     .from("dropi_publicaciones")
     .insert({
       ...copia,
+      // En Panamá, el fulfillment fijo; en otro país, el de la publicación copiada (o ninguno).
+      fulfillment: fulfillmentFijo(codigoPais) ?? copia.fulfillment ?? null,
       pais_id: paisId,
       nombre: p.nombre,
       dropi_id: String(p.id),

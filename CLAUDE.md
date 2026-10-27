@@ -471,8 +471,9 @@ convenciones técnicas del código.
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
 - **Operación › Fulfillment › Gestión de IDs Dropi** (antes «Gestión de publicaciones Dropi») (`/publicaciones-dropi`, módulo `publicaciones-dropi`, migración 0116, 21 oct
-  2026; debajo de Compras). **Fulfillment fijo** (Hernán, 27 oct 2026; migración 0160): `FULFILLMENT_DROPI` = 1.50 en todas las publicaciones;
-  la ficha y «Agregar» lo muestran apagado, `leerDatos` lo pone siempre (no viene del formulario) y es el valor por defecto de la columna. Los productos que ECOMFIVE tiene publicados en Dropi como proveedor; reemplaza la lista «GCC 🇵🇦 Ecomfive
+  2026; debajo de Compras). **Fulfillment fijo en Panamá** (Hernán, 27 oct 2026; migraciones 0160 y 0161): `fulfillmentFijo(codigoPais)` = 1.50 solo
+  en Panamá; ahí la ficha y «Agregar» lo muestran apagado y `leerDatos` lo pone (no viene del formulario). En otro país se escribe en la
+  ficha como antes. La columna no tiene valor por defecto: cada alta lo pone (también «Sin publicación», `sin-publicacion-actions.ts`). Los productos que ECOMFIVE tiene publicados en Dropi como proveedor; reemplaza la lista «GCC 🇵🇦 Ecomfive
   Panamá» de ClickUp. Una fila de `dropi_publicaciones` por publicación (por país): `dropi_id` (texto: a veces son dos, «7231-7679»),
   `estado` (el flujo de ClickUp: producto_nuevo → revisar_precio → verificar_dropshipper → validar_bajar_precio → bajar_precio → al_dia
   → archivado, oculto), `estado_publicacion`, `tipo_publicacion`, privatización (`privatizado_a`, `privatizado_email`, `dropshipper_id`

@@ -191,7 +191,7 @@ export function TablaPublicaciones({
           const o = COLOR_GRUPO[campo] && grupo.clave !== SIN_VALOR ? opcion(COLOR_GRUPO[campo], grupo.clave) : null;
           return o ? <Badge color={o.color}>{o.etiqueta}</Badge> : <span className="font-semibold">{grupo.etiqueta}</span>;
         }}
-        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} opciones={opcionesCrear} /> : undefined}
+        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} codigoPais={codigoPais} opciones={opcionesCrear} /> : undefined}
         vacio="Todavía no hay publicaciones en este país."
       />
       <FichaPublicacion
