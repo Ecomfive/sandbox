@@ -82,7 +82,7 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   if (!cuerpo) return { error: "Escribe el mensaje." };
   if (cuerpo.length > MAX_TEXTO) return { error: `El mensaje es muy largo (máximo ${MAX_TEXTO} caracteres).` };
   const supabase = createServiceClient();
-  const c = await conversacionPermitida(supabase, id, u);
+  const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
   if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
   const r = await enviarTextoWhatsapp(c.phoneNumberId, c.telefono, cuerpo);
@@ -117,7 +117,7 @@ export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: tru
   if (!cuerpo) return { error: "Escribe la nota." };
   if (cuerpo.length > MAX_TEXTO) return { error: `La nota es muy larga (máximo ${MAX_TEXTO} caracteres).` };
   const supabase = createServiceClient();
-  if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase
     .from("whatsapp_mensajes")
     .insert({ conversacion_id: id, direccion: "nota", tipo: "texto", texto: cuerpo, estado: "enviado", autor_id: u.id, autor_nombre: u.nombre || u.email });
@@ -130,7 +130,7 @@ export async function cambiarEstadoConversacion(id: string, estado: "abierta" | 
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   if (estado !== "abierta" && estado !== "resuelta") return { error: "Estado no válido." };
   const supabase = createServiceClient();
-  if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase.from("whatsapp_conversaciones").update({ estado, ...(estado === "resuelta" ? { no_leidos: 0 } : {}) }).eq("id", id);
   return error ? { error: "No se pudo cambiar." } : { ok: true };
 }
@@ -140,7 +140,7 @@ export async function tomarConversacion(id: string, soltar = false): Promise<{ o
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const supabase = createServiceClient();
-  if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase.from("whatsapp_conversaciones").update({ asignada_a: soltar ? null : u.id }).eq("id", id);
   return error ? { error: "No se pudo cambiar." } : { ok: true };
 }

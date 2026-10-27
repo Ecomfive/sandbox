@@ -57,6 +57,29 @@ export function paisEnDetalle(detalle: string | null | undefined, paises: { codi
 }
 
 /**
+ * Las entidades cuyo país se conoce por su id (`paisDe`): compras y rutas de envío, y desde la auditoría del 27 oct 2026 también
+ * landings, publicaciones de Dropi, fichas WMS y bodegas, que en su módulo ya se limitan por país.
+ */
+export const ENTIDADES_CON_PAIS = new Set(["wms_compras", "wms_rutas_envio", "landings", "dropi_publicaciones", "wms_productos", "wms_dropi_productos", "wms_bodegas"]);
+
+const MONTO = /\$\s?[\d.,]+/;
+
+/**
+ * Un evento de una compra sin sus montos, para quien tiene «Monto» oculto en Compras (auditoría del 27 oct 2026): del detalle se quita
+ * lo que lleva «$…» y de antes/después los datos con un monto. Null si era un cambio de montos y no queda nada que mostrar.
+ */
+export function eventoSinMontos<T extends { detalle?: string | null; antes?: unknown; despues?: unknown }>(evento: T): T | null {
+  const limpiar = (o: unknown) =>
+    o && typeof o === "object" && !Array.isArray(o) ? Object.fromEntries(Object.entries(o as Record<string, unknown>).filter(([, v]) => !MONTO.test(String(v ?? "")))) : o;
+  const cuantos = (o: unknown) => (o && typeof o === "object" ? Object.keys(o as object).length : 0);
+  const antes = limpiar(evento.antes);
+  const despues = limpiar(evento.despues);
+  if (cuantos(evento.antes) + cuantos(evento.despues) > 0 && cuantos(antes) + cuantos(despues) === 0) return null;
+  const detalle = evento.detalle ? evento.detalle.replace(/ · [^·→]*\$\s?[\d.,]+/g, "").replace(/\$\s?[\d.,]+/g, "$…") : evento.detalle;
+  return { ...evento, detalle, antes, despues };
+}
+
+/**
  * Si un evento de la auditoría se puede mostrar a esta persona: necesita el módulo de su entidad; las acciones del CRM
  * Comercial piden además «crm-comercial»; y una compra (o ruta de envío) de un país que la persona no puede ver queda fuera
  * (`paisDe` da el código de país de la compra o ruta, o `null` si es de Importadora; `undefined` si no se sabe).
@@ -70,7 +93,7 @@ export function eventoVisible(
   const modulo = MODULO_DE_ENTIDAD[evento.entidad] ?? "usuarios";
   if (!usuario.modulos.includes(modulo)) return false;
   if (COMERCIALES.has(evento.accion) && !usuario.modulos.includes("crm-comercial")) return false;
-  if (usuario.paisesPermitidos !== null && (evento.entidad === "wms_compras" || evento.entidad === "wms_rutas_envio")) {
+  if (usuario.paisesPermitidos !== null && ENTIDADES_CON_PAIS.has(evento.entidad)) {
     const pais = paisDe(evento.entidad, evento.entidad_id);
     // Sin saber el país (la compra se borró, por ejemplo) no se arriesga: se oculta.
     if (pais === undefined || !puedeVerPais(usuario.paisesPermitidos, pais)) return false;

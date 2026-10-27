@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accesoCrm, areaParaNota, areasVisibles } from "./areas";
+import { accesoCrm, areaParaNota, areasVisibles, escribeEnArea } from "./areas";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del CRM)
 const atencion = accesoCrm({ modulos: ["crm-dropshippers"], modulosSoloLectura: [] });
@@ -34,4 +34,13 @@ test("Atención no puede crear una nota comercial aunque la pida", () => {
 test("sin acceso no se puede escribir nada", () => {
   assert.equal(areaParaNota(sinAcceso, undefined), null);
   assert.equal(areaParaNota(sinAcceso, "atencion"), null);
+});
+
+test("en la bandeja, con Comercial en solo lectura no se escribe en conversaciones comerciales", () => {
+  const a = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial"], modulosSoloLectura: ["crm-comercial"] });
+  assert.equal(escribeEnArea(a, "comercial"), false);
+  assert.equal(escribeEnArea(a, "atencion"), true);
+  const comercial = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial"], modulosSoloLectura: ["crm-dropshippers"] });
+  assert.equal(escribeEnArea(comercial, "comercial"), true);
+  assert.equal(escribeEnArea(comercial, "atencion"), true);
 });

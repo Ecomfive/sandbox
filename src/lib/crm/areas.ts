@@ -54,6 +54,14 @@ export function areaParaNota(acceso: AccesoCrm, pedida: string | null | undefine
   return acceso.escribeAtencion ? "atencion" : null;
 }
 
+/**
+ * Si se puede escribir (mandar, anotar, resolver, tomar) en una conversación de esa área: Comercial pide poder escribir en Comercial;
+ * Atención, en cualquiera de las dos (como `areaParaNota`). Auditoría del 27 oct 2026: antes bastaba escribir en alguna área.
+ */
+export function escribeEnArea(acceso: AccesoCrm, area: AreaCrm): boolean {
+  return area === "comercial" ? acceso.escribeComercial : acceso.escribeAtencion || acceso.escribeComercial;
+}
+
 /** Acciones de la auditoría que son del trabajo comercial y no se muestran a Atención. */
 export const ACCIONES_COMERCIALES = [
   "crear_seguimiento_dropshipper",

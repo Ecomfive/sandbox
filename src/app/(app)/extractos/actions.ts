@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { parseExtracto, mapearMovimientos, type MapeoColumnas } from "@/lib/extractos/parse";
 import { requireModuloEscritura } from "@/lib/auth";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { obtenerPatrones, sugerirPlataforma, guardarPatron } from "@/lib/extractos/patrones";
 
 export interface ImportarExtractoState {
@@ -17,8 +18,9 @@ export async function importarExtracto(
   _prevState: ImportarExtractoState,
   formData: FormData
 ): Promise<ImportarExtractoState> {
+  let permitidos: string[] | null;
   try {
-    await requireModuloEscritura("extractos");
+    permitidos = (await requireModuloEscritura("extractos")).paisesPermitidos;
   } catch (error) {
     return { status: "error", mensaje: error instanceof Error ? error.message : "Sin permiso." };
   }
@@ -31,6 +33,10 @@ export async function importarExtracto(
   }
   if (!esUuid(paisId)) {
     return { status: "error", mensaje: "Selecciona un país." };
+  }
+  // Solo en un país que la persona tiene (auditoría del 27 oct 2026).
+  if (!(await puedeVerPaisId(createServiceClient(), permitidos, paisId))) {
+    return { status: "error", mensaje: SIN_ACCESO_PAIS };
   }
   if (!mapeoRaw) {
     return { status: "error", mensaje: "Falta el mapeo de columnas." };
@@ -107,8 +113,13 @@ export async function importarExtracto(
 }
 
 export async function asignarPlataforma(movimientoId: string, plataformaId: string) {
-  await requireModuloEscritura("extractos");
+  const usuario = await requireModuloEscritura("extractos");
   const supabase = createServiceClient();
+  // Solo movimientos de un país que la persona tiene (auditoría del 27 oct 2026).
+  if (!esUuid(movimientoId)) throw new Error("Movimiento no válido.");
+  const { data: delPais } = await supabase.from("movimientos_bancarios").select("extractos_bancarios(pais_id)").eq("id", movimientoId).maybeSingle();
+  const paisMovimiento = (delPais?.extractos_bancarios as unknown as { pais_id: string } | null)?.pais_id;
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, paisMovimiento))) throw new Error(SIN_ACCESO_PAIS);
   const { error } = await supabase
     .from("movimientos_bancarios")
     .update({ plataforma_id: plataformaId || null })

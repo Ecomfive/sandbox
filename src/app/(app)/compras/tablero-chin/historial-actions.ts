@@ -6,6 +6,7 @@ import type { LineaHistorial } from "@/lib/proveedor/historial";
 import { cargarHistorialPedido } from "@/lib/proveedor/historial-datos";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sinAccesoAlTablero } from "../acceso-compras";
 import { campoOculto, restriccionesDe } from "../permisos-compras";
 
 /** Lo que trae un monto: no se muestra a quien no ve los montos de Compras. */
@@ -17,6 +18,8 @@ const CON_MONTO = new Set<LineaHistorial["tipo"]>(["cotizacion", "monto", "canti
  */
 export async function historialPedidoEcomfive(pedidoId: string): Promise<{ lineas: LineaHistorial[]; traducciones: Record<string, string> } | { error: string }> {
   const usuario = await requireModulo("compras");
+  const sinTablero = sinAccesoAlTablero(usuario);
+  if (sinTablero) return { error: sinTablero };
   if (!esUuid(pedidoId)) return { error: "Pedido no válido." };
   const supabase = createServiceClient();
   const { data: proveedor } = await supabase.from("proveedores").select("id").eq("activo", true).order("creado_en").limit(1).maybeSingle();

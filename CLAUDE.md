@@ -64,6 +64,14 @@ convenciones técnicas del código.
     temporal); el webhook de Instagram solo guarda lo de las cuentas del equipo (`src/lib/instagram/remitentes.ts`, más
     `INSTAGRAM_REMITENTES`); `/instagram/compartir` solo guarda sola si la petición llega sin sitio de origen (`Sec-Fetch-Site`
     none o same-origin, la hoja de compartir del celular) y `/instagram/biblioteca` siempre pregunta antes de guardar.
+  - Mismo informe, permisos internos: el acceso por compra (país + «Qué compras ve») vive en `compras/acceso-compras.ts`
+    (`sinAccesoACompras`, `sinAccesoALinea` —que ahora revisa el alcance también con todos los países—, `sinAccesoAlTablero`) y lo
+    usan «Pagos a Shen Zhen» y el Tablero de Shen Zhen (que no se abre con la pestaña oculta ni con alcance limitado: es el espejo de
+    todos los pedidos); `renombrarTienda` pide «Tienda» editable, «lote» y ver todas; «Copiar cotización» no da el monto si está
+    oculto; la bitácora de Notificaciones filtra por país también landings, publicaciones y fichas WMS (`ENTIDADES_CON_PAIS`) y, con
+    alcance limitado o «Monto» oculto, quita las compras ajenas y los montos (`eventoSinMontos`); las fichas WMS, bodegas y
+    ubicaciones revisan el país (`puedeVerFilaDePais`, `puedeVerUbicacion`, `puedeVerBodega`); la bandeja de WhatsApp solo deja
+    escribir en el área donde se puede (`escribeEnArea`); patrones e importación de extractos revisan el país.
 
 ## Convenciones importantes
 

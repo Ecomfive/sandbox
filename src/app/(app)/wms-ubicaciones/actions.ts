@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { puedeVerBodega, puedeVerUbicacion, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ETIQUETA_PROPIEDAD, ETIQUETA_TAMANO, PROPIEDADES, TAMANOS, type Propiedad, type Tamano } from "./def-ubicaciones";
 
@@ -30,6 +31,8 @@ export async function crearUbicacion(formData: FormData): Promise<{ error?: stri
   if ("error" in datos) return datos;
 
   const supabase = createServiceClient();
+  // Solo en una bodega de un país que la persona tiene (auditoría del 27 oct 2026).
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodegaId))) return { error: SIN_ACCESO_PAIS };
   const { data: bodega } = await supabase.from("wms_bodegas").select("nombre, activa").eq("id", bodegaId).single();
   if (!bodega) return { error: "La bodega ya no existe." };
   if (bodega.activa !== true) return { error: "La bodega está inactiva." };
@@ -57,13 +60,14 @@ export async function crearUbicacion(formData: FormData): Promise<{ error?: stri
 
 /** Guarda los datos de una ubicación desde su ficha. La bodega no se cambia (el stock guardado ahí dependerá de ella). */
 export async function actualizarUbicacion(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const id = texto(formData.get("id"), 64);
   if (!UUID.test(id)) return { error: "Ubicación no válida." };
   const datos = leerDatos(formData);
   if ("error" in datos) return datos;
 
   const supabase = createServiceClient();
+  if (!(await puedeVerUbicacion(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: antes } = await supabase.from("wms_ubicaciones").select("codigo, propiedad, tamano").eq("id", id).single();
   if (!antes) return { error: "La ubicación ya no existe." };
 
@@ -88,9 +92,10 @@ export async function actualizarUbicacion(formData: FormData): Promise<{ error?:
 
 /** Desactiva o reactiva una ubicación. No se borra: los movimientos de stock que pasen por ella dependerán de ella. */
 export async function cambiarEstadoUbicacion(id: string, activa: boolean): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Ubicación no válida." };
   const supabase = createServiceClient();
+  if (!(await puedeVerUbicacion(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: actual } = await supabase.from("wms_ubicaciones").select("activa").eq("id", id).single();
   if (!actual) return { error: "La ubicación ya no existe." };
   if (actual.activa === activa) return {};
@@ -109,8 +114,9 @@ export async function cambiarEstadoUbicacion(id: string, activa: boolean): Promi
 
 /** La actividad de una ubicación para su ficha. Es una lectura: basta poder abrir el módulo. */
 export async function obtenerHistorialUbicacion(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Ubicación no válida." };
+  if (!(await puedeVerUbicacion(createServiceClient(), usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await createServiceClient()
     .from("historial_auditoria")
     .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
