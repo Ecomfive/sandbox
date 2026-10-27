@@ -1739,6 +1739,11 @@ convenciones técnicas del código.
   (crea un seguimiento). **Toda acción nueva del CRM** empieza con `requireModuloEscritura` del módulo de su área y
   devuelve `{ error }`; una lectura que muestre algo comercial exige `crm-comercial`.
 
+- **Rendimiento** (27 oct 2026): las funciones de Vercel van en **Oregón (`pdx1`, `vercel.json` › `regions`)**, la misma región que la base
+  de Supabase (us-west-2): antes corrían en Washington (`iad1`) y cada consulta cruzaba EE. UU. No quitar esa línea. Índices de la
+  migración 0162; `obtenerPendientesHoy` se guarda 45 s por país; la presencia late cada 60 s. Diagnóstico y lo que falta:
+  `RENDIMIENTO-PENDIENTE.md`.
+
 ## Dónde vive cada cosa
 
 - `supabase/migrations/` — cambios de esquema, en orden numerado. Correr

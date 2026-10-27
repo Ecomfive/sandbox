@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { conTtl } from "@/lib/cache-ttl";
 import { creditosPorAcabarse } from "@/lib/ia/consumo";
 import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
 
@@ -45,7 +46,7 @@ async function contarLotes(supabase: SupabaseClient, paisId: string): Promise<{ 
  * registrado, pedidos de Dropi con estado "Novedad" y retiros de Dropi que
  * no se pudieron vincular a ningún retiro local, los lotes vencidos o por vencer y los competidores nuevos en Dropi.
  */
-export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: string): Promise<PendientesHoy> {
+async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): Promise<PendientesHoy> {
   const [
     { count: alertasInventario },
     { data: plataformasPais },
@@ -99,3 +100,11 @@ export async function obtenerPendientesHoy(supabase: SupabaseClient, paisId: str
     creditosIA: creditosIA.length,
   };
 }
+
+/**
+ * Los pendientes de hoy de un país, guardados 45 segundos (rendimiento, 27 oct 2026): el layout los pide en **cada página** para los
+ * avisos del menú y «Hoy» y «Avisos» los vuelven a pedir; son nueve consultas (una recorría todas las órdenes). Son del país, no de cada
+ * persona (el menú se filtra después por sus módulos), así que se pueden compartir. Un aviso resuelto tarda hasta 45 s en bajar.
+ */
+const pendientesPorPais = conTtl(45_000, (paisId: string) => paisId, (paisId: string, supabase: SupabaseClient) => calcularPendientesHoy(supabase, paisId));
+export const obtenerPendientesHoy = (supabase: SupabaseClient, paisId: string): Promise<PendientesHoy> => pendientesPorPais(paisId, supabase);

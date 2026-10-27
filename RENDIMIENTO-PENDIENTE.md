@@ -71,3 +71,26 @@ miles de filas completas a JavaScript.
   (no contra la base real): la primera respuesta de las páginas pasó de ~930–1050
   ms a ~440–490 ms y las consultas por página, de 13–18 a 9–14.
 - **Punto 4 (límite a rangos personalizados): sin aplicar.**
+
+## Primera tanda del 27 oct 2026 (tras pasar la base de Nano a Small el 26 oct)
+
+Medido antes del cambio:
+- **Las funciones de Vercel corrían en Washington (`iad1`) y la base está en Oregón (us-west-2)**: cabecera `x-vercel-id` =
+  `iad1::iad1::…` en una ruta dinámica. Cada consulta cruzaba EE. UU. (~70 ms ida y vuelta) y una página hace 10–15.
+  **Arreglo:** `vercel.json` › `"regions": ["pdx1"]` (Portland, junto a la base). Comprobar después con
+  `fetch("https://mom-beta-proveduria.vercel.app/api/whatsapp/webhook")` → `x-vercel-id` debe decir `…::pdx1::…`.
+- Desde un PC en Panamá, cada consulta tarda ~190 ms solo de red; el conteo de «Novedad» (118.591 órdenes, sin índice) ~65 ms más.
+
+Aplicado:
+1. **Índices** (migración `0162_indices_rendimiento.sql`): `ordenes` (Novedad parcial y país+plataforma+fecha), `historial_auditoria`
+   (entidad+id+fecha y fecha), comentarios «Inconveniente…» de Compras (parcial), `wms_compra_eventos` (fecha, id) y
+   `scraping_producto_historial` (fecha, id).
+2. **`obtenerPendientesHoy` guardado 45 s por país** (`conTtl`, `src/lib/pendientes-hoy.ts`): lo pide el layout en cada página y lo
+   repiten «Hoy» y «Avisos»; son nueve consultas. Son datos del país (cliente de servicio), no de la persona.
+3. **Presencia cada 60 s** (antes 20): `LatidoPresencia` (una escritura por persona), umbral de «Activo» 135 s y Usuarios refresca cada
+   60 s y solo con la pestaña a la vista.
+
+Segunda tanda (pendiente): ventas diarias, eventos de Compras y Scraping agregados en SQL; `crm_sincronizar_ordenes` solo lo nuevo;
+quitar `select("*")`/jsonb que no se usan (`referencias.ts`); el punto 4 de arriba (límite a rangos personalizados); series de «Hoy»
+cortadas en 1000 filas.
+

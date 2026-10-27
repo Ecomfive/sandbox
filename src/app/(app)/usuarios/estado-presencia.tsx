@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { formatearTiempoRelativo } from "@/lib/formato";
 
 /** Si el último latido fue hace menos de esto, se considera "Activo ahora" — dos latidos de
- * `LatidoPresencia` (cada 20s) sin respuesta antes de pasar a "Última conexión". */
-const UMBRAL_ACTIVO_MS = 45_000;
+ * `LatidoPresencia` (cada 60s) sin respuesta antes de pasar a "Última conexión". */
+const UMBRAL_ACTIVO_MS = 135_000;
 
 /**
  * "Activo" en verde si la persona tiene un latido reciente (`ultimaActividadEn`, ver `LatidoPresencia`), o

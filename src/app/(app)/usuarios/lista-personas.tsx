@@ -55,10 +55,13 @@ export function ListaPersonas({
   const [pais, setPais] = useState("");
   const [soloPorCompletar, setSoloPorCompletar] = useState(false);
 
-  // Quién está «Activo» es de otras personas: mientras se mira la lista se vuelve a pedir cada 20 s (lo mismo que tarda
-  // `LatidoPresencia` en mandar un latido nuevo) para que se note cuando alguien entra o se va.
+  // Quién está «Activo» es de otras personas: mientras se mira la lista se vuelve a pedir cada 60 s (lo mismo que tarda
+  // `LatidoPresencia` en mandar un latido nuevo) para que se note cuando alguien entra o se va. Solo con la pestaña a la vista:
+  // `router.refresh()` vuelve a cargar toda la página (rendimiento, 27 oct 2026).
   useEffect(() => {
-    const id = setInterval(() => router.refresh(), 20_000);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 60_000);
     return () => clearInterval(id);
   }, [router]);
 
