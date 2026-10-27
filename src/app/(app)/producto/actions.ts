@@ -906,10 +906,10 @@ export async function subirFotoProductoDesdeUrl(id: string, direccion: string): 
   return guardarFotoProducto(id, ruta);
 }
 
-/** El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. */
-export async function sugerirSkuLibre(nombre: string): Promise<{ codigo: string }> {
+/** El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. Un compuesto empieza por COMBO. */
+export async function sugerirSkuLibre(nombre: string, compuesto = false): Promise<{ codigo: string }> {
   await requireAlgunModulo(CREAR_PRODUCTO);
-  const base = sugerirSku(String(nombre ?? "").slice(0, 200));
+  const base = sugerirSku(String(nombre ?? "").slice(0, 200), 3, { compuesto: compuesto === true });
   if (!base) return { codigo: "" };
   const { data } = await createServiceClient().from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);
   const usados = new Set((data ?? []).map((p) => String(p.codigo).trim().toUpperCase()));

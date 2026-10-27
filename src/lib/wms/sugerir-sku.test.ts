@@ -48,3 +48,14 @@ test("un SKU muy largo se corta en una barra", () => {
   assert.ok(largo.length <= 60);
   assert.ok(!largo.endsWith("/"));
 });
+
+test("el SKU de un compuesto (pack o combo) siempre empieza por COMBO, sin repetir «combo» ni «pack» del nombre", () => {
+  assert.equal(sugerirSku("Oxido Nítrico + Shilajit 8 EN 1 Regalo", 3, { compuesto: true }), "COMBO/OXIDO/NITRICO/SHILAJIT");
+  assert.equal(sugerirSku("Pack x2 Crema Nida", 3, { compuesto: true }), "COMBO/CREMA/NIDA");
+  assert.equal(sugerirSku("Combo Aceite de Orégano 300 capsulas Verde", 3, { compuesto: true }), "COMBO/ACEITE/OREGANO/CAPSULAS/300/VERDE");
+  assert.equal(sugerirSku("Combo", 3, { compuesto: true }), "COMBO");
+  assert.equal(sugerirSku("", 3, { compuesto: true }), "");
+  // Un producto simple no cambia, ni siquiera si su nombre dice «combo».
+  assert.equal(sugerirSku("Combo Aceite de Orégano"), "COMBO/ACEITE/OREGANO");
+  assert.equal(sugerirSku("Crema Nida"), "CREMA/NIDA");
+});
