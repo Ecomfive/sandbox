@@ -32,16 +32,18 @@ export async function crearUsuario(formData: FormData): Promise<{ error?: string
 
   const supabase = createServiceClient();
 
-  // Al primer usuario del sistema se le deja pasar sin permiso — todavía no hay sesión ni rol.
-  const { count: totalPerfiles } = await supabase.from("perfiles").select("id", { count: "exact", head: true });
-  if ((totalPerfiles ?? 0) > 0) {
+  // Al primer usuario del sistema se le deja pasar sin permiso — todavía no hay sesión ni rol. Solo si la cuenta de perfiles dio
+  // 0 sin error: si la consulta falla, se exige el permiso (auditoría 27 oct 2026; antes un error contaba como «no hay nadie»).
+  const { count: totalPerfiles, error: errorConteo } = await supabase.from("perfiles").select("id", { count: "exact", head: true });
+  const primerUsuario = !errorConteo && totalPerfiles === 0;
+  if (!primerUsuario) {
     try {
       await requireModuloEscritura("usuarios");
     } catch (error) {
       return { error: error instanceof Error ? error.message : "Sin permiso." };
     }
   }
-  if (!rol_id && (totalPerfiles ?? 0) > 0) return { error: "Elige qué va a poder hacer." };
+  if (!rol_id && !primerUsuario) return { error: "Elige qué va a poder hacer." };
 
   const contrasena = claveElegida || generarClaveTemporal();
   if (contrasena.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres." };

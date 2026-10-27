@@ -14,13 +14,14 @@ export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
   const supabase = createServiceClient();
-  const [{ count: totalPerfiles }, usuario] = await Promise.all([
+  const [{ count: totalPerfiles, error: errorConteo }, usuario] = await Promise.all([
     supabase.from("perfiles").select("id", { count: "exact", head: true }),
     getUsuarioActual(),
   ]);
 
   if (!usuario) {
-    if ((totalPerfiles ?? 0) > 0) redirect("/login");
+    // Solo con 0 perfiles confirmados (sin error) se ofrece crear el primero.
+    if (errorConteo || totalPerfiles !== 0) redirect("/login");
 
     // Bootstrap: todavía no existe ningún usuario, se permite crear el primero.
     const roles = await consultarRoles(supabase);

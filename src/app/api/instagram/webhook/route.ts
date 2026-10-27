@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { extraerCapturas, extraerNotas } from "@/lib/instagram/extraer";
 import { firmaValida, tokenDeVerificacionValido } from "@/lib/instagram/firma";
 import { guardarCapturas, guardarNotas } from "@/lib/instagram/guardar";
+import { esDelEquipo, remitentesPermitidos } from "@/lib/instagram/remitentes";
 
 export const dynamic = "force-dynamic";
 // Copiar un video de varios MB puede tardar: el trabajo sigue después de contestarle a Meta.
@@ -40,8 +41,10 @@ export async function POST(request: Request) {
     return new NextResponse("Bad Request", { status: 400 });
   }
 
-  const capturas = extraerCapturas(aviso);
-  const notas = extraerNotas(aviso);
+  // Solo lo que mandan las cuentas del equipo (auditoría 27 oct 2026): el resto se ignora sin guardar nada.
+  const permitidos = remitentesPermitidos();
+  const capturas = extraerCapturas(aviso).filter((c) => esDelEquipo(c.remitenteId, permitidos));
+  const notas = extraerNotas(aviso).filter((n) => esDelEquipo(n.remitenteId, permitidos));
   if (capturas.length > 0 || notas.length > 0) {
     // Primero las capturas y después las notas: un texto que llega en el mismo aviso se une a la captura recién guardada.
     after(async () => {

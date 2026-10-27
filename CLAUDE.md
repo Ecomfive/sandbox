@@ -56,6 +56,14 @@ convenciones técnicas del código.
     escapado.
   - `scripts/actualizar-pedidos-servidor.ts` escucha solo en 127.0.0.1, exige Host `localhost:4321` y un código por
     arranque en cada POST; el GET `/actualizar-saldo-rapido` solo muestra el botón.
+  - Auditoría del 27 oct 2026 (informe en `~/security-audit-skill/sandbox/run-2/`): la extensión «Ecomfive · Dropi» (0.2.1)
+    solo se inyecta en mom-beta-proveduria.vercel.app (no en localhost), `fondo.js` solo atiende al puente desde esa página o a
+    su ventanita y solo sube al proyecto de Supabase del sistema (`SUBIDA`); `scripts/scraping-proveedores.ts` arma el nombre de
+    la copia con valores revisados y comprueba que quede en `datos-privados/scraping/`; `crearUsuario` solo deja pasar sin permiso
+    si la cuenta de perfiles dio 0 **sin error**; se quitó `/actualizar-clave` (no la usaba nada: las cuentas se crean con clave
+    temporal); el webhook de Instagram solo guarda lo de las cuentas del equipo (`src/lib/instagram/remitentes.ts`, más
+    `INSTAGRAM_REMITENTES`); `/instagram/compartir` solo guarda sola si la petición llega sin sitio de origen (`Sec-Fetch-Site`
+    none o same-origin, la hoja de compartir del celular) y `/instagram/biblioteca` siempre pregunta antes de guardar.
 
 ## Convenciones importantes
 
@@ -434,7 +442,7 @@ convenciones técnicas del código.
   `marcadoYaLoTenemos`; «Volver a la lista» lo deshace; las búsquedas diarias no tocan esas columnas.
   **Descubrir proveedores** (migración 0157, 26 oct 2026, primero México): en `/scraping-proveedores/proveedores` (`descubrir.tsx`,
   `descubrir-actions.ts`), «Leer el catálogo de México» (solo `puedeActualizarDropi`) usa la extensión: lector `catalogo_mx`
-  (`extension/ecomfive-dropi/lectores/catalogo.js`, extensión 0.2.0; sesión de México = cualquier cuenta que no sea de proveedor,
+  (`extension/ecomfive-dropi/lectores/catalogo.js`, extensión 0.2.1; sesión de México = cualquier cuenta que no sea de proveedor,
   `CUENTAS.mx.tipoUsuario` null) lee todo `products/v4/index` del país y sube `[id, proveedor, stock, creado, precio, nombre,
   foto]`; `procesarDescubrir` resume por proveedor con `descubrir` (`src/lib/scraping/descubrir.ts`, con prueba: ventas estimadas =
   lo que bajó el stock contra la foto anterior guardada en Storage `wms-compras/scraping-catalogo/<país>.json`; «recién publicados» = los que no estaban en la lectura anterior y, en la primera, el 10 % más nuevo del catálogo por ID (Dropi México no manda `created_at` en `v4/index`; el lector sigue hasta una página vacía porque las páginas vienen con menos de 100),

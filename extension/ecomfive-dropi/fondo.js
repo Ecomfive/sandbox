@@ -17,8 +17,9 @@ const LECTORES = {
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   catalogo_mx: { pais: "mx", archivo: "lectores/catalogo.js", funcion: "leerCatalogo", estado: "__catalogo", archivos: ["catalogo"] },
 };
-// Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi».
-const SUBIDA = /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/upload\/sign\/wms-compras\/tmp-dropi-panel\/[0-9a-f-]{36}\/[a-z]+\.json\?token=/;
+// Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi» y solo en el proyecto de Supabase
+// del sistema (auditoría 27 oct 2026: antes cualquier proyecto *.supabase.co pasaba y lo leído podía terminar en otro lado).
+const SUBIDA = /^https:\/\/bcpndbpxbcfruivgizjn\.supabase\.co\/storage\/v1\/object\/upload\/sign\/wms-compras\/tmp-dropi-panel\/[0-9a-f-]{36}\/[a-z]+\.json\?token=/;
 
 const validarPais = (p) => {
   if (!Object.hasOwn(ORIGEN, p)) throw new Error("País no válido.");
@@ -134,9 +135,14 @@ async function atender(m) {
   throw new Error("Pedido desconocido.");
 }
 
+// La única página que puede hablarle a la extensión (por el puente). La ventanita de la extensión también puede.
+const SISTEMA = "https://mom-beta-proveduria.vercel.app";
+
 chrome.runtime.onMessage.addListener((msg, remitente, responder) => {
-  // Solo de esta misma extensión: el puente (en las páginas del sistema) o su ventanita.
+  // Solo de esta misma extensión, y si viene del puente, solo desde una página del sistema (auditoría 27 oct 2026).
   if (remitente.id !== chrome.runtime.id) return false;
+  const desdeVentanita = !remitente.tab && (remitente.url || "").startsWith(chrome.runtime.getURL(""));
+  if (!desdeVentanita && remitente.origin !== SISTEMA) return false;
   atender(msg).then(responder, (e) => responder({ error: String((e && e.message) || e) }));
   return true;
 });
