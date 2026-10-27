@@ -22,6 +22,7 @@ import { EncabezadoFilasPublicacion, FilaPublicacionLista } from "./fila-publica
 import { ProveedorTareas } from "./recomendacion-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 import { CalculadoraMargen } from "./calculadora-margen";
+import { NuevoProducto } from "./nuevo-producto";
 import { AvisoSinPublicacion } from "./sin-publicacion";
 import type { ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
@@ -149,11 +150,12 @@ export function TablaPublicaciones({
         </span>
         <AvisoSinPublicacion productos={sinPublicacion} sinId={sinId} puedeEscribir={puedeEscribir} />
       </p>
-      {/* Arriba de la lista: lo que espera para Dropi a la izquierda; la calculadora de margen (27 oct 2026, todos) y «Actualizar datos» a la derecha. */}
+      {/* Arriba de la lista: lo que espera para Dropi a la izquierda; la calculadora de margen (27 oct 2026, todos), «Nuevo producto» (27 oct 2026, quien edita la lista) y «Actualizar datos» a la derecha. */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         {barraDropi ?? <span />}
         <div className="flex flex-wrap gap-2">
           <CalculadoraMargen publicaciones={publicaciones} reglas={reglas} />
+          {puedeEscribir && <NuevoProducto />}
           {actualizarDropi && (
             <Link
               href="/publicaciones-dropi/actualizar"
