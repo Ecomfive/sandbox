@@ -22,7 +22,7 @@ import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
 import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
-import { actualizarPublicacion, archivarPublicacion, eliminarBorrador, publicarEnDropi, republicarPublicacion } from "./actions";
+import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
 import { conexionDropi, type FilaPublicacion } from "./def-publicaciones";
@@ -135,6 +135,7 @@ export function FichaPublicacion({
   puedeEscribir,
   puedeArchivar,
   puedeVerCompras,
+  puedeEliminar = false,
   corteVentas = null,
   margenMinimo,
   decisionesDisponibles,
@@ -153,6 +154,8 @@ export function FichaPublicacion({
   puedeArchivar: boolean;
   /** Solo un administrador: las compras del producto vinculado (el servidor lo vuelve a comprobar). */
   puedeVerCompras: boolean;
+  /** Solo un administrador: elimina para siempre una publicación sin ID de Dropi (el servidor lo vuelve a comprobar). */
+  puedeEliminar?: boolean;
   /** Hasta qué día llegan las ventas de Dropi (solo un administrador las ve); `null` si no se muestran. */
   corteVentas?: string | null;
   /** El margen mínimo de las reglas: por debajo, el punto rojo. */
@@ -178,6 +181,7 @@ export function FichaPublicacion({
       puedeEscribir={puedeEscribir}
       puedeArchivar={puedeArchivar}
       puedeVerCompras={puedeVerCompras}
+      puedeEliminar={puedeEliminar}
       corteVentas={corteVentas}
       margenMinimo={margenMinimo}
       decisionesDisponibles={decisionesDisponibles}
@@ -198,6 +202,7 @@ function ContenidoFicha({
   puedeEscribir,
   puedeArchivar,
   puedeVerCompras,
+  puedeEliminar,
   corteVentas,
   margenMinimo,
   decisionesDisponibles,
@@ -214,6 +219,7 @@ function ContenidoFicha({
   puedeEscribir: boolean;
   puedeArchivar: boolean;
   puedeVerCompras: boolean;
+  puedeEliminar: boolean;
   corteVentas: string | null;
   margenMinimo: number;
   decisionesDisponibles: boolean;
@@ -302,18 +308,21 @@ function ContenidoFicha({
     });
   }
 
-  // Un borrador sí se elimina para siempre (24 oct 2026); las demás publicaciones solo se archivan.
+  // Un borrador se elimina para siempre (24 oct 2026); una publicación sin ID de Dropi, solo un administrador (27 oct 2026).
+  // Las que tienen ID de Dropi solo se archivan.
   const [eliminando, setEliminando] = useState(false);
+  const eliminable = !p.publicarPendiente && !p.dropiId && (p.sinPublicar || puedeEliminar);
   function eliminar() {
-    if (!confirm(`Se va a eliminar para siempre el borrador «${p.nombre}», con sus datos y sus fotos. Esto no se puede deshacer. ¿Seguir?`)) return;
+    const que = p.sinPublicar ? "el borrador" : "la publicación";
+    if (!confirm(`Se va a eliminar para siempre ${que} «${p.nombre}», con sus datos y sus fotos. Esto no se puede deshacer. ¿Seguir?`)) return;
     setError(null);
     setEliminando(true);
     empezar(async () => {
-      const r = await eliminarBorrador(p.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await eliminarPublicacion(p.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       setEliminando(false);
       if (r.error) setError(r.error);
       else {
-        mostrarToast(r.detalle ?? "Borrador eliminado");
+        mostrarToast(r.detalle ?? "Eliminada");
         alCerrar();
       }
     });
@@ -406,9 +415,9 @@ function ContenidoFicha({
                   {publicando ? "Un momento..." : p.publicarPendiente ? "Publicación pendiente" : "Publicar en Dropi"}
                 </BotonAccion>
               )}
-              {!sinGuardar && puedeArchivar && p.sinPublicar && !p.publicarPendiente && (
+              {!sinGuardar && puedeArchivar && eliminable && (
                 <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
-                  {eliminando ? "Un momento..." : "Eliminar borrador"}
+                  {eliminando ? "Un momento..." : p.sinPublicar ? "Eliminar borrador" : "Eliminar"}
                 </BotonAccion>
               )}
               {!sinGuardar && puedeArchivar && puedeRepublicar && !p.sinPublicar && (

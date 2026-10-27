@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
@@ -439,25 +440,47 @@ export async function publicarEnDropi(id: string): Promise<{ error?: string; det
  * Dropi y no está pendiente de publicarse (si lo está, primero se deshace). Se va con sus comentarios, su actividad de IA y sus fotos de Storage.
  * Todas las demás siguen sin poder eliminarse (se archivan). Queda una línea en la auditoría.
  */
-export async function eliminarBorrador(id: string): Promise<{ error?: string; detalle?: string }> {
+/**
+ * Elimina una publicación para siempre. Un borrador sin publicar lo elimina quien puede modificar el módulo (24 oct 2026); cualquier
+ * otra publicación sin ID de Dropi, solo un administrador (27 oct 2026). Con ID de Dropi nunca: se archiva (regla de Hernán).
+ */
+export async function eliminarPublicacion(id: string): Promise<{ error?: string; detalle?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   const pub = await publicacionPermitida(id, usuario.paisesPermitidos);
   if (!pub) return { error: "La publicación ya no existe o no es de tus países." };
-  if (pub.estado_publicacion !== "borrador" || pub.dropi_id) return { error: "Solo se eliminan los borradores que nunca se publicaron en Dropi; las demás se archivan." };
+  if (String(pub.dropi_id ?? "").trim()) return { error: "Una publicación con ID de Dropi no se elimina: archívala." };
+  const borrador = pub.estado_publicacion === "borrador";
+  if (!borrador && !esAdministrador(usuario)) return { error: "Solo un administrador puede eliminar una publicación." };
   const supabase = createServiceClient();
   const pendiente = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", id).in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
   if (pendiente.data) return { error: "Tiene un cambio pendiente para Dropi: deshazlo en la lista de cambios pendientes antes de eliminarla." };
-  // Las fotos que subió este borrador y las que le generó la IA (nada más: nunca se borra un archivo de otra parte).
+  // Las fotos que subió el borrador y las de la carpeta de la publicación (nada más: nunca se borra un archivo de otra parte).
   const datos = normalizarDatosCrear(pub.datos_dropi);
   const archivos = datos.fotos.map((x) => x.url.split(`/object/public/${BUCKET}/`)[1]).filter((r): r is string => !!r && RUTA_FOTO_BORRADOR.test(r));
-  const { data: deLaIa } = await supabase.storage.from(BUCKET).list(`publicaciones/${id}/ia`, { limit: 200 });
-  for (const x of deLaIa ?? []) if (x.name) archivos.push(`publicaciones/${id}/ia/${x.name}`);
-  await registrarAuditoria({ accion: "eliminar_borrador_dropi", entidad: "dropi_publicaciones", entidadId: id, detalle: `${pub.nombre}: borrador eliminado para siempre` });
+  for (const carpeta of [`publicaciones/${id}`, `publicaciones/${id}/ia`, `publicaciones/${id}/dropi`]) {
+    const { data: lista } = await supabase.storage.from(BUCKET).list(carpeta, { limit: 500 });
+    for (const x of lista ?? []) if (x.name && x.id) archivos.push(`${carpeta}/${x.name}`);
+  }
+  await registrarAuditoria({
+    accion: borrador ? "eliminar_borrador_dropi" : "eliminar_publicacion_dropi",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${numeroPublicacion(pub.numero as number | null)} ${pub.nombre}: eliminada para siempre`,
+  });
   const { error } = await supabase.from("dropi_publicaciones").delete().eq("id", id);
-  if (error) return { error: /migraci|no se eliminan/i.test(error.message) ? "Falta correr en Supabase la migración 0152." : "No se pudo eliminar el borrador." };
-  if (archivos.length) await supabase.storage.from(BUCKET).remove(archivos);
+  if (error) return { error: /no se eliminan/i.test(error.message) ? "Falta correr en Supabase la migración 0159." : "No se pudo eliminar la publicación." };
+  // Las demás publicaciones dejan de enlazarla.
+  const { data: enlazadas } = await supabase.from("dropi_publicaciones").select("id, relacionados").contains("relacionados", [id]);
+  for (const o of enlazadas ?? []) {
+    await supabase.from("dropi_publicaciones").update({ relacionados: ((o.relacionados as string[]) ?? []).filter((x) => x !== id) }).eq("id", o.id);
+  }
+  // Una foto que otra publicación copió (`foto_url`) se queda.
+  const { data: usadas } = await supabase.from("dropi_publicaciones").select("foto_url").like("foto_url", `%/publicaciones/${id}/%`);
+  const enUso = new Set((usadas ?? []).map((u) => String(u.foto_url).split(`/object/public/${BUCKET}/`)[1]));
+  const borrar = archivos.filter((r) => !enUso.has(r));
+  if (borrar.length) await supabase.storage.from(BUCKET).remove(borrar);
   revalidatePath(RUTA);
-  return { detalle: "Borrador eliminado" };
+  return { detalle: borrador ? "Borrador eliminado" : "Publicación eliminada" };
 }
 
 /** La actividad de una publicación para su ficha. Es una lectura: basta poder abrir el módulo. */

@@ -198,6 +198,7 @@ export function TablaPublicaciones({
         puedeEscribir={puedeEscribir}
         puedeArchivar={puedeArchivar}
         puedeVerCompras={esAdmin}
+        puedeEliminar={esAdmin}
         corteVentas={corteVentas}
         margenMinimo={reglas.margen_minimo}
         decisionesDisponibles={decisionesDisponibles}
