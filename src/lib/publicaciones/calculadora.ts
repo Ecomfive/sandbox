@@ -56,3 +56,39 @@ export function textoWhatsapp(p: { nombre: string; idDropi?: string | null; cost
   ];
   return lineas.join("\n");
 }
+
+/** Lo que la calculadora necesita saber de una publicación para armar la lista de productos por SKU. */
+export interface PublicacionParaCalculo {
+  numero: number | null;
+  dropiId: string;
+  archivada: boolean;
+  duplicadaDe: string | null;
+  sinPublicar: boolean;
+  tipoDropi: "publico" | "privado" | null;
+  sku: { id: string; codigo: string; nombre: string } | null;
+}
+
+export interface ProductoDeCalculadora<T extends PublicacionParaCalculo> {
+  sku: { id: string; codigo: string; nombre: string };
+  /** La publicación de la que salen los costos y el precio: la pública y al día; las privadas y las apagadas, solo si no hay otra. */
+  representante: T;
+}
+
+/**
+ * Los productos que se pueden elegir en la calculadora (27 oct 2026, pedido de Jhokser): **uno por SKU**, no uno por publicación.
+ * Un producto con su público y sus privadas «P-MA …» sale una sola vez; sus datos vienen de la publicación pública al día (con ID de
+ * Dropi, la de número más bajo). Un SKU que solo tiene publicaciones archivadas, duplicadas o sin publicar no sale; una publicación sin
+ * SKU vinculado tampoco (se escribe a mano). Ordenados por código.
+ */
+export function productosPorSku<T extends PublicacionParaCalculo>(publicaciones: T[]): ProductoDeCalculadora<T>[] {
+  const peso = (p: T) => (p.tipoDropi === "privado" ? 2 : 0) + (p.dropiId.trim() ? 0 : 1);
+  const porSku = new Map<string, { sku: ProductoDeCalculadora<T>["sku"]; mejor: T }>();
+  for (const p of publicaciones) {
+    if (!p.sku || p.archivada || p.duplicadaDe || p.sinPublicar) continue;
+    const previo = porSku.get(p.sku.id);
+    if (!previo || peso(p) < peso(previo.mejor) || (peso(p) === peso(previo.mejor) && (p.numero ?? Infinity) < (previo.mejor.numero ?? Infinity))) {
+      porSku.set(p.sku.id, { sku: p.sku, mejor: p });
+    }
+  }
+  return [...porSku.values()].map((x) => ({ sku: x.sku, representante: x.mejor })).sort((a, b) => a.sku.codigo.localeCompare(b.sku.codigo, "es"));
+}
