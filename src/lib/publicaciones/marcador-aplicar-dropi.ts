@@ -93,7 +93,8 @@ const CODIGO = [
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
   "var id=Number(c.nuevo)||0,st=stockDe(o),k;",
-  "if(!id){var r=nuevo(o,bp);if(r.error)return{ok:false,error:r.error};",
+  // El precio elegido al republicar (27 oct 2026) va al producto nuevo; sin él, queda el del viejo.
+  "if(!id){var r=nuevo(o,bp,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
   "id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)}}",
   "var f=function(e){return{ok:false,nuevo:id,error:e}};",

@@ -751,16 +751,25 @@ async function esPrivada(p: { pais_id: string; dropi_id?: unknown; tipo_publicac
  * de «Aplicar en Dropi», que crea el producto de nuevo en Dropi (datos, fotos y stock), le saca el stock al viejo y lo archiva; al
  * terminar, el sistema crea la publicación nueva y archiva esta (`guardarResultadosDropi`).
  */
-export async function republicarPublicacion(id: string): Promise<{ error?: string; detalle?: string }> {
+export async function republicarPublicacion(id: string, precio: number): Promise<{ error?: string; detalle?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
+  // El precio del producto nuevo se elige al republicar (27 oct 2026: el 11446 salió con el precio viejo porque nadie lo cambió).
+  if (typeof precio !== "number" || !Number.isFinite(precio) || precio <= 0 || precio >= 100_000) return { error: "Pon el precio de venta del producto nuevo." };
+  const precioNuevo = Math.round(precio * 100) / 100;
   const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
   if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
   if (antes.estado === "archivado" || antes.estado_publicacion === "archivado") return { error: "Está archivada: sácala de Archivados antes de republicarla." };
   if (await esPrivada(antes)) return { error: "Es una publicación privada: las privadas no se republican." };
-  const r = await encolarRepublicar(createServiceClient(), { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  const precioAntes = antes.precio_venta === null || antes.precio_venta === undefined ? null : Number(antes.precio_venta);
+  const r = await encolarRepublicar(
+    createServiceClient(),
+    { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null },
+    { id: usuario.id, nombre: usuario.nombre || usuario.email },
+    { precio: precioNuevo, precioAntes },
+  );
   if ("error" in r) return { error: r.error };
-  if (!r.yaEstaba)
-    await registrarAuditoria({ accion: "dropi_republicar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»` });
+  const cambioPrecio = precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004 ? `, con precio $${precioNuevo.toFixed(2)}${precioAntes !== null ? ` (antes $${precioAntes.toFixed(2)})` : ""}` : `, con el mismo precio $${precioNuevo.toFixed(2)}`;
+  await registrarAuditoria({ accion: "dropi_republicar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»${cambioPrecio}` });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
 }

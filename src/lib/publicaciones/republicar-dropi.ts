@@ -21,8 +21,13 @@ export const CDN_FOTOS_DROPI = "https://d39ru7awumhhs2.cloudfront.net";
  * y con el stock que tiene hoy en cada bodega. Error si no se puede republicar: con variaciones, con stock en una bodega que no es
  * del proveedor (la B280 de Dropi), con unidades privatizadas o con porcentajes por dropshipper (no se copian bien: a mano).
  */
-export function armarProductoNuevo(producto: Obj, bodegasProveedor: Obj[]): { cuerpo: Obj } | { error: string } {
-  const r = armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null });
+export function armarProductoNuevo(
+  producto: Obj,
+  bodegasProveedor: Obj[],
+  /** El precio (y el sugerido) del producto nuevo, si se eligió al republicar (27 oct 2026: el 11446 salió con el precio viejo). Sin él, el del viejo. */
+  precios?: { precio?: number | null; precioSugerido?: number | null },
+): { cuerpo: Obj } | { error: string } {
+  const r = armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null, precio: precios?.precio ?? null, precioSugerido: precios?.precioSugerido ?? null });
   if ("error" in r) return r;
   const propias = new Set(bodegasProveedor.map((b) => Number(b.id)));
   const bodegas = Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : [];
@@ -93,7 +98,7 @@ export function fotosParaCopiar(producto: Obj, pais?: string): { url: string; no
 /** Lo mismo en JavaScript simple para el favorito (va después de `ARMAR_JS`, que define `armar`). La prueba compara los dos. */
 export const REPUBLICAR_JS = [
   "var CDN=" + JSON.stringify(CDN_FOTOS_DROPI) + ";",
-  "function nuevo(o,bp){var r=armar(o,bp,{nombre:null,nombreGuia:null});if(r.error)return r;",
+  "function nuevo(o,bp,p){var r=armar(o,bp,{nombre:null,nombreGuia:null,precio:p&&p.precio!=null?p.precio:null,precioSugerido:p&&p.precioSugerido!=null?p.precioSugerido:null});if(r.error)return r;",
   "var pr={};bp.forEach(function(p){pr[Number(p.id)]=1});",
   "var wp=Array.isArray(o.warehouse_product)?o.warehouse_product:[];",
   "if(wp.some(function(w){return Number(w.stock)>0&&!pr[Number(w.warehouse_id)]}))return{error:'Tiene stock en una bodega que no es de ECOMFIVE (la B280 de Dropi): no se republica.'};",

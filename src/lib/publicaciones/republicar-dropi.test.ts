@@ -5,7 +5,7 @@ import { armarMovimientoStock, armarProductoNuevo, CDN_FOTOS_DROPI, fotosParaCop
 
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS}; return { nuevo, mover, stockDe, fotosDe };`)() as {
-  nuevo: (o: Obj, bp: Obj[]) => Obj;
+  nuevo: (o: Obj, bp: Obj[], p?: { precio?: number | null; precioSugerido?: number | null }) => Obj;
   mover: (o: Obj, bp: Obj[], m: Record<string, number>, k: string) => Obj;
   stockDe: (o: Obj) => Record<string, number>;
   fotosDe: (o: Obj) => Obj[];
@@ -72,6 +72,8 @@ test("el favorito arma exactamente lo mismo que el sistema", () => {
   const casos: Obj[] = [veganic, { ...veganic, type: "VARIABLE" }, { ...veganic, warehouse_product: [] }, { ...veganic, private_product_inventories: [{ stock: 2, deleted_at: null }] }];
   for (const o of casos) {
     igual(delFavorito.nuevo(o, bp), armarProductoNuevo(o, bp));
+    // Con el precio elegido al republicar, los dos lo ponen igual (precio y sugerido).
+    igual(delFavorito.nuevo(o, bp, { precio: 5.99, precioSugerido: 5.99 }), armarProductoNuevo(o, bp, { precio: 5.99, precioSugerido: 5.99 }));
     igual(delFavorito.mover(o, bp, { "81": -224 }, "k"), armarMovimientoStock(o, bp, { "81": -224 }, "k"));
     igual(delFavorito.mover(o, bp, { "81": 7 }, "k"), armarMovimientoStock(o, bp, { "81": 7 }, "k"));
     igual(delFavorito.stockDe(o), stockPorBodega(o));

@@ -147,6 +147,12 @@ async function crearRepublicada(
   if (!id) {
     const datos: Record<string, unknown> = {};
     for (const k of COPIAR_AL_REPUBLICAR) datos[k] = vieja[k] ?? null;
+    // El precio elegido al republicar (27 oct 2026) es el de la nueva; si cambió, también su último cambio de precio.
+    const precioElegido = fila.precio === null || fila.precio === undefined ? null : Number(fila.precio);
+    if (precioElegido !== null && precioElegido > 0) {
+      if (Math.abs(precioElegido - Number(vieja.precio_venta ?? 0)) > 0.004) datos.ultimo_cambio_precio = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+      datos.precio_venta = precioElegido;
+    }
     const relacionados = [...new Set([...((vieja.relacionados as string[] | null) ?? []), vieja.id as string])];
     const { data, error } = await supabase
       .from("dropi_publicaciones")

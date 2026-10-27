@@ -138,16 +138,23 @@ export async function encolarRepublicar(
   supabase: SupabaseClient,
   pub: { id: string; pais_id: string; dropi_id: string | null },
   por: { id: string; nombre: string },
+  /** El precio del producto nuevo (27 oct 2026: se elige al republicar; el sugerido va igual) y el que tenía. Sin él, se copia el del viejo. */
+  precio?: { precio: number; precioAntes: number | null },
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
   const productoId = idsDeDropi(pub.dropi_id)[0];
   if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
   const falta = (m: string) => /tipo|column|does not exist|schema cache/i.test(m);
   const previo = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", pub.id).eq("tipo", "republicar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0145." : "No se pudo dejar la republicación para Dropi." };
-  if (previo.data) return { id: previo.data.id as string, yaEstaba: true };
+  const precios = precio ? { precio: precio.precio, precio_sugerido: precio.precio, precio_antes: precio.precioAntes } : {};
+  if (previo.data) {
+    // Ya esperaba: si ahora se eligió un precio, se le pone (todavía no se creó el producto nuevo).
+    if (precio) await supabase.from("dropi_cambios_pendientes").update(precios).eq("id", previo.data.id as string).is("nuevo_dropi_id", null);
+    return { id: previo.data.id as string, yaEstaba: true };
+  }
   const { data, error } = await supabase
     .from("dropi_cambios_pendientes")
-    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "republicar", creado_por: por.id, creado_por_nombre: por.nombre })
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "republicar", ...precios, creado_por: por.id, creado_por_nombre: por.nombre })
     .select("id")
     .single();
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0145." : "No se pudo dejar la republicación para Dropi." };

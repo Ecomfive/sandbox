@@ -1,13 +1,14 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
-import { useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ActualizarIcon, ArchivarIcon, ChevronRightIcon, DropiIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
+import { ConfirmarRepublicar } from "./confirmar-republicar";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
@@ -16,7 +17,7 @@ import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
-import { avisoRepublicar, conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
@@ -107,21 +108,25 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
 function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
   const { mostrarToast } = useToast();
   const [enviando, empezar] = useTransition();
+  const [confirmando, setConfirmando] = useState(false);
   if (!puedeRepublicar(f)) return <span aria-hidden="true" className="mr-1 w-9 shrink-0" />;
   const yaPendiente = republicacionPendiente(f);
-  function republicar() {
-    if (yaPendiente || !confirm(avisoRepublicar(f.dropiId))) return;
+  // Pide el precio del producto nuevo antes de dejarlo pendiente (27 oct 2026).
+  function republicar(precio: number) {
     empezar(async () => {
-      const r = await republicarPublicacion(f.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await republicarPublicacion(f.id, precio).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       mostrarToast(r.error ?? r.detalle ?? "Republicación pendiente", r.error ? "destructive" : undefined);
+      if (!r.error) setConfirmando(false);
     });
   }
   const texto = yaPendiente ? "Republicación pendiente" : "Republicar en Dropi";
   return (
+    <>
+    {confirmando && <ConfirmarRepublicar p={f} enviando={enviando} alCerrar={() => setConfirmando(false)} alConfirmar={republicar} />}
     <Tooltip texto={texto}>
       <button
         type="button"
-        onClick={republicar}
+        onClick={() => !yaPendiente && setConfirmando(true)}
         disabled={enviando}
         aria-disabled={yaPendiente || undefined}
         aria-label={`${texto}: ${f.nombre}`}
@@ -130,6 +135,7 @@ function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
         <ActualizarIcon className="h-4 w-4" />
       </button>
     </Tooltip>
+    </>
   );
 }
 

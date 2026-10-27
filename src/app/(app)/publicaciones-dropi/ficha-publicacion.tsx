@@ -26,9 +26,10 @@ import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
-import { avisoRepublicar, conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 import { AvisoEnCamino, VentasEnDropi } from "./ventas-publicacion";
+import { ConfirmarRepublicar } from "./confirmar-republicar";
 import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
@@ -354,13 +355,18 @@ function ContenidoFicha({
   const yaRepublicando = republicacionPendiente(p);
   // Lo que espera «Aplicar en Dropi» (o dio error) va arriba, junto a los botones, para que se vea (27 oct 2026); lo ya aplicado sigue abajo.
   const cambioEsperando = p.cambioDropi && p.cambioDropi.estado !== "aplicado" ? p.cambioDropi : null;
+  // Pide el precio del producto nuevo antes de dejarlo pendiente (27 oct 2026: el 11446 salió con el precio viejo).
+  const [confirmandoRepublicar, setConfirmandoRepublicar] = useState(false);
   function republicar() {
-    if (!confirm(avisoRepublicar(p.dropiId))) return;
     setError(null);
+    setConfirmandoRepublicar(true);
+  }
+  function confirmarRepublicar(precio: number) {
     setRepublicando(true);
     empezar(async () => {
-      const r = await republicarPublicacion(p.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await republicarPublicacion(p.id, precio).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       setRepublicando(false);
+      setConfirmandoRepublicar(false);
       if (r.error) setError(r.error);
       else mostrarToast(r.detalle ?? "Republicación pendiente");
     });
@@ -401,6 +407,7 @@ function ContenidoFicha({
         </>
       }
     >
+      {confirmandoRepublicar && <ConfirmarRepublicar p={p} enviando={republicando} alCerrar={() => setConfirmandoRepublicar(false)} alConfirmar={confirmarRepublicar} />}
       {/* Una publicación «Sin publicar»: lo que Dropi pide para crearla. Es un formulario aparte (uno no va dentro de otro). */}
       {p.sinPublicar && puedeEscribir && <DatosParaDropi p={p} opciones={opcionesCrear} />}
       <form onSubmit={guardar} aria-busy={pendiente} className="flex flex-1 flex-col">
