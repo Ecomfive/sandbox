@@ -8,7 +8,8 @@
 //  - Al **crear** un producto simple y **público**: una bodega con 100 unidades o más (`hasAtLeastOneWarehouseWithMinimumStock`).
 //  - Un producto que **no** es privado: mínimo 3 imágenes.
 //  - Si la cuenta tiene el permiso «Warranties»: las 4 garantías por defecto activas, de 10 días o más, con comentario en las tres primeras.
-//  - Opcionales: SKU, descripción para la app, método de envío y código de barras.
+//  - Opcionales en Dropi: SKU, descripción para la app, método de envío y código de barras. **Aquí el SKU es obligatorio** (pedido de Hernán,
+//    27 oct 2026): es el código del producto vinculado, el mismo que va en el nombre de la guía de envío y con el que se descuentan las ventas.
 // Guardar es `POST api/products` (sin ID; responde `objects.id`); después la pantalla sube las fotos (`POST api/products/photos/upload`) y las
 // garantías (`POST api/productwarranty/create { id, warranties }`). Las categorías se mandan como objetos de `GET api/categories`.
 //
@@ -103,6 +104,7 @@ export function faltantesCrearDropi(d: DatosCrearDropi): string[] {
   const f: string[] = [];
   if (!d.nombre.trim()) f.push("Falta el nombre.");
   else if (d.nombre.length > MAX_NOMBRE_CREAR) f.push(`El nombre admite ${MAX_NOMBRE_CREAR} caracteres.`);
+  if (!d.sku?.trim()) f.push("Falta el SKU (el código del producto vinculado).");
   if (d.nombreGuia !== null && d.nombreGuia.length > MAX_NOMBRE_CREAR) f.push(`El nombre de la guía admite ${MAX_NOMBRE_CREAR} caracteres.`);
   if (!(Number(d.peso) > 0)) f.push("Falta el peso (en gramos).");
   else if (Number(d.peso) > PESO_MAXIMO_G) f.push(`El peso máximo que admite Dropi es ${PESO_MAXIMO_G} g.`);

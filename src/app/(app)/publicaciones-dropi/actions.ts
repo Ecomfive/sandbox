@@ -162,8 +162,23 @@ async function fotosValidas(supabase: ReturnType<typeof createServiceClient>, ru
   return { fotos };
 }
 
-/** Lo que Dropi pide, leído del formulario (los campos `dd_*`); las fotos y las categorías llegan como listas en JSON. */
-async function leerDatosDropi(f: FormData, supabase: ReturnType<typeof createServiceClient>, base: { nombre: string; precio: number | null; publicacionId: string | null }): Promise<DatosCrearDropi | { error: string }> {
+/** El producto de Producto elegido en «Publicar en Dropi» (`sku_maestro_id`): su código es el SKU de Dropi. null si no viene o no existe. */
+async function productoElegido(f: FormData, supabase: ReturnType<typeof createServiceClient>): Promise<{ id: string; codigo: string; codigoBarras: string | null } | null> {
+  const id = texto(f, "sku_maestro_id", 64);
+  if (!UUID.test(id)) return null;
+  const { data } = await supabase.from("skus_maestros").select("id, codigo, codigo_barras").eq("id", id).maybeSingle();
+  return data ? { id: data.id as string, codigo: String(data.codigo ?? ""), codigoBarras: (data.codigo_barras as string | null) ?? null } : null;
+}
+
+/**
+ * Lo que Dropi pide, leído del formulario (los campos `dd_*`); las fotos y las categorías llegan como listas en JSON. El SKU, el nombre de la
+ * guía de envío y el código de barras salen del producto vinculado si no se escribieron (27 oct 2026): el SKU de Dropi es el código del producto.
+ */
+async function leerDatosDropi(
+  f: FormData,
+  supabase: ReturnType<typeof createServiceClient>,
+  base: { nombre: string; precio: number | null; publicacionId: string | null; producto?: { codigo: string; codigoBarras: string | null } | null },
+): Promise<DatosCrearDropi | { error: string }> {
   const lista = (k: string): unknown => {
     try {
       return JSON.parse(texto(f, k, 20000) || "[]");
@@ -175,9 +190,12 @@ async function leerDatosDropi(f: FormData, supabase: ReturnType<typeof createSer
   if ("error" in fotos) return fotos;
   const bodega = Math.trunc(Number(texto(f, "dd_bodega", 12)));
   const unidades = Math.trunc(Number(texto(f, "dd_unidades", 12)));
+  const sku = texto(f, "dd_sku", 120) || base.producto?.codigo || "";
+  // En la guía de envío va el SKU, para que despacho vea siempre el mismo nombre (22 oct 2026), si cabe en los 40 caracteres de Dropi.
+  const nombreGuia = texto(f, "dd_nombre_guia", 300) || (sku && sku.length <= MAX_NOMBRE_DROPI ? sku : "");
   return normalizarDatosCrear({
     nombre: base.nombre,
-    nombreGuia: null,
+    nombreGuia: nombreGuia || null,
     precio: base.precio,
     // El sugerido va igual al precio (decisión de Alcides, 23 oct 2026).
     precioSugerido: base.precio,
@@ -187,9 +205,9 @@ async function leerDatosDropi(f: FormData, supabase: ReturnType<typeof createSer
     alto: medida(f, "dd_alto"),
     categorias: lista("dd_categorias"),
     descripcion: descripcionAHtml(texto(f, "dd_descripcion", 20000)),
-    descripcionApp: "",
-    sku: null,
-    codigoBarras: null,
+    descripcionApp: texto(f, "dd_descripcion_app", 5000),
+    sku: sku || null,
+    codigoBarras: texto(f, "dd_codigo_barras", 60) || base.producto?.codigoBarras || null,
     bodegas: Number.isInteger(bodega) && bodega > 0 && Number.isInteger(unidades) ? [{ id: bodega, unidades }] : [],
     fotos: fotos.fotos,
   });
@@ -203,7 +221,8 @@ async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof
   const lista = await supabase.from("dropi_cambios_pendientes").select("datos").limit(1);
   if (lista.error) return { error: "Falta correr en Supabase la migración 0151." };
   const precio = typeof basicos.precio_venta === "number" ? basicos.precio_venta : null;
-  const datos = await leerDatosDropi(f, supabase, { nombre: String(basicos.nombre), precio, publicacionId: null });
+  const producto = await productoElegido(f, supabase);
+  const datos = await leerDatosDropi(f, supabase, { nombre: String(basicos.nombre), precio, publicacionId: null, producto });
   if ("error" in datos) return datos;
   const falta = faltantesCrearDropi(datos);
   if (falta.length) return { error: falta[0] };
@@ -211,6 +230,7 @@ async function crearParaPublicar(f: FormData, usuario: Awaited<ReturnType<typeof
     .from("dropi_publicaciones")
     .insert({
       ...basicos,
+      sku_maestro_id: producto?.id ?? null,
       dropi_id: null,
       tipo_publicacion: "publico",
       estado_publicacion: "borrador",
@@ -240,12 +260,14 @@ async function crearComoBorrador(f: FormData, usuario: Awaited<ReturnType<typeof
   const basicos = leerDatos(f);
   if ("error" in basicos) return basicos;
   const precio = typeof basicos.precio_venta === "number" ? basicos.precio_venta : null;
-  const datos = await leerDatosDropi(f, supabase, { nombre: String(basicos.nombre), precio, publicacionId: null });
+  const producto = await productoElegido(f, supabase);
+  const datos = await leerDatosDropi(f, supabase, { nombre: String(basicos.nombre), precio, publicacionId: null, producto });
   if ("error" in datos) return datos;
   const { data, error } = await supabase
     .from("dropi_publicaciones")
     .insert({
       ...basicos,
+      sku_maestro_id: producto?.id ?? null,
       dropi_id: null,
       tipo_publicacion: "publico",
       estado_publicacion: "borrador",
@@ -412,7 +434,10 @@ export async function guardarDatosDropi(f: FormData): Promise<{ error?: string }
   if (pub.estado_publicacion !== "borrador") return { error: "Solo se editan los datos de una publicación que todavía no está en Dropi." };
   const supabase = createServiceClient();
   const precio = pub.precio_venta === null || pub.precio_venta === undefined ? null : Number(pub.precio_venta);
-  const datos = await leerDatosDropi(f, supabase, { nombre: String(pub.nombre ?? ""), precio, publicacionId: id });
+  // Sin SKU escrito, el del producto que ya tiene vinculado.
+  const vinculado = pub.sku_maestro_id ? await supabase.from("skus_maestros").select("codigo, codigo_barras").eq("id", pub.sku_maestro_id as string).maybeSingle() : null;
+  const producto = vinculado?.data ? { codigo: String(vinculado.data.codigo ?? ""), codigoBarras: (vinculado.data.codigo_barras as string | null) ?? null } : null;
+  const datos = await leerDatosDropi(f, supabase, { nombre: String(pub.nombre ?? ""), precio, publicacionId: id, producto });
   if ("error" in datos) return datos;
   // Un borrador se guarda aunque falten datos; si ya está pendiente para Dropi tiene que seguir completo (lo pendiente toma estos datos).
   const pendiente = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", id).eq("tipo", "crear").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
@@ -439,11 +464,20 @@ export async function publicarEnDropi(id: string): Promise<{ error?: string; det
   if (pub.estado_publicacion !== "borrador") return { error: "Esta publicación ya está en Dropi." };
   if (pub.estado === "archivado") return { error: "Está archivada: sácala de Archivados antes de publicarla." };
   const precio = pub.precio_venta === null || pub.precio_venta === undefined ? null : Number(pub.precio_venta);
+  const supabase = createServiceClient();
   const guardados = normalizarDatosCrear((pub as Record<string, unknown>).datos_dropi);
+  // Un borrador de antes del 27 oct 2026 no guardaba el SKU: se toma el del producto vinculado (y va también en la guía de envío).
+  if (!guardados.sku && pub.sku_maestro_id) {
+    const { data: s } = await supabase.from("skus_maestros").select("codigo, codigo_barras").eq("id", pub.sku_maestro_id as string).maybeSingle();
+    if (s?.codigo) {
+      guardados.sku = String(s.codigo);
+      guardados.nombreGuia ??= guardados.sku.length <= MAX_NOMBRE_DROPI ? guardados.sku : null;
+      guardados.codigoBarras ??= (s.codigo_barras as string | null) ?? null;
+    }
+  }
   const datos = normalizarDatosCrear({ ...guardados, nombre: pub.nombre, precio, precioSugerido: precio });
   const falta = faltantesCrearDropi(datos);
   if (falta.length) return { error: `Faltan datos para Dropi: ${falta.join(" ")}` };
-  const supabase = createServiceClient();
   const r = await encolarCrear(supabase, { id, pais_id: pub.pais_id }, datos, { id: usuario.id, nombre: usuario.nombre || usuario.email });
   if ("error" in r) return { error: r.error };
   if (!r.yaEstaba) await registrarAuditoria({ accion: "dropi_crear_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${pub.nombre}: pendiente para «Aplicar en Dropi»` });

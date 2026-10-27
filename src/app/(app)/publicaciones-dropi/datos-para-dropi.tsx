@@ -36,7 +36,8 @@ export function DatosParaDropi({ p, opciones }: { p: FilaPublicacion; opciones: 
   }
 
   // Lo que Dropi todavía pide para publicarla, con lo último guardado (y el nombre y el precio de la ficha).
-  const falta = faltantesCrearDropi(normalizarDatosCrear({ ...p.datosDropi, nombre: p.nombre, precio: p.precioVenta, precioSugerido: p.precioVenta }));
+  // Sin SKU guardado cuenta el del producto vinculado, como al publicar (`publicarEnDropi`).
+  const falta = faltantesCrearDropi(normalizarDatosCrear({ ...p.datosDropi, sku: p.datosDropi?.sku ?? p.sku?.codigo ?? null, nombre: p.nombre, precio: p.precioVenta, precioSugerido: p.precioVenta }));
   return (
     <form onSubmit={guardar} noValidate aria-busy={pendiente} aria-label="Datos para Dropi" className="flex flex-col divide-y divide-border border-b border-border px-5 pb-5">
       <input type="hidden" name="id" value={p.id} />
@@ -51,7 +52,7 @@ export function DatosParaDropi({ p, opciones }: { p: FilaPublicacion; opciones: 
         </div>
       )}
       {/* `key`: al guardar se vuelven a tomar los datos que llegan del servidor. */}
-      <CamposDatosDropi key={version} opciones={opciones} inicial={p.datosDropi} idBase="ficha-dd" />
+      <CamposDatosDropi key={version} opciones={opciones} inicial={p.datosDropi} idBase="ficha-dd" skuInicial={p.sku?.codigo ?? null} nombre={p.nombre} />
       <div className="flex flex-col gap-2 pt-4">
         {error && (
           <p role="alert" className="m-0 text-sm text-destructive">

@@ -3,14 +3,16 @@
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import { useEffect, useRef, useState } from "react";
 import { Campo } from "@/components/ui/campo-ficha";
-import { anilloFoco, fieldClass } from "@/components/ui/field";
+import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
-import { AdjuntoIcon, EtiquetaIcon, InventarioIcon, ListaIcon, ProductoIcon } from "@/lib/nav-icons";
-import { MAX_FOTOS_CREAR, MIN_DESCRIPCION_CREAR, MIN_FOTOS_CREAR, MIN_STOCK_CREAR, PESO_MAXIMO_G, type DatosCrearDropi, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
+import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { AdjuntoIcon, EtiquetaIcon, InteligenciaIcon, InventarioIcon, ListaIcon, ProductoIcon } from "@/lib/nav-icons";
+import { MAX_FOTOS_CREAR, MAX_NOMBRE_CREAR, MIN_DESCRIPCION_CREAR, MIN_FOTOS_CREAR, MIN_STOCK_CREAR, PESO_MAXIMO_G, type DatosCrearDropi, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { descripcionAHtml, medirDescripcion } from "@/lib/publicaciones/descripcion-dropi";
 import { supabase } from "@/lib/supabase/client";
 import { prepararSubidaFotoBorrador } from "./actions";
+import { sugerirDescripcionNueva } from "./ia-actions";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const TIPOS_FOTO = ["image/jpeg", "image/png", "image/webp"];
@@ -55,14 +57,39 @@ export function CamposDatosDropi({
   faltante = null,
   invalido = () => undefined,
   idBase = "dd",
+  conProducto = false,
+  skuInicial = null,
+  nombre,
 }: {
   opciones: OpcionesCrear;
   inicial: DatosCrearDropi | null;
   faltante?: string | null;
   invalido?: (id: string) => true | undefined;
   idBase?: string;
+  /** Con el selector del producto de Producto (en «Agregar»): elegirlo pone su código como SKU y en la guía de envío. */
+  conProducto?: boolean;
+  /** El código del producto ya vinculado (la ficha de una «Sin publicar»), si los datos guardados no traen SKU. */
+  skuInicial?: string | null;
+  /** El nombre del producto, cuando no hay un campo «nombre» en el mismo formulario (la ficha); la IA parte de él. */
+  nombre?: string;
 }) {
   const { mostrarToast } = useToast();
+  const skuDeInicio = inicial?.sku ?? skuInicial ?? "";
+  const [producto, setProducto] = useState<OpcionSkuMaestro | null>(null);
+  const [sku, setSku] = useState(skuDeInicio);
+  const [guia, setGuia] = useState(inicial?.nombreGuia ?? (skuDeInicio.length <= MAX_NOMBRE_CREAR ? skuDeInicio : ""));
+  // Mientras la guía siga el SKU, cambiar el SKU la cambia; si alguien la escribe a mano, se respeta.
+  const [guiaPropia, setGuiaPropia] = useState(!!inicial?.nombreGuia && inicial.nombreGuia !== skuDeInicio);
+  const [sugiriendo, setSugiriendo] = useState(false);
+  const [anterior, setAnterior] = useState<string | null>(null);
+  function cambiarSku(valor: string) {
+    setSku(valor);
+    if (!guiaPropia) setGuia(valor.length <= MAX_NOMBRE_CREAR ? valor : "");
+  }
+  function elegirProducto(o: OpcionSkuMaestro | null) {
+    setProducto(o);
+    if (o) cambiarSku(o.codigo);
+  }
   const [categorias, setCategorias] = useState<string[]>(inicial?.categorias ?? []);
   const [otraCategoria, setOtraCategoria] = useState("");
   const [fotos, setFotos] = useState<FotoSubida[]>((inicial?.fotos ?? []).map((f) => ({ ruta: rutaDe(f.url), url: f.url })));
@@ -121,9 +148,71 @@ export function CamposDatosDropi({
     }
   }
 
+  /** «Sugerir con IA»: la IA escribe una descripción con el nombre, las categorías, el producto y la primera foto; queda en el campo para editarla. */
+  async function sugerirDescripcion() {
+    const formulario = campoDescripcion.current?.form;
+    const delFormulario = formulario?.elements.namedItem("nombre");
+    const nombreProducto = (nombre ?? (delFormulario instanceof HTMLInputElement ? delFormulario.value : "")).trim();
+    if (nombreProducto.length < 3) {
+      mostrarToast("Escribe primero el nombre del producto: la IA parte de él.", "destructive");
+      return;
+    }
+    setSugiriendo(true);
+    try {
+      const r = await sugerirDescripcionNueva({ nombre: nombreProducto, categorias, producto: producto ? `${producto.codigo} · ${producto.nombre}` : sku || null, foto: fotos[0]?.url ?? null });
+      if (r.error || !r.descripcion) {
+        mostrarToast(r.error ?? "No se pudo sugerir la descripción.", "destructive");
+        return;
+      }
+      setAnterior(descripcion.trim() ? descripcion : null);
+      setDescripcion(r.descripcion);
+      campoDescripcion.current?.focus();
+    } catch {
+      mostrarToast("No se pudo sugerir la descripción. Inténtalo de nuevo.", "destructive");
+    } finally {
+      setSugiriendo(false);
+    }
+  }
+
   const id = (n: string) => `${idBase}-${n}`;
   return (
     <>
+      <Seccion icono={EtiquetaIcon} titulo="SKU y guía de envío">
+        {conProducto && (
+          // El buscador lleva su propio nombre accesible («Producto vinculado»): el título va como texto, no como <label> de otro campo.
+          <div className="flex min-w-0 flex-col gap-1">
+            <span aria-hidden="true" className={labelClassSm}>
+              Producto vinculado
+            </span>
+            <input type="hidden" name="sku_maestro_id" value={producto?.id ?? ""} />
+            <CampoSkuMaestro valor={producto?.id ?? null} alCambiar={elegirProducto} etiquetaAria="Producto vinculado" placeholder="Código o nombre del producto" claseContenedor="w-full" className={`${fieldClass} w-full`} />
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <Campo etiqueta="SKU" id={id("sku")} obligatorio faltante={faltante}>
+            <input id={id("sku")} name="dd_sku" required maxLength={120} autoComplete="off" value={sku} onChange={(e) => cambiarSku(e.target.value)} aria-invalid={invalido(id("sku"))} placeholder="Ej: CREMA/HIDRATANTE/50" className={`${fieldClass} w-full font-mono`} />
+          </Campo>
+          <Campo etiqueta="Código de barras" id={id("barras")}>
+            <input id={id("barras")} name="dd_codigo_barras" maxLength={60} autoComplete="off" defaultValue={inicial?.codigoBarras ?? ""} placeholder="Ej: 7501031311309" className={`${fieldClass} w-full tabular-nums`} />
+          </Campo>
+        </div>
+        <Campo etiqueta="Nombre en la guía de envío" id={id("guia")}>
+          <input
+            id={id("guia")}
+            name="dd_nombre_guia"
+            maxLength={MAX_NOMBRE_CREAR}
+            autoComplete="off"
+            value={guia}
+            onChange={(e) => {
+              setGuia(e.target.value);
+              setGuiaPropia(e.target.value !== sku);
+            }}
+            placeholder="Ej: CREMA/HIDRATANTE/50"
+            className={`${fieldClass} w-full font-mono`}
+          />
+        </Campo>
+      </Seccion>
+
       <Seccion icono={ProductoIcon} titulo="Peso y medidas">
         <Campo etiqueta="Peso (g)" id={id("peso")} obligatorio faltante={faltante}>
           <input id={id("peso")} name="dd_peso" type="number" required min={0.001} max={PESO_MAXIMO_G} step="any" defaultValue={inicial?.peso ?? ""} aria-invalid={invalido(id("peso"))} placeholder="Ej: 120" className={`${fieldClass} w-full tabular-nums`} />
@@ -196,9 +285,38 @@ export function CamposDatosDropi({
             className={`${fieldClass} w-full resize-y`}
           />
         </Campo>
-        <p className={`m-0 text-xs tabular-nums ${medida.cumple ? "text-success" : "text-warning"}`}>
-          {medida.largo.toLocaleString("es-PA")} caracteres · mínimo {MIN_DESCRIPCION_CREAR}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={`m-0 text-xs tabular-nums ${medida.cumple ? "text-success" : "text-warning"}`}>
+            {medida.largo.toLocaleString("es-PA")} caracteres · mínimo {MIN_DESCRIPCION_CREAR}
+          </p>
+          <span className="flex flex-wrap items-center gap-2">
+            {anterior !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDescripcion(anterior);
+                  setAnterior(null);
+                }}
+                className={`inline-flex min-h-9 items-center rounded-md px-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+              >
+                Volver a la anterior
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={sugerirDescripcion}
+              disabled={sugiriendo}
+              aria-busy={sugiriendo}
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primario/40 bg-primario-suave px-3 text-sm font-medium text-primario hover:bg-primario-suave/70 disabled:opacity-60 ${anilloFoco}`}
+            >
+              <InteligenciaIcon aria-hidden="true" className="h-4 w-4" />
+              {sugiriendo ? "Escribiendo…" : descripcion.trim() ? "Sugerir otra con IA" : "Sugerir con IA"}
+            </button>
+          </span>
+        </div>
+        <Campo etiqueta="Descripción para la app de Dropi" id={id("descripcion-app")}>
+          <textarea id={id("descripcion-app")} name="dd_descripcion_app" rows={3} maxLength={5000} defaultValue={inicial?.descripcionApp ?? ""} placeholder="Ej: Crema hidratante de 50 ml para piel seca" className={`${fieldClass} w-full resize-y`} />
+        </Campo>
       </Seccion>
 
       <Seccion icono={InventarioIcon} titulo="Stock inicial">

@@ -45,6 +45,7 @@ import { detectarImagen } from "@/lib/seguridad/imagen";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { createServiceClient } from "@/lib/supabase/server";
+import { getPaisActual } from "@/lib/pais";
 
 const MODULO = "publicaciones-dropi";
 const BUCKET = "wms-productos";
@@ -702,4 +703,44 @@ async function marcarError(iaId: string, indice: number, mensaje: string) {
   if (!plan?.fotos?.[indice]) return;
   plan.fotos[indice] = { ...plan.fotos[indice], error: mensaje.slice(0, 300) };
   await supabase.from("dropi_publicaciones_ia").update({ resultado: plan, actualizado_en: new Date().toISOString() }).eq("id", iaId);
+}
+
+/** Las fotos que se le mandan a la IA al sugerir la descripción de un producto nuevo: solo las públicas de nuestro Storage. */
+const FOTO_PROPIA = () => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/`;
+
+/**
+ * «Sugerir con IA» de la descripción en «Publicar en Dropi» (pedido de Hernán, 27 oct 2026): la publicación todavía no existe, así que la IA
+ * trabaja con lo que está escrito en el formulario (nombre, categorías, producto vinculado y la primera foto subida) y las mismas reglas e
+ * indicaciones del Asistente de IA. Devuelve la descripción como texto (párrafos y listas con «- ») para que la persona la revise y la cambie
+ * en el mismo campo; no guarda nada. Queda en el consumo de IA.
+ */
+export async function sugerirDescripcionNueva(entrada: { nombre: string; categorias: string[]; producto?: string | null; foto?: string | null }): Promise<{ error?: string; descripcion?: string; notas?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!proveedorTexto()) return { error: SIN_IA };
+  const nombre = String(entrada?.nombre ?? "").trim().slice(0, 120);
+  if (nombre.length < 3) return { error: "Escribe primero el nombre del producto: la IA parte de él." };
+  const categorias = (Array.isArray(entrada?.categorias) ? entrada.categorias : []).map((c) => String(c).trim().slice(0, 80)).filter(Boolean).slice(0, 5);
+  const producto = String(entrada?.producto ?? "").trim().slice(0, 200) || null;
+  const foto = typeof entrada?.foto === "string" && entrada.foto.startsWith(FOTO_PROPIA()) ? entrada.foto.slice(0, 600) : null;
+  const supabase = createServiceClient();
+  const [{ reglas }, { indicaciones }, ejemplos, pais] = await Promise.all([cargarReglas(supabase), cargarIndicaciones(supabase), cargarEjemplos(), getPaisActual(supabase)]);
+  const datos: DatosPublicacionIA = {
+    nombre,
+    tituloDropi: null,
+    categoria: categorias.length ? categorias.join(", ") : null,
+    pais: pais.nombre ?? "",
+    precio: null,
+    producto,
+    revisiones: [],
+    competidores: [],
+    margen: null,
+    ventas30: null,
+  };
+  const contexto: ContextoIA = { reglas: reglasParaIA(reglas as Parameters<typeof reglasParaIA>[0]), indicaciones, ejemplos };
+  const r = await pedirIA({ ...pedidoTexto(datos, contexto), imagenes: foto ? [foto] : [] }, true, { operacion: "texto", modulo: MODULO, usuario, publicacionId: null });
+  if ("error" in r) return { error: r.error };
+  const propuesta = normalizarPropuestaTexto(r.texto, r.fuentes);
+  if (!propuesta?.descripcion) return { error: "La IA no devolvió una descripción que se pueda usar. Vuelve a intentar." };
+  await registrarAuditoria({ accion: "ia_texto_publicacion", entidad: "dropi_publicaciones", detalle: `${nombre}: descripción sugerida para publicar en Dropi (${modeloDeTexto()})` });
+  return { descripcion: propuesta.descripcion, notas: propuesta.notas };
 }

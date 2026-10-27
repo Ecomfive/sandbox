@@ -101,7 +101,7 @@ export function CrearPublicacionPanel({ paisId, opciones }: { paisId: string; op
             </Campo>
           </Seccion>
           {publicar ? (
-            <CamposDatosDropi opciones={opciones} inicial={null} faltante={faltante} invalido={invalido} idBase="pub-dd" />
+            <CamposDatosDropi opciones={opciones} inicial={null} faltante={faltante} invalido={invalido} idBase="pub-dd" conProducto />
           ) : (
             <Seccion icono={InventarioIcon} titulo="Stock">
               <Campo etiqueta="Dónde está" id="pub-ubicacion">
