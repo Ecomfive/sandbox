@@ -118,7 +118,8 @@ async function atender(m) {
       const l = LECTORES[m.lector];
       if (!l || !Object.hasOwn(LECTORES, m.lector)) throw new Error("Lector desconocido.");
       const guardada = (await chrome.storage.session.get(`pestana-${m.lector}`))[`pestana-${m.lector}`];
-      const t = guardada ? await chrome.tabs.get(guardada).catch(() => null) : null;
+      // Si la extensión se recargó a medias, no recuerda la pestaña: se busca la de Dropi del país (27 oct 2026).
+      const t = (guardada ? await chrome.tabs.get(guardada).catch(() => null) : null) || (await pestana(l.pais, false, false));
       if (!t) throw new Error("Se cerró la pestaña de Dropi mientras se leía.");
       return enPagina(
         t.id,
