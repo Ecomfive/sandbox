@@ -27,6 +27,17 @@ export interface SimpleParaSugerir {
   nombre: string;
 }
 
+/** Todas las palabras de un nombre, sin tildes ni mayúsculas y con los números («Shilajit (8 en 1)» → shilajit, 8, en, 1). */
+const fichaDe = (texto: string): Set<string> =>
+  new Set(
+    String(texto ?? "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  );
+
 /** Palabras de venta que no dicen qué producto es («Regalo», «Gratis», «Oferta»). */
 const PALABRAS_DE_VENTA = new Set(["regalo", "gratis", "oferta", "promo", "promocion", "kit", "combo", "pack", "duo", "trio"]);
 
@@ -48,8 +59,8 @@ export function sugerirComponentes(nombre: string, simples: SimpleParaSugerir[])
   for (const parte of partes) {
     const claves = palabrasClave(parte).filter((p) => !PALABRAS_DE_VENTA.has(p));
     if (!claves.length) continue;
-    let mejor: { id: string; puntaje: number } | null = null;
-    let empate = false;
+    const candidatos: { id: string; puntaje: number; comunes: number }[] = [];
+    const fichas = fichaDe(parte);
     for (const { s, claves: propias } of indice) {
       if (elegidos.some((e) => e.componenteId === s.id)) continue;
       // Al menos una palabra larga en común: «crema» sola no basta para juntar dos productos distintos.
@@ -57,13 +68,17 @@ export function sugerirComponentes(nombre: string, simples: SimpleParaSugerir[])
       if (!comunLarga) continue;
       const puntaje = parecidoNombre(claves, propias);
       if (puntaje < 0.5) continue;
-      if (!mejor || puntaje > mejor.puntaje) {
-        mejor = { id: s.id, puntaje };
-        empate = false;
-      } else if (puntaje === mejor.puntaje) empate = true;
+      candidatos.push({ id: s.id, puntaje, comunes: [...fichaDe(s.nombre)].filter((t) => fichas.has(t)).length });
     }
-    // Dos productos igual de parecidos («crema» sola): no se adivina, se busca a mano.
-    if (mejor && !empate) elegidos.push({ componenteId: mejor.id, cantidad: partes.length === 1 && pack.unidades ? pack.unidades : 1 });
+    if (!candidatos.length) continue;
+    // Entre los igual de parecidos desempatan todas las palabras en común, también los números y las cortas («Shilajit 8 EN 1» → «Shilajit en
+    // Capsula (8 en 1)» y no «Shilajit Gold»). Si aun así quedan dos iguales («crema» sola), no se adivina: se busca a mano.
+    const mejorPuntaje = Math.max(...candidatos.map((c) => c.puntaje));
+    const finalistas = candidatos.filter((c) => c.puntaje === mejorPuntaje);
+    const mejorComunes = Math.max(...finalistas.map((c) => c.comunes));
+    const ganadores = finalistas.filter((c) => c.comunes === mejorComunes);
+    const mejor = ganadores.length === 1 ? ganadores[0] : null;
+    if (mejor) elegidos.push({ componenteId: mejor.id, cantidad: partes.length === 1 && pack.unidades ? pack.unidades : 1 });
   }
   return elegidos;
 }
