@@ -54,8 +54,8 @@ export function Foto({ url, nombre, real = false, grande = false, enBlanco = fal
   );
 }
 
-/** El producto en una fila: foto de referencia, nombre y su código. */
-export function Producto({ p }: { p: PedidoPortal }) {
+/** El producto en una fila: foto de referencia, nombre y su código (y, debajo, `extra`: el botón del historial). */
+export function Producto({ p, extra }: { p: PedidoPortal; extra?: ReactNode }) {
   const { tr } = useIdioma();
   return (
     <span className="flex min-w-[14rem] items-center gap-2.5">
@@ -63,6 +63,7 @@ export function Producto({ p }: { p: PedidoPortal }) {
       <span className="min-w-0 whitespace-normal">
         <span className="block">{tr(p.producto)}</span>
         {p.referencia && <span className="block text-xs text-muted-foreground tabular-nums">{p.referencia}</span>}
+        {extra}
       </span>
     </span>
   );

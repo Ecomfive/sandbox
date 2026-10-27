@@ -2,7 +2,11 @@
 
 import { randomUUID } from "node:crypto";
 import { aplicarCotizacion, aplicarEnvio } from "@/lib/proveedor/aplicar";
+import { idiomaDeCuenta } from "@/lib/proveedor/cuenta";
+import type { LineaHistorial } from "@/lib/proveedor/historial";
+import { cargarHistorialPedido } from "@/lib/proveedor/historial-datos";
 import { guardarCeldaRegistro } from "@/lib/proveedor/registro-datos";
+import { traducirTextos } from "@/lib/proveedor/traducir";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioSesion } from "@/lib/auth";
 import { cuentaProveedorActual } from "@/lib/proveedor/sesion";
@@ -23,7 +27,7 @@ export async function prepararSubidaFotoReal(pedidoId: string, nombreArchivo: st
   const supabase = createServiceClient();
   const { data } = await supabase.from("proveedor_pedidos").select("proveedor_id, etapa, visible").eq("id", pedidoId).maybeSingle();
   if (!data || data.proveedor_id !== cuenta.proveedor.id || !data.visible) return { error: "Ese pedido ya no está en tu portal." };
-  if (data.etapa !== "por_cotizar" && data.etapa !== "cotizado") return { error: "Este pedido ya no se cotiza." };
+  if (data.etapa !== "por_cotizar" && data.etapa !== "cotizado" && data.etapa !== "produccion") return { error: "Este pedido ya no se cotiza." };
   const ruta = rutaFotoReal(cuenta.proveedor.id, pedidoId, String(nombreArchivo ?? ""), randomUUID());
   if (!ruta) return { error: "No se pudo preparar la subida." };
   const { data: firmada, error } = await supabase.storage.from(BUCKET_PROVEEDOR).createSignedUploadUrl(ruta);
@@ -65,6 +69,20 @@ export async function guardarCeldaRegistroProveedor(fila: string, campo: string,
     proveedor: cuenta.proveedor.nombre,
     notificarA: cuenta.proveedor.notificarA,
   });
+}
+
+/** El historial de un pedido (cotizaciones, unidades, etapas, envío, nota y registro de pagos). Lo escrito en español va traducido al chino. */
+export async function historialPedidoProveedor(pedidoId: string): Promise<{ lineas: LineaHistorial[]; traducciones: Record<string, string> } | { error: string }> {
+  const cuenta = await cuentaProveedorActual();
+  if (!cuenta) return SIN_SESION;
+  if (!esUuid(pedidoId)) return { error: "Pedido no válido." };
+  const supabase = createServiceClient();
+  const r = await cargarHistorialPedido(supabase, cuenta.proveedor.id, pedidoId, false);
+  if ("error" in r) return r;
+  const idioma = await idiomaDeCuenta(cuenta.cuentaId);
+  const libres = r.lineas.filter((l) => l.tipo === "nota" || l.tipo === "pagos").flatMap((l) => [l.antes, l.despues]);
+  const traducciones = idioma === "zh" ? await traducirTextos(supabase, libres, "zh") : {};
+  return { lineas: r.lineas, traducciones };
 }
 
 /** Lo nuevo de Ecomfive (decisiones, llegadas) queda visto al abrir el portal. */

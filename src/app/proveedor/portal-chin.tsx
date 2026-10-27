@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { IdiomaProveedor, Traducido, useIdioma } from "@/components/proveedor/idioma-contexto";
 import { BarraFiltroPortal, FiltroPortalProveedor, SinResultados, useFiltroPortal } from "@/components/proveedor/filtro-portal";
-import { Foto, Pestanas, Producto, TONO, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
+import { Foto, Pestanas, Producto as ProductoBase, TONO, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
 import type { CambioRegistro } from "@/components/proveedor/registro-pagos";
 import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import { claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
@@ -14,14 +14,17 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { cambioDeUnidades, unitarioDesdeTotal } from "@/lib/proveedor/cotizacion";
 import { clavePlazo, type PedidoPortal } from "@/lib/proveedor/datos";
-import { hoyPanama } from "@/lib/proveedor/fechas";
+import { diaPanama, hoyPanama, horaPanama } from "@/lib/proveedor/fechas";
+import type { LineaHistorial } from "@/lib/proveedor/historial";
+import { HistorialIcon } from "@/lib/nav-icons";
+import { historialPedidoEcomfive } from "@/app/(app)/compras/tablero-chin/historial-actions";
 import { paisesDe } from "@/lib/proveedor/filtro";
 import type { ResumenPagos } from "@/lib/proveedor/resumen-pagos";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import type { Idioma } from "@/lib/proveedor/textos";
 import { estadoTransito, textoPlazo, type Plazo } from "@/lib/proveedor/transito";
 import { supabase } from "@/lib/supabase/client";
-import { cambiarIdiomaProveedor, cotizarPedido, marcarEnviado, marcarVistoPorProveedor, prepararSubidaFotoReal } from "./actions";
+import { cambiarIdiomaProveedor, cotizarPedido, historialPedidoProveedor, marcarEnviado, marcarVistoPorProveedor, prepararSubidaFotoReal } from "./actions";
 import { FormularioClave } from "./cambiar-clave";
 import { PagosChin } from "./pagos-chin";
 
@@ -80,6 +83,7 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
     alCambiarTab?.(t);
   };
   const [cotizando, setCotizando] = useState<PedidoPortal | null>(null);
+  const [historial, setHistorial] = useState<PedidoPortal | null>(null);
   const hoy = useMemo(() => hoyPanama(), []);
 
   // Lo nuevo de Ecomfive queda visto al abrir su portal (se sigue viendo hasta recargar). Desde Ecomfive no se marca nada.
@@ -129,7 +133,17 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
       {tab === "cotizar" && conFiltro(de("por_cotizar").length, <PorCotizar pedidos={de("por_cotizar")} alCotizar={soloLectura ? null : setCotizando} />)}
       {tab === "cotizado" && conFiltro(de("cotizado").length, <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={soloLectura ? null : setCotizando} />)}
       {tab === "produccion" &&
-        conFiltro(de("produccion").length, <EnProduccion pedidos={de("produccion")} hoy={hoy} diasAnticipo={cuenta.diasAnticipo} soloLectura={soloLectura} alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })} />)}
+        conFiltro(
+          de("produccion").length,
+          <EnProduccion
+            pedidos={de("produccion")}
+            hoy={hoy}
+            diasAnticipo={cuenta.diasAnticipo}
+            soloLectura={soloLectura}
+            alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })}
+            alEditar={soloLectura ? null : setCotizando}
+          />,
+        )}
       {tab === "enviado" && conFiltro(de("enviado").length, <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />)}
       {tab === "pagos" && pagos && (soloLectura && pagosEcomfive ? pagosEcomfive : <PagosChin resumen={pagos.resumen} filas={pagos.filas} cambios={pagos.cambios} soloLectura={soloLectura} />)}
 
@@ -140,21 +154,25 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
           fotoReal={fotos[cotizando.id] ?? null}
           alCerrar={() => setCotizando(null)}
           alCotizar={(cambios, preview) => {
-            cambiar(cotizando.id, { ...cambios, etapa: "cotizado" });
+            // En producción la cotización se edita sin cambiar de etapa.
+            cambiar(cotizando.id, { ...cambios, etapa: cotizando.etapa === "produccion" ? "produccion" : "cotizado" });
             if (preview) setFotos((f) => ({ ...f, [cotizando.id]: preview }));
             setCotizando(null);
           }}
         />
       )}
+      {historial && <VentanaHistorial key={historial.id} p={historial} soloLectura={soloLectura} alCerrar={() => setHistorial(null)} />}
     </>
   );
 
   if (soloLectura)
     return (
-      <div className="flex flex-col gap-5" lang={idioma === "zh" ? "zh-CN" : "es"}>
-        {t.soloLectura && <p className="m-0 rounded-lg border border-border bg-muted px-3.5 py-2 text-[13px] text-muted-foreground">{t.soloLectura}</p>}
-        {cuerpo}
-      </div>
+      <AbrirHistorial.Provider value={setHistorial}>
+        <div className="flex flex-col gap-5" lang={idioma === "zh" ? "zh-CN" : "es"}>
+          {t.soloLectura && <p className="m-0 rounded-lg border border-border bg-muted px-3.5 py-2 text-[13px] text-muted-foreground">{t.soloLectura}</p>}
+          {cuerpo}
+        </div>
+      </AbrirHistorial.Provider>
     );
 
   return (
@@ -176,7 +194,9 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
           </div>
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-[1240px] flex-col gap-5 px-4 py-5">{cuerpo}</main>
+      <main className="mx-auto flex w-full max-w-[1240px] flex-col gap-5 px-4 py-5">
+        <AbrirHistorial.Provider value={setHistorial}>{cuerpo}</AbrirHistorial.Provider>
+      </main>
     </div>
   );
 }
@@ -366,7 +386,21 @@ function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fo
   );
 }
 
-function EnProduccion({ pedidos, hoy, diasAnticipo, soloLectura, alEnviar }: { pedidos: PedidoPortal[]; hoy: string; diasAnticipo: number; soloLectura: boolean; alEnviar: (id: string, fecha: string) => void }) {
+function EnProduccion({
+  pedidos,
+  hoy,
+  diasAnticipo,
+  soloLectura,
+  alEnviar,
+  alEditar,
+}: {
+  pedidos: PedidoPortal[];
+  hoy: string;
+  diasAnticipo: number;
+  soloLectura: boolean;
+  alEnviar: (id: string, fecha: string) => void;
+  alEditar: ((p: PedidoPortal) => void) | null;
+}) {
   const { t } = useIdioma();
   return (
     <Tarjeta titulo={t.produccionTitulo} accion={<span className="text-xs text-muted-foreground">{t.produccionPista}</span>}>
@@ -374,10 +408,20 @@ function EnProduccion({ pedidos, hoy, diasAnticipo, soloLectura, alEnviar }: { p
         <Vacio>{t.produccionVacio}</Vacio>
       ) : (
         <Tabla>
-          <Cabecera columnas={[{ texto: t.colProducto }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colTotal, derecha: true }, ...(soloLectura ? [] : [{ texto: t.colFechaEnvio }, { texto: "" }])]} />
+          <Cabecera
+            columnas={[
+              { texto: t.colProducto },
+              { texto: t.colDestino },
+              { texto: t.colVia },
+              { texto: t.colUnidades, derecha: true },
+              { texto: t.colTotal, derecha: true },
+              { texto: t.colConfirmado },
+              ...(soloLectura ? [] : [{ texto: t.colFechaEnvio }, { texto: "" }]),
+            ]}
+          />
           <tbody>
             {pedidos.map((p) => (
-              <FilaProduccion key={p.id} p={p} hoy={hoy} diasAnticipo={diasAnticipo} soloLectura={soloLectura} alEnviar={alEnviar} />
+              <FilaProduccion key={p.id} p={p} hoy={hoy} diasAnticipo={diasAnticipo} soloLectura={soloLectura} alEnviar={alEnviar} alEditar={alEditar} />
             ))}
           </tbody>
         </Tabla>
@@ -386,7 +430,21 @@ function EnProduccion({ pedidos, hoy, diasAnticipo, soloLectura, alEnviar }: { p
   );
 }
 
-function FilaProduccion({ p, hoy, diasAnticipo, soloLectura, alEnviar }: { p: PedidoPortal; hoy: string; diasAnticipo: number; soloLectura: boolean; alEnviar: (id: string, fecha: string) => void }) {
+function FilaProduccion({
+  p,
+  hoy,
+  diasAnticipo,
+  soloLectura,
+  alEnviar,
+  alEditar,
+}: {
+  p: PedidoPortal;
+  hoy: string;
+  diasAnticipo: number;
+  soloLectura: boolean;
+  alEnviar: (id: string, fecha: string) => void;
+  alEditar: ((p: PedidoPortal) => void) | null;
+}) {
   const { t, idioma, numero, tr, fecha, error } = useIdioma();
   const { mostrarToast } = useToast();
   const [f, setF] = useState(hoy);
@@ -410,6 +468,7 @@ function FilaProduccion({ p, hoy, diasAnticipo, soloLectura, alEnviar }: { p: Pe
       <td className={claseTdLista}>{viaTexto(p, idioma)}</td>
       <td className={`${claseTdLista} text-right tabular-nums`}>{numero(p.unidades)}</td>
       <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(p.montoTotal)}</td>
+      <td className={`${claseTdLista} tabular-nums`}>{p.confirmadoEn ? fecha(diaPanama(p.confirmadoEn)) : "—"}</td>
       {!soloLectura && (
         <>
           <td className={claseTdLista}>
@@ -426,9 +485,16 @@ function FilaProduccion({ p, hoy, diasAnticipo, soloLectura, alEnviar }: { p: Pe
                 </button>
               </span>
             ) : (
-              <button type="button" className={botonPrincipal} disabled={!f} onClick={() => setConfirmar(true)}>
-                {t.marcarEnviado}
-              </button>
+              <span className="inline-flex gap-1.5">
+                {alEditar && (
+                  <button type="button" className={botonNormal} onClick={() => alEditar(p)} aria-label={`${t.editarCotizacion}: ${tr(p.producto)}`}>
+                    {t.editarCotizacion}
+                  </button>
+                )}
+                <button type="button" className={botonPrincipal} disabled={!f} onClick={() => setConfirmar(true)}>
+                  {t.marcarEnviado}
+                </button>
+              </span>
             )}
           </td>
         </>
@@ -456,7 +522,19 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
         <Vacio>{t.enviadoVacio}</Vacio>
       ) : (
         <Tabla>
-          <Cabecera columnas={[{ texto: t.colProducto }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colEnviado }, { texto: t.colDias, derecha: true }, { texto: t.colPrometido }, { texto: t.colEstado }]} />
+          <Cabecera
+            columnas={[
+              { texto: t.colProducto },
+              { texto: t.colDestino },
+              { texto: t.colVia },
+              { texto: t.colUnidades, derecha: true },
+              { texto: t.colConfirmado },
+              { texto: t.colEnviado },
+              { texto: t.colDias, derecha: true },
+              { texto: t.colPrometido },
+              { texto: t.colEstado },
+            ]}
+          />
           <tbody>
             {filas.map(({ p, plazo, e, texto }) => (
               <tr key={p.id}>
@@ -466,6 +544,7 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
                 <td className={`${claseTdLista} font-semibold tabular-nums`}>{p.paisCodigo ?? "—"}</td>
                 <td className={claseTdLista}>{viaTexto(p, idioma)}</td>
                 <td className={`${claseTdLista} text-right tabular-nums`}>{numero(p.unidades)}</td>
+                <td className={`${claseTdLista} tabular-nums`}>{p.confirmadoEn ? fecha(diaPanama(p.confirmadoEn)) : "—"}</td>
                 <td className={`${claseTdLista} tabular-nums`}>{fecha(p.fechaEnvio)}</td>
                 <td className={`${claseTdLista} text-right tabular-nums`}>{t.dias(e.dias)}</td>
                 <td className={`${claseTdLista} text-muted-foreground tabular-nums`}>{plazoTexto(plazo)}</td>
@@ -485,9 +564,10 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
 function PanelCotizar({ p, fotoReal, alCerrar, alCotizar }: { p: PedidoPortal; fotoReal: string | null; alCerrar: () => void; alCotizar: (cambios: Partial<PedidoPortal>, preview: string | null) => void }) {
   const { t, idioma, numero, tr, error: errorEn } = useIdioma();
   const { mostrarToast } = useToast();
-  const corrigiendo = p.etapa === "cotizado";
+  // Corregir: ya cotizado o, en producción, la cotización de lo que Ecomfive confirmó (puede ser otra cantidad).
+  const corrigiendo = p.etapa === "cotizado" || p.etapa === "produccion";
   const [unidades, setUnidades] = useState(String(p.unidades ?? p.unidadesPedidas ?? ""));
-  const [total, setTotal] = useState(corrigiendo && p.montoTotal != null ? String(p.montoTotal) : "");
+  const [total, setTotal] = useState(corrigiendo && p.montoTotal ? String(p.montoTotal) : "");
   const [comentario, setComentario] = useState(p.comentarioProveedor ?? "");
   const [foto, setFoto] = useState<{ ruta: string; preview: string } | null>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -628,6 +708,124 @@ function PanelCotizar({ p, fotoReal, alCerrar, alCotizar }: { p: PedidoPortal; f
             {guardando ? t.enviando : corrigiendo ? t.guardarCorreccion : t.enviarCotizacion}
           </button>
         </div>
+      </div>
+    </Ventana>
+  );
+}
+
+/** Abre el historial de un pedido (lo pone `PortalChinContenido`). */
+const AbrirHistorial = createContext<(p: PedidoPortal) => void>(() => {});
+
+/** El producto de una fila, con «Historial» debajo de su código. */
+function Producto({ p }: { p: PedidoPortal }) {
+  const { t, tr } = useIdioma();
+  const abrir = useContext(AbrirHistorial);
+  return (
+    <ProductoBase
+      p={p}
+      extra={
+        <button
+          type="button"
+          onClick={() => abrir(p)}
+          aria-label={`${t.historial}: ${tr(p.producto)}`}
+          className={`mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-azul hover:underline ${anilloFoco}`}
+        >
+          <HistorialIcon aria-hidden="true" className="h-3.5 w-3.5" />
+          {t.historial}
+        </button>
+      }
+    />
+  );
+}
+
+/** El historial de un pedido: cotizaciones, unidades, etapas, envío, nota y registro de pagos, del más nuevo al más viejo. */
+function VentanaHistorial({ p, soloLectura, alCerrar }: { p: PedidoPortal; soloLectura: boolean; alCerrar: () => void }) {
+  const { t, tr, fecha, idioma, error: errorEn } = useIdioma();
+  const [datos, setDatos] = useState<{ lineas: LineaHistorial[]; traducciones: Record<string, string> } | { error: string } | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    (soloLectura ? historialPedidoEcomfive(p.id) : historialPedidoProveedor(p.id)).then((r) => vigente && setDatos(r));
+    return () => {
+      vigente = false;
+    };
+  }, [p.id, soloLectura]);
+
+  const TIPO: Record<LineaHistorial["tipo"], string> = {
+    cotizacion: t.histCotizacion,
+    unidades: t.histUnidades,
+    monto: t.histMonto,
+    cantidad: t.histCantidad,
+    etapa: t.histEtapa,
+    envio: t.histEnvio,
+    llegada: t.histLlegada,
+    nota: t.histNota,
+    pagos: t.histPagos,
+  };
+  const ETAPA: Record<string, string> = {
+    por_cotizar: t.tabCotizar,
+    cotizado: t.tabCotizado,
+    produccion: t.tabProduccion,
+    enviado: t.tabEnviado,
+    llegado: t.etapaLlegado,
+    descartado: t.etapaDescartado,
+  };
+  const traducciones = datos && "lineas" in datos ? datos.traducciones : {};
+  const valor = (l: LineaHistorial, v: string | null) => {
+    if (v === null) return null;
+    if (l.tipo === "etapa") return ETAPA[v] ?? v;
+    if (l.tipo === "envio" || l.tipo === "llegada") return /^\d{4}-\d{2}-\d{2}/.test(v) ? fecha(v.slice(0, 10)) : v;
+    if (l.tipo === "nota" || l.tipo === "pagos") return traducciones[v.trim()] ?? tr(v);
+    return v;
+  };
+  const quien = (l: LineaHistorial) => (l.lado === "proveedor" ? (l.autor ?? "—") : (l.autor ?? "Ecomfive"));
+
+  return (
+    <Ventana abierto alCerrar={alCerrar} lado="derecha" ancho="md" titulo={<span className="text-base font-semibold">{t.historialDe(tr(p.producto))}</span>}>
+      <div className="flex flex-col gap-3 p-4" lang={idioma === "zh" ? "zh-CN" : "es"}>
+        {datos === null ? (
+          <p className="m-0 text-sm text-muted-foreground" aria-live="polite">
+            {t.cargandoHistorial}
+          </p>
+        ) : "error" in datos ? (
+          <p role="alert" className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-[13px] text-destructive">
+            {errorEn(datos.error)}
+          </p>
+        ) : datos.lineas.length === 0 ? (
+          <p className="m-0 text-sm text-muted-foreground">{t.historialVacio}</p>
+        ) : (
+          <ol className="m-0 flex list-none flex-col p-0">
+            {datos.lineas.map((l, i) => {
+              const antes = valor(l, l.antes);
+              const despues = valor(l, l.despues);
+              return (
+                <li key={i} className="flex gap-3 border-b border-border py-2.5 last:border-b-0">
+                  <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${l.lado === "proveedor" ? "bg-primario" : "bg-foreground"}`} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{quien(l)}</span>
+                      <time dateTime={l.fecha} className="tabular-nums">
+                        {fecha(diaPanama(l.fecha))} · {horaPanama(l.fecha)}
+                      </time>
+                    </span>
+                    <span className="text-[13px] [overflow-wrap:anywhere]">
+                      <span className="text-muted-foreground">{TIPO[l.tipo]}: </span>
+                      {antes !== null && (
+                        <>
+                          <span className="text-muted-foreground line-through decoration-1">{antes}</span>
+                          <span aria-hidden="true" className="text-muted-foreground">
+                            {" "}
+                            →{" "}
+                          </span>
+                        </>
+                      )}
+                      <span className="font-semibold tabular-nums">{despues ?? "—"}</span>
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
       </div>
     </Ventana>
   );

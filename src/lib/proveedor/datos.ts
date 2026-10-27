@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { EtapaPortal, ViaPortal } from "./espejo";
+import { cargarConfirmaciones } from "./historial-datos";
 import type { Plazo } from "./transito";
 
 export interface Proveedor {
@@ -43,6 +44,8 @@ export interface PedidoPortal {
   actualizadoEn: string;
   /** Anticipo distinto del de siempre (lo dice la hoja de pagos de Shen Zhen; migración 0127). */
   anticipoMonto: number | null;
+  /** Cuándo Ecomfive lo confirmó (lo pasó a «En producción» por última vez), de la Actividad de la compra. */
+  confirmadoEn: string | null;
 }
 
 const COLUMNAS =
@@ -80,6 +83,7 @@ export function pedidoDesdeFila(f: Fila): PedidoPortal {
     cotizadoEn: txt(f.cotizado_en),
     actualizadoEn: String(f.actualizado_en),
     anticipoMonto: num(f.anticipo_monto),
+    confirmadoEn: null,
   };
 }
 
@@ -127,5 +131,12 @@ export async function cargarEspejo(supabase: SupabaseClient, proveedorId: string
     if (r.via !== "mar" && r.via !== "aire") continue;
     plazos[clavePlazo(r.pais_codigo as string, r.via)] = { min: num(r.dias_min), max: num(r.dias_max) };
   }
-  return { proveedor, pedidos: (pedidos.data ?? []).map(pedidoDesdeFila), plazos };
+  // La fecha de confirmación se muestra en «En producción» y «Enviado»: solo se busca la de esos pedidos.
+  const filas = pedidos.data ?? [];
+  const confirmaciones = await cargarConfirmaciones(
+    supabase,
+    filas.filter((f) => f.etapa === "produccion" || f.etapa === "enviado").map((f) => String(f.compra_id)),
+  );
+  const lista = filas.map((f) => ({ ...pedidoDesdeFila(f), confirmadoEn: confirmaciones[String(f.compra_id)] ?? null }));
+  return { proveedor, pedidos: lista, plazos };
 }

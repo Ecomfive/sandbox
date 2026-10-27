@@ -156,6 +156,8 @@ test("cada lado solo da sus pasos", () => {
   assert.ok(puedePasar("ecomfive", "cotizado", "produccion"));
   assert.ok(puedePasar("ecomfive", "cotizado", "descartado"));
   assert.ok(puedePasar("proveedor", "produccion", "enviado"));
+  assert.ok(puedePasar("proveedor", "produccion", "produccion"));
+  assert.ok(!puedePasar("proveedor", "enviado", "enviado"));
   assert.ok(!puedePasar("ecomfive", "produccion", "enviado"));
   assert.ok(puedePasar("ecomfive", "enviado", "llegado"));
   assert.ok(!puedePasar("proveedor", "enviado", "llegado"));
