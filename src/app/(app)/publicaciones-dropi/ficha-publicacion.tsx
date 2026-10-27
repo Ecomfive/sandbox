@@ -26,10 +26,10 @@ import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
-import { conexionDropi, noSeArchivaSinStock, type FilaPublicacion } from "./def-publicaciones";
+import { avisoRepublicar, conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 import { AvisoEnCamino, VentasEnDropi } from "./ventas-publicacion";
-import { ACCIONES, BODEGA_DROPI, EN_DROPI } from "@/lib/publicaciones/automatico";
+import { ACCIONES, EN_DROPI } from "@/lib/publicaciones/automatico";
 import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
@@ -346,10 +346,12 @@ function ContenidoFicha({
 
   // «Republicar» (pedido de Hernán, 23 oct 2026): nada se republica solo; el botón lo deja para «Aplicar en Dropi». Solo con ID de
   // Dropi, sin archivar y de nuestra bodega (lo de la B280 es de Dropi).
-  const puedeRepublicar = conectado && !p.archivada && p.bodega?.id !== BODEGA_DROPI && p.tipoDropi !== "privado";
-  const republicacionPendiente = p.cambioDropi?.tipo === "republicar" && p.cambioDropi.estado !== "aplicado";
+  const sePuedeRepublicar = puedeRepublicar(p);
+  const yaRepublicando = republicacionPendiente(p);
+  // Lo que espera «Aplicar en Dropi» (o dio error) va arriba, junto a los botones, para que se vea (27 oct 2026); lo ya aplicado sigue abajo.
+  const cambioEsperando = p.cambioDropi && p.cambioDropi.estado !== "aplicado" ? p.cambioDropi : null;
   function republicar() {
-    if (!confirm(`Se va a crear en Dropi una publicación nueva igual a esta (datos, fotos y stock) y la del ID ${p.dropiId} queda archivada y sin stock. En el sistema se crea la nueva con el mismo producto vinculado y esta se archiva. Se hace al pulsar «Aplicar en Dropi» con Dropi abierto. ¿Seguir?`)) return;
+    if (!confirm(avisoRepublicar(p.dropiId))) return;
     setError(null);
     setRepublicando(true);
     empezar(async () => {
@@ -423,9 +425,9 @@ function ContenidoFicha({
                   {eliminando ? "Un momento..." : p.sinPublicar ? "Eliminar borrador" : "Eliminar"}
                 </BotonAccion>
               )}
-              {!sinGuardar && puedeArchivar && puedeRepublicar && !p.sinPublicar && (
-                <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || republicacionPendiente} onClick={republicar}>
-                  {republicando ? "Un momento..." : republicacionPendiente ? "Republicación pendiente" : "Republicar"}
+              {!sinGuardar && puedeArchivar && sePuedeRepublicar && (
+                <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || yaRepublicando} onClick={republicar}>
+                  {republicando ? "Un momento..." : yaRepublicando ? "Republicación pendiente" : "Republicar"}
                 </BotonAccion>
               )}
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
@@ -450,6 +452,17 @@ function ContenidoFicha({
                 {error}
               </p>
             )}
+            {cambioEsperando && (
+              <div role="status" className="rounded-md border border-destructive/30 bg-destructive-soft px-3 py-2 text-sm [&>span]:text-sm [&>span]:font-medium">
+                <EstadoCambioDropi c={cambioEsperando} />
+              </div>
+            )}
+          </div>
+        )}
+        {/* Sin permiso de escritura no hay barra de botones: el aviso va igual arriba. */}
+        {!puedeEscribir && cambioEsperando && (
+          <div role="status" className="border-b border-border bg-destructive-soft px-5 py-3 [&>span]:text-sm [&>span]:font-medium">
+            <EstadoCambioDropi c={cambioEsperando} />
           </div>
         )}
 
@@ -496,7 +509,7 @@ function ContenidoFicha({
                     {!p.sinPublicar && d.nombre.trim() !== p.nombre.trim() && " · al guardar se cambia también en Dropi"}
                   </span>
                 </label>
-                {p.cambioDropi && <EstadoCambioDropi c={p.cambioDropi} />}
+                {p.cambioDropi && !cambioEsperando && <EstadoCambioDropi c={p.cambioDropi} />}
                 <div className="flex min-w-0 flex-col gap-1.5">
                   {conexionDropi(p) && (
                     <div className="flex">

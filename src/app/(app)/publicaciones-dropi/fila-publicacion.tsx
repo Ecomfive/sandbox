@@ -5,18 +5,18 @@ import { useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ArchivarIcon, ChevronRightIcon, DropiIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, ChevronRightIcon, DropiIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
-import { archivarPublicacion } from "./actions";
+import { archivarPublicacion, republicarPublicacion } from "./actions";
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
-import { conexionDropi, noSeArchivaSinStock, type FilaPublicacion } from "./def-publicaciones";
+import { avisoRepublicar, conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
@@ -94,6 +94,40 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
         className={`mr-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors disabled:opacity-50 ${sinStock ? "cursor-not-allowed opacity-40" : "hover:bg-muted hover:text-foreground"} ${anilloFoco}`}
       >
         <ArchivarIcon className="h-4 w-4" />
+      </button>
+    </Tooltip>
+  );
+}
+
+/**
+ * «Republicar» desde la fila, sin abrir la ficha (pedido de Hernán, 27 oct 2026): pide confirmar y lo deja pendiente para «Aplicar en Dropi»,
+ * como el botón de la ficha. Si ya está pendiente, el ícono va en rojo y no se puede volver a pedir. Donde no se ofrece, deja el hueco para que
+ * las filas no se corran.
+ */
+function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
+  const { mostrarToast } = useToast();
+  const [enviando, empezar] = useTransition();
+  if (!puedeRepublicar(f)) return <span aria-hidden="true" className="mr-1 w-9 shrink-0" />;
+  const yaPendiente = republicacionPendiente(f);
+  function republicar() {
+    if (yaPendiente || !confirm(avisoRepublicar(f.dropiId))) return;
+    empezar(async () => {
+      const r = await republicarPublicacion(f.id).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      mostrarToast(r.error ?? r.detalle ?? "Republicación pendiente", r.error ? "destructive" : undefined);
+    });
+  }
+  const texto = yaPendiente ? "Republicación pendiente" : "Republicar en Dropi";
+  return (
+    <Tooltip texto={texto}>
+      <button
+        type="button"
+        onClick={republicar}
+        disabled={enviando}
+        aria-disabled={yaPendiente || undefined}
+        aria-label={`${texto}: ${f.nombre}`}
+        className={`mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${yaPendiente ? "cursor-default text-destructive" : "text-muted-foreground hover:bg-muted hover:text-foreground"} ${anilloFoco}`}
+      >
+        <ActualizarIcon className="h-4 w-4" />
       </button>
     </Tooltip>
   );
@@ -178,7 +212,7 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
     { nombre: "En Dropi" },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[9rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[11.5rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
           {c.nombre}
@@ -317,9 +351,10 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
       <div className="min-w-0 flex-1">{fila}</div>
       {/* Una duplicada no sale de Archivados: en su lugar, un espacio del mismo ancho para que las filas no se corran. */}
       {f.duplicadaDe ? (
-        <span aria-hidden="true" className="mr-3 w-[7.25rem] shrink-0" />
+        <span aria-hidden="true" className="mr-3 w-[9.75rem] shrink-0" />
       ) : (
         <>
+          <BotonRepublicarFila f={f} />
           <BotonPrivatizarFila f={f} />
           <BotonApagarFila f={f} />
           <BotonArchivarFila f={f} />

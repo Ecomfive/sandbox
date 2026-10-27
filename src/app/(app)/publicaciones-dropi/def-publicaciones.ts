@@ -9,7 +9,7 @@ import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencia
 import type { ComponenteEnCamino, EtapaCotizacion } from "@/lib/compras/en-camino";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
-import { ACCIONES, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
+import { ACCIONES, BODEGA_DROPI, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
 import { sinStockParaArchivar } from "@/lib/publicaciones/archivar";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { NivelMargen } from "@/lib/publicaciones/reglas";
@@ -171,6 +171,19 @@ export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "sto
   const stock = f.stockProveedor ?? f.ventas?.stock ?? null;
   return !f.archivada && f.enDropi === "activo" && stock !== null && stock <= 0;
 }
+
+/**
+ * Si se ofrece «Republicar» (23 oct 2026; en la fila desde el 27 oct 2026): con ID de Dropi, sin archivar ni apagar, ya publicada, pública y de
+ * nuestra bodega (lo de la B280 es de Dropi). El servidor lo vuelve a comprobar en `republicarPublicacion`.
+ */
+export function puedeRepublicar(f: Pick<FilaPublicacion, "dropiId" | "archivada" | "bodega" | "tipoDropi" | "sinPublicar" | "apagadoPendiente" | "duplicadaDe">): boolean {
+  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && f.bodega?.id !== BODEGA_DROPI && f.tipoDropi !== "privado";
+}
+/** Si tiene una republicación esperando «Aplicar en Dropi» (o que dio error y se reintenta). */
+export const republicacionPendiente = (f: Pick<FilaPublicacion, "cambioDropi">) => f.cambioDropi?.tipo === "republicar" && f.cambioDropi.estado !== "aplicado";
+/** El aviso antes de republicar: lo mismo en la fila y en la ficha. */
+export const avisoRepublicar = (dropiId: string) =>
+  `Se va a crear en Dropi una publicación nueva igual a esta (datos, fotos y stock) y la del ID ${dropiId} queda archivada y sin stock. En el sistema se crea la nueva con el mismo producto vinculado y esta se archiva. Se hace al pulsar «Aplicar en Dropi» con Dropi abierto. ¿Seguir?`;
 
 /** Por debajo de cuántas unidades una publicación que vende tiene «Poco stock» (pedido de Hernán, 27 oct 2026). */
 export const POCO_STOCK = 100;
