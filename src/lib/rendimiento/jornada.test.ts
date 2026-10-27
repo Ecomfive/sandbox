@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarJornada, diaPanama, duracion, horaPanama, rangoDelDia, rutaDeLatido } from "./jornada";
+import { armarJornada, diaPanama, duracion, etiquetaHora, horaPanama, rangoDeHoras, rangoDelDia, rutaDeLatido } from "./jornada";
 
 // 8:00 de Panamá = 13:00 UTC.
 const min = (hhmm: string, ruta = "/publicaciones-dropi") => ({ minuto: `2026-10-27T${hhmm}:00.000Z`, ruta });
@@ -61,4 +61,13 @@ test("duración en palabras", () => {
   assert.equal(duracion(445), "7 h 25 min");
   assert.equal(duracion(120), "2 h");
   assert.equal(duracion(45), "45 min");
+});
+
+test("etiquetas y rango de horas", () => {
+  assert.equal(etiquetaHora(15), "3:00 p. m.");
+  assert.equal(etiquetaHora(0), "12:00 a. m.");
+  assert.equal(etiquetaHora(9, true), "9a");
+  assert.deepEqual(rangoDeHoras([]), [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  assert.deepEqual(rangoDeHoras([{ hora: 6 }, { hora: 20 }]).at(0), 6);
+  assert.deepEqual(rangoDeHoras([{ hora: 6 }, { hora: 20 }]).at(-1), 20);
 });

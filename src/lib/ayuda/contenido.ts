@@ -628,7 +628,8 @@ export const GUIAS: GuiaModulo[] = [
         titulo: "Uso",
         pasos: [
           "Arriba se elige el día (Día anterior, Día siguiente, Hoy o una fecha). La tabla «El equipo» trae a cada persona con su entrada, salida, tiempo activo, pausas, acciones y la página donde pasó más tiempo; las que no usaron el sistema salen al final, en gris.",
-          "Pulsa un nombre para ver su día hora por hora: cuántos minutos estuvo activa, en qué páginas y qué guardó (con la hora de cada cosa), y la lista de sus pausas.",
+          "En cada fila, la columna «Horas» trae una barrita por hora (más alta cuantos más minutos estuvo activa); pulsar una abre el día de esa persona en esa hora.",
+          "Al pulsar un nombre se ve su día como dashboard: arriba entrada, salida, tiempo activo, pausas (con sus horas) y acciones; debajo, una barra por hora con los minutos activos y, en morado, cuántas acciones guardó. Pulsa una barra (o muévete con las flechas del teclado) y abajo sale qué hizo en esa hora: en qué páginas estuvo y cuánto, y todo lo que guardó, con la hora de cada cosa.",
         ],
       },
     ],

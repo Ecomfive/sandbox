@@ -5,10 +5,12 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { fieldClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { Pagina } from "@/components/ui/pagina";
+import { Tooltip } from "@/components/ui/tooltip";
 import { irAlInicio, requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { cargarDia, type PersonaDelDia } from "@/lib/rendimiento/datos";
-import { MINUTOS_PAUSA, ZONA, diaPanama, duracion, type Jornada } from "@/lib/rendimiento/jornada";
+import { MINUTOS_PAUSA, ZONA, diaPanama, duracion, etiquetaHora, rangoDeHoras, type Jornada } from "@/lib/rendimiento/jornada";
+import { GraficaHoras } from "./grafica-horas";
 
 export const metadata = { title: "Rendimiento" };
 
@@ -19,16 +21,17 @@ const DIA = /^\d{4}-\d{2}-\d{2}$/;
 const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("es-PA", { timeZone: ZONA, hour: "numeric", minute: "2-digit" }) : "—");
 const otroDia = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const fechaLarga = (dia: string) => new Date(`${dia}T12:00:00Z`).toLocaleDateString("es-PA", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-const enlace = (dia: string, persona?: string) => `/rendimiento?dia=${dia}${persona ? `&persona=${persona}` : ""}`;
+const enlace = (dia: string, persona?: string, h?: number) => `/rendimiento?dia=${dia}${persona ? `&persona=${persona}` : ""}${h !== undefined ? `&hora=${h}` : ""}`;
 
 /**
  * Equipo › Rendimiento (pedido de Alcides, 27 oct 2026; migración 0166): la jornada de cada persona en un día: entrada, salida,
  * tiempo activo, pausas y qué hizo en cada hora (en qué páginas estuvo y qué guardó). Solo lo ven los administradores.
  */
-export default async function RendimientoPage({ searchParams }: { searchParams: Promise<{ dia?: string; persona?: string }> }) {
+export default async function RendimientoPage({ searchParams }: { searchParams: Promise<{ dia?: string; persona?: string; hora?: string }> }) {
   const usuario = await requireModulo("rendimiento");
   if (!esAdministrador(usuario)) irAlInicio(usuario, "rendimiento");
-  const { dia: diaPedido, persona } = await searchParams;
+  const { dia: diaPedido, persona, hora: horaPedida } = await searchParams;
+  const horaInicial = typeof horaPedida === "string" && /^\d{1,2}$/.test(horaPedida) && Number(horaPedida) < 24 ? Number(horaPedida) : null;
   const hoy = diaPanama();
   const dia = typeof diaPedido === "string" && DIA.test(diaPedido) && diaPedido <= hoy ? diaPedido : hoy;
   const equipo = await cargarDia(dia);
@@ -72,7 +75,7 @@ export default async function RendimientoPage({ searchParams }: { searchParams: 
       ) : (
         <>
           <Equipo equipo={equipo} dia={dia} elegida={elegida?.id ?? null} />
-          {elegida && <Detalle persona={elegida} />}
+          {elegida && <Detalle key={`${elegida.id}-${dia}-${horaInicial}`} persona={elegida} hora={horaInicial} />}
         </>
       )}
     </Pagina>
@@ -96,7 +99,7 @@ function Equipo({ equipo, dia, elegida }: { equipo: PersonaDelDia[]; dia: string
         <table className="tabla-datos w-full text-sm">
           <thead>
             <tr className={claseFilaEncabezado}>
-              {["Persona", "Entrada", "Salida", "Tiempo activo", "Pausas", "Acciones", "Más tiempo en"].map((t) => (
+              {["Persona", "Horas", "Entrada", "Salida", "Tiempo activo", "Pausas", "Acciones", "Más tiempo en"].map((t) => (
                 <th key={t} scope="col" className={claseEncabezadoColumna}>
                   {t}
                 </th>
@@ -114,6 +117,9 @@ function Equipo({ equipo, dia, elegida }: { equipo: PersonaDelDia[]; dia: string
                       {p.nombre}
                     </Link>
                   </td>
+                  <td className={claseCeldaColumna}>
+                    <TiraHoras persona={p} dia={dia} />
+                  </td>
                   <td className={`${claseCeldaColumna} tabular-nums`}>{hora(j.entrada)}</td>
                   <td className={`${claseCeldaColumna} tabular-nums`}>{hora(j.salida)}</td>
                   <td className={`${claseCeldaColumna} tabular-nums`}>{j.entrada ? duracion(j.minutosActivos) : "Sin actividad"}</td>
@@ -130,7 +136,34 @@ function Equipo({ equipo, dia, elegida }: { equipo: PersonaDelDia[]; dia: string
   );
 }
 
-function Detalle({ persona }: { persona: PersonaDelDia }) {
+/** Una barrita por hora (los minutos activos) en la fila de cada persona; pulsar una abre su día en esa hora. */
+function TiraHoras({ persona, dia }: { persona: PersonaDelDia; dia: string }) {
+  const horas = new Map(persona.jornada.horas.map((h) => [h.hora, h]));
+  return (
+    <span className="flex h-7 items-end gap-px">
+      {rangoDeHoras(persona.jornada.horas).map((h) => {
+        const x = horas.get(h);
+        const minutos = x?.minutos ?? 0;
+        const etiqueta = `${persona.nombre}, ${etiquetaHora(h)}: ${minutos} min${x?.acciones.length ? `, ${x.acciones.length} acciones` : ""}`;
+        return (
+          <span key={h} className="flex h-full [&>span]:h-full">
+          <Tooltip texto={etiqueta}>
+            <Link href={enlace(dia, persona.id, h)} aria-label={etiqueta} className="flex h-full w-2 items-end rounded-sm hover:bg-muted">
+              <span
+                aria-hidden="true"
+                className={`block w-full rounded-t-[2px] ${minutos ? "bg-primario/70" : x?.acciones.length ? "bg-primario/30" : "bg-border"}`}
+                style={{ height: minutos ? `${Math.max(12, (Math.min(60, minutos) / 60) * 100)}%` : x?.acciones.length ? "20%" : "2px" }}
+              />
+            </Link>
+          </Tooltip>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function Detalle({ persona, hora: horaInicial }: { persona: PersonaDelDia; hora: number | null }) {
   const j: Jornada = persona.jornada;
   return (
     <section aria-labelledby="titulo-persona" className="flex flex-col gap-4">
@@ -145,49 +178,15 @@ function Detalle({ persona }: { persona: PersonaDelDia }) {
             <KpiCard compacta titulo="Entrada" valor={hora(j.entrada)} />
             <KpiCard compacta titulo="Salida" valor={hora(j.salida)} />
             <KpiCard compacta titulo="Tiempo activo" valor={duracion(j.minutosActivos)} />
-            <KpiCard compacta titulo={`Pausas de más de ${MINUTOS_PAUSA} min`} valor={j.pausas.length ? duracion(j.pausas.reduce((t, x) => t + x.minutos, 0)) : "Ninguna"} subtexto={j.pausas.length ? `${j.pausas.length} pausas` : undefined} />
+            <KpiCard
+              compacta
+              titulo={`Pausas de más de ${MINUTOS_PAUSA} min`}
+              valor={j.pausas.length ? duracion(j.pausas.reduce((t, x) => t + x.minutos, 0)) : "Ninguna"}
+              subtexto={j.pausas.length ? j.pausas.map((p) => `${hora(p.desde)}–${hora(p.hasta)}`).join(" · ") : undefined}
+            />
             <KpiCard compacta titulo="Acciones guardadas" valor={j.acciones.toLocaleString("es-PA")} />
           </KpiGrid>
-          <ol className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
-            {j.horas.map((h) => (
-              <li key={h.hora} className="grid gap-3 px-4 py-4 sm:grid-cols-[5rem_minmax(0,1fr)]">
-                <span className="text-sm font-semibold tabular-nums">{`${h.hora % 12 || 12}:00 ${h.hora < 12 ? "a. m." : "p. m."}`}</span>
-                <div className="flex min-w-0 flex-col gap-2">
-                  <div className="flex items-center gap-3">
-                    <span aria-hidden="true" className="h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
-                      <span className="block h-full rounded-full bg-foreground" style={{ width: `${Math.min(100, (h.minutos / 60) * 100)}%` }} />
-                    </span>
-                    <span className="shrink-0 text-sm tabular-nums">{h.minutos ? `${h.minutos} min activa` : "Sin minutos en el sistema"}</span>
-                  </div>
-                  {h.paginas.length > 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      {h.paginas.map((p, i) => (
-                        <span key={p.pagina}>
-                          {i > 0 && " · "}
-                          <span className="text-foreground">{p.pagina}</span> {p.minutos} min
-                        </span>
-                      ))}
-                    </p>
-                  )}
-                  {h.acciones.length > 0 && (
-                    <ul className="flex flex-col gap-1 text-sm">
-                      {h.acciones.map((a, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="shrink-0 text-muted-foreground tabular-nums">{hora(a.creadoEn)}</span>
-                          <span className="min-w-0 break-words">{a.texto}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-          {j.pausas.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              Pausas: {j.pausas.map((p) => `${hora(p.desde)} a ${hora(p.hasta)} (${duracion(p.minutos)})`).join(" · ")}
-            </p>
-          )}
+          <GraficaHoras horas={j.horas} inicial={horaInicial} />
         </>
       )}
     </section>
