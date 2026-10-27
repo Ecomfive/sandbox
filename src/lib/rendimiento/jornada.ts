@@ -136,3 +136,18 @@ export function duracion(minutos: number): string {
   const m = minutos % 60;
   return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
 }
+
+/** «3:00 p. m.» (largo) o «3 p» (corto, para el eje). */
+export function etiquetaHora(h: number, corta = false): string {
+  const doce = h % 12 || 12;
+  const sufijo = h < 12 ? "a. m." : "p. m.";
+  return corta ? `${doce}${h < 12 ? "a" : "p"}` : `${doce}:00 ${sufijo}`;
+}
+
+/** Las horas que muestra la gráfica: de 7 a. m. a 6 p. m. como mínimo, ampliadas a lo que haya trabajado antes o después. */
+export function rangoDeHoras(horas: { hora: number }[]): number[] {
+  const usadas = horas.map((h) => h.hora);
+  const desde = Math.min(7, ...usadas);
+  const hasta = Math.max(18, ...usadas);
+  return Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
+}
