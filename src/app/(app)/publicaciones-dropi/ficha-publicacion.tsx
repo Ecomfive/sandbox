@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   fulfillmentFijo,
@@ -23,10 +23,10 @@ import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
 import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
-import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
+import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, pausarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
-import { conexionDropi, noSeArchivaSinStock, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
+import { conexionDropi, noSeArchivaSinStock, paraReactivar, pausada, puedePausar, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 import { MOTIVO_SIN_STOCK } from "@/lib/publicaciones/archivar";
 import { AvisoEnCamino, VentasEnDropi } from "./ventas-publicacion";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
@@ -264,7 +264,11 @@ function ContenidoFicha({
   const conectado = p.dropiId.trim() !== "";
   const idBloqueado = conectado && !editandoId;
   // Sin stock en Dropi no se archiva (27 oct 2026): «Archivar» queda apagado y, al pulsarlo, dice por qué.
-  const sinStockArchivar = noSeArchivaSinStock(p);
+  // Sin stock no se archiva (27 oct 2026): se pausa, si está en Dropi. Una pausada se reactiva con «Sacar de Archivados».
+  const sePausa = puedePausar(p);
+  const sinStockArchivar = !sePausa && noSeArchivaSinStock(p);
+  const estaPausada = pausada(p);
+  const reactivarYa = paraReactivar(p);
   const campoId = useRef<HTMLInputElement>(null);
   // Al desbloquear con el lápiz, el cursor entra en el campo.
   useEffect(() => {
@@ -339,13 +343,14 @@ function ContenidoFicha({
   function archivar() {
     const archivarla = !p.archivada;
     if (archivarla && sinStockArchivar) return setError(MOTIVO_SIN_STOCK);
+    const pausarla = archivarla && sePausa;
     setError(null);
     setArchivando(true);
     empezar(async () => {
-      const r = await archivarPublicacion(p.id, archivarla).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await (pausarla ? pausarPublicacion(p.id) : archivarPublicacion(p.id, archivarla)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       setArchivando(false);
       if (r.error) setError(r.error);
-      else mostrarToast(r.detalle ?? (archivarla ? "Publicación archivada" : "Publicación fuera de Archivados"));
+      else mostrarToast(r.detalle ?? (pausarla ? "Publicación pausada" : archivarla ? "Publicación archivada" : estaPausada ? "Publicación reactivada" : "Publicación fuera de Archivados"));
     });
   }
 
@@ -386,6 +391,8 @@ function ContenidoFicha({
             <Badge color="#8d8d8d">Duplicada</Badge>
           ) : p.sinPublicar ? (
             <Badge color="#8e4ec6">Sin publicar</Badge>
+          ) : estaPausada ? (
+            <Badge color={reactivarYa ? "#30a46c" : "#1d4ed8"}>{reactivarYa ? "Volvió el stock" : "Pausada sin stock"}</Badge>
           ) : p.archivada ? (
             <Badge color="#8d8d8d">Archivada</Badge>
           ) : (
@@ -452,9 +459,13 @@ function ContenidoFicha({
                       Archivar
                     </BotonAccion>
                   </Tooltip>
+                ) : sePausa ? (
+                  <BotonAccion icono={PausaIcon} tono="info" disabled={pendiente} onClick={archivar}>
+                    {archivando ? "Un momento..." : "Pausar por falta de stock"}
+                  </BotonAccion>
                 ) : (
-                  <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={archivar}>
-                    {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
+                  <BotonAccion icono={estaPausada ? ReactivarIcon : ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={archivar}>
+                    {archivando ? "Un momento..." : estaPausada ? "Reactivar" : p.archivada ? "Sacar de Archivados" : "Archivar"}
                   </BotonAccion>
                 ))}
             </div>
@@ -477,6 +488,23 @@ function ContenidoFicha({
           </div>
         )}
 
+        {estaPausada && (
+          <p role="note" className="m-0 flex items-start gap-2 border-b border-border px-5 py-3 text-sm">
+            <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${reactivarYa ? "bg-success" : "bg-azul"}`} />
+            <span>
+              {reactivarYa ? (
+                <>
+                  <span className="font-semibold">Volvió el stock en Dropi.</span> Reactívala para que se vuelva a ver y vender.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">Pausada por falta de stock</span> desde el {new Date(p.pausadaDesde!).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" })}.
+                  {p.enCamino > 0 ? ` Vienen ${p.enCamino.toLocaleString("es-PA")} unidades en camino.` : " No hay mercancía en camino."}
+                </>
+              )}
+            </span>
+          </p>
+        )}
         {p.duplicadaDe && (
           <p role="note" className="m-0 border-b border-border bg-muted/50 px-5 py-3 text-sm">
             <span className="font-semibold">Duplicada de {p.duplicadaDe}.</span> Tiene el mismo ID de Dropi ({p.dropiId}): venía repetida de ClickUp. Usa esa; esta queda en

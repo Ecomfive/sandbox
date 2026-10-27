@@ -7,12 +7,12 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, AnalisisCompetenciaIcon, PausaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 const tiposDe = (g: GrupoRecomendacion) => TIPOS_RECOMENDACION.filter((t) => t.grupo === g).map((t) => t.valor);
-import { DEF_PUBLICACIONES, POCO_STOCK, estadoVinculo, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, POCO_STOCK, estadoVinculo, paraReactivar, pausada, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
@@ -43,6 +43,8 @@ interface Tarjeta {
   extraColor?: "rojo" | "verde";
   /** Un segundo número junto al grande, tras una barra: «/ 300» (el total) o «/ 6 en camino». */
   junto?: (abiertas: FilaPublicacion[]) => { n: number; texto?: string; color?: "verde" };
+  /** Cuenta también las archivadas (las pausadas por falta de stock están en Archivados). */
+  todas?: boolean;
 }
 
 /** Una tarjeta por cada acción calculada (21 oct 2026): cuenta y filtra por el campo «Acción». */
@@ -140,6 +142,30 @@ const TARJETAS: Tarjeta[] = [
     junto: (abiertas) => ({ n: abiertas.filter((f) => pocoStock(f) && f.enCamino > 0).length, texto: "en camino", color: "verde" }),
     atajo: { id: "poco-stock", etiqueta: "Poco stock", ayuda: `Filtrar la lista: venden y tienen menos de ${POCO_STOCK} unidades`, filtro: seleccion("pocoStock", "si") },
   },
+  {
+    id: "pausadas",
+    // Las pausadas por falta de stock (27 oct 2026, pedido de Alcides): archivadas en Dropi para que la competencia no vea que se agotaron,
+    // pero a la vista hasta reponerlas. Junto al número, en verde, las que Dropi ya ve con unidades: hay que reactivarlas.
+    titulo: "Pausadas sin stock",
+    icono: PausaIcon,
+    color: "azul",
+    detalle: "Archivadas en Dropi mientras se reponen",
+    todas: true,
+    cuenta: (f) => pausada(f),
+    junto: (todas) => ({ n: todas.filter(paraReactivar).length, texto: "para reactivar", color: "verde" }),
+    extra: (todas) => {
+      const n = todas.filter((f) => pausada(f) && !paraReactivar(f) && f.enCamino > 0).length;
+      return n ? `${n.toLocaleString("es-PA")} con mercancía en camino` : null;
+    },
+    extraColor: "verde",
+    atajo: {
+      id: "pausadas",
+      etiqueta: "Pausadas sin stock",
+      ayuda: "Filtrar la lista: pausadas por falta de stock",
+      filtro: seleccion("pausada", "reactivar", "pausada"),
+      ademas: [seleccion("publicacion", "archivado")],
+    },
+  },
 ];
 
 /** Una tarjeta del tablero: ícono de color, título y el número grande. Es un botón que pone o quita su filtro en la lista. */
@@ -190,9 +216,12 @@ export function TableroAcciones({ publicaciones, reglas, def = DEF_PUBLICACIONES
   const abiertas = publicaciones.filter((f) => !f.archivada);
   return (
     <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
-      {TARJETAS.map((t) => (
-        <TarjetaAccion key={t.id} t={t} valor={abiertas.filter(t.cuenta).length} junto={t.junto ? t.junto(abiertas) : null} extra={t.extra ? t.extra(abiertas, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas) : t.detalle} def={def} />
-      ))}
+      {TARJETAS.map((t) => {
+        const base = t.todas ? publicaciones : abiertas;
+        return (
+          <TarjetaAccion key={t.id} t={t} valor={base.filter(t.cuenta).length} junto={t.junto ? t.junto(base) : null} extra={t.extra ? t.extra(base, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas) : t.detalle} def={def} />
+        );
+      })}
     </section>
   );
 }

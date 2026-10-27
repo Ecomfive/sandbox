@@ -10,7 +10,7 @@ import type { ComponenteEnCamino, EtapaCotizacion } from "@/lib/compras/en-camin
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
 import { ACCIONES, BODEGA_DROPI, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
-import { sinStockParaArchivar } from "@/lib/publicaciones/archivar";
+import { listaParaReactivar, sePuedePausar, sinStockParaArchivar } from "@/lib/publicaciones/archivar";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { Revision } from "@/lib/publicaciones/optimizacion";
@@ -113,6 +113,8 @@ export interface FilaPublicacion {
   archivada: boolean;
   /** Si es un duplicado de otra publicación con el mismo ID de Dropi (migración 0147): «PUB-0309 · nombre» de la que vale. */
   duplicadaDe: string | null;
+  /** Desde cuándo está pausada por falta de stock (migración 0165): archivada en Dropi, pero a la vista en «Pausadas sin stock». */
+  pausadaDesde: string | null;
   /** Tiene un apagado esperando «Aplicar en Dropi» (migración 0148): en el sistema ya cuenta como apagada (va a Archivados, sin acciones). */
   apagadoPendiente: boolean;
   /** Dropi todavía no se tocó con ese apagado (ningún intento): se puede deshacer desde el sistema sin consecuencias. */
@@ -191,6 +193,24 @@ export const POCO_STOCK = 100;
 export function pocoStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas">): boolean {
   const stock = f.stockProveedor ?? f.ventas?.stock ?? null;
   return !f.archivada && f.enDropi === "activo" && stock !== null && stock > 0 && stock < POCO_STOCK && (f.ventas?.netas30 ?? 0) > 0;
+}
+
+const stockDe = (f: Pick<FilaPublicacion, "stockProveedor" | "ventas">) => f.stockProveedor ?? f.ventas?.stock ?? null;
+const privadoDe = (f: Pick<FilaPublicacion, "stockProveedor" | "stockPrivadoProveedor">) => (f.stockProveedor === null ? null : f.stockPrivadoProveedor);
+
+/** Pausada por falta de stock (27 oct 2026, migración 0165): en Archivados (y archivada en Dropi), pero a la vista en «Pausadas sin stock». */
+export function pausada(f: Pick<FilaPublicacion, "archivada" | "pausadaDesde" | "duplicadaDe">): boolean {
+  return f.archivada && !!f.pausadaDesde && !f.duplicadaDe;
+}
+
+/** Una pausada a la que Dropi ya le vuelve a ver unidades: hay que reactivarla (sacarla de Archivados). */
+export function paraReactivar(f: Pick<FilaPublicacion, "archivada" | "pausadaDesde" | "duplicadaDe" | "stockProveedor" | "stockPrivadoProveedor" | "ventas">): boolean {
+  return pausada(f) && listaParaReactivar(stockDe(f), privadoDe(f));
+}
+
+/** Se puede pausar por falta de stock: publicada en Dropi, sin archivar, sin stock y sin un apagado esperando. */
+export function puedePausar(f: Pick<FilaPublicacion, "dropiId" | "archivada" | "sinPublicar" | "apagadoPendiente" | "duplicadaDe" | "stockProveedor" | "stockPrivadoProveedor" | "ventas">): boolean {
+  return !f.apagadoPendiente && !f.duplicadaDe && sePuedePausar({ dropiId: f.dropiId, archivada: f.archivada, sinPublicar: f.sinPublicar, stock: stockDe(f), privado: privadoDe(f) });
 }
 
 /** No se puede archivar porque no tiene stock en Dropi (27 oct 2026). La misma cuenta que hace el servidor en `archivarPublicacion`. */
@@ -338,6 +358,17 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       agrupable: true,
       ordenGrupos: EN_DROPI.map((e) => e.valor),
       colorValor: (v) => EN_DROPI.find((e) => e.valor === v)?.color,
+    },
+    {
+      id: "pausada",
+      etiqueta: "Pausada",
+      tipo: "seleccion",
+      valores: (f) => [paraReactivar(f) ? "reactivar" : pausada(f) ? "pausada" : "no"],
+      opciones: () => [
+        { valor: "reactivar", etiqueta: "Para reactivar (volvió el stock)" },
+        { valor: "pausada", etiqueta: "Pausada sin stock" },
+        { valor: "no", etiqueta: "No pausada" },
+      ],
     },
     { id: "privatizado", etiqueta: "Privatizado a", tipo: "seleccion", valores: (f) => uno(f.privatizadoA || null), etiquetaSinValor: "Sin privatizar", agrupable: true },
     { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${numeroPublicacion(f.numero)} ${f.nombre} ${f.dropiId}` },
