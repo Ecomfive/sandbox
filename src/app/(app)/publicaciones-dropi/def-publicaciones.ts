@@ -169,8 +169,12 @@ export interface FilaPublicacion {
  * Dropi reporta sus ventas); «no_aparece» si tiene ID pero la lectura no lo trae; null sin ID o sin forma de saberlo.
  */
 export type ConexionDropi = "conectado" | "no_aparece";
-/** Activa en Dropi y con 0 unidades (la lectura de «Mis productos» manda sobre la carga de ventas). Sin datos de stock, no. */
-export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas">): boolean {
+/**
+ * Activa en Dropi y con 0 unidades (la lectura de «Mis productos» manda sobre la carga de ventas). Sin datos de stock, no. Una pausada por
+ * falta de stock también cuenta (pedido de Alcides, 27 oct 2026): sigue en «Sin stock» hasta reactivarla desde ahí mismo.
+ */
+export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas" | "pausadaDesde" | "duplicadaDe">): boolean {
+  if (pausada(f)) return true;
   const stock = f.stockProveedor ?? f.ventas?.stock ?? null;
   return !f.archivada && f.enDropi === "activo" && stock !== null && stock <= 0;
 }
@@ -373,7 +377,8 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "fechaPublicacion", etiqueta: "Fecha de publicación", tipo: "fecha", valor: (f) => f.ventas?.primeraVenta?.slice(0, 10) ?? f.fechaPublicacion },
   ],
   // Archivadas: las que Dropi tiene archivadas (si vuelven a estar activas en Dropi, salen solas de aquí).
-  cerrados: { etiqueta: "Archivados", esCerrado: (f) => f.archivada, campoEstado: "publicacion", valoresCerrados: ["archivado"], ocultosPorDefecto: true },
+  // Una pausada por falta de stock no se esconde en Archivados: se sigue viendo en la lista y en «Sin stock» (27 oct 2026).
+  cerrados: { etiqueta: "Archivados", esCerrado: (f) => f.archivada && !pausada(f), campoEstado: "publicacion", valoresCerrados: ["archivado"], ocultosPorDefecto: true },
   csvAntes: [
     { etiqueta: "N.º", valor: (f) => numeroPublicacion(f.numero) },
     { etiqueta: "ID Dropi", valor: (f) => f.dropiId },

@@ -99,6 +99,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     color: "#1d4ed8",
     modulos: [
       { clave: "puestos", etiqueta: "Puestos y organigrama" },
+      { clave: "rendimiento", etiqueta: "Rendimiento del equipo" },
       { clave: "usuarios", etiqueta: "Usuarios y roles" },
       { clave: "configuracion", etiqueta: "Configuración del sistema" },
     ],
@@ -111,7 +112,7 @@ export const MODULOS_ACCESO: ModuloAcceso[] = AREAS_ACCESO.flatMap((a) => a.modu
 export const etiquetaDeModulo = (clave: string): string => MODULOS_ACCESO.find((m) => m.clave === clave)?.etiqueta ?? clave;
 
 /** Los módulos con datos sensibles (nómina, bancos, retiros, márgenes) y los que dan poder de administración: llevan su marca en la matriz. */
-export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "gastos", "usuarios", "configuracion"]);
+export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "gastos", "usuarios", "configuracion", "rendimiento"]);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lo que se puede afinar dentro de un módulo
@@ -179,6 +180,7 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
     { clave: "tiempos", etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },
     { clave: "planificacion", etiqueta: "Planificación", href: "/compras/planificacion" },
     { clave: "envios", etiqueta: "Envíos", href: "/compras/envios" },
+    { clave: "sin-stock", etiqueta: "Sin stock", href: "/compras/sin-stock" },
   ],
   acciones: [
     { clave: "crear", etiqueta: "Crear compra", requiereEdicion: true },

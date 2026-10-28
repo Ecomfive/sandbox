@@ -70,6 +70,29 @@ export function stockPorBodega(producto: Obj): Record<string, number> {
 /** La carpeta de las fotos de cada país en el CDN de Dropi, por si ninguna foto del producto la dice (25 oct 2026, el 10474). */
 export const CARPETA_FOTOS_PAIS: Record<string, string> = { pa: "panama/products/" };
 
+/**
+ * Qué foto es, sin importar cuántas veces Dropi le antepuso su número de subida («1779932274» + nombre: una republicación o un reintento
+ * sube la misma foto y Dropi le pone otro número delante), el formato ni los espacios: así la misma foto subida varias veces se reconoce
+ * como una sola (28 oct 2026, PUB-0446: 17 «Principal» iguales). `CLAVE_FOTO_JS` es lo mismo para el favorito; la prueba compara los dos.
+ */
+export function claveFoto(nombre: string): string {
+  const s = String(nombre);
+  const a = s.replace(/\.[a-z0-9]{2,5}$/i, "").toLowerCase();
+  const b = a.replace(/^(?:1\d{9})+/, "");
+  return (b || a).replace(/[^a-z0-9]+/g, "") || s.toLowerCase();
+}
+
+/** El nombre con el que se sube una foto: sin los números de subida de Dropi, para que no se acumulen en cada republicación. */
+export function nombreSinPrefijo(nombre: string): string {
+  const s = String(nombre);
+  return s.replace(/^(?:1\d{9})+/, "") || s;
+}
+
+export const CLAVE_FOTO_JS = [
+  "function ck(s){s=String(s);var a=s.replace(/\\.[a-z0-9]{2,5}$/i,'').toLowerCase(),b=a.replace(/^(?:1\\d{9})+/,'');return (b||a).replace(/[^a-z0-9]+/g,'')||s.toLowerCase()}",
+  "function nl(s){s=String(s);return s.replace(/^(?:1\\d{9})+/,'')||s}",
+].join("");
+
 export function fotosParaCopiar(producto: Obj, pais?: string): { url: string; nombre: string; main: boolean; alternas: string[] }[] {
   const galeria = Array.isArray(producto.gallery) ? (producto.gallery as Obj[]) : [];
   // La carpeta de las fotos del país en el CDN («panama/products/»), sacada de una foto que sí tiene `urlS3`.

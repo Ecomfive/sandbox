@@ -43,6 +43,7 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
     "/inventario": pendientes.lotesVencidos + pendientes.lotesPorVencer,
     "/analisis-competencia": pendientes.competidoresNuevos,
     "/publicaciones-dropi": pendientes.tareasAtrasadas + pendientes.creditosIA,
+    "/compras": pendientes.sinStockPorRevisar,
   };
   const contadores: ContadoresMenu = {};
   for (const [href, cantidad] of Object.entries(porPagina)) {
@@ -57,7 +58,8 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
       pendientes.lotesPorVencer +
       pendientes.competidoresNuevos +
       pendientes.tareasAtrasadas +
-      pendientes.creditosIA
+      pendientes.creditosIA +
+      pendientes.sinStockPorRevisar
     : 0;
   return { contadores, total, paraTi: 0 };
 }

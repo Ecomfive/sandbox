@@ -4,8 +4,9 @@
 // (el navegador, desde la pestaña de Dropi, no: el CDN guarda copias sin la cabecera CORS). Lo llama `guardarNuestrosProductos`.
 // Sin la migración no hace nada. Cada foto se revisa por su firma; una que no se puede bajar se intenta otra vez en la próxima lectura.
 
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { galeriaDeProducto, planFotos, rutaFotoDropi, type FotoGaleria } from "../src/lib/publicaciones/fotos-dropi";
+import { galeriaDeProducto, planFotos, rutaFotoDropi, type FotoGaleria, type FotoGuardada } from "../src/lib/publicaciones/fotos-dropi";
 import { idsDeDropi, productoPrincipal, type ProductoProveedor } from "../src/lib/publicaciones/sincronizar-dropi";
 import { detectarImagen } from "../src/lib/seguridad/imagen";
 import { descargarPublico } from "../src/lib/seguridad/url-externa";
@@ -18,6 +19,8 @@ export interface ResumenFotos {
   copiadas: number;
   actualizadas: number;
   fueraDeDropi: number;
+  /** Copias repetidas de una misma foto que se quitaron. */
+  repetidasQuitadas: number;
   errores: string[];
   /** Las que quedaron para la próxima lectura por el tope de esta. */
   pendientes: number;
@@ -49,7 +52,7 @@ export async function copiarFotosDropi(
   pubs: { id: string; dropi_id: string | null; estado_publicacion: string | null }[],
   max = 300,
 ): Promise<ResumenFotos> {
-  const resumen: ResumenFotos = { copiadas: 0, actualizadas: 0, fueraDeDropi: 0, errores: [], pendientes: 0 };
+  const resumen: ResumenFotos = { copiadas: 0, actualizadas: 0, fueraDeDropi: 0, repetidasQuitadas: 0, errores: [], pendientes: 0 };
   // La galería de cada producto (la de activos manda si vino en las dos pestañas). Una lectura vieja sin direcciones no trae galería.
   const crudoDe = new Map<number, Record<string, unknown>>();
   for (const o of crudos) {
@@ -69,13 +72,13 @@ export async function copiarFotosDropi(
   if (!trabajo.length) return resumen;
 
   // Lo ya copiado de esas publicaciones, de a 200 (sin la migración 0153, nada que hacer).
-  const guardadas = new Map<string, { nombre: string; principal: boolean; orden: number; enDropi: boolean }[]>();
+  const guardadas = new Map<string, FotoGuardada[]>();
   for (let i = 0; i < trabajo.length; i += 200) {
     const ids = trabajo.slice(i, i + 200).map((t) => t.pubId);
-    const { data, error } = await supabase.from("dropi_publicacion_fotos").select("publicacion_id, nombre, principal, orden, en_dropi").in("publicacion_id", ids);
+    const { data, error } = await supabase.from("dropi_publicacion_fotos").select("publicacion_id, nombre, principal, orden, en_dropi, ruta").in("publicacion_id", ids);
     if (error) return { ...resumen, sinTabla: /does not exist|schema cache/i.test(error.message) || undefined, errores: /does not exist|schema cache/i.test(error.message) ? [] : [error.message] };
     for (const g of data ?? [])
-      guardadas.set(g.publicacion_id as string, [...(guardadas.get(g.publicacion_id as string) ?? []), { nombre: g.nombre as string, principal: !!g.principal, orden: Number(g.orden), enDropi: !!g.en_dropi }]);
+      guardadas.set(g.publicacion_id as string, [...(guardadas.get(g.publicacion_id as string) ?? []), { nombre: g.nombre as string, principal: !!g.principal, orden: Number(g.orden), enDropi: !!g.en_dropi, ruta: (g.ruta as string | null) ?? undefined }]);
   }
 
   const ahora = new Date().toISOString();
@@ -92,6 +95,15 @@ export async function copiarFotosDropi(
       if (error) resumen.errores.push(`${t.productoId}: ${error.message}`);
       else resumen.fueraDeDropi += plan.fuera.length;
     }
+    // La misma foto subida varias veces a Dropi (28 oct 2026, PUB-0446: 17 «Principal»): se queda una copia por foto.
+    if (plan.repetidas.length) {
+      const { error } = await supabase.from("dropi_publicacion_fotos").delete().eq("publicacion_id", t.pubId).in("nombre", plan.repetidas);
+      if (error) resumen.errores.push(`${t.productoId}: ${error.message}`);
+      else {
+        resumen.repetidasQuitadas += plan.repetidas.length;
+        if (plan.rutasBorrar.length) await supabase.storage.from(BUCKET).remove(plan.rutasBorrar);
+      }
+    }
     for (const f of plan.bajar) {
       if (bajadas >= max) {
         resumen.pendientes++;
@@ -103,7 +115,8 @@ export async function copiarFotosDropi(
         resumen.errores.push(`${t.productoId} ${f.nombre}: ${b.error}`);
         continue;
       }
-      const ruta = rutaFotoDropi(t.pubId, f.nombre, b.extension);
+      // El archivo se llama como la huella de su contenido: la misma foto con otro nombre en Dropi reusa el mismo (28 oct 2026, PUB-0446).
+      const ruta = rutaFotoDropi(t.pubId, createHash("md5").update(b.bytes).digest("hex"), b.extension);
       const subida = await supabase.storage.from(BUCKET).upload(ruta, b.bytes, { contentType: b.tipo, upsert: true });
       if (subida.error) {
         resumen.errores.push(`${t.productoId} ${f.nombre}: ${subida.error.message}`);

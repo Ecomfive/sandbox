@@ -192,7 +192,7 @@ export async function encolarApagar(
 
 /**
  * «Archivar» y «Sacar de Archivados» en Dropi (pedido de Jhokser, 24 oct 2026; migración 0151): el sistema ya cambió la publicación y deja en la
- * cola que Dropi haga lo mismo (`archiveProduct` / `unarchive`). `antes` es cómo estaba la publicación, para devolverla a eso si se deshace
+ * cola que Dropi haga lo mismo (`archiveProduct` / `activateProduct`). `antes` es cómo estaba la publicación, para devolverla a eso si se deshace
  * el cambio pendiente. Si ya había uno esperando: el mismo no se repite, y el contrario lo cancela (Dropi nunca se tocó): vuelve `cancelo`
  * con el estado de antes de ese cambio, para que la publicación quede exactamente como estaba.
  */

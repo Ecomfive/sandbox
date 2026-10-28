@@ -38,6 +38,7 @@ export const MODULOS: Modulo[] = [
   { clave: "generador-landings", etiqueta: "Generador de landings (Testing Lab)" },
   { clave: "usuarios", etiqueta: "Usuarios y roles" },
   { clave: "puestos", etiqueta: "Puestos y organigrama" },
+  { clave: "rendimiento", etiqueta: "Rendimiento del equipo" },
   { clave: "configuracion", etiqueta: "Configuración del sistema" },
   { clave: "notificaciones", etiqueta: "Centro de notificaciones" },
 ];

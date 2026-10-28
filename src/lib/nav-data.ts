@@ -134,6 +134,7 @@ const AREAS: NavSection[] = [
     items: [
       { label: "Usuarios y roles", href: "/usuarios" },
       { label: "Puestos", href: "/puestos" },
+      { label: "Rendimiento", href: "/rendimiento" },
     ],
   },
   // Las fichas de producto de Shopify y de Dropi ya no están en el menú (se llega a ellas desde Producto); la página y su

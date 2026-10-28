@@ -5,7 +5,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ArchivarIcon, ChevronRightIcon, DropiIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
@@ -268,7 +268,16 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
           <span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-border-control" />
         )}
         <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{f.nombre}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-medium">{f.nombre}</span>
+            {/* Privado: insignia violeta sólida con candado junto al nombre, para verla de lejos (28 oct 2026). */}
+            {f.tipoDropi === "privado" && (
+              <span className="inline-flex max-w-48 shrink-0 items-center gap-1 rounded-full bg-privado px-2 py-0.5 text-xs font-semibold text-white">
+                <CandadoIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+                <span className="truncate">Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>
+              </span>
+            )}
+          </span>
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
             <span className="tabular-nums">{f.dropiId ? `ID ${f.dropiId}` : "Sin ID de Dropi"}</span>
@@ -293,7 +302,6 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {sugerida ? `${ETIQUETA_SUGERENCIA[sugerida.tipo]}${sugerida.sku ? ` · ${sugerida.sku.codigo}` : ""}` : "Sin SKU"}
               </span>
             )}
-            {f.tipoDropi === "privado" && <span>Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>}
             {f.sinPublicar && (
               <span className={`inline-flex items-center gap-1.5 font-medium ${f.publicarPendiente ? "text-destructive" : ""}`}>
                 {f.publicarPendiente && <Punto clase="bg-destructive" texto="Publicación pendiente en Dropi" />}

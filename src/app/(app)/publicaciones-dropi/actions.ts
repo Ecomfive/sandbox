@@ -323,9 +323,11 @@ export async function crearPublicacion(f: FormData): Promise<PublicacionCreada> 
   if ("error" in datos) return datos;
   const repetido = await idDropiRepetido(paisId, (datos.dropi_id as string | null) ?? null, null);
   if (repetido) return { error: repetido };
+  // El producto de Producto elegido (o creado) en «Agregar» queda vinculado (27 oct 2026).
+  const producto = await productoElegido(f, supabase);
   const { data, error } = await supabase
     .from("dropi_publicaciones")
-    .insert({ ...datos, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
+    .insert({ ...datos, sku_maestro_id: producto?.id ?? null, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
     .select("id")
     .single();
   if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0116." : "No se pudo crear la publicación." };
