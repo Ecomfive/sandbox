@@ -4,6 +4,7 @@
 // (el navegador, desde la pestaña de Dropi, no: el CDN guarda copias sin la cabecera CORS). Lo llama `guardarNuestrosProductos`.
 // Sin la migración no hace nada. Cada foto se revisa por su firma; una que no se puede bajar se intenta otra vez en la próxima lectura.
 
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { galeriaDeProducto, planFotos, rutaFotoDropi, type FotoGaleria, type FotoGuardada } from "../src/lib/publicaciones/fotos-dropi";
 import { idsDeDropi, productoPrincipal, type ProductoProveedor } from "../src/lib/publicaciones/sincronizar-dropi";
@@ -114,7 +115,8 @@ export async function copiarFotosDropi(
         resumen.errores.push(`${t.productoId} ${f.nombre}: ${b.error}`);
         continue;
       }
-      const ruta = rutaFotoDropi(t.pubId, f.nombre, b.extension);
+      // El archivo se llama como la huella de su contenido: la misma foto con otro nombre en Dropi reusa el mismo (28 oct 2026, PUB-0446).
+      const ruta = rutaFotoDropi(t.pubId, createHash("md5").update(b.bytes).digest("hex"), b.extension);
       const subida = await supabase.storage.from(BUCKET).upload(ruta, b.bytes, { contentType: b.tipo, upsert: true });
       if (subida.error) {
         resumen.errores.push(`${t.productoId} ${f.nombre}: ${subida.error.message}`);

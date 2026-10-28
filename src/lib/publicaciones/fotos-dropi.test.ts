@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { galeriaDeProducto, planFotos, repetidasDe, rutaFotoDropi, rutasSinUso } from "./fotos-dropi";
+import { galeriaDeProducto, planFotos, planUnificar, repetidasDe, rutaFotoDropi, rutasSinUso, unaPorFoto } from "./fotos-dropi";
 import { CDN_FOTOS_DROPI, CLAVE_FOTO_JS, claveFoto, nombreSinPrefijo } from "./republicar-dropi";
 
 const producto = {
@@ -33,9 +33,53 @@ test("plan: baja lo que falta, pone al día lo copiado y marca lo que Dropi ya n
   assert.deepEqual(planFotos(galeria, galeria.map((f) => ({ nombre: f.nombre, principal: f.principal, orden: f.orden, enDropi: true }))), { bajar: [], actualizar: [], fuera: [], repetidas: [], rutasBorrar: [] });
 });
 
-test("ruta: en la carpeta de la publicación, sin espacios ni caracteres raros", () => {
-  assert.equal(rutaFotoDropi("p1", "1779932274veganic 4.png", "png"), "publicaciones/p1/dropi/1779932274veganic-4.png");
-  assert.equal(rutaFotoDropi("p1", "../../x.jpg", "jpg"), "publicaciones/p1/dropi/x.jpg");
+test("ruta: en la carpeta de la publicación, con la huella del contenido de nombre", () => {
+  assert.equal(rutaFotoDropi("p1", "3A4F89569E6D1CB0238573B487465D9F", "png"), "publicaciones/p1/dropi/3a4f89569e6d1cb0238573b487465d9f.png");
+  assert.equal(rutaFotoDropi("p1", "../../x", "jpg"), "publicaciones/p1/dropi/foto.jpg");
+});
+
+test("una por foto: la misma foto con otro nombre (mismo archivo) o con otro número de subida sale una vez, la primera", () => {
+  // PUB-0446: nombres al azar distintos, el mismo archivo (la lectura los guarda con la huella de nombre).
+  const fs = [
+    { nombre: "b0e865aa-94e3-4d85-ba6c-e18249f8cd05.png", ruta: "publicaciones/p/dropi/aaa.png" },
+    { nombre: "572be607-c0d5-4673-b7aa-f128495cc216.png", ruta: "publicaciones/p/dropi/aaa.png" },
+    { nombre: "1779932274anti.jpg", ruta: "publicaciones/p/dropi/bbb.jpg" },
+    { nombre: "1781111111anti.jpg", ruta: null },
+    { nombre: "otra.jpg", ruta: "publicaciones/p/dropi/ccc.jpg" },
+  ];
+  assert.deepEqual(unaPorFoto(fs).map((f) => f.nombre), ["b0e865aa-94e3-4d85-ba6c-e18249f8cd05.png", "1779932274anti.jpg", "otra.jpg"]);
+});
+
+test("unificar: 17 archivos iguales con nombres distintos quedan en uno con su huella, y las 17 filas apuntan a él", () => {
+  const h = "3a4f89569e6d1cb0238573b487465d9f";
+  const filas = Array.from({ length: 17 }, (_, i) => ({ nombre: `uuid-${i}.png`, ruta: `publicaciones/p/dropi/uuid-${i}.png` }));
+  const huellaDe = new Map<string, string | null>(filas.map((f) => [f.ruta, h]));
+  huellaDe.set("publicaciones/p/dropi/otra.jpg", "ffffffffffffffffffffffffffffffff");
+  const plan = planUnificar("p", [...filas, { nombre: "otra.jpg", ruta: "publicaciones/p/dropi/otra.jpg" }], huellaDe);
+  assert.deepEqual(plan.mover, [
+    { desde: "publicaciones/p/dropi/uuid-0.png", hacia: `publicaciones/p/dropi/${h}.png` },
+    { desde: "publicaciones/p/dropi/otra.jpg", hacia: "publicaciones/p/dropi/ffffffffffffffffffffffffffffffff.jpg" },
+  ]);
+  assert.equal(plan.borrar.length, 16);
+  assert.ok(!plan.borrar.includes("publicaciones/p/dropi/uuid-0.png"));
+  assert.equal(plan.cambiarRuta.length, 18);
+  assert.ok(plan.cambiarRuta.slice(0, 17).every((c) => c.ruta === `publicaciones/p/dropi/${h}.png`));
+  assert.equal(plan.distintas, 2);
+});
+
+test("unificar: si el archivo ya tiene su huella de nombre no se mueve nada; sin huella no se toca", () => {
+  const h = "0123456789abcdef0123456789abcdef";
+  const filas = [
+    { nombre: "a.png", ruta: `publicaciones/p/dropi/${h}.png` },
+    { nombre: "b.png", ruta: "publicaciones/p/dropi/b.png" },
+    { nombre: "c.png", ruta: "publicaciones/p/dropi/c.png" },
+    { nombre: "d.png", ruta: null },
+  ];
+  const plan = planUnificar("p", filas, new Map([[`publicaciones/p/dropi/${h}.png`, h], ["publicaciones/p/dropi/b.png", h], ["publicaciones/p/dropi/c.png", null]]));
+  assert.deepEqual(plan.mover, []);
+  assert.deepEqual(plan.borrar, ["publicaciones/p/dropi/b.png"]);
+  assert.deepEqual(plan.cambiarRuta, [{ nombre: "b.png", ruta: `publicaciones/p/dropi/${h}.png` }]);
+  assert.equal(plan.distintas, 3);
 });
 
 test("clave: la misma foto con otro número de subida, formato o espacios es la misma", () => {

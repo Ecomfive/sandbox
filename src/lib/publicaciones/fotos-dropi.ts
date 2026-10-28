@@ -2,6 +2,9 @@
 // producto; esto decide qué fotos bajar y qué cambiar de las ya copiadas. Lógica pura, con prueba (fotos-dropi.test.ts).
 // **Una foto es una sola aunque Dropi la liste varias veces** (28 oct 2026, PUB-0446: 17 «Principal» iguales): Dropi le antepone un
 // número de subida al nombre cada vez que se sube, así que el nombre exacto no sirve de llave; se compara con `claveFoto`.
+// **Y por su contenido** (28 oct 2026): las 17 de PUB-0446 tenían 17 nombres al azar distintos (`b0e865aa-….png`) y eran el mismo archivo,
+// así que el nombre tampoco basta. La copia del sistema se guarda con la huella de su contenido (md5) como nombre de archivo
+// (`rutaFotoDropi`): dos fotos iguales caen en el mismo archivo y comparten `ruta`, y `unaPorFoto` las muestra y las sube una sola vez.
 
 import { claveFoto, fotosParaCopiar } from "./republicar-dropi";
 
@@ -84,8 +87,55 @@ export function planFotos(galeria: FotoGaleria[], guardadas: FotoGuardada[]) {
   };
 }
 
-/** Dónde queda la copia en el bucket `wms-productos`: la carpeta de la publicación, sin caracteres raros en el nombre. */
-export function rutaFotoDropi(publicacionId: string, nombre: string, extension: string): string {
-  const base = nombre.replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+|[.-]+$/g, "").slice(0, 80) || "foto";
-  return `publicaciones/${publicacionId}/dropi/${base}.${extension}`;
+/**
+ * Dónde queda la copia en el bucket `wms-productos`: la carpeta de la publicación y, de nombre, la huella md5 de su contenido. La misma
+ * foto con otro nombre en Dropi cae en el mismo archivo (no se guarda dos veces) y las filas que la usan comparten `ruta`.
+ */
+export function rutaFotoDropi(publicacionId: string, huella: string, extension: string): string {
+  const base = huella.toLowerCase().replace(/[^0-9a-f]/g, "").slice(0, 64) || "foto";
+  return `publicaciones/${publicacionId}/dropi/${base}.${extension.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+}
+
+/**
+ * Cada foto una sola vez, en el orden en que vienen (la primera se queda): dos filas son la misma foto si comparten el archivo de Storage
+ * (`ruta`, que con `rutaFotoDropi` es su contenido) o la `claveFoto` de su nombre. Para la sección «Fotos» de la ficha y para republicar.
+ */
+export function unaPorFoto<T extends { nombre: string; ruta?: string | null }>(fotos: T[]): T[] {
+  const vistas = new Set<string>();
+  return fotos.filter((f) => {
+    const claves = [`n:${claveFoto(f.nombre)}`, ...(f.ruta ? [`r:${f.ruta}`] : [])];
+    const repetida = claves.some((c) => vistas.has(c));
+    for (const c of claves) vistas.add(c);
+    return !repetida;
+  });
+}
+
+/**
+ * Para limpiar las copias de antes (`scripts/limpiar-fotos-duplicadas.ts`), con la huella md5 de cada archivo (la que da Storage; `null`
+ * si no se sabe): los archivos de una publicación con el mismo contenido se juntan en uno con su huella de nombre. `mover` lleva un
+ * archivo a ese nombre (si ninguno lo tiene ya), `cambiarRuta` apunta las filas al archivo que queda y `borrar` son las copias que sobran.
+ * Las filas no se borran: siguen siendo las fotos que Dropi lista, y la lectura diaria no las vuelve a bajar.
+ */
+export function planUnificar(publicacionId: string, filas: { nombre: string; ruta: string | null }[], huellaDe: Map<string, string | null>) {
+  const grupos = new Map<string, string[]>();
+  for (const f of filas) {
+    const h = f.ruta ? huellaDe.get(f.ruta) : null;
+    if (!f.ruta || !h) continue;
+    const rutas = grupos.get(h) ?? [];
+    if (!rutas.includes(f.ruta)) rutas.push(f.ruta);
+    grupos.set(h, rutas);
+  }
+  const mover: { desde: string; hacia: string }[] = [];
+  const borrar: string[] = [];
+  const destino = new Map<string, string>();
+  for (const [h, rutas] of grupos) {
+    const extension = (rutas[0].match(/\.([a-z0-9]{2,5})$/i)?.[1] ?? "jpg").toLowerCase();
+    const hacia = rutas.find((r) => r.endsWith(`/${h}.${r.split(".").pop()}`)) ?? rutaFotoDropi(publicacionId, h, extension);
+    const desde = rutas.includes(hacia) ? hacia : rutas[0];
+    if (desde !== hacia) mover.push({ desde, hacia });
+    borrar.push(...rutas.filter((r) => r !== desde && r !== hacia));
+    for (const r of rutas) destino.set(r, hacia);
+  }
+  const cambiarRuta = filas.filter((f) => f.ruta && destino.has(f.ruta) && destino.get(f.ruta) !== f.ruta).map((f) => ({ nombre: f.nombre, ruta: destino.get(f.ruta!)! }));
+  return { mover, borrar, cambiarRuta, distintas: grupos.size + filas.filter((f) => !f.ruta || !huellaDe.get(f.ruta)).length };
 }

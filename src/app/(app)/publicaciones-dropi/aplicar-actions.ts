@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { normalizarDatosCrear, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
-import { claveFoto } from "@/lib/publicaciones/republicar-dropi";
+import { unaPorFoto } from "@/lib/publicaciones/fotos-dropi";
 import { normalizarDatosPrivatizar, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -219,19 +219,17 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
   if (republicar.length) {
     const fotos = await createServiceClient()
       .from("dropi_publicacion_fotos")
-      .select("publicacion_id, nombre, url")
+      .select("publicacion_id, nombre, url, ruta")
       .in("publicacion_id", republicar)
       .eq("en_dropi", true)
       .order("principal", { ascending: false })
       .order("orden");
-    // Cada foto una sola vez, aunque Dropi la tenga repetida (28 oct 2026, PUB-0446): si no, cada republicación copia todas las repetidas.
-    const vistas = new Set<string>();
-    for (const f of fotos.error ? [] : (fotos.data ?? [])) {
-      const clave = `${f.publicacion_id}|${claveFoto(f.nombre as string)}`;
-      if (vistas.has(clave)) continue;
-      vistas.add(clave);
-      deSistema.set(f.publicacion_id as string, [...(deSistema.get(f.publicacion_id as string) ?? []), { url: f.url as string, nombre: f.nombre as string }]);
-    }
+    const crudas = new Map<string, { url: string; nombre: string; ruta: string | null }[]>();
+    for (const f of fotos.error ? [] : (fotos.data ?? []))
+      crudas.set(f.publicacion_id as string, [...(crudas.get(f.publicacion_id as string) ?? []), { url: f.url as string, nombre: f.nombre as string, ruta: f.ruta as string | null }]);
+    // Cada foto una sola vez, aunque Dropi la tenga repetida con el mismo nombre o con otro (28 oct 2026, PUB-0446): si no, cada
+    // republicación copia todas las repetidas.
+    for (const [id, fs] of crudas) deSistema.set(id, unaPorFoto(fs).map(({ url, nombre }) => ({ url, nombre })));
   }
   return {
     pais: pais.nombre,
