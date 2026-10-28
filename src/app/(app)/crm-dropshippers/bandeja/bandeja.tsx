@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { textoVentana } from "@/lib/whatsapp/ventana";
@@ -197,6 +197,13 @@ export function Bandeja({
   estado360?: { clave: boolean; sandbox: boolean; palabraSecreta: boolean } | null;
 }) {
   const { mostrarToast } = useToast();
+  // Las horas («14:05», «Ayer») y lo que queda de las 24 h dependen de la zona y del reloj de quien mira: el servidor no las sabe, así
+  // que se dibujan recién en el navegador (si no, React avisa que el HTML no coincide, error #418).
+  const enNavegador = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [datos, setDatos] = useState(inicial);
   const [filtro, setFiltro] = useState<Filtro>(abrirInicial ? "todas" : "sinResponder");
   const [numero, setNumero] = useState<string>("todos");
@@ -324,7 +331,7 @@ export function Bandeja({
   }, [deNumero, filtro, buscar, miId, elegido]);
 
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
-  const ventana = sel ? textoVentana(sel.ultimoEntranteEn) : null;
+  const ventana = sel && enNavegador ? textoVentana(sel.ultimoEntranteEn) : null;
   const esNota = modo === "nota";
   const bloqueado = !escribe || (!esNota && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
@@ -489,7 +496,7 @@ export function Bandeja({
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5 border-b border-[var(--wa-borde)] py-3 pr-3.5">
                     <span className="flex items-baseline gap-2">
                       <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
-                      <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{horaCorta(c.ultimoMensajeEn)}</span>
+                      <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
                     </span>
                     <span className="flex items-center gap-1.5 text-sm text-[var(--wa-sec)]">
                       {c.ultimoDe === "saliente" && <Palomitas estado="entregado" />}
@@ -598,15 +605,17 @@ export function Bandeja({
           </div>
 
           <div ref={chatRef} className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
-            <p
-              className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
-                ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
-              }`}
-            >
-              {ventana
-                ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
-                : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada (próximamente). Las notas privadas sí se pueden dejar."}
-            </p>
+            {enNavegador && (
+              <p
+                className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
+                  ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
+                }`}
+              >
+                {ventana
+                  ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
+                  : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada (próximamente). Las notas privadas sí se pueden dejar."}
+              </p>
+            )}
             {mensajes && chat?.hayAnteriores && (
               <button
                 type="button"
