@@ -5,9 +5,23 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { supabase } from "@/lib/supabase/client";
+import { ACEPTAR_WHATSAPP, BUCKET_WHATSAPP, MAX_BYTES_WHATSAPP } from "@/lib/whatsapp/archivos";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, notaWhatsapp, obtenerBandeja, pasarConversacionDeArea, tomarConversacion } from "./actions";
+import {
+  abrirConversacion,
+  cambiarEstadoConversacion,
+  conectarWebhook360,
+  descartarArchivoWhatsapp,
+  enviarWhatsapp,
+  mandarArchivoWhatsapp,
+  notaWhatsapp,
+  obtenerBandeja,
+  pasarConversacionDeArea,
+  prepararArchivoWhatsapp,
+  tomarConversacion,
+} from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
 
 /** Qué conversaciones se ven: las pestañas de siempre o, con más de un área, las de un área. */
@@ -62,7 +76,20 @@ function etiquetaDia(iso: string): string {
   return d.toLocaleDateString("es-PA", { weekday: "long", day: "numeric", month: "short" });
 }
 
-const ESTADO_SALIENTE: Record<string, string> = { enviando: "Enviando", enviado: "Enviado ✓", entregado: "Entregado ✓✓", leido: "Leído ✓✓", fallido: "No se entregó" };
+/** «2,4 MB», «850 KB». */
+const peso = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("es-PA", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
+/** Antes de subir: el motivo si el archivo seguro no se puede mandar por WhatsApp (el servidor lo revisa de nuevo por su contenido). */
+function motivoArchivo(f: File): string | null {
+  const tipo = f.type.toLowerCase();
+  if (tipo === "video/quicktime") return "Los videos .MOV no se pueden mandar por WhatsApp: expórtalo como MP4.";
+  if (tipo.startsWith("image/") && tipo !== "image/jpeg" && tipo !== "image/png") return "Por WhatsApp las fotos van en JPG o PNG.";
+  const max = tipo.startsWith("image/") ? MAX_BYTES_WHATSAPP.image : tipo.startsWith("video/") ? MAX_BYTES_WHATSAPP.video : MAX_BYTES_WHATSAPP.document;
+  if (f.size > max) return `Pesa ${peso(f.size)}: por WhatsApp ${tipo.startsWith("image/") ? "las fotos pesan" : tipo.startsWith("video/") ? "los videos pesan" : "los archivos pesan"} hasta ${peso(max)}.`;
+  return null;
+}
+
+const ESTADO_SALIENTE: Record<string, string> ={ enviando: "Enviando", enviado: "Enviado ✓", entregado: "Entregado ✓✓", leido: "Leído ✓✓", fallido: "No se entregó" };
 
 /** La etiqueta de color de un área, con su punto. */
 function EtiquetaArea({ area }: { area: AreaCrm }) {
@@ -135,6 +162,9 @@ export function Bandeja({
   const [modo, setModo] = useState<"responder" | "nota">("responder");
   const [borrador, setBorrador] = useState("");
   const [menuArea, setMenuArea] = useState(false);
+  /** La foto, video o documento que se va a mandar con el texto como pie (solo al responder, no en notas). */
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const entradaArchivo = useRef<HTMLInputElement>(null);
   const [enviando, empezar] = useTransition();
   const finRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -217,17 +247,47 @@ export function Bandeja({
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
 
+  const conArchivo = !esNota && archivo !== null;
+
+  function elegirArchivo(f: File | undefined) {
+    if (!f) return;
+    const motivo = motivoArchivo(f);
+    if (motivo) {
+      mostrarToast(motivo, "destructive");
+      return;
+    }
+    setArchivo(f);
+    textoRef.current?.focus();
+  }
+
   function mandar() {
-    if (!sel || !borrador.trim() || bloqueado) return;
+    if (!sel || bloqueado || (!borrador.trim() && !conArchivo)) return;
     const texto = borrador;
+    const id = sel.id;
+    const adjunto = conArchivo ? archivo : null;
     empezar(async () => {
-      const r = await (esNota ? notaWhatsapp(sel.id, texto) : enviarWhatsapp(sel.id, texto)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      let r: { ok: true } | { error: string };
+      if (adjunto) {
+        // El navegador sube el archivo al bucket con un permiso firmado y el servidor lo revisa y lo manda (actions.ts).
+        const permiso = await prepararArchivoWhatsapp(id, adjunto.name || "archivo", adjunto.size).catch(() => ({ error: "No se pudo preparar la subida." }));
+        if ("error" in permiso) r = permiso;
+        else {
+          const subida = await supabase.storage.from(BUCKET_WHATSAPP).uploadToSignedUrl(permiso.ruta, permiso.token, adjunto, { contentType: adjunto.type || "application/octet-stream" });
+          if (subida.error) {
+            r = { error: "No se pudo subir el archivo. Revisa tu conexión e inténtalo de nuevo." };
+            void descartarArchivoWhatsapp(id, permiso.ruta);
+          } else r = await mandarArchivoWhatsapp(id, permiso.ruta, adjunto.name || "archivo", texto).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+        }
+      } else {
+        r = await (esNota ? notaWhatsapp(id, texto) : enviarWhatsapp(id, texto)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      }
       if ("error" in r) {
         mostrarToast(r.error, "destructive");
         return;
       }
       setBorrador("");
-      await refrescar(sel.id);
+      setArchivo(null);
+      await refrescar(id);
     });
   }
 
@@ -356,6 +416,7 @@ export function Bandeja({
                 onClick={() => {
                   setElegido(c.id);
                   setMenuArea(false);
+                  setArchivo(null);
                   setChat((x) => (x?.id === c.id ? x : null));
                   // Al abrirla queda leída (el servidor la marca en `abrirConversacion`).
                   setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
@@ -505,6 +566,20 @@ export function Bandeja({
                   Nota privada
                 </button>
               </div>
+              {conArchivo && archivo && (
+                <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-muted px-2.5 py-2">
+                  <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-primario-suave text-[10px] font-bold text-primario">
+                    {archivo.type.startsWith("image/") ? "FOTO" : archivo.type.startsWith("video/") ? "VIDEO" : "DOC"}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[13px] font-medium">{archivo.name}</span>
+                    <span className="text-[11.5px] text-muted-foreground">{peso(archivo.size)} · el texto de abajo va como pie</span>
+                  </span>
+                  <button type="button" onClick={() => setArchivo(null)} disabled={enviando} className={`rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-card hover:text-foreground ${anilloFoco}`}>
+                    Quitar
+                  </button>
+                </div>
+              )}
               <label className="sr-only" htmlFor="mensaje-chat">
                 {esNota ? "Nota privada" : "Mensaje"}
               </label>
@@ -521,13 +596,54 @@ export function Bandeja({
                     mandar();
                   }
                 }}
-                placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : ventana ? `Escribe a ${sel.nombre.split(" ")[0]}… (Ctrl + Enter envía)` : "Fuera de las 24 h: hace falta una plantilla aprobada"}
+                onPaste={(e) => {
+                  // Pegar una captura la deja lista para mandar.
+                  const f = esNota ? undefined : e.clipboardData.files[0];
+                  if (f) {
+                    e.preventDefault();
+                    elegirArchivo(f);
+                  }
+                }}
+                placeholder={
+                  esNota
+                    ? "Nota para el equipo. El dropshipper no la ve."
+                    : !ventana
+                      ? "Fuera de las 24 h: hace falta una plantilla aprobada"
+                      : conArchivo
+                        ? "Texto que acompaña el archivo (opcional)"
+                        : `Escribe a ${sel.nombre.split(" ")[0]}… (Ctrl + Enter envía; pega o adjunta una foto)`
+                }
                 className={`min-h-16 w-full resize-y rounded-[10px] border px-3 py-2 text-sm disabled:opacity-60 ${esNota ? "border-transparent bg-warning-soft text-warning placeholder:text-warning/70" : "border-border bg-card"} ${anilloFoco}`}
               />
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {!esNota && !bloqueado && (
+                    <>
+                      <input
+                        ref={entradaArchivo}
+                        type="file"
+                        accept={ACEPTAR_WHATSAPP}
+                        aria-label="Elegir foto, video o documento"
+                        className="sr-only"
+                        tabIndex={-1}
+                        onChange={(e) => {
+                          elegirArchivo(e.target.files?.[0]);
+                          e.target.value = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={enviando}
+                        onClick={() => entradaArchivo.current?.click()}
+                        className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11.5px] font-medium text-foreground-soft hover:bg-muted disabled:opacity-50 ${anilloFoco}`}
+                      >
+                        📎 Foto, video o documento
+                      </button>
+                    </>
+                  )}
                   {!esNota &&
                     !bloqueado &&
+                    !conArchivo &&
                     RAPIDAS.map((r) => (
                       <button
                         key={r}
@@ -544,11 +660,11 @@ export function Bandeja({
                 </div>
                 <button
                   type="button"
-                  disabled={enviando || bloqueado || !borrador.trim()}
+                  disabled={enviando || bloqueado || (!borrador.trim() && !conArchivo)}
                   onClick={mandar}
                   className={`boton-neon inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-transparent px-4 text-[13px] font-semibold text-white disabled:opacity-50 ${anilloFoco}`}
                 >
-                  {enviando ? "Enviando…" : esNota ? "Guardar nota" : "Enviar"}
+                  {enviando ? (conArchivo ? "Subiendo…" : "Enviando…") : esNota ? "Guardar nota" : "Enviar"}
                 </button>
               </div>
             </div>

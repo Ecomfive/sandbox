@@ -1,6 +1,8 @@
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
+import { BUCKET_WHATSAPP, extensionDeMime } from "./archivos";
 import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante } from "./extraer";
+import { bajarArchivoWhatsapp } from "./media";
 
 /**
  * Guarda los mensajes que llegan por el webhook (migración 0158): cada uno en su conversación (número de la empresa + teléfono del
@@ -32,7 +34,29 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
       p_resumen: resumenMensaje(m.tipo, m.texto),
     });
     if (error) console.error(`WhatsApp: no se pudo guardar un mensaje${desdeCelular ? " mandado desde el celular" : ""}`, m.waId, error.message);
+    else if (m.mediaId) await copiarAlBucket(m.waId, m.mediaId, m.mediaMime);
   }
+}
+
+/** Los tipos que se guardan con su tipo real (se muestran en la bandeja); cualquier otro queda como archivo para descargar. */
+const SE_MUESTRAN = /^(image\/(jpeg|png|webp|gif)|audio\/(ogg|mpeg|mp4|aac|amr)|video\/(mp4|3gpp)|application\/pdf)$/;
+
+/**
+ * Copia al bucket del sistema (migración 0169, `entrantes/`) un archivo que llegó por WhatsApp, porque Meta solo lo guarda unos 30
+ * días. Si no se puede (el sandbox no entrega archivos, o Meta falla), el mensaje queda como antes: se baja de Meta al abrirlo.
+ */
+async function copiarAlBucket(waId: string, mediaId: string, mime: string | null): Promise<void> {
+  const r = await bajarArchivoWhatsapp(mediaId);
+  if ("error" in r) return;
+  const tipo = String(r.mime || mime || "").split(";")[0].trim().toLowerCase();
+  const ruta = `entrantes/${waId.replace(/[^\w.-]+/g, "_").slice(0, 160)}.${extensionDeMime(tipo)}`;
+  const supabase = createServiceClient();
+  const { error } = await supabase.storage.from(BUCKET_WHATSAPP).upload(ruta, r.bytes, { contentType: SE_MUESTRAN.test(tipo) ? tipo : "application/octet-stream", upsert: true });
+  if (error) {
+    console.error("WhatsApp: no se pudo copiar un archivo al bucket", waId, error.message);
+    return;
+  }
+  await supabase.from("whatsapp_mensajes").update({ media_ruta: ruta }).eq("wa_id", waId).is("media_ruta", null);
 }
 
 /** Los estados de los mensajes que mandó el equipo. Un estado nunca vuelve atrás; un «fallido» se guarda con su motivo. */

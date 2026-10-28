@@ -144,12 +144,23 @@ export async function cargarConversacion(
   dropshipperId: string | null,
 ): Promise<{ mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null }> {
   const [mensajesR, dsR, casosR] = await Promise.all([
+    // `media_ruta` es de la migración 0169: sin ella se leen los mensajes igual (los archivos se bajan de Meta).
     supabase
       .from("whatsapp_mensajes")
-      .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_nombre, momento")
+      .select("id, direccion, tipo, texto, media_id, media_ruta, media_nombre, estado, error, autor_nombre, momento")
       .eq("conversacion_id", id)
       .order("momento", { ascending: false })
-      .limit(300),
+      .limit(300)
+      .then((r) =>
+        r.error
+          ? supabase
+              .from("whatsapp_mensajes")
+              .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_nombre, momento")
+              .eq("conversacion_id", id)
+              .order("momento", { ascending: false })
+              .limit(300)
+          : r,
+      ),
     dropshipperId
       ? supabase.from("dropshippers").select("id, nombre, codigo, estado, tiendas, tienda, dropshipper_cuentas(plataformas(nombre), paises(codigo))").eq("id", dropshipperId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -164,7 +175,7 @@ export async function cargarConversacion(
       tipo: m.tipo as string,
       texto: (m.texto as string | null) ?? null,
       mediaNombre: (m.media_nombre as string | null) ?? null,
-      conArchivo: !!m.media_id,
+      conArchivo: !!(m.media_id || (m as { media_ruta?: string | null }).media_ruta),
       estado: m.estado as string,
       error: (m.error as string | null) ?? null,
       autor: (m.autor_nombre as string | null) ?? null,
