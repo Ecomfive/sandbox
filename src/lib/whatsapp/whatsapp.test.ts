@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
 import { urlDescarga360 } from "./proveedor";
-import { errorEnEspanol, minutosVentana, textoVentana } from "./ventana";
+import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
 
 const aviso = (value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value }] }] });
 const META = { display_phone_number: "50760000000", phone_number_id: "1234567890" };
@@ -99,6 +99,18 @@ test("la ventana de 24 h: cuánto queda desde el último mensaje del dropshipper
   assert.equal(textoVentana("2026-10-25T19:59:00Z", ahora), null);
   assert.match(errorEnEspanol(131047, "x"), /24 h/);
   assert.equal(errorEnEspanol(null, "Algo"), "WhatsApp no lo envió: Algo");
+});
+
+test("un envío rechazado dice el motivo, venga de Meta, de 360dialog o como texto", () => {
+  // Meta: el detalle del error manda sobre el mensaje genérico.
+  assert.deepEqual(leerErrorEnvio(400, { error: { code: 131047, message: "Re-engagement message", error_data: { details: "Más de 24 horas" } } }), { codigo: 131047, mensaje: "Más de 24 horas" });
+  // 360dialog con su propia forma.
+  assert.deepEqual(leerErrorEnvio(400, { meta: { success: false, http_code: 400, developer_message: "Phone number not registered" } }), { codigo: null, mensaje: "Phone number not registered" });
+  assert.deepEqual(leerErrorEnvio(400, { errors: [{ code: 1013, title: "User is not valid" }] }), { codigo: 1013, mensaje: "User is not valid" });
+  // Un texto suelto o nada.
+  assert.equal(leerErrorEnvio(502, "Bad Gateway").mensaje, "Bad Gateway");
+  assert.equal(leerErrorEnvio(500, null).mensaje, "código 500");
+  assert.equal(errorEnEspanol(null, leerErrorEnvio(500, null).mensaje), "WhatsApp no lo envió: código 500");
 });
 
 test("coexistencia: lo que el equipo manda desde el celular llega como eco, con el teléfono del dropshipper", () => {

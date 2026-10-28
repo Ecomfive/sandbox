@@ -1,5 +1,5 @@
 import { config360, urlMensajes360 } from "./proveedor";
-import { errorEnEspanol } from "./ventana";
+import { errorEnEspanol, leerErrorEnvio } from "./ventana";
 
 /**
  * El envío de un texto desde un número de la empresa (`phoneNumberId`) a un dropshipper. Con 360dialog configurado (`D360_API_KEY`,
@@ -31,10 +31,19 @@ export async function enviarTextoWhatsapp(phoneNumberId: string, para: string, c
   } catch {
     return { error: "No se pudo conectar con WhatsApp. Inténtalo de nuevo." };
   }
-  const j = (await r.json().catch(() => null)) as { messages?: { id?: string }[]; error?: { code?: number; message?: string } } | null;
-  const waId = j?.messages?.[0]?.id;
+  const crudo = await r.text().catch(() => "");
+  let j: unknown = crudo;
+  try {
+    j = JSON.parse(crudo);
+  } catch {
+    // Sin JSON: el texto tal cual sirve de motivo.
+  }
+  const waId = (j as { messages?: { id?: string }[] } | null)?.messages?.[0]?.id;
   if (r.ok && waId) return { waId };
+  // En los registros de Vercel queda la respuesta tal cual (no lleva claves: solo el motivo de WhatsApp o de 360dialog).
+  console.error(`[whatsapp] envío rechazado por ${d360 ? "360dialog" : "Meta"} (${r.status}): ${crudo.slice(0, 800)}`);
   if (d360 && r.status === 429) return { error: "360dialog no deja mandar más mensajes por ahora (en el sandbox, el límite es de 200)." };
   if (d360 && r.status === 401) return { error: "360dialog rechazó la clave (D360_API_KEY). Revísala en el servidor." };
-  return { error: errorEnEspanol(j?.error?.code ?? null, j?.error?.message ?? null) };
+  const motivo = leerErrorEnvio(r.status, j);
+  return { error: errorEnEspanol(motivo.codigo, motivo.mensaje) };
 }
