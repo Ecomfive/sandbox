@@ -17,6 +17,13 @@ type Obj = Record<string, unknown>;
 export const CDN_FOTOS_DROPI = "https://d39ru7awumhhs2.cloudfront.net";
 
 /**
+ * Cada país de Dropi tiene su propio CDN de fotos (28 oct 2026: las de Costa Rica, «costarica/products/…», dan 403 en el de Panamá y
+ * están en `d3sk39qh2f4j46`). Se elige por la carpeta del país con que empieza la ruta; sin carpeta conocida, el de Panamá.
+ */
+export const CDN_FOTOS_PAIS: Record<string, string> = { "costarica/": "https://d3sk39qh2f4j46.cloudfront.net" };
+export const cdnDeRuta = (ruta: string) => Object.entries(CDN_FOTOS_PAIS).find(([carpeta]) => ruta.startsWith(carpeta))?.[1] ?? CDN_FOTOS_DROPI;
+
+/**
  * El cuerpo del `POST api/products` que crea el producto nuevo: el del guardado del viejo tal cual, sin ID, sin reservas a privados
  * y con el stock que tiene hoy en cada bodega. Error si no se puede republicar: con variaciones, con stock en una bodega que no es
  * del proveedor (la B280 de Dropi), con unidades privatizadas o con porcentajes por dropshipper (no se copian bien: a mano).
@@ -68,7 +75,7 @@ export function stockPorBodega(producto: Obj): Record<string, number> {
 
 /** Las fotos del producto que se copian, la principal primero, con su dirección en el CDN (o la `url` completa si no tiene `urlS3`). */
 /** La carpeta de las fotos de cada país en el CDN de Dropi, por si ninguna foto del producto la dice (25 oct 2026, el 10474). */
-export const CARPETA_FOTOS_PAIS: Record<string, string> = { pa: "panama/products/" };
+export const CARPETA_FOTOS_PAIS: Record<string, string> = { pa: "panama/products/", cr: "costarica/products/" };
 
 /**
  * Qué foto es, sin importar cuántas veces Dropi le antepuso su número de subida («1779932274» + nombre: una republicación o un reintento
@@ -102,15 +109,15 @@ export function fotosParaCopiar(producto: Obj, pais?: string): { url: string; no
     .map((f) => {
       const s3 = String(f.urlS3 ?? "").trim();
       const u = String(f.url ?? "").trim();
-      const url = s3 ? `${CDN_FOTOS_DROPI}/${encodeURI(s3)}` : /^https?:\/\//i.test(u) ? u : "";
+      const url = s3 ? `${cdnDeRuta(s3)}/${encodeURI(s3)}` : /^https?:\/\//i.test(u) ? u : "";
       const nombre = (s3 || u).split("/").pop() || "foto.jpg";
       // Sin `urlS3`, la dirección de Dropi puede no dejarse bajar desde su pantalla (25 oct 2026: una foto del 10474 dio «Failed
       // to fetch»): se prueba también la misma ruta en el CDN y la carpeta del producto en el CDN.
       const alternas: string[] = [];
       if (!s3 && url) {
         const ruta = /^https?:\/\/[^/]+\/(.+)$/i.exec(u)?.[1] ?? "";
-        if (/products\//.test(ruta)) alternas.push(`${CDN_FOTOS_DROPI}/${ruta}`);
-        if (carpeta) alternas.push(`${CDN_FOTOS_DROPI}/${carpeta}${producto.id}/${encodeURI(nombre)}`);
+        if (/products\//.test(ruta)) alternas.push(`${cdnDeRuta(ruta)}/${ruta}`);
+        if (carpeta) alternas.push(`${cdnDeRuta(carpeta)}/${carpeta}${producto.id}/${encodeURI(nombre)}`);
       }
       return { url, nombre, main: f.main === true, alternas: alternas.filter((a, i) => a !== url && alternas.indexOf(a) === i) };
     })
@@ -121,6 +128,8 @@ export function fotosParaCopiar(producto: Obj, pais?: string): { url: string; no
 /** Lo mismo en JavaScript simple para el favorito (va después de `ARMAR_JS`, que define `armar`). La prueba compara los dos. */
 export const REPUBLICAR_JS = [
   "var CDN=" + JSON.stringify(CDN_FOTOS_DROPI) + ";",
+  // El CDN de cada país (`cdnDeRuta`): Costa Rica tiene el suyo.
+  "var CDNP=" + JSON.stringify(CDN_FOTOS_PAIS) + ";function cdnR(r){for(var k in CDNP)if(String(r).indexOf(k)===0)return CDNP[k];return CDN}",
   "function nuevo(o,bp,p){var r=armar(o,bp,{nombre:null,nombreGuia:null,precio:p&&p.precio!=null?p.precio:null,precioSugerido:p&&p.precioSugerido!=null?p.precioSugerido:null});if(r.error)return r;",
   "var pr={};bp.forEach(function(p){pr[Number(p.id)]=1});",
   "var wp=Array.isArray(o.warehouse_product)?o.warehouse_product:[];",
@@ -140,8 +149,8 @@ export const REPUBLICAR_JS = [
   "function fotosDe(o){var g=Array.isArray(o.gallery)?o.gallery:[],ca=null;g.forEach(function(f){var m=/^(.*?products\\/)\\d+\\//.exec(String(f.urlS3!=null?f.urlS3:'').trim());if(!ca&&m&&m[1])ca=m[1]});",
   "if(!ca&&typeof P==='string'&&CARPETAS[P])ca=CARPETAS[P];",
   "return g.filter(function(f){return!f.variation_id}).map(function(f){",
-  "var s=String(f.urlS3!=null?f.urlS3:'').trim(),u=String(f.url!=null?f.url:'').trim(),url=s?CDN+'/'+encodeURI(s):(/^https?:\\/\\//i.test(u)?u:''),nombre=(s||u).split('/').pop()||'foto.jpg',al=[];",
-  "if(!s&&url){var m=/^https?:\\/\\/[^/]+\\/(.+)$/i.exec(u),ru=m?m[1]:'';if(/products\\//.test(ru))al.push(CDN+'/'+ru);if(ca)al.push(CDN+'/'+ca+o.id+'/'+encodeURI(nombre))}",
+  "var s=String(f.urlS3!=null?f.urlS3:'').trim(),u=String(f.url!=null?f.url:'').trim(),url=s?cdnR(s)+'/'+encodeURI(s):(/^https?:\\/\\//i.test(u)?u:''),nombre=(s||u).split('/').pop()||'foto.jpg',al=[];",
+  "if(!s&&url){var m=/^https?:\\/\\/[^/]+\\/(.+)$/i.exec(u),ru=m?m[1]:'';if(/products\\//.test(ru))al.push(cdnR(ru)+'/'+ru);if(ca)al.push(cdnR(ca)+'/'+ca+o.id+'/'+encodeURI(nombre))}",
   "return{url:url,nombre:nombre,main:f.main===true,alternas:al.filter(function(a,i){return a!==url&&al.indexOf(a)===i})}",
   "}).filter(function(f){return f.url}).sort(function(a,b){return Number(b.main)-Number(a.main)})}",
 ].join("");

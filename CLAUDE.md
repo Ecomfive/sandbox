@@ -547,6 +547,11 @@ convenciones técnicas del código.
   chrome://extensions. **Sin la extensión** (navegador integrado): `scripts/dropi-diario.ts subida cr` / `cargar cr` y
   `scripts/ventas-dropi.ts subida cr` / `cargar cr` hacen lo mismo con Costa Rica (otra carpeta temporal y otros archivos, nunca se
   cruzan con Panamá; la primera vez `dropiDiario(subida, { pedidos: 58, cartera: 58 })` para traer desde el 1 de septiembre).
+  **Cada país tiene su CDN de fotos** (28 oct 2026, primera carga de Costa Rica: ninguna foto se copió): las de Costa Rica
+  («costarica/products/…») dan 403 en `CDN_FOTOS_DROPI` (Panamá) y están en `d3sk39qh2f4j46.cloudfront.net`. `CDN_FOTOS_PAIS` /
+  `cdnDeRuta` (`republicar-dropi.ts`) eligen el CDN por la carpeta del país; `fotosParaCopiar` y su gemela del favorito (`cdnR` en
+  `REPUBLICAR_JS`, con prueba) los usan. Cambia `VERSION_FAVORITO`: hay que volver a arrastrar «Aplicar en Dropi». Lo demás que usa
+  `CDN_FOTOS_DROPI` (el proxy `api/publicaciones-dropi/foto`, Descubrir proveedores, Scraping) sigue solo con Panamá.
   **Retomar una actualización a medias** (27 oct 2026, pedido de Hernán: se recargó la página y la de las 12:47 quedó «en curso» sin
   barra). La corrida la conduce la página (`correr` en `panel-actualizar.tsx`): al abrir el panel con una corrida `corriendo` de menos de
   40 minutos (`VIGENCIA_MS`, igual que `empezarActualizacion`) la retoma sola: arma la barra con las partes ya guardadas, y por cada lector

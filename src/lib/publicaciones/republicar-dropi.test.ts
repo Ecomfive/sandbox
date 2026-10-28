@@ -81,6 +81,22 @@ test("el favorito arma exactamente lo mismo que el sistema", () => {
   }
 });
 
+test("fotos de Costa Rica: se bajan de su propio CDN, en el sistema y en el favorito", () => {
+  const cr: Obj = {
+    id: 309,
+    gallery: [
+      { urlS3: "costarica/products/309/177594143873dadcb7.png", main: true, variation_id: null },
+      { url: "https://otro.example.com/costarica/products/309/sin-s3.jpg", main: false, variation_id: null },
+    ],
+  };
+  const f = fotosParaCopiar(cr);
+  assert.equal(f[0].url, "https://d3sk39qh2f4j46.cloudfront.net/costarica/products/309/177594143873dadcb7.png");
+  assert.ok(f[1].alternas.every((a) => a.startsWith("https://d3sk39qh2f4j46.cloudfront.net/costarica/")));
+  igual(delFavorito.fotosDe(cr), f);
+  // Panamá sigue en el suyo.
+  assert.ok(fotosParaCopiar(veganic)[0].url.startsWith(`${CDN_FOTOS_DROPI}/panama/`));
+});
+
 test("el favorito republica solo lo que viene marcado «republicar» y sube fotos al mismo endpoint de Dropi", () => {
   const codigo = decodeURIComponent(marcadorAplicarDropi("https://sistema.ecomfive.io").slice("javascript:".length));
   assert.ok(codigo.includes("if(c.tipo==='republicar')return republicar(c,bp);"));
