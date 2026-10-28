@@ -18,6 +18,8 @@ export interface PendientesHoy {
   tareasAtrasadas: number;
   /** Proveedores de IA (OpenAI, Gemini) cuyo crédito estimado bajó del monto de aviso o se agotó (migración 0134). */
   creditosIA: number;
+  /** Productos que se quedaron sin stock en Dropi y Compras todavía no revisa (migración 0167). */
+  sinStockPorRevisar: number;
 }
 
 async function contarNovedades(supabase: SupabaseClient, paisId: string): Promise<{ count: number | null }> {
@@ -57,6 +59,7 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
     { count: competidoresNuevos },
     { count: tareasAtrasadas },
     creditosIA,
+    { count: sinStockPorRevisar },
   ] = await Promise.all([
     supabase
       .from("alertas_inventario_no_retornado")
@@ -81,6 +84,8 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
       .lt("plazo", new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" })),
     // Sin la migración 0134 no hay crédito registrado y cuenta cero.
     creditosPorAcabarse(supabase).catch(() => []),
+    // Sin la migración 0167 la consulta falla y cuenta cero.
+    supabase.from("compras_alertas_sin_stock").select("*", { count: "exact", head: true }).eq("pais_id", paisId).eq("estado", "abierta"),
   ]);
 
   const plataformasConSaldo = new Set((saldos ?? []).map((s) => s.plataforma_id));
@@ -98,6 +103,7 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
     competidoresNuevos: competidoresNuevos ?? 0,
     tareasAtrasadas: tareasAtrasadas ?? 0,
     creditosIA: creditosIA.length,
+    sinStockPorRevisar: sinStockPorRevisar ?? 0,
   };
 }
 

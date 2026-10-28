@@ -9,6 +9,7 @@ import { puedeVerPais } from "@/lib/paises-permitidos";
  */
 export const MODULO_DE_ENTIDAD: Record<string, string> = {
   puestos: "puestos",
+  compras_alertas_sin_stock: "compras",
   skus_maestros: "producto",
   dropshippers: "crm-dropshippers",
   wms_compras: "compras",

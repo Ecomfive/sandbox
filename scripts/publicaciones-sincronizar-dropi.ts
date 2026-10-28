@@ -14,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { copiarFotosDropi } from "./publicaciones-copiar-fotos";
+import { revisarSinStock } from "../src/lib/compras/sin-stock-datos";
 import {
   bodegasEnOrden,
   cambiosDesdeDropi,
@@ -168,7 +169,15 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     }),
     "Lectura",
   );
-  return { ...resumen, fotos, detalle };
+  // Compras › Sin stock (migración 0167): con el stock nuevo se abren las alertas de lo que se quedó sin stock y se cierran las de lo que
+  // volvió a tener. Un problema aquí no tumba la lectura: queda en el resumen.
+  let sinStock: Awaited<ReturnType<typeof revisarSinStock>>;
+  try {
+    sinStock = await revisarSinStock(supabase, { id: pais.id, codigo });
+  } catch (e) {
+    sinStock = { error: String((e as Error)?.message ?? e) };
+  }
+  return { ...resumen, fotos, sinStock, detalle };
 }
 
 // Uso directo con un archivo guardado.

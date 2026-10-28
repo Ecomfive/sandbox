@@ -96,6 +96,15 @@ const PENDIENTES: {
     accion: "Revisar",
   },
   {
+    clave: "sin-stock",
+    modulo: "compras",
+    campo: "sinStockPorRevisar",
+    titulo: "Productos sin stock en Dropi",
+    descripcion: "Se quedaron sin stock: Compras revisa el inventario manual y decide si compra",
+    href: "/compras/sin-stock",
+    accion: "Revisar",
+  },
+  {
     clave: "creditos-ia",
     modulo: "publicaciones-dropi",
     campo: "creditosIA",

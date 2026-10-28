@@ -1309,6 +1309,14 @@ convenciones técnicas del código.
   el histórico (atenuadas, con su etapa), pero ningún total las cuenta. Toda suma nueva de compras por producto, país, proveedor o mes debe
   aplicarla (ya la tienen `por-categoria`, `unidades-mes`, `en-camino` y, desde ahora, `datos-producto` y `compras-producto`). Si ves un total de
   compras que incluye una descartada, es este mismo error: arréglalo con esta regla.
+- **Compras › Sin stock** (`/compras/sin-stock`, pestaña `sin-stock` de `CATALOGO_COMPRAS`, migración 0167, 27 oct 2026, pedido de Alcides): mientras el
+  inventario no está conectado, `guardarNuestrosProductos` (la lectura de «Mis productos» de las 7:00 y de «Actualizar datos») llama a
+  `revisarSinStock` (`src/lib/compras/sin-stock-datos.ts`; lógica pura y prueba en `sin-stock.ts`): un producto = el producto vinculado de sus
+  publicaciones vivas (no archivadas del todo; una pausada cuenta) con todos sus IDs, o el ID de Dropi sin vincular; stock = público + privado de la
+  lectura. Sin stock y sin alerta viva → `compras_alertas_sin_stock` abierta (una viva por `clave` y país) y aviso «Para ti» tipo `sin_stock` a quienes
+  pueden **modificar** Compras y ven el país (`armarPersonasConAcceso`); vuelve a tener stock → se cierra sola (`volvio_stock`). Compras la revisa
+  (`revisarAlertaSinStock`: Comprar / Hay inventario manual / No reponer + nota, auditoría `revisar_sin_stock`). Cuenta en «Hoy», «Avisos» y el menú
+  (`PendientesHoy.sinStockPorRevisar`). La primera lectura abre una alerta por cada producto que ya estaba sin stock.
 - **Compras › Dashboard** (`/compras/dashboard`, `dashboard-compras.tsx`): toda la operación a la vez con **filtros que se
   cruzan** (fechas de creación, país, proveedor, vía, tienda, responsable, etapa, solo abiertas): pulsar un mes de la gráfica,
   una etapa o una fila de «Comparar por» pone ese filtro y lo vuelve a quitar; los filtros activos se ven como chips.
