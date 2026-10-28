@@ -44,6 +44,8 @@
   /* Los niveles de acceso de Usuarios y roles cuando están elegidos (relleno sólido con texto blanco, ≥ 4,5:1 en los dos temas). */
   --nivel-lectura: #1d4ed8;
   --nivel-edicion: #8a35c9;
+  /* Insignia «Privado» de Gestión de IDs Dropi: violeta sólido con texto blanco (6,1:1), igual en los dos temas. */
+  --privado: #8a35c9;
   --sin-acceso: #c9c6d1;
 }
 
@@ -75,6 +77,7 @@
   --color-primario-suave: var(--primario-suave);
   --color-nivel-lectura: var(--nivel-lectura);
   --color-nivel-edicion: var(--nivel-edicion);
+  --color-privado: var(--privado);
   --color-sin-acceso: var(--sin-acceso);
   --font-sans: var(--font-inter);
 }
@@ -110,6 +113,7 @@
   --azul-soft: #172554;
   --nivel-lectura: #2563eb;
   --nivel-edicion: #8a35c9;
+  --privado: #8a35c9;
   --sin-acceso: #4a4a52;
 }
 

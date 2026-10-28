@@ -146,13 +146,14 @@ const CODIGO = [
   "function tiene(n,nom){var k=ck(nom);return fotosDe(n).some(function(g){return ck(g.nombre)===k})}",
   // Sube a un producto las fotos que le falten; devuelve cuántas no se pudieron subir.
   "async function subirFotos(id,n,fs,principal){var mal=0;fs=unicas(fs);for(var i=0;i<fs.length;i++){if(tiene(n,fs[i].nombre))continue;if(!(await subir(id,{url:fs[i].url,nombre:fs[i].nombre,main:principal&&i===0})))mal++}return mal}",
-  // Archivar (o sacar de Archivados) un producto en Dropi: `archiveProduct` / `unarchive`, y se vuelve a leer para comprobar.
+  // Archivar (o sacar de Archivados) un producto en Dropi: `archiveProduct` / `activateProduct` (las que llama el botón de «Mis productos»; se vuelve a leer para
+  // comprobar). **No `unarchive`**: Dropi responde bien a esa ruta pero no desarchiva (28 oct 2026, el 8537 «Truly Jelly Booster» quedó archivado).
   "async function archivar(c){",
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
   "var quiere=c.restaurar!==true;if(!!o.archived===quiere)return{ok:true};",
-  "var r=await pedir('/products/'+c.producto+(quiere?'/archiveProduct':'/unarchive'),'POST',{});",
+  "var r=await pedir('/products/'+c.producto+(quiere?'/archiveProduct':'/activateProduct'),'POST',{});",
   "if(!r.ok)return{ok:false,error:motivo(r)+(quiere?' Si tiene órdenes pendientes, se reintenta en el próximo Aplicar en Dropi.':'')};",
   "var v=await pedir('/products/'+c.producto),w=v.j&&v.j.objects;",
   "if(!v.ok||!w)return{ok:false,error:'Se pidió, pero no se pudo comprobar en Dropi.'};",

@@ -121,10 +121,13 @@ function crearDropi(opciones: { usuarios?: Record<string, Obj>; fallaAsignar?: b
       productos.get(Number(m[1]))!.archived = true;
       return responder(true);
     }
-    if (metodo === "POST" && m && m[2] === "/unarchive") {
+    // Lo que hace el botón de «Mis productos» de Dropi para sacar un producto de Archivados.
+    if (metodo === "POST" && m && m[2] === "/activateProduct") {
       productos.get(Number(m[1]))!.archived = null;
       return responder(true);
     }
+    // Dropi acepta esta ruta (responde bien) pero no desarchiva: lo que le pasó al 8537 el 28 oct 2026.
+    if (metodo === "POST" && m && m[2] === "/unarchive") return responder(true);
     return responder({ isSuccess: false, message: `Ruta no simulada: ${metodo} ${ruta}` }, 404);
   };
   return { productos, llamadas, fetchFalso, stockDe, garantias, fotoPorPlataforma: true };
@@ -182,7 +185,8 @@ test("archivar: lo archiva en Dropi y lo comprueba; sacar de Archivados lo devue
   [r] = await aplicar(d, [{ ...base, id: "a3", tipo: "archivar", restaurar: true, producto: 8751 }]);
   assert.equal(r.ok, true);
   assert.ok(!d.productos.get(8751)!.archived);
-  assert.ok(d.llamadas.includes("POST /products/8751/unarchive"));
+  assert.ok(d.llamadas.includes("POST /products/8751/activateProduct"));
+  assert.ok(!d.llamadas.some((l) => l.endsWith("/unarchive")), "no usa la ruta que Dropi acepta pero no aplica");
 });
 
 test("archivar: si Dropi no deja (órdenes pendientes) queda con error y el motivo, para reintentar", async () => {
