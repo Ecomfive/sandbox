@@ -84,8 +84,8 @@ test("estados de lo que mandó el equipo: en español, y el motivo si falló", (
 });
 
 test("lo que no es de WhatsApp o viene incompleto se ignora sin romper", () => {
-  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [], ecos: [] });
-  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [], ecos: [] });
+  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [], ecos: [], revocados: [] });
+  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [], ecos: [], revocados: [] });
   assert.deepEqual(extraerAviso(aviso({ metadata: {}, messages: [{ from: "1", id: "x", type: "text", text: { body: "hola" } }] })).mensajes, []);
   assert.deepEqual(extraerAviso(aviso({ metadata: META, messages: [{ id: "sin-remitente", type: "text" }] })).mensajes, []);
 });
@@ -177,4 +177,25 @@ test("360dialog: los archivos solo se bajan de Meta, cambiados al dominio de 360
   assert.equal(urlDescarga360("https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1&ext=2"), "https://waba-v2.360dialog.io/whatsapp_business/attachments/?mid=1&ext=2");
   assert.equal(urlDescarga360("https://evil.example.com/x"), null);
   assert.equal(urlDescarga360("http://lookaside.fbsbx.com/x"), null);
+});
+
+test("un mensaje borrado «para todos» no es un mensaje nuevo: apunta al original, que se conserva", () => {
+  const { mensajes, revocados } = extraerAviso(
+    aviso({
+      metadata: META,
+      contacts: [{ wa_id: "50761112233", profile: { name: "Ana" } }],
+      messages: [
+        { from: "50761112233", id: "wamid.REVOCA", timestamp: "1700000100", type: "revoke", revoke: { original_message_id: "wamid.ORIGINAL" } },
+        { from: "50761112233", id: "wamid.NUEVO", timestamp: "1700000200", type: "text", text: { body: "hola" } },
+      ],
+    }),
+  );
+  assert.deepEqual(revocados, [{ waIdOriginal: "wamid.ORIGINAL", momento: new Date(1700000100 * 1000).toISOString() }]);
+  assert.deepEqual(mensajes.map((m) => m.waId), ["wamid.NUEVO"]);
+});
+
+test("un aviso de borrado sin el id del original se ignora", () => {
+  const { mensajes, revocados } = extraerAviso(aviso({ metadata: META, messages: [{ from: "50761112233", id: "x", type: "revoke", revoke: {} }] }));
+  assert.deepEqual(revocados, []);
+  assert.deepEqual(mensajes, []);
 });

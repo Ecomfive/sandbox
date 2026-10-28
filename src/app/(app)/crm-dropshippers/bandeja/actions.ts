@@ -172,6 +172,35 @@ export async function pasarConversacionDeArea(id: string, area: string): Promise
   return { ok: true };
 }
 
+/**
+ * Marca (o desmarca) que este chat se borró en la app de WhatsApp Business. **No borra nada**: el historial se queda en el sistema y los chats no se
+ * pueden borrar (disparador de la migración 0171). Meta no avisa cuando se borra un chat entero en la app, así que lo marca una persona; queda una nota
+ * en el chat con quién lo hizo y la auditoría.
+ */
+export async function marcarChatBorradoEnApp(id: string, borrado: boolean): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
+  const autor = u.nombre || u.email;
+  const { error } = await supabase
+    .from("whatsapp_conversaciones")
+    .update(borrado ? { borrada_en_app_en: new Date().toISOString(), borrada_en_app_por: autor } : { borrada_en_app_en: null, borrada_en_app_por: null })
+    .eq("id", id);
+  if (error) return { error: /borrada_en_app/.test(error.message) ? "Falta correr la migración 0171 (los chats no se borran)." : "No se pudo marcar el chat." };
+  await supabase.from("whatsapp_mensajes").insert({
+    conversacion_id: id,
+    direccion: "nota",
+    tipo: "texto",
+    texto: borrado ? `${autor} marcó este chat como borrado en la app de WhatsApp Business.` : `${autor} quitó la marca de «borrado en la app de WhatsApp Business».`,
+    estado: "enviado",
+    autor_id: u.id,
+    autor_nombre: autor,
+  });
+  await registrarAuditoria({ accion: "marcar_chat_borrado_app", entidad: "whatsapp_conversaciones", entidadId: id, detalle: borrado ? "Marcado como borrado en la app" : "Marca quitada" });
+  return { ok: true };
+}
+
 /** «Tomar» la conversación: queda a cargo de quien la toma (o se suelta, con `soltar`). */
 export async function tomarConversacion(id: string, soltar = false): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);

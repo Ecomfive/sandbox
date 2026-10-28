@@ -21,6 +21,15 @@ export interface MensajeEntrante {
   momento: string;
 }
 
+/**
+ * Un mensaje que su autor borró «para todos» en WhatsApp (`type: revoke`). No es un mensaje nuevo: apunta al original, que **se conserva** en
+ * el sistema y se marca como eliminado (nunca se borra).
+ */
+export interface RevocadoEntrante {
+  waIdOriginal: string;
+  momento: string;
+}
+
 export type EstadoMensaje = "enviado" | "entregado" | "leido" | "fallido";
 
 export interface EstadoEntrante {
@@ -79,11 +88,12 @@ function contenidoDe(m: Obj): Pick<MensajeEntrante, "tipo" | "texto" | "mediaId"
  * Con `sinMetadata` (avisos de 360dialog, que llegan por su propia dirección): se aceptan sin `object` y, si no traen el número de la
  * empresa (el sandbox no lo manda), se usa ese id. Quien escribe sin teléfono compartido llega con su id de usuario (`from_user_id`).
  */
-export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: MensajeEntrante[]; estados: EstadoEntrante[]; ecos: MensajeEntrante[] } {
+export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: MensajeEntrante[]; estados: EstadoEntrante[]; ecos: MensajeEntrante[]; revocados: RevocadoEntrante[] } {
   const mensajes: MensajeEntrante[] = [];
   const estados: EstadoEntrante[] = [];
   const ecos: MensajeEntrante[] = [];
-  if (obj(aviso).object !== "whatsapp_business_account" && !(sinMetadata && obj(aviso).object === undefined)) return { mensajes, estados, ecos };
+  const revocados: RevocadoEntrante[] = [];
+  if (obj(aviso).object !== "whatsapp_business_account" && !(sinMetadata && obj(aviso).object === undefined)) return { mensajes, estados, ecos, revocados };
   for (const entrada of lista(obj(aviso).entry)) {
     for (const cambio of lista(obj(entrada).changes)) {
       const campo = obj(cambio).field;
@@ -104,6 +114,12 @@ export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: 
       }
       const nombres = new Map(lista(valor.contacts).map((c) => [String(obj(c).wa_id ?? obj(c).user_id ?? ""), texto(obj(obj(c).profile).name)]));
       for (const m of lista(valor.messages).map(obj)) {
+        // Lo que alguien borra «para todos» en WhatsApp no borra nada aquí: se marca el original (guardar.ts).
+        if (String(m.type ?? "") === "revoke") {
+          const original = texto(obj(m.revoke).original_message_id);
+          if (original) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp) });
+          continue;
+        }
         const de = texto(m.from);
         // Sin teléfono compartido (BSUID): se guarda el id tal cual y se le responde con `recipient` (ver api.ts).
         const usuario = de ? null : texto(m.from_user_id);
@@ -122,7 +138,7 @@ export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: 
       }
     }
   }
-  return { mensajes, estados, ecos };
+  return { mensajes, estados, ecos, revocados };
 }
 
 const ETIQUETA_TIPO: Record<string, string> = {

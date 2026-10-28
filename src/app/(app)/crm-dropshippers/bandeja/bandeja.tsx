@@ -7,7 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, mensajesAnteriores, notaWhatsapp, obtenerBandeja, pasarConversacionDeArea, tomarConversacion } from "./actions";
+import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
@@ -29,6 +29,9 @@ const RAPIDAS = ["Ya reviso tu guía y te confirmo 👌", "¿Me compartes el nú
 
 /** La nota que deja «Pasar a otra área» (actions.ts): se dibuja como aviso del sistema, no como nota de una persona. */
 const ES_CAMBIO_DE_AREA = /^.+ pasó este chat de (Atención|Comercial|Dirección) a (Atención|Comercial|Dirección)\.$/;
+/** Las notas que deja «Marcar borrado en la app» (actions.ts): también son avisos del sistema. */
+const ES_MARCA_BORRADO = /^.+ (marcó este chat como borrado en la app de WhatsApp Business|quitó la marca de «borrado en la app de WhatsApp Business»)\.$/;
+const esAvisoDelSistema = (texto: string | null) => ES_CAMBIO_DE_AREA.test(texto ?? "") || ES_MARCA_BORRADO.test(texto ?? "");
 
 const iniciales = (nombre: string) =>
   nombre
@@ -513,10 +516,11 @@ export function Bandeja({
                         </span>
                       )}
                     </span>
-                    {(areas.length > 1 || !c.dropshipperId || c.estado === "resuelta" || c.asignadaA || datos.numeros.length > 1) && (
+                    {(areas.length > 1 || !c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || datos.numeros.length > 1) && (
                       <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
                         {areas.length > 1 && <EtiquetaArea area={c.area} />}
                         {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
+                        {c.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">Borrado en la app</span>}
                         {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
                         {datos.numeros.length > 1 && <span>{numeroDe.get(c.numeroId)?.nombre}</span>}
                         {c.asignadaA && <span>· {c.asignadaA}</span>}
@@ -560,6 +564,7 @@ export function Bandeja({
               </span>
             </button>
             <EtiquetaArea area={sel.area} />
+            {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
             {escribe && (
               <>
                 {sel.asignadaAId === miId ? (
@@ -592,6 +597,14 @@ export function Bandeja({
                 </div>
                 <button type="button" disabled={enviando} className={botonPildora} onClick={() => setImportar({ conversacion: sel })} title="Traer el historial que quedó en el celular">
                   Importar chat
+                </button>
+                <button
+                  type="button"
+                  disabled={enviando}
+                  className={botonPildora}
+                  onClick={() => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo.")}
+                >
+                  {sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app"}
                 </button>
                 {sel.estado === "abierta" ? (
                   <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
@@ -629,6 +642,11 @@ export function Bandeja({
                 )}
               </>
             )}
+            {enNavegador && sel.borradaEnApp && (
+              <p className="m-0 mb-2 max-w-[560px] self-center rounded-lg bg-warning-soft px-3 py-1.5 text-center text-[12.5px] text-warning">
+                Este chat se borró en la app de WhatsApp Business ({sel.borradaEnApp.por ? `lo marcó ${sel.borradaEnApp.por}` : "marcado"}, {etiquetaDia(sel.borradaEnApp.en)}). Aquí se conserva todo el historial.
+              </p>
+            )}
             {mensajes && chat?.hayAnteriores && (
               <button
                 type="button"
@@ -647,7 +665,7 @@ export function Bandeja({
                 const previo = mensajes[i - 1];
                 const separador = i === 0 || etiquetaDia(previo.momento) !== dia;
                 // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp).
-                const seguido = !separador && !!previo && previo.direccion === m.direccion && !ES_CAMBIO_DE_AREA.test(previo.texto ?? "");
+                const seguido = !separador && !!previo && previo.direccion === m.direccion && !esAvisoDelSistema(previo.texto);
                 return (
                   <Fragment key={m.id}>
                     {separador && (
@@ -884,7 +902,7 @@ function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
  * pegado al anterior del mismo lado, sin colita.
  */
 function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
-  if (m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? "")) {
+  if (m.direccion === "nota" && esAvisoDelSistema(m.texto)) {
     return (
       <span className="my-1.5 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
         {m.texto} · {horaMensaje(m.momento)}
@@ -917,6 +935,7 @@ function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
     >
       {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
       <Contenido m={m} />
+      {m.eliminadoEnWhatsapp && <span className="mt-1 block text-[11.5px] text-[var(--wa-sec)] italic">Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva.</span>}
       <span
         className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
       >

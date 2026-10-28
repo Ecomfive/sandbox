@@ -1,6 +1,6 @@
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
-import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante } from "./extraer";
+import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
 
 /**
  * Guarda los mensajes que llegan por el webhook (migración 0158): cada uno en su conversación (número de la empresa + teléfono del
@@ -46,5 +46,18 @@ export async function guardarEstados(estados: EstadoEntrante[]): Promise<void> {
     }
     const anteriores = ORDEN_ESTADO.slice(0, ORDEN_ESTADO.indexOf(e.estado));
     await supabase.from("whatsapp_mensajes").update({ estado: e.estado }).eq("wa_id", e.waId).in("estado", anteriores);
+  }
+}
+
+/**
+ * Marca los mensajes que su autor borró «para todos» en WhatsApp. **No se borra nada**: el texto original se queda y el chat lo muestra con la marca
+ * «eliminado en WhatsApp» (migración 0171). Un aviso repetido no cambia la hora de la primera marca.
+ */
+export async function guardarRevocados(revocados: RevocadoEntrante[]): Promise<void> {
+  if (!revocados.length) return;
+  const supabase = createServiceClient();
+  for (const r of revocados) {
+    const { error } = await supabase.from("whatsapp_mensajes").update({ eliminado_en_whatsapp_en: r.momento }).eq("wa_id", r.waIdOriginal).is("eliminado_en_whatsapp_en", null);
+    if (error) console.error("WhatsApp: no se pudo marcar un mensaje eliminado en WhatsApp", r.waIdOriginal, error.message);
   }
 }

@@ -4,7 +4,7 @@ import { firmaValida, tokenDeVerificacionValido } from "@/lib/instagram/firma";
 import { createServiceClient } from "@/lib/supabase/server";
 import { extraerAviso } from "@/lib/whatsapp/extraer";
 import { extraerEventosCuenta, hayCamposNuevos, resumenDeAviso } from "@/lib/whatsapp/eventos";
-import { guardarEntrantes, guardarEstados } from "@/lib/whatsapp/guardar";
+import { guardarEntrantes, guardarEstados, guardarRevocados } from "@/lib/whatsapp/guardar";
 import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 
 export const dynamic = "force-dynamic";
@@ -45,17 +45,19 @@ export async function POST(request: Request) {
   // Si llega algo que la bandeja no entiende (o de otra forma), queda una línea en los registros: solo nombres, nunca el contenido.
   const resumen = resumenDeAviso(aviso);
   if (hayCamposNuevos(resumen.campos)) console.log(`[whatsapp] ${"Meta"} aviso con campos: ${resumen.campos.join(", ") || "(ninguno)"}; claves: ${resumen.claves.join(", ")}`);
-  const { mensajes, estados, ecos } = extraerAviso(aviso);
+  const { mensajes, estados, ecos, revocados } = extraerAviso(aviso);
   // Plantillas aprobadas o rechazadas, calidad, categoría, límite del número y restricciones de la cuenta.
   const eventos = extraerEventosCuenta(aviso);
-  if (mensajes.length || estados.length || ecos.length || eventos.length) {
+  if (mensajes.length || estados.length || ecos.length || eventos.length || revocados.length) {
     after(async () => {
       await aplicarEventosCuenta(createServiceClient(), eventos);
       await guardarEntrantes(mensajes);
       // Lo que se respondió desde la app del celular (coexistencia), para que la bandeja y los KPIs lo cuenten.
       await guardarEntrantes(ecos, true);
       await guardarEstados(estados);
+      // Lo que se borró «para todos» en WhatsApp se marca, nunca se borra aquí.
+      await guardarRevocados(revocados);
     });
   }
-  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length });
+  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length, revocados: revocados.length });
 }
