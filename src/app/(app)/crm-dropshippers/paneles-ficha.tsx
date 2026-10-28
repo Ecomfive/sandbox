@@ -338,8 +338,8 @@ export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: 
                   type="text"
                   name="contacto_telefono"
                   autoComplete="off"
-                  defaultValue={d.telefono ?? ""}
-                  placeholder="Ej: +57 300 111 2233"
+                  defaultValue=""
+                  placeholder={d.tieneTelefono ? "Número oculto: déjalo vacío para no cambiarlo" : "Ej: +57 300 111 2233"}
                   className={`${fieldClass} w-full`}
                 />
               </Campo>

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
 import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
 import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
+import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
 export interface NumeroVista {
@@ -15,8 +16,7 @@ export interface NumeroVista {
 export interface ConversacionVista {
   id: string;
   numeroId: string;
-  telefono: string;
-  /** El nombre del dropshipper en el CRM o, si no está, el de su perfil de WhatsApp (o el teléfono). */
+  /** El nombre del dropshipper en el CRM o, si no está, el de su perfil de WhatsApp (o «Contacto XXXX»). El número nunca viaja a la pantalla. */
   nombre: string;
   nombrePerfil: string | null;
   dropshipperId: string | null;
@@ -98,7 +98,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, area, telefono, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
+      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
@@ -110,8 +110,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     return {
       id: c.id as string,
       numeroId: c.numero_id as string,
-      telefono: c.telefono as string,
-      nombre: d?.nombre ?? (c.nombre_perfil as string | null) ?? (c.telefono as string),
+      nombre: d?.nombre ?? (c.nombre_perfil as string | null) ?? nombreSinNumero(c.id as string),
       nombrePerfil: (c.nombre_perfil as string | null) ?? null,
       dropshipperId: (c.dropshipper_id as string | null) ?? null,
       codigo: d?.codigo ?? null,

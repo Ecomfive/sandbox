@@ -37,13 +37,13 @@ export interface OcultoVista {
 type Uno<T> = T | T[] | null;
 const uno = <T,>(v: Uno<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
-type FilaChat = { telefono: string; nombre_perfil: string | null; dropshippers: Uno<{ nombre: string }> };
+type FilaChat = { nombre_perfil: string | null; dropshippers: Uno<{ nombre: string }> };
 const nombreDelChat = (c: Uno<FilaChat>): string => {
   const f = uno(c);
-  return f ? (uno(f.dropshippers)?.nombre ?? f.nombre_perfil ?? f.telefono) : "Chat";
+  return f ? (uno(f.dropshippers)?.nombre ?? f.nombre_perfil ?? "Chat sin nombre") : "Chat";
 };
 
-const CHAT = "whatsapp_conversaciones(telefono, nombre_perfil, dropshippers(nombre))";
+const CHAT = "whatsapp_conversaciones(nombre_perfil, dropshippers(nombre))";
 
 /**
  * Las peticiones que le tocan a esta persona (las que debe resolver, las que hizo; un administrador las ve todas) y, para un administrador, lo que está
@@ -87,7 +87,7 @@ export async function cargarBorrados(supabase: SupabaseClient, usuario: { id: st
   const ocultos: OcultoVista[] = [];
   if (esAdmin) {
     const [chats, mensajes] = await Promise.all([
-      supabase.from("whatsapp_conversaciones").select("id, telefono, nombre_perfil, oculta_en, oculta_por, dropshippers(nombre)").not("oculta_en", "is", null).order("oculta_en", { ascending: false }).limit(100),
+      supabase.from("whatsapp_conversaciones").select("id, nombre_perfil, oculta_en, oculta_por, dropshippers(nombre)").not("oculta_en", "is", null).order("oculta_en", { ascending: false }).limit(100),
       supabase.from("whatsapp_mensajes").select(`id, texto, tipo, oculto_en, oculto_por, ${CHAT}`).not("oculto_en", "is", null).order("oculto_en", { ascending: false }).limit(100),
     ]);
     for (const c of chats.data ?? []) ocultos.push({ tipo: "chat", id: c.id as string, chat: nombreDelChat(c as unknown as FilaChat), vista: "", por: (c.oculta_por as string | null) ?? null, en: c.oculta_en as string });

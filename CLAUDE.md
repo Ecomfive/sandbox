@@ -988,6 +988,14 @@ convenciones técnicas del código.
   nuevo del dropshipper a un chat oculto lo vuelve a mostrar con una nota del sistema (`volverAMostrarSiOcultos`, `guardar.ts`). Si el jefe no responde, la petición espera (el administrador solo
   recupera, no autoriza por encima); los KPIs siguen contando los chats ocultos. Todo se lee con consultas aparte que ignoran el error: sin la migración la bandeja carga igual. Auditoría:
   `pedir/autorizar/rechazar/cancelar_borrado_whatsapp` y `recuperar_whatsapp`. Reversa: `supabase/rollbacks/0172_rollback.sql`.
+  **Números ocultos, etapa 1** (28 oct 2026, pedido de Jhokser): el WhatsApp de un dropshipper **no viaja a ninguna pantalla** (ni siquiera para quien lo puede ver): `ConversacionVista` y `FilaDropshipper` ya no
+  traen `telefono` (solo `tieneTelefono`), el chat sin nombre se llama `nombreSinNumero(id)` («Contacto FB19») y la ficha dice «Número oculto». `MostrarTelefono` (`crm-dropshippers/mostrar-telefono.tsx`) pide el número
+  con `mostrarTelefono(tipo, id)` (`telefono-actions.ts`), que **solo entrega a un administrador** (`puedeVerTelefonos`, `src/lib/whatsapp/telefono-oculto.ts`, con prueba; el botón sale con `AccesoCrm.verTelefonos`) y deja
+  `ver_telefono_dropshipper` en la auditoría. Se quitaron los enlaces `wa.me` y la búsqueda por número; el campo WhatsApp de la ficha del dropshipper arranca vacío y **vacío = no cambiar** (`actualizarDropshipper`).
+  El servidor sigue usando el número para enviar. **Etapa 2 pendiente** (aparte, más riesgosa): cifrar el número en la base (clave del servidor + huella para emparejar) y decidir quién más puede descifrarlo; hoy `whatsapp_conversaciones.telefono`
+  y `dropshippers.contacto_telefono` siguen en texto normal y las funciones SQL de WhatsApp, los KPIs, la importación de chats y el emparejamiento dependen de ellos.
+  **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
+  si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
 - **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del
   último mensaje de un dropshipper solo se le escribe con una plantilla que Meta aprobó. Se crean, se cambian y se mandan a Meta desde el sistema. Tablas:
   `whatsapp_plantillas` (por nombre e idioma; `categoria` = la pedida, `categoria_actual` = la que Meta le puso; `estado` borrador → pendiente → aprobada /

@@ -199,3 +199,28 @@ test("un aviso de borrado sin el id del original se ignora", () => {
   assert.deepEqual(revocados, []);
   assert.deepEqual(mensajes, []);
 });
+
+test("un mensaje que el equipo borra «para todos» desde la app (eco revoke) no es un mensaje nuevo: se marca el original", () => {
+  const { ecos, revocados } = extraerAviso({
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "WABA",
+        changes: [
+          {
+            field: "smb_message_echoes",
+            value: {
+              metadata: META,
+              message_echoes: [
+                { from: "50760000000", to: "50761112233", id: "wamid.R", timestamp: "1793040100", type: "revoke", revoke: { original_message_id: "wamid.MIO" } },
+                { from: "50760000000", to: "50761112233", id: "wamid.T", timestamp: "1793040200", type: "text", text: { body: "hola" } },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(revocados, [{ waIdOriginal: "wamid.MIO", momento: new Date(1793040100 * 1000).toISOString() }]);
+  assert.deepEqual(ecos.map((e) => e.waId), ["wamid.T"]);
+});

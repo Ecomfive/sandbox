@@ -249,7 +249,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
   if (!actual) return { error: "No se encontró el dropshipper." };
 
   // El WhatsApp se guarda en formato internacional; sin prefijo se asume el primer país donde vende.
-  let contacto_telefono: string | null = null;
+  // El número no sale escrito en la ficha: un campo vacío lo deja como estaba (no lo borra).
+  let contacto_telefono: string | null = (actual.contacto_telefono as string | null) ?? null;
   let pais_origen: string | null | undefined;
   const telefonoTexto = texto(formData, "contacto_telefono");
   if (telefonoTexto) {
