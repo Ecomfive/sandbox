@@ -76,19 +76,21 @@ function contenidoDe(m: Obj): Pick<MensajeEntrante, "tipo" | "texto" | "mediaId"
  * Los mensajes que llegan, los estados de los mandados y los «ecos» de un aviso del webhook (lo que no se entiende se ignora).
  * Un eco (campo `smb_message_echoes`, coexistencia: el número sigue en la app WhatsApp Business del celular) es un mensaje que el
  * equipo mandó desde el celular; su `telefono` es el del dropshipper (a quien se le mandó).
+ * Con `sinMetadata` (avisos de 360dialog, que llegan por su propia dirección): se aceptan sin `object` y, si no traen el número de la
+ * empresa (el sandbox no lo manda), se usa ese id. Quien escribe sin teléfono compartido llega con su id de usuario (`from_user_id`).
  */
-export function extraerAviso(aviso: unknown): { mensajes: MensajeEntrante[]; estados: EstadoEntrante[]; ecos: MensajeEntrante[] } {
+export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: MensajeEntrante[]; estados: EstadoEntrante[]; ecos: MensajeEntrante[] } {
   const mensajes: MensajeEntrante[] = [];
   const estados: EstadoEntrante[] = [];
   const ecos: MensajeEntrante[] = [];
-  if (obj(aviso).object !== "whatsapp_business_account") return { mensajes, estados, ecos };
+  if (obj(aviso).object !== "whatsapp_business_account" && !(sinMetadata && obj(aviso).object === undefined)) return { mensajes, estados, ecos };
   for (const entrada of lista(obj(aviso).entry)) {
     for (const cambio of lista(obj(entrada).changes)) {
       const campo = obj(cambio).field;
       if (campo !== "messages" && campo !== "smb_message_echoes") continue;
       const valor = obj(obj(cambio).value);
       const meta = obj(valor.metadata);
-      const phoneNumberId = texto(meta.phone_number_id);
+      const phoneNumberId = texto(meta.phone_number_id) ?? sinMetadata ?? null;
       if (!phoneNumberId) continue;
       const numeroEmpresa = conMas(texto(meta.display_phone_number));
       if (campo === "smb_message_echoes") {
@@ -100,12 +102,15 @@ export function extraerAviso(aviso: unknown): { mensajes: MensajeEntrante[]; est
         }
         continue;
       }
-      const nombres = new Map(lista(valor.contacts).map((c) => [String(obj(c).wa_id ?? ""), texto(obj(obj(c).profile).name)]));
+      const nombres = new Map(lista(valor.contacts).map((c) => [String(obj(c).wa_id ?? obj(c).user_id ?? ""), texto(obj(obj(c).profile).name)]));
       for (const m of lista(valor.messages).map(obj)) {
         const de = texto(m.from);
+        // Sin teléfono compartido (BSUID): se guarda el id tal cual y se le responde con `recipient` (ver api.ts).
+        const usuario = de ? null : texto(m.from_user_id);
         const waId = texto(m.id);
-        if (!de || !waId) continue;
-        mensajes.push({ phoneNumberId, numeroEmpresa, telefono: conMas(de)!, nombre: nombres.get(de) ?? null, waId, ...contenidoDe(m), momento: momentoDe(m.timestamp) });
+        if ((!de && !usuario) || !waId) continue;
+        const telefono = de ? conMas(de)! : usuario!;
+        mensajes.push({ phoneNumberId, numeroEmpresa, telefono, nombre: nombres.get((de ?? usuario)!) ?? null, waId, ...contenidoDe(m), momento: momentoDe(m.timestamp) });
       }
       for (const s of lista(valor.statuses).map(obj)) {
         const waId = texto(s.id);

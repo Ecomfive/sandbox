@@ -54,3 +54,25 @@ bloquear. Los nombres de los menús de Meta cambian seguido: si algo no se llama
 - **Archivos:** Meta guarda las fotos, audios y documentos que llegan unos 30 días. Copiarlos a Storage para siempre está pendiente.
 - **Calidad del número:** muchos bloqueos o reportes bajan la calificación del número y Meta puede limitarlo. No mandar mensajes masivos
   sin plantilla ni a quien no escribió.
+
+## Con 360dialog (28 oct 2026): un solo número para todo el equipo
+
+360dialog es un socio oficial de Meta: conecta el número por QR (también con coexistencia, sin la revisión de proveedor tecnológico)
+y usa la misma API que Meta. El sistema lo usa cuando está `D360_API_KEY` (código en `src/lib/whatsapp/proveedor.ts`).
+
+**Datos en Vercel** (Settings › Environment Variables; nunca en el código ni en el chat), y volver a desplegar:
+- `D360_API_KEY`: la clave del número en 360dialog (o la del sandbox).
+- `D360_SANDBOX` = `1` mientras se prueba con el sandbox. Quitarla al pasar al número real.
+- `D360_WEBHOOK_CLAVE`: una palabra larga inventada (16 caracteres o más). 360dialog no firma los avisos: esta palabra va en la
+  dirección del webhook y es lo único que los protege.
+
+**Conectar:** con esos datos puestos, en la Bandeja de WhatsApp (sin conversaciones todavía) aparece **«Conectar el webhook de
+360dialog»** para quien administra el sistema. Registra `https://<dominio>/api/whatsapp/360dialog/<D360_WEBHOOK_CLAVE>`.
+
+**Sandbox (prueba gratis):** escribir `START` por WhatsApp al número de pruebas de 360dialog (+55 11 4673 3492, confirmarlo en su
+documentación): responde con la clave. Solo se le puede escribir al propio teléfono, hasta 200 mensajes, y no entrega archivos.
+El número aparece en la bandeja como «WhatsApp» (id `360dialog`): ponerle nombre con
+`update whatsapp_numeros set nombre = 'Ecomfive' where phone_number_id = '360dialog';`
+
+**Áreas con un solo número** (migración 0168): el área es de cada conversación. Todo chat nuevo entra a Atención y se pasa a Comercial
+o Dirección con el botón «Pasar a otra área» del chat; quien no ve esa área deja de verlo. Queda una nota en el chat y la auditoría.

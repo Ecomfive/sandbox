@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
+import { urlDescarga360 } from "./proveedor";
 import { errorEnEspanol, minutosVentana, textoVentana } from "./ventana";
 
 const aviso = (value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value }] }] });
@@ -125,4 +126,43 @@ test("coexistencia: lo que el equipo manda desde el celular llega como eco, con 
   assert.equal(ecos[0].numeroEmpresa, "+50760000000");
   assert.equal(ecos[0].texto, "Sí, ya salió hoy.");
   assert.equal(ecos[0].waId, "wamid.E");
+});
+
+test("360dialog: el aviso del sandbox (sin object ni metadata) se acepta solo por su dirección, con el número por defecto", () => {
+  const sandbox = {
+    entry: [
+      {
+        changes: [
+          {
+            field: "messages",
+            value: {
+              contacts: [{ profile: { name: "Hernán" }, wa_id: "50761112233" }],
+              messages: [{ from: "50761112233", id: "wamid.S", timestamp: "1793040000", type: "text", text: { body: "hola" } }],
+            },
+          },
+        ],
+      },
+    ],
+  };
+  assert.equal(extraerAviso(sandbox).mensajes.length, 0);
+  const { mensajes } = extraerAviso(sandbox, "360dialog");
+  assert.equal(mensajes.length, 1);
+  assert.equal(mensajes[0].phoneNumberId, "360dialog");
+  assert.equal(mensajes[0].telefono, "+50761112233");
+  assert.equal(mensajes[0].nombre, "Hernán");
+});
+
+test("360dialog: quien escribe sin teléfono compartido llega con su id de usuario", () => {
+  const { mensajes } = extraerAviso(
+    { entry: [{ changes: [{ field: "messages", value: { contacts: [{ profile: { name: "Ana" }, user_id: "PA.123abc" }], messages: [{ from_user_id: "PA.123abc", id: "wamid.B", timestamp: "1793040000", type: "text", text: { body: "hola" } }] } }] }] },
+    "360dialog",
+  );
+  assert.equal(mensajes[0].telefono, "PA.123abc");
+  assert.equal(mensajes[0].nombre, "Ana");
+});
+
+test("360dialog: los archivos solo se bajan de Meta, cambiados al dominio de 360dialog", () => {
+  assert.equal(urlDescarga360("https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1&ext=2"), "https://waba-v2.360dialog.io/whatsapp_business/attachments/?mid=1&ext=2");
+  assert.equal(urlDescarga360("https://evil.example.com/x"), null);
+  assert.equal(urlDescarga360("http://lookaside.fbsbx.com/x"), null);
 });

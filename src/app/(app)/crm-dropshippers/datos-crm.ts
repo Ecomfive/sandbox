@@ -29,9 +29,9 @@ async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<
   if (!areas.length) return chats;
   const { data, error } = await supabase
     .from("whatsapp_conversaciones")
-    .select("id, dropshipper_id, estado, no_leidos, ultimo_texto, ultimo_mensaje_en, ultimo_de, whatsapp_numeros!inner(area)")
+    .select("id, dropshipper_id, estado, no_leidos, ultimo_texto, ultimo_mensaje_en, ultimo_de")
     .not("dropshipper_id", "is", null)
-    .in("whatsapp_numeros.area", areas)
+    .in("area", areas)
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(2000);
   if (error) return chats;

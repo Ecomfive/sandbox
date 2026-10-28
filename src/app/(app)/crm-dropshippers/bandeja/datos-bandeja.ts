@@ -28,6 +28,8 @@ export interface ConversacionVista {
   ultimoMensajeEn: string | null;
   ultimoTexto: string | null;
   ultimoDe: "entrante" | "saliente" | "nota" | null;
+  /** El área del chat (migración 0168): decide quién lo ve. Se cambia con «Pasar a otra área». */
+  area: AreaCrm;
 }
 
 export interface MensajeVista {
@@ -60,22 +62,22 @@ const uno = <T,>(v: Uno<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v)
 /** Las áreas cuyos números ve esta persona: Atención ve el suyo; Comercial ve los dos. */
 export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u));
 
-/** Los números de la empresa y las conversaciones (las 300 más recientes) que esta persona puede ver. `null` si falta la migración 0158. */
+/**
+ * Los números de la empresa y las conversaciones (las 300 más recientes) que esta persona puede ver: las de las áreas que ve. El área es
+ * de cada conversación desde la migración 0168, así un solo número sirve a todo el equipo. `null` si falta la migración 0158.
+ */
 export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | null> {
   const areas = areasDe(usuario);
-  const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).in("area", areas).order("nombre");
+  const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (numerosR.error) return null;
   const numeros = (numerosR.data ?? []) as NumeroVista[];
   if (!numeros.length) return { numeros, conversaciones: [] };
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, telefono, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
+      "id, numero_id, area, telefono, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
     )
-    .in(
-      "numero_id",
-      numeros.map((n) => n.id),
-    )
+    .in("area", areas)
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(300);
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
@@ -97,6 +99,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       ultimoMensajeEn: (c.ultimo_mensaje_en as string | null) ?? null,
       ultimoTexto: (c.ultimo_texto as string | null) ?? null,
       ultimoDe: (c.ultimo_de as ConversacionVista["ultimoDe"]) ?? null,
+      area: c.area as AreaCrm,
     };
   });
   return { numeros, conversaciones };
@@ -112,18 +115,20 @@ export async function conversacionPermitida(
   usuario: PermisosCrm,
   /** Para mandar, anotar, resolver o tomar: además, poder escribir en el área del número (auditoría del 27 oct 2026). */
   escribe = false,
-): Promise<{ id: string; telefono: string; dropshipperId: string | null; asignadaA: string | null; ultimoEntranteEn: string | null; phoneNumberId: string } | null> {
+): Promise<{ id: string; area: AreaCrm; telefono: string; dropshipperId: string | null; asignadaA: string | null; ultimoEntranteEn: string | null; phoneNumberId: string } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data } = await supabase
     .from("whatsapp_conversaciones")
-    .select("id, telefono, dropshipper_id, asignada_a, ultimo_entrante_en, whatsapp_numeros(phone_number_id, area)")
+    .select("id, area, telefono, dropshipper_id, asignada_a, ultimo_entrante_en, whatsapp_numeros(phone_number_id)")
     .eq("id", id)
     .maybeSingle();
-  const numero = uno(data?.whatsapp_numeros as Uno<{ phone_number_id: string; area: AreaCrm }>);
-  if (!data || !numero || !areasDe(usuario).includes(numero.area)) return null;
-  if (escribe && !escribeEnArea(accesoCrm(usuario), numero.area)) return null;
+  const numero = uno(data?.whatsapp_numeros as Uno<{ phone_number_id: string }>);
+  const area = data?.area as AreaCrm | undefined;
+  if (!data || !numero || !area || !areasDe(usuario).includes(area)) return null;
+  if (escribe && !escribeEnArea(accesoCrm(usuario), area)) return null;
   return {
     id: data.id as string,
+    area,
     telefono: data.telefono as string,
     dropshipperId: (data.dropshipper_id as string | null) ?? null,
     asignadaA: (data.asignada_a as string | null) ?? null,

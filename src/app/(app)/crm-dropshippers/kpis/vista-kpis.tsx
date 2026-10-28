@@ -20,6 +20,8 @@ export interface KpisWhatsapp {
     mediana_min: number | null;
     promedio_min: number | null;
   }[];
+  /** Por área del chat (migración 0168; con un solo número es el desglose que importa). */
+  areas?: { area: string; conversaciones: number; consultas: number; sin_responder: number; en_15_min: number; mediana_min: number | null }[];
   personas: { persona: string; enviados: number; respondidas: number; mediana_min: number | null; en_15_min: number }[];
   dias: { dia: string; consultas: number; sin_responder: number; mediana_min: number | null }[];
 }
@@ -74,6 +76,34 @@ export function VistaKpis({ datos, dias, periodos }: { datos: KpisWhatsapp; dias
           <KpiCard titulo="Conversaciones" valor={conversaciones} subtexto={`${consultas} consultas`} />
         </KpiGrid>
       </KpiGroup>
+
+      {(datos?.areas ?? []).length > 0 && (
+        <MarcoTabla ariaLabel="KPIs por área">
+          <table className="w-full min-w-[40rem] border-collapse">
+            <thead>
+              <tr>
+                {["Área", "Conversaciones", "Consultas", "Sin responder", "Tiempo de respuesta (mediana)", "En 15 min"].map((t) => (
+                  <th key={t} scope="col" className={claseTh}>
+                    {t}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(datos.areas ?? []).map((a) => (
+                <tr key={a.area} className="hover:bg-muted">
+                  <td className={`${claseTd} font-medium`}>{AREA[a.area] ?? a.area}</td>
+                  <td className={`${claseTd} tabular-nums`}>{a.conversaciones}</td>
+                  <td className={`${claseTd} tabular-nums`}>{a.consultas}</td>
+                  <td className={claseTd}>{a.sin_responder ? <Pastilla tono="peligro">{a.sin_responder}</Pastilla> : "0"}</td>
+                  <td className={`${claseTd} tabular-nums`}>{duracion(a.mediana_min)}</td>
+                  <td className={`${claseTd} tabular-nums`}>{porcentaje(a.en_15_min, a.consultas)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </MarcoTabla>
+      )}
 
       <MarcoTabla ariaLabel="KPIs por número">
         <table className="w-full min-w-[56rem] border-collapse">
