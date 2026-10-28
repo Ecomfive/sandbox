@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { compraCuenta } from "@/lib/compras/cuenta";
+import { diasPedidoLlegada, promedioDias } from "@/lib/compras/tiempo-compra";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import { colorEtapa, etiquetaEtapa, numeroOC } from "../compras/def-compras";
 import { obtenerComprasProducto, type CompraDeProducto } from "./compras-actions";
@@ -17,7 +18,8 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  * la primera vez (unidades, total, costo promedio, cuántas compras y entre qué fechas; por país si se compra en varios) y
  * debajo cada compra, de la más nueva a la más vieja, que se abre en Compras. Solo cuenta las compras con el producto
  * vinculado (Compras › Productos). Si se compró en varios países, las compras van **agrupadas por país** (cada país con sus compras
- * juntas, el que más compró primero) y no mezcladas. Con `limite` muestra solo las últimas. Con `pais` (Inventario, que es de un país) cuenta y
+ * juntas, el que más compró primero) y no mezcladas. Cada compra dice cuándo se pidió y cuándo llegó, con los días que tardó, y arriba
+ * va el tiempo promedio del pedido a la llegada (28 oct 2026, pedido de Hernán). Con `limite` muestra solo las últimas. Con `pais` (Inventario, que es de un país) cuenta y
  * lista solo las compras de ese país, y dice aparte lo comprado en todos. Una compra descartada se ve en la lista (atenuada) pero **no
  * suma** en ningún total (`compraCuenta`).
  */
@@ -69,6 +71,7 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
   const primera = vigentes.length ? vigentes[vigentes.length - 1].fecha : null;
   const ultima = vigentes.length ? vigentes[0].fecha : null;
   const vistas = limite ? datos.slice(0, limite) : datos;
+  const tiempoPromedio = promedioDias(vigentes.map((c) => diasPedidoLlegada(c.fecha, c.llegada)));
   // En varios países: un bloque por país, el que más unidades compró primero; dentro, de la más nueva a la más vieja.
   const grupos =
     !pais && porPais.size > 1
@@ -80,11 +83,12 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
 
   return (
     <div className="flex flex-col gap-3">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-5">
         <Cifra etiqueta="Unidades compradas" valor={entero(unidades)} />
         <Cifra etiqueta="Total invertido" valor={conCosto.length ? usd(total) : "—"} />
         <Cifra etiqueta="Costo promedio" valor={unidadesConCosto ? usd(total / unidadesConCosto) : "—"} />
         <Cifra etiqueta={vigentes.length === 1 ? "Compra" : "Compras"} valor={entero(vigentes.length)} />
+        <Cifra etiqueta="Pedido a llegada" valor={tiempoPromedio === null ? "—" : `${entero(tiempoPromedio)} días`} />
       </dl>
       <p className="m-0 text-xs text-muted-foreground">
         {primera === null || ultima === null ? "Todas las compras están descartadas" : vigentes.length === 1 ? `El ${formatearFecha(primera)}` : `Del ${formatearFecha(primera)} al ${formatearFecha(ultima)}`}
@@ -115,7 +119,7 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
 }
 
 /**
- * Las compras de una lista, cada una con su orden, fecha, etapa, unidades, costo por unidad y total; el país solo si la lista no
+ * Las compras de una lista, cada una con su orden, cuándo se pidió y cuándo llegó (con los días), etapa, unidades, costo por unidad y total; el país solo si la lista no
  * está ya agrupada por país. Depende del ancho de la lista, no de la pantalla: angosta, cada compra son dos líneas (orden arriba,
  * fecha y etapa abajo; unidades arriba y costo abajo, a la derecha); ancha (`@2xl`), una sola fila con columnas fijas. En los dos
  * casos las cifras quedan alineadas entre filas y entre los grupos de cada país.
@@ -127,14 +131,14 @@ function ListaCompras({ compras, conPais }: { compras: CompraDeProducto[]; conPa
         {compras.map((c) => (
           <li
             key={`${c.compraId}-${c.sku}`}
-            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 @2xl:grid-cols-[7.5rem_6rem_minmax(0,1fr)_4.5rem_5.5rem_6.5rem] ${compraCuenta(c) ? "" : "opacity-60"}`}
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 @2xl:grid-cols-[7.5rem_9.5rem_minmax(0,1fr)_4.5rem_5.5rem_6.5rem] ${compraCuenta(c) ? "" : "opacity-60"}`}
           >
             <div className="flex min-w-0 flex-col items-start gap-1 @2xl:contents">
               <Link href={`/compras/lista?ver=todos&abrir=${c.compraId}`} className={`rounded font-medium hover:underline @2xl:justify-self-start ${anilloFoco}`}>
                 {c.codigo ?? numeroOC(c.numero)}
               </Link>
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 @2xl:contents">
-                <span className="text-xs text-muted-foreground tabular-nums">{formatearFecha(c.fecha)}</span>
+                <FechasCompra c={c} />
                 <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
                   {conPais && c.pais && <span className="text-xs text-muted-foreground">{c.pais}</span>}
@@ -159,6 +163,24 @@ function ListaCompras({ compras, conPais }: { compras: CompraDeProducto[]; conPa
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Cuándo se pidió y cuándo llegó, con los días que tardó; sin llegada todavía, solo el pedido. */
+function FechasCompra({ c }: { c: CompraDeProducto }) {
+  const dias = diasPedidoLlegada(c.fecha, c.llegada);
+  return (
+    <span className="flex flex-col text-xs leading-snug text-muted-foreground tabular-nums">
+      <span>Pedido {formatearFecha(c.fecha)}</span>
+      {c.llegada ? (
+        <span>
+          Llegó {formatearFecha(c.llegada)}
+          {dias !== null && <span className="text-foreground"> · {entero(dias)} días</span>}
+        </span>
+      ) : (
+        compraCuenta(c) && <span>Sin llegar</span>
+      )}
+    </span>
   );
 }
 
