@@ -6,11 +6,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { textoVentana } from "@/lib/whatsapp/ventana";
-import { abrirConversacion, cambiarEstadoConversacion, enviarWhatsapp, notaWhatsapp, obtenerBandeja, tomarConversacion } from "./actions";
+import type { AreaCrm } from "@/lib/crm/areas";
+import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, notaWhatsapp, obtenerBandeja, pasarConversacionDeArea, tomarConversacion } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
 
 type Pestana = "sinResponder" | "mias" | "todas";
 const REFRESCO_MS = 8000;
+
+/** Las áreas de un chat, con el color de su etiqueta (boceto https://claude.ai/artifact/Sn3pB4cdUixXk6WdRh4kr8). */
+const AREAS_CHAT: { valor: AreaCrm; etiqueta: string; clase: string }[] = [
+  { valor: "atencion", etiqueta: "Atención", clase: "bg-azul-soft text-azul" },
+  { valor: "comercial", etiqueta: "Comercial", clase: "bg-success-soft text-success" },
+  { valor: "direccion", etiqueta: "Dirección", clase: "bg-primario-suave text-primario" },
+];
+const areaChat = (a: AreaCrm) => AREAS_CHAT.find((x) => x.valor === a) ?? AREAS_CHAT[0];
 
 const iniciales = (nombre: string) =>
   nombre
@@ -77,11 +86,17 @@ export function Bandeja({
   abrirInicial,
   escribe,
   miId,
+  areas,
+  conectar360 = false,
 }: {
   inicial: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] };
   abrirInicial: string | null;
   escribe: boolean;
   miId: string;
+  /** Las áreas que ve la persona: con más de una, cada chat muestra la suya. */
+  areas: AreaCrm[];
+  /** 360dialog configurado en el servidor y la persona administra el sistema: puede registrar el webhook desde aquí. */
+  conectar360?: boolean;
 }) {
   const { mostrarToast } = useToast();
   const [datos, setDatos] = useState(inicial);
@@ -172,12 +187,27 @@ export function Bandeja({
 
   if (!datos.numeros.length) {
     return (
-      <section className="flex flex-col gap-2 rounded-xl border border-border bg-card px-5 py-6">
+      <section className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card px-5 py-6">
         <h2 className="m-0 text-base font-semibold">WhatsApp todavía no está conectado</h2>
         <p className="m-0 max-w-2xl text-sm text-muted-foreground">
-          Falta conectar el número de la empresa en Meta (WhatsApp Cloud API) y poner sus datos en el servidor. Cuando llegue el primer mensaje, el número aparece aquí solo. Los pasos
-          están en el Centro de ayuda, en «CRM Dropshippers › Bandeja de WhatsApp».
+          Falta conectar el número de la empresa (con 360dialog o directo con Meta) y poner sus datos en el servidor. Cuando llegue el primer mensaje, el número aparece aquí solo. Los
+          pasos están en el Centro de ayuda, en «CRM Dropshippers › Bandeja de WhatsApp».
         </p>
+        {conectar360 && (
+          <button
+            type="button"
+            disabled={enviando}
+            className={`mt-2 inline-flex min-h-9 items-center rounded-lg border border-border bg-card px-3 text-[13px] font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}
+            onClick={() =>
+              empezar(async () => {
+                const r = await conectarWebhook360().catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+                mostrarToast("error" in r ? r.error : "Listo: 360dialog ya manda los mensajes al sistema. Escríbele al número para probar.", "error" in r ? "destructive" : undefined);
+              })
+            }
+          >
+            Conectar el webhook de 360dialog
+          </button>
+        )}
       </section>
     );
   }
@@ -272,6 +302,7 @@ export function Bandeja({
                   <span className="flex flex-wrap gap-1 text-[11px] text-muted-foreground">
                     {!c.dropshipperId && <span className="rounded bg-warning-soft px-1.5 text-warning">No está en el CRM</span>}
                     {c.estado === "resuelta" && <span className="rounded bg-success-soft px-1.5 text-success">Resuelta</span>}
+                    {areas.length > 1 && <span className={`rounded px-1.5 font-medium ${areaChat(c.area).clase}`}>{areaChat(c.area).etiqueta}</span>}
                     {datos.numeros.length > 1 && <span>{numeroDe.get(c.numeroId)?.nombre}</span>}
                     {c.asignadaA && <span>· {c.asignadaA}</span>}
                   </span>
@@ -301,6 +332,30 @@ export function Bandeja({
             </div>
             {escribe && (
               <div className="flex flex-wrap gap-1.5">
+                <label className="sr-only" htmlFor="area-chat">
+                  Área del chat
+                </label>
+                <select
+                  id="area-chat"
+                  value={sel.area}
+                  disabled={enviando}
+                  onChange={(e) => {
+                    const destino = e.target.value as AreaCrm;
+                    const queda = areas.includes(destino);
+                    accion(
+                      () => pasarConversacionDeArea(sel.id, destino),
+                      queda ? `Chat pasado a ${areaChat(destino).etiqueta}` : `Chat pasado a ${areaChat(destino).etiqueta}: ya no lo verás en tu bandeja`,
+                    );
+                    if (!queda) setElegido(null);
+                  }}
+                  className={`min-h-9 rounded-lg border border-border bg-card px-2 text-[13px] font-medium ${areaChat(sel.area).clase} ${anilloFoco}`}
+                >
+                  {AREAS_CHAT.map((a) => (
+                    <option key={a.valor} value={a.valor}>
+                      {a.valor === sel.area ? `Área: ${a.etiqueta}` : `Pasar a ${a.etiqueta}`}
+                    </option>
+                  ))}
+                </select>
                 {sel.asignadaAId === miId ? (
                   <button type="button" disabled={enviando} className={boton} onClick={() => accion(() => tomarConversacion(sel.id, true), "Conversación soltada")}>
                     Soltar

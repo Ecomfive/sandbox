@@ -17,10 +17,10 @@ export const dynamic = "force-dynamic";
 async function contarSinResponder(supabase: SupabaseClient, areas: AreaCrm[]): Promise<number> {
   const { count, error } = await supabase
     .from("whatsapp_conversaciones")
-    .select("id, whatsapp_numeros!inner(area)", { count: "exact", head: true })
+    .select("id", { count: "exact", head: true })
     .eq("estado", "abierta")
     .or("no_leidos.gt.0,ultimo_de.eq.entrante")
-    .in("whatsapp_numeros.area", areas);
+    .in("area", areas);
   return error ? 0 : (count ?? 0);
 }
 

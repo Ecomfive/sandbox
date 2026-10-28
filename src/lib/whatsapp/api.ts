@@ -1,28 +1,40 @@
+import { config360, urlMensajes360 } from "./proveedor";
 import { errorEnEspanol } from "./ventana";
 
 /**
- * El envío por WhatsApp Cloud API (Graph API de Meta): un texto desde un número de la empresa (`phoneNumberId`) a un dropshipper. El
- * token (`WHATSAPP_TOKEN`, de un usuario del sistema de Meta, permanente) solo vive en el servidor. Devuelve el id del mensaje en
- * WhatsApp para enlazar después sus estados (entregado, leído), o el error en palabras para el equipo.
+ * El envío de un texto desde un número de la empresa (`phoneNumberId`) a un dropshipper. Con 360dialog configurado (`D360_API_KEY`,
+ * ver `proveedor.ts`) sale por 360dialog; si no, por la Cloud API de Meta con `WHATSAPP_TOKEN` (de un usuario del sistema de Meta,
+ * permanente). Las claves solo viven en el servidor. Devuelve el id del mensaje en WhatsApp para enlazar después sus estados (entregado,
+ * leído), o el error en palabras para el equipo.
  */
 export async function enviarTextoWhatsapp(phoneNumberId: string, para: string, cuerpo: string): Promise<{ waId: string } | { error: string }> {
-  const token = process.env.WHATSAPP_TOKEN;
-  if (!token) return { error: "WhatsApp todavía no está conectado: falta el token de Meta (WHATSAPP_TOKEN)." };
-  const version = process.env.WHATSAPP_API_VERSION || "v23.0";
-  if (!/^\d+$/.test(phoneNumberId) || !/^v\d+\.\d+$/.test(version)) return { error: "El número de WhatsApp no es válido." };
+  // Un teléfono va en `to` (solo dígitos); un id de usuario de WhatsApp sin teléfono (BSUID, el sandbox lo usa a veces) en `recipient`.
+  const destino = /^\+?\d+$/.test(para) ? { to: para.replace(/\D/g, "") } : { recipient: para };
+  const mensaje = JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...destino, type: "text", text: { preview_url: false, body: cuerpo } });
+  const d360 = config360();
+  let url: string;
+  let cabeceras: Record<string, string>;
+  if (d360) {
+    url = urlMensajes360(d360);
+    cabeceras = { "D360-API-KEY": d360.clave, "Content-Type": "application/json" };
+  } else {
+    const token = process.env.WHATSAPP_TOKEN;
+    if (!token) return { error: "WhatsApp todavía no está conectado: falta la clave de 360dialog (D360_API_KEY) o el token de Meta (WHATSAPP_TOKEN)." };
+    const version = process.env.WHATSAPP_API_VERSION || "v23.0";
+    if (!/^\d+$/.test(phoneNumberId) || !/^v\d+\.\d+$/.test(version)) return { error: "El número de WhatsApp no es válido." };
+    url = `https://graph.facebook.com/${version}/${phoneNumberId}/messages`;
+    cabeceras = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  }
   let r: Response;
   try {
-    r = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: para.replace(/\D/g, ""), type: "text", text: { preview_url: false, body: cuerpo } }),
-      signal: AbortSignal.timeout(15_000),
-    });
+    r = await fetch(url, { method: "POST", headers: cabeceras, body: mensaje, signal: AbortSignal.timeout(15_000) });
   } catch {
     return { error: "No se pudo conectar con WhatsApp. Inténtalo de nuevo." };
   }
   const j = (await r.json().catch(() => null)) as { messages?: { id?: string }[]; error?: { code?: number; message?: string } } | null;
   const waId = j?.messages?.[0]?.id;
   if (r.ok && waId) return { waId };
+  if (d360 && r.status === 429) return { error: "360dialog no deja mandar más mensajes por ahora (en el sandbox, el límite es de 200)." };
+  if (d360 && r.status === 401) return { error: "360dialog rechazó la clave (D360_API_KEY). Revísala en el servidor." };
   return { error: errorEnEspanol(j?.error?.code ?? null, j?.error?.message ?? null) };
 }
