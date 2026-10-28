@@ -11,6 +11,9 @@ import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, envia
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
+import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
+import { PapeleraIcon } from "@/lib/nav-icons";
+import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 
 /** Qué conversaciones se ven: las pestañas de siempre o, con más de un área, las de un área. */
 type Filtro = "sinResponder" | "mias" | "todas" | `area:${AreaCrm}`;
@@ -223,6 +226,7 @@ export function Bandeja({
   const [modo, setModo] = useState<"responder" | "nota">("responder");
   const [borrador, setBorrador] = useState("");
   const [verPlantillas, setVerPlantillas] = useState(false);
+  const [borrar, setBorrar] = useState<QueBorrar | null>(null);
   const [menuArea, setMenuArea] = useState(false);
   const [verFicha, setVerFicha] = useState(true);
   const [enviando, empezar] = useTransition();
@@ -565,6 +569,11 @@ export function Bandeja({
             </button>
             <EtiquetaArea area={sel.area} />
             {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
+            {sel.borradoPendiente && (
+              <Link href="/crm-dropshippers/borrados" className={`rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-medium text-azul hover:underline ${anilloFoco}`}>
+                Borrado esperando autorización
+              </Link>
+            )}
             {escribe && (
               <>
                 {sel.asignadaAId === miId ? (
@@ -606,6 +615,11 @@ export function Bandeja({
                 >
                   {sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app"}
                 </button>
+                {!sel.borradoPendiente && (
+                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => setBorrar({ tipo: "chat" })}>
+                    Pedir borrar el chat
+                  </button>
+                )}
                 {sel.estado === "abierta" ? (
                   <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
                     Marcar resuelta
@@ -683,7 +697,7 @@ export function Bandeja({
                         Desde aquí, mensajes que llegaron al sistema
                       </span>
                     )}
-                    <Burbuja m={m} seguido={seguido} />
+                    <Burbuja m={m} seguido={seguido} alPedirBorrar={escribe ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined} />
                   </Fragment>
                 );
               })
@@ -774,6 +788,19 @@ export function Bandeja({
         </div>
       )}
 
+      {borrar && sel && (
+        <PedirBorrado
+          conversacionId={sel.id}
+          nombre={sel.nombre}
+          que={borrar}
+          alCerrar={() => setBorrar(null)}
+          alPedido={(autorizan) => {
+            setBorrar(null);
+            mostrarToast(`Petición enviada: ${autorizan.join(", ")} la tiene que autorizar. Hasta entonces no se borra nada.`);
+            void refrescar(sel.id);
+          }}
+        />
+      )}
       {verPlantillas && sel && (
         <EnviarPlantilla
           conversacionId={sel.id}
@@ -901,7 +928,21 @@ function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
  * nota privada a la derecha en amarillo con candado (el dropshipper no la ve) y los cambios de área como aviso al centro. `seguido`: va
  * pegado al anterior del mismo lado, sin colita.
  */
-function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
+/** El botón de la esquina de cada mensaje (se ve al pasar el cursor o al enfocarlo con el teclado): pide borrarlo, no lo borra. */
+function BotonBorrarMensaje({ alPulsar }: { alPulsar: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={alPulsar}
+      aria-label="Pedir borrar este mensaje"
+      className={`absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wa-fondo)] text-[var(--wa-sec)] opacity-0 shadow-[0_1px_2px_var(--wa-sombra)] group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100 ${anilloFoco}`}
+    >
+      <PapeleraIcon aria-hidden="true" className="h-3 w-3" />
+    </button>
+  );
+}
+
+function Burbuja({ m, seguido, alPedirBorrar }: { m: MensajeVista; seguido: boolean; alPedirBorrar?: (m: MensajeVista) => void }) {
   if (m.direccion === "nota" && esAvisoDelSistema(m.texto)) {
     return (
       <span className="my-1.5 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
@@ -912,7 +953,8 @@ function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
   const margen = seguido ? "mt-0.5" : "mt-2";
   if (m.direccion === "nota") {
     return (
-      <div className={`${margen} max-w-[min(65%,560px)] self-end rounded-lg border border-dashed border-[var(--wa-nota-borde)] bg-[var(--wa-nota)] px-2.5 pt-1.5 pb-2 text-[14px] leading-[19px] text-[var(--wa-nota-texto)]`}>
+      <div className={`${margen} group relative max-w-[min(65%,560px)] self-end rounded-lg border border-dashed border-[var(--wa-nota-borde)] bg-[var(--wa-nota)] px-2.5 pt-1.5 pb-2 text-[14px] leading-[19px] text-[var(--wa-nota-texto)]`}>
+        {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
         <span className="mb-0.5 flex items-center gap-1 text-[11.5px] font-bold tracking-[0.04em] text-[var(--wa-nota-acento)] uppercase">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
             <rect x="5" y="11" width="14" height="10" rx="2" />
@@ -929,13 +971,15 @@ function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
   const colita = seguido ? "" : nuestro ? "rounded-tr-none" : "rounded-tl-none";
   return (
     <div
-      className={`${margen} max-w-[min(65%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${colita} ${
+      className={`${margen} group relative max-w-[min(65%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${colita} ${
         nuestro ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
       }`}
     >
+      {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
       {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
       <Contenido m={m} />
       {m.eliminadoEnWhatsapp && <span className="mt-1 block text-[11.5px] text-[var(--wa-sec)] italic">Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva.</span>}
+      {m.borradoPendiente && <span className="mt-1 block text-[11.5px] font-medium text-azul">Borrado esperando autorización</span>}
       <span
         className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
       >
