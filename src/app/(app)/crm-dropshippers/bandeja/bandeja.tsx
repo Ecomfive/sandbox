@@ -5,9 +5,23 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { supabase } from "@/lib/supabase/client";
+import { ACEPTAR_WHATSAPP, BUCKET_WHATSAPP, MAX_BYTES_WHATSAPP } from "@/lib/whatsapp/archivos";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, notaWhatsapp, obtenerBandeja, pasarConversacionDeArea, tomarConversacion } from "./actions";
+import {
+  abrirConversacion,
+  cambiarEstadoConversacion,
+  conectarWebhook360,
+  descartarArchivoWhatsapp,
+  enviarWhatsapp,
+  mandarArchivoWhatsapp,
+  notaWhatsapp,
+  obtenerBandeja,
+  pasarConversacionDeArea,
+  prepararArchivoWhatsapp,
+  tomarConversacion,
+} from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
 
 /** Qué conversaciones se ven: las pestañas de siempre o, con más de un área, las de un área. */
@@ -152,6 +166,19 @@ function Contenido({ m }: { m: MensajeVista }) {
 }
 
 /** Un botón redondo de ícono, como los de la barra de WhatsApp. */
+/** «2,4 MB», «850 KB». */
+const peso = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("es-PA", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
+/** Antes de subir: el motivo si el archivo seguro no se puede mandar por WhatsApp (el servidor lo revisa de nuevo por su contenido). */
+function motivoArchivo(f: File): string | null {
+  const tipo = f.type.toLowerCase();
+  if (tipo === "video/quicktime") return "Los videos .MOV no se pueden mandar por WhatsApp: expórtalo como MP4.";
+  if (tipo.startsWith("image/") && tipo !== "image/jpeg" && tipo !== "image/png") return "Por WhatsApp las fotos van en JPG o PNG.";
+  const max = tipo.startsWith("image/") ? MAX_BYTES_WHATSAPP.image : tipo.startsWith("video/") ? MAX_BYTES_WHATSAPP.video : MAX_BYTES_WHATSAPP.document;
+  if (f.size > max) return `Pesa ${peso(f.size)}: por WhatsApp ${tipo.startsWith("image/") ? "las fotos pesan" : tipo.startsWith("video/") ? "los videos pesan" : "los archivos pesan"} hasta ${peso(max)}.`;
+  return null;
+}
+
 const botonIcono = `flex h-10 w-10 flex-none items-center justify-center rounded-full text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] disabled:opacity-50 ${anilloFoco}`;
 /** Un botón con texto de la cabecera del chat. */
 const botonPildora = `inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 text-[13px] font-medium hover:bg-[var(--wa-hover)] disabled:opacity-50 ${anilloFoco}`;
@@ -191,6 +218,9 @@ export function Bandeja({
   const [borrador, setBorrador] = useState("");
   const [menuArea, setMenuArea] = useState(false);
   const [verFicha, setVerFicha] = useState(true);
+  /** La foto, video o documento que se va a mandar con el texto como pie (solo al responder, no en notas). */
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const entradaArchivo = useRef<HTMLInputElement>(null);
   const [enviando, empezar] = useTransition();
   const finRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -284,17 +314,47 @@ export function Bandeja({
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
 
+  const conArchivo = !esNota && archivo !== null;
+
+  function elegirArchivo(f: File | undefined) {
+    if (!f) return;
+    const motivo = motivoArchivo(f);
+    if (motivo) {
+      mostrarToast(motivo, "destructive");
+      return;
+    }
+    setArchivo(f);
+    textoRef.current?.focus();
+  }
+
   function mandar() {
-    if (!sel || !borrador.trim() || bloqueado) return;
+    if (!sel || bloqueado || (!borrador.trim() && !conArchivo)) return;
     const texto = borrador;
+    const id = sel.id;
+    const adjunto = conArchivo ? archivo : null;
     empezar(async () => {
-      const r = await (esNota ? notaWhatsapp(sel.id, texto) : enviarWhatsapp(sel.id, texto)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      let r: { ok: true } | { error: string };
+      if (adjunto) {
+        // El navegador sube el archivo al bucket con un permiso firmado y el servidor lo revisa y lo manda (actions.ts).
+        const permiso = await prepararArchivoWhatsapp(id, adjunto.name || "archivo", adjunto.size).catch(() => ({ error: "No se pudo preparar la subida." }));
+        if ("error" in permiso) r = permiso;
+        else {
+          const subida = await supabase.storage.from(BUCKET_WHATSAPP).uploadToSignedUrl(permiso.ruta, permiso.token, adjunto, { contentType: adjunto.type || "application/octet-stream" });
+          if (subida.error) {
+            r = { error: "No se pudo subir el archivo. Revisa tu conexión e inténtalo de nuevo." };
+            void descartarArchivoWhatsapp(id, permiso.ruta);
+          } else r = await mandarArchivoWhatsapp(id, permiso.ruta, adjunto.name || "archivo", texto).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+        }
+      } else {
+        r = await (esNota ? notaWhatsapp(id, texto) : enviarWhatsapp(id, texto)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      }
       if ("error" in r) {
         mostrarToast(r.error, "destructive");
         return;
       }
       setBorrador("");
-      await refrescar(sel.id);
+      setArchivo(null);
+      await refrescar(id);
     });
   }
 
@@ -425,6 +485,7 @@ export function Bandeja({
                   onClick={() => {
                     setElegido(c.id);
                     setMenuArea(false);
+                    setArchivo(null);
                     setChat((x) => (x?.id === c.id ? x : null));
                     // Al abrirla queda leída (el servidor la marca en `abrirConversacion`).
                     setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
@@ -577,7 +638,23 @@ export function Bandeja({
 
           {escribe ? (
             <div className="flex flex-col bg-[var(--wa-panel)]">
-              {!esNota && !bloqueado && (
+              {conArchivo && archivo && (
+                <div className="mx-3 mt-2 flex items-center gap-2.5 rounded-lg bg-[var(--wa-fondo)] px-3 py-2">
+                  <span aria-hidden="true" className="flex h-9 w-9 flex-none items-center justify-center rounded-md bg-[var(--wa-panel)] text-[10px] font-bold text-[var(--wa-sec)]">
+                    {archivo.type.startsWith("image/") ? "FOTO" : archivo.type.startsWith("video/") ? "VIDEO" : "DOC"}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[13.5px] font-medium text-[var(--wa-texto)]">{archivo.name}</span>
+                    <span className="text-[12px] text-[var(--wa-sec)]">{peso(archivo.size)} · lo que escribas va como pie</span>
+                  </span>
+                  <button type="button" onClick={() => setArchivo(null)} disabled={enviando} aria-label="Quitar el archivo" className={botonIcono}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {!esNota && !bloqueado && !conArchivo && (
                 <div className="flex gap-2 overflow-x-auto px-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {RAPIDAS.map((r) => (
                     <button
@@ -613,6 +690,27 @@ export function Bandeja({
                     Nota privada
                   </button>
                 </div>
+                {!esNota && (
+                  <>
+                    <input
+                      ref={entradaArchivo}
+                      type="file"
+                      accept={ACEPTAR_WHATSAPP}
+                      aria-label="Elegir foto, video o documento"
+                      className="sr-only"
+                      tabIndex={-1}
+                      onChange={(e) => {
+                        elegirArchivo(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button type="button" disabled={enviando || bloqueado} onClick={() => entradaArchivo.current?.click()} aria-label="Adjuntar foto, video o documento" className={`${botonIcono} mb-px`}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="m21.4 11.6-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5" />
+                      </svg>
+                    </button>
+                  </>
+                )}
                 <label className="flex min-w-0 flex-1">
                   <span className="sr-only">{esNota ? "Nota privada para el equipo" : `Mensaje para ${sel.nombre}`}</span>
                   <textarea
@@ -628,7 +726,17 @@ export function Bandeja({
                         mandar();
                       }
                     }}
-                    placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : ventana ? "Escribe un mensaje" : "Fuera de las 24 h: hace falta una plantilla aprobada"}
+                    onPaste={(e) => {
+                      // Pegar una captura la deja lista para mandar.
+                      const f = esNota ? undefined : e.clipboardData.files[0];
+                      if (f) {
+                        e.preventDefault();
+                        elegirArchivo(f);
+                      }
+                    }}
+                    placeholder={
+                      esNota ? "Nota para el equipo. El dropshipper no la ve." : !ventana ? "Fuera de las 24 h: hace falta una plantilla aprobada" : conArchivo ? "Añade un pie (opcional)" : "Escribe un mensaje"
+                    }
                     className={`min-h-[42px] w-full resize-none rounded-lg border-0 px-3.5 py-[10px] text-[15px] leading-[22px] outline-none placeholder:text-[var(--wa-sec)] focus-visible:ring-2 focus-visible:ring-[var(--wa-acento)] disabled:opacity-60 ${
                       esNota ? "bg-[var(--wa-nota)] text-[var(--wa-nota-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-texto)]"
                     }`}
@@ -636,9 +744,9 @@ export function Bandeja({
                 </label>
                 <button
                   type="button"
-                  disabled={enviando || bloqueado || !borrador.trim()}
+                  disabled={enviando || bloqueado || (!borrador.trim() && !conArchivo)}
                   onClick={mandar}
-                  aria-label={enviando ? "Enviando" : esNota ? "Guardar nota privada" : "Enviar mensaje"}
+                  aria-label={enviando ? (conArchivo ? "Subiendo el archivo" : "Enviando") : esNota ? "Guardar nota privada" : conArchivo ? "Enviar el archivo" : "Enviar mensaje"}
                   className={`flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full text-[var(--wa-acento-texto)] disabled:opacity-40 ${esNota ? "bg-[var(--wa-nota-acento)]" : "bg-[var(--wa-acento)]"} ${anilloFoco}`}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

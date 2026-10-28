@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
+import { detectarArchivoWhatsapp, excedeTamano } from "./archivos";
 import { urlDescarga360 } from "./proveedor";
 import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
 
@@ -177,4 +178,23 @@ test("360dialog: los archivos solo se bajan de Meta, cambiados al dominio de 360
   assert.equal(urlDescarga360("https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1&ext=2"), "https://waba-v2.360dialog.io/whatsapp_business/attachments/?mid=1&ext=2");
   assert.equal(urlDescarga360("https://evil.example.com/x"), null);
   assert.equal(urlDescarga360("http://lookaside.fbsbx.com/x"), null);
+});
+
+test("archivos por WhatsApp: se reconocen por su contenido, con los límites de Meta", () => {
+  const bytes = (...partes: (number[] | string)[]) => new Uint8Array(partes.flatMap((p) => (typeof p === "string" ? [...p].map((c) => c.charCodeAt(0)) : p)));
+  const jpg = detectarArchivoWhatsapp(bytes([0xff, 0xd8, 0xff, 0xe0], "resto"), "foto.png");
+  assert.deepEqual(jpg, { tipoWa: "image", tipo: "imagen", mime: "image/jpeg", extension: "jpg" });
+  const mp4 = detectarArchivoWhatsapp(bytes([0, 0, 0, 0x20], "ftypisom", [0, 0, 2, 0]), "video.mp4");
+  assert.equal("tipoWa" in mp4 && mp4.tipoWa, "video");
+  const mov = detectarArchivoWhatsapp(bytes([0, 0, 0, 0x14], "ftypqt  ", [0, 0, 0, 0]), "IMG_1234.MOV");
+  assert.ok("error" in mov && mov.error.includes("MP4"));
+  const pdf = detectarArchivoWhatsapp(bytes("%PDF-1.7 ..."), "catalogo.pdf");
+  assert.equal("tipoWa" in pdf && pdf.tipoWa, "document");
+  const gif = detectarArchivoWhatsapp(bytes("GIF89a......"), "a.gif");
+  assert.ok("error" in gif);
+  const html = detectarArchivoWhatsapp(bytes("<html><script>"), "foto.jpg");
+  assert.ok("error" in html);
+  assert.equal(excedeTamano("image", 5 * 1024 * 1024), null);
+  assert.ok(excedeTamano("image", 5 * 1024 * 1024 + 1));
+  assert.ok(excedeTamano("video", 17 * 1024 * 1024));
 });
