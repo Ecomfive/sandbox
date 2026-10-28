@@ -4,9 +4,12 @@ import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { type AreaCrm } from "@/lib/crm/areas";
+import { accionBandejaBloqueada, permisosBandeja } from "@/lib/crm/permisos-bandeja";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
-import { enviarTextoWhatsapp } from "@/lib/whatsapp/api";
+import { nombreSeguro } from "@/lib/compras/adjuntos";
+import { enviarArchivoWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
+import { BUCKET_WHATSAPP, detectarArchivoWhatsapp, excedeTamano, MAX_BYTES_WHATSAPP } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { config360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
@@ -33,14 +36,14 @@ export async function ultimosMensajesDropshipper(
   if (!u) return { error: "No tienes acceso." };
   if (!/^[0-9a-f-]{36}$/i.test(dropshipperId)) return null;
   const supabase = createServiceClient();
-  const { data: c, error } = await supabase
+  let consulta = supabase
     .from("whatsapp_conversaciones")
     .select("id, no_leidos, ultimo_entrante_en, whatsapp_numeros(nombre)")
     .eq("dropshipper_id", dropshipperId)
-    .in("area", areasDe(u))
-    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
+    .in("area", areasDe(u));
+  // Lo afinado: con «los suyos y los libres», la ficha tampoco muestra el chat que lleva otra persona.
+  if (permisosBandeja(u.afinado).alcance === "mias-y-libres") consulta = consulta.or(`asignada_a.is.null,asignada_a.eq.${u.id}`);
+  const { data: c, error } = await consulta.order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
   if (error || !c) return null;
   const numero = c.whatsapp_numeros as unknown as { nombre: string } | { nombre: string }[];
   const { mensajes } = await cargarConversacion(supabase, c.id as string, null);
@@ -82,6 +85,8 @@ export async function mensajesAnteriores(id: string, antesDe: string): Promise<{
 export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueada = accionBandejaBloqueada(u.afinado, "responder");
+  if (bloqueada) return { error: bloqueada };
   const cuerpo = String(texto ?? "").trim();
   if (!cuerpo) return { error: "Escribe el mensaje." };
   if (cuerpo.length > MAX_TEXTO) return { error: `El mensaje es muy largo (máximo ${MAX_TEXTO} caracteres).` };
@@ -113,10 +118,117 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   return { ok: true };
 }
 
+/** WhatsApp acepta pies de foto o video de hasta 1024 caracteres. */
+const MAX_PIE = 1024;
+
+/**
+ * Da permiso (URL firmada) para que el navegador suba una foto, un video o un documento al bucket `whatsapp` (migración 0170), en la
+ * carpeta de esa conversación: el servidor no recibe archivos grandes. El archivo se revisa de verdad al mandarlo.
+ */
+export async function prepararArchivoWhatsapp(id: string, nombre: string, bytes: number): Promise<{ ruta: string; token: string } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueada = accionBandejaBloqueada(u.afinado, "archivos");
+  if (bloqueada) return { error: bloqueada };
+  if (typeof nombre !== "string" || !nombre.trim()) return { error: "El archivo no tiene nombre." };
+  if (!Number.isFinite(bytes) || bytes <= 0) return { error: "El archivo está vacío." };
+  if (bytes > MAX_BYTES_WHATSAPP.document) return { error: "Por WhatsApp los archivos pesan hasta 100 MB." };
+  const supabase = createServiceClient();
+  const c = await conversacionPermitida(supabase, id, u, true);
+  if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
+  const ruta = `salientes/${id}/${crypto.randomUUID()}-${nombreSeguro(nombre)}`;
+  const { data, error } = await supabase.storage.from(BUCKET_WHATSAPP).createSignedUploadUrl(ruta);
+  if (error || !data) return { error: "No se pudo preparar la subida. ¿Ya se corrió la migración 0170?" };
+  return { ruta, token: data.token };
+}
+
+/**
+ * Manda por WhatsApp un archivo ya subido con `prepararArchivoWhatsapp`, con su pie de texto. Se revisa que sea de la carpeta de esa
+ * conversación, su contenido (foto JPG/PNG, video MP4, documento) y su peso; se guarda con su tipo real y WhatsApp lo baja de un
+ * enlace firmado de una hora. Si algo falla, el archivo se borra.
+ */
+export async function mandarArchivoWhatsapp(id: string, ruta: string, nombre: string, pie: string): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueada = accionBandejaBloqueada(u.afinado, "archivos");
+  if (bloqueada) return { error: bloqueada };
+  const supabase = createServiceClient();
+  const storage = supabase.storage.from(BUCKET_WHATSAPP);
+  const carpeta = `salientes/${id}/`;
+  const propia = typeof ruta === "string" && ruta.startsWith(carpeta) && !ruta.includes("..") && ruta.length <= 300;
+  const falla = async (error: string) => {
+    if (propia) await storage.remove([ruta]);
+    return { error };
+  };
+  if (!propia) return { error: "Ese archivo no es de esta conversación." };
+  // Sin acceso a la conversación o con el archivo ya mandado no se borra nada: solo lo que se puede mandar se limpia al fallar.
+  const c = await conversacionPermitida(supabase, id, u, true);
+  if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  const { count } = await supabase.from("whatsapp_mensajes").select("id", { count: "exact", head: true }).eq("media_ruta", ruta);
+  if (count) return { error: "Ese archivo ya se mandó. Vuelve a adjuntarlo." };
+  if (minutosVentana(c.ultimoEntranteEn) <= 0) return falla("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.");
+  const texto = String(pie ?? "").trim();
+  if (texto.length > MAX_PIE) return falla(`El texto que acompaña el archivo es muy largo (máximo ${MAX_PIE} caracteres).`);
+
+  const { data, error } = await storage.download(ruta);
+  if (error || !data) return falla("No se encontró el archivo. Vuelve a adjuntarlo.");
+  const contenido = new Uint8Array(await data.arrayBuffer());
+  const nombreArchivo = String(nombre ?? "").trim().slice(0, 120) || "archivo";
+  const tipo = detectarArchivoWhatsapp(contenido, nombreArchivo);
+  if ("error" in tipo) return falla(tipo.error);
+  const pesado = excedeTamano(tipo.tipoWa, contenido.byteLength);
+  if (pesado) return falla(pesado);
+  // Se guarda con el tipo que corresponde a su contenido, no el que mandó el navegador.
+  if ((data.type || "").split(";")[0] !== tipo.mime) {
+    const { error: errorTipo } = await storage.update(ruta, contenido, { contentType: tipo.mime, upsert: true });
+    if (errorTipo) return falla("No se pudo guardar el archivo.");
+  }
+  const { data: firmado } = await storage.createSignedUrl(ruta, 3600);
+  if (!firmado?.signedUrl) return falla("No se pudo preparar el archivo para WhatsApp.");
+
+  const r = await enviarArchivoWhatsapp(c.phoneNumberId, c.telefono, { tipoWa: tipo.tipoWa, enlace: firmado.signedUrl, texto: texto || null, nombre: nombreArchivo });
+  if ("error" in r) return falla(r.error);
+  const ahora = new Date().toISOString();
+  const { error: errorGuardar } = await supabase.from("whatsapp_mensajes").insert({
+    conversacion_id: id,
+    direccion: "saliente",
+    tipo: tipo.tipo,
+    texto: texto || null,
+    media_ruta: ruta,
+    media_mime: tipo.mime,
+    media_nombre: tipo.tipoWa === "document" ? nombreArchivo : null,
+    wa_id: r.waId,
+    estado: "enviado",
+    autor_id: u.id,
+    autor_nombre: u.nombre || u.email,
+    momento: ahora,
+  });
+  // Ya salió por WhatsApp: si no se pudo anotar, se avisa (no se reintenta, para no mandarlo dos veces).
+  if (errorGuardar) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
+  await supabase
+    .from("whatsapp_conversaciones")
+    .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje(tipo.tipo, texto || null), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
+    .eq("id", id);
+  return { ok: true };
+}
+
+/** Borra un archivo que se subió pero se quitó antes de mandarlo. Solo de la carpeta de esa conversación y si no se mandó. */
+export async function descartarArchivoWhatsapp(id: string, ruta: string): Promise<void> {
+  const u = await usuarioBandeja(true);
+  if (!u || typeof ruta !== "string" || !ruta.startsWith(`salientes/${id}/`) || ruta.includes("..")) return;
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u, true))) return;
+  const { count } = await supabase.from("whatsapp_mensajes").select("id", { count: "exact", head: true }).eq("media_ruta", ruta);
+  if (!count) await supabase.storage.from(BUCKET_WHATSAPP).remove([ruta]);
+}
+
 /** Una nota privada en la conversación: la ve el equipo, nunca el dropshipper (no sale por WhatsApp). */
 export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueada = accionBandejaBloqueada(u.afinado, "notas");
+  if (bloqueada) return { error: bloqueada };
   const cuerpo = String(texto ?? "").trim();
   if (!cuerpo) return { error: "Escribe la nota." };
   if (cuerpo.length > MAX_TEXTO) return { error: `La nota es muy larga (máximo ${MAX_TEXTO} caracteres).` };
@@ -132,6 +244,8 @@ export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: tru
 export async function cambiarEstadoConversacion(id: string, estado: "abierta" | "resuelta"): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueada = accionBandejaBloqueada(u.afinado, "resolver");
+  if (bloqueada) return { error: bloqueada };
   if (estado !== "abierta" && estado !== "resuelta") return { error: "Estado no válido." };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
@@ -148,6 +262,8 @@ const NOMBRE_AREA: Record<AreaCrm, string> = { atencion: "Atención", comercial:
 export async function pasarConversacionDeArea(id: string, area: string): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueada = accionBandejaBloqueada(u.afinado, "pasar-area");
+  if (bloqueada) return { error: bloqueada };
   if (!Object.hasOwn(NOMBRE_AREA, area)) return { error: "Área no válida." };
   const destino = area as AreaCrm;
   const supabase = createServiceClient();
@@ -174,6 +290,8 @@ export async function pasarConversacionDeArea(id: string, area: string): Promise
 export async function tomarConversacion(id: string, soltar = false): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueada = accionBandejaBloqueada(u.afinado, "tomar");
+  if (bloqueada) return { error: bloqueada };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase.from("whatsapp_conversaciones").update({ asignada_a: soltar ? null : u.id }).eq("id", id);

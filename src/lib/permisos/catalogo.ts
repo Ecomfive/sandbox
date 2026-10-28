@@ -234,7 +234,46 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
   },
 };
 
-const CATALOGOS: Record<string, CatalogoModulo> = { compras: CATALOGO_COMPRAS };
+/**
+ * CRM Dropshippers (28 oct 2026, pedido de Hernán): con un solo número de WhatsApp para todo el equipo, cada persona ve la bandeja según
+ * su rol y lo afinado. Las áreas (Atención, Comercial, Dirección) siguen saliendo de los módulos `crm-comercial` y `crm-direccion`; aquí se
+ * afina dentro de ellas: qué pestañas ve, qué puede hacer en un chat, si ve el teléfono y qué chats ve (todos los de su área o solo los
+ * suyos). Lo aplican `bandeja/actions.ts` y `datos-bandeja.ts` en el servidor y la bandeja en pantalla.
+ */
+export const CATALOGO_CRM: CatalogoModulo = {
+  modulo: "crm-dropshippers",
+  etiqueta: "CRM Dropshippers",
+  pestanas: [
+    { clave: "bandeja", etiqueta: "Bandeja de WhatsApp", href: "/crm-dropshippers/bandeja" },
+    { clave: "casos", etiqueta: "Casos", href: "/crm-dropshippers/casos" },
+    { clave: "ranking", etiqueta: "Ranking", href: "/crm-dropshippers/ranking" },
+    { clave: "vinculos", etiqueta: "Vínculos", href: "/crm-dropshippers/vinculos" },
+  ],
+  acciones: [
+    { clave: "responder", etiqueta: "Responder por WhatsApp", requiereEdicion: true },
+    { clave: "archivos", etiqueta: "Mandar fotos, videos y documentos", requiereEdicion: true },
+    { clave: "notas", etiqueta: "Dejar notas privadas en el chat", requiereEdicion: true },
+    { clave: "pasar-area", etiqueta: "Pasar un chat a otra área", requiereEdicion: true },
+    { clave: "tomar", etiqueta: "Tomar y soltar chats", requiereEdicion: true },
+    { clave: "resolver", etiqueta: "Marcar resuelto y reabrir", requiereEdicion: true },
+  ],
+  grupos: [
+    {
+      nombre: "Datos del dropshipper",
+      sensible: true,
+      campos: [{ clave: "telefono", etiqueta: "Teléfono de WhatsApp", editable: false, ocultable: true }],
+    },
+  ],
+  alcance: {
+    titulo: "Qué chats de WhatsApp ve",
+    opciones: [
+      { valor: "todas", etiqueta: "Todos los chats de sus áreas" },
+      { valor: "mias-y-libres", etiqueta: "Los que tiene a cargo y los que nadie tomó" },
+    ],
+  },
+};
+
+const CATALOGOS: Record<string, CatalogoModulo> = { compras: CATALOGO_COMPRAS, "crm-dropshippers": CATALOGO_CRM };
 
 /** El catálogo de lo afinable de un módulo, o `undefined` si ese módulo todavía solo se da o se quita completo. */
 export const catalogoDe = (modulo: string): CatalogoModulo | undefined => CATALOGOS[modulo];

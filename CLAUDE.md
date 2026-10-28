@@ -970,6 +970,17 @@ convenciones técnicas del código.
   `/api/whatsapp/360dialog/[clave]` (sin firma: la puerta es `D360_WEBHOOK_CLAVE`, comparada en tiempo constante; `extraerAviso(aviso,
   "360dialog")` acepta avisos sin `object` ni `metadata`). El botón «Conectar el webhook de 360dialog» (`conectarWebhook360`, solo
   administradores, `esAdministrador`) registra la dirección; la bandeja vacía les dice si faltan `D360_API_KEY` o `D360_WEBHOOK_CLAVE`.
+  **Fotos, videos y documentos** (migración 0170, 28 oct 2026): bucket privado `whatsapp`. Lo que manda el equipo: el navegador lo
+  sube a `salientes/<conversación>/` con `prepararArchivoWhatsapp` (URL firmada; el servidor no recibe archivos grandes) y
+  `mandarArchivoWhatsapp` lo revisa por contenido (`detectarArchivoWhatsapp`: foto JPG/PNG 5 MB, video MP4/3GP 16 MB, documento 100 MB;
+  un .MOV no) y lo manda con un enlace firmado de una hora (`enviarArchivoWhatsapp`). Lo que llega se copia a `entrantes/` en el
+  webhook (`copiarAlBucket`, guardar.ts) porque Meta lo guarda ~30 días. `whatsapp_mensajes.media_ruta`: con ella
+  `/api/whatsapp/media/[id]` redirige a un enlace firmado de 10 min; sin ella baja de Meta (`bajarArchivoWhatsapp`, media.ts).
+  **Afinado del CRM** (28 oct 2026): `CATALOGO_CRM` (`src/lib/permisos/catalogo.ts`) hace del CRM un módulo afinable en Usuarios y roles:
+  pestañas (bandeja, casos, ranking, vinculos; sus páginas usan `requirePestana`), acciones de la bandeja (responder, archivos, notas,
+  pasar-area, tomar, resolver), el campo `telefono` y el alcance «mias-y-libres». Todo pasa por `src/lib/crm/permisos-bandeja.ts`
+  (con prueba): `accionBandejaBloqueada` al inicio de cada acción de `bandeja/actions.ts`, `chatEnAlcance` en `conversacionPermitida`, el
+  filtro de alcance en `cargarBandeja`, `ultimosMensajesDropshipper` y `cargarChats`, y `permisos` en la bandeja para esconder botones.
 - **CRM Dropshippers rediseñado** (26 oct 2026, al estilo de Gestión de IDs Dropi). `/crm-dropshippers` es la lista
   (`lista-dropshippers.tsx`): `TableroCrm` (`tablero-crm.tsx`, tarjetas que cuentan y filtran con atajos sobre `DEF_DROPSHIPPERS`,
   colores `COLORES` del tablero de Gestión de IDs), `ListaDatos` con `FilaDropshipperLista` (`fila-dropshipper.tsx`) y la ficha en

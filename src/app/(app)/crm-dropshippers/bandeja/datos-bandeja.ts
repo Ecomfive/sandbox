@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
 import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { chatEnAlcance, permisosBandeja, TELEFONO_OCULTO } from "@/lib/crm/permisos-bandeja";
+import type { Afinado } from "@/lib/permisos/afinado";
+
+/** Quien abre la bandeja: sus módulos (áreas) y, si se tienen, su id y lo afinado del CRM (qué chats ve, si ve el teléfono). */
+type UsuarioBandeja = PermisosCrm & { id?: string; afinado?: Record<string, Afinado> };
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
 export interface NumeroVista {
@@ -80,29 +85,35 @@ export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u)
  * Los números de la empresa y las conversaciones (las 300 más recientes) que esta persona puede ver: las de las áreas que ve. El área es
  * de cada conversación desde la migración 0168, así un solo número sirve a todo el equipo. `null` si falta la migración 0158.
  */
-export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | null> {
+export async function cargarBandeja(supabase: SupabaseClient, usuario: UsuarioBandeja): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | null> {
   const areas = areasDe(usuario);
+  const permisos = permisosBandeja(usuario.afinado);
   const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (numerosR.error) return null;
   const numeros = (numerosR.data ?? []) as NumeroVista[];
   if (!numeros.length) return { numeros, conversaciones: [] };
-  const { data } = await supabase
+  let consulta = supabase
     .from("whatsapp_conversaciones")
     .select(
       "id, numero_id, area, telefono, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
-    .in("numero_id", numeros.map((n) => n.id))
-    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
-    .limit(300);
+    .in("numero_id", numeros.map((n) => n.id));
+  // Lo afinado (CATALOGO_CRM): «los suyos y los libres» deja fuera los que lleva otra persona. El id es el de su perfil (uuid).
+  if (permisos.alcance === "mias-y-libres") {
+    consulta = usuario.id && /^[0-9a-f-]{36}$/i.test(usuario.id) ? consulta.or(`asignada_a.is.null,asignada_a.eq.${usuario.id}`) : consulta.is("asignada_a", null);
+  }
+  const { data } = await consulta.order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(300);
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
     const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null }>);
+    // Sin permiso para ver el teléfono, ni en el dato ni como nombre de quien no tiene perfil.
+    const telefono = permisos.verTelefono ? (c.telefono as string) : TELEFONO_OCULTO;
     return {
       id: c.id as string,
       numeroId: c.numero_id as string,
-      telefono: c.telefono as string,
-      nombre: d?.nombre ?? (c.nombre_perfil as string | null) ?? (c.telefono as string),
+      telefono,
+      nombre: d?.nombre ?? (c.nombre_perfil as string | null) ?? (permisos.verTelefono ? telefono : "Sin nombre"),
       nombrePerfil: (c.nombre_perfil as string | null) ?? null,
       dropshipperId: (c.dropshipper_id as string | null) ?? null,
       codigo: d?.codigo ?? null,
@@ -128,7 +139,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
 export async function conversacionPermitida(
   supabase: SupabaseClient,
   id: string,
-  usuario: PermisosCrm,
+  usuario: UsuarioBandeja,
   /** Para mandar, anotar, resolver o tomar: además, poder escribir en el área del número (auditoría del 27 oct 2026). */
   escribe = false,
 ): Promise<{ id: string; area: AreaCrm; telefono: string; dropshipperId: string | null; asignadaA: string | null; ultimoEntranteEn: string | null; phoneNumberId: string } | null> {
@@ -142,6 +153,8 @@ export async function conversacionPermitida(
   const area = data?.area as AreaCrm | undefined;
   if (!data || !numero || !area || !areasDe(usuario).includes(area)) return null;
   if (escribe && !escribeEnArea(accesoCrm(usuario), area)) return null;
+  // Lo afinado: con «los suyos y los libres», el chat que lleva otra persona no se abre (ni por la dirección ni por una acción).
+  if (!chatEnAlcance(permisosBandeja(usuario.afinado).alcance, (data.asignada_a as string | null) ?? null, usuario.id)) return null;
   return {
     id: data.id as string,
     area,
@@ -168,11 +181,22 @@ export async function cargarConversacion(
 ): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null }> {
   let consulta = supabase
     .from("whatsapp_mensajes")
+    .select("id, direccion, tipo, texto, media_id, media_ruta, media_nombre, estado, error, autor_nombre, momento, wa_id")
+    .eq("conversacion_id", id);
+  let sinRuta = supabase
+    .from("whatsapp_mensajes")
     .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_nombre, momento, wa_id")
     .eq("conversacion_id", id);
-  if (antesDe) consulta = consulta.lt("momento", antesDe);
+  if (antesDe) {
+    consulta = consulta.lt("momento", antesDe);
+    sinRuta = sinRuta.lt("momento", antesDe);
+  }
   const [mensajesR, dsR, casosR] = await Promise.all([
-    consulta.order("momento", { ascending: false }).limit(MENSAJES_POR_VEZ),
+    // `media_ruta` es de la migración 0170: sin ella se leen los mensajes igual (los archivos se bajan de Meta).
+    consulta
+      .order("momento", { ascending: false })
+      .limit(MENSAJES_POR_VEZ)
+      .then((r) => (r.error ? sinRuta.order("momento", { ascending: false }).limit(MENSAJES_POR_VEZ) : r)),
     dropshipperId
       ? supabase.from("dropshippers").select("id, nombre, codigo, estado, tiendas, tienda, dropshipper_cuentas(plataformas(nombre), paises(codigo))").eq("id", dropshipperId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -187,7 +211,7 @@ export async function cargarConversacion(
       tipo: m.tipo as string,
       texto: (m.texto as string | null) ?? null,
       mediaNombre: (m.media_nombre as string | null) ?? null,
-      conArchivo: !!m.media_id,
+      conArchivo: !!(m.media_id || (m as { media_ruta?: string | null }).media_ruta),
       estado: m.estado as string,
       error: (m.error as string | null) ?? null,
       autor: (m.autor_nombre as string | null) ?? null,

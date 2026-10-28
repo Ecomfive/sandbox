@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getUsuarioActual } from "@/lib/auth";
-import { MODULO_ATENCION, MODULO_COMERCIAL } from "@/lib/crm/areas";
+import { MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION } from "@/lib/crm/areas";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { createServiceClient } from "@/lib/supabase/server";
-import { config360, urlDescarga360, urlMedia360 } from "@/lib/whatsapp/proveedor";
+import { BUCKET_WHATSAPP } from "@/lib/whatsapp/archivos";
+import { bajarArchivoWhatsapp } from "@/lib/whatsapp/media";
 import { conversacionPermitida } from "@/app/(app)/crm-dropshippers/bandeja/datos-bandeja";
 
 export const dynamic = "force-dynamic";
@@ -13,24 +14,31 @@ const SE_MUESTRAN = /^(image\/(jpeg|png|webp|gif)|audio\/(ogg|mpeg|mp4|aac|amr)|
 const MAX_BYTES = 25 * 1024 * 1024;
 
 /**
- * Una foto, audio, video o documento que mandó un dropshipper por WhatsApp (CRM › Bandeja). Meta lo guarda unos 30 días y se baja
- * con el token del servidor: aquí se pide, se revisa que la persona pueda ver esa conversación (su área) y se le pasa el archivo. El
- * id es el del mensaje en el sistema, no el de Meta.
+ * Una foto, audio, video o documento de un chat de WhatsApp (CRM › Bandeja). Se revisa que la persona pueda ver esa conversación (su
+ * área). Tres orígenes:
+ *  - un chat importado del celular (migración 0169, `media_id` «storage:…»): del bucket `whatsapp-importados`;
+ *  - lo que manda el equipo y lo que llega desde la migración 0170 (`media_ruta`): enlace firmado de pocos minutos del bucket `whatsapp`;
+ *  - lo demás se baja de WhatsApp (Meta lo guarda unos 30 días).
+ * El id es el del mensaje en el sistema, no el de Meta.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const u = await getUsuarioActual();
-  if (!u || !(u.modulos.includes(MODULO_ATENCION) || u.modulos.includes(MODULO_COMERCIAL))) return new NextResponse("Forbidden", { status: 403 });
+  if (!u || !(u.modulos.includes(MODULO_ATENCION) || u.modulos.includes(MODULO_COMERCIAL) || u.modulos.includes(MODULO_DIRECCION))) return new NextResponse("Forbidden", { status: 403 });
   if (!/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not Found", { status: 404 });
   const supabase = createServiceClient();
-  const { data: m } = await supabase.from("whatsapp_mensajes").select("conversacion_id, media_id, media_mime, media_nombre").eq("id", id).maybeSingle();
-  if (!m?.media_id || !(await conversacionPermitida(supabase, m.conversacion_id as string, u))) return new NextResponse("Not Found", { status: 404 });
+  // `media_ruta` es de la migración 0170: sin ella se lee igual el resto.
+  const conRuta = await supabase.from("whatsapp_mensajes").select("conversacion_id, media_id, media_mime, media_nombre, media_ruta").eq("id", id).maybeSingle();
+  const { data: m } = conRuta.error ? await supabase.from("whatsapp_mensajes").select("conversacion_id, media_id, media_mime, media_nombre").eq("id", id).maybeSingle() : conRuta;
+  const ruta = (m as { media_ruta?: string | null } | null)?.media_ruta ?? null;
+  if (!m || !(m.media_id || ruta) || !(await conversacionPermitida(supabase, m.conversacion_id as string, u))) return new NextResponse("Not Found", { status: 404 });
   const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
+
   // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169): vive en el bucket, en la carpeta del chat.
-  if (String(m.media_id).startsWith("storage:")) {
-    const ruta = String(m.media_id).slice(8);
-    if (!ruta.startsWith(`${m.conversacion_id}/`) || ruta.includes("..")) return new NextResponse("Not Found", { status: 404 });
-    const { data: archivo } = await supabase.storage.from("whatsapp-importados").download(ruta);
+  if (String(m.media_id ?? "").startsWith("storage:")) {
+    const rutaImportada = String(m.media_id).slice(8);
+    if (!rutaImportada.startsWith(`${m.conversacion_id}/`) || rutaImportada.includes("..")) return new NextResponse("Not Found", { status: 404 });
+    const { data: archivo } = await supabase.storage.from("whatsapp-importados").download(rutaImportada);
     if (!archivo || archivo.size > MAX_BYTES) return new NextResponse("Archivo no disponible.", { status: 410 });
     const bytes = new Uint8Array(await archivo.arrayBuffer());
     // El tipo sale de la extensión que dio el celular: una foto solo se muestra si de verdad lo es.
@@ -38,30 +46,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const tipo = declarado.startsWith("image/") ? (detectarImagen(bytes.slice(0, 64))?.tipo ?? "") : declarado;
     return respuesta(bytes, tipo, nombre);
   }
-  if (!/^\d+$/.test(String(m.media_id))) return new NextResponse("Not Found", { status: 404 });
-  // Con 360dialog (proveedor.ts) los archivos se piden por su dominio y con su clave; si no, a Meta con el token.
-  const d360 = config360();
-  if (d360?.sandbox) return new NextResponse("El sandbox de 360dialog no entrega archivos: se verán con el número real.", { status: 410 });
-  const token = process.env.WHATSAPP_TOKEN;
-  const version = process.env.WHATSAPP_API_VERSION || "v23.0";
-  if (!d360 && (!token || !/^v\d+\.\d+$/.test(version))) return new NextResponse("Not Found", { status: 404 });
-  const autorizacion: Record<string, string> = d360 ? { "D360-API-KEY": d360.clave } : { Authorization: `Bearer ${token}` };
-  try {
-    const info = await fetch(d360 ? urlMedia360(String(m.media_id)) : `https://graph.facebook.com/${version}/${m.media_id}`, { headers: autorizacion, signal: AbortSignal.timeout(10_000) });
-    const j = (await info.json().catch(() => null)) as { url?: string; mime_type?: string; file_size?: number } | null;
-    // Meta da una dirección temporal de su propio dominio: solo se sigue esa (con 360dialog, cambiada a su dominio).
-    const descarga = j?.url ? (d360 ? urlDescarga360(j.url) : /^https:\/\/[a-z0-9.-]+\.(fbsbx|facebook|whatsapp)\.(com|net)\//i.test(j.url) ? j.url : null) : null;
-    if (!info.ok || !descarga || Number(j?.file_size ?? 0) > MAX_BYTES) {
-      return new NextResponse("Archivo no disponible (Meta lo guarda unos 30 días).", { status: 410 });
-    }
-    const archivo = await fetch(descarga, { headers: autorizacion, signal: AbortSignal.timeout(20_000) });
-    if (!archivo.ok) return new NextResponse("Archivo no disponible.", { status: 410 });
-    const bytes = await archivo.arrayBuffer();
-    if (bytes.byteLength > MAX_BYTES) return new NextResponse("Archivo muy grande.", { status: 413 });
-    return respuesta(bytes, String(j?.mime_type || m.media_mime || ""), nombre);
-  } catch {
-    return new NextResponse("No se pudo traer el archivo de WhatsApp.", { status: 502 });
+
+  // Lo que manda el equipo y lo que llega desde la migración 0170: enlace firmado del bucket (no pasa por aquí: los videos pesan).
+  if (ruta) {
+    if ((!ruta.startsWith("salientes/") && !ruta.startsWith("entrantes/")) || ruta.includes("..")) return new NextResponse("Not Found", { status: 404 });
+    const seMuestra = SE_MUESTRAN.test(String(m.media_mime ?? ""));
+    const { data, error } = await supabase.storage.from(BUCKET_WHATSAPP).createSignedUrl(ruta, 600, seMuestra ? undefined : { download: nombre });
+    if (error || !data?.signedUrl) return new NextResponse("Archivo no disponible.", { status: 410 });
+    return NextResponse.redirect(data.signedUrl, { status: 302, headers: { "Cache-Control": "private, max-age=300" } });
   }
+
+  const r = await bajarArchivoWhatsapp(String(m.media_id));
+  if ("error" in r) return new NextResponse(r.error, { status: r.status });
+  if (r.bytes.byteLength > MAX_BYTES) return new NextResponse("Archivo muy grande.", { status: 413 });
+  return respuesta(r.bytes, String(r.mime || m.media_mime || ""), nombre);
 }
 
 /** El archivo para la página: los tipos que se muestran van en línea; cualquier otro, como descarga. Nunca se ejecuta nada. */
