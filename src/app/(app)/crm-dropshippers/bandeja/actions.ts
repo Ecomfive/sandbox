@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, MODULO_ATENCION, MODULO_COMERCIAL, type AreaCrm } from "@/lib/crm/areas";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarTextoWhatsapp } from "@/lib/whatsapp/api";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
@@ -181,12 +182,12 @@ export async function tomarConversacion(id: string, soltar = false): Promise<{ o
 
 /**
  * Registra en 360dialog la dirección del webhook del sistema (`/api/whatsapp/360dialog/<D360_WEBHOOK_CLAVE>`), para que le mande los
- * mensajes del número. Solo quien administra el sistema (Configuración, con edición). La dirección es la del sitio desde donde se pulsa
+ * mensajes del número. Solo quien administra el sistema (Usuarios y roles, con edición). La dirección es la del sitio desde donde se pulsa
  * el botón, o `D360_WEBHOOK_BASE` si está puesta.
  */
 export async function conectarWebhook360(): Promise<{ ok: true } | { error: string }> {
   const u = await getUsuarioActual();
-  if (!u || !u.modulos.includes("configuracion") || u.modulosSoloLectura.includes("configuracion")) return { error: "Solo quien administra el sistema puede conectar el webhook." };
+  if (!u || !esAdministrador(u)) return { error: "Solo quien administra el sistema puede conectar el webhook." };
   const d360 = config360();
   if (!d360) return { error: "Falta la clave de 360dialog (D360_API_KEY) en el servidor." };
   const clave = process.env.D360_WEBHOOK_CLAVE;

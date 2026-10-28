@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { accesoCrm, areasVisibles } from "@/lib/crm/areas";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { config360 } from "@/lib/whatsapp/proveedor";
 import { Bandeja } from "./bandeja";
@@ -31,7 +32,12 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           escribe={a.escribeAtencion || a.escribeComercial || a.escribeDireccion}
           miId={usuario.id}
           areas={areasVisibles(a)}
-          conectar360={!!config360() && usuario.modulos.includes("configuracion") && !usuario.modulosSoloLectura.includes("configuracion")}
+          estado360={
+            // Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, nunca su valor).
+            esAdministrador(usuario)
+              ? { clave: !!config360(), sandbox: !!config360()?.sandbox, palabraSecreta: (process.env.D360_WEBHOOK_CLAVE?.length ?? 0) >= 16 }
+              : null
+          }
         />
       )}
     </Pagina>

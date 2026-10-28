@@ -87,7 +87,7 @@ export function Bandeja({
   escribe,
   miId,
   areas,
-  conectar360 = false,
+  estado360 = null,
 }: {
   inicial: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] };
   abrirInicial: string | null;
@@ -95,8 +95,8 @@ export function Bandeja({
   miId: string;
   /** Las áreas que ve la persona: con más de una, cada chat muestra la suya. */
   areas: AreaCrm[];
-  /** 360dialog configurado en el servidor y la persona administra el sistema: puede registrar el webhook desde aquí. */
-  conectar360?: boolean;
+  /** Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, no su valor). Con la clave, puede registrar el webhook. */
+  estado360?: { clave: boolean; sandbox: boolean; palabraSecreta: boolean } | null;
 }) {
   const { mostrarToast } = useToast();
   const [datos, setDatos] = useState(inicial);
@@ -193,7 +193,17 @@ export function Bandeja({
           Falta conectar el número de la empresa (con 360dialog o directo con Meta) y poner sus datos en el servidor. Cuando llegue el primer mensaje, el número aparece aquí solo. Los
           pasos están en el Centro de ayuda, en «CRM Dropshippers › Bandeja de WhatsApp».
         </p>
-        {conectar360 && (
+        {estado360 && (
+          <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0 text-[13px]" aria-label="Datos de 360dialog en el servidor">
+            <li className={estado360.clave ? "text-success" : "text-destructive"}>
+              {estado360.clave ? `✓ Clave de 360dialog cargada${estado360.sandbox ? " (sandbox)" : ""}` : "✗ Falta D360_API_KEY en el servidor (Vercel, Production) y volver a desplegar"}
+            </li>
+            <li className={estado360.palabraSecreta ? "text-success" : "text-destructive"}>
+              {estado360.palabraSecreta ? "✓ Palabra secreta del webhook cargada" : "✗ Falta D360_WEBHOOK_CLAVE (16 caracteres o más) en el servidor"}
+            </li>
+          </ul>
+        )}
+        {estado360?.clave && (
           <button
             type="button"
             disabled={enviando}
