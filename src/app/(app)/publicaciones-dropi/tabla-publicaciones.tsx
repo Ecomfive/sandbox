@@ -22,6 +22,8 @@ import { EncabezadoFilasPublicacion, FilaPublicacionLista } from "./fila-publica
 import { ProveedorTareas } from "./recomendacion-publicacion";
 import { TableroAcciones } from "./tablero-acciones";
 import { CalculadoraMargen } from "./calculadora-margen";
+import { ProveedorMoneda } from "./moneda-contexto";
+import { MONEDA_DOLAR, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { AvisoSinPublicacion } from "./sin-publicacion";
 import type { ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
@@ -67,6 +69,7 @@ export function TablaPublicaciones({
   paisId,
   codigoPais,
   nombrePais,
+  moneda = MONEDA_DOLAR,
   puedeEscribir,
   puedeArchivar,
   esAdmin,
@@ -87,6 +90,8 @@ export function TablaPublicaciones({
   paisId: string;
   codigoPais: string;
   nombrePais: string;
+  /** La moneda del país (Costa Rica en colones, con su valor en dólares en pequeño). */
+  moneda?: MonedaPublicaciones;
   puedeEscribir: boolean;
   puedeArchivar: boolean;
   /** Un administrador: la ficha le muestra las compras del producto vinculado. */
@@ -138,6 +143,7 @@ export function TablaPublicaciones({
     () => false,
   );
   return (
+    <ProveedorMoneda moneda={moneda}>
     <ProveedorTareas {...tareas}>
     <ProveedorSkusMaestros opciones={opcionesSku}>
       <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
@@ -214,5 +220,6 @@ export function TablaPublicaciones({
       />
     </ProveedorSkusMaestros>
     </ProveedorTareas>
+    </ProveedorMoneda>
   );
 }

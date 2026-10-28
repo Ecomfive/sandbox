@@ -552,6 +552,12 @@ convenciones técnicas del código.
   `cdnDeRuta` (`republicar-dropi.ts`) eligen el CDN por la carpeta del país; `fotosParaCopiar` y su gemela del favorito (`cdnR` en
   `REPUBLICAR_JS`, con prueba) los usan. Cambia `VERSION_FAVORITO`: hay que volver a arrastrar «Aplicar en Dropi». Lo demás que usa
   `CDN_FOTOS_DROPI` (el proxy `api/publicaciones-dropi/foto`, Descubrir proveedores, Scraping) sigue solo con Panamá.
+  **Moneda de cada país** (28 oct 2026, Hernán: «en colones y pequeño el valor en dólares»): los montos de una publicación están en la
+  moneda de su país de Dropi (Costa Rica en colones: Dropi da 5.499). `src/lib/publicaciones/moneda.ts` (`monedaPublicaciones`,
+  `formatoMonto`, `formatoEnDolares`, `simboloMoneda`, con prueba) y `moneda-contexto.tsx` (`ProveedorMoneda` en `TablaPublicaciones`,
+  `useMoneda`, `<Monto>`): la lista (precio, costos, utilidad), la ficha, la calculadora (también el texto de WhatsApp,
+  `textoWhatsapp(…, monto)`) y «Republicar» escriben «₡5 499» con «US$10.78» en pequeño (tasa del día, `tasasUsd`, que la página pide solo
+  si el país no usa dólares). Panamá queda igual («$8.99»). Los costos de una publicación de Costa Rica se escriben en colones.
   **Retomar una actualización a medias** (27 oct 2026, pedido de Hernán: se recargó la página y la de las 12:47 quedó «en curso» sin
   barra). La corrida la conduce la página (`correr` en `panel-actualizar.tsx`): al abrir el panel con una corrida `corriendo` de menos de
   40 minutos (`VIGENCIA_MS`, igual que `empezarActualizacion`) la retoma sola: arma la barra con las partes ya guardadas, y por cada lector

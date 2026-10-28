@@ -43,15 +43,21 @@ const usd = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
  * El cálculo como mensaje de WhatsApp: el nombre en negrita (con su ID de Dropi si lo tiene) y una línea por dato. El coste real (lo
  * que costó la última compra) va solo si se conoce.
  */
-export function textoWhatsapp(p: { nombre: string; idDropi?: string | null; costeReal?: number | null }, d: DatosCalculo, r: ResultadoCalculo): string {
+export function textoWhatsapp(
+  p: { nombre: string; idDropi?: string | null; costeReal?: number | null },
+  d: DatosCalculo,
+  r: ResultadoCalculo,
+  /** Cómo escribir los montos (Costa Rica en colones, 28 oct 2026); en dólares por omisión. El coste real (de Compras) va siempre en dólares. */
+  monto: (n: number) => string = usd,
+): string {
   const nombre = p.nombre.trim().replace(/\*/g, "");
   const lineas = [
     nombre ? `*${nombre}*${p.idDropi?.trim() ? ` · ID ${p.idDropi.trim()}` : ""}` : p.idDropi?.trim() ? `*ID ${p.idDropi.trim()}*` : "*Cálculo de margen*",
     ...(p.costeReal != null ? [`Coste real: ${usd(p.costeReal)}`] : []),
-    `Costo de mercancía: ${usd(d.costo)}`,
-    `Fulfillment: ${usd(d.fulfillment)}`,
-    `Precio de venta: ${usd(d.precio)}`,
-    `Utilidad: ${usd(r.utilidad)}`,
+    `Costo de mercancía: ${monto(d.costo)}`,
+    `Fulfillment: ${monto(d.fulfillment)}`,
+    `Precio de venta: ${monto(d.precio)}`,
+    `Utilidad: ${monto(r.utilidad)}`,
     `Margen: ${Math.round(r.margen * 100)} %`,
   ];
   return lineas.join("\n");

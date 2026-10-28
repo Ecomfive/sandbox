@@ -7,11 +7,11 @@ import { Ventana } from "@/components/ui/ventana";
 import { calcularMargen, leerMonto, precioParaMargen, productosPorSku, textoWhatsapp } from "@/lib/publicaciones/calculadora";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import type { FilaPublicacion } from "./def-publicaciones";
+import { useMoneda } from "./moneda-contexto";
 
 const COLOR_NIVEL: Record<string, string> = { critico: "text-destructive", bajo: "text-destructive", aceptable: "text-warning", sano: "text-success" };
 const ETIQUETA_NIVEL: Record<string, string> = { critico: "crítico", bajo: "bajo", aceptable: "aceptable", sano: "saludable" };
 const monto = (n: number | null) => (n === null ? "" : n.toFixed(2));
-const usd = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 const pct = (n: number) => `${Math.round(n * 100)} %`;
 const etiquetaOpcion = (sku: { codigo: string; nombre: string }) => `${sku.codigo} · ${sku.nombre}`;
 
@@ -43,6 +43,8 @@ export function CalculadoraMargen({ publicaciones, reglas }: { publicaciones: Fi
 function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones: FilaPublicacion[]; reglas: Reglas; alCerrar: () => void }) {
   const { mostrarToast } = useToast();
   const id = useId();
+  // En la moneda del país (Costa Rica en colones, con su valor en dólares en pequeño).
+  const { monto: usd, enDolares, simbolo } = useMoneda();
   // Un producto por SKU; sus datos salen de su publicación pública al día (`productosPorSku`).
   const opciones = useMemo(() => productosPorSku(publicaciones).map((x) => ({ etiqueta: etiquetaOpcion(x.sku), codigo: x.sku.codigo, nombre: x.sku.nombre, p: x.representante })), [publicaciones]);
   const [buscar, setBuscar] = useState("");
@@ -76,7 +78,7 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
   const paraMinimo = precioParaMargen(datos.costo, datos.fulfillment, reglas.margen_minimo);
   // El coste real (lo que costó la última compra) solo se incluye si la publicación elegida lo tiene y no se cambió el producto.
   const costeReal = elegida && nombreElegido === nombre ? elegida.costeReal : null;
-  const mensaje = resultado ? textoWhatsapp({ nombre, idDropi, costeReal }, datos, resultado) : null;
+  const mensaje = resultado ? textoWhatsapp({ nombre, idDropi, costeReal }, datos, resultado, (n) => usd(n)) : null;
 
   async function copiar() {
     if (!mensaje) return;
@@ -138,7 +140,7 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
               </label>
               <span className="flex items-center gap-1 rounded-md border border-border-control bg-card px-3 focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground">
                 <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  $
+                  {simbolo}
                 </span>
                 <input
                   id={`${id}-${clave}`}
@@ -160,7 +162,10 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
               <dl className="m-0 grid grid-cols-2 gap-3">
                 <div>
                   <dt className="text-xs text-muted-foreground">Utilidad</dt>
-                  <dd className={`m-0 text-2xl font-semibold tabular-nums ${resultado.utilidad < 0 ? "text-destructive" : ""}`}>{usd(resultado.utilidad)}</dd>
+                  <dd className={`m-0 text-2xl font-semibold tabular-nums ${resultado.utilidad < 0 ? "text-destructive" : ""}`}>
+                    {usd(resultado.utilidad)}
+                    {enDolares(resultado.utilidad) && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{enDolares(resultado.utilidad)}</span>}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-muted-foreground">Margen</dt>

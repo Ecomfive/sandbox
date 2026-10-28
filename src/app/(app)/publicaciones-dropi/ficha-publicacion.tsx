@@ -43,6 +43,7 @@ import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
 import { PublicacionesDelProducto } from "./mismo-producto";
+import { Monto } from "./moneda-contexto";
 import { VentasDropiProducto } from "../producto/ventas-dropi-producto";
 
 interface Formulario {
@@ -92,7 +93,6 @@ const desde = (p: FilaPublicacion): Formulario => ({
 
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
 const fechaLarga = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
-const usd = (v: number | null) => (v === null || !Number.isFinite(v) ? "—" : `$${v.toFixed(2)}`);
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -684,7 +684,9 @@ function ContenidoFicha({
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
               <div>
                 <dt className="text-xs text-muted-foreground">Utilidad bruta</dt>
-                <dd className="font-semibold">{usd(utilidad)}</dd>
+                <dd className="font-semibold">
+                  <Monto valor={utilidad} />
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Margen bruto</dt>
@@ -701,7 +703,7 @@ function ContenidoFicha({
                     <>
                       <span className="block font-semibold">{fechaLarga(p.cambioPrecioDropi.fecha)}</span>
                       <span className="block text-muted-foreground">
-                        de {usd(p.cambioPrecioDropi.antes)} a {usd(p.cambioPrecioDropi.despues)} en Dropi
+                        de <Monto valor={p.cambioPrecioDropi.antes} /> a <Monto valor={p.cambioPrecioDropi.despues} /> en Dropi
                       </span>
                     </>
                   ) : (

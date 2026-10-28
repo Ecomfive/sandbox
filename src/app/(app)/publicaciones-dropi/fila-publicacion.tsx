@@ -18,6 +18,7 @@ import { motivoArchivar, motivoPausar, motivoRepublicar } from "@/lib/publicacio
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { InsigniaConectado } from "./insignia-conectado";
+import { Monto, useMoneda } from "./moneda-contexto";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
 import { conexionDropi, estadoBotones, paraReactivar, pausada, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 
@@ -25,7 +26,6 @@ import { conexionDropi, estadoBotones, paraReactivar, pausada, puedeRepublicar, 
 const COLUMNAS_CON_VENTAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
 const COLUMNAS_SIN_VENTAS = "lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_4rem_1rem]";
 
-const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 
 const Punto = ({ clase, texto }: { clase: string; texto: string }) => (
@@ -250,6 +250,8 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
  */
 export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchivar = false }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; puedeArchivar?: boolean }) {
+  // Los montos en la moneda del país (Costa Rica en colones, con su valor en dólares en pequeño).
+  const { monto } = useMoneda();
   const enDropi = EN_DROPI.find((e) => e.valor === (f.archivada && f.enDropi !== "archivado" ? "archivado" : f.enDropi));
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
   const sugerida = !f.sku && f.sugerencia && f.sugerencia.tipo !== "ninguno" ? f.sugerencia : null;
@@ -338,16 +340,16 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
 
       {/* Los datos: en pantalla ancha una columna cada uno; en angosta, debajo del producto en una fila que envuelve. */}
       <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:order-none lg:contents">
-        <Celda nombre="Precio" alinear="derecha" principal={<span className="font-semibold tabular-nums">{usd(f.precioVenta)}</span>} apoyo={
+        <Celda nombre="Precio" alinear="derecha" principal={<Monto valor={f.precioVenta} className="font-semibold tabular-nums" />} apoyo={
             <span className="flex flex-col lg:items-end">
-              <span className="max-w-full truncate">Costo de producto {usd(f.costoMercancia)}</span>
-              <span className="max-w-full truncate">Fulfillment {usd(f.fulfillment)}</span>
+              <span className="max-w-full truncate">Costo de producto {monto(f.costoMercancia)}</span>
+              <span className="max-w-full truncate">Fulfillment {monto(f.fulfillment)}</span>
             </span>
           } />
         <Celda
           nombre="Utilidad bruta y margen bruto"
           alinear="derecha"
-          principal={<span className="tabular-nums">{usd(f.utilidad)}</span>}
+          principal={<Monto valor={f.utilidad} className="tabular-nums" />}
           apoyo={
             f.margen === null ? (
               "Sin margen"
