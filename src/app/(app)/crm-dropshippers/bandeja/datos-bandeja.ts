@@ -78,6 +78,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       "id, numero_id, area, telefono, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
     )
     .in("area", areas)
+    // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
+    .in("numero_id", numeros.map((n) => n.id))
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(300);
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
