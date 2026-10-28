@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { MODULO_ATENCION, MODULO_COMERCIAL } from "@/lib/crm/areas";
+import { detectarImagen } from "@/lib/seguridad/imagen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { config360, urlDescarga360, urlMedia360 } from "@/lib/whatsapp/proveedor";
 import { conversacionPermitida } from "@/app/(app)/crm-dropshippers/bandeja/datos-bandeja";
@@ -24,6 +25,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const supabase = createServiceClient();
   const { data: m } = await supabase.from("whatsapp_mensajes").select("conversacion_id, media_id, media_mime, media_nombre").eq("id", id).maybeSingle();
   if (!m?.media_id || !(await conversacionPermitida(supabase, m.conversacion_id as string, u))) return new NextResponse("Not Found", { status: 404 });
+  const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
+  // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169): vive en el bucket, en la carpeta del chat.
+  if (String(m.media_id).startsWith("storage:")) {
+    const ruta = String(m.media_id).slice(8);
+    if (!ruta.startsWith(`${m.conversacion_id}/`) || ruta.includes("..")) return new NextResponse("Not Found", { status: 404 });
+    const { data: archivo } = await supabase.storage.from("whatsapp-importados").download(ruta);
+    if (!archivo || archivo.size > MAX_BYTES) return new NextResponse("Archivo no disponible.", { status: 410 });
+    const bytes = new Uint8Array(await archivo.arrayBuffer());
+    // El tipo sale de la extensión que dio el celular: una foto solo se muestra si de verdad lo es.
+    const declarado = String(m.media_mime || "").toLowerCase();
+    const tipo = declarado.startsWith("image/") ? (detectarImagen(bytes.slice(0, 64))?.tipo ?? "") : declarado;
+    return respuesta(bytes, tipo, nombre);
+  }
   if (!/^\d+$/.test(String(m.media_id))) return new NextResponse("Not Found", { status: 404 });
   // Con 360dialog (proveedor.ts) los archivos se piden por su dominio y con su clave; si no, a Meta con el token.
   const d360 = config360();
@@ -44,19 +58,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (!archivo.ok) return new NextResponse("Archivo no disponible.", { status: 410 });
     const bytes = await archivo.arrayBuffer();
     if (bytes.byteLength > MAX_BYTES) return new NextResponse("Archivo muy grande.", { status: 413 });
-    const tipo = String(j?.mime_type || m.media_mime || "").split(";")[0].trim().toLowerCase();
-    const seMuestra = SE_MUESTRAN.test(tipo);
-    const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
-    return new NextResponse(bytes, {
-      headers: {
-        "Content-Type": seMuestra ? tipo : "application/octet-stream",
-        "Content-Disposition": `${seMuestra ? "inline" : "attachment"}; filename="${nombre}"`,
-        "Cache-Control": "private, max-age=3600",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "default-src 'none'; sandbox",
-      },
-    });
+    return respuesta(bytes, String(j?.mime_type || m.media_mime || ""), nombre);
   } catch {
     return new NextResponse("No se pudo traer el archivo de WhatsApp.", { status: 502 });
   }
+}
+
+/** El archivo para la página: los tipos que se muestran van en línea; cualquier otro, como descarga. Nunca se ejecuta nada. */
+function respuesta(bytes: ArrayBuffer | Uint8Array, mime: string, nombre: string) {
+  const tipo = mime.split(";")[0].trim().toLowerCase();
+  const seMuestra = SE_MUESTRAN.test(tipo);
+  return new NextResponse(bytes as BodyInit, {
+    headers: {
+      "Content-Type": seMuestra ? tipo : "application/octet-stream",
+      "Content-Disposition": `${seMuestra ? "inline" : "attachment"}; filename="${nombre}"`,
+      "Cache-Control": "private, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+    },
+  });
 }

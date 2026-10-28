@@ -2,13 +2,14 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, notaWhatsapp, obtenerBandeja, pasarConversacionDeArea, tomarConversacion } from "./actions";
+import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, mensajesAnteriores, notaWhatsapp, obtenerBandeja, pasarConversacionDeArea, tomarConversacion } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
+import { ImportarChat } from "./importar-chat";
 
 /** Qué conversaciones se ven: las pestañas de siempre o, con más de un área, las de un área. */
 type Filtro = "sinResponder" | "mias" | "todas" | `area:${AreaCrm}`;
@@ -44,6 +45,18 @@ function colorFoto(nombre: string): string {
   let h = 0;
   for (const c of nombre) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return COLORES_FOTO[h % COLORES_FOTO.length];
+}
+
+type ChatAbierto = { id: string; mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null };
+
+/**
+ * Junta lo que ya se veía con lo que trae el refresco: el refresco trae los 300 más recientes y, con «Ver mensajes anteriores» (o un chat
+ * importado largo), lo de antes se queda; lo repetido se toma del refresco (su estado, palomitas, puede haber cambiado).
+ */
+function unirMensajes(antes: MensajeVista[], nuevos: MensajeVista[]): MensajeVista[] {
+  const porId = new Map(antes.map((m) => [m.id, m]));
+  for (const m of nuevos) porId.set(m.id, m);
+  return [...porId.values()].sort((a, b) => (a.momento < b.momento ? -1 : a.momento > b.momento ? 1 : 0));
 }
 
 const sinResponder = (c: ConversacionVista) => c.estado === "abierta" && (c.noLeidos > 0 || c.ultimoDe === "entrante");
@@ -140,12 +153,15 @@ function Contenido({ m }: { m: MensajeVista }) {
           <span className="truncate">{m.mediaNombre ?? "Abrir documento"}</span>
         </a>
       )}
+      {m.importado && !m.conArchivo && m.mediaNombre && (
+        <span className="mb-1 block text-[13px] text-[var(--wa-sec)]">📎 {m.mediaNombre} (el archivo no se subió: vuelve a importar el chat con sus archivos)</span>
+      )}
       {m.tipo === "reaccion" && <span className="text-[var(--wa-sec)]">Reaccionó </span>}
       {m.tipo === "ubicacion" && <span className="block text-xs font-medium text-[var(--wa-sec)]">Ubicación</span>}
       {m.texto ? (
         <span className="whitespace-pre-wrap break-words">{m.texto}</span>
       ) : (
-        !m.conArchivo && m.tipo !== "reaccion" && <span className="text-[var(--wa-sec)]">Mensaje que el sistema todavía no muestra ({m.tipo}).</span>
+        !m.conArchivo && !m.mediaNombre && m.tipo !== "reaccion" && <span className="text-[var(--wa-sec)]">Mensaje que el sistema todavía no muestra ({m.tipo}).</span>
       )}
     </>
   );
@@ -186,7 +202,13 @@ export function Bandeja({
   const [numero, setNumero] = useState<string>("todos");
   const [buscar, setBuscar] = useState("");
   const [elegido, setElegido] = useState<string | null>(abrirInicial);
-  const [chat, setChat] = useState<{ id: string; mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | null>(null);
+  const [chat, setChat] = useState<ChatAbierto | null>(null);
+  /** La ventana «Importar chat»: con el chat abierto o, con `null`, para uno que todavía no existe en la bandeja. */
+  const [importar, setImportar] = useState<{ conversacion: ConversacionVista | null } | null>(null);
+  const [cargandoAnteriores, setCargandoAnteriores] = useState(false);
+  const chatRef = useRef<HTMLDivElement>(null);
+  /** La altura del chat antes de sumar mensajes viejos arriba, para dejar la vista donde estaba. */
+  const alturaAntes = useRef<number | null>(null);
   const [modo, setModo] = useState<"responder" | "nota">("responder");
   const [borrador, setBorrador] = useState("");
   const [menuArea, setMenuArea] = useState(false);
@@ -201,7 +223,10 @@ export function Bandeja({
     if (b && !("error" in b)) setDatos(b);
     if (id) {
       const c = await abrirConversacion(id).catch(() => null);
-      if (c && !("error" in c)) setChat((antes) => (antes && antes.id !== id ? antes : { id, ...c }));
+      if (c && !("error" in c))
+        setChat((antes) =>
+          antes && antes.id !== id ? antes : antes ? { ...antes, ...c, mensajes: unirMensajes(antes.mensajes, c.mensajes), hayAnteriores: antes.hayAnteriores } : { id, ...c },
+        );
     }
   }, []);
 
@@ -244,10 +269,31 @@ export function Bandeja({
     };
   }, [menuArea]);
 
-  const cantidadMensajes = chat?.mensajes.length ?? 0;
+  // Al abrir el chat o con un mensaje nuevo, se baja al final; al sumar mensajes viejos arriba, la vista se queda donde estaba.
+  const ultimoId = chat?.mensajes.at(-1)?.id;
   useEffect(() => {
     finRef.current?.scrollIntoView({ block: "end" });
-  }, [cantidadMensajes, chat?.id]);
+  }, [ultimoId, chat?.id]);
+  const cantidadMensajes = chat?.mensajes.length ?? 0;
+  useLayoutEffect(() => {
+    const caja = chatRef.current;
+    if (caja && alturaAntes.current !== null) caja.scrollTop += caja.scrollHeight - alturaAntes.current;
+    alturaAntes.current = null;
+  }, [cantidadMensajes]);
+
+  async function verAnteriores() {
+    if (!chat?.mensajes.length || cargandoAnteriores) return;
+    const id = chat.id;
+    setCargandoAnteriores(true);
+    const r = await mensajesAnteriores(id, chat.mensajes[0].momento).catch(() => ({ error: "No se pudieron traer. Inténtalo de nuevo." }));
+    setCargandoAnteriores(false);
+    if ("error" in r) {
+      mostrarToast(r.error, "destructive");
+      return;
+    }
+    alturaAntes.current = chatRef.current?.scrollHeight ?? null;
+    setChat((antes) => (antes && antes.id === id ? { ...antes, mensajes: unirMensajes(r.mensajes, antes.mensajes), hayAnteriores: r.hayAnteriores } : antes));
+  }
 
   // El campo crece con lo escrito, hasta unas seis líneas (como en WhatsApp).
   useEffect(() => {
@@ -367,6 +413,13 @@ export function Bandeja({
               {unNumero ? `${unNumero.nombre} · ${unNumero.numero}` : `${datos.numeros.length} números de WhatsApp`}
             </span>
           </div>
+          {escribe && (
+            <button type="button" onClick={() => setImportar({ conversacion: null })} className={botonIcono} aria-label="Importar un chat exportado desde el celular" title="Importar un chat del celular">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+              </svg>
+            </button>
+          )}
         </div>
         <div className="flex flex-col gap-2 px-3 pt-2 pb-2.5">
           <div className="flex gap-2">
@@ -528,6 +581,9 @@ export function Bandeja({
                     </div>
                   )}
                 </div>
+                <button type="button" disabled={enviando} className={botonPildora} onClick={() => setImportar({ conversacion: sel })} title="Traer el historial que quedó en el celular">
+                  Importar chat
+                </button>
                 {sel.estado === "abierta" ? (
                   <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
                     Marcar resuelta
@@ -541,7 +597,7 @@ export function Bandeja({
             )}
           </div>
 
-          <div className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
+          <div ref={chatRef} className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
             <p
               className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
                 ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
@@ -551,6 +607,16 @@ export function Bandeja({
                 ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
                 : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada (próximamente). Las notas privadas sí se pueden dejar."}
             </p>
+            {mensajes && chat?.hayAnteriores && (
+              <button
+                type="button"
+                onClick={() => void verAnteriores()}
+                disabled={cargandoAnteriores}
+                className={`mb-2 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--wa-acento)] shadow-[0_1px_0.5px_var(--wa-sombra)] hover:underline disabled:opacity-60 ${anilloFoco}`}
+              >
+                {cargandoAnteriores ? "Trayendo mensajes anteriores…" : "Ver mensajes anteriores"}
+              </button>
+            )}
             {!mensajes ? (
               <p className="m-0 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] text-[var(--wa-sec)]">Cargando…</p>
             ) : (
@@ -565,6 +631,16 @@ export function Bandeja({
                     {separador && (
                       <span className="my-2 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)] first-letter:uppercase">
                         {dia}
+                      </span>
+                    )}
+                    {m.importado && (i === 0 || !previo.importado) && (
+                      <span className="my-1.5 self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
+                        Historial importado del celular
+                      </span>
+                    )}
+                    {!m.importado && i > 0 && previo.importado && (
+                      <span className="my-1.5 self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
+                        Desde aquí, mensajes que llegaron al sistema
                       </span>
                     )}
                     <Burbuja m={m} seguido={seguido} />
@@ -737,6 +813,22 @@ export function Bandeja({
           )}
         </aside>
       )}
+
+      {importar && (
+        <ImportarChat
+          abierto
+          alCerrar={() => setImportar(null)}
+          conversacion={importar.conversacion}
+          numeros={datos.numeros}
+          areas={areas}
+          alTerminar={(id) => {
+            if (!importar.conversacion) setFiltro("todas");
+            setElegido(id);
+            setChat((x) => (x?.id === id ? null : x));
+            void refrescar(id);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -793,8 +885,9 @@ function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
       <span
         className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
       >
+        {m.importado && <span className="sr-only">Importado del celular, </span>}
         {horaMensaje(m.momento)}
-        {nuestro && <Palomitas estado={m.estado} />}
+        {nuestro && !m.importado && <Palomitas estado={m.estado} />}
       </span>
       {m.estado === "fallido" && m.error && <span className="clear-both block pt-1 text-[11.5px] text-destructive">{m.error}</span>}
     </div>
