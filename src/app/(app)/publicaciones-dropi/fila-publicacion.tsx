@@ -293,7 +293,12 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {sugerida ? `${ETIQUETA_SUGERENCIA[sugerida.tipo]}${sugerida.sku ? ` · ${sugerida.sku.codigo}` : ""}` : "Sin SKU"}
               </span>
             )}
-            {f.tipoDropi === "privado" && <span>Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>}
+            {/* Privado resaltado en un cuadro morado (el color de la marca: no se confunde con los estados rojo, ámbar y verde). */}
+            {f.tipoDropi === "privado" && (
+              <span className="rounded border border-primario/40 bg-accent px-1.5 font-semibold text-accent-foreground">
+                Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}
+              </span>
+            )}
             {f.sinPublicar && (
               <span className={`inline-flex items-center gap-1.5 font-medium ${f.publicarPendiente ? "text-destructive" : ""}`}>
                 {f.publicarPendiente && <Punto clase="bg-destructive" texto="Publicación pendiente en Dropi" />}
