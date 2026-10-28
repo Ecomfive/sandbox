@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { alertaDeEvento, extraerEventosCuenta, type EventoCuenta } from "./eventos";
+import { alertaDeEvento, extraerEventosCuenta, hayCamposNuevos, resumenDeAviso, type EventoCuenta } from "./eventos";
 
 const aviso = (field: string, value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "1", time: 1, changes: [{ field, value }] }] });
 
@@ -80,5 +80,23 @@ describe("alertaDeEvento", () => {
   });
   it("lo que pasa en la cuenta es crítico", () => {
     for (const evento of ["ACCOUNT_VIOLATION", "ACCOUNT_RESTRICTION", "DISABLED_UPDATE"] as const) assert.equal(alertaDeEvento({ tipo: "cuenta", evento, detalle: "x" })?.severidad, "critica");
+  });
+});
+
+describe("resumenDeAviso", () => {
+  it("anota solo los nombres de los campos, nunca el contenido", () => {
+    const r = resumenDeAviso({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "messages", value: { secreto: 1 } }, { field: "message_template_status_update", value: {} }, { field: "messages", value: {} }] }] });
+    assert.deepEqual(r, { campos: ["messages", "message_template_status_update"], claves: ["object", "entry"] });
+  });
+  it("un aviso de otra forma deja ver al menos sus claves", () => {
+    assert.deepEqual(resumenDeAviso({ event: "template_status", name: "x" }), { campos: [], claves: ["event", "name"] });
+    assert.deepEqual(resumenDeAviso(null), { campos: [], claves: [] });
+  });
+  it("solo se anota lo que la bandeja no conoce", () => {
+    assert.equal(hayCamposNuevos(["messages"]), false);
+    assert.equal(hayCamposNuevos(["messages", "smb_message_echoes"]), false);
+    assert.equal(hayCamposNuevos(["messages", "history"]), true);
+    assert.equal(hayCamposNuevos(["message_template_status_update"]), true);
+    assert.equal(hayCamposNuevos([]), true);
   });
 });

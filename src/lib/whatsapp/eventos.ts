@@ -102,6 +102,23 @@ export function extraerEventosCuenta(aviso: unknown, sinObjeto = false): EventoC
   return eventos;
 }
 
+/**
+ * Solo los nombres de los campos de un aviso (`messages`, `message_template_status_update`…) y las claves de su primer nivel, nunca su
+ * contenido: sirve para anotar en los registros qué tipo de avisos manda 360dialog, que no documenta cuáles reenvía al webhook del número.
+ */
+export function resumenDeAviso(aviso: unknown): { campos: string[]; claves: string[] } {
+  const campos = new Set<string>();
+  for (const entrada of lista(obj(aviso).entry)) for (const cambio of lista(obj(entrada).changes)) {
+    const campo = texto(obj(cambio).field);
+    if (campo) campos.add(campo);
+  }
+  return { campos: [...campos], claves: Object.keys(obj(aviso)).slice(0, 12) };
+}
+
+/** Los campos que la bandeja ya entiende: de lo demás se deja una línea en los registros. */
+const CAMPOS_CONOCIDOS = new Set(["messages", "smb_message_echoes"]);
+export const hayCamposNuevos = (campos: string[]): boolean => campos.length === 0 || campos.some((c) => !CAMPOS_CONOCIDOS.has(c));
+
 export type Severidad = "info" | "aviso" | "critica";
 
 export interface AlertaNueva {

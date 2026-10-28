@@ -983,7 +983,10 @@ convenciones técnicas del código.
   (recibe el cliente de Supabase y usa rutas relativas porque también lo usa `scripts/`): `enviarPlantillaAMeta` crea (queda «en revisión») o cambia (solo una
   aprobada, rechazada o pausada: una en revisión o deshabilitada no se cambia), `aplicarEventosCuenta` guarda lo que avisa Meta y deja la alerta,
   `sincronizarPlantillas` («Actualizar estado») trae el estado actual y las plantillas creadas directo en Meta. Los dos webhooks (`/api/whatsapp/webhook` y
-  el de 360dialog) aplican estos avisos además de los mensajes; **hay que suscribir esos campos del webhook en Meta** (360dialog los reenvía). Reglas que salen
+  el de 360dialog) aplican estos avisos además de los mensajes. **Con 360dialog no hay app de Meta que configurar** (el número es de su app) y su documentación solo
+  habla de los campos `messages` e `history` en el webhook del número: **no está confirmado que reenvíe** estos avisos (por probar con el número real). Los webhooks
+  anotan en los registros de Vercel una línea `[whatsapp] … aviso con campos: …` (solo nombres) cuando llega un campo que la bandeja no conoce, y «Actualizar estado»
+  trae el estado, la calidad y la categoría aunque no llegue ningún aviso; lo que solo viene por aviso (límite del número, restricciones de la cuenta) no. Reglas que salen
   de Meta: se crean hasta **100 plantillas por hora** y no hay un mínimo documentado entre una y otra (los 2 minutos de `scripts/crear-plantillas-sugeridas.ts` son
   una precaución nuestra); una aprobada se cambia **una vez cada 24 h (10 cada 30 días)** y su categoría no se cambia; borrar una aprobada impide reusar su nombre 30
   días; **cualquier mensaje para retomar una conversación o que anime a volver a comprar es Marketing** (Meta lo recategoriza solo y avisa), por eso casi todas las

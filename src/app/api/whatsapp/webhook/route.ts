@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { firmaValida, tokenDeVerificacionValido } from "@/lib/instagram/firma";
 import { createServiceClient } from "@/lib/supabase/server";
 import { extraerAviso } from "@/lib/whatsapp/extraer";
-import { extraerEventosCuenta } from "@/lib/whatsapp/eventos";
+import { extraerEventosCuenta, hayCamposNuevos, resumenDeAviso } from "@/lib/whatsapp/eventos";
 import { guardarEntrantes, guardarEstados } from "@/lib/whatsapp/guardar";
 import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 
@@ -42,6 +42,9 @@ export async function POST(request: Request) {
   } catch {
     return new NextResponse("Bad Request", { status: 400 });
   }
+  // Si llega algo que la bandeja no entiende (o de otra forma), queda una línea en los registros: solo nombres, nunca el contenido.
+  const resumen = resumenDeAviso(aviso);
+  if (hayCamposNuevos(resumen.campos)) console.log(`[whatsapp] ${"Meta"} aviso con campos: ${resumen.campos.join(", ") || "(ninguno)"}; claves: ${resumen.claves.join(", ")}`);
   const { mensajes, estados, ecos } = extraerAviso(aviso);
   // Plantillas aprobadas o rechazadas, calidad, categoría, límite del número y restricciones de la cuenta.
   const eventos = extraerEventosCuenta(aviso);
