@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
 import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
 export interface NumeroVista {
@@ -33,6 +34,8 @@ export interface ConversacionVista {
   area: AreaCrm;
   /** Alguien marcó que este chat se borró en la app de WhatsApp Business (migración 0171). El historial se conserva aquí igual. */
   borradaEnApp: { por: string | null; en: string } | null;
+  /** Hay una petición de borrar este chat esperando autorización (migración 0172). */
+  borradoPendiente: boolean;
 }
 
 export interface MensajeVista {
@@ -50,6 +53,8 @@ export interface MensajeVista {
   importado: boolean;
   /** Su autor lo borró «para todos» en WhatsApp: aquí se conserva y se marca (migración 0171). */
   eliminadoEnWhatsapp: boolean;
+  /** Hay una petición de borrar este mensaje esperando autorización (migración 0172). */
+  borradoPendiente: boolean;
 }
 
 /** Lo que se ve del dropshipper junto al chat. */
@@ -121,6 +126,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       ultimoDe: (c.ultimo_de as ConversacionVista["ultimoDe"]) ?? null,
       area: c.area as AreaCrm,
       borradaEnApp: null,
+      borradoPendiente: false,
     };
   });
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
@@ -129,7 +135,10 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     const porId = new Map((marcadas.data ?? []).map((x) => [x.id as string, { por: (x.borrada_en_app_por as string | null) ?? null, en: x.borrada_en_app_en as string }]));
     for (const c of conversaciones) c.borradaEnApp = porId.get(c.id) ?? null;
   }
-  return { numeros, conversaciones };
+  // Lo que se autorizó borrar se oculta y se marca lo que espera autorización (migración 0172). Sin ella, nada.
+  const [ocultas, pendientes] = await Promise.all([conversacionesOcultas(supabase), borradosPendientes(supabase)]);
+  for (const c of conversaciones) c.borradoPendiente = pendientes.chats.has(c.id);
+  return { numeros, conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)) };
 }
 
 /**
@@ -193,8 +202,11 @@ export async function cargarConversacion(
     // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
     supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
   ]);
+  const [ocultos, pendientes] = await Promise.all([mensajesOcultos(supabase, id), borradosPendientes(supabase)]);
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
-  const mensajes: MensajeVista[] = (mensajesR.data ?? [])
+  const traidos = mensajesR.data ?? [];
+  const mensajes: MensajeVista[] = traidos
+    .filter((m) => !ocultos.has(m.id as string))
     .map((m) => ({
       id: m.id as string,
       direccion: m.direccion as MensajeVista["direccion"],
@@ -208,6 +220,7 @@ export async function cargarConversacion(
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),
+      borradoPendiente: pendientes.mensajes.has(m.id as string),
     }))
     .reverse();
   const d = dsR.data as {
@@ -230,5 +243,5 @@ export async function cargarConversacion(
         casos: ((casosR.data ?? []) as { numero: number; titulo: string; prioridad: string }[]).map((c) => ({ codigo: `CAS-${String(c.numero).padStart(4, "0")}`, titulo: c.titulo, prioridad: c.prioridad })),
       }
     : null;
-  return { mensajes, hayAnteriores: mensajes.length === MENSAJES_POR_VEZ, dropshipper };
+  return { mensajes, hayAnteriores: traidos.length === MENSAJES_POR_VEZ, dropshipper };
 }

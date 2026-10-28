@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AreaCrm } from "@/lib/crm/areas";
+import { conversacionesOcultas } from "@/lib/whatsapp/ocultos";
 import { diasEntre, type ChatDropshipper, type FilaCaso, type FilaDropshipper, type ResumenCrm } from "./def-crm";
 
 export interface DatosCrm {
@@ -35,7 +36,9 @@ async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(2000);
   if (error) return chats;
-  for (const c of data ?? []) {
+  // Un chat que se autorizó borrar (migración 0172) ya no cuenta.
+  const ocultas = await conversacionesOcultas(supabase);
+  for (const c of (data ?? []).filter((x) => !ocultas.has(x.id as string))) {
     const id = c.dropshipper_id as string;
     const sinResponder = c.estado === "abierta" && (Number(c.no_leidos) > 0 || c.ultimo_de === "entrante");
     const antes = chats.get(id);

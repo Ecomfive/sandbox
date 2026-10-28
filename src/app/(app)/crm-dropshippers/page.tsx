@@ -6,6 +6,7 @@ import { getPaisActual } from "@/lib/pais";
 import { accesoCrm, areasVisibles, type AreaCrm } from "@/lib/crm/areas";
 import { requireModulo } from "@/lib/auth";
 import { normalizar } from "@/lib/tabla/motor";
+import { conversacionesOcultas } from "@/lib/whatsapp/ocultos";
 import { obtenerDatosCrm } from "./datos-crm";
 import { ListaDropshippers } from "./lista-dropshippers";
 
@@ -15,13 +16,17 @@ export const dynamic = "force-dynamic";
 
 /** Las conversaciones de WhatsApp sin responder en los números que ve la persona (también las de quien no está en el CRM). */
 async function contarSinResponder(supabase: SupabaseClient, areas: AreaCrm[]): Promise<number> {
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from("whatsapp_conversaciones")
-    .select("id", { count: "exact", head: true })
+    .select("id")
     .eq("estado", "abierta")
     .or("no_leidos.gt.0,ultimo_de.eq.entrante")
-    .in("area", areas);
-  return error ? 0 : (count ?? 0);
+    .in("area", areas)
+    .limit(2000);
+  if (error) return 0;
+  // Un chat que se autorizó borrar (migración 0172) ya no cuenta.
+  const ocultas = await conversacionesOcultas(supabase);
+  return (data ?? []).filter((c) => !ocultas.has(c.id as string)).length;
 }
 
 /**
