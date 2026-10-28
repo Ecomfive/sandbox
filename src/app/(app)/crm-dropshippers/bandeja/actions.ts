@@ -10,7 +10,7 @@ import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
 import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
-import { config360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
+import { claves360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper } from "./datos-bandeja";
 
@@ -91,7 +91,7 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
   if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
-  const r = await enviarTextoWhatsapp(c.phoneNumberId, c.telefono, cuerpo);
+  const r = await enviarTextoWhatsapp({ phoneNumberId: c.phoneNumberId, numero: c.numeroEmpresa }, c.telefono, cuerpo);
   if ("error" in r) return { error: r.error };
   const ahora = new Date().toISOString();
   const autor = u.nombre || u.email;
@@ -213,35 +213,43 @@ export async function tomarConversacion(id: string, soltar = false): Promise<{ o
 
 /**
  * Registra en 360dialog la dirección del webhook del sistema (`/api/whatsapp/360dialog/<D360_WEBHOOK_CLAVE>`), para que le mande los
- * mensajes del número. Solo quien administra el sistema (Usuarios y roles, con edición). La dirección es la del sitio desde donde se pulsa
+ * mensajes: en cada número con su clave cargada (`D360_API_KEY` y las `D360_API_KEY_<número>`), la misma dirección para todos. Solo quien administra el sistema (Usuarios y roles, con edición). La dirección es la del sitio desde donde se pulsa
  * el botón, o `D360_WEBHOOK_BASE` si está puesta.
  */
 export async function conectarWebhook360(): Promise<{ ok: true } | { error: string }> {
   const u = await getUsuarioActual();
   if (!u || !esAdministrador(u)) return { error: "Solo quien administra el sistema puede conectar el webhook." };
-  const d360 = config360();
-  if (!d360) return { error: "Falta la clave de 360dialog (D360_API_KEY) en el servidor." };
+  const claves = claves360();
+  if (!claves.length) return { error: "Falta la clave de 360dialog (D360_API_KEY) en el servidor." };
   const clave = process.env.D360_WEBHOOK_CLAVE;
   if (!clave || clave.length < 16) return { error: "Falta la palabra secreta del webhook (D360_WEBHOOK_CLAVE, de 16 caracteres o más) en el servidor." };
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const base = process.env.D360_WEBHOOK_BASE?.replace(/\/+$/, "") || (host ? `https://${host}` : null);
   if (!base || !/^https:\/\//.test(base)) return { error: "No se pudo saber la dirección del sistema." };
-  let r: Response;
-  try {
-    r = await fetch(urlWebhook360(d360), {
-      method: "POST",
-      headers: { "D360-API-KEY": d360.clave, "Content-Type": "application/json" },
-      body: JSON.stringify({ url: `${base}/api/whatsapp/360dialog/${encodeURIComponent(clave)}` }),
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch {
-    return { error: "No se pudo conectar con 360dialog. Inténtalo de nuevo." };
+  const fallas: string[] = [];
+  for (const { variable, config } of claves) {
+    let r: Response;
+    try {
+      r = await fetch(urlWebhook360(config), {
+        method: "POST",
+        headers: { "D360-API-KEY": config.clave, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: `${base}/api/whatsapp/360dialog/${encodeURIComponent(clave)}` }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      fallas.push(`${variable}: no se pudo conectar con 360dialog`);
+      continue;
+    }
+    if (r.status === 401 || r.status === 403) fallas.push(`${variable}: 360dialog rechazó la clave`);
+    else if (!r.ok) fallas.push(`${variable}: 360dialog no aceptó el webhook (código ${r.status})`);
   }
-  if (r.status === 401 || r.status === 403) return { error: "360dialog rechazó la clave (D360_API_KEY). Revísala en el servidor." };
-  if (!r.ok) return { error: `360dialog no aceptó el webhook (código ${r.status}).` };
-  await registrarAuditoria({ accion: "conectar_webhook_360dialog", entidad: "whatsapp_conversaciones", detalle: d360.sandbox ? "Sandbox" : "Producción" });
-  return { ok: true };
+  await registrarAuditoria({
+    accion: "conectar_webhook_360dialog",
+    entidad: "whatsapp_conversaciones",
+    detalle: `${claves.length - fallas.length} de ${claves.length} números${claves[0].config.sandbox ? " (sandbox)" : ""}`,
+  });
+  return fallas.length ? { error: `${fallas.join(". ")}. Revisa esas claves en el servidor.` } : { ok: true };
 }
 
 /** Una plantilla aprobada, lista para mandarle a esta persona: con lo que el sistema ya sabe de ella en cada variable y lo que falta escribir. */
@@ -342,7 +350,7 @@ export async function enviarPlantillaConversacion(id: string, plantillaId: strin
   if (count) return { error: "Ya le mandaste esta plantilla hoy. Repetirla es lo que más reportes causa: espera su respuesta." };
   const valores = resolverVariables(p.variables ?? [], await personaDeLaConversacion(supabase, id), Array.isArray(manuales) ? manuales.map(String) : []);
   if ("error" in valores) return valores;
-  const r = await enviarPlantillaWhatsapp(c.phoneNumberId, c.telefono, p.nombre, p.idioma, valores.valores);
+  const r = await enviarPlantillaWhatsapp({ phoneNumberId: c.phoneNumberId, numero: c.numeroEmpresa }, c.telefono, p.nombre, p.idioma, valores.valores);
   if ("error" in r) return r;
   const texto = [p.encabezado, rellenar(p.cuerpo, valores.valores)].filter(Boolean).join("\n");
   const ahora = new Date().toISOString();

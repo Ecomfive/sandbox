@@ -24,7 +24,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not Found", { status: 404 });
   const supabase = createServiceClient();
   const { data: m } = await supabase.from("whatsapp_mensajes").select("conversacion_id, media_id, media_mime, media_nombre").eq("id", id).maybeSingle();
-  if (!m?.media_id || !(await conversacionPermitida(supabase, m.conversacion_id as string, u))) return new NextResponse("Not Found", { status: 404 });
+  const c = m?.media_id ? await conversacionPermitida(supabase, m.conversacion_id as string, u) : null;
+  if (!m?.media_id || !c) return new NextResponse("Not Found", { status: 404 });
   const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
   // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169): vive en el bucket, en la carpeta del chat.
   if (String(m.media_id).startsWith("storage:")) {
@@ -40,7 +41,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
   if (!/^\d+$/.test(String(m.media_id))) return new NextResponse("Not Found", { status: 404 });
   // Con 360dialog (proveedor.ts) los archivos se piden por su dominio y con su clave; si no, a Meta con el token.
-  const d360 = config360();
+  // Con varios números, el archivo se pide con la clave del número por donde llegó.
+  const d360 = config360(c.numeroEmpresa);
   if (d360?.sandbox) return new NextResponse("El sandbox de 360dialog no entrega archivos: se verán con el número real.", { status: 410 });
   const token = process.env.WHATSAPP_TOKEN;
   const version = process.env.WHATSAPP_API_VERSION || "v23.0";

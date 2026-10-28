@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
-import { urlDescarga360 } from "./proveedor";
+import { claves360, config360, urlDescarga360, variableClave360 } from "./proveedor";
 import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
 
 const aviso = (value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value }] }] });
@@ -198,4 +198,28 @@ test("un aviso de borrado sin el id del original se ignora", () => {
   const { mensajes, revocados } = extraerAviso(aviso({ metadata: META, messages: [{ from: "50761112233", id: "x", type: "revoke", revoke: {} }] }));
   assert.deepEqual(revocados, []);
   assert.deepEqual(mensajes, []);
+});
+
+test("360dialog con varios números: cada uno usa su propia clave y, si no tiene, la principal", () => {
+  const antes = { ...process.env };
+  try {
+    for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
+    assert.equal(config360("+584220350576"), null);
+    process.env.D360_API_KEY = "clave-58";
+    process.env.D360_API_KEY_50761234567 = "clave-507";
+    assert.equal(variableClave360("+507 6123-4567"), "D360_API_KEY_50761234567");
+    assert.equal(config360("+50761234567")?.clave, "clave-507");
+    assert.equal(config360("+584220350576")?.clave, "clave-58");
+    assert.equal(config360()?.clave, "clave-58");
+    assert.deepEqual(
+      claves360().map((c) => [c.variable, c.config.clave]),
+      [
+        ["D360_API_KEY", "clave-58"],
+        ["D360_API_KEY_50761234567", "clave-507"],
+      ],
+    );
+  } finally {
+    for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
+    Object.assign(process.env, antes);
+  }
 });
