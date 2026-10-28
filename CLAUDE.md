@@ -617,7 +617,7 @@ convenciones técnicas del código.
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
   **Archivar y sacar de Archivados** (`archivarPublicacion`): cambian la publicación al instante y encolan `archivar` (`restaurar` = sacarla): `archiveProduct` /
-  `unarchive` de Dropi, **solo eso** (no saca stock: eso es «Apagar»). El estado de antes (`estado_antes`, `estado_publicacion_antes`) se guarda para devolverla al
+  `activateProduct` de Dropi (la llamada del botón de «Mis productos»; **no `unarchive`**: Dropi la acepta sin error pero no desarchiva, así falló el 8537 «Truly Jelly Booster» el 28 oct 2026), **solo eso** (no saca stock: eso es «Apagar»). El estado de antes (`estado_antes`, `estado_publicacion_antes`) se guarda para devolverla al
   deshacer; el contrario de uno pendiente lo cancela (Dropi nunca se tocó). Sin ID de Dropi o «Sin publicar», solo cambia el sistema.
   **Descripción y fotos**: `elegirDescripcionIA` («Usar esta descripción» del Asistente de IA; `descripcionAHtml` la vuelve HTML escapado, mínimo 200 caracteres
   sin etiquetas, `descripcion-dropi.ts`) y `aprobarFotosIA` (las fotos generadas que se marcan «Subir a Dropi») van en un `cambio` (`descripcion`, `descripcion_antes`,
@@ -645,7 +645,7 @@ convenciones técnicas del código.
   **El Estado de la ficha** (elegir Archivado/Activo en el selector) también encola `archivar`, igual que el botón «Archivar» (`actualizarPublicacion`). Solo productos **simples y públicos** (un privado nace de uno público; uno variable se arma a mano). Las categorías
   que ofrece el formulario salen de nuestros productos leídos de Dropi (`opcionesParaCrear`), con «Otra categoría» para escribir otra; las bodegas, de las de
   ECOMFIVE leídas (no la B280, que es de Dropi). **Pendiente de probar con Dropi real**: crear un producto de verdad (hasta ahora está probado contra un Dropi simulado
-  con las rutas que usa su pantalla) y que `unarchive` devuelva el producto sin stock (el stock lo pone la persona en Dropi).
+  con las rutas que usa su pantalla) y que `activateProduct` devuelva el producto sin stock (el stock lo pone la persona en Dropi).
   **Sin «Notas» en la ficha; compras solo para administradores** (23 oct 2026, pedido de Hernán): el campo «Notas» se quitó (la columna
   `notas` se conserva sin leerla ni escribirla; la migración 0146 pasó lo escrito a un comentario «Notas anteriores» de la Actividad, y lo nuevo
   va como comentario). La ficha trae el bloque «Compras» (`ComprasProducto` del producto vinculado) **solo para un administrador**
