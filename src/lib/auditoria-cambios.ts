@@ -177,6 +177,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   generar_codigo_barras: "Generó un código de barras interno",
   cambiar_clase_producto: "Cambió el estado del producto",
   unir_productos: "Unió productos",
+  marcar_chat_borrado_app: "Marcó el chat como borrado en la app de WhatsApp Business",
   crear_plantilla_whatsapp: "Creó la plantilla de WhatsApp",
   editar_plantilla_whatsapp: "Modificó la plantilla de WhatsApp",
   enviar_plantilla_meta: "Mandó la plantilla a Meta",

@@ -3,7 +3,7 @@ import { tokenDeVerificacionValido } from "@/lib/instagram/firma";
 import { createServiceClient } from "@/lib/supabase/server";
 import { extraerEventosCuenta, hayCamposNuevos, resumenDeAviso } from "@/lib/whatsapp/eventos";
 import { extraerAviso } from "@/lib/whatsapp/extraer";
-import { guardarEntrantes, guardarEstados } from "@/lib/whatsapp/guardar";
+import { guardarEntrantes, guardarEstados, guardarRevocados } from "@/lib/whatsapp/guardar";
 import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 import { NUMERO_360_SIN_ID } from "@/lib/whatsapp/proveedor";
 
@@ -34,16 +34,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
   // Si llega algo que la bandeja no entiende (o de otra forma), queda una línea en los registros: solo nombres, nunca el contenido.
   const resumen = resumenDeAviso(aviso);
   if (hayCamposNuevos(resumen.campos)) console.log(`[whatsapp] ${"360dialog"} aviso con campos: ${resumen.campos.join(", ") || "(ninguno)"}; claves: ${resumen.claves.join(", ")}`);
-  const { mensajes, estados, ecos } = extraerAviso(aviso, NUMERO_360_SIN_ID);
+  const { mensajes, estados, ecos, revocados } = extraerAviso(aviso, NUMERO_360_SIN_ID);
   // Plantillas aprobadas o rechazadas, calidad, categoría, límite del número y restricciones de la cuenta.
   const eventos = extraerEventosCuenta(aviso, true);
-  if (mensajes.length || estados.length || ecos.length || eventos.length) {
+  if (mensajes.length || estados.length || ecos.length || eventos.length || revocados.length) {
     after(async () => {
       await aplicarEventosCuenta(createServiceClient(), eventos);
       await guardarEntrantes(mensajes);
       await guardarEntrantes(ecos, true);
       await guardarEstados(estados);
+      // Lo que se borró «para todos» en WhatsApp se marca, nunca se borra aquí.
+      await guardarRevocados(revocados);
     });
   }
-  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length });
+  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length, revocados: revocados.length });
 }

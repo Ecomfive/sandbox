@@ -31,6 +31,8 @@ export interface ConversacionVista {
   ultimoDe: "entrante" | "saliente" | "nota" | null;
   /** El área del chat (migración 0168): decide quién lo ve. Se cambia con «Pasar a otra área». */
   area: AreaCrm;
+  /** Alguien marcó que este chat se borró en la app de WhatsApp Business (migración 0171). El historial se conserva aquí igual. */
+  borradaEnApp: { por: string | null; en: string } | null;
 }
 
 export interface MensajeVista {
@@ -46,6 +48,8 @@ export interface MensajeVista {
   momento: string;
   /** Vino de un chat exportado desde el celular («Importar chat», wa_id «import:…»), no por el webhook. */
   importado: boolean;
+  /** Su autor lo borró «para todos» en WhatsApp: aquí se conserva y se marca (migración 0171). */
+  eliminadoEnWhatsapp: boolean;
 }
 
 /** Lo que se ve del dropshipper junto al chat. */
@@ -116,8 +120,15 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       ultimoTexto: (c.ultimo_texto as string | null) ?? null,
       ultimoDe: (c.ultimo_de as ConversacionVista["ultimoDe"]) ?? null,
       area: c.area as AreaCrm,
+      borradaEnApp: null,
     };
   });
+  // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
+  const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null);
+  if (!marcadas.error) {
+    const porId = new Map((marcadas.data ?? []).map((x) => [x.id as string, { por: (x.borrada_en_app_por as string | null) ?? null, en: x.borrada_en_app_en as string }]));
+    for (const c of conversaciones) c.borradaEnApp = porId.get(c.id) ?? null;
+  }
   return { numeros, conversaciones };
 }
 
@@ -171,7 +182,7 @@ export async function cargarConversacion(
     .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_nombre, momento, wa_id")
     .eq("conversacion_id", id);
   if (antesDe) consulta = consulta.lt("momento", antesDe);
-  const [mensajesR, dsR, casosR] = await Promise.all([
+  const [mensajesR, dsR, casosR, eliminadosR] = await Promise.all([
     consulta.order("momento", { ascending: false }).limit(MENSAJES_POR_VEZ),
     dropshipperId
       ? supabase.from("dropshippers").select("id, nombre, codigo, estado, tiendas, tienda, dropshipper_cuentas(plataformas(nombre), paises(codigo))").eq("id", dropshipperId).maybeSingle()
@@ -179,7 +190,10 @@ export async function cargarConversacion(
     dropshipperId
       ? supabase.from("casos_dropshipper").select("numero, titulo, prioridad").eq("dropshipper_id", dropshipperId).neq("estado", "resuelto").order("abierto_en", { ascending: false }).limit(5)
       : Promise.resolve({ data: null }),
+    // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
+    supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
   ]);
+  const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
   const mensajes: MensajeVista[] = (mensajesR.data ?? [])
     .map((m) => ({
       id: m.id as string,
@@ -193,6 +207,7 @@ export async function cargarConversacion(
       autor: (m.autor_nombre as string | null) ?? null,
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
+      eliminadoEnWhatsapp: eliminados.has(m.id as string),
     }))
     .reverse();
   const d = dsR.data as {

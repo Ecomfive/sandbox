@@ -970,6 +970,15 @@ convenciones técnicas del código.
   `/api/whatsapp/360dialog/[clave]` (sin firma: la puerta es `D360_WEBHOOK_CLAVE`, comparada en tiempo constante; `extraerAviso(aviso,
   "360dialog")` acepta avisos sin `object` ni `metadata`). El botón «Conectar el webhook de 360dialog» (`conectarWebhook360`, solo
   administradores, `esAdministrador`) registra la dirección; la bandeja vacía les dice si faltan `D360_API_KEY` o `D360_WEBHOOK_CLAVE`.
+  **Los chats no se borran** (28 oct 2026, pedido de Jhokser; migración 0171): aunque se borre una conversación en la app de WhatsApp Business, en el sistema se queda. Dos
+  disparadores (`whatsapp_no_borrar`) hacen fallar cualquier DELETE o TRUNCATE sobre `whatsapp_conversaciones` y `whatsapp_mensajes` (también desde un script o el editor SQL, como
+  `dropi_publicaciones` en la 0140; el borrado en cascada de una conversación pasa por el disparador de sus mensajes). Lo único que se hace es dejar una nota o **marcar «borrado en la app»**:
+  `whatsapp_conversaciones.borrada_en_app_en` / `_por`, con `marcarChatBorradoEnApp` (bandeja/actions.ts; botón del chat «Marcar borrado en la app» / «Quitar marca de borrado»; deja una nota
+  del sistema —`ES_MARCA_BORRADO`, se dibuja como aviso— y la auditoría `marcar_chat_borrado_app`) y la insignia «Borrado en la app» en el chat y en la lista. **Meta no documenta ningún aviso
+  cuando se borra un chat entero en la app**, así que la marca la pone una persona. Sí hay aviso cuando el dropshipper borra un mensaje «para todos» (`type: revoke` en `messages`):
+  `extraerAviso` lo devuelve en `revocados` (no crea un mensaje) y `guardarRevocados` marca el original (`whatsapp_mensajes.eliminado_en_whatsapp_en`), que se muestra con su texto y la
+  marca «Lo eliminó en WhatsApp quien lo mandó». Las marcas se leen con consultas aparte que ignoran el error, así que sin la migración la bandeja sigue cargando (sin marcas). Reversa:
+  `supabase/rollbacks/0171_rollback.sql`.
 - **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del
   último mensaje de un dropshipper solo se le escribe con una plantilla que Meta aprobó. Se crean, se cambian y se mandan a Meta desde el sistema. Tablas:
   `whatsapp_plantillas` (por nombre e idioma; `categoria` = la pedida, `categoria_actual` = la que Meta le puso; `estado` borrador → pendiente → aprobada /
