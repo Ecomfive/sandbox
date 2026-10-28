@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { CUENTAS, LECTORES, PARTES, lectoresDe, puedeActualizarDropi, sesionValida } from "./partes";
+import { CUENTAS, LECTORES, LECTORES_PAIS, PARTES, archivoSubido, diasPrimeraLectura, lectoresDe, puedeActualizarDropi, sesionValida } from "./partes";
 
 const ext = (f: string) => readFileSync(`extension/ecomfive-dropi/${f}`, "utf8");
 
@@ -33,7 +33,7 @@ test("la extensión solo sube a la carpeta temporal del sistema en SU proyecto d
 
 test("el puente solo va en las páginas del sistema y la extensión solo entra a Dropi", () => {
   const m = JSON.parse(ext("manifest.json")) as { host_permissions: string[]; content_scripts: { matches: string[] }[]; permissions: string[] };
-  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.mx/*"]);
+  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*"]);
   // Solo la página del sistema: ninguna página de localhost puede usar la sesión de Dropi (auditoría 27 oct 2026).
   assert.deepEqual(m.content_scripts[0].matches, ["https://mom-beta-proveduria.vercel.app/*"]);
   assert.ok(ext("fondo.js").includes(`remitente.origin !== SISTEMA`));
@@ -53,6 +53,29 @@ test("la sesión de Panamá tiene que ser la de proveedor ECOMFIVE y no estar po
   // México: cualquier cuenta que no sea de proveedor (la de proveedor no ve el catálogo).
   assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "ok");
   assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "SUPPLIER", tienda: "X", vence: null }, ahora), "otra_cuenta");
+});
+
+test("Costa Rica: sus partes, sus lectores en app.dropi.cr y sus archivos con otro nombre que los de Panamá", () => {
+  const cr = PARTES.filter((p) => p.pais === "cr");
+  assert.deepEqual(cr.map((p) => p.tipo), ["pedidos", "cartera", "retiros", "stock", "ventas"]);
+  assert.deepEqual(lectoresDe(cr.map((p) => p.clave)), LECTORES_PAIS.cr);
+  assert.deepEqual(lectoresDe(["ventas_cr", "pedidos"]), ["proveedor", "ventas_cr"]);
+  assert.equal(CUENTAS.cr.origen, "https://app.dropi.cr");
+  assert.equal(archivoSubido("proveedor", "pedidos"), "pedidos");
+  assert.equal(archivoSubido("proveedor_cr", "pedidos"), "pedidoscr");
+  // Los nombres de Costa Rica pasan el filtro de la extensión (solo letras antes de .json).
+  assert.match(`${archivoSubido("ventas_cr", "movimientos")}.json`, /^[a-z]+\.json$/);
+  // La cuenta de proveedor de Costa Rica, sin exigir el nombre de la tienda; una de dropshipper no sirve.
+  const ahora = Date.parse("2026-10-28T15:00:00Z");
+  assert.equal(sesionValida("cr", { hay: true, tipoUsuario: "SUPPLIER", tienda: "ECOMFIVE CR", vence: null }, ahora), "ok");
+  assert.equal(sesionValida("cr", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "otra_cuenta");
+});
+
+test("la primera lectura de Costa Rica trae desde el 1 de septiembre; Panamá, los días de siempre", () => {
+  assert.deepEqual(diasPrimeraLectura("cr", new Date("2026-10-28T15:00:00Z")), { pedidos: 58, cartera: 58 });
+  assert.equal(diasPrimeraLectura("pa", new Date("2026-10-28T15:00:00Z")), null);
+  // Si ya pasaron menos de 30 días desde esa fecha, bastan los de siempre.
+  assert.equal(diasPrimeraLectura("cr", new Date("2026-09-20T15:00:00Z")), null);
 });
 
 test("qué lectores corren según lo elegido, y quién ve el botón", () => {

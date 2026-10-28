@@ -12,7 +12,7 @@ export type MensajeExtension =
   | { tipo: "hola" }
   | { tipo: "sesion"; pais: CodigoPaisDropi; abrir: boolean }
   | { tipo: "mostrar"; pais: CodigoPaisDropi }
-  | { tipo: "lanzar"; lector: ClaveLector; subida: Record<string, string> }
+  | { tipo: "lanzar"; lector: ClaveLector; subida: Record<string, string>; dias?: { pedidos: number; cartera: number } | null }
   | { tipo: "avance"; lector: ClaveLector };
 
 export interface SesionDropi {

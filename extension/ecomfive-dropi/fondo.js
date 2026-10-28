@@ -6,15 +6,19 @@
 //
 // Pedidos que entiende (del puente en las páginas del sistema o de la ventanita de la extensión):
 //   { tipo: "hola" }                              → { version }
-//   { tipo: "sesion", pais: "pa"|"mx", abrir }    → { pestana, hay, tipoUsuario, tienda, vence }  (abrir: crea la pestaña si falta)
+//   { tipo: "sesion", pais: "pa"|"cr"|"mx", abrir } → { pestana, hay, tipoUsuario, tienda, vence }  (abrir: crea la pestaña si falta)
 //   { tipo: "mostrar", pais }                     → pone la pestaña de Dropi de ese país al frente (la crea si falta)
-//   { tipo: "lanzar", lector, subida }            → arranca el lector en la pestaña (sin esperarlo)
+//   { tipo: "lanzar", lector, subida, dias }      → arranca el lector en la pestaña (sin esperarlo); `dias` solo en la primera lectura
+//                                                   de un país ({ pedidos, cartera }: Costa Rica trae desde el 1 de septiembre)
 //   { tipo: "avance", lector }                    → lo que lleva el lector (window.__dropiDiario / __ventasDropi, sin el detalle)
 
-const ORIGEN = { pa: "https://app.dropi.pa", mx: "https://app.dropi.mx" };
+const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx" };
 const LECTORES = {
   proveedor: { pais: "pa", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
+  // Costa Rica (28 oct 2026): los mismos lectores en la pestaña de app.dropi.cr.
+  proveedor_cr: { pais: "cr", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
+  ventas_cr: { pais: "cr", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   catalogo_mx: { pais: "mx", archivo: "lectores/catalogo.js", funcion: "leerCatalogo", estado: "__catalogo", archivos: ["catalogo"] },
 };
 // Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi» y solo en el proyecto de Supabase
@@ -101,15 +105,18 @@ async function atender(m) {
         if (typeof u !== "string" || !SUBIDA.test(u)) throw new Error("Dirección de subida no válida.");
         subida[a] = u;
       }
+      const d = m.dias;
+      const entero = (x) => Number.isInteger(x) && x > 0 && x <= 400;
+      const dias = d && entero(d.pedidos) && entero(d.cartera) ? { pedidos: d.pedidos, cartera: d.cartera } : null;
       const t = await pestana(l.pais, true, false);
       await chrome.scripting.executeScript({ target: { tabId: t.id }, world: "MAIN", files: [l.archivo] });
       await enPagina(
         t.id,
-        (funcion, s) => {
-          window[funcion](s);
+        (funcion, s, dd) => {
+          window[funcion](s, dd || undefined);
           return "iniciado";
         },
-        [l.funcion, subida],
+        [l.funcion, subida, dias],
       );
       await chrome.storage.session.set({ [`pestana-${m.lector}`]: t.id });
       return { ok: true };

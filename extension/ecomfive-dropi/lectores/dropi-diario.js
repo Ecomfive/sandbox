@@ -19,18 +19,22 @@ async function dropiDiario(subida, dias = { pedidos: 30, cartera: 7 }) {
     const token = JSON.parse(localStorage.getItem("DROPI_token") || "null");
     const usuario = JSON.parse(localStorage.getItem("DROPI_LoginResult") || "{}")?.objects;
     if (!token || !usuario?.id) throw new Error("No hay sesión de Dropi en esta página.");
-    if (usuario.type_user !== "SUPPLIER" || usuario.store_name !== "ECOMFIVE") throw new Error("Esta sesión no es la del proveedor ECOMFIVE.");
     const pais = location.hostname.split(".").pop();
+    // Panamá: la cuenta de proveedor ECOMFIVE. Costa Rica (28 oct 2026): su cuenta de proveedor.
+    if (usuario.type_user !== "SUPPLIER" || (pais === "pa" && usuario.store_name !== "ECOMFIVE"))
+      throw new Error(pais === "pa" ? "Esta sesión no es la del proveedor ECOMFIVE." : "Esta sesión no es de una cuenta de proveedor.");
     const api = location.hostname.replace(/^app\./, "api.");
     const apiV2 = location.hostname.replace(/^app\./, "api-v2.");
     const cabeceras = { "X-Authorization": "Bearer " + token, Accept: "application/json" };
 
-    // Fechas de Panamá (la cartera llega en UTC y se pasa a la hora de Panamá, como la da el Excel de Dropi).
-    const diaPanama = (d) => d.toLocaleDateString("en-CA", { timeZone: "America/Panama" });
-    const hoy = diaPanama(new Date());
-    const haceDias = (n) => diaPanama(new Date(Date.now() - n * 86400000));
-    const horaPanama = (iso) => {
-      const d = new Date(new Date(iso).getTime() - 5 * 3600000);
+    // Fechas del país (la cartera llega en UTC y se pasa a la hora del país, como la da el Excel de Dropi): Panamá UTC−5, Costa Rica UTC−6.
+    const zona = pais === "cr" ? "America/Costa_Rica" : "America/Panama";
+    const desfase = pais === "cr" ? 6 : 5;
+    const diaPais = (d) => d.toLocaleDateString("en-CA", { timeZone: zona });
+    const hoy = diaPais(new Date());
+    const haceDias = (n) => diaPais(new Date(Date.now() - n * 86400000));
+    const horaPais = (iso) => {
+      const d = new Date(new Date(iso).getTime() - desfase * 3600000);
       const p = (n) => String(n).padStart(2, "0");
       return `${p(d.getUTCDate())}-${p(d.getUTCMonth() + 1)}-${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
     };
@@ -85,7 +89,7 @@ async function dropiDiario(subida, dias = { pedidos: 30, cartera: 7 }) {
       const j = await pedir(`https://${api}/api/historywallet?${q}`);
       const lista = j.objects || [];
       for (const m of lista)
-        cartera.set(m.id, { ID: m.id, FECHA: horaPanama(m.created_at), TIPO: m.type, MONTO: Number(m.amount), "ORDEN ID": m.order_id ?? null, "NUMERO DE GUIA": m.order?.shipping_guide ?? null, "DESCRIPCIÓN": m.description ?? null });
+        cartera.set(m.id, { ID: m.id, FECHA: horaPais(m.created_at), TIPO: m.type, MONTO: Number(m.amount), "ORDEN ID": m.order_id ?? null, "NUMERO DE GUIA": m.order?.shipping_guide ?? null, "DESCRIPCIÓN": m.description ?? null });
       estado.cartera = cartera.size;
       if (lista.length < 100) break;
       await espera(400);

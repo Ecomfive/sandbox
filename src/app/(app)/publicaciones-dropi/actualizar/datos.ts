@@ -34,10 +34,13 @@ export interface UltimaParte {
  * pedidos, cartera y retiros: `dropi_sesiones` de la tarea de las 7:00). Sin la migración, `disponible` = false.
  */
 export async function cargarPanel(supabase: SupabaseClient): Promise<{ disponible: boolean; corridas: Corrida[]; ultima: Partial<Record<ClaveParte, UltimaParte>> }> {
+  // Las tareas programadas son solo de Panamá: su última carga cuenta solo para las partes de Panamá (28 oct 2026, llegó Costa Rica).
+  const { data: pa } = await supabase.from("paises").select("id").eq("codigo", "PA").maybeSingle();
+  const paId = (pa?.id as string | undefined) ?? "00000000-0000-0000-0000-000000000000";
   const [r, ventas, stock, sesion] = await Promise.all([
     supabase.from("dropi_actualizaciones").select("id, iniciado_por_nombre, origen, estado, pedidas, partes, inicio, fin").order("inicio", { ascending: false }).limit(30),
-    supabase.from("dropi_ventas_cargas").select("corte, productos").order("corte", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("dropi_productos_proveedor_lecturas").select("leido_en, productos").order("leido_en", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("dropi_ventas_cargas").select("corte, productos").eq("pais_id", paId).order("corte", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("dropi_productos_proveedor_lecturas").select("leido_en, productos").eq("pais_id", paId).order("leido_en", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("dropi_sesiones").select("renovada_en, ok, mensaje").eq("pais_codigo", "PA").eq("tipo", "proveedor").maybeSingle(),
   ]);
   const corridas: Corrida[] = (r.data ?? []).map((c) => ({

@@ -2,7 +2,7 @@
 
 // «Actualizar Dropi» (migración 0154): el panel pide las direcciones de subida, la extensión lee Dropi desde su pestaña y sube los
 // archivos, y el panel pide procesar cada parte aquí, una por una (cada llamada tiene los 5 minutos de la página). Por ahora solo
-// para quien está en CORREOS_ACTUALIZAR_DROPI.
+// para quien está en CORREOS_ACTUALIZAR_DROPI. Panamá y, desde el 28 oct 2026, Costa Rica: cada parte sabe de qué país es.
 
 import { revalidatePath } from "next/cache";
 import { requireModuloEscritura } from "@/lib/auth";
@@ -10,7 +10,7 @@ import { ingerirCartera, type FilaCartera } from "@/lib/dropi-actualizar/ingerir
 import { ingerirPedidos, type PedidoDropi } from "@/lib/dropi-actualizar/ingerir-pedidos";
 import { ingerirRetiros, type FilaRetiro } from "@/lib/dropi-actualizar/ingerir-retiros";
 import { ingerirVentas, type MovimientosDropi, type ResumenDropi } from "@/lib/dropi-actualizar/ingerir-ventas";
-import { LECTORES, PARTES, esParte, lectoresDe, puedeActualizarDropi, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
+import { LECTORES, PARTES, archivoSubido, esParte, lectoresDe, parte as parteDe, puedeActualizarDropi, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
 import { createServiceClient } from "@/lib/supabase/server";
 import { guardarNuestrosProductos, type LecturaNuestros } from "../../../../../scripts/publicaciones-sincronizar-dropi";
 
@@ -33,6 +33,8 @@ export async function empezarActualizacion(partes: unknown): Promise<{ error?: s
   const usuario = await usuarioPermitido();
   const pedidas = (Array.isArray(partes) ? partes : []).filter(esParte);
   if (!pedidas.length) return { error: "Elige al menos una parte." };
+  // Panamá y Costa Rica se actualizan por separado (28 oct 2026, Hernán: juntos es mucha carga y tarda mucho más).
+  if (new Set(pedidas.map((p) => parteDe(p).pais)).size > 1) return { error: "Panamá y Costa Rica se actualizan por separado: elige las partes de un solo país." };
   const supabase = createServiceClient();
   // Una sola a la vez (26 oct 2026: un doble clic arrancó dos y el CRM no alcanzó). Una que quedó «corriendo» hace más de 40
   // minutos (se cerró la pestaña a medias) ya no bloquea.
@@ -65,7 +67,7 @@ export async function empezarActualizacion(partes: unknown): Promise<{ error?: s
 async function firmarSubidas(supabase: ReturnType<typeof createServiceClient>, id: string, lector: ClaveLector): Promise<Record<string, string> | string> {
   const urls: Record<string, string> = {};
   for (const archivo of LECTORES[lector].archivos) {
-    const { data: s, error: e } = await supabase.storage.from(BUCKET).createSignedUploadUrl(`${CARPETA}/${id}/${archivo}.json`, { upsert: true });
+    const { data: s, error: e } = await supabase.storage.from(BUCKET).createSignedUploadUrl(`${CARPETA}/${id}/${archivoSubido(lector, archivo)}.json`, { upsert: true });
     if (e || !s) return `No se pudo preparar la subida (${e?.message ?? "sin detalle"}).`;
     urls[archivo] = s.signedUrl;
   }
@@ -125,30 +127,35 @@ export async function procesarParte(id: string, parte: string): Promise<{ error?
   if (!fila || fila.estado !== "corriendo" || !(fila.pedidas as string[]).includes(parte)) return { error: "Esa actualización ya terminó." };
   const avisos: string[] = [];
   const log = (t: string) => avisos.push(t);
+  // De qué país es la parte y con qué nombre subió la extensión cada archivo («pedidos» de Panamá, «pedidoscr» de Costa Rica).
+  const p = parteDe(parte);
+  const codigo = p.pais.toUpperCase();
+  const archivo = (a: string) => archivoSubido(p.lector, a);
   try {
     let resumen = "";
     let datos: Record<string, unknown> = {};
-    if (parte === "pedidos") {
-      const l = await bajar<{ desde: string; hasta: string; pedidos: PedidoDropi[] }>(supabase, id, "pedidos");
-      const r = await ingerirPedidos(supabase, "PA", l.pedidos, log);
+    if (p.tipo === "pedidos") {
+      const l = await bajar<{ desde: string; hasta: string; pedidos: PedidoDropi[] }>(supabase, id, archivo("pedidos"));
+      const r = await ingerirPedidos(supabase, codigo, l.pedidos, log);
       resumen = `${n(r.leidos)} pedidos del ${l.desde} al ${l.hasta}${r.crm !== null ? ` · ${n(r.crm)} del CRM al día` : ""}`;
       datos = r;
-    } else if (parte === "cartera") {
-      const r = await ingerirCartera(supabase, "PA", await bajar<FilaCartera[]>(supabase, id, "cartera"));
+    } else if (p.tipo === "cartera") {
+      const r = await ingerirCartera(supabase, codigo, await bajar<FilaCartera[]>(supabase, id, archivo("cartera")));
       resumen = `${n(r.movimientos)} movimientos`;
       datos = r;
-    } else if (parte === "retiros") {
-      const r = await ingerirRetiros(supabase, "PA", await bajar<FilaRetiro[]>(supabase, id, "retiros"), log);
+    } else if (p.tipo === "retiros") {
+      const r = await ingerirRetiros(supabase, codigo, await bajar<FilaRetiro[]>(supabase, id, archivo("retiros")), log);
       resumen = [`${n(r.vinculadosAhora)} vinculados ahora`, r.sinVincular ? `${n(r.sinVincular)} sin vincular` : "", r.saldo !== null ? `saldo $${r.saldo.toFixed(2)}` : ""].filter(Boolean).join(" · ");
       datos = r;
-    } else if (parte === "stock") {
-      const r = (await guardarNuestrosProductos(supabase, await bajar<LecturaNuestros>(supabase, id, "stock"), true, FOTOS_POR_VEZ)) as unknown as Record<string, unknown>;
-      resumen = `${n(Number(r.productos ?? 0))} productos (${n(Number(r.activos ?? 0))} activos)`;
+    } else if (p.tipo === "stock") {
+      const r = (await guardarNuestrosProductos(supabase, await bajar<LecturaNuestros>(supabase, id, archivo("stock")), true, FOTOS_POR_VEZ)) as unknown as Record<string, unknown>;
+      const creadas = Array.isArray(r.creadasPrimeraCarga) ? r.creadasPrimeraCarga.length : 0;
+      resumen = `${n(Number(r.productos ?? 0))} productos (${n(Number(r.activos ?? 0))} activos)${creadas ? ` · ${n(creadas)} publicaciones creadas (primera carga)` : ""}`;
       datos = { productos: r.productos, activos: r.activos, archivados: r.archivados };
-      // La sesión de proveedor de Panamá funcionó: lo mismo que marca la tarea diaria.
-      await supabase.from("dropi_sesiones").upsert({ pais_codigo: "PA", tipo: "proveedor", renovada_en: new Date().toISOString(), ok: true, mensaje: "Actualizar Dropi" });
+      // La sesión de proveedor del país funcionó: lo mismo que marca la tarea diaria.
+      await supabase.from("dropi_sesiones").upsert({ pais_codigo: codigo, tipo: "proveedor", renovada_en: new Date().toISOString(), ok: true, mensaje: "Actualizar Dropi" });
     } else {
-      const r = await ingerirVentas(supabase, await bajar<MovimientosDropi>(supabase, id, "movimientos"), await bajar<ResumenDropi>(supabase, id, "resumen"), log);
+      const r = await ingerirVentas(supabase, await bajar<MovimientosDropi>(supabase, id, archivo("movimientos")), await bajar<ResumenDropi>(supabase, id, archivo("resumen")), log, codigo);
       resumen = `corte ${r.corte} · ${n(r.productos)} productos · ${n(r.movimientos)} movimientos`;
       datos = r;
     }

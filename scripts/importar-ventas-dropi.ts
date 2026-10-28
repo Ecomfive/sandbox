@@ -5,6 +5,7 @@
 //
 //   npx tsx scripts/importar-ventas-dropi.ts            → informe (no escribe)
 //   npx tsx scripts/importar-ventas-dropi.ts --aplicar  → carga
+//   --pais=cr                                           → Costa Rica (lee los archivos …-cr.json; 28 oct 2026)
 
 process.loadEnvFile(".env.local");
 import { createClient } from "@supabase/supabase-js";
@@ -12,15 +13,17 @@ import { readFileSync } from "node:fs";
 import { armarVentas, ingerirVentas, type MovimientosDropi, type ResumenDropi } from "../src/lib/dropi-actualizar/ingerir-ventas";
 
 const aplicar = process.argv.includes("--aplicar");
+const PAIS = process.argv.includes("--pais=cr") ? "cr" : "pa";
+const sufijo = PAIS === "pa" ? "" : `-${PAIS}`;
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const M = JSON.parse(readFileSync("datos-privados/dropi-historial-movimientos.json", "utf8")) as MovimientosDropi;
-const R = JSON.parse(readFileSync("datos-privados/dropi-historial-resumen.json", "utf8")) as ResumenDropi;
+const M = JSON.parse(readFileSync(`datos-privados/dropi-historial-movimientos${sufijo}.json`, "utf8")) as MovimientosDropi;
+const R = JSON.parse(readFileSync(`datos-privados/dropi-historial-resumen${sufijo}.json`, "utf8")) as ResumenDropi;
 
 async function main() {
   const v = armarVentas(M, R, "informe");
   console.log(`Corte ${v.corteFecha}: ${v.productos.length} productos, ${v.movimientos} movimientos, ${v.diarias.length} filas por día, ${v.dropshippers.length} dropshippers (${v.porMes.length} filas por producto y mes), ${v.netasTotal} unidades netas.`);
   if (!aplicar) return console.log("Con --aplicar se cargan (reemplazan lo de estos productos; los que ya no vienen conservan su historia).");
-  await ingerirVentas(supabase, M, R, (t) => console.log(t));
+  await ingerirVentas(supabase, M, R, (t) => console.log(t), PAIS.toUpperCase());
   console.log("Cargado.");
 }
 

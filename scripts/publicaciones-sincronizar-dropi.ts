@@ -23,6 +23,7 @@ import {
   normalizarProductoProveedor,
   productoPrincipal,
   productosNuevos,
+  ubicacionDeProducto,
   type ProductoProveedor,
 } from "../src/lib/publicaciones/sincronizar-dropi";
 
@@ -146,6 +147,65 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   // Lo que Dropi ya no lista (eliminado) sale de la tabla: se reemplaza en cada lectura.
   revisar(await supabase.from("dropi_productos_proveedor").delete().eq("pais_id", pais.id).lt("leido_en", leidoEn), "Quitar los que ya no están");
 
+  // **Primera carga de un país** (28 oct 2026, Costa Rica, pedido de Hernán): si el país todavía no tiene ninguna publicación, se crea una
+  // por cada producto de Dropi (activo → «Producto nuevo», archivado → archivado), con su bodega, precio y tipo, para vincularla después
+  // a Producto. Solo esa vez: desde el 24 oct el sistema manda y la lectura ya no crea publicaciones (lo nuevo solo se informa).
+  let creadasPrimeraCarga: string[] = [];
+  if (!pubs.length) {
+    const lista = [...productos.values()];
+    const creadas: { id: string; dropi_id: string }[] = [];
+    await enTrozos(lista, 200, async (t) => {
+      creadas.push(
+        ...(revisar(
+          await supabase
+            .from("dropi_publicaciones")
+            .insert(
+              t.map((p) => ({
+                pais_id: pais.id,
+                nombre: p.nombre,
+                dropi_id: String(p.id),
+                estado: p.archivado ? "archivado" : "producto_nuevo",
+                estado_publicacion: p.archivado ? "archivado" : "activo",
+                tipo_publicacion: p.privado ? "privado" : "publico",
+                precio_venta: p.precio,
+                ubicacion: ubicacionDeProducto(p),
+                fecha_publicacion: (p.creado ?? hoy).slice(0, 10),
+              })),
+            )
+            .select("id, dropi_id"),
+          "Crear las publicaciones de la primera carga",
+        ) as { id: string; dropi_id: string }[]),
+      );
+    });
+    await enTrozos(creadas, 200, async (t) =>
+      void revisar(
+        await supabase.from("historial_auditoria").insert(
+          t.map((c) => {
+            const p = productos.get(Number(c.dropi_id))!;
+            const b = p.bodegas.length ? bodegasEnOrden(p.bodegas)[0] : null;
+            return {
+              usuario_id: null,
+              usuario_nombre: "Sistema",
+              accion: "crear_publicacion_dropi",
+              entidad: "dropi_publicaciones",
+              entidad_id: c.id,
+              detalle: `${p.nombre} (ID ${p.id}) · primera carga de ${pais.nombre}${p.archivado ? " · archivado en Dropi" : ""}${b ? ` · bodega ${codigoBodega(b.id)} ${b.nombre}` : ""}`,
+            };
+          }),
+        ),
+        "Actividad de la primera carga",
+      ),
+    );
+    creadasPrimeraCarga = creadas.map((c) => c.dropi_id);
+    // Las publicaciones recién creadas también copian sus fotos en esta misma lectura.
+    pubs.push(
+      ...(revisar(
+        await supabase.from("dropi_publicaciones").select("id, nombre, dropi_id, ubicacion, precio_venta, tipo_publicacion, estado_publicacion").eq("pais_id", pais.id),
+        "Publicaciones creadas",
+      ) as typeof pubs),
+    );
+  }
+
   // Las fotos de cada publicación al sistema (migración 0153): las que falten se copian del CDN de Dropi al bucket. Un problema aquí
   // no tumba la lectura: queda en el resumen y se reintenta mañana.
   let fotos: Awaited<ReturnType<typeof copiarFotosDropi>> | { error: string };
@@ -177,7 +237,7 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   } catch (e) {
     sinStock = { error: String((e as Error)?.message ?? e) };
   }
-  return { ...resumen, fotos, sinStock, detalle };
+  return { ...resumen, creadasPrimeraCarga, fotos, sinStock, detalle };
 }
 
 // Uso directo con un archivo guardado.

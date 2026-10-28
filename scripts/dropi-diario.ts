@@ -11,6 +11,8 @@
 //   npx tsx scripts/dropi-diario.ts cuadre <AAAA-MM-DD>  → pedidos de ese día en el sistema por estado (JSON), para cuadrarlos
 //        con lo que da el MCP de Dropi
 //   npx tsx scripts/dropi-diario.ts sesion-vencida  → deja en el Centro de notificaciones que la sesión de Dropi Panamá expiró
+//   `subida cr` / `cargar cr` (28 oct 2026): lo mismo con Costa Rica (la función del navegador se corre en app.dropi.cr, con su cuenta
+//        de proveedor); sus temporales van en otra carpeta, así nunca se cruzan con los de Panamá. Sin país, Panamá.
 
 process.loadEnvFile(".env.local");
 import { spawnSync } from "node:child_process";
@@ -21,9 +23,11 @@ import { guardarNuestrosProductos, type LecturaNuestros } from "./publicaciones-
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const BUCKET = "wms-compras";
-const CARPETA = "tmp-dropi-diario";
+// El país va en el segundo argumento (`subida cr`): Panamá por omisión.
+const PAIS = process.argv[3] === "cr" ? "cr" : "pa";
+const CARPETA = PAIS === "pa" ? "tmp-dropi-diario" : `tmp-dropi-diario-${PAIS}`;
 const TIPOS = ["pedidos", "cartera", "retiros", "stock"] as const;
-const DESTINO = ".dropi-downloads/diario";
+const DESTINO = PAIS === "pa" ? ".dropi-downloads/diario" : `.dropi-downloads/diario-${PAIS}`;
 
 async function subida() {
   const sello = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
@@ -44,7 +48,7 @@ function correr(script: string, ...args: string[]): boolean {
 }
 
 async function marcarSesion(ok: boolean, mensaje: string) {
-  const { error } = await supabase.from("dropi_sesiones").upsert({ pais_codigo: "PA", tipo: "proveedor", renovada_en: new Date().toISOString(), ok, mensaje });
+  const { error } = await supabase.from("dropi_sesiones").upsert({ pais_codigo: PAIS.toUpperCase(), tipo: "proveedor", renovada_en: new Date().toISOString(), ok, mensaje });
   if (error) console.warn(`Aviso: no se guardó el estado de la sesión (${error.message}).`);
 }
 
@@ -75,9 +79,9 @@ async function cargar() {
   console.log(`Lectura ${sello}: ${lp.pedidos.length} pedidos (${lp.desde} a ${lp.hasta}), ${(lecturas.cartera as unknown[]).length} movimientos de cartera, ${(lecturas.retiros as unknown[]).length} retiros, ${(lecturas.stock as LecturaNuestros).productos.length} productos.`);
 
   const fallos: string[] = [];
-  if (!correr("dropi-ingerir-ordenes.ts", "pa", archivos.pedidos)) fallos.push("pedidos");
-  if (!correr("dropi-ingerir-cartera.ts", "pa", archivos.cartera)) fallos.push("cartera");
-  if (!correr("dropi-ingerir-retiros.ts", "pa", archivos.retiros)) fallos.push("retiros");
+  if (!correr("dropi-ingerir-ordenes.ts", PAIS, archivos.pedidos)) fallos.push("pedidos");
+  if (!correr("dropi-ingerir-cartera.ts", PAIS, archivos.cartera)) fallos.push("cartera");
+  if (!correr("dropi-ingerir-retiros.ts", PAIS, archivos.retiros)) fallos.push("retiros");
   console.log("\n— stock (Gestión de IDs Dropi)");
   try {
     const r = await guardarNuestrosProductos(supabase, lecturas.stock as LecturaNuestros, true);
@@ -131,7 +135,7 @@ const acciones: Record<string, () => Promise<void>> = {
   cuadre: () => cuadre(arg ?? ""),
   "sesion-vencida": () => marcarSesion(false, "La sesión de Dropi Panamá (ECOMFIVE) expiró: hay que iniciar sesión en el navegador integrado."),
 };
-(acciones[orden ?? ""]?.() ?? Promise.reject(new Error("Uso: npx tsx scripts/dropi-diario.ts subida|cargar|cuadre <AAAA-MM-DD>|sesion-vencida"))).catch((e) => {
+(acciones[orden ?? ""]?.() ?? Promise.reject(new Error("Uso: npx tsx scripts/dropi-diario.ts subida [cr]|cargar [cr]|cuadre <AAAA-MM-DD>|sesion-vencida"))).catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });

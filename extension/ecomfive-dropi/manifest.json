@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Ecomfive · Dropi",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Trae de Dropi al sistema Ecomfive los pedidos, la cartera, los retiros, el stock y las ventas («Actualizar Dropi»). Solo lee Dropi.",
   "permissions": ["scripting", "storage"],
-  "host_permissions": ["https://app.dropi.pa/*", "https://app.dropi.mx/*"],
+  "host_permissions": ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*"],
   "background": { "service_worker": "fondo.js" },
   "content_scripts": [
     {

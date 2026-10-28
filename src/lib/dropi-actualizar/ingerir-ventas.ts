@@ -22,10 +22,12 @@ export interface ResumenDropi {
 }
 
 const NEGATIVAS = new Set(["cancelada", "rechazada", "devolucion"]);
-const diaPanama = (utc: string) => new Date(new Date(`${utc}:00Z`).getTime() - 5 * 3600e3).toISOString().slice(0, 10);
+/** Las horas que el país está detrás de UTC (Panamá 5, Costa Rica 6): el día de cada movimiento es el del país. */
+export const HORAS_DETRAS_UTC: Record<string, number> = { PA: 5, CR: 6 };
 
-/** Arma las filas de la carga (sin base). */
-export function armarVentas(M: MovimientosDropi, R: ResumenDropi, paisId: string) {
+/** Arma las filas de la carga (sin base). `horasDetras`: las del país (Panamá por omisión). */
+export function armarVentas(M: MovimientosDropi, R: ResumenDropi, paisId: string, horasDetras = 5) {
+  const diaPanama = (utc: string) => new Date(new Date(`${utc}:00Z`).getTime() - horasDetras * 3600e3).toISOString().slice(0, 10);
   const corteFecha = diaPanama(R.generado.slice(0, 16));
   const clase = (i: number) => M.clases[i];
   const col = (k: string) => R.cabecera.indexOf(k);
@@ -108,11 +110,11 @@ export function armarVentas(M: MovimientosDropi, R: ResumenDropi, paisId: string
   return { corteFecha, productos, diarias, dropshippers, porMes, movimientos, netasTotal };
 }
 
-/** Reemplaza la carga de ventas de Panamá con esta lectura. `log` recibe los avisos. */
-export async function ingerirVentas(supabase: SupabaseClient, M: MovimientosDropi, R: ResumenDropi, log: (texto: string) => void = () => {}) {
-  const { data: pais } = await supabase.from("paises").select("id").eq("codigo", "PA").single();
-  if (!pais) throw new Error("No está el país PA.");
-  const v = armarVentas(M, R, pais.id as string);
+/** Reemplaza la carga de ventas de un país (`PA`, `CR`) con esta lectura. `log` recibe los avisos. */
+export async function ingerirVentas(supabase: SupabaseClient, M: MovimientosDropi, R: ResumenDropi, log: (texto: string) => void = () => {}, codigoPais = "PA") {
+  const { data: pais } = await supabase.from("paises").select("id").eq("codigo", codigoPais.toUpperCase()).single();
+  if (!pais) throw new Error(`No está el país ${codigoPais.toUpperCase()}.`);
+  const v = armarVentas(M, R, pais.id as string, HORAS_DETRAS_UTC[codigoPais.toUpperCase()] ?? 5);
   const enTandas = async (tabla: string, filas: Record<string, unknown>[]) => {
     for (let i = 0; i < filas.length; i += 1000) {
       const { error } = await supabase.from(tabla).insert(filas.slice(i, i + 1000));
