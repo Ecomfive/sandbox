@@ -1,4 +1,4 @@
-// Fotos, videos y documentos por WhatsApp (28 oct 2026, migración 0169). Qué se puede mandar se decide por el contenido del archivo
+// Fotos, videos y documentos por WhatsApp (28 oct 2026, migración 0170). Qué se puede mandar se decide por el contenido del archivo
 // (sus primeros bytes), no por el nombre ni por lo que dice el navegador. Sin base ni red, para poder probarlo: whatsapp.test.ts.
 import { detectarAdjunto } from "@/lib/compras/adjuntos";
 

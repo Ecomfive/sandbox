@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { accesoCrm, areasVisibles, escribeEnArea, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
+import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
 import { chatEnAlcance, permisosBandeja, TELEFONO_OCULTO } from "@/lib/crm/permisos-bandeja";
 import type { Afinado } from "@/lib/permisos/afinado";
 
@@ -48,6 +49,8 @@ export interface MensajeVista {
   error: string | null;
   autor: string | null;
   momento: string;
+  /** Vino de un chat exportado desde el celular («Importar chat», wa_id «import:…»), no por el webhook. */
+  importado: boolean;
 }
 
 /** Lo que se ve del dropshipper junto al chat. */
@@ -63,6 +66,17 @@ export interface ResumenDropshipper {
 
 type Uno<T> = T | T[] | null;
 const uno = <T,>(v: Uno<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+
+/** Quien abre el CRM (Atención o Comercial); con `escribe`, además puede escribir en alguna de las dos áreas. */
+export async function usuarioBandeja(escribe: boolean): Promise<UsuarioActual | null> {
+  const u = await getUsuarioActual();
+  if (!u || !(u.modulos.includes(MODULO_ATENCION) || u.modulos.includes(MODULO_COMERCIAL))) return null;
+  if (escribe) {
+    const a = accesoCrm(u);
+    if (!a.escribeAtencion && !a.escribeComercial && !a.escribeDireccion) return null;
+  }
+  return u;
+}
 
 /** Las áreas cuyos números ve esta persona: Atención ve el suyo; Comercial ve los dos. */
 export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u));
@@ -152,30 +166,37 @@ export async function conversacionPermitida(
   };
 }
 
-/** Los mensajes de una conversación (los 300 más recientes, del más viejo al más nuevo) y el resumen de su dropshipper. */
+/** Cuántos mensajes se traen de una vez; si vinieron todos, hay más viejos para «Ver mensajes anteriores». */
+export const MENSAJES_POR_VEZ = 300;
+
+/**
+ * Los mensajes de una conversación (los 300 más recientes, del más viejo al más nuevo; con `antesDe`, los 300 anteriores a esa hora) y
+ * el resumen de su dropshipper.
+ */
 export async function cargarConversacion(
   supabase: SupabaseClient,
   id: string,
   dropshipperId: string | null,
-): Promise<{ mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null }> {
+  antesDe?: string,
+): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null }> {
+  let consulta = supabase
+    .from("whatsapp_mensajes")
+    .select("id, direccion, tipo, texto, media_id, media_ruta, media_nombre, estado, error, autor_nombre, momento, wa_id")
+    .eq("conversacion_id", id);
+  let sinRuta = supabase
+    .from("whatsapp_mensajes")
+    .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_nombre, momento, wa_id")
+    .eq("conversacion_id", id);
+  if (antesDe) {
+    consulta = consulta.lt("momento", antesDe);
+    sinRuta = sinRuta.lt("momento", antesDe);
+  }
   const [mensajesR, dsR, casosR] = await Promise.all([
-    // `media_ruta` es de la migración 0169: sin ella se leen los mensajes igual (los archivos se bajan de Meta).
-    supabase
-      .from("whatsapp_mensajes")
-      .select("id, direccion, tipo, texto, media_id, media_ruta, media_nombre, estado, error, autor_nombre, momento")
-      .eq("conversacion_id", id)
+    // `media_ruta` es de la migración 0170: sin ella se leen los mensajes igual (los archivos se bajan de Meta).
+    consulta
       .order("momento", { ascending: false })
-      .limit(300)
-      .then((r) =>
-        r.error
-          ? supabase
-              .from("whatsapp_mensajes")
-              .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_nombre, momento")
-              .eq("conversacion_id", id)
-              .order("momento", { ascending: false })
-              .limit(300)
-          : r,
-      ),
+      .limit(MENSAJES_POR_VEZ)
+      .then((r) => (r.error ? sinRuta.order("momento", { ascending: false }).limit(MENSAJES_POR_VEZ) : r)),
     dropshipperId
       ? supabase.from("dropshippers").select("id, nombre, codigo, estado, tiendas, tienda, dropshipper_cuentas(plataformas(nombre), paises(codigo))").eq("id", dropshipperId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -195,6 +216,7 @@ export async function cargarConversacion(
       error: (m.error as string | null) ?? null,
       autor: (m.autor_nombre as string | null) ?? null,
       momento: m.momento as string,
+      importado: String(m.wa_id ?? "").startsWith("import:"),
     }))
     .reverse();
   const d = dsR.data as {
@@ -217,5 +239,5 @@ export async function cargarConversacion(
         casos: ((casosR.data ?? []) as { numero: number; titulo: string; prioridad: string }[]).map((c) => ({ codigo: `CAS-${String(c.numero).padStart(4, "0")}`, titulo: c.titulo, prioridad: c.prioridad })),
       }
     : null;
-  return { mensajes, dropshipper };
+  return { mensajes, hayAnteriores: mensajes.length === MENSAJES_POR_VEZ, dropshipper };
 }

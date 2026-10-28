@@ -77,7 +77,7 @@ El número aparece en la bandeja como «WhatsApp» (id `360dialog`): ponerle nom
 **Áreas con un solo número** (migración 0168): el área es de cada conversación. Todo chat nuevo entra a Atención y se pasa a Comercial
 o Dirección con el botón «Pasar a otra área» del chat; quien no ve esa área deja de verlo. Queda una nota en el chat y la auditoría.
 
-## Fotos, videos y documentos (28 oct 2026, migración 0169)
+## Fotos, videos y documentos (28 oct 2026, migración 0170)
 
 Se mandan desde la bandeja con «📎» o pegando una captura. Límites de WhatsApp: fotos JPG/PNG 5 MB, videos MP4 16 MB (H.264 + AAC;
 un .MOV hay que exportarlo como MP4), documentos 100 MB. Todo queda en el bucket privado `whatsapp` de Supabase, también lo que

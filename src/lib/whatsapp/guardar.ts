@@ -42,7 +42,7 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
 const SE_MUESTRAN = /^(image\/(jpeg|png|webp|gif)|audio\/(ogg|mpeg|mp4|aac|amr)|video\/(mp4|3gpp)|application\/pdf)$/;
 
 /**
- * Copia al bucket del sistema (migración 0169, `entrantes/`) un archivo que llegó por WhatsApp, porque Meta solo lo guarda unos 30
+ * Copia al bucket del sistema (migración 0170, `entrantes/`) un archivo que llegó por WhatsApp, porque Meta solo lo guarda unos 30
  * días. Si no se puede (el sandbox no entrega archivos, o Meta falla), el mensaje queda como antes: se baja de Meta al abrirlo.
  */
 async function copiarAlBucket(waId: string, mediaId: string, mime: string | null): Promise<void> {
