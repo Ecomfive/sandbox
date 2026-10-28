@@ -60,6 +60,8 @@ export function CamposDatosDropi({
   conProducto = false,
   skuInicial = null,
   nombre,
+  productoNuevo = null,
+  alPedirCrearProducto,
 }: {
   opciones: OpcionesCrear;
   inicial: DatosCrearDropi | null;
@@ -72,6 +74,10 @@ export function CamposDatosDropi({
   skuInicial?: string | null;
   /** El nombre del producto, cuando no hay un campo «nombre» en el mismo formulario (la ficha); la IA parte de él. */
   nombre?: string;
+  /** Un producto recién creado desde «Agregar»: queda elegido solo. */
+  productoNuevo?: OpcionSkuMaestro | null;
+  /** «No existe: crear el producto» bajo el buscador (27 oct 2026). */
+  alPedirCrearProducto?: () => void;
 }) {
   const { mostrarToast } = useToast();
   const skuDeInicio = inicial?.sku ?? skuInicial ?? "";
@@ -89,6 +95,12 @@ export function CamposDatosDropi({
   function elegirProducto(o: OpcionSkuMaestro | null) {
     setProducto(o);
     if (o) cambiarSku(o.codigo);
+  }
+  // El producto recién creado se elige solo (se compara con el anterior durante el render, sin efecto).
+  const [nuevoVisto, setNuevoVisto] = useState(productoNuevo);
+  if (productoNuevo !== nuevoVisto) {
+    setNuevoVisto(productoNuevo);
+    if (productoNuevo) elegirProducto(productoNuevo);
   }
   const [categorias, setCategorias] = useState<string[]>(inicial?.categorias ?? []);
   const [otraCategoria, setOtraCategoria] = useState("");
@@ -186,6 +198,7 @@ export function CamposDatosDropi({
             </span>
             <input type="hidden" name="sku_maestro_id" value={producto?.id ?? ""} />
             <CampoSkuMaestro valor={producto?.id ?? null} alCambiar={elegirProducto} etiquetaAria="Producto vinculado" placeholder="Código o nombre del producto" claseContenedor="w-full" className={`${fieldClass} w-full`} />
+            {alPedirCrearProducto && !producto && <BotonCrearProducto alPulsar={alPedirCrearProducto} />}
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
@@ -368,5 +381,14 @@ export function CamposDatosDropi({
         </Campo>
       </Seccion>
     </>
+  );
+}
+
+/** «No existe: crear el producto», bajo el buscador del producto vinculado de «Agregar». */
+export function BotonCrearProducto({ alPulsar }: { alPulsar: () => void }) {
+  return (
+    <button type="button" onClick={alPulsar} className={`self-start rounded-md px-1 py-1 text-sm font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+      No existe: crear el producto
+    </button>
   );
 }

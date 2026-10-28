@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Ventana } from "@/components/ui/ventana";
 import { Campo } from "@/components/ui/campo-ficha";
-import { anilloFoco, fieldClass } from "@/components/ui/field";
+import { CampoSkuMaestro, ProveedorSkusMaestros, useOpcionesSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
 import { MAX_NOMBRE_CREAR, PRECIO_MINIMO, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { fulfillmentFijo, UBICACIONES } from "@/lib/publicaciones/publicacion";
 import { crearPublicacion, type PublicacionCreada } from "./actions";
-import { CamposDatosDropi } from "./campos-datos-dropi";
+import { BotonCrearProducto, CamposDatosDropi } from "./campos-datos-dropi";
+import { CrearProductoAlAgregar } from "./crear-producto-al-agregar";
 import { CrearProductoDePublicacion } from "./crear-producto-de-publicacion";
 
 type Modo = "publicar" | "existente";
@@ -23,6 +25,9 @@ type Modo = "publicar" | "existente";
  * Si se crea sin elegir un producto de Producto (un pack de 2 o 3, o un combo de varios productos que todavía no existe), al terminar sale un aviso
  * con el atajo «Crear el producto»: abre la ficha del producto con el nombre, el SKU y la misma foto de la publicación, y lo deja vinculado
  * (pedido de Jhokser, 27 oct 2026). Lo puede hacer quien edita esta lista, sin abrir Producto.
+ *
+ * En los dos modos se busca el producto de Producto que se vincula y, si no existe, «No existe: crear el producto» lo crea ahí mismo y lo
+ * deja elegido (pedido de Alcides, 27 oct 2026; reemplaza el botón «Nuevo producto» de la barra).
  */
 export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId: string; codigoPais: string; opciones: OpcionesCrear }) {
   const fijo = fulfillmentFijo(codigoPais);
@@ -31,6 +36,33 @@ export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId
   // La publicación recién creada sin producto: se ofrece crearlo (el pack o combo).
   const [creada, setCreada] = useState<PublicacionCreada | null>(null);
   const [productoCreado, setProductoCreado] = useState(false);
+  // El producto que se crea desde aquí: se suma a la lista del buscador y queda elegido.
+  const opcionesSku = useOpcionesSkuMaestro();
+  const [nuevos, setNuevos] = useState<OpcionSkuMaestro[]>([]);
+  const [productoNuevo, setProductoNuevo] = useState<OpcionSkuMaestro | null>(null);
+  const [vinculado, setVinculado] = useState<OpcionSkuMaestro | null>(null);
+  const [nombreProducto, setNombreProducto] = useState("");
+  const abrirProducto = useRef<(() => void) | null>(null);
+  const quiereAbrir = useRef(false);
+  const registrar = useCallback((abrir: () => void) => {
+    abrirProducto.current = abrir;
+    if (quiereAbrir.current) {
+      quiereAbrir.current = false;
+      abrir();
+    }
+  }, []);
+  // La ficha del producto llega con el nombre escrito en la publicación; si cambió, se vuelve a armar y se abre al quedar lista.
+  function pedirCrearProducto() {
+    const nombre = (document.getElementById("pub-nombre") as HTMLInputElement | null)?.value.trim() ?? "";
+    if (nombre === nombreProducto && abrirProducto.current) return abrirProducto.current();
+    quiereAbrir.current = true;
+    setNombreProducto(nombre);
+  }
+  function productoCreadoAqui(o: OpcionSkuMaestro) {
+    setNuevos((a) => [o, ...a]);
+    setProductoNuevo(o);
+    setVinculado(o);
+  }
   async function crear(f: FormData) {
     const r = await crearPublicacion(f);
     if (!r.error && r.id && r.sinProducto) {
@@ -40,14 +72,18 @@ export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId
     return r;
   }
   return (
-    <>
+    <ProveedorSkusMaestros opciones={nuevos.length ? [...nuevos, ...opcionesSku] : opcionesSku}>
     <FichaCrear
       titulo={publicar ? "Publicar en Dropi" : "Anotar publicación de Dropi"}
       etiquetaCrear={publicar ? "Crear y dejar pendiente para Dropi" : "Crear publicación"}
       action={crear}
       mensajeExito={publicar ? "Publicación creada: queda pendiente para Dropi" : "Publicación creada"}
       ocultos={{ pais_id: paisId, modo }}
-      alAbrir={() => setModo("publicar")}
+      alAbrir={() => {
+        setModo("publicar");
+        setProductoNuevo(null);
+        setVinculado(null);
+      }}
       // Con datos sin completar se guarda como borrador («Sin publicar»): se completa y se publica después, o se elimina.
       secundario={
         publicar
@@ -92,6 +128,17 @@ export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId
               />
             </Campo>
             {!publicar && (
+              // El buscador lleva su propio nombre accesible («Producto vinculado»): el título va como texto, no como <label>.
+              <div className="flex min-w-0 flex-col gap-1">
+                <span aria-hidden="true" className={labelClassSm}>
+                  Producto vinculado
+                </span>
+                <input type="hidden" name="sku_maestro_id" value={vinculado?.id ?? ""} />
+                <CampoSkuMaestro valor={vinculado?.id ?? null} alCambiar={setVinculado} etiquetaAria="Producto vinculado" placeholder="Código o nombre del producto" claseContenedor="w-full" className={`${fieldClass} w-full`} />
+                {!vinculado && <BotonCrearProducto alPulsar={pedirCrearProducto} />}
+              </div>
+            )}
+            {!publicar && (
               <Campo etiqueta="ID en Dropi" id="pub-dropi">
                 <input id="pub-dropi" name="dropi_id" autoComplete="off" maxLength={60} placeholder="Ej: 11144" className={`${fieldClass} w-full tabular-nums`} />
               </Campo>
@@ -126,7 +173,16 @@ export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId
             </Campo>
           </Seccion>
           {publicar ? (
-            <CamposDatosDropi opciones={opciones} inicial={null} faltante={faltante} invalido={invalido} idBase="pub-dd" conProducto />
+            <CamposDatosDropi
+              opciones={opciones}
+              inicial={null}
+              faltante={faltante}
+              invalido={invalido}
+              idBase="pub-dd"
+              conProducto
+              productoNuevo={productoNuevo}
+              alPedirCrearProducto={pedirCrearProducto}
+            />
           ) : (
             <Seccion icono={InventarioIcon} titulo="Stock">
               <Campo etiqueta="Dónde está" id="pub-ubicacion">
@@ -144,6 +200,8 @@ export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId
         </>
       )}
     </FichaCrear>
+    {/* Fuera del formulario de «Agregar»: un formulario dentro de otro enviaría los dos. */}
+    <CrearProductoAlAgregar key={nombreProducto} nombre={nombreProducto} alRegistrar={registrar} alCrear={productoCreadoAqui} />
     {creada?.id && (
       <Ventana abierto alCerrar={() => setCreada(null)} titulo={productoCreado ? "Producto creado" : "Publicación creada"} ancho="sm">
         <div className="flex flex-col gap-4 p-5 text-sm">
@@ -176,6 +234,6 @@ export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId
         </div>
       </Ventana>
     )}
-    </>
+    </ProveedorSkusMaestros>
   );
 }
