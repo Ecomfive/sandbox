@@ -101,7 +101,7 @@ function crearDropi(opciones: { usuarios?: Record<string, Obj>; fallaAsignar?: b
       if (opciones.fotos === "rechaza") return responder({ isSuccess: false, message: "Formato no permitido" }, 422);
       if (opciones.fotos === "fallaLaPrincipal" && (init.body as FormData).get("main") === "true" && !fallo.hecho) {
         fallo.veces++;
-        if (fallo.veces >= 2) fallo.hecho = true;
+        fallo.hecho = true;
         return responder({ isSuccess: false, message: "Error temporal" }, 500);
       }
       if (opciones.fotos === "soloXAuth" && (init.headers as Record<string, string>).Authorization) return responder({ isSuccess: false, message: "Unauthorized" }, 401);
@@ -394,7 +394,15 @@ test("republicar: si en un intento falló la foto principal, el reintento sube j
   assert.equal(r2.ok, true, String(r2.error));
   const g = d.productos.get(9001)!.gallery as Obj[];
   assert.equal(g.length, 2, "las dos fotos, sin repetir");
-  assert.ok(g.some((f) => f.main && String(f.urlS3).endsWith("1779932274veganic.jpg")), "la principal quedó como principal");
+  assert.ok(g.some((f) => f.main && String(f.urlS3).endsWith("veganic.jpg")), "la principal quedó como principal");
+});
+
+test("republicar: un error 5xx al subir una foto no se reintenta en el momento (Dropi pudo haberla guardado y quedaría repetida)", async () => {
+  const d = crearDropi({ fotos: "fallaLaPrincipal" });
+  d.productos.set(8751, productoBase(8751, { gallery: [{ id: 1, main: true, urlS3: "panama/products/8751/1779932274veganic.jpg", url: null, variation_id: null }] }));
+  const [r1] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
+  assert.equal(r1.ok, false);
+  assert.equal(d.llamadas.filter((l) => String(l).includes("/products/photos/upload")).length, 1, "un solo intento de subida");
 });
 
 test("republicar: si el navegador no deja bajar la foto del CDN, la pide a la plataforma y la sube", async () => {
@@ -422,7 +430,24 @@ test("republicar: con fotos copiadas en el sistema, sube esas (la primera como p
   assert.equal(r.ok, true, String(r.error));
   const g = d.productos.get(9001)!.gallery as Obj[];
   assert.equal(g.length, 2);
-  assert.ok(g[0].main && String(g[0].urlS3).endsWith("1779932274anti.jpg"));
+  assert.ok(g[0].main && String(g[0].urlS3).endsWith("anti.jpg"));
+});
+
+test("republicar: la misma foto repetida en el sistema (con otros números de Dropi) se sube una sola vez, sin el número en el nombre", async () => {
+  const d = crearDropi({ cdnBloqueado: true });
+  d.fotoPorPlataforma = false;
+  d.productos.set(10474, productoBase(10474));
+  const fotos = [foto("1779932274anti.jpg"), foto("17800000001779932274anti.jpg"), foto("1781111111anti.jpg"), foto("1779932275anti-2.png")];
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474, fotos }]);
+  assert.equal(r.ok, true, String(r.error));
+  const g = d.productos.get(9001)!.gallery as Obj[];
+  assert.equal(g.length, 2, "la principal una vez y la otra una vez");
+  assert.equal(g.filter((f) => f.main).length, 1);
+  assert.ok(String(g[0].urlS3).endsWith("1779999999anti.jpg"), "se sube sin el número viejo");
+  // Si el cambio se vuelve a aplicar (reintento), no se sube nada más.
+  const [r2] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474, nuevo: 9001, fotos }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal((d.productos.get(9001)!.gallery as Obj[]).length, 2, "el reintento no repite ninguna");
 });
 
 // ─── Privatizar (26 oct 2026) ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

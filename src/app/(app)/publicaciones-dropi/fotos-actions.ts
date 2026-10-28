@@ -2,6 +2,7 @@
 
 import { requireModulo } from "@/lib/auth";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
+import { claveFoto } from "@/lib/publicaciones/republicar-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
 
 // Las fotos de una publicación copiadas de Dropi al sistema (migración 0153): las lee la sección «Fotos» de su ficha. Basta poder abrir
@@ -34,15 +35,19 @@ export async function obtenerFotosPublicacion(id: string): Promise<{ fotos: Foto
     .order("principal", { ascending: false })
     .order("orden");
   if (error) return /does not exist|schema cache/i.test(error.message) ? { error: "Falta correr en Supabase la migración 0153." } : { error: "No se pudieron leer las fotos." };
+  // Una misma foto subida varias veces a Dropi se ve una sola vez (la primera de la lista: la que sigue en Dropi o la principal).
+  const vistas = new Set<string>();
   return {
-    fotos: (data ?? []).map((f) => ({
-      id: f.id as string,
-      nombre: f.nombre as string,
-      url: f.url as string,
-      principal: !!f.principal,
-      enDropi: !!f.en_dropi,
-      dropiId: f.dropi_producto_id == null ? null : Number(f.dropi_producto_id),
-      copiadaEn: f.creado_en as string,
-    })),
+    fotos: (data ?? [])
+      .filter((f) => !vistas.has(claveFoto(f.nombre as string)) && vistas.add(claveFoto(f.nombre as string)))
+      .map((f) => ({
+        id: f.id as string,
+        nombre: f.nombre as string,
+        url: f.url as string,
+        principal: !!f.principal,
+        enDropi: !!f.en_dropi,
+        dropiId: f.dropi_producto_id == null ? null : Number(f.dropi_producto_id),
+        copiadaEn: f.creado_en as string,
+      })),
   };
 }

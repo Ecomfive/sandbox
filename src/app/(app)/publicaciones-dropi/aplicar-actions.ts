@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { normalizarDatosCrear, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
+import { claveFoto } from "@/lib/publicaciones/republicar-dropi";
 import { normalizarDatosPrivatizar, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -223,8 +224,14 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
       .eq("en_dropi", true)
       .order("principal", { ascending: false })
       .order("orden");
-    for (const f of fotos.error ? [] : (fotos.data ?? []))
+    // Cada foto una sola vez, aunque Dropi la tenga repetida (28 oct 2026, PUB-0446): si no, cada republicación copia todas las repetidas.
+    const vistas = new Set<string>();
+    for (const f of fotos.error ? [] : (fotos.data ?? [])) {
+      const clave = `${f.publicacion_id}|${claveFoto(f.nombre as string)}`;
+      if (vistas.has(clave)) continue;
+      vistas.add(clave);
       deSistema.set(f.publicacion_id as string, [...(deSistema.get(f.publicacion_id as string) ?? []), { url: f.url as string, nombre: f.nombre as string }]);
+    }
   }
   return {
     pais: pais.nombre,

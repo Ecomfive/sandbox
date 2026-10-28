@@ -24,7 +24,7 @@
 import { APAGAR_JS } from "./apagar-dropi";
 import { CREAR_JS } from "./crear-dropi";
 import { PRIVATIZAR_JS } from "./privatizar-dropi";
-import { REPUBLICAR_JS } from "./republicar-dropi";
+import { CLAVE_FOTO_JS, REPUBLICAR_JS } from "./republicar-dropi";
 
 /** El armado del guardado de Dropi, en JavaScript simple para el favorito (el mismo de `armarGuardadoProducto`). */
 export const ARMAR_JS = [
@@ -70,7 +70,11 @@ const CODIGO = [
   // Una foto: se baja del CDN de Dropi y se sube al producto nuevo como lo hace la pantalla de Dropi. Si la subida falla se reintenta
   // una vez con solo «X-Authorization» (la cabecera que manda la pantalla de Dropi) y, si igual falla, `FE` guarda por qué (25 oct
   // 2026: las republicaciones del 8751 y el 10474 crearon el producto nuevo y no pudieron copiar las fotos, sin saber el motivo).
-  "var FE='';",
+  "var FE='',ST=0;",
+  // Cada foto es una sola aunque su nombre cambie (Dropi le antepone un número en cada subida): `ck` es su llave y `nl` el nombre con
+  // que se sube, sin esos números (28 oct 2026, PUB-0446: la principal se subía una y otra vez y quedaban 17 iguales).
+  CLAVE_FOTO_JS,
+  "function unicas(fs){var v={};return fs.filter(function(x){var k=ck(x.nombre);if(v[k])return false;v[k]=1;return true})}",
   // Se baja de su dirección y, si falla, de sus `alternas` (la misma foto en el CDN de Dropi).
   // Cada dirección se pide primero directo (sin la caché del navegador). El CDN de Dropi (CloudFront) guarda copias de las fotos sin la
   // cabecera CORS y, según la compresión que pida el navegador, le toca una de esas y no la deja leer (25 oct 2026, el 10474 y luego
@@ -83,10 +87,10 @@ const CODIGO = [
   "var cdn=u.indexOf(CDN+'/')===0,porV=function(){return cdn?porVentana(u).then(function(b){return b||otra()}):otra()};",
   "return fetch(u,{cache:'no-store',credentials:'omit'}).then(function(x){if(!x.ok){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' (respondió '+x.status+')';return porV()}return x.blob()},function(e){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' ('+String(e&&e.message||e)+')';return porV()})};return otra()}",
   "function subir(id,f){return bajar(f).then(function(b){if(!b)return false;",
-  "var mandar=function(h){var d=new FormData();d.append('files',new File([b],f.nombre,{type:b.type||'image/jpeg'}));d.append('id',String(id));d.append('main',f.main?'true':'false');",
+  "var mandar=function(h){var d=new FormData();d.append('files',new File([b],nl(f.nombre),{type:b.type||'image/jpeg'}));d.append('id',String(id));d.append('main',f.main?'true':'false');",
   "return fetch(A+'/products/photos/upload',{method:'POST',headers:h,body:d}).then(function(x){return x.text().then(function(t){var j=null;try{j=JSON.parse(t)}catch(z){}var ok=x.ok&&!(j&&j.isSuccess===false);",
-  "if(!ok)FE='Dropi no aceptó la foto '+f.nombre+' (respondió '+x.status+(j&&(j.message||j.error)?': '+String(j.message||j.error).slice(0,120):t?': '+t.replace(/\\s+/g,' ').slice(0,120):'')+')';return ok})},function(e){FE='no se pudo subir la foto '+f.nombre+' ('+String(e&&e.message||e)+')';return false})};",
-  "return mandar({Accept:'application/json',Authorization:'Bearer '+T,'x-authorization':'Bearer '+T}).then(function(ok){return ok||mandar({Accept:'application/json','X-Authorization':'Bearer '+T})})})}",
+  "ST=x.status;if(!ok)FE='Dropi no aceptó la foto '+f.nombre+' (respondió '+x.status+(j&&(j.message||j.error)?': '+String(j.message||j.error).slice(0,120):t?': '+t.replace(/\\s+/g,' ').slice(0,120):'')+')';return ok})},function(e){ST=0;FE='no se pudo subir la foto '+f.nombre+' ('+String(e&&e.message||e)+')';return false})};",
+  "return mandar({Accept:'application/json',Authorization:'Bearer '+T,'x-authorization':'Bearer '+T}).then(function(ok){return ok||(ST>=500?false:mandar({Accept:'application/json','X-Authorization':'Bearer '+T}))})})}",
   "function porque(){return FE?': '+FE:''}",
   "async function republicar(c,bp){",
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
@@ -102,7 +106,7 @@ const CODIGO = [
   // Sube las fotos que el nuevo no tiene, comparando por nombre (Dropi le antepone un número): contar cuántas tenía y seguir desde ahí
   // repetía una y dejaba fuera la principal si en un intento anterior subió una del medio (25 oct 2026, el 11309).
   // Las fotos copiadas en el sistema (migración 0153) mandan, la principal primero; sin ellas, las de Dropi.
-  "var fs=Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o),mal=0;for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i])))mal++;",
+  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),mal=0;for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i])))mal++;",
   "if(mal)return f('Se creó el '+id+', pero no se pudieron copiar '+mal+' foto(s)'+porque()+'.');",
   // Las garantías del viejo pasan al nuevo (25 oct 2026: el 11309 quedó sin ellas; en Dropi la casilla de cada garantía se marca solo
   // si el producto la tiene guardada). Solo si el nuevo todavía no tiene ninguna, así un reintento no las repite.
@@ -139,9 +143,9 @@ const CODIGO = [
   "if(v.ok&&w&&!w.archived)return{ok:true,archivado:false,error:'Se pidió archivarlo, pero Dropi todavía no lo muestra archivado.'};",
   "return{ok:true,archivado:true}}",
   // ¿La galería del producto ya tiene una foto con ese nombre? (Dropi antepone un número al nombre del archivo: se compara el final.)
-  "function tiene(n,nom){return fotosDe(n).some(function(g){return g.nombre.slice(-nom.length)===nom})}",
+  "function tiene(n,nom){var k=ck(nom);return fotosDe(n).some(function(g){return ck(g.nombre)===k})}",
   // Sube a un producto las fotos que le falten; devuelve cuántas no se pudieron subir.
-  "async function subirFotos(id,n,fs,principal){var mal=0;for(var i=0;i<fs.length;i++){if(tiene(n,fs[i].nombre))continue;if(!(await subir(id,{url:fs[i].url,nombre:fs[i].nombre,main:principal&&i===0})))mal++}return mal}",
+  "async function subirFotos(id,n,fs,principal){var mal=0;fs=unicas(fs);for(var i=0;i<fs.length;i++){if(tiene(n,fs[i].nombre))continue;if(!(await subir(id,{url:fs[i].url,nombre:fs[i].nombre,main:principal&&i===0})))mal++}return mal}",
   // Archivar (o sacar de Archivados) un producto en Dropi: `archiveProduct` / `unarchive`, y se vuelve a leer para comprobar.
   "async function archivar(c){",
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
@@ -194,7 +198,7 @@ const CODIGO = [
   "id=idCreado(g.j);if(!id)return fin(sinId(g))}",
   "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return fin('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
   // Las fotos y las garantías del público pasan al privado; si algo de eso falla, solo se avisa (Dropi no las exige a un producto privado).
-  "var fs=Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o),mal=0,avisos=[];",
+  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),mal=0,avisos=[];",
   "for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i])))mal++;",
   "if(mal)avisos.push('No se pudieron copiar '+mal+' foto(s)'+porque()+': súbelas a mano al ID '+id+'.');",
   "var gv=await pedir('/productwarranty/show','POST',{product_id:Number(c.producto)}),gn=await pedir('/productwarranty/show','POST',{product_id:id});",
