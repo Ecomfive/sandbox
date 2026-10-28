@@ -3,6 +3,7 @@ import { getUsuarioActual } from "@/lib/auth";
 import { MODULO_ATENCION, MODULO_COMERCIAL } from "@/lib/crm/areas";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { estaOculto } from "@/lib/whatsapp/ocultos";
 import { config360, urlDescarga360, urlMedia360 } from "@/lib/whatsapp/proveedor";
 import { conversacionPermitida } from "@/app/(app)/crm-dropshippers/bandeja/datos-bandeja";
 
@@ -25,6 +26,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const supabase = createServiceClient();
   const { data: m } = await supabase.from("whatsapp_mensajes").select("conversacion_id, media_id, media_mime, media_nombre").eq("id", id).maybeSingle();
   if (!m?.media_id || !(await conversacionPermitida(supabase, m.conversacion_id as string, u))) return new NextResponse("Not Found", { status: 404 });
+  // Lo que se autorizó borrar (migración 0172) ya no se entrega.
+  if (await estaOculto(supabase, id, m.conversacion_id as string)) return new NextResponse("Not Found", { status: 404 });
   const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
   // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169): vive en el bucket, en la carpeta del chat.
   if (String(m.media_id).startsWith("storage:")) {

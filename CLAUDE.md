@@ -979,6 +979,15 @@ convenciones técnicas del código.
   `extraerAviso` lo devuelve en `revocados` (no crea un mensaje) y `guardarRevocados` marca el original (`whatsapp_mensajes.eliminado_en_whatsapp_en`), que se muestra con su texto y la
   marca «Lo eliminó en WhatsApp quien lo mandó». Las marcas se leen con consultas aparte que ignoran el error, así que sin la migración la bandeja sigue cargando (sin marcas). Reversa:
   `supabase/rollbacks/0171_rollback.sql`.
+  **Borrar pide autorización** (28 oct 2026, pedido de Jhokser; migración 0172): quien escribe en el CRM no borra un chat ni un mensaje por su cuenta: lo **pide** (`pedirBorrado`,
+  `crm-dropshippers/borrados/actions.ts`; botón «Pedir borrar el chat» del encabezado y papelera en la esquina de cada mensaje, `bandeja/pedir-borrado.tsx`) con un motivo de 5 letras o más.
+  La petición (`whatsapp_solicitudes_borrado`, una pendiente por chat o mensaje) la autoriza **el jefe de quien la pide en Puestos** (`quienAutoriza`, `src/lib/whatsapp/borrado.ts`, con prueba:
+  `jefesDe` salta puestos vacantes y solo cuenta a quien ve el CRM; sin jefe, un administrador distinto de quien pide; nunca quien lo pide). Al autorizar (`resolverSolicitudBorrado`, que primero
+  reclama la petición con un update condicionado a `pendiente`) el chat o el mensaje **se oculta, no se borra** (`oculta_en`/`oculta_por`, `oculto_en`/`oculto_por`): la bandeja, «sin responder»,
+  la lista del CRM y los archivos (`/api/whatsapp/media`) no lo muestran (`src/lib/whatsapp/ocultos.ts`) y un administrador lo recupera en CRM › Borrados (`recuperarOculto`). Un mensaje
+  nuevo del dropshipper a un chat oculto lo vuelve a mostrar con una nota del sistema (`volverAMostrarSiOcultos`, `guardar.ts`). Si el jefe no responde, la petición espera (el administrador solo
+  recupera, no autoriza por encima); los KPIs siguen contando los chats ocultos. Todo se lee con consultas aparte que ignoran el error: sin la migración la bandeja carga igual. Auditoría:
+  `pedir/autorizar/rechazar/cancelar_borrado_whatsapp` y `recuperar_whatsapp`. Reversa: `supabase/rollbacks/0172_rollback.sql`.
 - **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del
   último mensaje de un dropshipper solo se le escribe con una plantilla que Meta aprobó. Se crean, se cambian y se mandan a Meta desde el sistema. Tablas:
   `whatsapp_plantillas` (por nombre e idioma; `categoria` = la pedida, `categoria_actual` = la que Meta le puso; `estado` borrador → pendiente → aprobada /

@@ -33,6 +33,19 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
     });
     if (error) console.error(`WhatsApp: no se pudo guardar un mensaje${desdeCelular ? " mandado desde el celular" : ""}`, m.waId, error.message);
   }
+  if (!desdeCelular) await volverAMostrarSiOcultos(supabase, telefonos);
+}
+
+/**
+ * Si un dropshipper escribe a un chat que se había autorizado ocultar (migración 0172), el chat vuelve a verse: nadie se queda sin ser atendido.
+ * Deja una nota del sistema. Sin la migración no hace nada.
+ */
+async function volverAMostrarSiOcultos(supabase: ReturnType<typeof createServiceClient>, telefonos: string[]): Promise<void> {
+  const { data, error } = await supabase.from("whatsapp_conversaciones").update({ oculta_en: null, oculta_por: null }).in("telefono", telefonos).not("oculta_en", "is", null).select("id");
+  if (error || !data?.length) return;
+  await supabase.from("whatsapp_mensajes").insert(
+    data.map((c) => ({ conversacion_id: c.id as string, direccion: "nota", tipo: "texto", texto: "Volvió a escribir: el chat vuelve a verse en la bandeja.", estado: "enviado", autor_nombre: "Sistema" })),
+  );
 }
 
 /** Los estados de los mensajes que mandó el equipo. Un estado nunca vuelve atrás; un «fallido» se guarda con su motivo. */
