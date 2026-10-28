@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { hojaPagos } from "@/lib/proveedor/excel-portal";
 import { CAMPOS_CALCULADOS, COLUMNA_HOJA, TIPO_CAMPO, totalesRegistro, type CampoRegistro, type FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import type { Textos } from "@/lib/proveedor/textos";
+import { BotonExcel } from "./boton-excel";
 import { SinResultados, useFiltroPortal } from "./filtro-portal";
 import { useIdioma } from "./idioma-contexto";
 import { Vacio, dinero } from "./piezas-proveedor";
+import { ColumnaCasilla, useSeleccion } from "./seleccion";
 
 type Guardar = (fila: string, campo: CampoRegistro, valor: string) => Promise<{ error?: string }>;
 
@@ -48,6 +51,7 @@ export interface CambioRegistro {
  */
 export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: FilaRegistro[]; guardar?: Guardar; pista: string; cambios?: CambioRegistro[] }) {
   const { t, tr } = useIdioma();
+  const seleccion = useSeleccion();
   // El buscador y el país son los del portal (arriba de las pestañas).
   const { filtro, pasa, activo } = useFiltroPortal();
   const [cuantas, setCuantas] = useState(POR_TANDA);
@@ -61,6 +65,8 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
   const totales = totalesRegistro(visibles);
   const aLaVista = visibles.slice(0, cuantas);
   const usd = (n: number) => dinero(n, n % 1 ? 2 : 0);
+  // El Excel lleva todas las filas que dejan el buscador y el país (no solo las 100 que se ven), o las que se marcaron.
+  const hoja = hojaPagos(visibles, { t, tr, via: () => "" });
   const fondoTh = (campo: CampoRegistro) => (CAMPOS_CALCULADOS.includes(campo) ? "bg-muted" : guardar ? "bg-primario-suave" : "");
 
   return (
@@ -102,8 +108,8 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        {guardar && (
-          <div className="flex flex-wrap items-center justify-end gap-2.5 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-end gap-2.5 border-b border-border px-4 py-3">
+          {guardar && (
             <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <span aria-hidden="true" className="h-3 w-3 rounded-sm border border-primario/40 bg-primario-suave" />
@@ -114,8 +120,9 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
                 {t.leyCalculada}
               </span>
             </span>
-          </div>
-        )}
+          )}
+          <BotonExcel clave="pagos" titulo={t.tabPagos} columnas={hoja.columnas} filas={hoja.filas} />
+        </div>
 
         {visibles.length === 0 ? (
           activo ? (
@@ -130,6 +137,7 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
             <table className="w-full min-w-[1320px] border-collapse text-[13px]">
               <thead className="sticky top-0 z-[1] bg-card">
                 <tr>
+                  <ColumnaCasilla encabezado ids={visibles.map((f) => f.fila)} />
                   <th scope="col" className="border-b border-border bg-card px-3 py-2.5 text-left align-bottom">
                     <span className="block font-semibold">{t.colProducto}</span>
                     <span className="block text-[11px] font-normal text-muted-foreground">{COLUMNA_HOJA.producto}</span>
@@ -145,6 +153,7 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
               <tbody>
                 {aLaVista.map((f) => (
                   <tr key={f.fila} className="border-t border-border">
+                    <ColumnaCasilla id={f.fila} nombre={tr(String(f.valores.producto ?? ""))} />
                     <td className="min-w-[17rem] px-3 py-2">
                       <span className="flex items-center gap-2.5">
                         {f.foto ? (
@@ -168,7 +177,7 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
               </tbody>
               <tfoot className="sticky bottom-0 bg-card">
                 <tr className="border-t-2 border-border bg-muted/40">
-                  <th scope="row" colSpan={7} className="px-3 py-3 text-right font-bold">
+                  <th scope="row" colSpan={seleccion ? 8 : 7} className="px-3 py-3 text-right font-bold">
                     {t.totalFila}
                   </th>
                   <td className="bg-[#fef08a] px-3 py-3 text-right font-bold text-[#18181b] tabular-nums">{usd(totales.sinPagar)}</td>
