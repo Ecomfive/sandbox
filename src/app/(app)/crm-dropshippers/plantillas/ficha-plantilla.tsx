@@ -105,6 +105,8 @@ export function FichaPlantilla({
   const [error, setError] = useState<string | null>(null);
   const [tocado, setTocado] = useState(false);
   const textoRef = useRef<HTMLTextAreaElement>(null);
+  // Si nunca se tocó el texto, el navegador dice que el cursor está al principio: ahí no se agrega la variable, sino al final.
+  const tocoElTexto = useRef(false);
 
   const yaEnMeta = !!plantilla && plantilla.estado !== "borrador";
   const bloqueada = !puedeEscribir || plantilla?.estado === "pendiente" || plantilla?.estado === "deshabilitada";
@@ -129,8 +131,8 @@ export function FichaPlantilla({
   function agregarVariable() {
     const area = textoRef.current;
     const token = `{{${siguienteRanura(cuerpo)}}}`;
-    const desde = area?.selectionStart ?? cuerpo.length;
-    const hasta = area?.selectionEnd ?? cuerpo.length;
+    const desde = tocoElTexto.current ? Math.min(area?.selectionStart ?? cuerpo.length, cuerpo.length) : cuerpo.length;
+    const hasta = tocoElTexto.current ? Math.min(area?.selectionEnd ?? cuerpo.length, cuerpo.length) : cuerpo.length;
     cambiarCuerpo(`${cuerpo.slice(0, desde)}${token}${cuerpo.slice(hasta)}`);
     requestAnimationFrame(() => {
       area?.focus();
@@ -265,6 +267,7 @@ export function FichaPlantilla({
                       id="plantilla-cuerpo"
                       ref={textoRef}
                       value={cuerpo}
+                      onFocus={() => (tocoElTexto.current = true)}
                       onChange={(e) => cambiarCuerpo(e.target.value)}
                       rows={5}
                       placeholder="Ej: Hola {{1}}, hace unos días hablamos y quedó algo pendiente. ¿Quieres que lo retomemos?"
