@@ -651,7 +651,7 @@ convenciones técnicas del código.
   va como comentario). La ficha trae el bloque «Compras» (`ComprasProducto` del producto vinculado) **solo para un administrador**
   (`puedeVerCompras`, `esAdministrador`); `obtenerComprasProducto` lo vuelve a comprobar en el servidor (Producto, Inventario, o administrador con
   Gestión de IDs Dropi).
-  **Encabezado fijo, fotos y cursor** (23 oct 2026, pedido de Hernán): la lista lleva una franja con el nombre de cada columna
+  **«Privado» en la lista** (28 oct 2026): una publicación privada (`tipoDropi === "privado"`) lleva junto a su nombre una insignia violeta sólida con candado y «Privado · a quién» (`bg-privado text-white`, token `--privado`, 6,1:1 en los dos temas), no un texto suelto en la fila de datos. **Encabezado fijo, fotos y cursor** (23 oct 2026, pedido de Hernán): la lista lleva una franja con el nombre de cada columna
   (`EncabezadoFilasPublicacion`, `encabezado` de `ListaDatos` con `variante="filas"`; solo en pantalla ancha, comparte la rejilla de la fila
   y queda fija con `sticky top-0 z-[15]` **fuera** del `<ul overflow-hidden>`, que impediría que se quede fija). Las fotos del «Producto
   vinculado» y del «Producto» de la ficha son `FotoAmpliable` (se amplían encima con `VisorImagen`, sin llevar a ningún sitio; la de la ficha
