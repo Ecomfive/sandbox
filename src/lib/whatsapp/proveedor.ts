@@ -1,8 +1,9 @@
 // WhatsApp por 360dialog (28 oct 2026): un socio oficial de Meta que conecta los números de la empresa por QR (también con
 // coexistencia, sin la revisión de proveedor tecnológico) y expone la misma API que la Cloud API de Meta. Con `D360_API_KEY` en el
 // servidor, todo el envío y los archivos van por 360dialog; sin ella, directo con Meta (`WHATSAPP_TOKEN`). Una clave de 360dialog es de
-// un solo número: es la opción «un solo número para todo el equipo» (el área es de cada conversación, migración 0168).
-//   D360_API_KEY       la clave del número (o la de prueba del sandbox).
+// un solo número: con varios números (29 oct 2026: Comercial +58, de la líder comercial; Atención +507), cada uno lleva la suya.
+//   D360_API_KEY       la clave del número principal (o la de prueba del sandbox); también la de las plantillas.
+//   D360_API_KEY_<n>   la clave de otro número, con sus dígitos en el nombre: D360_API_KEY_50761234567 para el +507 6123-4567.
 //   D360_SANDBOX       «1» mientras se prueba con el sandbox (otro dominio; no entrega archivos; solo se le escribe al propio teléfono).
 //   D360_WEBHOOK_CLAVE una palabra larga inventada: va en la dirección del webhook, porque 360dialog no firma los avisos.
 
@@ -17,9 +18,26 @@ export const NUMERO_360_SIN_ID = "360dialog";
 const ORIGEN = "https://waba-v2.360dialog.io";
 const ORIGEN_SANDBOX = "https://waba-sandbox.360dialog.io";
 
-export function config360(): Config360 | null {
-  const clave = process.env.D360_API_KEY?.trim();
+/** El nombre de la variable con la clave propia de un número de la empresa: «D360_API_KEY_584220350576». */
+export const variableClave360 = (numero: string) => `D360_API_KEY_${numero.replace(/\D/g, "")}`;
+
+/**
+ * La clave de 360dialog para hablar por un número de la empresa (`numero`, como «+584220350576»): la suya propia si está cargada, si no la
+ * principal. Sin `numero`, la principal (plantillas, el sandbox).
+ */
+export function config360(numero?: string | null): Config360 | null {
+  const propia = numero && /\d{7,}/.test(numero) ? process.env[variableClave360(numero)]?.trim() : undefined;
+  const clave = propia || process.env.D360_API_KEY?.trim();
   return clave ? { clave, sandbox: process.env.D360_SANDBOX === "1" } : null;
+}
+
+/** Todas las claves cargadas, cada una con el nombre de su variable (para registrar el webhook en cada número). */
+export function claves360(): { variable: string; config: Config360 }[] {
+  const sandbox = process.env.D360_SANDBOX === "1";
+  return Object.keys(process.env)
+    .filter((v) => /^D360_API_KEY(_\d{7,})?$/.test(v) && process.env[v]?.trim())
+    .sort()
+    .map((variable) => ({ variable, config: { clave: process.env[variable]!.trim(), sandbox } }));
 }
 
 /** La dirección base de 360dialog (las plantillas se administran en `<base>/message_templates`; el sandbox no las maneja). */

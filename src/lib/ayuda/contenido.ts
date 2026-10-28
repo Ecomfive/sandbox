@@ -587,6 +587,7 @@ export const GUIAS: GuiaModulo[] = [
           "En el servidor (Vercel) van cuatro datos, nunca en el código: WHATSAPP_TOKEN (token permanente de un usuario del sistema de Meta con permisos de WhatsApp), WHATSAPP_APP_SECRET (secreto de la app), WHATSAPP_VERIFY_TOKEN (una palabra que se inventa) y, si hace falta, WHATSAPP_API_VERSION.",
           "En la app de Meta › WhatsApp › Configuración › Webhook: URL https://<dominio del sistema>/api/whatsapp/webhook, el mismo token de verificación, y suscribir el campo «messages» (y «smb_message_echoes» si el número sigue en la app del celular).",
           "El número aparece en la bandeja solo cuando llega su primer mensaje (con el nombre «WhatsApp +507…»); su nombre y su área (Atención, Comercial o Dirección) se cambian en la base. La guía completa está en WHATSAPP-META.md.",
+          "Otro número con 360dialog (por ejemplo, uno para Comercial): en 360dialog se genera la API key de ese número y se carga en el servidor (Vercel) con los dígitos del número en el nombre: D360_API_KEY_50761234567 para el +507 6123-4567. La del primer número sigue en D360_API_KEY. Su webhook es la misma dirección del primero. Cuando llegue su primer mensaje, se le pone el nombre y el área: todo chat nuevo de ese número entra a esa área.",
         ],
       },
       {

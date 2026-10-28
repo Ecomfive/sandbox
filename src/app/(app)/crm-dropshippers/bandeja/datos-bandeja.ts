@@ -150,14 +150,14 @@ export async function conversacionPermitida(
   usuario: PermisosCrm,
   /** Para mandar, anotar, resolver o tomar: además, poder escribir en el área del número (auditoría del 27 oct 2026). */
   escribe = false,
-): Promise<{ id: string; area: AreaCrm; telefono: string; dropshipperId: string | null; asignadaA: string | null; ultimoEntranteEn: string | null; phoneNumberId: string } | null> {
+): Promise<{ id: string; area: AreaCrm; telefono: string; dropshipperId: string | null; asignadaA: string | null; ultimoEntranteEn: string | null; phoneNumberId: string; numeroEmpresa: string | null } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data } = await supabase
     .from("whatsapp_conversaciones")
-    .select("id, area, telefono, dropshipper_id, asignada_a, ultimo_entrante_en, whatsapp_numeros(phone_number_id)")
+    .select("id, area, telefono, dropshipper_id, asignada_a, ultimo_entrante_en, whatsapp_numeros(phone_number_id, numero)")
     .eq("id", id)
     .maybeSingle();
-  const numero = uno(data?.whatsapp_numeros as Uno<{ phone_number_id: string }>);
+  const numero = uno(data?.whatsapp_numeros as Uno<{ phone_number_id: string; numero: string | null }>);
   const area = data?.area as AreaCrm | undefined;
   if (!data || !numero || !area || !areasDe(usuario).includes(area)) return null;
   if (escribe && !escribeEnArea(accesoCrm(usuario), area)) return null;
@@ -169,6 +169,8 @@ export async function conversacionPermitida(
     asignadaA: (data.asignada_a as string | null) ?? null,
     ultimoEntranteEn: (data.ultimo_entrante_en as string | null) ?? null,
     phoneNumberId: numero.phone_number_id,
+    // El número de la empresa: con varios números en 360dialog, decide con qué clave se manda (proveedor.ts).
+    numeroEmpresa: numero.numero ?? null,
   };
 }
 
