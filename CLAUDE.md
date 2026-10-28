@@ -940,7 +940,7 @@ convenciones técnicas del código.
   360dialog (`src/lib/whatsapp/proveedor.ts`; `D360_SANDBOX=1` para el sandbox) y los avisos llegan a
   `/api/whatsapp/360dialog/[clave]` (sin firma: la puerta es `D360_WEBHOOK_CLAVE`, comparada en tiempo constante; `extraerAviso(aviso,
   "360dialog")` acepta avisos sin `object` ni `metadata`). El botón «Conectar el webhook de 360dialog» (`conectarWebhook360`, solo
-  Configuración con edición) registra la dirección.
+  administradores, `esAdministrador`) registra la dirección; la bandeja vacía les dice si faltan `D360_API_KEY` o `D360_WEBHOOK_CLAVE`.
 - **CRM Dropshippers rediseñado** (26 oct 2026, al estilo de Gestión de IDs Dropi). `/crm-dropshippers` es la lista
   (`lista-dropshippers.tsx`): `TableroCrm` (`tablero-crm.tsx`, tarjetas que cuentan y filtran con atajos sobre `DEF_DROPSHIPPERS`,
   colores `COLORES` del tablero de Gestión de IDs), `ListaDatos` con `FilaDropshipperLista` (`fila-dropshipper.tsx`) y la ficha en
