@@ -22,6 +22,9 @@ export function config360(): Config360 | null {
   return clave ? { clave, sandbox: process.env.D360_SANDBOX === "1" } : null;
 }
 
+/** La dirección base de 360dialog (las plantillas se administran en `<base>/message_templates`; el sandbox no las maneja). */
+export const urlBase360 = (c: Config360) => (c.sandbox ? ORIGEN_SANDBOX : ORIGEN);
+
 /** Donde se mandan los mensajes. */
 export const urlMensajes360 = (c: Config360) => (c.sandbox ? `${ORIGEN_SANDBOX}/v1/messages` : `${ORIGEN}/messages`);
 

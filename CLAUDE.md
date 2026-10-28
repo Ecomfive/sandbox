@@ -970,6 +970,33 @@ convenciones técnicas del código.
   `/api/whatsapp/360dialog/[clave]` (sin firma: la puerta es `D360_WEBHOOK_CLAVE`, comparada en tiempo constante; `extraerAviso(aviso,
   "360dialog")` acepta avisos sin `object` ni `metadata`). El botón «Conectar el webhook de 360dialog» (`conectarWebhook360`, solo
   administradores, `esAdministrador`) registra la dirección; la bandeja vacía les dice si faltan `D360_API_KEY` o `D360_WEBHOOK_CLAVE`.
+- **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del
+  último mensaje de un dropshipper solo se le escribe con una plantilla que Meta aprobó. Se crean, se cambian y se mandan a Meta desde el sistema. Tablas:
+  `whatsapp_plantillas` (por nombre e idioma; `categoria` = la pedida, `categoria_actual` = la que Meta le puso; `estado` borrador → pendiente → aprobada /
+  rechazada / pausada / deshabilitada; `calidad`; `variables` = una por {{n}} con su dato y su ejemplo), `whatsapp_alertas` y `whatsapp_mensajes.plantilla_id`;
+  los avisos «Para ti» usan el tipo `whatsapp` de `notificaciones_usuario`. **Lógica pura con prueba** (`src/lib/whatsapp/`): `plantillas.ts` (`validarPlantilla`:
+  errores que impiden mandarla —nombre, largos de Meta, variables en orden y con ejemplo, botones— y avisos de lo que Meta suele rechazar —variable al principio
+  o al final, dos seguidas, pocas palabras por variable, una «utilidad» que suena a promoción, marketing sin botón «No»—; `construirComponentes` /
+  `desdeComponentes` / `leerListaMeta`; `resolverVariables`), `eventos.ts` (los avisos de Meta: `message_template_status_update`, `_quality_update`,
+  `template_category_update`, `phone_number_quality_update` y `account_update`; `alertaDeEvento`) y `plantillas-sugeridas.ts`. **Con Meta/360dialog**
+  (`api-plantillas.ts`): con `D360_API_KEY`, por 360dialog (`POST /message_templates`, `POST /message_templates/<id>` para cambiar, `GET`, `DELETE ?name=&hsm_id=`;
+  el sandbox no maneja plantillas); si no, directo con Meta (`WHATSAPP_TOKEN` y **`WHATSAPP_WABA_ID`**, nueva). Todo corre en `plantillas-servidor.ts`
+  (recibe el cliente de Supabase y usa rutas relativas porque también lo usa `scripts/`): `enviarPlantillaAMeta` crea (queda «en revisión») o cambia (solo una
+  aprobada, rechazada o pausada: una en revisión o deshabilitada no se cambia), `aplicarEventosCuenta` guarda lo que avisa Meta y deja la alerta,
+  `sincronizarPlantillas` («Actualizar estado») trae el estado actual y las plantillas creadas directo en Meta. Los dos webhooks (`/api/whatsapp/webhook` y
+  el de 360dialog) aplican estos avisos además de los mensajes. **Con 360dialog no hay app de Meta que configurar** (el número es de su app) y su documentación solo
+  habla de los campos `messages` e `history` en el webhook del número: **no está confirmado que reenvíe** estos avisos (por probar con el número real). Los webhooks
+  anotan en los registros de Vercel una línea `[whatsapp] … aviso con campos: …` (solo nombres) cuando llega un campo que la bandeja no conoce, y «Actualizar estado»
+  trae el estado, la calidad y la categoría aunque no llegue ningún aviso; lo que solo viene por aviso (límite del número, restricciones de la cuenta) no. Reglas que salen
+  de Meta: se crean hasta **100 plantillas por hora** y no hay un mínimo documentado entre una y otra (los 2 minutos de `scripts/crear-plantillas-sugeridas.ts` son
+  una precaución nuestra); una aprobada se cambia **una vez cada 24 h (10 cada 30 días)** y su categoría no se cambia; borrar una aprobada impide reusar su nombre 30
+  días; **cualquier mensaje para retomar una conversación o que anime a volver a comprar es Marketing** (Meta lo recategoriza solo y avisa), por eso casi todas las
+  sugeridas lo son. La pantalla es una lista con alertas arriba, el estado de la conexión y el límite de envío, una explicación corta («¿Qué es una plantilla?»),
+  filtros por estado, y una ficha lateral guiada (`ficha-plantilla.tsx`) con vista previa tipo WhatsApp. Solo muestra lo que Meta avisó (el límite del número viene
+  de `phone_number_quality_update`; la calidad del número no se muestra porque 360dialog no la entrega). Crear y cambiar: quien puede modificar el CRM; eliminar:
+  administradores. **En el chat** (`bandeja/enviar-plantilla.tsx`, `plantillasParaConversacion` / `enviarPlantillaConversacion`): con la ventana cerrada sale
+  «Enviar plantilla»; las variables se llenan con la ficha del dropshipper (primer nombre, nombre completo, tienda) o se escriben al enviar, y **no se manda la misma plantilla a
+  la misma persona dos veces en 24 h**. Sin migración 0170 la pantalla avisa. Reversa: `supabase/rollbacks/0170_rollback.sql`.
 - **CRM Dropshippers rediseñado** (26 oct 2026, al estilo de Gestión de IDs Dropi). `/crm-dropshippers` es la lista
   (`lista-dropshippers.tsx`): `TableroCrm` (`tablero-crm.tsx`, tarjetas que cuentan y filtran con atajos sobre `DEF_DROPSHIPPERS`,
   colores `COLORES` del tablero de Gestión de IDs), `ListaDatos` con `FilaDropshipperLista` (`fila-dropshipper.tsx`) y la ficha en

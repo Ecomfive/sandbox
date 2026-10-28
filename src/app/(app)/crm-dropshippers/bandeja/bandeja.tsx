@@ -9,6 +9,7 @@ import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, mensajesAnteriores, notaWhatsapp, obtenerBandeja, pasarConversacionDeArea, tomarConversacion } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
+import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 
 /** Qué conversaciones se ven: las pestañas de siempre o, con más de un área, las de un área. */
@@ -218,6 +219,7 @@ export function Bandeja({
   const alturaAntes = useRef<number | null>(null);
   const [modo, setModo] = useState<"responder" | "nota">("responder");
   const [borrador, setBorrador] = useState("");
+  const [verPlantillas, setVerPlantillas] = useState(false);
   const [menuArea, setMenuArea] = useState(false);
   const [verFicha, setVerFicha] = useState(true);
   const [enviando, empezar] = useTransition();
@@ -606,15 +608,26 @@ export function Bandeja({
 
           <div ref={chatRef} className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
             {enNavegador && (
-              <p
-                className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
-                  ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
-                }`}
-              >
-                {ventana
-                  ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
-                  : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada (próximamente). Las notas privadas sí se pueden dejar."}
-              </p>
+              <>
+                <p
+                  className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
+                    ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
+                  }`}
+                >
+                  {ventana
+                    ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
+                    : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada. Las notas privadas sí se pueden dejar."}
+                </p>
+                {!ventana && escribe && (
+                  <button
+                    type="button"
+                    onClick={() => setVerPlantillas(true)}
+                    className={`mb-2 min-h-9 self-center rounded-full bg-[var(--wa-acento)] px-4 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 ${anilloFoco}`}
+                  >
+                    Enviar plantilla
+                  </button>
+                )}
+              </>
             )}
             {mensajes && chat?.hayAnteriores && (
               <button
@@ -741,6 +754,19 @@ export function Bandeja({
           <span className="text-[22px] font-light">Bandeja de WhatsApp</span>
           <span className="max-w-sm text-sm text-[var(--wa-sec)]">Elige una conversación de la lista para responder o dejar una nota privada.</span>
         </div>
+      )}
+
+      {verPlantillas && sel && (
+        <EnviarPlantilla
+          conversacionId={sel.id}
+          nombre={sel.nombre}
+          alCerrar={() => setVerPlantillas(false)}
+          alEnviado={() => {
+            setVerPlantillas(false);
+            mostrarToast("Plantilla enviada.");
+            void refrescar(sel.id);
+          }}
+        />
       )}
 
       {/* ===== Ficha del dropshipper (como «Info del contacto») ===== */}

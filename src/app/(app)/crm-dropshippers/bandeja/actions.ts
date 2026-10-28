@@ -6,8 +6,10 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { type AreaCrm } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
-import { enviarTextoWhatsapp } from "@/lib/whatsapp/api";
+import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
+import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
+import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { config360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper } from "./datos-bandeja";
@@ -210,5 +212,129 @@ export async function conectarWebhook360(): Promise<{ ok: true } | { error: stri
   if (r.status === 401 || r.status === 403) return { error: "360dialog rechazó la clave (D360_API_KEY). Revísala en el servidor." };
   if (!r.ok) return { error: `360dialog no aceptó el webhook (código ${r.status}).` };
   await registrarAuditoria({ accion: "conectar_webhook_360dialog", entidad: "whatsapp_conversaciones", detalle: d360.sandbox ? "Sandbox" : "Producción" });
+  return { ok: true };
+}
+
+/** Una plantilla aprobada, lista para mandarle a esta persona: con lo que el sistema ya sabe de ella en cada variable y lo que falta escribir. */
+export interface PlantillaParaEnviar {
+  id: string;
+  nombre: string;
+  /** La categoría que le puso Meta. */
+  categoria: string;
+  encabezado: string | null;
+  cuerpo: string;
+  pie: string | null;
+  botones: string[];
+  /** El valor de cada variable ({{1}}, {{2}}…): el que el sistema sabe, o vacío si se escribe al enviar. */
+  valores: string[];
+  /** Qué variables se escriben al enviar, y cómo se llaman. */
+  manual: boolean[];
+  etiquetas: string[];
+  /** Por qué no se puede mandar a esta persona (le falta un dato en el CRM), o null. */
+  faltante: string | null;
+  /** Ya se le mandó esta misma plantilla en las últimas 24 h. */
+  yaEnviada: boolean;
+}
+
+type UnoDs<T> = T | T[] | null;
+
+/** El nombre y la tienda de la persona del chat, para llenar las variables: su ficha del CRM o, si no está, el nombre de su perfil de WhatsApp. */
+async function personaDeLaConversacion(supabase: ReturnType<typeof createServiceClient>, id: string): Promise<{ nombre: string | null; tienda: string | null }> {
+  const { data } = await supabase.from("whatsapp_conversaciones").select("nombre_perfil, dropshippers(nombre, tiendas, tienda)").eq("id", id).maybeSingle();
+  const ds = data?.dropshippers as UnoDs<{ nombre: string | null; tiendas: string[] | null; tienda: string | null }> | undefined;
+  const d = Array.isArray(ds) ? (ds[0] ?? null) : (ds ?? null);
+  return { nombre: d?.nombre ?? (data?.nombre_perfil as string | null) ?? null, tienda: d?.tiendas?.[0] ?? d?.tienda ?? null };
+}
+
+/** Las plantillas que Meta aprobó, con sus datos ya llenos para este chat (para «Enviar plantilla»). */
+export async function plantillasParaConversacion(id: string): Promise<{ plantillas: PlantillaParaEnviar[] } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
+  const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("estado", "aprobada").order("nombre");
+  if (error) return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
+  const aprobadas = (data ?? []) as PlantillaGuardada[];
+  if (!aprobadas.length) return { plantillas: [] };
+  const persona = await personaDeLaConversacion(supabase, id);
+  const desde = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  const { data: previas } = await supabase
+    .from("whatsapp_mensajes")
+    .select("plantilla_id")
+    .eq("conversacion_id", id)
+    .eq("direccion", "saliente")
+    .gte("momento", desde)
+    .in("plantilla_id", aprobadas.map((p) => p.id));
+  const yaMandadas = new Set((previas ?? []).map((m) => m.plantilla_id as string));
+  return {
+    plantillas: aprobadas.map((p) => {
+      const variables = p.variables ?? [];
+      const automaticas = resolverVariables(variables.filter((v) => v.campo !== "manual"), persona);
+      return {
+        id: p.id,
+        nombre: p.nombre,
+        categoria: p.categoria_actual ?? p.categoria,
+        encabezado: p.encabezado,
+        cuerpo: p.cuerpo,
+        pie: p.pie,
+        botones: p.botones ?? [],
+        valores: variables.map((v) => {
+          if (v.campo === "manual") return "";
+          const r = resolverVariables([v], persona);
+          return "valores" in r ? r.valores[0] : "";
+        }),
+        manual: variables.map((v) => v.campo === "manual"),
+        etiquetas: variables.map((v) => v.etiqueta?.trim() || ""),
+        faltante: "error" in automaticas ? automaticas.error : null,
+        yaEnviada: yaMandadas.has(p.id),
+      };
+    }),
+  };
+}
+
+/**
+ * Le manda una plantilla aprobada a esta persona (la única forma de escribirle pasadas 24 h de su último mensaje). Los datos de su ficha
+ * llenan las variables; las «manual» se escriben al enviar (`manuales`, una por variable, en orden). No se manda la misma plantilla dos
+ * veces a la misma persona en 24 h: repetir un mensaje es lo que más reportes causa.
+ */
+export async function enviarPlantillaConversacion(id: string, plantillaId: string, manuales: string[]): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  if (!/^[0-9a-f-]{36}$/i.test(String(plantillaId))) return { error: "Plantilla no válida." };
+  const supabase = createServiceClient();
+  const c = await conversacionPermitida(supabase, id, u, true);
+  if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  const { data } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("id", plantillaId).maybeSingle();
+  const p = data as PlantillaGuardada | null;
+  if (!p) return { error: "La plantilla ya no existe." };
+  if (p.estado !== "aprobada") return { error: "Meta todavía no aprobó esa plantilla (o la pausó): no se puede enviar." };
+  const desde = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  const { count } = await supabase.from("whatsapp_mensajes").select("id", { count: "exact", head: true }).eq("conversacion_id", id).eq("direccion", "saliente").eq("plantilla_id", p.id).gte("momento", desde);
+  if (count) return { error: "Ya le mandaste esta plantilla hoy. Repetirla es lo que más reportes causa: espera su respuesta." };
+  const valores = resolverVariables(p.variables ?? [], await personaDeLaConversacion(supabase, id), Array.isArray(manuales) ? manuales.map(String) : []);
+  if ("error" in valores) return valores;
+  const r = await enviarPlantillaWhatsapp(c.phoneNumberId, c.telefono, p.nombre, p.idioma, valores.valores);
+  if ("error" in r) return r;
+  const texto = [p.encabezado, rellenar(p.cuerpo, valores.valores)].filter(Boolean).join("\n");
+  const ahora = new Date().toISOString();
+  const autor = u.nombre || u.email;
+  const { error } = await supabase.from("whatsapp_mensajes").insert({
+    conversacion_id: id,
+    direccion: "saliente",
+    tipo: "plantilla",
+    texto,
+    wa_id: r.waId,
+    estado: "enviado",
+    plantilla_id: p.id,
+    autor_id: u.id,
+    autor_nombre: autor,
+    momento: ahora,
+  });
+  if (error) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
+  await supabase
+    .from("whatsapp_conversaciones")
+    .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje("plantilla", texto), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
+    .eq("id", id);
+  await registrarAuditoria({ accion: "enviar_plantilla_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: p.nombre });
   return { ok: true };
 }
