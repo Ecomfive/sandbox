@@ -12,6 +12,7 @@ import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper }
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
+import { MostrarTelefono } from "../mostrar-telefono";
 import { PapeleraIcon } from "@/lib/nav-icons";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 
@@ -191,6 +192,7 @@ export function Bandeja({
   abrirInicial,
   escribe,
   miId,
+  verTelefono = false,
   areas,
   estado360 = null,
 }: {
@@ -198,6 +200,8 @@ export function Bandeja({
   abrirInicial: string | null;
   escribe: boolean;
   miId: string;
+  /** Puede usar «Mostrar número» (por ahora, administradores). */
+  verTelefono?: boolean;
   /** Las áreas que ve la persona: con más de una, cada chat muestra la suya y se puede filtrar por área. */
   areas: AreaCrm[];
   /** Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, no su valor). Con la clave, puede registrar el webhook. */
@@ -336,7 +340,7 @@ export function Bandeja({
           c.id === elegido ||
           (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "todas" ? true : c.area === filtro.slice(5)),
       )
-      .filter((c) => !q || [c.nombre, c.nombrePerfil, c.telefono, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)));
+      .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)));
   }, [deNumero, filtro, buscar, miId, elegido]);
 
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
@@ -559,7 +563,7 @@ export function Bandeja({
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-[16px]">{sel.nombre}</span>
                 <span className="truncate text-[13px] text-[var(--wa-sec)] tabular-nums">
-                  {sel.telefono}
+                  Número oculto
                   {sel.codigo ? ` · ${sel.codigo}` : ""}
                   {sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? ` · «${sel.nombrePerfil}» en WhatsApp` : ""}
                   {datos.numeros.length > 1 ? ` · ${numeroDe.get(sel.numeroId)?.nombre}` : ""}
@@ -829,7 +833,7 @@ export function Bandeja({
             <Foto nombre={sel.nombre} tam="ficha" />
             <span className="mt-3 text-xl">{sel.nombre}</span>
             <span className="text-[15px] text-[var(--wa-sec)] tabular-nums">
-              {sel.telefono}
+              <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
               {sel.codigo ? ` · ${sel.codigo}` : ""}
             </span>
           </div>
@@ -867,7 +871,7 @@ export function Bandeja({
           ) : !sel.dropshipperId ? (
             <Bloque titulo="No está en el CRM">
               <p className="m-0 text-[13px] text-[var(--wa-sec)]">Si es un dropshipper, agrégalo (o pon este número en su ficha) y la conversación queda enlazada con el próximo mensaje.</p>
-              <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.telefono)}`} className={`text-[14px] font-medium text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
+              <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.nombre)}`} className={`text-[14px] font-medium text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
                 Buscarlo en el CRM
               </Link>
             </Bloque>
@@ -978,7 +982,11 @@ function Burbuja({ m, seguido, alPedirBorrar }: { m: MensajeVista; seguido: bool
       {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
       {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
       <Contenido m={m} />
-      {m.eliminadoEnWhatsapp && <span className="mt-1 block text-[11.5px] text-[var(--wa-sec)] italic">Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva.</span>}
+      {m.eliminadoEnWhatsapp && (
+        <span className="mt-1 block text-[11.5px] font-medium text-[var(--wa-sec)] italic">
+          {nuestro ? "Se eliminó desde la app de WhatsApp Business (Meta no dice quién). Aquí se conserva." : "Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva."}
+        </span>
+      )}
       {m.borradoPendiente && <span className="mt-1 block text-[11.5px] font-medium text-azul">Borrado esperando autorización</span>}
       <span
         className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}

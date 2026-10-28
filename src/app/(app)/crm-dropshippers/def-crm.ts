@@ -102,7 +102,8 @@ export interface FilaDropshipper {
   tiendas: string[];
   ciudad: string | null;
   email: string | null;
-  telefono: string | null;
+  /** Tiene WhatsApp guardado. El número no viaja a la pantalla: se pide con «Mostrar número». */
+  tieneTelefono: boolean;
   estado: string;
   nivel: string;
   responsable: string | null;
@@ -340,7 +341,7 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       ],
     },
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (d) => `${d.nombre} ${d.codigo} ${d.tiendas.join(" ")}` },
-    { id: "contacto", etiqueta: "Correo o teléfono", tipo: "texto", valor: (d) => `${d.email ?? ""} ${d.telefono ?? ""}` },
+    { id: "contacto", etiqueta: "Correo", tipo: "texto", valor: (d) => d.email ?? "" },
     { id: "pedidos", etiqueta: "Pedidos del mes", tipo: "numero", valor: (d) => d.pedidosMes },
     { id: "ventas", etiqueta: "Ventas del mes", tipo: "numero", valor: (d) => d.ventasMes },
     { id: "ultimoPedido", etiqueta: "Último pedido", tipo: "fecha", valor: (d) => d.ultimoPedido },

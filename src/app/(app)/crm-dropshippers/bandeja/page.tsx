@@ -31,6 +31,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           abrirInicial={typeof abrir === "string" ? abrir : null}
           escribe={a.escribeAtencion || a.escribeComercial || a.escribeDireccion}
           miId={usuario.id}
+          verTelefono={a.verTelefonos}
           areas={areasVisibles(a)}
           estado360={
             // Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, nunca su valor).

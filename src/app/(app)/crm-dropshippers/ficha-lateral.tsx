@@ -18,6 +18,7 @@ import {
 } from "@/lib/nav-icons";
 import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
 import { BotonEscalar, LineaDeTiempo, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
+import { MostrarTelefono } from "./mostrar-telefono";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
@@ -132,16 +133,6 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
               <ChatIcon className="h-4 w-4" />
               WhatsApp
             </Link>
-          ) : d.telefono ? (
-            <a
-              href={`https://wa.me/${d.telefono.replace(/\D/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover ${anilloFoco}`}
-            >
-              <ChatIcon className="h-4 w-4" />
-              WhatsApp<span className="sr-only"> (se abre en una pestaña nueva)</span>
-            </a>
           ) : (
             <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
               <ChatIcon className="h-4 w-4" />
@@ -167,7 +158,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       </div>
 
       <Bloque icono={ChatIcon} titulo="Conversación de WhatsApp">
-        <ConversacionWhatsapp key={`chat-${d.id}`} dropshipperId={d.id} telefono={d.telefono} />
+        <ConversacionWhatsapp key={`chat-${d.id}`} dropshipperId={d.id} />
       </Bloque>
 
       <Bloque icono={EstadoIcon} titulo="Desempeño">
@@ -217,7 +208,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       <Bloque icono={PersonaIcon} titulo="Datos">
         <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
           {[
-            ["Teléfono", <span key="t" className="tabular-nums">{d.telefono ?? "—"}</span>],
+            ["Teléfono", d.tieneTelefono ? <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede={acceso.verTelefonos} /> : "—"],
             ["Ciudad", d.ciudad ?? "—"],
             ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
             ["Responsable", d.responsable ?? "Sin asignar"],
