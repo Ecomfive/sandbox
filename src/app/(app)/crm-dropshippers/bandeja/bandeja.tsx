@@ -268,11 +268,14 @@ export function Bandeja({
   const lista = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     return deNumero
-      .filter((c) =>
-        filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "todas" ? true : c.area === filtro.slice(5),
+      .filter(
+        (c) =>
+          // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
+          c.id === elegido ||
+          (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "todas" ? true : c.area === filtro.slice(5)),
       )
       .filter((c) => !q || [c.nombre, c.nombrePerfil, c.telefono, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)));
-  }, [deNumero, filtro, buscar, miId]);
+  }, [deNumero, filtro, buscar, miId, elegido]);
 
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
   const ventana = sel ? textoVentana(sel.ultimoEntranteEn) : null;
@@ -575,7 +578,7 @@ export function Bandeja({
           {escribe ? (
             <div className="flex flex-col bg-[var(--wa-panel)]">
               {!esNota && !bloqueado && (
-                <div className="flex gap-2 overflow-x-auto px-3 pt-2">
+                <div className="flex gap-2 overflow-x-auto px-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {RAPIDAS.map((r) => (
                     <button
                       key={r}
@@ -785,9 +788,11 @@ function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
         nuestro ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
       }`}
     >
-      {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-acento)]">{m.autor}</span>}
+      {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
       <Contenido m={m} />
-      <span className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] text-[var(--wa-sec)] tabular-nums ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}>
+      <span
+        className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
+      >
         {horaMensaje(m.momento)}
         {nuestro && <Palomitas estado={m.estado} />}
       </span>

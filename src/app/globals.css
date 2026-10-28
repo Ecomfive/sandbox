@@ -264,6 +264,9 @@ html {
   --wa-punto: rgb(84 101 111 / 0.08);
   --wa-entrante: #ffffff;
   --wa-saliente: #d9fdd3;
+  /* El autor, la hora y las palomitas dentro de una burbuja verde (se leen bien sobre ese verde en los dos temas). */
+  --wa-autor: #005c4b;
+  --wa-meta-saliente: #4a5d56;
   --wa-acento: #008069;
   --wa-acento-texto: #ffffff;
   --wa-acento-suave: #d9fdd3;
@@ -289,6 +292,8 @@ html {
   --wa-punto: rgb(134 150 160 / 0.07);
   --wa-entrante: #202c33;
   --wa-saliente: #005c4b;
+  --wa-autor: #8fe8cf;
+  --wa-meta-saliente: #c3dbd3;
   --wa-acento: #00a884;
   --wa-acento-texto: #111b21;
   --wa-acento-suave: #103629;
