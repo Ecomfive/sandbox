@@ -1,9 +1,9 @@
 "use server";
 
 import { headers } from "next/headers";
-import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
+import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { accesoCrm, MODULO_ATENCION, MODULO_COMERCIAL, type AreaCrm } from "@/lib/crm/areas";
+import { type AreaCrm } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
@@ -12,21 +12,10 @@ import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
 import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { config360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
-import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper } from "./datos-bandeja";
+import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
-
-/** Quien abre el CRM (Atención o Comercial); con `escribe`, además puede escribir en alguna de las dos áreas. */
-async function usuarioBandeja(escribe: boolean): Promise<UsuarioActual | null> {
-  const u = await getUsuarioActual();
-  if (!u || !(u.modulos.includes(MODULO_ATENCION) || u.modulos.includes(MODULO_COMERCIAL))) return null;
-  if (escribe) {
-    const a = accesoCrm(u);
-    if (!a.escribeAtencion && !a.escribeComercial && !a.escribeDireccion) return null;
-  }
-  return u;
-}
 
 /** La lista de conversaciones, para refrescar la bandeja cada pocos segundos. */
 export async function obtenerBandeja(): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | { error: string }> {
@@ -67,7 +56,7 @@ export async function ultimosMensajesDropshipper(
 }
 
 /** Los mensajes de una conversación y su dropshipper. Al abrirla (o mientras está abierta) queda leída. */
-export async function abrirConversacion(id: string): Promise<{ mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | { error: string }> {
+export async function abrirConversacion(id: string): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null } | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   const supabase = createServiceClient();
@@ -75,6 +64,17 @@ export async function abrirConversacion(id: string): Promise<{ mensajes: Mensaje
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
   await supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", id).gt("no_leidos", 0);
   return cargarConversacion(supabase, id, c.dropshipperId);
+}
+
+/** «Ver mensajes anteriores»: los 300 de antes de `antesDe` (un chat importado del celular puede tener años de mensajes). */
+export async function mensajesAnteriores(id: string, antesDe: string): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean } | { error: string }> {
+  const u = await usuarioBandeja(false);
+  if (!u) return { error: "No tienes acceso." };
+  if (Number.isNaN(Date.parse(String(antesDe)))) return { error: "Fecha no válida." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
+  const { mensajes, hayAnteriores } = await cargarConversacion(supabase, id, null, new Date(antesDe).toISOString());
+  return { mensajes, hayAnteriores };
 }
 
 /**
@@ -253,7 +253,7 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("estado", "aprobada").order("nombre");
-  if (error) return { error: "Falta correr la migración 0169 (plantillas de WhatsApp)." };
+  if (error) return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
   const aprobadas = (data ?? []) as PlantillaGuardada[];
   if (!aprobadas.length) return { plantillas: [] };
   const persona = await personaDeLaConversacion(supabase, id);

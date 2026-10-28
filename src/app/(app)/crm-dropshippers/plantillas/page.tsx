@@ -22,7 +22,7 @@ export default async function PlantillasWhatsappPage() {
       <EncabezadoPagina titulo="Plantillas de WhatsApp">Los mensajes que Meta aprueba para escribirle a alguien pasadas 24 horas de su último mensaje.</EncabezadoPagina>
       {datos === null ? (
         <p role="alert" className="m-0 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-sm text-warning">
-          Falta correr la migración 0169 (plantillas de WhatsApp) en la base.
+          Falta correr la migración 0170 (plantillas de WhatsApp) en la base.
         </p>
       ) : (
         <Plantillas inicial={datos} conexion={conexionPlantillas()} escribe={a.escribeAtencion || a.escribeComercial || a.escribeDireccion} esAdmin={esAdministrador(usuario)} />

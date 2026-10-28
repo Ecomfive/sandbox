@@ -126,7 +126,7 @@ export async function guardarPlantilla(id: string | null, entrada: EntradaPlanti
     const { data, error } = await supabase.from("whatsapp_plantillas").insert({ ...fila, categoria_actual: null, creado_por: u.id, creado_por_nombre: autor }).select("id").single();
     if (error) {
       if (error.code === "23505") return { error: "Ya tienes una plantilla con ese nombre y ese idioma." };
-      if (error.code === "42P01") return { error: "Falta correr la migración 0169 (plantillas de WhatsApp)." };
+      if (error.code === "42P01") return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
       return { error: "No se pudo guardar la plantilla." };
     }
     id = data.id as string;
@@ -209,7 +209,7 @@ export async function agregarSugerida(clave: string): Promise<{ id: string } | {
     })
     .select("id")
     .single();
-  if (error) return { error: error.code === "23505" ? "Esa plantilla ya está en la lista." : error.code === "42P01" ? "Falta correr la migración 0169 (plantillas de WhatsApp)." : "No se pudo agregar." };
+  if (error) return { error: error.code === "23505" ? "Esa plantilla ya está en la lista." : error.code === "42P01" ? "Falta correr la migración 0170 (plantillas de WhatsApp)." : "No se pudo agregar." };
   await registrarAuditoria({ accion: "crear_plantilla_whatsapp", entidad: "whatsapp_plantillas", entidadId: data.id as string, detalle: `${s.nombre} (sugerida)` });
   revalidatePath(RUTA_PLANTILLAS);
   return { id: data.id as string };

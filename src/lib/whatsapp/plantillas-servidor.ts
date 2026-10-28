@@ -85,7 +85,7 @@ async function destinatariosCrm(supabase: SupabaseClient): Promise<string[]> {
 
 /**
  * Deja una alerta (la pantalla de Plantillas y la de Bandeja la muestran) y un aviso «Para ti» a quienes manejan el CRM. No repite la misma
- * alerta de hace menos de 10 minutos (Meta a veces manda un aviso dos veces). Sin la migración 0169 no hace nada.
+ * alerta de hace menos de 10 minutos (Meta a veces manda un aviso dos veces). Sin la migración 0170 no hace nada.
  */
 export async function registrarAlerta(supabase: SupabaseClient, a: AlertaNueva, plantillaId: string | null): Promise<void> {
   const desde = new Date(Date.now() - 10 * 60_000).toISOString();
@@ -241,7 +241,7 @@ export async function sincronizarPlantillas(supabase: SupabaseClient): Promise<{
   const lista = await listarPlantillasMeta();
   if ("error" in lista) return lista;
   const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA);
-  if (error) return { error: "Falta correr la migración 0169 (plantillas de WhatsApp)." };
+  if (error) return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
   const locales = (data ?? []) as PlantillaGuardada[];
   let actualizadas = 0;
   let nuevas = 0;

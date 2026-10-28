@@ -21,7 +21,7 @@ export interface NumeroLimite {
   limite: string | null;
 }
 
-/** Las plantillas, las últimas alertas y el límite de cada número. `null` si falta la migración 0169. */
+/** Las plantillas, las últimas alertas y el límite de cada número. `null` si falta la migración 0170. */
 export async function cargarPlantillas(supabase: SupabaseClient): Promise<{ plantillas: PlantillaGuardada[]; alertas: AlertaVista[]; numeros: NumeroLimite[] } | null> {
   const [plantillasR, alertasR, numerosR] = await Promise.all([
     supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).order("creado_en", { ascending: false }).limit(500),
@@ -41,7 +41,7 @@ export async function cargarPlantillas(supabase: SupabaseClient): Promise<{ plan
       vista: !!a.vista_en,
       creadoEn: a.creado_en as string,
     })),
-    // Sin la columna (migración 0169 a medias) los números salen sin límite.
+    // Sin la columna (migración 0170 a medias) los números salen sin límite.
     numeros: numerosR.error ? [] : (numerosR.data ?? []).map((n) => ({ id: n.id as string, nombre: n.nombre as string, numero: n.numero as string, limite: (n.limite_mensajes as string | null) ?? null })),
   };
 }

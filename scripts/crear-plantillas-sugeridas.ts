@@ -3,7 +3,7 @@
 // precaución nuestra para no parecer un envío en masa. Las que todavía no están en el sistema las agrega como borrador; las que ya están
 // en Meta (en revisión, aprobadas…) no las toca.
 // Uso: npx tsx scripts/crear-plantillas-sugeridas.ts [--aplicar] [--espera=120]   (sin --aplicar solo dice qué haría)
-// Necesita WhatsApp conectado en el servidor (`D360_API_KEY`, o `WHATSAPP_TOKEN` y `WHATSAPP_WABA_ID`) y la migración 0169.
+// Necesita WhatsApp conectado en el servidor (`D360_API_KEY`, o `WHATSAPP_TOKEN` y `WHATSAPP_WABA_ID`) y la migración 0170.
 
 process.loadEnvFile(".env.local");
 import { createClient } from "@supabase/supabase-js";
@@ -24,7 +24,7 @@ const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
     process.exit(1);
   }
   const { data, error } = await supabase.from("whatsapp_plantillas").select("id, nombre, idioma, estado, error_envio, meta_id");
-  if (error) throw new Error(`${error.message} (¿falta la migración 0169?)`);
+  if (error) throw new Error(`${error.message} (¿falta la migración 0170?)`);
   const existentes = data ?? [];
 
   let enviadas = 0;

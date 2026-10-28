@@ -6,7 +6,7 @@
 --     o la cuenta restringidos) para mostrarlo en la pantalla y en la campana.
 --   * whatsapp_numeros.limite_mensajes: el límite de envío que avisó Meta (TIER_250, TIER_10K…).
 --   * whatsapp_mensajes.plantilla_id: qué plantilla se usó en un mensaje.
--- Código: src/lib/whatsapp/plantillas*.ts, src/app/(app)/crm-dropshippers/plantillas/. Reversa: supabase/rollbacks/0169_rollback.sql
+-- Código: src/lib/whatsapp/plantillas*.ts, src/app/(app)/crm-dropshippers/plantillas/. Reversa: supabase/rollbacks/0170_rollback.sql
 
 create table if not exists whatsapp_plantillas (
   id uuid primary key default uuid_v7(),

@@ -1,4 +1,4 @@
--- Reversa de 0169_whatsapp_plantillas.sql. Borra las plantillas y las alertas guardadas (no las de Meta): hacer copia antes.
+-- Reversa de 0170_whatsapp_plantillas.sql. Borra las plantillas y las alertas guardadas (no las de Meta): hacer copia antes.
 alter table whatsapp_mensajes drop column if exists plantilla_id;
 alter table whatsapp_numeros drop column if exists limite_actualizado_en;
 alter table whatsapp_numeros drop column if exists limite_mensajes;
