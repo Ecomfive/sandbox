@@ -1,7 +1,8 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { accesoCrm, areasVisibles } from "@/lib/crm/areas";
+import { permisosBandeja } from "@/lib/crm/permisos-bandeja";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { config360 } from "@/lib/whatsapp/proveedor";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 /** CRM Dropshippers › Bandeja de WhatsApp (26 oct 2026): los chats de los números de la empresa, para contestar desde el sistema. */
 export default async function BandejaWhatsappPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const usuario = await requireModulo("crm-dropshippers");
+  const usuario = await requirePestana("crm-dropshippers", "bandeja");
   const { abrir } = await searchParams;
   const datos = await cargarBandeja(createServiceClient(), usuario);
   const a = accesoCrm(usuario);
@@ -32,6 +33,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           escribe={a.escribeAtencion || a.escribeComercial || a.escribeDireccion}
           miId={usuario.id}
           areas={areasVisibles(a)}
+          permisos={permisosBandeja(usuario.afinado)}
           estado360={
             // Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, nunca su valor).
             esAdministrador(usuario)

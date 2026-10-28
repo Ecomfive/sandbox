@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase/client";
 import { ACEPTAR_WHATSAPP, BUCKET_WHATSAPP, MAX_BYTES_WHATSAPP } from "@/lib/whatsapp/archivos";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
+import type { PermisosBandeja } from "@/lib/crm/permisos-bandeja";
 import {
   abrirConversacion,
   cambiarEstadoConversacion,
@@ -166,6 +167,9 @@ function Contenido({ m }: { m: MensajeVista }) {
 }
 
 /** Un botón redondo de ícono, como los de la barra de WhatsApp. */
+/** Sin nada afinado: todos los botones (lo que se pasa cuando la página no manda permisos). */
+const PERMISOS_COMPLETOS: PermisosBandeja = { responder: true, archivos: true, notas: true, pasarArea: true, tomar: true, resolver: true, verTelefono: true, alcance: "todas" };
+
 /** «2,4 MB», «850 KB». */
 const peso = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("es-PA", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
@@ -197,6 +201,7 @@ export function Bandeja({
   miId,
   areas,
   estado360 = null,
+  permisos = PERMISOS_COMPLETOS,
 }: {
   inicial: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] };
   abrirInicial: string | null;
@@ -206,6 +211,8 @@ export function Bandeja({
   areas: AreaCrm[];
   /** Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, no su valor). Con la clave, puede registrar el webhook. */
   estado360?: { clave: boolean; sandbox: boolean; palabraSecreta: boolean } | null;
+  /** Lo afinado de la persona en el CRM (Usuarios y roles): qué botones ve. El servidor lo vuelve a revisar en cada acción. */
+  permisos?: PermisosBandeja;
 }) {
   const { mostrarToast } = useToast();
   const [datos, setDatos] = useState(inicial);
@@ -214,7 +221,8 @@ export function Bandeja({
   const [buscar, setBuscar] = useState("");
   const [elegido, setElegido] = useState<string | null>(abrirInicial);
   const [chat, setChat] = useState<{ id: string; mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | null>(null);
-  const [modo, setModo] = useState<"responder" | "nota">("responder");
+  // Sin permiso para responder pero sí para notas, el campo arranca en «Nota privada».
+  const [modo, setModo] = useState<"responder" | "nota">(!permisos.responder && permisos.notas ? "nota" : "responder");
   const [borrador, setBorrador] = useState("");
   const [menuArea, setMenuArea] = useState(false);
   const [verFicha, setVerFicha] = useState(true);
@@ -310,7 +318,7 @@ export function Bandeja({
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
   const ventana = sel ? textoVentana(sel.ultimoEntranteEn) : null;
   const esNota = modo === "nota";
-  const bloqueado = !escribe || (!esNota && !ventana);
+  const bloqueado = !escribe || (esNota ? !permisos.notas : !permisos.responder || !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
 
@@ -561,7 +569,7 @@ export function Bandeja({
             <EtiquetaArea area={sel.area} />
             {escribe && (
               <>
-                {sel.asignadaAId === miId ? (
+                {!permisos.tomar ? null : sel.asignadaAId === miId ? (
                   <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}>
                     Soltar
                   </button>
@@ -570,6 +578,7 @@ export function Bandeja({
                     {sel.asignadaA ? `Tomar (la lleva ${sel.asignadaA})` : "Tomar"}
                   </button>
                 )}
+                {permisos.pasarArea && (
                 <div ref={menuRef} className="relative">
                   <button type="button" disabled={enviando} aria-haspopup="menu" aria-expanded={menuArea} onClick={() => setMenuArea((v) => !v)} className={botonPildora}>
                     Pasar a otra área
@@ -589,7 +598,8 @@ export function Bandeja({
                     </div>
                   )}
                 </div>
-                {sel.estado === "abierta" ? (
+                )}
+                {!permisos.resolver ? null : sel.estado === "abierta" ? (
                   <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
                     Marcar resuelta
                   </button>
@@ -636,7 +646,7 @@ export function Bandeja({
             <div ref={finRef} />
           </div>
 
-          {escribe ? (
+          {escribe && (permisos.responder || permisos.notas) ? (
             <div className="flex flex-col bg-[var(--wa-panel)]">
               {conArchivo && archivo && (
                 <div className="mx-3 mt-2 flex items-center gap-2.5 rounded-lg bg-[var(--wa-fondo)] px-3 py-2">
@@ -673,6 +683,7 @@ export function Bandeja({
               )}
               <div className="flex items-end gap-2 px-3 py-2">
                 <div role="group" aria-label="Tipo de mensaje" className="mb-1 flex flex-none rounded-full bg-[var(--wa-fondo)] p-[3px]">
+                  {permisos.responder && (
                   <button
                     type="button"
                     aria-pressed={!esNota}
@@ -681,6 +692,8 @@ export function Bandeja({
                   >
                     Mensaje
                   </button>
+                  )}
+                  {permisos.notas && (
                   <button
                     type="button"
                     aria-pressed={esNota}
@@ -689,8 +702,9 @@ export function Bandeja({
                   >
                     Nota privada
                   </button>
+                  )}
                 </div>
-                {!esNota && (
+                {!esNota && permisos.archivos && (
                   <>
                     <input
                       ref={entradaArchivo}
@@ -756,7 +770,7 @@ export function Bandeja({
               </div>
             </div>
           ) : (
-            <p className="m-0 bg-[var(--wa-panel)] px-4 py-3 text-[13px] text-[var(--wa-sec)]">Tienes acceso de solo lectura al CRM.</p>
+            <p className="m-0 bg-[var(--wa-panel)] px-4 py-3 text-[13px] text-[var(--wa-sec)]">{escribe ? "Tu acceso no incluye responder ni dejar notas en los chats." : "Tienes acceso de solo lectura al CRM."}</p>
           )}
         </section>
       ) : (

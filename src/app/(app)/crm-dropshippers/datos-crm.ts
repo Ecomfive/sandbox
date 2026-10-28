@@ -24,16 +24,17 @@ const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) 
  * El chat de WhatsApp de cada dropshipper (migración 0158) en los números de las áreas que ve la persona: la conversación más
  * reciente y la suma de no leídos de todas. Sin la migración (o sin áreas), ninguno.
  */
-async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<Map<string, ChatDropshipper>> {
+async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[], soloSuyosYLibres: string | null): Promise<Map<string, ChatDropshipper>> {
   const chats = new Map<string, ChatDropshipper>();
   if (!areas.length) return chats;
-  const { data, error } = await supabase
+  let consulta = supabase
     .from("whatsapp_conversaciones")
     .select("id, dropshipper_id, estado, no_leidos, ultimo_texto, ultimo_mensaje_en, ultimo_de")
     .not("dropshipper_id", "is", null)
-    .in("area", areas)
-    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
-    .limit(2000);
+    .in("area", areas);
+  // Lo afinado (CATALOGO_CRM): con «los suyos y los libres», el chat que lleva otra persona no se ve en la lista.
+  if (soloSuyosYLibres && /^[0-9a-f-]{36}$/i.test(soloSuyosYLibres)) consulta = consulta.or(`asignada_a.is.null,asignada_a.eq.${soloSuyosYLibres}`);
+  const { data, error } = await consulta.order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(2000);
   if (error) return chats;
   for (const c of data ?? []) {
     const id = c.dropshipper_id as string;
@@ -61,7 +62,13 @@ async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<
  * dropshipper (pedidos y ventas del mes, último pedido, casos abiertos) las hace Postgres en la vista
  * `crm_dropshippers_resumen` (migración 0062), no JavaScript.
  */
-export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, areasWhatsapp: AreaCrm[] = []): Promise<DatosCrm> {
+export async function obtenerDatosCrm(
+  supabase: SupabaseClient,
+  paisId: string,
+  areasWhatsapp: AreaCrm[] = [],
+  /** El id de quien mira si lo afinado le deja ver solo sus chats y los libres; null = todos los de sus áreas. */
+  soloSuyosYLibres: string | null = null,
+): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
@@ -89,7 +96,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       .eq("pais_id", paisId)
       .order("abierto_en", { ascending: false })
       .limit(500),
-    cargarChats(supabase, areasWhatsapp),
+    cargarChats(supabase, areasWhatsapp, soloSuyosYLibres),
   ]);
 
   // Plan B: si la migración 0065 (cuentas vinculadas) todavía no se corrió, el directorio se lee sin ellas.

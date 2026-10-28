@@ -4,6 +4,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { accesoCrm, areasVisibles, type AreaCrm } from "@/lib/crm/areas";
+import { permisosBandeja } from "@/lib/crm/permisos-bandeja";
 import { requireModulo } from "@/lib/auth";
 import { normalizar } from "@/lib/tabla/motor";
 import { obtenerDatosCrm } from "./datos-crm";
@@ -36,7 +37,7 @@ export default async function CrmDropshippersPage({ searchParams }: { searchPara
   const pais = await getPaisActual(supabase);
   const acceso = accesoCrm(usuario);
   const areas = areasVisibles(acceso);
-  const [datos, sinResponder] = await Promise.all([obtenerDatosCrm(supabase, pais.id, areas), contarSinResponder(supabase, areas)]);
+  const [datos, sinResponder] = await Promise.all([obtenerDatosCrm(supabase, pais.id, areas, permisosBandeja(usuario.afinado).alcance === "mias-y-libres" ? usuario.id : null), contarSinResponder(supabase, areas)]);
   let abrirInicial = typeof abrir === "string" ? abrir : null;
   if (!abrirInicial && typeof buscar === "string" && buscar.trim()) {
     const q = normalizar(buscar.trim());
