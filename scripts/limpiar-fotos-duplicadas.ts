@@ -23,11 +23,11 @@ const aplicar = process.argv.includes("--aplicar");
     if (!data || data.length < 1000) break;
   }
 
-  const numeros = new Map<string, number>();
+  const numeros = new Map<string, { numero: number; dropiId: string; nombre: string; estado: string }>();
   for (let i = 0; i < [...porPublicacion.keys()].length; i += 200) {
     const ids = [...porPublicacion.keys()].slice(i, i + 200);
-    const { data } = await supabase.from("dropi_publicaciones").select("id, numero").in("id", ids);
-    for (const p of data ?? []) numeros.set(p.id as string, Number(p.numero));
+    const { data } = await supabase.from("dropi_publicaciones").select("id, numero, dropi_id, nombre, estado_publicacion").in("id", ids);
+    for (const p of data ?? []) numeros.set(p.id as string, { numero: Number(p.numero), dropiId: String(p.dropi_id ?? "sin ID"), nombre: String(p.nombre ?? ""), estado: String(p.estado_publicacion ?? "") });
   }
 
   let publicaciones = 0;
@@ -41,7 +41,8 @@ const aplicar = process.argv.includes("--aplicar");
     filasQuitadas += repetidas.length;
     const rutas = rutasSinUso(repetidas, conservar.values());
     archivos += rutas.length;
-    detalle.push(`PUB-${String(numeros.get(id) ?? "?").padStart(4, "0")}: ${fotos.length} fotos, ${conservar.size} distintas, ${repetidas.length} repetidas`);
+    const pub = numeros.get(id);
+    detalle.push(`PUB-${String(pub?.numero ?? "?").padStart(4, "0")} · ID Dropi ${pub?.dropiId ?? "?"} · ${pub?.estado ?? ""} · ${pub?.nombre ?? ""}: ${fotos.length} fotos en Dropi, ${conservar.size} distintas, ${repetidas.length} repetidas`);
     if (!aplicar) continue;
     const { error } = await supabase.from("dropi_publicacion_fotos").delete().eq("publicacion_id", id).in("nombre", repetidas.map((r) => r.nombre));
     if (error) {
