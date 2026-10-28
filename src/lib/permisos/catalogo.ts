@@ -180,6 +180,7 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
     { clave: "tiempos", etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },
     { clave: "planificacion", etiqueta: "Planificación", href: "/compras/planificacion" },
     { clave: "envios", etiqueta: "Envíos", href: "/compras/envios" },
+    { clave: "sin-stock", etiqueta: "Sin stock", href: "/compras/sin-stock" },
   ],
   acciones: [
     { clave: "crear", etiqueta: "Crear compra", requiereEdicion: true },
