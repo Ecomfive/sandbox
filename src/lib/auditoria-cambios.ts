@@ -176,6 +176,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   eliminar_tarifa_envio: "Eliminó una tarifa de envío",
   generar_codigo_barras: "Generó un código de barras interno",
   cambiar_clase_producto: "Cambió el estado del producto",
+  unir_productos: "Unió productos",
   renombrar_producto: "Cambió el nombre",
   cambiar_sku_producto: "Cambió el SKU",
   crear_caso_dropshipper: "Abrió un caso",
