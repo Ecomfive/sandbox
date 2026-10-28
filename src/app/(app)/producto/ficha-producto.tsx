@@ -11,7 +11,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
-import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, PapeleraIcon, ProductoIcon, TestIcon, VentasIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnlaceIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, PapeleraIcon, ProductoIcon, TestIcon, VentasIcon } from "@/lib/nav-icons";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
@@ -30,6 +30,8 @@ import { VentasDropiProducto } from "./ventas-dropi-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
 import { CategoriaProducto } from "./categoria-producto";
 import { SelectorClaseProducto } from "./selector-clase";
+import { UnirProducto } from "./unir-producto";
+import type { ResumenUnion } from "@/lib/wms/unir-productos";
 
 function Dato({ etiqueta, children, className = "" }: { etiqueta: string; children: React.ReactNode; className?: string }) {
   return (
@@ -82,7 +84,7 @@ export function FichaProducto({
   /** El producto es igual para todos los países; el código de país solo da formato a las fechas de la actividad. */
   codigoPais: string;
   puedeEscribir: boolean;
-  /** Solo un administrador: elimina el producto de verdad (si nada depende de él). */
+  /** Solo un administrador con edición en Producto: elimina el producto de verdad (si nada depende de él) o lo une con un duplicado. */
   puedeEliminar: boolean;
   /** El promedio de los winners: la marca negra del «Resultado del test». */
   referenciasTest: ReferenciasTest;
@@ -96,6 +98,7 @@ export function FichaProducto({
   const [error, setError] = useState<string | null>(null);
   // Sube cada vez que se cambia el estado, para que la línea de tiempo se vuelva a pedir.
   const [version, setVersion] = useState(0);
+  const [unirAbierto, setUnirAbierto] = useState(false);
 
   const indice = producto ? orden.indexOf(producto.id) : -1;
   const anterior = indice > 0 ? orden[indice - 1] : null;
@@ -138,6 +141,16 @@ export function FichaProducto({
     });
   }
 
+  // Unir con un duplicado: el más viejo se queda. Si el abierto era el que se eliminó, la ficha ya no tiene a qué volver y se cierra.
+  function alUnido(r: ResumenUnion) {
+    setUnirAbierto(false);
+    mostrarToast(`Productos unidos: queda ${r.conservar.codigo}`);
+    setVersion((v) => v + 1);
+    if (producto && r.eliminar.id === producto.id) alCerrar();
+  }
+
+  // Una variante o un producto con variantes no se une con otro: la base se negaría.
+  const sePuedeUnir = !!producto && puedeEliminar && !producto.padre && producto.variantes.length === 0;
   const esTest = producto?.clase === "test";
   return (
     <Ventana
@@ -159,6 +172,18 @@ export function FichaProducto({
         <>
           {/* La fecha de creación arriba a la derecha, como en una tarea de ClickUp. */}
           {/* Eliminar arriba, a la mano (solo administradores, y solo si nada depende del producto). */}
+          {producto && sePuedeUnir && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setUnirAbierto(true)}
+              className={`mr-1 inline-flex h-9 items-center gap-1.5 rounded-md border border-border-control bg-card px-2.5 text-xs font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}
+            >
+              <EnlaceIcon aria-hidden="true" className="h-3.5 w-3.5" />
+              Unir con otro
+            </button>
+          )}
+          {producto && sePuedeUnir && unirAbierto && <UnirProducto producto={producto} alCerrar={() => setUnirAbierto(false)} alUnido={alUnido} />}
           {producto && puedeEliminar && (
             <button
               type="button"

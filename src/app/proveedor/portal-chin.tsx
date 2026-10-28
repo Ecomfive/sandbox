@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { IdiomaProveedor, Traducido, useIdioma } from "@/components/proveedor/idioma-contexto";
+import { BotonExcel } from "@/components/proveedor/boton-excel";
+import { ColumnaCasilla, SeleccionProveedor, useSeleccion } from "@/components/proveedor/seleccion";
 import { BarraFiltroPortal, FiltroPortalProveedor, SinResultados, useFiltroPortal } from "@/components/proveedor/filtro-portal";
 import { Foto, Pestanas, Producto as ProductoBase, TONO, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
 import type { CambioRegistro } from "@/components/proveedor/registro-pagos";
@@ -14,6 +16,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { cambioDeUnidades, unitarioDesdeTotal } from "@/lib/proveedor/cotizacion";
 import { clavePlazo, type PedidoPortal } from "@/lib/proveedor/datos";
+import { hojaCotizados, hojaEnviados, hojaPorCotizar, hojaProduccion, type ContextoExcel } from "@/lib/proveedor/excel-portal";
 import { diaPanama, hoyPanama, horaPanama } from "@/lib/proveedor/fechas";
 import type { LineaHistorial } from "@/lib/proveedor/historial";
 import { HistorialIcon } from "@/lib/nav-icons";
@@ -67,7 +70,9 @@ export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPorta
   return (
     <IdiomaProveedor idioma={idioma} traducciones={datos.traducciones}>
       <FiltroPortalProveedor>
-        <PortalChinContenido {...datos} soloLectura={soloLectura} />
+        <SeleccionProveedor>
+          <PortalChinContenido {...datos} soloLectura={soloLectura} />
+        </SeleccionProveedor>
       </FiltroPortalProveedor>
     </IdiomaProveedor>
   );
@@ -78,7 +83,9 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
   const [lista, setLista] = useState(pedidos);
   const [fotos, setFotos] = useState(fotosReales);
   const [tab, setTabEstado] = useState<Tab>(tabInicial === "pagos" && !pagos ? "cotizar" : (tabInicial ?? "cotizar"));
+  const seleccion = useSeleccion();
   const setTab = (t: Tab) => {
+    seleccion?.limpiar();
     setTabEstado(t);
     alCambiarTab?.(t);
   };
@@ -264,10 +271,11 @@ function SelectorIdioma() {
   );
 }
 
-function Cabecera({ columnas }: { columnas: { texto: string; derecha?: boolean }[] }) {
+function Cabecera({ columnas, ids }: { columnas: { texto: string; derecha?: boolean }[]; ids: string[] }) {
   return (
     <thead className="sticky top-0 z-[1] bg-card">
       <tr>
+        <ColumnaCasilla encabezado ids={ids} />
         {columnas.map((c, i) => (
           <th key={i} scope="col" className={`${claseThLista} ${c.derecha ? "text-right" : ""}`}>
             {c.texto}
@@ -286,18 +294,34 @@ function Tabla({ children }: { children: ReactNode }) {
   );
 }
 
+/** Lo que necesita el Excel de cada pestaña: textos, traducción y cómo se ve la vía. */
+function useContextoExcel(): ContextoExcel {
+  const { t, tr, idioma } = useIdioma();
+  return { t, tr, via: (p) => viaTexto(p, idioma) };
+}
+
 function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar: ((p: PedidoPortal) => void) | null }) {
   const { t, idioma, numero, tr } = useIdioma();
+  const hoja = hojaPorCotizar(pedidos, useContextoExcel());
   return (
-    <Tarjeta titulo={t.cotizarTitulo} accion={<span className="text-xs text-muted-foreground">{t.cotizarPista}</span>}>
+    <Tarjeta
+      titulo={t.cotizarTitulo}
+      accion={
+        <span className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">{t.cotizarPista}</span>
+          <BotonExcel clave="por-cotizar" titulo={t.tabCotizar} columnas={hoja.columnas} filas={hoja.filas} />
+        </span>
+      }
+    >
       {pedidos.length === 0 ? (
         <Vacio>{t.cotizarVacio}</Vacio>
       ) : (
         <Tabla>
-          <Cabecera columnas={[{ texto: t.colProducto }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colNota }, { texto: "" }]} />
+          <Cabecera ids={pedidos.map((p) => p.id)} columnas={[{ texto: t.colProducto }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colNota }, { texto: "" }]} />
           <tbody>
             {pedidos.map((p) => (
               <tr key={p.id}>
+                <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
                 <td className={claseTdLista}>
                   <Producto p={p} />
                 </td>
@@ -321,13 +345,15 @@ function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar
 
 function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fotos: Record<string, string>; alCorregir: ((p: PedidoPortal) => void) | null }) {
   const { t, idioma, numero, tr } = useIdioma();
+  const hoja = hojaCotizados(pedidos, useContextoExcel());
   return (
-    <Tarjeta titulo={t.cotizadoTitulo}>
+    <Tarjeta titulo={t.cotizadoTitulo} accion={<BotonExcel clave="cotizado" titulo={t.tabCotizado} columnas={hoja.columnas} filas={hoja.filas} />}>
       {pedidos.length === 0 ? (
         <Vacio>{t.cotizadoVacio}</Vacio>
       ) : (
         <Tabla>
           <Cabecera
+            ids={pedidos.map((p) => p.id)}
             columnas={[
               { texto: t.colProducto },
               { texto: t.colDestino },
@@ -345,6 +371,7 @@ function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fo
               const cambio = cambioDeUnidades(p.unidadesPedidas, p.unidades);
               return (
                 <tr key={p.id}>
+                  <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
                   <td className={claseTdLista}>
                     <Producto p={p} />
                     {p.comentarioProveedor && (
@@ -398,13 +425,23 @@ function EnProduccion({
   alEditar: ((p: PedidoPortal) => void) | null;
 }) {
   const { t } = useIdioma();
+  const hoja = hojaProduccion(pedidos, useContextoExcel());
   return (
-    <Tarjeta titulo={t.produccionTitulo} accion={<span className="text-xs text-muted-foreground">{t.produccionPista}</span>}>
+    <Tarjeta
+      titulo={t.produccionTitulo}
+      accion={
+        <span className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">{t.produccionPista}</span>
+          <BotonExcel clave="en-produccion" titulo={t.tabProduccion} columnas={hoja.columnas} filas={hoja.filas} />
+        </span>
+      }
+    >
       {pedidos.length === 0 ? (
         <Vacio>{t.produccionVacio}</Vacio>
       ) : (
         <Tabla>
           <Cabecera
+            ids={pedidos.map((p) => p.id)}
             columnas={[
               { texto: t.colProducto },
               { texto: t.colDestino },
@@ -458,6 +495,7 @@ function FilaProduccion({
   }
   return (
     <tr>
+      <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
       <td className={claseTdLista}>
         <Producto p={p} />
       </td>
@@ -495,7 +533,7 @@ function FilaProduccion({
 }
 
 function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: Record<string, Plazo>; hoy: string }) {
-  const { t, idioma, numero, fecha } = useIdioma();
+  const { t, idioma, numero, fecha, tr } = useIdioma();
   const filas = pedidos
     .filter((p) => p.fechaEnvio)
     .map((p) => {
@@ -507,13 +545,26 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
     })
     .sort((a, b) => b.p.fechaEnvio!.localeCompare(a.p.fechaEnvio!));
   const plazoTexto = (plazo: Plazo | null) => (idioma === "zh" ? textoPlazo(plazo).replace(/ d$/, " 天") : textoPlazo(plazo));
+  const hoja = hojaEnviados(
+    filas.map(({ p, plazo, e, texto }) => ({ p, dias: e.dias, plazo: plazoTexto(plazo), estado: texto })),
+    useContextoExcel(),
+  );
   return (
-    <Tarjeta titulo={t.enviadoTitulo} accion={<span className="text-xs text-muted-foreground">{t.enviadoPista}</span>}>
+    <Tarjeta
+      titulo={t.enviadoTitulo}
+      accion={
+        <span className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">{t.enviadoPista}</span>
+          <BotonExcel clave="enviado" titulo={t.tabEnviado} columnas={hoja.columnas} filas={hoja.filas} />
+        </span>
+      }
+    >
       {filas.length === 0 ? (
         <Vacio>{t.enviadoVacio}</Vacio>
       ) : (
         <Tabla>
           <Cabecera
+            ids={filas.map(({ p }) => p.id)}
             columnas={[
               { texto: t.colProducto },
               { texto: t.colDestino },
@@ -529,6 +580,7 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
           <tbody>
             {filas.map(({ p, plazo, e, texto }) => (
               <tr key={p.id}>
+                <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
                 <td className={claseTdLista}>
                   <Producto p={p} />
                 </td>

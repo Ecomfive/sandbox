@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
@@ -52,16 +52,24 @@ const iniciales = (nombre: string) =>
     .join("")
     .toUpperCase();
 
+/** El color de la foto de cada chat, siempre el mismo para el mismo nombre (oscuros: el texto blanco se lee bien). */
+const COLORES_FOTO = ["#a1517a", "#2f7d6d", "#4a6fa5", "#8a6d1d", "#6b5b95", "#b0573c", "#3d7a8f", "#7a5c3e"];
+function colorFoto(nombre: string): string {
+  let h = 0;
+  for (const c of nombre) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return COLORES_FOTO[h % COLORES_FOTO.length];
+}
+
 const sinResponder = (c: ConversacionVista) => c.estado === "abierta" && (c.noLeidos > 0 || c.ultimoDe === "entrante");
 
-/** «14:05» si es de hoy, «ayer», «26 oct». */
+/** «14:05» si es de hoy, «Ayer», «26 oct». */
 function horaCorta(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   const hoy = new Date();
   if (d.toDateString() === hoy.toDateString()) return d.toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" });
   const ayer = new Date(hoy.getTime() - 86_400_000);
-  if (d.toDateString() === ayer.toDateString()) return "ayer";
+  if (d.toDateString() === ayer.toDateString()) return "Ayer";
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short" });
 }
 
@@ -76,20 +84,43 @@ function etiquetaDia(iso: string): string {
   return d.toLocaleDateString("es-PA", { weekday: "long", day: "numeric", month: "short" });
 }
 
-/** «2,4 MB», «850 KB». */
-const peso = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("es-PA", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+const ESTADO_SALIENTE: Record<string, string> = { enviando: "Enviando", enviado: "Enviado", entregado: "Entregado", leido: "Leído", fallido: "No se entregó" };
 
-/** Antes de subir: el motivo si el archivo seguro no se puede mandar por WhatsApp (el servidor lo revisa de nuevo por su contenido). */
-function motivoArchivo(f: File): string | null {
-  const tipo = f.type.toLowerCase();
-  if (tipo === "video/quicktime") return "Los videos .MOV no se pueden mandar por WhatsApp: expórtalo como MP4.";
-  if (tipo.startsWith("image/") && tipo !== "image/jpeg" && tipo !== "image/png") return "Por WhatsApp las fotos van en JPG o PNG.";
-  const max = tipo.startsWith("image/") ? MAX_BYTES_WHATSAPP.image : tipo.startsWith("video/") ? MAX_BYTES_WHATSAPP.video : MAX_BYTES_WHATSAPP.document;
-  if (f.size > max) return `Pesa ${peso(f.size)}: por WhatsApp ${tipo.startsWith("image/") ? "las fotos pesan" : tipo.startsWith("video/") ? "los videos pesan" : "los archivos pesan"} hasta ${peso(max)}.`;
-  return null;
+/** Las palomitas de WhatsApp: un reloj mientras sale, una (enviado), dos grises (entregado), dos azules (leído) o un aviso si falló. */
+function Palomitas({ estado }: { estado: string }) {
+  const nombre = ESTADO_SALIENTE[estado] ?? estado;
+  if (estado === "enviando")
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" role="img" aria-label={nombre} className="flex-none">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v4l2.5 2" />
+      </svg>
+    );
+  if (estado === "fallido")
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" role="img" aria-label={nombre} className="flex-none text-destructive">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7.5v5.5M12 16.5h.01" />
+      </svg>
+    );
+  const doble = estado === "entregado" || estado === "leido";
+  return (
+    <svg width="17" height="11" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={nombre} className={`flex-none ${estado === "leido" ? "text-[var(--wa-leido)]" : ""}`}>
+      <path d={doble ? "m1 6.5 3.2 3.2L11 2.5" : "m3 6.5 3.2 3.2L13 2.5"} />
+      {doble && <path d="m7.5 9.2.5.5L14.8 2.5" />}
+    </svg>
+  );
 }
 
-const ESTADO_SALIENTE: Record<string, string> ={ enviando: "Enviando", enviado: "Enviado ✓", entregado: "Entregado ✓✓", leido: "Leído ✓✓", fallido: "No se entregó" };
+/** La foto redonda de un chat: sus iniciales sobre su color. */
+function Foto({ nombre, tam }: { nombre: string; tam: "lista" | "cabecera" | "ficha" }) {
+  const medida = tam === "ficha" ? "h-[120px] w-[120px] text-[40px]" : tam === "cabecera" ? "h-10 w-10 text-[15px]" : "h-[49px] w-[49px] text-[17px]";
+  return (
+    <span aria-hidden="true" style={{ backgroundColor: colorFoto(nombre) }} className={`flex flex-none items-center justify-center rounded-full font-semibold text-white ${medida}`}>
+      {iniciales(nombre)}
+    </span>
+  );
+}
 
 /** La etiqueta de color de un área, con su punto. */
 function EtiquetaArea({ area }: { area: AreaCrm }) {
@@ -109,31 +140,55 @@ function Contenido({ m }: { m: MensajeVista }) {
     <>
       {m.conArchivo && m.tipo === "imagen" && (
         <a href={src} target="_blank" rel="noreferrer" className={`mb-1 block ${anilloFoco}`}>
-          <img src={src} alt={m.texto ? `Foto: ${m.texto}` : "Foto que mandó por WhatsApp"} loading="lazy" className="max-h-64 max-w-full rounded-lg object-contain" />
+          <img src={src} alt={m.texto ? `Foto: ${m.texto}` : "Foto que mandó por WhatsApp"} loading="lazy" className="max-h-72 max-w-full rounded-md object-contain" />
         </a>
       )}
       {m.conArchivo && m.tipo === "sticker" && <img src={src} alt="Sticker" loading="lazy" className="h-28 w-28 object-contain" />}
       {m.conArchivo && m.tipo === "audio" && <audio controls preload="none" src={src} className="max-w-full" />}
-      {m.conArchivo && m.tipo === "video" && <video controls preload="none" src={src} className="max-h-64 max-w-full rounded-lg" />}
+      {m.conArchivo && m.tipo === "video" && <video controls preload="none" src={src} className="max-h-72 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "documento" && (
-        <a href={src} target="_blank" rel="noreferrer" className={`mb-1 flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5 text-[13px] font-medium text-primario ${anilloFoco}`}>
-          <span aria-hidden="true" className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-primario-suave text-[10px] font-bold">
+        <a href={src} target="_blank" rel="noreferrer" className={`mb-1 flex items-center gap-2 rounded-md bg-[var(--wa-panel)] px-2 py-2 text-[13px] font-medium ${anilloFoco}`}>
+          <span aria-hidden="true" className="flex h-8 w-7 flex-none items-center justify-center rounded bg-[var(--wa-acento)] text-[9px] font-bold text-[var(--wa-acento-texto)]">
             DOC
           </span>
           <span className="truncate">{m.mediaNombre ?? "Abrir documento"}</span>
         </a>
       )}
-      {m.tipo === "reaccion" && <span className="text-muted-foreground">Reaccionó </span>}
-      {m.tipo === "ubicacion" && <span className="block text-xs font-medium text-muted-foreground">Ubicación</span>}
-      {m.texto ? <span className="block whitespace-pre-wrap break-words">{m.texto}</span> : !m.conArchivo && m.tipo !== "reaccion" && <span className="text-muted-foreground">Mensaje que el sistema todavía no muestra ({m.tipo}).</span>}
+      {m.tipo === "reaccion" && <span className="text-[var(--wa-sec)]">Reaccionó </span>}
+      {m.tipo === "ubicacion" && <span className="block text-xs font-medium text-[var(--wa-sec)]">Ubicación</span>}
+      {m.texto ? (
+        <span className="whitespace-pre-wrap break-words">{m.texto}</span>
+      ) : (
+        !m.conArchivo && m.tipo !== "reaccion" && <span className="text-[var(--wa-sec)]">Mensaje que el sistema todavía no muestra ({m.tipo}).</span>
+      )}
     </>
   );
 }
 
+/** Un botón redondo de ícono, como los de la barra de WhatsApp. */
+/** «2,4 MB», «850 KB». */
+const peso = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("es-PA", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
+/** Antes de subir: el motivo si el archivo seguro no se puede mandar por WhatsApp (el servidor lo revisa de nuevo por su contenido). */
+function motivoArchivo(f: File): string | null {
+  const tipo = f.type.toLowerCase();
+  if (tipo === "video/quicktime") return "Los videos .MOV no se pueden mandar por WhatsApp: expórtalo como MP4.";
+  if (tipo.startsWith("image/") && tipo !== "image/jpeg" && tipo !== "image/png") return "Por WhatsApp las fotos van en JPG o PNG.";
+  const max = tipo.startsWith("image/") ? MAX_BYTES_WHATSAPP.image : tipo.startsWith("video/") ? MAX_BYTES_WHATSAPP.video : MAX_BYTES_WHATSAPP.document;
+  if (f.size > max) return `Pesa ${peso(f.size)}: por WhatsApp ${tipo.startsWith("image/") ? "las fotos pesan" : tipo.startsWith("video/") ? "los videos pesan" : "los archivos pesan"} hasta ${peso(max)}.`;
+  return null;
+}
+
+const botonIcono = `flex h-10 w-10 flex-none items-center justify-center rounded-full text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] disabled:opacity-50 ${anilloFoco}`;
+/** Un botón con texto de la cabecera del chat. */
+const botonPildora = `inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 text-[13px] font-medium hover:bg-[var(--wa-hover)] disabled:opacity-50 ${anilloFoco}`;
+
 /**
- * La bandeja de WhatsApp (26 oct 2026; diseño del boceto https://claude.ai/artifact/Sn3pB4cdUixXk6WdRh4kr8, 28 oct): a la izquierda el
- * número y las conversaciones (Sin responder, Mías, Todas y, con más de un área, cada área), al centro el chat para contestar o dejar
- * una nota privada, con «Pasar a otra área», y a la derecha el dropshipper. Se refresca sola cada pocos segundos mientras está a la vista.
+ * La bandeja de WhatsApp (26 oct 2026). Desde el 28 oct 2026 se ve y se usa como WhatsApp (pedido de Hernán; prototipo
+ * https://claude.ai/artifact/RGtk9mxmht8nzneUX75ucx): a la izquierda «Chats» con el buscador, los filtros (Sin responder, Mías, Todas y,
+ * con más de un área, cada área) y la lista; al centro la conversación con burbujas, palomitas y la barra para escribir (Enter envía,
+ * Mayús + Enter baja de línea), donde también se deja una nota privada; a la derecha, la ficha del dropshipper, que se abre y se cierra
+ * tocando su nombre. Se refresca sola cada pocos segundos mientras está a la vista. Los colores propios viven en `.bandeja-wa` (globals.css).
  */
 export function Bandeja({
   inicial,
@@ -162,6 +217,7 @@ export function Bandeja({
   const [modo, setModo] = useState<"responder" | "nota">("responder");
   const [borrador, setBorrador] = useState("");
   const [menuArea, setMenuArea] = useState(false);
+  const [verFicha, setVerFicha] = useState(true);
   /** La foto, video o documento que se va a mandar con el texto como pie (solo al responder, no en notas). */
   const [archivo, setArchivo] = useState<File | null>(null);
   const entradaArchivo = useRef<HTMLInputElement>(null);
@@ -223,6 +279,14 @@ export function Bandeja({
     finRef.current?.scrollIntoView({ block: "end" });
   }, [cantidadMensajes, chat?.id]);
 
+  // El campo crece con lo escrito, hasta unas seis líneas (como en WhatsApp).
+  useEffect(() => {
+    const t = textoRef.current;
+    if (!t) return;
+    t.style.height = "auto";
+    t.style.height = `${Math.min(t.scrollHeight, 144)}px`;
+  }, [borrador]);
+
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
   const deNumero = useMemo(() => datos.conversaciones.filter((c) => numero === "todos" || c.numeroId === numero), [datos.conversaciones, numero]);
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
@@ -234,11 +298,14 @@ export function Bandeja({
   const lista = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     return deNumero
-      .filter((c) =>
-        filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "todas" ? true : c.area === filtro.slice(5),
+      .filter(
+        (c) =>
+          // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
+          c.id === elegido ||
+          (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "todas" ? true : c.area === filtro.slice(5)),
       )
       .filter((c) => !q || [c.nombre, c.nombrePerfil, c.telefono, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)));
-  }, [deNumero, filtro, buscar, miId]);
+  }, [deNumero, filtro, buscar, miId, elegido]);
 
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
   const ventana = sel ? textoVentana(sel.ultimoEntranteEn) : null;
@@ -346,42 +413,41 @@ export function Bandeja({
     );
   }
 
-  const boton = `inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[12.5px] font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
-  const etiquetaSeccion = "m-0 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase";
   const unNumero = datos.numeros.length === 1 ? datos.numeros[0] : null;
+  const verDropshipper = chat?.id === sel?.id ? chat?.dropshipper : null;
 
   return (
-    <div className="flex min-h-[640px] overflow-hidden rounded-[14px] border border-border bg-card lg:h-[calc(100vh-200px)]">
-      {/* Conversaciones */}
-      <aside aria-label="Conversaciones" className={`${sel ? "hidden lg:flex" : "flex"} w-full flex-col border-border lg:w-[320px] lg:flex-none lg:border-r`}>
-        <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3">
-          <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-success-soft text-[13px] font-bold text-success">
-            W
-          </span>
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-[13px] font-semibold">{unNumero ? unNumero.nombre : `${datos.numeros.length} números de WhatsApp`}</span>
-            <span className="truncate text-xs text-muted-foreground tabular-nums">{unNumero ? `${unNumero.numero} · un número para todo el equipo` : "Elige cuál ver abajo"}</span>
+    <div className="bandeja-wa flex min-h-[640px] overflow-hidden rounded-[14px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
+      {/* ===== Chats ===== */}
+      <aside aria-label="Conversaciones" className={`${sel ? "hidden lg:flex" : "flex"} w-full flex-col border-[var(--wa-borde)] lg:w-[380px] lg:flex-none lg:border-r`}>
+        <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h2 className="m-0 text-[22px] font-bold">Chats</h2>
+            <span className="truncate text-[12.5px] text-[var(--wa-sec)] tabular-nums">
+              {unNumero ? `${unNumero.nombre} · ${unNumero.numero}` : `${datos.numeros.length} números de WhatsApp`}
+            </span>
           </div>
         </div>
-        <div className="flex flex-col gap-2.5 border-b border-border px-3.5 py-2.5">
+        <div className="flex flex-col gap-2 px-3 pt-2 pb-2.5">
           <div className="flex gap-2">
-            <label className="sr-only" htmlFor="buscar-chat">
-              Buscar conversación
+            <label className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-lg bg-[var(--wa-panel)] px-3.5 text-[var(--wa-sec)] focus-within:ring-2 focus-within:ring-[var(--wa-acento)]">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <span className="sr-only">Buscar conversación</span>
+              <input
+                type="search"
+                value={buscar}
+                onChange={(e) => setBuscar(e.target.value)}
+                placeholder="Buscar nombre, teléfono o tienda"
+                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[var(--wa-texto)] outline-none placeholder:text-[var(--wa-sec)]"
+              />
             </label>
-            <input
-              id="buscar-chat"
-              type="search"
-              value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
-              placeholder="Buscar nombre, teléfono o tienda"
-              className={`min-h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-[13px] ${anilloFoco}`}
-            />
             {datos.numeros.length > 1 && (
-              <>
-                <label className="sr-only" htmlFor="numero-chat">
-                  Número de la empresa
-                </label>
-                <select id="numero-chat" value={numero} onChange={(e) => setNumero(e.target.value)} className={`min-h-9 max-w-[45%] rounded-lg border border-border bg-background px-2 text-[13px] ${anilloFoco}`}>
+              <label className="flex">
+                <span className="sr-only">Número de la empresa</span>
+                <select value={numero} onChange={(e) => setNumero(e.target.value)} className={`h-10 max-w-[150px] rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] ${anilloFoco}`}>
                   <option value="todos">Todos los números</option>
                   {datos.numeros.map((n) => (
                     <option key={n.id} value={n.id}>
@@ -389,7 +455,7 @@ export function Bandeja({
                     </option>
                   ))}
                 </select>
-              </>
+              </label>
             )}
           </div>
           <div role="group" aria-label="Qué conversaciones ver" className="flex flex-wrap gap-1.5">
@@ -399,316 +465,346 @@ export function Bandeja({
                 type="button"
                 aria-pressed={filtro === o.id}
                 onClick={() => setFiltro(o.id)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                  filtro === o.id ? "border-foreground bg-foreground text-background" : "border-border bg-card text-foreground-soft hover:bg-muted"
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px] ${
+                  filtro === o.id ? "bg-[var(--wa-acento-suave)] font-semibold text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-sec)] hover:bg-[var(--wa-borde)]"
                 } ${anilloFoco}`}
               >
-                {o.texto} <span className="tabular-nums opacity-80">{o.cuenta}</span>
+                {o.texto}
+                {o.cuenta > 0 && <span className="tabular-nums">{o.cuenta}</span>}
               </button>
             ))}
           </div>
         </div>
         <ul className="m-0 flex-1 list-none overflow-y-auto p-0">
-          {lista.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  setElegido(c.id);
-                  setMenuArea(false);
-                  setArchivo(null);
-                  setChat((x) => (x?.id === c.id ? x : null));
-                  // Al abrirla queda leída (el servidor la marca en `abrirConversacion`).
-                  setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
-                }}
-                aria-current={c.id === elegido ? "true" : undefined}
-                className={`grid w-full grid-cols-[34px_minmax(0,1fr)_auto] gap-2.5 border-b border-border px-3.5 py-3 text-left ${c.id === elegido ? "bg-primario-suave" : "hover:bg-muted"} ${anilloFoco}`}
-              >
-                <span aria-hidden="true" className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground-soft">
-                  {iniciales(c.nombre)}
-                </span>
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-[13px] font-semibold">{c.nombre}</span>
-                  <span className={`truncate text-xs ${c.noLeidos ? "font-medium text-foreground" : "text-muted-foreground"}`}>
-                    {c.ultimoDe === "saliente" ? "Tú: " : ""}
-                    {c.ultimoTexto ?? ""}
+          {lista.map((c) => {
+            const actual = c.id === elegido;
+            return (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setElegido(c.id);
+                    setMenuArea(false);
+                    setArchivo(null);
+                    setChat((x) => (x?.id === c.id ? x : null));
+                    // Al abrirla queda leída (el servidor la marca en `abrirConversacion`).
+                    setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
+                  }}
+                  aria-current={actual ? "true" : undefined}
+                  className={`flex w-full items-center gap-3 pl-3.5 text-left ${actual ? "bg-[var(--wa-sel)]" : "hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+                >
+                  <Foto nombre={c.nombre} tam="lista" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5 border-b border-[var(--wa-borde)] py-3 pr-3.5">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
+                      <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{horaCorta(c.ultimoMensajeEn)}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-sm text-[var(--wa-sec)]">
+                      {c.ultimoDe === "saliente" && <Palomitas estado="entregado" />}
+                      {c.ultimoDe === "nota" && (
+                        <span className="flex-none font-medium text-[var(--wa-nota-acento)]">Nota:</span>
+                      )}
+                      <span className={`min-w-0 flex-1 truncate ${c.noLeidos ? "font-medium text-[var(--wa-texto)]" : ""}`}>{c.ultimoTexto ?? ""}</span>
+                      {c.noLeidos > 0 && (
+                        <span className="flex h-5 min-w-5 flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1.5 text-xs font-semibold text-[var(--wa-acento-texto)] tabular-nums">
+                          {c.noLeidos}
+                          <span className="sr-only"> sin leer</span>
+                        </span>
+                      )}
+                    </span>
+                    {(areas.length > 1 || !c.dropshipperId || c.estado === "resuelta" || c.asignadaA || datos.numeros.length > 1) && (
+                      <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
+                        {areas.length > 1 && <EtiquetaArea area={c.area} />}
+                        {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
+                        {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
+                        {datos.numeros.length > 1 && <span>{numeroDe.get(c.numeroId)?.nombre}</span>}
+                        {c.asignadaA && <span>· {c.asignadaA}</span>}
+                      </span>
+                    )}
                   </span>
-                  {(areas.length > 1 || !c.dropshipperId || c.estado === "resuelta" || c.asignadaA || datos.numeros.length > 1) && (
-                    <span className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-                      {areas.length > 1 && <EtiquetaArea area={c.area} />}
-                      {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
-                      {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
-                      {datos.numeros.length > 1 && <span>{numeroDe.get(c.numeroId)?.nombre}</span>}
-                      {c.asignadaA && <span>· {c.asignadaA}</span>}
-                    </span>
-                  )}
-                </span>
-                <span className="flex flex-col items-end gap-1 text-[11px] text-muted-foreground tabular-nums">
-                  <span className={c.noLeidos ? "font-semibold text-destructive" : ""}>{horaCorta(c.ultimoMensajeEn)}</span>
-                  {c.noLeidos > 0 && (
-                    <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white" aria-label={`${c.noLeidos} sin leer`}>
-                      {c.noLeidos}
-                    </span>
-                  )}
-                </span>
-              </button>
-            </li>
-          ))}
-          {!lista.length && <li className="px-4 py-8 text-center text-[13px] text-muted-foreground">{filtro === "sinResponder" ? "Nada sin responder." : "No hay conversaciones con este filtro."}</li>}
+                </button>
+              </li>
+            );
+          })}
+          {!lista.length && <li className="px-4 py-10 text-center text-sm text-[var(--wa-sec)]">{filtro === "sinResponder" ? "Nada sin responder." : "No hay conversaciones con este filtro."}</li>}
         </ul>
       </aside>
 
-      {/* Chat */}
+      {/* ===== Conversación ===== */}
       {sel ? (
         <section aria-label={`Conversación con ${sel.nombre}`} className="flex min-w-0 flex-1 flex-col">
-          <div className="flex flex-wrap items-center gap-2.5 border-b border-border bg-card px-3.5 py-2.5">
-            <button type="button" onClick={() => setElegido(null)} className={`${boton} lg:hidden`} aria-label="Volver a las conversaciones">
-              ←
+          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--wa-borde)] bg-[var(--wa-panel)] px-3 py-2">
+            <button type="button" onClick={() => setElegido(null)} className={`${botonIcono} lg:hidden`} aria-label="Volver a las conversaciones">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M11 18l-6-6 6-6" />
+              </svg>
             </button>
-            <span aria-hidden="true" className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground-soft">
-              {iniciales(sel.nombre)}
-            </span>
-            <div className="flex min-w-0 flex-[1_1_180px] flex-col">
-              <span className="truncate text-sm font-semibold">{sel.nombre}</span>
-              <span className="truncate text-xs text-muted-foreground tabular-nums">
-                {sel.telefono}
-                {sel.codigo ? ` · ${sel.codigo}` : ""}
-                {sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? ` · «${sel.nombrePerfil}» en WhatsApp` : ""}
-                {datos.numeros.length > 1 ? ` · ${numeroDe.get(sel.numeroId)?.nombre}` : ""}
+            <button
+              type="button"
+              onClick={() => setVerFicha((v) => !v)}
+              aria-expanded={verFicha}
+              aria-label={`${verFicha ? "Cerrar" : "Ver"} la ficha de ${sel.nombre}`}
+              className={`flex min-w-0 flex-[1_1_200px] items-center gap-3 rounded-lg py-0.5 text-left ${anilloFoco}`}
+            >
+              <Foto nombre={sel.nombre} tam="cabecera" />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-[16px]">{sel.nombre}</span>
+                <span className="truncate text-[13px] text-[var(--wa-sec)] tabular-nums">
+                  {sel.telefono}
+                  {sel.codigo ? ` · ${sel.codigo}` : ""}
+                  {sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? ` · «${sel.nombrePerfil}» en WhatsApp` : ""}
+                  {datos.numeros.length > 1 ? ` · ${numeroDe.get(sel.numeroId)?.nombre}` : ""}
+                  {sel.asignadaA ? ` · la lleva ${sel.asignadaA}` : ""}
+                </span>
               </span>
-            </div>
+            </button>
             <EtiquetaArea area={sel.area} />
             {escribe && (
               <>
                 {sel.asignadaAId === miId ? (
-                  <button type="button" disabled={enviando} className={boton} onClick={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}>
+                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}>
                     Soltar
                   </button>
                 ) : (
-                  <button type="button" disabled={enviando} className={boton} onClick={() => accion(() => tomarConversacion(sel.id), "La conversación quedó a tu cargo.")}>
+                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => tomarConversacion(sel.id), "La conversación quedó a tu cargo.")}>
                     {sel.asignadaA ? `Tomar (la lleva ${sel.asignadaA})` : "Tomar"}
                   </button>
                 )}
                 <div ref={menuRef} className="relative">
-                  <button
-                    type="button"
-                    disabled={enviando}
-                    aria-haspopup="menu"
-                    aria-expanded={menuArea}
-                    onClick={() => setMenuArea((v) => !v)}
-                    className={`boton-neon inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-transparent px-2.5 text-[12.5px] font-medium text-white disabled:opacity-50 ${anilloFoco}`}
-                  >
-                    Pasar a otra área ▾
+                  <button type="button" disabled={enviando} aria-haspopup="menu" aria-expanded={menuArea} onClick={() => setMenuArea((v) => !v)} className={botonPildora}>
+                    Pasar a otra área
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
                   </button>
                   {menuArea && (
-                    <div role="menu" aria-label="Pasar a otra área" className="absolute top-[calc(100%+6px)] right-0 z-20 flex w-64 flex-col rounded-[10px] border border-border bg-card p-1.5 shadow-lg">
-                      <p className="m-0 px-2 pt-1 pb-1.5 text-[11.5px] text-muted-foreground">El chat pasa a esa área. Quien no la ve deja de verlo.</p>
+                    <div role="menu" aria-label="Pasar a otra área" className="absolute top-[calc(100%+6px)] right-0 z-20 flex w-64 flex-col rounded-[10px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] p-1.5 shadow-lg">
+                      <p className="m-0 px-2 pt-1 pb-1.5 text-[11.5px] text-[var(--wa-sec)]">El chat pasa a esa área. Quien no la ve deja de verlo.</p>
                       {AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => (
-                        <button key={a.valor} type="button" role="menuitem" onClick={() => pasarA(a.valor)} className={`flex flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-muted ${anilloFoco}`}>
+                        <button key={a.valor} type="button" role="menuitem" onClick={() => pasarA(a.valor)} className={`flex flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}>
                           <EtiquetaArea area={a.valor} />
-                          <span className="text-[11.5px] text-muted-foreground">{a.para}</span>
+                          <span className="text-[11.5px] text-[var(--wa-sec)]">{a.para}</span>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
                 {sel.estado === "abierta" ? (
-                  <button type="button" disabled={enviando} className={boton} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
+                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
                     Marcar resuelta
                   </button>
                 ) : (
-                  <button type="button" disabled={enviando} className={boton} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "abierta"), "Conversación reabierta.")}>
+                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "abierta"), "Conversación reabierta.")}>
                     Reabrir
                   </button>
                 )}
               </>
             )}
           </div>
-          <p className={`m-0 border-b border-border px-3.5 py-1.5 text-xs ${ventana ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>
-            {ventana
-              ? `Ventana de 24 h abierta: se puede responder con texto libre durante ${ventana.replace(/^quedan /, "")} más.`
-              : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada (próximamente). Las notas privadas sí se pueden dejar."}
-          </p>
-          <div className="flex flex-1 flex-col gap-2 overflow-y-auto bg-muted p-4">
+
+          <div className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
+            <p
+              className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
+                ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
+              }`}
+            >
+              {ventana
+                ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
+                : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada (próximamente). Las notas privadas sí se pueden dejar."}
+            </p>
             {!mensajes ? (
-              <p className="m-0 text-[13px] text-muted-foreground">Cargando…</p>
+              <p className="m-0 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] text-[var(--wa-sec)]">Cargando…</p>
             ) : (
               mensajes.map((m, i) => {
                 const dia = etiquetaDia(m.momento);
-                const separador = i === 0 || etiquetaDia(mensajes[i - 1].momento) !== dia;
+                const previo = mensajes[i - 1];
+                const separador = i === 0 || etiquetaDia(previo.momento) !== dia;
+                // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp).
+                const seguido = !separador && !!previo && previo.direccion === m.direccion && !ES_CAMBIO_DE_AREA.test(previo.texto ?? "");
                 return (
                   <Fragment key={m.id}>
-                    {separador && <span className="self-center rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] text-muted-foreground first-letter:uppercase">{dia}</span>}
-                    <Burbuja m={m} />
+                    {separador && (
+                      <span className="my-2 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)] first-letter:uppercase">
+                        {dia}
+                      </span>
+                    )}
+                    <Burbuja m={m} seguido={seguido} />
                   </Fragment>
                 );
               })
             )}
             <div ref={finRef} />
           </div>
+
           {escribe ? (
-            <div className="flex flex-col gap-2 border-t border-border bg-card px-3.5 pt-2.5 pb-3">
-              <div role="group" aria-label="Tipo de mensaje" className="flex gap-1">
-                <button
-                  type="button"
-                  aria-pressed={!esNota}
-                  onClick={() => setModo("responder")}
-                  className={`rounded-md px-2.5 py-1 text-[12.5px] ${!esNota ? "bg-muted font-semibold text-foreground" : "text-muted-foreground hover:bg-muted"} ${anilloFoco}`}
-                >
-                  Responder por WhatsApp
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={esNota}
-                  onClick={() => setModo("nota")}
-                  className={`rounded-md px-2.5 py-1 text-[12.5px] ${esNota ? "bg-warning-soft font-semibold text-warning" : "text-muted-foreground hover:bg-muted"} ${anilloFoco}`}
-                >
-                  Nota privada
-                </button>
-              </div>
+            <div className="flex flex-col bg-[var(--wa-panel)]">
               {conArchivo && archivo && (
-                <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-muted px-2.5 py-2">
-                  <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-primario-suave text-[10px] font-bold text-primario">
+                <div className="mx-3 mt-2 flex items-center gap-2.5 rounded-lg bg-[var(--wa-fondo)] px-3 py-2">
+                  <span aria-hidden="true" className="flex h-9 w-9 flex-none items-center justify-center rounded-md bg-[var(--wa-panel)] text-[10px] font-bold text-[var(--wa-sec)]">
                     {archivo.type.startsWith("image/") ? "FOTO" : archivo.type.startsWith("video/") ? "VIDEO" : "DOC"}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[13px] font-medium">{archivo.name}</span>
-                    <span className="text-[11.5px] text-muted-foreground">{peso(archivo.size)} · el texto de abajo va como pie</span>
+                    <span className="truncate text-[13.5px] font-medium text-[var(--wa-texto)]">{archivo.name}</span>
+                    <span className="text-[12px] text-[var(--wa-sec)]">{peso(archivo.size)} · lo que escribas va como pie</span>
                   </span>
-                  <button type="button" onClick={() => setArchivo(null)} disabled={enviando} className={`rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-card hover:text-foreground ${anilloFoco}`}>
-                    Quitar
+                  <button type="button" onClick={() => setArchivo(null)} disabled={enviando} aria-label="Quitar el archivo" className={botonIcono}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
                   </button>
                 </div>
               )}
-              <label className="sr-only" htmlFor="mensaje-chat">
-                {esNota ? "Nota privada" : "Mensaje"}
-              </label>
-              <textarea
-                id="mensaje-chat"
-                ref={textoRef}
-                rows={3}
-                value={borrador}
-                disabled={bloqueado}
-                onChange={(e) => setBorrador(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    mandar();
-                  }
-                }}
-                onPaste={(e) => {
-                  // Pegar una captura la deja lista para mandar.
-                  const f = esNota ? undefined : e.clipboardData.files[0];
-                  if (f) {
-                    e.preventDefault();
-                    elegirArchivo(f);
-                  }
-                }}
-                placeholder={
-                  esNota
-                    ? "Nota para el equipo. El dropshipper no la ve."
-                    : !ventana
-                      ? "Fuera de las 24 h: hace falta una plantilla aprobada"
-                      : conArchivo
-                        ? "Texto que acompaña el archivo (opcional)"
-                        : `Escribe a ${sel.nombre.split(" ")[0]}… (Ctrl + Enter envía; pega o adjunta una foto)`
-                }
-                className={`min-h-16 w-full resize-y rounded-[10px] border px-3 py-2 text-sm disabled:opacity-60 ${esNota ? "border-transparent bg-warning-soft text-warning placeholder:text-warning/70" : "border-border bg-card"} ${anilloFoco}`}
-              />
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {!esNota && !bloqueado && (
-                    <>
-                      <input
-                        ref={entradaArchivo}
-                        type="file"
-                        accept={ACEPTAR_WHATSAPP}
-                        aria-label="Elegir foto, video o documento"
-                        className="sr-only"
-                        tabIndex={-1}
-                        onChange={(e) => {
-                          elegirArchivo(e.target.files?.[0]);
-                          e.target.value = "";
-                        }}
-                      />
-                      <button
-                        type="button"
-                        disabled={enviando}
-                        onClick={() => entradaArchivo.current?.click()}
-                        className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11.5px] font-medium text-foreground-soft hover:bg-muted disabled:opacity-50 ${anilloFoco}`}
-                      >
-                        📎 Foto, video o documento
-                      </button>
-                    </>
-                  )}
-                  {!esNota &&
-                    !bloqueado &&
-                    !conArchivo &&
-                    RAPIDAS.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => {
-                          setBorrador(r);
-                          textoRef.current?.focus();
-                        }}
-                        className={`rounded-full border border-dashed border-border px-2.5 py-0.5 text-[11.5px] text-foreground-soft hover:bg-muted ${anilloFoco}`}
-                      >
-                        {r}
-                      </button>
-                    ))}
+              {!esNota && !bloqueado && !conArchivo && (
+                <div className="flex gap-2 overflow-x-auto px-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {RAPIDAS.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => {
+                        setBorrador(r);
+                        textoRef.current?.focus();
+                      }}
+                      className={`flex-none rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 py-1 text-[13px] whitespace-nowrap hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+                    >
+                      {r}
+                    </button>
+                  ))}
                 </div>
+              )}
+              <div className="flex items-end gap-2 px-3 py-2">
+                <div role="group" aria-label="Tipo de mensaje" className="mb-1 flex flex-none rounded-full bg-[var(--wa-fondo)] p-[3px]">
+                  <button
+                    type="button"
+                    aria-pressed={!esNota}
+                    onClick={() => setModo("responder")}
+                    className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${!esNota ? "bg-[var(--wa-acento)] text-[var(--wa-acento-texto)]" : "text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+                  >
+                    Mensaje
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={esNota}
+                    onClick={() => setModo("nota")}
+                    className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${esNota ? "bg-[var(--wa-nota-acento)] text-[var(--wa-fondo)]" : "text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+                  >
+                    Nota privada
+                  </button>
+                </div>
+                {!esNota && (
+                  <>
+                    <input
+                      ref={entradaArchivo}
+                      type="file"
+                      accept={ACEPTAR_WHATSAPP}
+                      aria-label="Elegir foto, video o documento"
+                      className="sr-only"
+                      tabIndex={-1}
+                      onChange={(e) => {
+                        elegirArchivo(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button type="button" disabled={enviando || bloqueado} onClick={() => entradaArchivo.current?.click()} aria-label="Adjuntar foto, video o documento" className={`${botonIcono} mb-px`}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="m21.4 11.6-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+                <label className="flex min-w-0 flex-1">
+                  <span className="sr-only">{esNota ? "Nota privada para el equipo" : `Mensaje para ${sel.nombre}`}</span>
+                  <textarea
+                    ref={textoRef}
+                    rows={1}
+                    value={borrador}
+                    disabled={bloqueado}
+                    onChange={(e) => setBorrador(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Como en WhatsApp: Enter envía y Mayús + Enter baja de línea.
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        mandar();
+                      }
+                    }}
+                    onPaste={(e) => {
+                      // Pegar una captura la deja lista para mandar.
+                      const f = esNota ? undefined : e.clipboardData.files[0];
+                      if (f) {
+                        e.preventDefault();
+                        elegirArchivo(f);
+                      }
+                    }}
+                    placeholder={
+                      esNota ? "Nota para el equipo. El dropshipper no la ve." : !ventana ? "Fuera de las 24 h: hace falta una plantilla aprobada" : conArchivo ? "Añade un pie (opcional)" : "Escribe un mensaje"
+                    }
+                    className={`min-h-[42px] w-full resize-none rounded-lg border-0 px-3.5 py-[10px] text-[15px] leading-[22px] outline-none placeholder:text-[var(--wa-sec)] focus-visible:ring-2 focus-visible:ring-[var(--wa-acento)] disabled:opacity-60 ${
+                      esNota ? "bg-[var(--wa-nota)] text-[var(--wa-nota-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-texto)]"
+                    }`}
+                  />
+                </label>
                 <button
                   type="button"
                   disabled={enviando || bloqueado || (!borrador.trim() && !conArchivo)}
                   onClick={mandar}
-                  className={`boton-neon inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-transparent px-4 text-[13px] font-semibold text-white disabled:opacity-50 ${anilloFoco}`}
+                  aria-label={enviando ? (conArchivo ? "Subiendo el archivo" : "Enviando") : esNota ? "Guardar nota privada" : conArchivo ? "Enviar el archivo" : "Enviar mensaje"}
+                  className={`flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full text-[var(--wa-acento-texto)] disabled:opacity-40 ${esNota ? "bg-[var(--wa-nota-acento)]" : "bg-[var(--wa-acento)]"} ${anilloFoco}`}
                 >
-                  {enviando ? (conArchivo ? "Subiendo…" : "Enviando…") : esNota ? "Guardar nota" : "Enviar"}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 12 20 4l-6 16-3-7-7-1Z" />
+                  </svg>
                 </button>
               </div>
             </div>
           ) : (
-            <p className="m-0 border-t border-border bg-card px-4 py-3 text-[13px] text-muted-foreground">Tienes acceso de solo lectura al CRM.</p>
+            <p className="m-0 bg-[var(--wa-panel)] px-4 py-3 text-[13px] text-[var(--wa-sec)]">Tienes acceso de solo lectura al CRM.</p>
           )}
         </section>
       ) : (
-        <div className="hidden flex-1 items-center justify-center bg-muted p-8 text-[13px] text-muted-foreground lg:flex">Elige una conversación de la lista.</div>
+        <div className="bandeja-wa-chat hidden flex-1 flex-col items-center justify-center gap-2 p-8 text-center lg:flex">
+          <span className="text-[22px] font-light">Bandeja de WhatsApp</span>
+          <span className="max-w-sm text-sm text-[var(--wa-sec)]">Elige una conversación de la lista para responder o dejar una nota privada.</span>
+        </div>
       )}
 
-      {/* El dropshipper */}
-      {sel && (
-        <aside aria-label="El dropshipper" className="hidden w-[280px] flex-none flex-col gap-4 overflow-y-auto border-l border-border p-3.5 xl:flex">
-          <div className="flex flex-col">
-            <h2 className="m-0 truncate text-[15px] font-semibold">{sel.nombre}</h2>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {sel.codigo ? `${sel.codigo} · ` : ""}
+      {/* ===== Ficha del dropshipper (como «Info del contacto») ===== */}
+      {sel && verFicha && (
+        <aside aria-label="Ficha del dropshipper" className="hidden w-[330px] flex-none flex-col overflow-y-auto border-l border-[var(--wa-borde)] bg-[var(--wa-fondo)] xl:flex">
+          <div className="flex items-center gap-3 bg-[var(--wa-panel)] px-3 py-2.5">
+            <button type="button" onClick={() => setVerFicha(false)} aria-label="Cerrar la ficha" className={botonIcono}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+            <h2 className="m-0 text-base font-semibold">Ficha del dropshipper</h2>
+          </div>
+          <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
+            <Foto nombre={sel.nombre} tam="ficha" />
+            <span className="mt-3 text-xl">{sel.nombre}</span>
+            <span className="text-[15px] text-[var(--wa-sec)] tabular-nums">
               {sel.telefono}
+              {sel.codigo ? ` · ${sel.codigo}` : ""}
             </span>
           </div>
-          {chat?.id === sel.id && chat.dropshipper ? (
+          {verDropshipper ? (
             <>
-              <div className="flex flex-col gap-1.5">
-                <h3 className={etiquetaSeccion}>Dónde vende</h3>
+              <Bloque titulo="Dónde vende">
                 <div className="flex flex-wrap gap-1.5">
-                  {[...chat.dropshipper.tiendas, ...chat.dropshipper.cuentas].map((t) => (
-                    <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-[11.5px]">
+                  {[...verDropshipper.tiendas, ...verDropshipper.cuentas].map((t) => (
+                    <span key={t} className="rounded-md bg-[var(--wa-panel)] px-2 py-0.5 text-[13px]">
                       {t}
                     </span>
                   ))}
-                  {!chat.dropshipper.tiendas.length && !chat.dropshipper.cuentas.length && <span className="text-[12.5px] text-muted-foreground">Sin tiendas ni cuentas vinculadas.</span>}
+                  {!verDropshipper.tiendas.length && !verDropshipper.cuentas.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin tiendas ni cuentas vinculadas.</span>}
                 </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <h3 className={etiquetaSeccion}>Estado</h3>
-                <span className="self-start rounded-full bg-success-soft px-2 py-px text-xs font-medium text-success capitalize">{chat.dropshipper.estado}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <h3 className={etiquetaSeccion}>Casos abiertos</h3>
-                {chat.dropshipper.casos.length ? (
-                  chat.dropshipper.casos.map((c) => (
-                    <div key={c.codigo} className="rounded-lg border border-border px-2.5 py-1.5 text-[12.5px]">
-                      <span className="block text-[11.5px] text-muted-foreground tabular-nums">
+              </Bloque>
+              <Bloque titulo="Estado">
+                <span className="self-start rounded-full bg-success-soft px-2 py-px text-xs font-medium text-success capitalize">{verDropshipper.estado}</span>
+              </Bloque>
+              <Bloque titulo="Casos abiertos">
+                {verDropshipper.casos.length ? (
+                  verDropshipper.casos.map((c) => (
+                    <div key={c.codigo} className="rounded-lg border border-[var(--wa-borde)] px-2.5 py-1.5 text-[13px]">
+                      <span className="block text-[11.5px] text-[var(--wa-sec)] tabular-nums">
                         {c.codigo}
                         {c.prioridad === "alta" && <span className="font-semibold text-destructive"> · alta</span>}
                       </span>
@@ -716,31 +812,36 @@ export function Bandeja({
                     </div>
                   ))
                 ) : (
-                  <span className="text-[12.5px] text-muted-foreground">Sin casos abiertos.</span>
+                  <span className="text-[13px] text-[var(--wa-sec)]">Sin casos abiertos.</span>
                 )}
-              </div>
+              </Bloque>
             </>
           ) : !sel.dropshipperId ? (
-            <div className="flex flex-col gap-2 text-[12.5px]">
-              <p className="m-0 text-muted-foreground">Este WhatsApp no está en el CRM. Si es un dropshipper, agrégalo (o pon este número en su ficha) y la conversación queda enlazada con el próximo mensaje.</p>
-              <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.telefono)}`} className={`font-medium text-primario hover:underline ${anilloFoco}`}>
-                Buscarlo en el CRM →
+            <Bloque titulo="No está en el CRM">
+              <p className="m-0 text-[13px] text-[var(--wa-sec)]">Si es un dropshipper, agrégalo (o pon este número en su ficha) y la conversación queda enlazada con el próximo mensaje.</p>
+              <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.telefono)}`} className={`text-[14px] font-medium text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
+                Buscarlo en el CRM
               </Link>
-            </div>
+            </Bloque>
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <h3 className={etiquetaSeccion}>Área del chat</h3>
+          <Bloque titulo="Área del chat">
             <span className="self-start">
               <EtiquetaArea area={sel.area} />
             </span>
-            <div className="flex flex-col gap-1 text-xs text-foreground-soft">
+            <div className="flex flex-col gap-1 text-[12.5px] text-[var(--wa-sec)]">
               {cambiosDeArea.length ? cambiosDeArea.map((m) => <span key={m.id}>{`${m.texto} · ${horaCorta(m.momento)}`}</span>) : <span>Entró a {areaChat(sel.area).etiqueta} con su primer mensaje.</span>}
             </div>
-          </div>
-          {chat?.id === sel.id && chat.dropshipper && (
-            <Link href={`/crm-dropshippers?abrir=${chat.dropshipper.id}`} className={`inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-card px-3 text-[13px] font-medium hover:bg-muted ${anilloFoco}`}>
-              Abrir su ficha en el CRM
-            </Link>
+          </Bloque>
+          {verDropshipper && (
+            <div className="px-5 py-4">
+              <Link href={`/crm-dropshippers?abrir=${verDropshipper.id}`} className={`flex items-center gap-3 py-1 text-[15px] text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <path d="M20 21a8 8 0 0 0-16 0" />
+                  <circle cx="12" cy="8" r="4" />
+                </svg>
+                Abrir su ficha en el CRM
+              </Link>
+            </div>
           )}
         </aside>
       )}
@@ -748,47 +849,62 @@ export function Bandeja({
   );
 }
 
-/** Un mensaje del chat: del dropshipper (izquierda), del equipo (derecha, lavanda), nota privada (ámbar, al centro) o cambio de área. */
-function Burbuja({ m }: { m: MensajeVista }) {
+/** Un bloque de la ficha, separado del siguiente con la franja gris de WhatsApp. */
+function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2 border-b-8 border-[var(--wa-panel)] px-5 py-4">
+      <h3 className="m-0 text-[13px] font-normal text-[var(--wa-sec)]">{titulo}</h3>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Un mensaje del chat, como en WhatsApp: del dropshipper a la izquierda en blanco, del equipo a la derecha en verde con sus palomitas,
+ * nota privada a la derecha en amarillo con candado (el dropshipper no la ve) y los cambios de área como aviso al centro. `seguido`: va
+ * pegado al anterior del mismo lado, sin colita.
+ */
+function Burbuja({ m, seguido }: { m: MensajeVista; seguido: boolean }) {
   if (m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? "")) {
     return (
-      <span className="self-center rounded-lg border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground">
+      <span className="my-1.5 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
         {m.texto} · {horaMensaje(m.momento)}
       </span>
     );
   }
+  const margen = seguido ? "mt-0.5" : "mt-2";
   if (m.direccion === "nota") {
     return (
-      <div className="max-w-[88%] self-center rounded-xl bg-warning-soft px-3 py-2 text-[13.5px] text-warning">
-        <span className="block text-[11px] font-semibold tracking-[0.04em] uppercase">Nota privada</span>
-        <Contenido m={m} />
-        <span className="mt-1 block text-[10.5px]">
-          {m.autor ? `${m.autor} · ` : ""}
-          {horaMensaje(m.momento)} · el dropshipper no la ve
+      <div className={`${margen} max-w-[min(65%,560px)] self-end rounded-lg border border-dashed border-[var(--wa-nota-borde)] bg-[var(--wa-nota)] px-2.5 pt-1.5 pb-2 text-[14px] leading-[19px] text-[var(--wa-nota-texto)]`}>
+        <span className="mb-0.5 flex items-center gap-1 text-[11.5px] font-bold tracking-[0.04em] text-[var(--wa-nota-acento)] uppercase">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+          Nota privada{m.autor ? ` · ${m.autor}` : ""}
         </span>
+        <Contenido m={m} />
+        <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-nota-acento)]">{horaMensaje(m.momento)}</span>
       </div>
     );
   }
   const nuestro = m.direccion === "saliente";
+  const colita = seguido ? "" : nuestro ? "rounded-tr-none" : "rounded-tl-none";
   return (
     <div
-      className={`max-w-[min(78%,520px)] rounded-xl px-3 py-2 text-[13.5px] leading-relaxed ${
-        nuestro ? "self-end rounded-tr-sm bg-primario-suave" : "self-start rounded-tl-sm border border-border bg-card"
+      className={`${margen} max-w-[min(65%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${colita} ${
+        nuestro ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
       }`}
     >
+      {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
       <Contenido m={m} />
-      <span className={`mt-1 flex flex-wrap justify-end gap-x-1.5 text-[10.5px] ${m.estado === "fallido" ? "font-medium text-destructive" : "text-muted-foreground"}`}>
-        {nuestro && m.autor && <span>{m.autor}</span>}
-        {nuestro && m.autor && <span aria-hidden="true">·</span>}
-        <span>{horaMensaje(m.momento)}</span>
-        {nuestro && (
-          <>
-            <span aria-hidden="true">·</span>
-            <span className={m.estado === "leido" ? "text-azul" : ""}>{ESTADO_SALIENTE[m.estado] ?? m.estado}</span>
-          </>
-        )}
+      <span
+        className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
+      >
+        {horaMensaje(m.momento)}
+        {nuestro && <Palomitas estado={m.estado} />}
       </span>
-      {m.estado === "fallido" && m.error && <span className="block text-[11px] text-destructive">{m.error}</span>}
+      {m.estado === "fallido" && m.error && <span className="clear-both block pt-1 text-[11.5px] text-destructive">{m.error}</span>}
     </div>
   );
 }
