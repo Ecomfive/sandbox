@@ -75,4 +75,4 @@ El número aparece en la bandeja como «WhatsApp» (id `360dialog`): ponerle nom
 `update whatsapp_numeros set nombre = 'Ecomfive' where phone_number_id = '360dialog';`
 
 **Áreas con un solo número** (migración 0168): el área es de cada conversación. Todo chat nuevo entra a Atención y se pasa a Comercial
-o Dirección con el selector «Área» del chat; quien no ve esa área deja de verlo. Queda una nota en el chat y la auditoría.
+o Dirección con el botón «Pasar a otra área» del chat; quien no ve esa área deja de verlo. Queda una nota en el chat y la auditoría.

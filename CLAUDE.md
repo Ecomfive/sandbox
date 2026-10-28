@@ -935,7 +935,7 @@ convenciones técnicas del código.
   (`/crm-dropshippers/kpis`, oculta sin `crm-direccion` en el layout): la función `whatsapp_kpis(p_desde, p_areas)` devuelve por número,
   por persona y por día las consultas (primer entrante tras un saliente), sin responder y la mediana hasta la primera respuesta.
   **360dialog y un solo número** (migración 0168, 28 oct 2026): el área es de cada conversación (`whatsapp_conversaciones.area`; un
-  trigger le pone la del número al crearla) y se cambia con `pasarConversacionDeArea` (selector «Área» del chat, nota + auditoría). Todo
+  trigger le pone la del número al crearla) y se cambia con `pasarConversacionDeArea` (botón «Pasar a otra área» del chat, nota + auditoría). Todo
   filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. Con `D360_API_KEY` el envío y los archivos van por
   360dialog (`src/lib/whatsapp/proveedor.ts`; `D360_SANDBOX=1` para el sandbox) y los avisos llegan a
   `/api/whatsapp/360dialog/[clave]` (sin firma: la puerta es `D360_WEBHOOK_CLAVE`, comparada en tiempo constante; `extraerAviso(aviso,
