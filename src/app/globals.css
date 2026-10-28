@@ -250,6 +250,64 @@ html {
   filter: brightness(1.08);
 }
 
+/* Bandeja de WhatsApp del CRM (28 oct 2026, pedido de Hernán: que se vea y se use como WhatsApp; prototipo
+   https://claude.ai/artifact/RGtk9mxmht8nzneUX75ucx). Sus colores propios, claros y oscuros, solo dentro de `.bandeja-wa`. */
+.bandeja-wa {
+  --wa-fondo: #ffffff;
+  --wa-panel: #f0f2f5;
+  --wa-borde: #e9edef;
+  --wa-texto: #111b21;
+  --wa-sec: #54656f;
+  --wa-hover: #f5f6f6;
+  --wa-sel: #f0f2f5;
+  --wa-chat: #efeae2;
+  --wa-punto: rgb(84 101 111 / 0.08);
+  --wa-entrante: #ffffff;
+  --wa-saliente: #d9fdd3;
+  --wa-acento: #008069;
+  --wa-acento-texto: #ffffff;
+  --wa-acento-suave: #d9fdd3;
+  --wa-acento-suave-texto: #005c4b;
+  --wa-nota: #fff4cc;
+  --wa-nota-texto: #3d2e00;
+  --wa-nota-borde: #c99a1c;
+  --wa-nota-acento: #8a6400;
+  --wa-leido: #027eb5;
+  --wa-aviso: #fffbea;
+  --wa-chip: #ffffff;
+  --wa-sombra: rgb(11 20 26 / 0.13);
+}
+:root[data-theme="dark"] .bandeja-wa {
+  --wa-fondo: #111b21;
+  --wa-panel: #202c33;
+  --wa-borde: #2a3942;
+  --wa-texto: #e9edef;
+  --wa-sec: #8d9ca6;
+  --wa-hover: #1b262d;
+  --wa-sel: #2a3942;
+  --wa-chat: #0b141a;
+  --wa-punto: rgb(134 150 160 / 0.07);
+  --wa-entrante: #202c33;
+  --wa-saliente: #005c4b;
+  --wa-acento: #00a884;
+  --wa-acento-texto: #111b21;
+  --wa-acento-suave: #103629;
+  --wa-acento-suave-texto: #7ae3c3;
+  --wa-nota: #3a3016;
+  --wa-nota-texto: #f5e6b8;
+  --wa-nota-borde: #8a6400;
+  --wa-nota-acento: #e0b84a;
+  --wa-leido: #53bdeb;
+  --wa-aviso: #182229;
+  --wa-chip: #182229;
+  --wa-sombra: rgb(0 0 0 / 0.35);
+}
+.bandeja-wa-chat {
+  background-color: var(--wa-chat);
+  background-image: radial-gradient(var(--wa-punto) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
 /* Dashboards: las barras de progreso con el degradado neón (la elegida, además, con su brillo), una línea neón arriba
    de un bloque destacado y las líneas de las gráficas con un halo suave de su color. */
 .barra-neon {

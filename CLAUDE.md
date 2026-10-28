@@ -943,7 +943,7 @@ convenciones técnicas del código.
   `SHOPIFY_CLIENT_SECRET`; el permiso dura 24 h y se guarda en memoria) o un token fijo de una app vieja (`SHOPIFY_ADMIN_TOKEN`);
   permisos `write_products`, `read_products`, `read_publications`, `write_publications`; versión `SHOPIFY_API_VERSION` o 2026-10.
   **Pendiente:** Claude (textos), con `BotonPendiente`. Las reseñas son de clientes reales: la IA no las inventa.
-- **CRM Dropshippers › Bandeja de WhatsApp** (`/crm-dropshippers/bandeja`, módulo `crm-dropshippers`, migración 0158, 26 oct 2026).
+- **CRM Dropshippers › Bandeja de WhatsApp** (`/crm-dropshippers/bandeja`, módulo `crm-dropshippers`, migración 0158, 26 oct 2026). **Se ve y se usa como WhatsApp** (28 oct 2026, pedido de Hernán; prototipo https://claude.ai/artifact/RGtk9mxmht8nzneUX75ucx): `bandeja.tsx` con sus propios colores en `.bandeja-wa` de `globals.css` (variables `--wa-*`, claros y oscuros con `data-theme`; `.bandeja-wa-chat` = el fondo del chat). Burbujas agrupadas con colita, `Palomitas` (enviando, enviado, entregado, leído en azul, fallido), notas privadas en amarillo con candado, Enter envía y Mayús + Enter baja de línea, ficha del dropshipper que se abre tocando su nombre (`verFicha`). No lleva el logo ni el nombre de WhatsApp.
   WhatsApp **directo al sistema con la API oficial de Meta (Cloud API), sin Chatwoot** (decisión de Hernán): Nicole (Atención) contesta
   desde aquí sin el celular. Meta avisa cada mensaje y cada estado al webhook `src/app/api/whatsapp/webhook/route.ts` (firma
   `X-Hub-Signature-256` con `WHATSAPP_APP_SECRET`, la misma `firmaValida` de Instagram; `GET` de verificación con
