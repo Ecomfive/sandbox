@@ -1,8 +1,11 @@
 import { after, NextResponse } from "next/server";
 // La firma de Meta es la misma para Instagram y WhatsApp (X-Hub-Signature-256 con el secreto de la app).
 import { firmaValida, tokenDeVerificacionValido } from "@/lib/instagram/firma";
+import { createServiceClient } from "@/lib/supabase/server";
 import { extraerAviso } from "@/lib/whatsapp/extraer";
+import { extraerEventosCuenta } from "@/lib/whatsapp/eventos";
 import { guardarEntrantes, guardarEstados } from "@/lib/whatsapp/guardar";
+import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -40,13 +43,16 @@ export async function POST(request: Request) {
     return new NextResponse("Bad Request", { status: 400 });
   }
   const { mensajes, estados, ecos } = extraerAviso(aviso);
-  if (mensajes.length || estados.length || ecos.length) {
+  // Plantillas aprobadas o rechazadas, calidad, categoría, límite del número y restricciones de la cuenta.
+  const eventos = extraerEventosCuenta(aviso);
+  if (mensajes.length || estados.length || ecos.length || eventos.length) {
     after(async () => {
+      await aplicarEventosCuenta(createServiceClient(), eventos);
       await guardarEntrantes(mensajes);
       // Lo que se respondió desde la app del celular (coexistencia), para que la bandeja y los KPIs lo cuenten.
       await guardarEntrantes(ecos, true);
       await guardarEstados(estados);
     });
   }
-  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length });
+  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length });
 }

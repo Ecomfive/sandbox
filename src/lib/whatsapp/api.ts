@@ -8,9 +8,22 @@ import { errorEnEspanol, leerErrorEnvio } from "./ventana";
  * leído), o el error en palabras para el equipo.
  */
 export async function enviarTextoWhatsapp(phoneNumberId: string, para: string, cuerpo: string): Promise<{ waId: string } | { error: string }> {
+  return enviarMensajeWhatsapp(phoneNumberId, para, { type: "text", text: { preview_url: false, body: cuerpo } });
+}
+
+/**
+ * Manda una plantilla aprobada (la única forma de escribirle a alguien pasadas 24 h de su último mensaje). `parametros` son los valores de
+ * {{1}}, {{2}}… en orden, ya limpios (sin saltos de línea). `idioma` es el código de la plantilla («es»).
+ */
+export async function enviarPlantillaWhatsapp(phoneNumberId: string, para: string, nombre: string, idioma: string, parametros: string[]): Promise<{ waId: string } | { error: string }> {
+  const componentes = parametros.length ? [{ type: "body", parameters: parametros.map((text) => ({ type: "text", text })) }] : [];
+  return enviarMensajeWhatsapp(phoneNumberId, para, { type: "template", template: { name: nombre, language: { code: idioma }, components: componentes } });
+}
+
+async function enviarMensajeWhatsapp(phoneNumberId: string, para: string, contenido: Record<string, unknown>): Promise<{ waId: string } | { error: string }> {
   // Un teléfono va en `to` (solo dígitos); un id de usuario de WhatsApp sin teléfono (BSUID, el sandbox lo usa a veces) en `recipient`.
   const destino = /^\+?\d+$/.test(para) ? { to: para.replace(/\D/g, "") } : { recipient: para };
-  const mensaje = JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...destino, type: "text", text: { preview_url: false, body: cuerpo } });
+  const mensaje = JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...destino, ...contenido });
   const d360 = config360();
   let url: string;
   let cabeceras: Record<string, string>;

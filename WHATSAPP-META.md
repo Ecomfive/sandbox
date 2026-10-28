@@ -76,3 +76,19 @@ El número aparece en la bandeja como «WhatsApp» (id `360dialog`): ponerle nom
 
 **Áreas con un solo número** (migración 0168): el área es de cada conversación. Todo chat nuevo entra a Atención y se pasa a Comercial
 o Dirección con el botón «Pasar a otra área» del chat; quien no ve esa área deja de verlo. Queda una nota en el chat y la auditoría.
+
+## Plantillas (28 oct 2026)
+
+Se manejan desde el sistema (CRM › Plantillas, ver `CLAUDE.md`). Lo que hace falta del lado de Meta:
+
+- Con 360dialog no hay que configurar nada más: la misma clave (`D360_API_KEY`) crea, cambia y borra plantillas, y reenvía los avisos de Meta al webhook.
+  El sandbox de 360dialog **no** maneja plantillas: hace falta el número real.
+- Directo con Meta: además de `WHATSAPP_TOKEN`, va `WHATSAPP_WABA_ID` (el identificador de la cuenta de WhatsApp Business, en Meta › WhatsApp Manager).
+- **Suscribir en el webhook** (además de `messages` y `smb_message_echoes`): `message_template_status_update` (aprobada, rechazada, pausada),
+  `message_template_quality_update` (calidad), `template_category_update` (Meta cambia la categoría), `phone_number_quality_update` (límite de envío del número) y
+  `account_update` (restricciones o infracciones de la cuenta). Con ellos el sistema deja una alerta y un aviso «Para ti».
+- Reglas de Meta que conviene saber: 100 plantillas por hora como máximo; una aprobada se cambia una vez cada 24 horas; **retomar una conversación es Marketing**
+  (se cobra más por mensaje y Meta cambia sola una «utilidad» que suene a promoción); una plantilla con mala calidad se pausa (3 h la primera vez, 6 h la segunda y
+  la tercera se deshabilita).
+- Crear las cinco plantillas sugeridas, una cada dos minutos, cuando el número ya esté conectado: `npx tsx scripts/crear-plantillas-sugeridas.ts --aplicar`
+  (sin `--aplicar` solo dice qué haría).

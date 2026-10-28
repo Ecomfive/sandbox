@@ -1,7 +1,10 @@
 import { after, NextResponse } from "next/server";
 import { tokenDeVerificacionValido } from "@/lib/instagram/firma";
+import { createServiceClient } from "@/lib/supabase/server";
+import { extraerEventosCuenta } from "@/lib/whatsapp/eventos";
 import { extraerAviso } from "@/lib/whatsapp/extraer";
 import { guardarEntrantes, guardarEstados } from "@/lib/whatsapp/guardar";
+import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 import { NUMERO_360_SIN_ID } from "@/lib/whatsapp/proveedor";
 
 export const dynamic = "force-dynamic";
@@ -29,12 +32,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
     return new NextResponse("Bad Request", { status: 400 });
   }
   const { mensajes, estados, ecos } = extraerAviso(aviso, NUMERO_360_SIN_ID);
-  if (mensajes.length || estados.length || ecos.length) {
+  // Plantillas aprobadas o rechazadas, calidad, categoría, límite del número y restricciones de la cuenta.
+  const eventos = extraerEventosCuenta(aviso, true);
+  if (mensajes.length || estados.length || ecos.length || eventos.length) {
     after(async () => {
+      await aplicarEventosCuenta(createServiceClient(), eventos);
       await guardarEntrantes(mensajes);
       await guardarEntrantes(ecos, true);
       await guardarEstados(estados);
     });
   }
-  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length });
+  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length });
 }
