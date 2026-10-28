@@ -140,7 +140,7 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     bodegas: p.bodegas,
     categorias: p.categorias,
     fotos: p.fotos,
-    creado_dropi: p.creado ? `${p.creado.slice(0, 19)}-05:00` : null,
+    creado_dropi: p.creado ? `${p.creado.slice(0, 19)}${codigo === "CR" || codigo === "MX" ? "-06:00" : "-05:00"}` : null,
     leido_en: leidoEn,
   }));
   await enTrozos(filas, 500, async (t) => void revisar(await supabase.from("dropi_productos_proveedor").upsert(t, { onConflict: "pais_id,dropi_producto_id" }), "Guardar productos"));

@@ -27,9 +27,10 @@ async function dropiDiario(subida, dias = { pedidos: 30, cartera: 7 }) {
     const apiV2 = location.hostname.replace(/^app\./, "api-v2.");
     const cabeceras = { "X-Authorization": "Bearer " + token, Accept: "application/json" };
 
-    // Fechas del país (la cartera llega en UTC y se pasa a la hora del país, como la da el Excel de Dropi): Panamá UTC−5, Costa Rica UTC−6.
-    const zona = pais === "cr" ? "America/Costa_Rica" : "America/Panama";
-    const desfase = pais === "cr" ? 6 : 5;
+    // Fechas del país (la cartera llega en UTC y se pasa a la hora del país, como la da el Excel de Dropi): Panamá UTC−5, Costa Rica y
+    // México (centro) UTC−6.
+    const zona = pais === "cr" ? "America/Costa_Rica" : pais === "mx" ? "America/Mexico_City" : "America/Panama";
+    const desfase = pais === "cr" || pais === "mx" ? 6 : 5;
     const diaPais = (d) => d.toLocaleDateString("en-CA", { timeZone: zona });
     const hoy = diaPais(new Date());
     const haceDias = (n) => diaPais(new Date(Date.now() - n * 86400000));

@@ -17,7 +17,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const BUCKET = "wms-compras";
-const PAIS = process.argv[3] === "cr" ? "cr" : "pa";
+const PAIS = process.argv[3] === "cr" || process.argv[3] === "mx" ? process.argv[3] : "pa";
 const CARPETA = PAIS === "pa" ? "tmp-dropi" : `tmp-dropi-${PAIS}`;
 const sufijo = PAIS === "pa" ? "" : `-${PAIS}`;
 
@@ -52,7 +52,7 @@ async function cargar() {
 }
 
 const orden = process.argv[2];
-(orden === "subida" ? subida() : orden === "cargar" ? cargar() : Promise.reject(new Error("Uso: npx tsx scripts/ventas-dropi.ts subida [cr]|cargar [cr]"))).catch((e) => {
+(orden === "subida" ? subida() : orden === "cargar" ? cargar() : Promise.reject(new Error("Uso: npx tsx scripts/ventas-dropi.ts subida [cr|mx]|cargar [cr|mx]"))).catch((e) => {
   console.error(e.message ?? e);
   process.exit(1);
 });

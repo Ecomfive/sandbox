@@ -1,6 +1,7 @@
 const MONEDA_POR_PAIS: Record<string, { locale: string; currency: string; timeZone: string }> = {
   CR: { locale: "es-CR", currency: "CRC", timeZone: "America/Costa_Rica" },
   PA: { locale: "es-PA", currency: "USD", timeZone: "America/Panama" },
+  MX: { locale: "es-MX", currency: "MXN", timeZone: "America/Mexico_City" },
 };
 
 /** 9520682 -> "₡9.520.682,00" (CR) o "$9,520,682.00" (PA), según el país. */

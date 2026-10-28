@@ -552,6 +552,12 @@ convenciones técnicas del código.
   `cdnDeRuta` (`republicar-dropi.ts`) eligen el CDN por la carpeta del país; `fotosParaCopiar` y su gemela del favorito (`cdnR` en
   `REPUBLICAR_JS`, con prueba) los usan. Cambia `VERSION_FAVORITO`: hay que volver a arrastrar «Aplicar en Dropi». Lo demás que usa
   `CDN_FOTOS_DROPI` (el proxy `api/publicaciones-dropi/foto`, Descubrir proveedores, Scraping) sigue solo con Panamá.
+  **México** (28 oct 2026, Hernán: «lo mismo que Panamá y Costa Rica»): la cuenta de **proveedor** de app.dropi.mx se lee desde el
+  navegador integrado con `scripts/dropi-diario.ts subida mx` / `cargar mx` y `scripts/ventas-dropi.ts subida mx` / `cargar mx` (la de
+  dropshipper de «Descubrir proveedores» sigue en Chrome con la extensión: las dos no caben en el mismo navegador, por eso México no
+  tiene tarjeta en «Actualizar datos»). Hora de México UTC−6 (`dropiDiario`, `OFFSET_HORAS`, `HORAS_DETRAS_UTC`, `creado_dropi`), pesos
+  en `formatearMoneda` (`formato.ts`) y en Gestión de IDs (`monedaPublicaciones`: MXN con su valor en dólares). Las fotos de México
+  están en el CDN de Panamá (`cdnDeRuta` ya lo cubre). La primera lectura trae 60 días y crea sus publicaciones (como Costa Rica).
   **Moneda de cada país** (28 oct 2026, Hernán: «en colones y pequeño el valor en dólares»): los montos de una publicación están en la
   moneda de su país de Dropi (Costa Rica en colones: Dropi da 5.499). `src/lib/publicaciones/moneda.ts` (`monedaPublicaciones`,
   `formatoMonto`, `formatoEnDolares`, `simboloMoneda`, con prueba) y `moneda-contexto.tsx` (`ProveedorMoneda` en `TablaPublicaciones`,

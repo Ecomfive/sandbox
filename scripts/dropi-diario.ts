@@ -13,6 +13,8 @@
 //   npx tsx scripts/dropi-diario.ts sesion-vencida  → deja en el Centro de notificaciones que la sesión de Dropi Panamá expiró
 //   `subida cr` / `cargar cr` (28 oct 2026): lo mismo con Costa Rica (la función del navegador se corre en app.dropi.cr, con su cuenta
 //        de proveedor); sus temporales van en otra carpeta, así nunca se cruzan con los de Panamá. Sin país, Panamá.
+//   `subida mx` / `cargar mx` (28 oct 2026): México con su cuenta de proveedor, abierta en el navegador integrado (la de dropshipper
+//        de «Descubrir proveedores» sigue en Chrome: las dos no caben en el mismo navegador).
 
 process.loadEnvFile(".env.local");
 import { spawnSync } from "node:child_process";
@@ -24,7 +26,7 @@ import { guardarNuestrosProductos, type LecturaNuestros } from "./publicaciones-
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const BUCKET = "wms-compras";
 // El país va en el segundo argumento (`subida cr`): Panamá por omisión.
-const PAIS = process.argv[3] === "cr" ? "cr" : "pa";
+const PAIS = process.argv[3] === "cr" || process.argv[3] === "mx" ? process.argv[3] : "pa";
 const CARPETA = PAIS === "pa" ? "tmp-dropi-diario" : `tmp-dropi-diario-${PAIS}`;
 const TIPOS = ["pedidos", "cartera", "retiros", "stock"] as const;
 const DESTINO = PAIS === "pa" ? ".dropi-downloads/diario" : `.dropi-downloads/diario-${PAIS}`;
@@ -135,7 +137,7 @@ const acciones: Record<string, () => Promise<void>> = {
   cuadre: () => cuadre(arg ?? ""),
   "sesion-vencida": () => marcarSesion(false, "La sesión de Dropi Panamá (ECOMFIVE) expiró: hay que iniciar sesión en el navegador integrado."),
 };
-(acciones[orden ?? ""]?.() ?? Promise.reject(new Error("Uso: npx tsx scripts/dropi-diario.ts subida [cr]|cargar [cr]|cuadre <AAAA-MM-DD>|sesion-vencida"))).catch((e) => {
+(acciones[orden ?? ""]?.() ?? Promise.reject(new Error("Uso: npx tsx scripts/dropi-diario.ts subida [cr|mx]|cargar [cr|mx]|cuadre <AAAA-MM-DD>|sesion-vencida"))).catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });

@@ -2,7 +2,7 @@
 // (src/lib/dropi-actualizar/ingerir-retiros.ts, lo mismo que usa «Actualizar Dropi»): vincula cada retiro de Dropi al del equipo
 // por su correlativo, deja aparte los que no se pueden vincular y actualiza el saldo de la billetera.
 //
-// Uso: npx tsx scripts/dropi-ingerir-retiros.ts <cr|pa> <archivo.json>
+// Uso: npx tsx scripts/dropi-ingerir-retiros.ts <cr|pa|mx> <archivo.json>
 
 process.loadEnvFile(".env.local");
 import { createClient } from "@supabase/supabase-js";
@@ -11,8 +11,8 @@ import { ingerirRetiros, type FilaRetiro } from "../src/lib/dropi-actualizar/ing
 
 const pais = process.argv[2];
 const archivo = process.argv[3];
-if (!["cr", "pa"].includes(pais ?? "") || !archivo) {
-  console.error("Uso: npx tsx scripts/dropi-ingerir-retiros.ts <cr|pa> <archivo.json>");
+if (!["cr", "pa", "mx"].includes(pais ?? "") || !archivo) {
+  console.error("Uso: npx tsx scripts/dropi-ingerir-retiros.ts <cr|pa|mx> <archivo.json>");
   process.exit(1);
 }
 

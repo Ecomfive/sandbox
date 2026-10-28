@@ -23,7 +23,7 @@ export interface ResumenDropi {
 
 const NEGATIVAS = new Set(["cancelada", "rechazada", "devolucion"]);
 /** Las horas que el país está detrás de UTC (Panamá 5, Costa Rica 6): el día de cada movimiento es el del país. */
-export const HORAS_DETRAS_UTC: Record<string, number> = { PA: 5, CR: 6 };
+export const HORAS_DETRAS_UTC: Record<string, number> = { PA: 5, CR: 6, MX: 6 };
 
 /** Arma las filas de la carga (sin base). `horasDetras`: las del país (Panamá por omisión). */
 export function armarVentas(M: MovimientosDropi, R: ResumenDropi, paisId: string, horasDetras = 5) {

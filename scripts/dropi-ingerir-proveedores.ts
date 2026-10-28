@@ -3,7 +3,7 @@
 // Supabase: crea/actualiza el proveedor y registra su cantidad de
 // productos para hoy.
 //
-// Uso: npx tsx scripts/dropi-ingerir-proveedores.ts <cr|pa> <archivo.json>
+// Uso: npx tsx scripts/dropi-ingerir-proveedores.ts <cr|pa|mx> <archivo.json>
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
@@ -11,8 +11,8 @@ import { readFileSync } from "node:fs";
 const pais = process.argv[2];
 const archivo = process.argv[3];
 
-if (!["cr", "pa"].includes(pais ?? "") || !archivo) {
-  console.error("Uso: npx tsx scripts/dropi-ingerir-proveedores.ts <cr|pa> <archivo.json>");
+if (!["cr", "pa", "mx"].includes(pais ?? "") || !archivo) {
+  console.error("Uso: npx tsx scripts/dropi-ingerir-proveedores.ts <cr|pa|mx> <archivo.json>");
   process.exit(1);
 }
 

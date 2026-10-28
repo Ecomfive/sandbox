@@ -1,7 +1,7 @@
 // Lee un archivo de pedidos de Dropi ya extraído (ver dropi-extraer-ordenes.ts o dropi-diario.ts) y lo guarda con
 // `ingerirPedidos` (src/lib/dropi-actualizar/ingerir-pedidos.ts, lo mismo que usa «Actualizar Dropi»).
 //
-// Uso: npx tsx scripts/dropi-ingerir-ordenes.ts <cr|pa> <archivo.json>
+// Uso: npx tsx scripts/dropi-ingerir-ordenes.ts <cr|pa|mx> <archivo.json>
 
 process.loadEnvFile(".env.local");
 import { createClient } from "@supabase/supabase-js";
@@ -10,8 +10,8 @@ import { ingerirPedidos, type PedidoDropi } from "../src/lib/dropi-actualizar/in
 
 const pais = process.argv[2];
 const archivo = process.argv[3];
-if (!["cr", "pa"].includes(pais ?? "") || !archivo) {
-  console.error("Uso: npx tsx scripts/dropi-ingerir-ordenes.ts <cr|pa> <archivo.json>");
+if (!["cr", "pa", "mx"].includes(pais ?? "") || !archivo) {
+  console.error("Uso: npx tsx scripts/dropi-ingerir-ordenes.ts <cr|pa|mx> <archivo.json>");
   process.exit(1);
 }
 
