@@ -60,6 +60,7 @@ export function Motivos({ inicial, puedeAnalizar }: { inicial: MotivosRecurrente
   }
 
   const maximo = Math.max(1, ...datos.motivos.map((m) => m.dias));
+  const maximoProducto = Math.max(1, ...datos.productos.map((p) => p.clientes));
   const analizando = avance !== null && avance.startsWith("Analizando");
 
   return (
@@ -107,7 +108,7 @@ export function Motivos({ inicial, puedeAnalizar }: { inicial: MotivosRecurrente
       )}
       {datos.falta && (
         <p role="alert" className="m-0 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-sm text-warning">
-          Falta correr la migración 0182 (actividad del cliente) en la base.
+          Falta correr la migración 0183 (productos y versión de la actividad del cliente) en la base.
         </p>
       )}
       {!datos.iaConectada && !datos.falta && (
@@ -122,6 +123,7 @@ export function Motivos({ inicial, puedeAnalizar }: { inicial: MotivosRecurrente
         </p>
       )}
 
+      {datos.motivos.length > 0 && <h2 className="m-0 text-base font-semibold">Por qué escriben</h2>}
       {datos.motivos.length > 0 && (
         <ul className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card p-0">
           {datos.motivos.map((m) => {
@@ -158,6 +160,27 @@ export function Motivos({ inicial, puedeAnalizar }: { inicial: MotivosRecurrente
             );
           })}
         </ul>
+      )}
+
+      {datos.productos.length > 0 && (
+        <>
+          <h2 className="m-0 mt-2 text-base font-semibold">Productos que más interesan</h2>
+          <ul className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card p-0">
+            {datos.productos.map((p) => (
+              <li key={p.nombre} className="flex flex-col gap-2 px-4 py-3">
+                <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <span className="text-sm font-medium">{p.nombre}</span>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {plural(p.clientes, "cliente", "clientes")} · {plural(p.dias, "día", "días")}
+                  </span>
+                </span>
+                <span aria-hidden="true" className="block h-2 overflow-hidden rounded-full bg-muted">
+                  <span className="block h-full rounded-full bg-primario" style={{ width: `${Math.max(4, Math.round((p.clientes / maximoProducto) * 100))}%` }} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

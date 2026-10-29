@@ -5,17 +5,40 @@ import {
   conversacionParaIA,
   diaDePanama,
   diasPorAnalizar,
+  etiquetaDeMotivo,
   frecuenciaDeMotivos,
+  interesPorProducto,
+  MAX_DIAS_POR_PEDIDO,
   MAX_LETRAS_MENSAJE,
+  MAX_PRODUCTOS_POR_DIA,
   MAX_RESUMEN,
+  MOTIVOS,
   normalizarAnalisis,
   pedidoActividad,
+  productosDelAnalisis,
   situacionDelCliente,
   textoParaIA,
+  tramosDeDias,
+  VERSION_ANALISIS,
+  type DiaGuardado,
   type MensajeActividad,
 } from "./actividad";
 
 const m = (id: string, direccion: string, momento: string, texto: string | null = "hola", tipo = "texto"): MensajeActividad => ({ id, direccion, tipo, texto, momento });
+const guardado = (firma: string, version = VERSION_ANALISIS): DiaGuardado => ({ firma, version });
+
+describe("motivos", () => {
+  it("los ids no se repiten y cada uno tiene su etiqueta", () => {
+    assert.equal(new Set(MOTIVOS.map((x) => x.id)).size, MOTIVOS.length);
+    assert.ok(MOTIVOS.every((x) => x.etiqueta.length > 5));
+  });
+
+  it("los motivos de la primera versión se siguen leyendo con su etiqueta", () => {
+    assert.equal(etiquetaDeMotivo("producto_stock"), "Producto o stock");
+    assert.equal(etiquetaDeMotivo("llegada_mercancia"), "Preguntó cuándo llega mercancía");
+    assert.equal(etiquetaDeMotivo("desconocido"), "desconocido");
+  });
+});
 
 describe("día de Panamá", () => {
   it("resta las 5 horas de Panamá: la medianoche de Panamá es a las 05:00 UTC", () => {
@@ -43,12 +66,31 @@ describe("agrupar por día", () => {
   });
 
   it("la firma cambia cuando llega otro mensaje, y solo entonces hay que volver a analizar", () => {
-    const igual = agruparPorDia(mensajes);
-    const guardados = new Map(dias.map((d) => [d.dia, d.firma]));
-    assert.equal(diasPorAnalizar(igual, guardados).length, 0);
+    const guardados = new Map(dias.map((d) => [d.dia, guardado(d.firma)]));
+    assert.equal(diasPorAnalizar(agruparPorDia(mensajes), guardados).length, 0);
     const conNuevo = agruparPorDia([...mensajes, m("5", "entrante", "2026-10-28T16:00:00Z", "¿Y entonces?")]);
     assert.deepEqual(diasPorAnalizar(conNuevo, guardados).map((d) => d.dia), ["2026-10-28"]);
     assert.deepEqual(diasPorAnalizar(dias, new Map()).map((d) => d.dia), ["2026-10-27", "2026-10-28"]);
+  });
+
+  it("un día analizado con una versión anterior se vuelve a analizar aunque no haya mensajes nuevos", () => {
+    const guardados = new Map(dias.map((d) => [d.dia, guardado(d.firma, VERSION_ANALISIS - 1)]));
+    assert.equal(diasPorAnalizar(dias, guardados).length, 2);
+  });
+});
+
+describe("tramos de días", () => {
+  it("parte la lista en tramos, el de los días más nuevos primero y cada tramo en orden cronológico", () => {
+    const dias = Array.from({ length: MAX_DIAS_POR_PEDIDO * 2 + 3 }, (_, i) => i);
+    const tramos = tramosDeDias(dias);
+    assert.equal(tramos.length, 3);
+    assert.deepEqual(tramos[0], dias.slice(-MAX_DIAS_POR_PEDIDO));
+    assert.deepEqual(tramos[2], [0, 1, 2]);
+    assert.equal(tramos.flat().length, dias.length);
+  });
+
+  it("una lista vacía no da tramos", () => {
+    assert.deepEqual(tramosDeDias([]), []);
   });
 });
 
@@ -74,38 +116,56 @@ describe("lo que se le manda a la IA", () => {
     assert.equal(texto, "## 2026-10-27\nCliente: ¿Dónde está mi guía?\nEquipo: Ya la reviso");
   });
 
-  it("el pedido lista los motivos permitidos y pide solo JSON", () => {
+  it("el pedido lista los motivos permitidos, pide los productos y pide solo JSON", () => {
     const p = pedidoActividad(agruparPorDia([m("1", "entrante", "2026-10-27T20:00:00Z")]));
-    assert.ok(p.instrucciones.includes("estado_guia") && p.instrucciones.includes("Responde SOLO con JSON"));
+    assert.ok(p.instrucciones.includes("llegada_mercancia") && p.instrucciones.includes("Responde SOLO con JSON"));
+    assert.ok(p.instrucciones.includes('"productos"') && p.instrucciones.includes("Cutting Mix"));
   });
 });
 
 describe("lo que devuelve la IA", () => {
   const dias = ["2026-10-27", "2026-10-28"];
 
-  it("lee el JSON aunque venga rodeado de texto", () => {
-    const r = normalizarAnalisis('Claro:\n{"dias":[{"dia":"2026-10-27","motivos":["estado_guia"],"resumen":"Preguntó por su guía","estado":"resuelta"}]}\nListo', dias);
-    assert.deepEqual(r, [{ dia: "2026-10-27", motivos: ["estado_guia"], resumen: "Preguntó por su guía", estado: "resuelta" }]);
+  it("lee el JSON aunque venga rodeado de texto, con sus productos", () => {
+    const r = normalizarAnalisis('Claro:\n{"dias":[{"dia":"2026-10-27","motivos":["estado_guia"],"productos":["Cutting Mix"],"resumen":"Preguntó por su guía","estado":"resuelta"}]}\nListo', dias);
+    assert.deepEqual(r, [{ dia: "2026-10-27", motivos: ["estado_guia"], productos: ["Cutting Mix"], resumen: "Preguntó por su guía", estado: "resuelta" }]);
   });
 
   it("descarta motivos que no están en la lista, los repetidos y los días que no se pidieron", () => {
     const r = normalizarAnalisis(
       JSON.stringify({
         dias: [
-          { dia: "2026-10-27", motivos: ["inventado", "queja", "queja", "retiro_pago", "devolucion", "otro"], resumen: "x", estado: "pendiente" },
-          { dia: "2026-01-01", motivos: ["queja"], resumen: "fuera", estado: "resuelta" },
-          { dia: "2026-10-27", motivos: ["queja"], resumen: "repetido", estado: "resuelta" },
+          { dia: "2026-10-27", motivos: ["inventado", "queja_servicio", "queja_servicio", "retiro_estado", "devolucion_solicitud", "otro"], resumen: "x", estado: "pendiente" },
+          { dia: "2026-01-01", motivos: ["queja_servicio"], resumen: "fuera", estado: "resuelta" },
+          { dia: "2026-10-27", motivos: ["queja_servicio"], resumen: "repetido", estado: "resuelta" },
         ],
       }),
       dias,
     );
     assert.equal(r.length, 1);
-    assert.deepEqual(r[0].motivos, ["queja", "retiro_pago", "devolucion"]);
+    assert.deepEqual(r[0].motivos, ["queja_servicio", "retiro_estado", "devolucion_solicitud"]);
+  });
+
+  it("un motivo de la primera versión ya no es válido (se vuelve «otro»)", () => {
+    const r = normalizarAnalisis(JSON.stringify({ dias: [{ dia: "2026-10-27", motivos: ["producto_stock"], resumen: "x", estado: "resuelta" }] }), dias);
+    assert.deepEqual(r[0].motivos, ["otro"]);
+  });
+
+  it("limpia los productos: comillas, espacios, repetidos, vacíos y tope", () => {
+    const productos = [" «Cutting   Mix» ", "cutting mix", "", "a", 5, "Aceite de semilla de calabaza.", ...Array.from({ length: 10 }, (_, i) => `Producto ${i}`)];
+    const r = normalizarAnalisis(JSON.stringify({ dias: [{ dia: "2026-10-27", motivos: ["llegada_mercancia"], productos, resumen: "x", estado: "resuelta" }] }), dias);
+    assert.equal(r[0].productos.length, MAX_PRODUCTOS_POR_DIA);
+    assert.deepEqual(r[0].productos.slice(0, 3), ["Cutting Mix", "cutting mix", "Aceite de semilla de calabaza"]);
+  });
+
+  it("sin productos queda una lista vacía", () => {
+    const r = normalizarAnalisis(JSON.stringify({ dias: [{ dia: "2026-10-27", motivos: ["saludo"], resumen: "Saludó", estado: "sin_consulta" }] }), dias);
+    assert.deepEqual(r[0].productos, []);
   });
 
   it("un estado inválido es «sin consulta», sin motivos queda «otro» y el resumen se recorta; sin resumen se descarta", () => {
     const r = normalizarAnalisis(
-      JSON.stringify({ dias: [{ dia: "2026-10-27", motivos: [], resumen: "r".repeat(MAX_RESUMEN + 50), estado: "rara" }, { dia: "2026-10-28", motivos: ["queja"], resumen: "  ", estado: "resuelta" }] }),
+      JSON.stringify({ dias: [{ dia: "2026-10-27", motivos: [], resumen: "r".repeat(MAX_RESUMEN + 50), estado: "rara" }, { dia: "2026-10-28", motivos: ["queja_servicio"], resumen: "  ", estado: "resuelta" }] }),
       dias,
     );
     assert.equal(r.length, 1);
@@ -121,15 +181,57 @@ describe("lo que devuelve la IA", () => {
   });
 });
 
+describe("productos del análisis", () => {
+  const catalogo = [
+    { id: "1", nombre: "Cutting Mix", codigo: "CUTTING/MIX" },
+    { id: "2", nombre: "Aceite de Semilla de Calabaza (180 Softgels)", codigo: "ACEITE/SEMILLA/CALABAZA" },
+  ];
+
+  it("usa el nombre del catálogo cuando lo reconoce y deja el resto como lo escribió la IA", () => {
+    assert.deepEqual(productosDelAnalisis(["cutting mix", "semilla de calabaza", "Crema Nida"], catalogo), ["Cutting Mix", "Aceite de Semilla de Calabaza (180 Softgels)", "Crema Nida"]);
+  });
+
+  it("no repite un producto que se nombró de dos maneras", () => {
+    assert.deepEqual(productosDelAnalisis(["Cutting Mix", "cutting mix"], catalogo), ["Cutting Mix"]);
+  });
+});
+
 describe("motivos más frecuentes", () => {
   it("cuenta los días por motivo, ordena de más a menos y no cuenta los días sin consulta", () => {
     const f = frecuenciaDeMotivos([
-      { dia: "1", motivos: ["estado_guia", "queja"], estado: "resuelta" },
+      { dia: "1", motivos: ["estado_guia", "queja_servicio"], estado: "resuelta" },
       { dia: "2", motivos: ["estado_guia"], estado: "pendiente" },
       { dia: "3", motivos: ["saludo"], estado: "sin_consulta" },
-      { dia: "4", motivos: ["retiro_pago"], estado: "resuelta" },
+      { dia: "4", motivos: ["retiro_estado"], estado: "resuelta" },
     ]);
-    assert.deepEqual(f.map((x) => [x.id, x.dias]), [["estado_guia", 2], ["retiro_pago", 1], ["queja", 1]]);
+    assert.deepEqual(f.map((x) => [x.id, x.dias]), [["estado_guia", 2], ["retiro_estado", 1], ["queja_servicio", 1]]);
+  });
+
+  it("los motivos de la primera versión siguen contando con su etiqueta hasta que se vuelva a analizar", () => {
+    const f = frecuenciaDeMotivos([
+      { dia: "1", motivos: ["producto_stock"], estado: "resuelta" },
+      { dia: "2", motivos: ["producto_stock"], estado: "resuelta" },
+    ]);
+    assert.deepEqual(f, [{ id: "producto_stock", etiqueta: "Producto o stock", dias: 2 }]);
+  });
+});
+
+describe("interés por producto", () => {
+  it("cuenta clientes y días por producto, sin distinguir mayúsculas, del más al menos pedido", () => {
+    const r = interesPorProducto([
+      { cliente: "a", productos: ["Cutting Mix", "Aceite de semilla"] },
+      { cliente: "a", productos: ["cutting mix"] },
+      { cliente: "b", productos: ["Cutting Mix"] },
+      { cliente: "c", productos: ["Aceite de semilla"] },
+    ]);
+    assert.deepEqual(r, [
+      { nombre: "Cutting Mix", dias: 3, clientes: 2 },
+      { nombre: "Aceite de semilla", dias: 2, clientes: 2 },
+    ]);
+  });
+
+  it("un producto repetido el mismo día cuenta una vez", () => {
+    assert.deepEqual(interesPorProducto([{ cliente: "a", productos: ["X1", "x1"] }]), [{ nombre: "X1", dias: 1, clientes: 1 }]);
   });
 });
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { personasDe, type ClaseEvento, type EventoEquipo } from "@/lib/whatsapp/actividad-equipo";
 import { actividadDelEquipo } from "./equipo-actions";
+import { usePlegado } from "./usar-plegado";
 
 const PUNTO: Record<ClaseEvento, string> = { mensaje: "bg-[var(--wa-acento)]", nota: "bg-warning", archivo: "bg-azul", cambio: "bg-[var(--wa-sec)]" };
 const NOMBRE_CLASE: Record<ClaseEvento, string> = { mensaje: "Respuesta", nota: "Nota privada", archivo: "Archivo", cambio: "Cambio" };
@@ -21,6 +22,7 @@ export function ActividadDelEquipoFicha({ conversacionId, version }: { conversac
   const [cargando, setCargando] = useState(false);
   const [quien, setQuien] = useState("");
   // La bandeja lo monta de nuevo con cada chat (`key`), así que lo que llega siempre es de este chat.
+  const [plegado, alternarPlegado] = usePlegado(`equipo:${conversacionId}`);
   const vigente = useRef(true);
 
   useEffect(() => {
@@ -59,10 +61,27 @@ export function ActividadDelEquipoFicha({ conversacionId, version }: { conversac
 
   return (
     <div className="flex flex-col gap-2.5 border-b-8 border-[var(--wa-panel)] px-5 py-4">
-      <h3 className="m-0 text-[13px] font-normal text-[var(--wa-sec)]">Actividad del equipo</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="m-0 text-[13px] font-normal text-[var(--wa-sec)]">Actividad del equipo</h3>
+        {eventos && eventos.length > 0 && (
+          <button
+            type="button"
+            onClick={alternarPlegado}
+            aria-expanded={!plegado}
+            aria-label={plegado ? "Desplegar la actividad del equipo" : "Plegar la actividad del equipo"}
+            title={plegado ? "Desplegar" : "Plegar"}
+            className={`flex h-7 w-7 flex-none items-center justify-center rounded-full text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={plegado ? "" : "rotate-180"}>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        )}
+      </div>
       {!eventos && !error && <span className="text-[13px] text-[var(--wa-sec)]">Cargando…</span>}
       {eventos && eventos.length === 0 && <span className="text-[13px] text-[var(--wa-sec)]">Nadie del equipo ha hecho nada en este chat todavía.</span>}
-      {eventos && eventos.length > 0 && (
+      {eventos && eventos.length > 0 && plegado && <span className="text-[12.5px] text-[var(--wa-sec)]">Desplegar para ver lo que hizo cada persona</span>}
+      {eventos && eventos.length > 0 && !plegado && (
         <>
           {personas.length > 1 && (
             <label className="flex flex-col gap-1">
