@@ -5,6 +5,7 @@ import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { esGrupo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
+import { dondeVende, paisesDondeVende, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
@@ -43,6 +44,10 @@ export interface ConversacionVista {
   borradaEnApp: { por: string | null; en: string } | null;
   /** Hay una petición de borrar este chat esperando autorización (migración 0172). */
   borradoPendiente: boolean;
+  /** Dónde vende (códigos ISO): los países de su dropshipper en el CRM y de sus cuentas. No sale del prefijo del número (alguien de Colombia vende en Costa Rica). */
+  paises: string[];
+  /** Dónde vende: plataforma y país, de sus cuentas vinculadas y lo puesto a mano en el chat (migración 0193). */
+  vendeEn: VendeEn[];
   /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
   etiquetas: string[];
   /** Desde cuándo espera respuesta: su primer mensaje sin contestar (migración 0189). Sin la migración, null y se usa `ultimoEntranteEn`. */
@@ -141,7 +146,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas), perfiles:asignada_a(nombre)",
+      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas, dropshipper_paises(paises(codigo)), dropshipper_cuentas(plataformas(nombre), paises(codigo))), perfiles:asignada_a(nombre)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
@@ -149,7 +154,11 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(300);
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
-    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null; nivel: string | null; etiquetas: string[] | null }>);
+    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null; nivel: string | null; etiquetas: string[] | null;
+      dropshipper_paises?: { paises: Uno<{ codigo: string }> }[];
+      dropshipper_cuentas?: { plataformas: Uno<{ nombre: string }>; paises: Uno<{ codigo: string }> }[];
+    }>);
+    const cuentas = (d?.dropshipper_cuentas ?? []).map((x) => ({ plataforma: uno(x.plataformas)?.nombre ?? null, pais: uno(x.paises)?.codigo ?? null }));
     return {
       id: c.id as string,
       numeroId: c.numero_id as string,
@@ -175,6 +184,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       etiquetas: d ? (d.etiquetas ?? []) : [],
       esperandoDesde: null,
       motivo: null,
+      vendeEn: dondeVende(cuentas, []),
+      paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas.filter((x): x is { plataforma: string | null; pais: string } => !!x.pais)),
     };
   });
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
@@ -192,6 +203,26 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       if (a) {
         c.nombrePersonalizado = a;
         c.nombre = a;
+      }
+    }
+  }
+  // Dónde vende cada dropshipper, puesto a mano o quitado (migraciones 0193 y 0194). Sin ellas, solo lo de sus cuentas.
+  const conDs = [...new Set(conversaciones.map((c) => c.dropshipperId).filter((x): x is string => !!x))];
+  if (conDs.length) {
+    const manual = await supabase.from("dropshipper_vende_en").select("dropshipper_id, oculto, crm_plataformas_venta(nombre), paises(codigo)").in("dropshipper_id", conDs);
+    if (!manual.error) {
+      const porDs = new Map<string, { plataforma: string; pais: string; oculto: boolean }[]>();
+      for (const m of manual.data ?? []) {
+        const plataforma = uno(m.crm_plataformas_venta as Uno<{ nombre: string }>)?.nombre;
+        const pais = uno(m.paises as Uno<{ codigo: string }>)?.codigo;
+        if (!plataforma || !pais) continue;
+        porDs.set(m.dropshipper_id as string, [...(porDs.get(m.dropshipper_id as string) ?? []), { plataforma, pais, oculto: !!m.oculto }]);
+      }
+      for (const c of conversaciones) {
+        const extra = c.dropshipperId ? porDs.get(c.dropshipperId) : undefined;
+        if (!extra) continue;
+        c.vendeEn = dondeVende(c.vendeEn, extra);
+        c.paises = [...new Set([...c.paises, ...c.vendeEn.map((e) => e.pais)])];
       }
     }
   }

@@ -7,6 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
+import { bandera, nombrePais } from "@/lib/whatsapp/origen-chat";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
@@ -15,6 +16,7 @@ import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectar
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
+import { VendeEnChat } from "./vende-en";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
@@ -1028,7 +1030,7 @@ export function Bandeja({
             </span>
           )}
         </span>
-        {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || otroNumero || c.etiquetas.length > 0 || grupo || espera) && (
+        {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || otroNumero || c.etiquetas.length > 0 || grupo || espera || c.paises.length > 0) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
             {grupo && c.motivo && (
               <span
@@ -1042,6 +1044,12 @@ export function Bandeja({
               <span className={`font-semibold tabular-nums ${espera.clase} ${ancha ? "lg:hidden" : ""}`}>
                 {espera.texto}
                 {espera.plazo && <span className="font-normal"> · {espera.plazo}</span>}
+              </span>
+            )}
+            {c.paises.length > 0 && (
+              <span title={`Vende en ${c.paises.map(nombrePais).join(", ")}`} className="rounded-full border border-[var(--wa-borde)] px-1.5 py-px font-semibold text-[var(--wa-texto)]">
+                <span className="sr-only">Vende en {c.paises.map(nombrePais).join(", ")}</span>
+                <span aria-hidden="true">{c.paises.map(bandera).join(" ")}</span>
               </span>
             )}
             {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
@@ -1455,7 +1463,11 @@ export function Bandeja({
                     {[
                       sel.codigo,
                       sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
-                      numeroDe.get(sel.numeroId)?.nombre,
+                      // El área ya va en su etiqueta de color al lado: no se repite en el nombre del número («Ecomfive · Atención» → «Ecomfive»).
+                      (numeroDe.get(sel.numeroId)?.nombre ?? "")
+                        .split(/\s*·\s*/)
+                        .filter((parte) => parte && parte.toLowerCase() !== areaChat(sel.area).etiqueta.toLowerCase())
+                        .join(" · ") || null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
@@ -1466,6 +1478,29 @@ export function Bandeja({
               </span>
               {sel.vip && <EtiquetaVip />}
               <EtiquetaArea area={sel.area} />
+              {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
+              <VendeEnChat
+                key={`vende-${sel.id}`}
+                conversacionId={sel.id}
+                vendeEn={sel.vendeEn}
+                puede={escribe && !!sel.dropshipperId}
+                alCambiar={(nuevo) =>
+                  setDatos((d) => ({
+                    ...d,
+                    conversaciones: d.conversaciones.map((x) =>
+                      x.dropshipperId && x.dropshipperId === sel.dropshipperId ? { ...x, vendeEn: nuevo, paises: [...new Set([...x.paises, ...nuevo.map((v) => v.pais)])] } : x,
+                    ),
+                  }))
+                }
+                alCambioLista={() => void refrescar(sel.id)}
+              />
+              {sel.paises
+                .filter((p) => !sel.vendeEn.some((v) => v.pais === p))
+                .map((p) => (
+                  <span key={p} className="inline-flex items-center gap-1 rounded-full border border-border-control px-2 py-px text-[11px] font-semibold">
+                    <span aria-hidden="true">{bandera(p)}</span> {nombrePais(p)}
+                  </span>
+                ))}
               {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}
               {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
               {sel.borradoPendiente && (
