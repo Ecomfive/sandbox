@@ -1034,7 +1034,7 @@ convenciones técnicas del código.
   Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
   de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
   del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
-  **Tareas y VIP** (29 oct 2026, migración 0186): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
+  **Tareas y VIP** (29 oct 2026, migración 0187): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
   (puede no tener dropshipper), `sku_id`/`pais_id`/`compras_esperadas`/`llegada_estimada` y el estado nuevo `esperando`. «Tarea»
   (`BotonNuevaTarea`, `bandeja/tareas-chat.tsx`) y «Avisarme cuando llegue» (`ProductosDelChatFicha` → `avisarCuandoLlegue`: guarda las
   compras en camino de ese producto al país del chat, `cargarEnCaminoDatos`) están en `tareas/actions.ts`; quedan a cargo de quien lleva
@@ -1073,6 +1073,7 @@ convenciones técnicas del código.
   del sistema —`ES_MARCA_BORRADO`, se dibuja como aviso— y la auditoría `marcar_chat_borrado_app`) y la insignia «Borrado en la app» en el chat y en la lista. **Meta no documenta ningún aviso
   cuando se borra un chat entero en la app**, así que la marca la pone una persona. Sí hay aviso cuando el dropshipper borra un mensaje «para todos» (`type: revoke` en `messages`):
   `extraerAviso` lo devuelve en `revocados` (no crea un mensaje) y `guardarRevocados` marca el original (`whatsapp_mensajes.eliminado_en_whatsapp_en`), que se muestra con su texto y la
+  **Reacciones sobre el mensaje** (29 oct 2026, pedido de Hernán, migración 0186): Meta manda en cada reacción `reaction.message_id`; `contenidoDe` lo deja en `MensajeEntrante.reaccionA` y `guardarEntrantes` lo guarda en `whatsapp_mensajes.reaccion_a` (la reacción sigue siendo una fila tipo «reaccion», texto = emoji; sin emoji = la quitó). La bandeja no la dibuja como mensaje: `agruparReacciones` (`src/lib/whatsapp/reacciones.ts`, con prueba) la pone sobre el mensaje cuyo `wa_id` es `reaccion_a` (una por lado, la última manda) y `Burbuja` la pinta como pastilla sobre el borde de abajo; las de antes de la 0186 van sobre el último mensaje del otro lado. `cargarConversacion` lee `reaccion_a` aparte (sin la columna, carga igual).
   marca «Lo eliminó en WhatsApp quien lo mandó». Las marcas se leen con consultas aparte que ignoran el error, así que sin la migración la bandeja sigue cargando (sin marcas). Reversa:
   `supabase/rollbacks/0171_rollback.sql`.
   **Borrar pide autorización** (28 oct 2026, pedido de Jhokser; migración 0172): quien escribe en el CRM no borra un chat ni un mensaje por su cuenta: lo **pide** (`pedirBorrado`,

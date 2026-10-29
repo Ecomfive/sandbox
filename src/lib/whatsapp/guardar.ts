@@ -34,6 +34,8 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
       p_resumen: resumenMensaje(m.tipo, m.texto),
     });
     if (error) console.error(`WhatsApp: no se pudo guardar un mensaje${desdeCelular ? " mandado desde el celular" : ""}`, m.waId, error.message);
+    // Una reacción: a qué mensaje va (migración 0186), para dibujarla sobre ese mensaje. Sin la columna no pasa nada.
+    else if (m.reaccionA) await supabase.from("whatsapp_mensajes").update({ reaccion_a: m.reaccionA }).eq("wa_id", m.waId);
   }
   if (!desdeCelular) await volverAMostrarSiOcultos(supabase, telefonos);
   await avisarBandeja();

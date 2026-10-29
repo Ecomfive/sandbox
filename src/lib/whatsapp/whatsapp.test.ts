@@ -29,6 +29,7 @@ test("un texto que llega: número de la empresa, quién escribe con su nombre de
       mediaId: null,
       mediaMime: null,
       mediaNombre: null,
+      reaccionA: null,
       momento: new Date(1793040000 * 1000).toISOString(),
     },
   ]);
@@ -270,5 +271,9 @@ test("un mensaje sin texto que el sistema no sabe leer dice qué llegó, no un �
   // Lo que ya se mostraba bien no cambia.
   assert.equal(caso({ type: "text", text: { body: "hola" } }).texto, "hola");
   assert.equal(caso({ type: "reaction", reaction: { emoji: "👍" } }).texto, "👍");
+  // A qué mensaje va la reacción (migración 0186); sin emoji, la quitó.
+  assert.equal(caso({ type: "reaction", reaction: { message_id: "wamid.ORIGEN", emoji: "❤️" } }).reaccionA, "wamid.ORIGEN");
+  assert.equal(caso({ type: "reaction", reaction: { message_id: "wamid.ORIGEN", emoji: "" } }).texto, null);
+  assert.equal(caso({ type: "text", text: { body: "hola" } }).reaccionA, null);
   assert.equal(caso({ type: "image", image: { id: "m1", mime_type: "image/jpeg" } }).texto, null);
 });

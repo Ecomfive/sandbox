@@ -57,7 +57,7 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
     paisDelChat(supabase, c.telefono, c.dropshipperId),
     supabase.from(TABLA).select("sku_id, creado_en").eq("conversacion_id", conversacionId).order("creado_en"),
     supabase.from("whatsapp_mensajes").select("texto").eq("conversacion_id", conversacionId).eq("direccion", "entrante").not("texto", "is", null).order("momento", { ascending: false }).limit(40),
-    // Las tareas «avisarle cuando llegue» de este chat (sin la migración 0186, ninguna).
+    // Las tareas «avisarle cuando llegue» de este chat (sin la migración 0187, ninguna).
     supabase.from("tareas_dropshipper").select("sku_id, llegada_estimada").eq("conversacion_id", conversacionId).eq("estado", "esperando"),
   ]);
   const avisos = new Map(((avisosR.error ? [] : avisosR.data) ?? []).map((a) => [a.sku_id as string, { llegadaEstimada: (a.llegada_estimada as string | null) ?? null }]));
