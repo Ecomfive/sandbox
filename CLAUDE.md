@@ -128,7 +128,9 @@ convenciones técnicas del código.
   (`src/components/accesos/`) muestra quién tiene acceso a la sección: sale de
   los roles (`permisos_rol` + `perfiles`, ver `src/lib/accesos-actions.ts`), es
   solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles. Se
-  llama «Accesos» y no «Compartir» porque no comparte ni da permisos.
+  llama «Accesos» y no «Compartir» porque no comparte ni da permisos. **Solo para administradores** (29 oct 2026, pedido de
+  Hernán): `BarraMigas` lo muestra con `verAccesos` (`esAdministrador` en el layout) y `obtenerAccesoSeccion` lo vuelve a exigir;
+  ya no trae «Copiar vínculo».
 - **Ancho de las páginas.** El contenido de toda página (y de su `loading.tsx`,
   para que no salte al cargar) va dentro de `<Pagina ancho="...">`
   (`src/components/ui/pagina.tsx`), no en un `<main>` con `max-w-*` a mano:
@@ -1055,6 +1057,15 @@ convenciones técnicas del código.
   `ver_telefono_dropshipper` en la auditoría. Se quitaron los enlaces `wa.me` y la búsqueda por número; el campo WhatsApp de la ficha del dropshipper arranca vacío y **vacío = no cambiar** (`actualizarDropshipper`).
   El servidor sigue usando el número para enviar. **Etapa 2 pendiente** (aparte, más riesgosa): cifrar el número en la base (clave del servidor + huella para emparejar) y decidir quién más puede descifrarlo; hoy `whatsapp_conversaciones.telefono`
   y `dropshippers.contacto_telefono` siguen en texto normal y las funciones SQL de WhatsApp, los KPIs, la importación de chats y el emparejamiento dependen de ellos.
+  **Mandar archivos** (29 oct 2026): el clip del cuadro de texto (o pegar una imagen) abre `EnviarArchivo` (`bandeja/enviar-archivo.tsx`): vista previa, texto al pie (menos el audio) y dos pasos: `prepararEnvioArchivo`
+  da un permiso firmado y el navegador sube el archivo directo al bucket `whatsapp-importados` en `<chat>/enviados/…` (una acción del servidor no admite archivos grandes); `enviarArchivoPorWhatsapp` lo baja, **lo clasifica por su
+  contenido** (`detectarArchivoWhatsapp`, `src/lib/whatsapp/archivos.ts`, con prueba: fotos JPG/PNG ≤ 5 MB; audios MP3, M4A/AAC, OGG **con Opus** y AMR ≤ 16 MB; video MP4/3GP ≤ 16 MB; documentos PDF, Word, Excel, PowerPoint
+  y .txt ≤ 16 MB), lo sube a WhatsApp (`subirMedioWhatsapp`, `api.ts`: multipart a `<360dialog>/media` o `graph.facebook.com/<v>/<número>/media`; **el sandbox de 360dialog no maneja archivos**) y lo manda con su id
+  (`enviarArchivoWhatsapp`). Queda en el chat como un mensaje saliente con `media_id = storage:<ruta>`, que `/api/whatsapp/media/<mensaje>` ya sabe servir. Mismas reglas que un texto: poder escribir, no solo supervisar y la
+  ventana de 24 h abierta (`chatParaEnviar`). Si algo falla, el archivo subido se borra. Auditoría `enviar_archivo_whatsapp`. **Notas de voz** (`bandeja/grabar-voz.tsx`, `src/lib/whatsapp/voz.ts`, con prueba): el micrófono junto al clip abre una ventana que graba con `MediaRecorder` (WebM en Chrome, MP4 en Safari: WhatsApp no los acepta) hasta
+  `MAX_SEGUNDOS_VOZ` (5 min); al detener, el audio se decodifica (`AudioContext.decodeAudioData`), se mezcla a mono y se **codifica a MP3 en el navegador** con `@breezystack/lamejs` (LGPL-3.0, 64 kbps, 44,1 kHz; se carga con
+  `import()` solo al grabar) y pasa a `EnviarArchivo` para escucharlo y enviarlo como cualquier audio (sale como archivo MP3, no como el globo de voz del celular, que exige OGG/Opus). **La cabecera `Permissions-Policy` de `next.config.ts` tiene que dejar el micrófono a la propia página (`microphone=(self)`)**: con `microphone=()` el navegador lo niega aunque la persona lo haya permitido. Si el almacén `whatsapp-importados` no existe, `prepararEnvioArchivo` lo crea. **Pendiente**: **probar con el número real**
+  (no se pudo probar contra 360dialog) y, si se quiere el globo de voz, codificar a OGG/Opus (WebCodecs `AudioEncoder` + empaquetado Ogg).
   **Números por área** (29 oct 2026): la bandeja solo ofrece los números de WhatsApp de las áreas de la persona (`numerosDeAreas`, `crm/areas.ts`, con prueba): Atención ve el número de Atención y **no** el de Comercial ni
   el selector «Todos los números / …» ni la línea «N números de WhatsApp» de la cabecera (salen solo si hay más de un número); Comercial ve los dos y Dirección los tres. Los chats siguen saliendo por su área, vengan del número que vengan; «Importar chat» también ofrece solo esos números.
   **Marcar como no leído** (29 oct 2026): clic derecho (o tecla de menú / Mayús + F10) sobre un chat de la lista abre un menú con «Marcar como no leído» —o «Marcar como leído» si tiene mensajes sin leer—, y el encabezado del chat

@@ -5,8 +5,10 @@ import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
-import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
+import { enviarArchivoWhatsapp, enviarPlantillaWhatsapp, enviarTextoWhatsapp, subirMedioWhatsapp } from "@/lib/whatsapp/api";
+import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO, TIPO_DE_MENSAJE } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
@@ -153,6 +155,113 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
     .from("whatsapp_conversaciones")
     .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje("texto", cuerpo), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
     .eq("id", id);
+  return { ok: true };
+}
+
+/** Donde quedan los archivos que se mandan (el bucket de los chats importados, migración 0169): `<chat>/enviados/…`. El chat los muestra con `/api/whatsapp/media/<mensaje>`. */
+const BUCKET_ARCHIVOS = "whatsapp-importados";
+/** Un texto al pie de una foto, un video o un documento: WhatsApp admite hasta 1024 caracteres. */
+const MAX_PIE = 1024;
+
+type ChatParaEnviar = NonNullable<Awaited<ReturnType<typeof conversacionPermitida>>>;
+
+/** Lo que hace falta para mandarle algo a un dropshipper: poder escribir en el chat, no estar solo supervisando y la ventana de 24 h abierta. */
+async function chatParaEnviar(id: string): Promise<{ u: NonNullable<Awaited<ReturnType<typeof usuarioBandeja>>>; c: ChatParaEnviar; supabase: ReturnType<typeof createServiceClient> } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const supabase = createServiceClient();
+  const c = await conversacionPermitida(supabase, id, u, true);
+  if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  const supervisando = avisoSupervision(u, c);
+  if (supervisando) return { error: supervisando };
+  if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
+  return { u, c, supabase };
+}
+
+/**
+ * Primer paso de mandar un archivo (foto, audio, video o documento, 29 oct 2026): da el permiso firmado para que el navegador lo suba directo al almacenamiento (una acción del
+ * servidor no admite archivos grandes). Todavía no se manda nada: `enviarArchivoPorWhatsapp` revisa el contenido y lo manda.
+ */
+export async function prepararEnvioArchivo(id: string, nombre: string, tamano: number): Promise<{ ruta: string; token: string } | { error: string }> {
+  const e = await chatParaEnviar(id);
+  if ("error" in e) return e;
+  if (!Number.isFinite(tamano) || tamano <= 0) return { error: "El archivo está vacío." };
+  if (tamano > MAX_BYTES_ENVIO) return { error: `El archivo pesa más de ${MAX_BYTES_ENVIO / 1024 / 1024} MB.` };
+  const ruta = `${id}/enviados/${crypto.randomUUID()}-${nombreArchivoSeguro(nombre)}`;
+  const pedir = () => e.supabase.storage.from(BUCKET_ARCHIVOS).createSignedUploadUrl(ruta);
+  let { data, error } = await pedir();
+  // Si el almacén de los archivos todavía no existe (la migración 0169 no se corrió), se crea aquí y se vuelve a pedir el permiso.
+  if (error && /bucket|not found/i.test(error.message ?? "")) {
+    await e.supabase.storage.createBucket(BUCKET_ARCHIVOS, { public: false, fileSizeLimit: 25 * 1024 * 1024 });
+    ({ data, error } = await pedir());
+  }
+  if (error || !data) {
+    console.error("[whatsapp] no se pudo preparar la subida de un archivo:", error?.message);
+    return { error: `No se pudo preparar la subida del archivo${error?.message ? ` (${error.message})` : ""}.` };
+  }
+  return { ruta, token: data.token };
+}
+
+/**
+ * Segundo paso: manda por WhatsApp el archivo que el navegador ya subió. Se revisa **por su contenido** que sea algo que WhatsApp acepta (`detectarArchivoWhatsapp`), se sube a
+ * WhatsApp, se manda con su texto al pie (menos el audio) y queda en el chat. Si algo falla, el archivo subido se borra.
+ */
+export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre: string, texto: string): Promise<{ ok: true } | { error: string }> {
+  const e = await chatParaEnviar(id);
+  if ("error" in e) return e;
+  const { u, c, supabase } = e;
+  if (typeof ruta !== "string" || !ruta.startsWith(`${id}/enviados/`) || ruta.includes("..")) return { error: "Archivo no válido." };
+  const quitar = () => supabase.storage.from(BUCKET_ARCHIVOS).remove([ruta]);
+
+  const { data: archivo, error: errorBajada } = await supabase.storage.from(BUCKET_ARCHIVOS).download(ruta);
+  if (errorBajada || !archivo) return { error: "El archivo no llegó. Inténtalo de nuevo." };
+  if (archivo.size > MAX_BYTES_ENVIO) {
+    await quitar();
+    return { error: `El archivo pesa más de ${MAX_BYTES_ENVIO / 1024 / 1024} MB.` };
+  }
+  const bytes = new Uint8Array(await archivo.arrayBuffer());
+  const nombreMostrado = String(nombre ?? "").replace(/[\\/\u0000-\u001f]/g, "").trim().slice(-120) || "archivo";
+  const clase = detectarArchivoWhatsapp(bytes, nombreMostrado);
+  if ("error" in clase) {
+    await quitar();
+    return { error: clase.error };
+  }
+  const pie = String(texto ?? "").trim().slice(0, MAX_PIE);
+  const de = { phoneNumberId: c.phoneNumberId, numero: c.numeroEmpresa };
+  const subida = await subirMedioWhatsapp(de, bytes, clase.mime, nombreMostrado);
+  if ("error" in subida) {
+    await quitar();
+    return { error: subida.error };
+  }
+  const r = await enviarArchivoWhatsapp(de, c.telefono, clase.tipo, subida.id, { texto: pie, nombre: nombreMostrado });
+  if ("error" in r) {
+    await quitar();
+    return { error: r.error };
+  }
+  const ahora = new Date().toISOString();
+  const tipo = TIPO_DE_MENSAJE[clase.tipo];
+  const llevaPie = clase.tipo !== "audio" && pie;
+  const { error } = await supabase.from("whatsapp_mensajes").insert({
+    conversacion_id: id,
+    direccion: "saliente",
+    tipo,
+    texto: llevaPie ? pie : null,
+    media_id: `storage:${ruta}`,
+    media_mime: clase.mime,
+    media_nombre: nombreMostrado,
+    wa_id: r.waId,
+    estado: "enviado",
+    autor_id: u.id,
+    autor_nombre: u.nombre || u.email,
+    momento: ahora,
+  });
+  // Ya salió por WhatsApp: si no se pudo anotar, se avisa (no se reintenta, para no mandarlo dos veces).
+  if (error) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
+  await supabase
+    .from("whatsapp_conversaciones")
+    .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje(tipo, llevaPie ? pie : null), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
+    .eq("id", id);
+  await registrarAuditoria({ accion: "enviar_archivo_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `Mandó ${tipo === "imagen" ? "una foto" : tipo === "audio" ? "un audio" : tipo === "video" ? "un video" : "un documento"}` });
   return { ok: true };
 }
 
