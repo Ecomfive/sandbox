@@ -8,6 +8,7 @@
 
 import { normalizarDropi, type Evento, type ProductoVisto } from "@/lib/scraping/comparar";
 import type { Coincidencia } from "@/lib/scraping/cruces";
+import { formatoMonto } from "@/lib/publicaciones/moneda";
 
 /** Nuestro proveedor en Dropi: lo que vende se compara con todo lo demás. */
 export const NUESTRO_PROVEEDOR = /^ecomfive$/i;
@@ -48,7 +49,8 @@ export interface ProductoAlerta {
   igualA: string | null;
 }
 
-const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
+/** Un precio en la moneda del catálogo: «$8.99» en Panamá, «₡5 499» en Costa Rica (29 oct 2026). */
+export const precioEn = (n: number | null, moneda = "USD"): string => formatoMonto(n, { moneda, porUsd: null });
 const unidades = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-PA"));
 
 /**
@@ -60,8 +62,11 @@ export function armarAlertas(datos: {
   cambios: { id: string; eventos: Evento[] }[];
   desaparecidos: string[];
   proveedoresNuevos: { nombre: string; productos: number }[];
+  /** La moneda del país del catálogo (sin ella, dólares). */
+  moneda?: string;
 }): Alerta[] {
   const { productos } = datos;
+  const usd = (n: number | null) => precioEn(n, datos.moneda);
   const alertas: Alerta[] = [];
   const nuestro = (p: ProductoAlerta) => (p.igualA ? productos.get(p.igualA) ?? null : null);
 
@@ -185,7 +190,6 @@ export interface ProductoDecision {
 /** Al ritmo de lo vendido en 7 días, con menos de estas semanas de stock es una oportunidad. */
 export const SEMANAS_OPORTUNIDAD = 6;
 
-const usdD = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const unD = (n: number) => n.toLocaleString("es-PA");
 
 /**
@@ -203,7 +207,10 @@ export function decisionesDeHoy(
   competidoresNuevos: { proveedorId: number; nombre: string; productos: number }[],
   corte: string | null,
   ahora = new Date(),
+  /** La moneda del país del catálogo, para los textos (sin ella, dólares). */
+  moneda = "USD",
 ): Decision[] {
+  const usdD = (n: number | null) => precioEn(n, moneda);
   const hace7 = new Date(ahora.getTime() - 7 * 86_400_000).toISOString();
   const igualesDe = new Map<string, ProductoDecision[]>();
   for (const p of competencia) if (p.igualA) igualesDe.set(p.igualA, [...(igualesDe.get(p.igualA) ?? []), p]);
@@ -338,7 +345,7 @@ export function medidaEnNombre(nombre: string): { tipo: TipoMedida; cantidad: nu
  * * si no, por unidades: un PACK-2 nuestro frente a la unidad de otro compara contra el doble de su precio.
  * `nota` explica la conversión («$6.00 por 60 cápsulas») y es `null` si no hizo falta convertir.
  */
-export function precioEquivalente(nuestroNombre: string, otro: { precio: number | null; nombre: string }): { precio: number | null; nota: string | null } {
+export function precioEquivalente(nuestroNombre: string, otro: { precio: number | null; nombre: string }, moneda = "USD"): { precio: number | null; nota: string | null } {
   if (otro.precio === null) return { precio: null, nota: null };
   const un = unidadesEnNombre(nuestroNombre);
   const uo = unidadesEnNombre(otro.nombre);
@@ -349,10 +356,10 @@ export function precioEquivalente(nuestroNombre: string, otro: { precio: number 
     const totalN = un * mn.cantidad;
     const totalO = uo * mo.cantidad;
     if (totalN === totalO) return { precio: otro.precio, nota: null };
-    return { precio: redondo((otro.precio / totalO) * totalN), nota: `$${otro.precio.toFixed(2)} por ${totalO.toLocaleString("es-PA")} ${mo.tipo}` };
+    return { precio: redondo((otro.precio / totalO) * totalN), nota: `${precioEn(otro.precio, moneda)} por ${totalO.toLocaleString("es-PA")} ${mo.tipo}` };
   }
   if (un === uo) return { precio: otro.precio, nota: null };
-  return { precio: redondo((otro.precio / uo) * un), nota: `$${otro.precio.toFixed(2)} por ${uo} unidad${uo === 1 ? "" : "es"}` };
+  return { precio: redondo((otro.precio / uo) * un), nota: `${precioEn(otro.precio, moneda)} por ${uo} unidad${uo === 1 ? "" : "es"}` };
 }
 
 /**

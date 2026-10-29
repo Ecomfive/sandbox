@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEquivalente, precioPorUnidad, unidadesBajadas, unirCoincidencias, unidadesEnNombre, type ProductoAlerta } from "./analisis";
+import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEn, precioEquivalente, precioPorUnidad, unidadesBajadas, unirCoincidencias, unidadesEnNombre, type ProductoAlerta } from "./analisis";
 
 test("normaliza un producto con su proveedor y reconoce los nuestros", () => {
   const p = normalizarCompetencia({ id: 7, name: "King Maker 120", sale_price: 6.99, user: { id: 2094, name: "ECOMFIVE" }, warehouse_product: [{ stock: 5 }] });
@@ -143,4 +143,11 @@ test("unirCoincidencias: un competidor encontrado por dos nombres cuenta una vez
   assert.equal(r[0].parecido, 0.95);
   assert.equal(r[0].porFoto, true);
   assert.deepEqual(unirCoincidencias([]), []);
+});
+
+test("los precios van en la moneda del catálogo: dólares en Panamá, colones en Costa Rica", () => {
+  assert.equal(precioEn(8.99), "$8.99");
+  assert.equal(precioEn(null, "CRC"), "—");
+  assert.match(precioEn(5499, "CRC"), /^₡\s?5.?499$/);
+  assert.match(precioEquivalente("Colágeno 60 cápsulas", { precio: 6000, nombre: "Colágeno 30 cápsulas" }, "CRC").nota ?? "", /^₡\s?6.?000 por 30 cápsulas$/);
 });

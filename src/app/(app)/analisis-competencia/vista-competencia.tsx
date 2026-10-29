@@ -8,12 +8,12 @@ import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { useMonedaCompetencia } from "@/components/competencia/moneda-competencia";
 import { formatearFechaHora } from "@/lib/formato";
 import { marcarAlertasVistas } from "./actions";
 import { decisionesDeHoy, posicionPrecio, precioEquivalente, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
 import type { AlertaC, CompetidorC, DatosCompetencia, FilaNuestro, ProductoC } from "./def-competencia";
 
-const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const num = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-PA"));
 const segundos = (ms: number | null) => (ms === null ? "" : ms < 90_000 ? `${Math.round(ms / 1000)} s` : `${Math.round(ms / 60_000)} min`);
 /** Cuántos productos de un competidor se ven al abrirlo (el resto, con «Ver todos»). */
@@ -150,6 +150,7 @@ function QueHacerHoy({ decisiones, alAbrir }: { decisiones: Decision[]; alAbrir:
 
 /** «Nuestros productos frente a la competencia»: la posición en precio de cada uno, con filtros de un toque. */
 function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicionesNuestras>; alAbrir: (proveedorId: number) => void }) {
+  const { moneda, precio: usd } = useMonedaCompetencia();
   const [estado, setEstado] = useState<EstadoPosicion | "">("");
   const [todos, setTodos] = useState(false);
   const cuenta = (e: EstadoPosicion) => filas.filter((f) => f.posicion.estado === e).length;
@@ -179,7 +180,7 @@ function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicione
           {visibles.map((f) => {
             const mas = f.iguales.find((i) => precioEquivalente(f.nuestro.nombre, i).precio === f.posicion.minimo) ?? f.iguales[0];
             const dif = f.nuestro.precio !== null ? Math.round((f.nuestro.precio - f.posicion.minimo) * 100) / 100 : null;
-            const nota = precioEquivalente(f.nuestro.nombre, mas).nota;
+            const nota = precioEquivalente(f.nuestro.nombre, mas, moneda).nota;
             return (
               <li key={f.nuestro.id} className="border-b border-border last:border-0">
                 <button
@@ -337,6 +338,7 @@ function Novedades({ alertas, alAbrir, puedeEscribir, busquedas }: { alertas: Al
 // ---------- Un competidor (se abre en su sitio) ----------
 
 function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: ProductoC[]; nuestros: Map<string, ProductoC>; busqueda: string }) {
+  const { moneda, precio: usd } = useMonedaCompetencia();
   const [abierto, setAbierto] = useState<string | null>(null);
   const [todos, setTodos] = useState(false);
   const orden = useMemo(
@@ -364,7 +366,7 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
           <tbody>
             {visibles.map((p) => {
               const n = p.igualA ? nuestros.get(p.igualA) : undefined;
-              const eq = n ? precioEquivalente(n.nombre, p) : null;
+              const eq = n ? precioEquivalente(n.nombre, p, moneda) : null;
               const dif = n && n.precio !== null && eq?.precio != null ? Math.round((eq.precio - n.precio) * 100) / 100 : null;
               const ab = abierto === p.id;
               return (
@@ -505,6 +507,7 @@ type Orden = "vendido" | "iguales" | "productos";
  * nuestro) y cada producto despliega su historial.
  */
 export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
+  const { moneda } = useMonedaCompetencia();
   const [abierto, setAbierto] = useState<number | null>(null);
   const [texto, setTexto] = useState("");
   const [soloIguales, setSoloIguales] = useState(false);
@@ -566,8 +569,10 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
       datos.productos.filter((p) => !p.esNuestro),
       nuevosComp,
       datos.corte,
+      undefined,
+      moneda,
     );
-  }, [datos.productos, datos.competidores, datos.corte]);
+  }, [datos.productos, datos.competidores, datos.corte, moneda]);
   const abrirCompetidor = (prov: number) => {
     setTexto("");
     setSoloIguales(false);
