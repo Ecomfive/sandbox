@@ -12,8 +12,8 @@ const NOMBRE_CLASE: Record<ClaseEvento, string> = { mensaje: "Respuesta", nota: 
 const cuando = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 /**
- * «Actividad del equipo» en la ficha del chat (pedido de Jhokser, 29 oct 2026): qué hizo cada persona en esta conversación —sus respuestas, notas, archivos, y cambios como cambiar el
- * nombre, vincular el chat o pasarlo de área— con filtro por persona. Del más nuevo al más viejo.
+ * «Actividad del equipo» en la ficha del chat (pedido de Jhokser, 29 oct 2026): qué hizo cada persona con este cliente —creó un caso o un pedido, cambió el nombre, sus
+ * datos o sus etiquetas, vinculó el chat, lo pasó de área…— con filtro por persona. No repite los mensajes, que ya están en el chat (pedido de Alcides). Del más nuevo al más viejo.
  */
 export function ActividadDelEquipoFicha({ conversacionId, version }: { conversacionId: string; version: string }) {
   const [eventos, setEventos] = useState<EventoEquipo[] | null>(null);
@@ -79,7 +79,7 @@ export function ActividadDelEquipoFicha({ conversacionId, version }: { conversac
         )}
       </div>
       {!eventos && !error && <span className="text-[13px] text-[var(--wa-sec)]">Cargando…</span>}
-      {eventos && eventos.length === 0 && <span className="text-[13px] text-[var(--wa-sec)]">Nadie del equipo ha hecho nada en este chat todavía.</span>}
+      {eventos && eventos.length === 0 && <span className="text-[13px] text-[var(--wa-sec)]">Nadie del equipo ha hecho cambios con este cliente todavía.</span>}
       {eventos && eventos.length > 0 && plegado && <span className="text-[12.5px] text-[var(--wa-sec)]">Desplegar para ver lo que hizo cada persona</span>}
       {eventos && eventos.length > 0 && !plegado && (
         <>
