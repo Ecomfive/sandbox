@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
@@ -353,10 +353,13 @@ export async function listarUsuariosPlataforma(
 export async function vincularCuenta(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("crm-dropshippers");
   const dropshipper_id = texto(formData, "dropshipper_id");
-  const id_externo = texto(formData, "id_externo");
-  const tienda_nombre = texto(formData, "tienda_nombre") || null;
+  // Uno o varios usuarios (29 oct 2026): un mismo dropshipper puede tener varios usuarios de Dropi. Cada `id_externo` va con su `tienda_nombre`.
+  const ids = formData.getAll("id_externo").map((v) => String(v).trim());
+  const tiendas = formData.getAll("tienda_nombre").map((v) => String(v).trim());
   if (!ES_ID(dropshipper_id)) return { error: "Dropshipper no válido." };
-  if (!/^[\w.-]{1,64}$/.test(id_externo)) return { error: "Elige el usuario de la plataforma." };
+  if (!ids.length || ids.some((id) => !/^[\w.-]{1,64}$/.test(id))) return { error: "Elige el usuario de la plataforma." };
+  if (ids.length > 30) return { error: "Son demasiados usuarios de una vez (máximo 30)." };
+  if (new Set(ids).size !== ids.length) return { error: "Elegiste el mismo usuario dos veces." };
 
   const supabase = createServiceClient();
   const [{ data: pais }, { data: plat }] = await Promise.all([
@@ -365,20 +368,30 @@ export async function vincularCuenta(formData: FormData): Promise<{ error?: stri
   ]);
   if (!pais || !plat) return { error: "Elige el país y la plataforma." };
 
-  const { error } = await supabase
-    .from("dropshipper_cuentas")
-    .insert({ dropshipper_id, plataforma_id: plat.id, pais_id: pais.id, id_externo, tienda_nombre });
+  const filas = ids.map((id_externo, n) => ({ dropshipper_id, plataforma_id: plat.id, pais_id: pais.id, id_externo, tienda_nombre: tiendas[n] || null }));
+  const { error } = await supabase.from("dropshipper_cuentas").insert(filas);
   if (error) {
-    return { error: error.code === "23505" ? "Ese usuario ya está vinculado a un dropshipper." : "No se pudo vincular la cuenta." };
+    return {
+      error:
+        error.code === "23505"
+          ? ids.length > 1
+            ? "Alguno de esos usuarios ya está vinculado a un dropshipper: no se vinculó ninguno."
+            : "Ese usuario ya está vinculado a un dropshipper."
+          : ids.length > 1
+            ? "No se pudieron vincular las cuentas."
+            : "No se pudo vincular la cuenta.",
+    };
   }
   // Para que sus cifras de ese país aparezcan en el directorio, el dropshipper debe vender en él.
   await supabase.from("dropshipper_paises").upsert({ dropshipper_id, pais_id: pais.id }, { onConflict: "dropshipper_id,pais_id", ignoreDuplicates: true });
-  await registrarAuditoria({
-    accion: "vincular_cuenta_dropshipper",
-    entidad: "dropshippers",
-    entidadId: dropshipper_id,
-    detalle: `${plat.nombre} usuario ${id_externo}${tienda_nombre ? ` (${tienda_nombre})` : ""}`,
-  });
+  await registrarAuditoriaLote(
+    filas.map((f) => ({
+      accion: "vincular_cuenta_dropshipper",
+      entidad: "dropshippers",
+      entidadId: dropshipper_id,
+      detalle: `${plat.nombre} usuario ${f.id_externo}${f.tienda_nombre ? ` (${f.tienda_nombre})` : ""}`,
+    })),
+  );
   revalidatePath("/crm-dropshippers", "layout");
   return {};
 }
