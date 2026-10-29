@@ -62,7 +62,7 @@ export function ActividadDelEquipoFicha({ conversacionId, version }: { conversac
   return (
     <div className="flex flex-col gap-2.5 border-b-8 border-[var(--wa-panel)] px-5 py-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="m-0 text-[13px] font-normal text-[var(--wa-sec)]">Actividad del equipo</h3>
+        <h3 className="m-0 text-[13px] font-normal text-[var(--wa-sec)]">Actividad</h3>
         {eventos && eventos.length > 0 && (
           <button
             type="button"
