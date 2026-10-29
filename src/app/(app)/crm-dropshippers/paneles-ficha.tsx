@@ -6,13 +6,13 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PedidoIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { recomendarProducto } from "../sugerencias-clientes/actions";
 import { FichaSugerencia } from "../sugerencias-clientes/ficha-sugerencia";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { CampoTiendas } from "./campo-tiendas";
-import { crearCaso, crearPedidoManual, editarDropshipper, registrarInteraccion } from "./actions";
-import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, TIPOS_INTERACCION, nombrePais, type FilaDropshipper } from "./def-crm";
+import { crearCaso, editarDropshipper, registrarInteraccion } from "./actions";
+import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, TIPOS_INTERACCION, nombrePais, type FilaDropshipper } from "./def-crm";
 
 const hoy = () => new Date().toLocaleDateString("en-CA"); // AAAA-MM-DD en la hora de quien lo usa
 
@@ -147,63 +147,6 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
             <CampoPais id="campo-pais-caso" paises={paises.length ? paises : [codigoPais]} inicial={codigoPais} />
           </Seccion>
         </>
-      )}
-    </FichaCrear>
-  );
-}
-
-/** Registrar a mano un pedido del dropshipper. */
-export function PanelPedido({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codigoPais: string; alGuardar?: () => void }) {
-  return (
-    <FichaCrear
-      alGuardar={alGuardar}
-      titulo="Nuevo pedido"
-      etiquetaCrear="Registrar pedido"
-      action={crearPedidoManual}
-      mensajeExito="Pedido registrado"
-      ocultos={{ dropshipper_id: d.id }}
-      boton={(abrir) => <BotonAccion texto="Pedido" icono={PedidoIcon} alHacerClic={abrir} />}
-    >
-      {({ faltante, invalido }) => (
-        <Seccion icono={PedidoIcon} titulo="Pedido">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta="Fecha" id="campo-fecha-pedido" obligatorio faltante={faltante}>
-              <input
-                id="campo-fecha-pedido"
-                type="date"
-                name="fecha"
-                required
-                data-enfocar
-                aria-invalid={invalido("campo-fecha-pedido")}
-                defaultValue={hoy()}
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-            <Campo etiqueta="Monto" id="campo-monto-pedido" obligatorio faltante={faltante}>
-              <input
-                id="campo-monto-pedido"
-                type="number"
-                name="monto"
-                required
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                aria-invalid={invalido("campo-monto-pedido")}
-                placeholder="Ej: 45.50"
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-            <Campo etiqueta="N.º de pedido" id="campo-numero-pedido">
-              <input id="campo-numero-pedido" type="text" name="numero" autoComplete="off" placeholder="Ej: 48213" className={`${fieldClass} w-full`} />
-            </Campo>
-            <Campo etiqueta="Estado" id="campo-estado-pedido">
-              <select id="campo-estado-pedido" name="estado" defaultValue="pendiente" className={`${fieldClass} w-full`}>
-                <Opciones lista={ESTADOS_PEDIDO} />
-              </select>
-            </Campo>
-          </div>
-          <CampoPais id="campo-pais-pedido" paises={d.paises} inicial={codigoPais} />
-        </Seccion>
       )}
     </FichaCrear>
   );

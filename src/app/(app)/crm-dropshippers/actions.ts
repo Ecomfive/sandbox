@@ -9,7 +9,7 @@ import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ACCIONES_COMERCIALES, FASES, MODULO_ATENCION, MODULO_COMERCIAL, accesoCrm, areaParaNota, areasVisibles, etiquetaFase } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { enlazarChatsPorTelefono, telefonoDeOtro } from "@/lib/whatsapp/vinculo";
-import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
+import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
@@ -185,38 +185,6 @@ export async function crearCaso(formData: FormData): Promise<{ error?: string }>
     entidad: "dropshippers",
     entidadId: dropshipper_id,
     detalle: `caso=${data.numero} ${titulo}`,
-  });
-  revalidatePath("/crm-dropshippers", "layout");
-  return {};
-}
-
-/** Registra a mano un pedido de un dropshipper (hasta que Dropi los traiga solo). */
-export async function crearPedidoManual(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("crm-dropshippers");
-  const dropshipper_id = texto(formData, "dropshipper_id");
-  const numero = texto(formData, "numero") || null;
-  const fecha = texto(formData, "fecha");
-  const estado = texto(formData, "estado");
-  const monto = Number(texto(formData, "monto").replace(",", "."));
-
-  if (!ES_ID(dropshipper_id)) return { error: "Elige el dropshipper." };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha))) return { error: "Escribe la fecha del pedido." };
-  if (!Number.isFinite(monto) || monto < 0 || monto > 1e9) return { error: "El monto debe ser un número mayor o igual a cero." };
-  if (!esUnoDe(ESTADOS_PEDIDO, estado)) return { error: "Elige el estado del pedido." };
-
-  const supabase = createServiceClient();
-  const pais = await resolverPais(supabase, dropshipper_id, texto(formData, "pais"));
-  if ("error" in pais) return { error: pais.error };
-
-  const { error } = await supabase
-    .from("pedidos_dropshipper")
-    .insert({ dropshipper_id, pais_id: pais.id, numero, fecha, monto, estado, origen: "manual" });
-  if (error) return { error: "No se pudo guardar el pedido." };
-  await registrarAuditoria({
-    accion: "crear_pedido_dropshipper",
-    entidad: "dropshippers",
-    entidadId: dropshipper_id,
-    detalle: `pedido=${numero ?? "—"} monto=${monto}`,
   });
   revalidatePath("/crm-dropshippers", "layout");
   return {};
