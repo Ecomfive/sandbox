@@ -618,7 +618,7 @@ convenciones técnicas del código.
   mismo: se hace el cambio en el sistema → queda **pendiente** en `dropi_cambios_pendientes` (se ve en la lista de cambios pendientes y se puede «Deshacer»,
   que deja el sistema como estaba) → el favorito «Aplicar en Dropi» lo manda a Dropi y la ventana deja «Posponer» cada uno. Nada habla con Dropi por otro
   camino. Ya van por la cola: **nombre, precio y sugerido, descripción y fotos** (un `cambio`), **archivar y sacar de Archivados** (`archivar`), **apagar**,
-  **republicar**, **publicar una publicación nueva** (`crear`) y **privatizar** (`privatizar`). **Un proceso nuevo del módulo que cambie algo en Dropi** se agrega así, sin saltarse nada:
+  **republicar**, **publicar una publicación nueva** (`crear`), **privatizar** (`privatizar`) y **el stock de una bodega** (`stock`). **Un proceso nuevo del módulo que cambie algo en Dropi** se agrega así, sin saltarse nada:
   (1) su `tipo` en la restricción de `dropi_cambios_pendientes` (migración, con reversa y prueba en PGlite); (2) su `encolarX` en `cambios-dropi.ts` (un solo cambio
   pendiente por publicación si es una acción, y «cancelarse» con su contrario); (3) su función en el código del favorito (`marcador-aplicar-dropi.ts`, que se
   comprueba de punta a punta contra un Dropi simulado en `marcador-flujo.test.ts`: lee el producto, comprueba que es del proveedor, hace el cambio, lo vuelve
@@ -649,6 +649,15 @@ convenciones técnicas del código.
   publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
+  **Cambiar stock en Dropi** (28 oct 2026, pedido de Alcides; migración 0173, `src/lib/publicaciones/stock-dropi.ts`, con prueba): un séptimo cambio de la cola
+  (`tipo = 'stock'`, `datos` = `DatosStock`: bodega, nombre, unidades que deben quedar, `antes` = lo que mostraba la lectura y concepto). En el bloque «Stock» de la
+  ficha (`BodegasStockDropi`, `stock-dropi.tsx`) cada bodega de ECOMFIVE (también las sin stock, de `opcionesCrear.bodegas`) tiene un lápiz; la B280 se ve y no se edita.
+  `cambiarStockDropi` (`actions.ts`) valida la bodega contra las del país y encola (`encolarStock`: uno por publicación y bodega, índice único; otro pedido le pone las
+  unidades nuevas y conserva el primer `antes`). **Se pide un objetivo, no un movimiento**: el favorito (`stock`, `STOCK_JS` = `armarAjusteStock`) lee el stock de Dropi en
+  ese momento, hace la ENTRADA o SALIDA de la diferencia (`mover`), lo relee y devuelve `antes`, `stock`, `bodegas` y un aviso si Dropi tenía otra cosa que el sistema; si
+  ya está en el objetivo, no guarda nada (un reintento no mueve dos veces). Rechaza variaciones, bodegas que no son del proveedor y dejar menos que lo reservado a privados.
+  `guardarResultadosDropi` pone el stock releído en `dropi_productos_proveedor` (`stockAlSistema`) sin esperar la lectura. Deshacer: con `intentos = 0`, el sistema no cambia.
+  La fila muestra «Stock pendiente» (`FilaPublicacion.stockPendiente`).
   **Archivar y sacar de Archivados** (`archivarPublicacion`): cambian la publicación al instante y encolan `archivar` (`restaurar` = sacarla): `archiveProduct` /
   `activateProduct` de Dropi (la llamada del botón de «Mis productos»; **no `unarchive`**: Dropi la acepta sin error pero no desarchiva, así falló el 8537 «Truly Jelly Booster» el 28 oct 2026), **solo eso** (no saca stock: eso es «Apagar»). El estado de antes (`estado_antes`, `estado_publicacion_antes`) se guarda para devolverla al
   deshacer; el contrario de uno pendiente lo cancela (Dropi nunca se tocó). Sin ID de Dropi o «Sin publicar», solo cambia el sistema.

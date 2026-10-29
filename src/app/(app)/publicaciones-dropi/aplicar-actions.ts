@@ -6,6 +6,8 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { normalizarDatosCrear, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { unaPorFoto } from "@/lib/publicaciones/fotos-dropi";
 import { normalizarDatosPrivatizar, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
+import { normalizarDatosStock, type DatosStock } from "@/lib/publicaciones/stock-dropi";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -19,9 +21,11 @@ export interface CambioParaDropi {
   /**
    * «republicar» = crear el producto de nuevo en Dropi y archivar el viejo sin stock (0145); «apagar» = sacar el stock y archivar (0148);
    * «archivar» = archivar o sacar de Archivados (0151); «crear» = publicar la publicación nueva en Dropi (0151); «privatizar» = dejarle
-   * unidades a un dropshipper en un producto privado nuevo (0154).
+   * unidades a un dropshipper en un producto privado nuevo (0154); «stock» = dejar una bodega con unas unidades (0173).
    */
-  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar";
+  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar" | "stock";
+  /** «stock»: la bodega y las unidades que deben quedar (al favorito viaja como `datos`). */
+  stock: DatosStock | null;
   /** «archivar»: true = sacarlo de Archivados. */
   restaurar: boolean;
   /** «cambio»: la descripción nueva (null = no se cambia) y las fotos que se suben. */
@@ -195,6 +199,18 @@ async function publicadaEnDropi(supabase: ReturnType<typeof createServiceClient>
 }
 
 /**
+ * Pone en la lectura de «Mis productos» (`dropi_productos_proveedor`) el stock que el favorito acaba de dejar y releer en Dropi: las bodegas con
+ * stock y el total (lo demás lo trae la próxima lectura). El nombre de una bodega que Dropi no mande se conserva del que ya estaba.
+ */
+async function stockAlSistema(supabase: ReturnType<typeof createServiceClient>, paisId: string, productoId: number, bodegas: { id: number; nombre: string; stock: number }[]) {
+  const { data: fila } = await supabase.from("dropi_productos_proveedor").select("bodegas").eq("pais_id", paisId).eq("dropi_producto_id", productoId).maybeSingle();
+  if (!fila) return;
+  const nombres = new Map((Array.isArray(fila.bodegas) ? (fila.bodegas as { id: number; nombre?: string }[]) : []).map((b) => [Number(b.id), String(b.nombre ?? "")]));
+  const nuevas = bodegas.filter((b) => b.stock > 0).map((b) => ({ id: b.id, nombre: b.nombre || nombres.get(b.id) || "", stock: b.stock }));
+  await supabase.from("dropi_productos_proveedor").update({ bodegas: nuevas, stock: nuevas.reduce((t, b) => t + b.stock, 0) }).eq("pais_id", paisId).eq("dropi_producto_id", productoId);
+}
+
+/**
  * Los cambios que esperan para Dropi en un país (pendientes y los que dieron error, para reintentarlos), para el favorito «Aplicar en
  * Dropi». No lleva nada de la sesión de Dropi: el favorito los aplica desde su pestaña.
  */
@@ -235,7 +251,8 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
     pais: pais.nombre,
     cambios: (data ?? []).map((f) => ({
       id: f.id as string,
-      tipo: f.tipo === "republicar" ? ("republicar" as const) : f.tipo === "apagar" ? ("apagar" as const) : f.tipo === "archivar" ? ("archivar" as const) : f.tipo === "crear" ? ("crear" as const) : f.tipo === "privatizar" ? ("privatizar" as const) : ("cambio" as const),
+      tipo: f.tipo === "republicar" ? ("republicar" as const) : f.tipo === "apagar" ? ("apagar" as const) : f.tipo === "archivar" ? ("archivar" as const) : f.tipo === "crear" ? ("crear" as const) : f.tipo === "privatizar" ? ("privatizar" as const) : f.tipo === "stock" ? ("stock" as const) : ("cambio" as const),
+      stock: f.tipo === "stock" ? normalizarDatosStock(f.datos) : null,
       restaurar: f.restaurar === true,
       descripcion: (f.descripcion as string | null | undefined) ?? null,
       fotos: f.tipo === "republicar" || f.tipo === "privatizar" ? (deSistema.get(f.publicacion_id as string) ?? []) : normalizarDatosCrear({ fotos: f.fotos }).fotos,
@@ -265,7 +282,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   if (!pais) return { error: "País no válido." };
   if (!Array.isArray(resultados) || resultados.length > MAX) return { error: "Resultados no válidos." };
   const limpios = resultados
-    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown })
+    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown })
     .filter((r) => typeof r.id === "string" && UUID.test(r.id))
     .map((r) => ({
       id: r.id as string,
@@ -277,6 +294,16 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       error: typeof r.error === "string" ? r.error.slice(0, 500) : "Sin detalle",
       // «crear»: un aviso que no impidió publicar (por ejemplo, las garantías que Dropi no dejó poner).
       aviso: typeof r.aviso === "string" ? r.aviso.slice(0, 300) : null,
+      // «stock»: lo que había en Dropi, lo que quedó en la bodega y todas sus bodegas releídas (para poner el stock en el sistema sin esperar la lectura).
+      antes: Number.isInteger(r.antes) && (r.antes as number) >= 0 ? (r.antes as number) : null,
+      stock: Number.isInteger(r.stock) && (r.stock as number) >= 0 ? (r.stock as number) : null,
+      bodegas: Array.isArray(r.bodegas)
+        ? (r.bodegas as unknown[])
+            .slice(0, 20)
+            .map((b) => b as { id?: unknown; nombre?: unknown; stock?: unknown })
+            .filter((b) => Number.isInteger(b.id) && (b.id as number) > 0 && Number.isInteger(b.stock) && (b.stock as number) >= 0)
+            .map((b) => ({ id: b.id as number, nombre: String(b.nombre ?? "").slice(0, 80), stock: b.stock as number }))
+        : null,
       // El ID del producto que creó una republicación (aunque haya fallado un paso después).
       nuevo: Number.isInteger(r.nuevo) && (r.nuevo as number) > 0 && (r.nuevo as number) < 100_000_000 ? (r.nuevo as number) : null,
     }));
@@ -325,6 +352,27 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         detalle: hecho ? `ID ${f.dropi_producto_id}: sin stock y archivado en Dropi${privatizacion} (desde Dropi)` : `ID ${f.dropi_producto_id} · ${r.error}${privatizacion}`,
       });
       if (hecho) aplicados++;
+      else errores++;
+      continue;
+    }
+    if (f.tipo === "stock") {
+      const d = normalizarDatosStock(f.datos);
+      await supabase
+        .from("dropi_cambios_pendientes")
+        .update(r.ok ? { estado: "aplicado", aplicado_en: ahora, error: null, intentos: Number(f.intentos) + 1 } : { estado: "error", error: r.error, intentos: Number(f.intentos) + 1 })
+        .eq("id", r.id);
+      // Confirmado en Dropi: el sistema muestra ya ese stock (lo que releyó el favorito), sin esperar la próxima lectura de «Mis productos».
+      if (r.ok && r.bodegas) await stockAlSistema(supabase, pais.id, Number(f.dropi_producto_id), r.bodegas);
+      const bodega = `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}`;
+      auditoria.push({
+        accion: r.ok ? "dropi_stock_aplicado" : "dropi_stock_error",
+        entidad: "dropi_publicaciones",
+        entidadId: f.publicacion_id as string,
+        detalle: r.ok
+          ? `ID ${f.dropi_producto_id} · stock en ${bodega}: ${r.antes ?? "—"} → ${r.stock ?? d.unidades} u. («${d.concepto}»)${r.aviso ? ` · ${r.aviso}` : ""} (desde Dropi)`
+          : `ID ${f.dropi_producto_id} · stock en ${bodega} a ${d.unidades} u. · ${r.error}`,
+      });
+      if (r.ok) aplicados++;
       else errores++;
       continue;
     }
