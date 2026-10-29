@@ -44,6 +44,9 @@ test("fotos, documentos, botones y ubicaciones: el pie o el texto, y el archivo 
         { from: "50761112233", id: "wamid.B", timestamp: "3", type: "interactive", interactive: { type: "button_reply", button_reply: { id: "si", title: "Sí, confirmo" } } },
         { from: "50761112233", id: "wamid.U", timestamp: "4", type: "location", location: { latitude: 8.98, longitude: -79.52, name: "Bodega" } },
         { from: "50761112233", id: "wamid.X", timestamp: "5", type: "unsupported" },
+        { from: "50761112233", id: "wamid.Y", timestamp: "6", type: "unsupported", unsupported: { type: "media_placeholder" }, errors: [{ code: 131051, title: "Message type unknown" }] },
+        { from: "50761112233", id: "wamid.Z", timestamp: "7", type: "unsupported", unsupported: { type: "algo_nuevo" }, errors: [{ code: 131051, title: "Message type unknown" }] },
+        { from: "50761112233", id: "wamid.W", timestamp: "8", type: "unsupported", errors: [{ code: 131051, title: "Message type unknown" }] },
       ],
     }),
   );
@@ -54,7 +57,10 @@ test("fotos, documentos, botones y ubicaciones: el pie o el texto, y el archivo 
       ["documento", null, "MEDIA2", "guia.pdf"],
       ["texto", "Sí, confirmo", null, null],
       ["ubicacion", "Bodega · 8.98, -79.52", null, null],
-      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma.", null, null],
+      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma. Pídele que lo mande de nuevo como mensaje normal.", null, null],
+      ["otro", "Mandó una foto o un video que WhatsApp no entrega (por ejemplo, de «ver una vez»). WhatsApp no lo entrega a la plataforma: pídele que lo mande de nuevo como mensaje normal.", null, null],
+      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma (algo_nuevo). Pídele que lo mande de nuevo como mensaje normal.", null, null],
+      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma (Message type unknown). Pídele que lo mande de nuevo como mensaje normal.", null, null],
     ],
   );
   assert.equal(resumenMensaje("imagen", "Llegó así"), "Foto: Llegó así");
