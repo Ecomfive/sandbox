@@ -1,2 +1,3 @@
--- Reversa de 0179_whatsapp_productos_chat.sql: se pierden los productos fijados en las fichas de los chats (las sugerencias siguen saliendo solas).
-drop table if exists whatsapp_conversacion_productos;
+-- Reversa de 0179_whatsapp_contactos_y_rapidas.sql: se pierden los mensajes rápidos y los nombres personalizados de los chats (los chats y sus mensajes no se tocan).
+drop table if exists whatsapp_respuestas_rapidas;
+alter table whatsapp_conversaciones drop column if exists nombre_personalizado;

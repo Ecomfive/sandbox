@@ -16,6 +16,10 @@ import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
 import { GrabarVoz } from "./grabar-voz";
 import { ProductosDelChatFicha } from "./productos-chat";
+import { VentanaNombreContacto } from "./nombre-contacto";
+import { listarRespuestasRapidas, guardarRespuestaRapida, usarRespuestaRapida } from "./rapidas-actions";
+import { VentanaRapidas } from "./respuestas-rapidas";
+import { sugerirRapidas, validarRapida, yaEsRapida, type RespuestaRapida } from "@/lib/whatsapp/rapidas";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
@@ -36,7 +40,8 @@ const AREAS_CHAT: { valor: AreaCrm; etiqueta: string; clase: string; para: strin
 const areaChat = (a: AreaCrm) => AREAS_CHAT.find((x) => x.valor === a) ?? AREAS_CHAT[0];
 
 /** Respuestas de un toque para lo que más se repite en Atención. */
-const RAPIDAS = ["Ya reviso tu guía y te confirmo 👌", "¿Me compartes el número de pedido?", "Te paso el estado en un momento"];
+/** Los mensajes rápidos de siempre: se usan mientras no exista la tabla de la migración 0179. */
+const RAPIDAS_BASE: RespuestaRapida[] = ["Hola, ¿cómo estás? 👋", "Ya reviso tu guía y te confirmo 👌", "¿Me compartes el número de pedido?", "Te paso el estado en un momento"].map((texto, i) => ({ id: `base-${i}`, texto, usos: 0 }));
 
 /** La nota que deja «Pasar a otra área» (actions.ts): se dibuja como aviso del sistema, no como nota de una persona. */
 const ES_CAMBIO_DE_AREA = /^.+ pasó este chat de (Atención|Comercial|Dirección) a (Atención|Comercial|Dirección)\.$/;
@@ -259,6 +264,21 @@ export function Bandeja({
   const [verPlantillas, setVerPlantillas] = useState(false);
   const [borrar, setBorrar] = useState<QueBorrar | null>(null);
   const [vincular, setVincular] = useState(false);
+  // Mensajes rápidos del equipo (se ofrecen arriba del cuadro de texto) y el cambio de nombre de un contacto.
+  const [rapidas, setRapidas] = useState<RespuestaRapida[]>(RAPIDAS_BASE);
+  const [verRapidas, setVerRapidas] = useState(false);
+  const [nombreDe, setNombreDe] = useState<{ id: string; nombre: string; personalizado: string | null } | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    listarRespuestasRapidas()
+      .then((r) => {
+        if (vigente && !("error" in r) && !r.falta) setRapidas(r.respuestas);
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, []);
   // El archivo (foto, audio, video o documento) que se va a mandar por WhatsApp.
   const [archivo, setArchivo] = useState<File | null>(null);
   const inputArchivo = useRef<HTMLInputElement | null>(null);
@@ -494,6 +514,30 @@ export function Bandeja({
         return refrescar(null);
       })
       .catch(() => mostrarToast("No se pudo marcar.", "destructive"));
+  }
+
+  /** Pone un mensaje rápido en el cuadro de texto (no lo envía: se puede cambiar antes) y anota que se usó. */
+  function elegirRapida(r: RespuestaRapida) {
+    setBorrador(r.texto);
+    textoRef.current?.focus();
+    if (!r.id.startsWith("base-")) {
+      setRapidas((l) => l.map((x) => (x.id === r.id ? { ...x, usos: x.usos + 1 } : x)));
+      void usarRespuestaRapida(r.id);
+    }
+  }
+
+  /** Guarda un texto (lo escrito o un mensaje ya mandado) como mensaje rápido. */
+  function guardarComoRapida(texto: string) {
+    const v = validarRapida(texto);
+    if ("error" in v) return mostrarToast(v.error, "destructive");
+    if (yaEsRapida(rapidas, v.texto)) return mostrarToast("Ese mensaje rápido ya existe.");
+    void guardarRespuestaRapida(v.texto)
+      .then((r) => {
+        if ("error" in r) return mostrarToast(r.error, "destructive");
+        setRapidas((l) => [...l.filter((x) => !x.id.startsWith("base-")), r.respuesta]);
+        mostrarToast("Guardado como mensaje rápido.");
+      })
+      .catch(() => mostrarToast("No se pudo guardar.", "destructive"));
   }
 
   function accion(fn: () => Promise<{ ok: true } | { error: string }>, ok: string) {
@@ -756,6 +800,13 @@ export function Bandeja({
                 </span>
               </span>
             </button>
+            {escribe && (
+              <button type="button" onClick={() => setNombreDe({ id: sel.id, nombre: sel.nombre, personalizado: sel.nombrePersonalizado })} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                </svg>
+              </button>
+            )}
             <EtiquetaArea area={sel.area} />
             {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
             {sel.borradoPendiente && (
@@ -900,7 +951,7 @@ export function Bandeja({
                         Desde aquí, mensajes que llegaron al sistema
                       </span>
                     )}
-                    <Burbuja m={m} seguido={seguido} alPedirBorrar={escribe && !mirando ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined} />
+                    <Burbuja m={m} seguido={seguido} alPedirBorrar={escribe && !mirando ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined} alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined} />
                   </Fragment>
                 );
               })
@@ -917,20 +968,26 @@ export function Bandeja({
                 </p>
               )}
               {!esNota && !bloqueado && (
-                <div className="flex gap-2 overflow-x-auto px-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {RAPIDAS.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => {
-                        setBorrador(r);
-                        textoRef.current?.focus();
-                      }}
-                      className={`flex-none rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 py-1 text-[13px] whitespace-nowrap hover:bg-[var(--wa-hover)] ${anilloFoco}`}
-                    >
-                      {r}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2 px-3 pt-2">
+                  {/* Con el cuadro vacío, los más usados; escribiendo, los que se parecen a lo escrito («hol» → «Hola, ¿cómo estás?»). */}
+                  <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {sugerirRapidas(rapidas, borrador).map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        title={r.texto}
+                        onClick={() => elegirRapida(r)}
+                        className={`flex-none rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 py-1 text-[13px] whitespace-nowrap hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+                      >
+                        <span className="block max-w-[22rem] truncate">{r.texto}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => setVerRapidas(true)} aria-label="Mensajes rápidos: ver, agregar o quitar" title="Mensajes rápidos" className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
+                    </svg>
+                  </button>
                 </div>
               )}
               <div className="flex items-end gap-2 px-3 py-2">
@@ -1003,6 +1060,14 @@ export function Bandeja({
                     }`}
                   />
                 </label>
+                {!esNota && !bloqueado && borrador.trim().length >= 3 && !yaEsRapida(rapidas, borrador) && (
+                  <button type="button" onClick={() => guardarComoRapida(borrador)} aria-label="Guardar lo escrito como mensaje rápido" title="Guardar como mensaje rápido" className={`${botonIcono} mb-px`}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M6 3h12v18l-6-4-6 4V3Z" />
+                      <path d="M12 7v6M9 10h6" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={enviando || bloqueado || !borrador.trim()}
@@ -1042,9 +1107,36 @@ export function Bandeja({
               <button type="button" role="menuitem" onClick={() => marcarLeido(c, c.noLeidos > 0)} className={`rounded-md px-3 py-2 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}>
                 {c.noLeidos > 0 ? "Marcar como leído" : "Marcar como no leído"}
               </button>
+              {escribe && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuChat(null);
+                    setNombreDe({ id: c.id, nombre: c.nombre, personalizado: c.nombrePersonalizado });
+                  }}
+                  className={`rounded-md px-3 py-2 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+                >
+                  Cambiar el nombre
+                </button>
+              )}
             </div>
           );
         })()}
+      {verRapidas && <VentanaRapidas rapidas={rapidas} setRapidas={setRapidas} puedeEditar={escribe && !rapidas.some((r) => r.id.startsWith("base-"))} alCerrar={() => setVerRapidas(false)} />}
+      {nombreDe && (
+        <VentanaNombreContacto
+          conversacionId={nombreDe.id}
+          nombreActual={nombreDe.nombre}
+          personalizado={nombreDe.personalizado}
+          alCerrar={() => setNombreDe(null)}
+          alListo={(mensaje) => {
+            setNombreDe(null);
+            mostrarToast(mensaje);
+            void refrescar(elegido);
+          }}
+        />
+      )}
       {archivo && sel && (
         <EnviarArchivo
           conversacionId={sel.id}
@@ -1114,7 +1206,16 @@ export function Bandeja({
             </div>
             <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
               <Foto nombre={sel.nombre} tam="ficha" />
-              <span className="mt-3 text-xl">{sel.nombre}</span>
+              <span className="mt-3 flex max-w-full items-center justify-center gap-1">
+                <span className="min-w-0 text-xl [overflow-wrap:anywhere]">{sel.nombre}</span>
+                {escribe && (
+                  <button type="button" onClick={() => setNombreDe({ id: sel.id, nombre: sel.nombre, personalizado: sel.nombrePersonalizado })} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8 flex-none`}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                    </svg>
+                  </button>
+                )}
+              </span>
               {(sel.codigo || verTelefono) && (
                 <span className="flex items-center gap-1 text-[15px] text-[var(--wa-sec)] tabular-nums">
                   {sel.codigo}
@@ -1248,7 +1349,24 @@ function BotonBorrarMensaje({ alPulsar }: { alPulsar: () => void }) {
   );
 }
 
-function Burbuja({ m, seguido, alPedirBorrar }: { m: MensajeVista; seguido: boolean; alPedirBorrar?: (m: MensajeVista) => void }) {
+/** El botón de guardar un mensaje ya mandado como mensaje rápido (junto al de pedir borrarlo; se ve al pasar el cursor o al enfocarlo). */
+function BotonRapidaMensaje({ alPulsar }: { alPulsar: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={alPulsar}
+      aria-label="Guardar este mensaje como mensaje rápido"
+      title="Guardar como mensaje rápido"
+      className={`absolute top-1 right-8 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wa-fondo)] text-[var(--wa-sec)] opacity-0 shadow-[0_1px_2px_var(--wa-sombra)] group-hover:opacity-100 hover:text-[var(--wa-acento)] focus-visible:opacity-100 ${anilloFoco}`}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
+      </svg>
+    </button>
+  );
+}
+
+function Burbuja({ m, seguido, alPedirBorrar, alGuardarRapida }: { m: MensajeVista; seguido: boolean; alPedirBorrar?: (m: MensajeVista) => void; alGuardarRapida?: (texto: string) => void }) {
   if (m.direccion === "nota" && esAvisoDelSistema(m.texto)) {
     return (
       <span className="my-1.5 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
@@ -1282,6 +1400,7 @@ function Burbuja({ m, seguido, alPedirBorrar }: { m: MensajeVista; seguido: bool
       }`}
     >
       {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
+      {nuestro && alGuardarRapida && m.tipo === "texto" && (m.texto?.trim().length ?? 0) >= 3 && <BotonRapidaMensaje alPulsar={() => alGuardarRapida(m.texto ?? "")} />}
       {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
       <Contenido m={m} />
       {m.eliminadoEnWhatsapp && (

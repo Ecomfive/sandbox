@@ -1028,7 +1028,7 @@ convenciones técnicas del código.
   No se mandan acuses de lectura a WhatsApp. **Productos que pregunta** (29 oct 2026): la ficha del chat (`productos-chat.tsx`,
   `productos-chat-actions.ts`) cruza los últimos 40 mensajes entrantes con los productos simples de `skus_maestros` (`productosMencionados`
   en `src/lib/crm/productos-chat.ts`: dos palabras seguidas del nombre o el código) y suma los fijados (tabla `whatsapp_conversacion_productos`,
-  migración 0179); de cada uno, `cargarEnCamino` del país del dropshipper (o del prefijo del número). Bajo 1280 px la ficha se abre encima.
+  migración 0180); de cada uno, `cargarEnCamino` del país del dropshipper (o del prefijo del número). Bajo 1280 px la ficha se abre encima.
   filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
   comercial; +507 Atención): cada número de 360dialog tiene su clave; `config360(numero)` usa `D360_API_KEY_<dígitos del número>` si está y si no
   `D360_API_KEY` (la principal, también la de plantillas). El envío (`NumeroEmpresa` en `api.ts`, `conversacionPermitida().numeroEmpresa`)
@@ -1066,7 +1066,13 @@ convenciones técnicas del código.
   contenido** (`detectarArchivoWhatsapp`, `src/lib/whatsapp/archivos.ts`, con prueba: fotos JPG/PNG ≤ 5 MB; audios MP3, M4A/AAC, OGG **con Opus** y AMR ≤ 16 MB; video MP4/3GP ≤ 16 MB; documentos PDF, Word, Excel, PowerPoint
   y .txt ≤ 16 MB), lo sube a WhatsApp (`subirMedioWhatsapp`, `api.ts`: multipart a `<360dialog>/media` o `graph.facebook.com/<v>/<número>/media`; **el sandbox de 360dialog no maneja archivos**) y lo manda con su id
   (`enviarArchivoWhatsapp`). Queda en el chat como un mensaje saliente con `media_id = storage:<ruta>`, que `/api/whatsapp/media/<mensaje>` ya sabe servir. Mismas reglas que un texto: poder escribir, no solo supervisar y la
-  ventana de 24 h abierta (`chatParaEnviar`). Si algo falla, el archivo subido se borra. Auditoría `enviar_archivo_whatsapp`. **Mensajes sin texto que no se saben leer** (29 oct 2026): `contenidoDe` (`extraer.ts`) ya no deja `Mensaje` vacío: un tipo que WhatsApp no entrega (`unsupported`, con su motivo), un anuncio (`request_welcome`), un pedido, un aviso del
+  ventana de 24 h abierta (`chatParaEnviar`). Si algo falla, el archivo subido se borra. Auditoría `enviar_archivo_whatsapp`. **Mensajes rápidos y nombre del contacto** (29 oct 2026, migración 0179): `whatsapp_respuestas_rapidas` (texto único sin importar mayúsculas, `usos`, RLS sin políticas; 6 de arranque) compartidas por todo el equipo del
+  CRM; `rapidas-actions.ts` (`listarRespuestasRapidas`, `guardarRespuestaRapida`, `editarRespuestaRapida`, `borrarRespuestaRapida` —no es historial de ningún chat, por eso sí se borra—, `usarRespuestaRapida`). Arriba del cuadro
+  de texto salen los más usados o, escribiendo, los que empiezan por lo escrito o lo contienen (`sugerirRapidas`, `src/lib/whatsapp/rapidas.ts`, con prueba); se guardan con el marcador «+» junto a enviar, con el rayo de un mensaje
+  ya mandado, o en `VentanaRapidas` (`respuestas-rapidas.tsx`, el rayo de arriba). Sin la migración se usan 4 de siempre y no se pueden editar. **Nombre del contacto:** `whatsapp_conversaciones.nombre_personalizado` (aparte de
+  `nombre_perfil`, que cada mensaje vuelve a escribir) manda sobre el del CRM y el del perfil (`cargarBandeja`, consulta aparte que ignora el error); se cambia con el lápiz del encabezado o «Cambiar el nombre» del clic derecho
+  (`renombrarContacto`, `VentanaNombreContacto`); vaciarlo vuelve al de siempre y no toca el CRM. Reversa: `supabase/rollbacks/0179_rollback.sql`.
+  **Mensajes sin texto que no se saben leer** (29 oct 2026): `contenidoDe` (`extraer.ts`) ya no deja `Mensaje` vacío: un tipo que WhatsApp no entrega (`unsupported`, con su motivo), un anuncio (`request_welcome`), un pedido, un aviso del
   sistema, un botón (usa su `payload` si no trae texto), un formulario (`nfm_reply`) o un tipo desconocido dicen qué llegó y de qué tipo de Meta (`textoDeRespaldo`, con prueba). Lo ya guardado como «Mensaje» no se puede recuperar (no se guarda el aviso crudo).
   **Ver una foto del chat**: pulsarla abre `VisorImagen` (`components/ui/visor-imagen.tsx`, con `pie` y `descargar` opcionales) sobre la misma página, centrada, con su texto y «Descargar»; ya no se abre la imagen suelta en otra pestaña.
   **Notas de voz** (`bandeja/grabar-voz.tsx`, `src/lib/whatsapp/voz.ts`, con prueba): el micrófono junto al clip abre una ventana que graba con `MediaRecorder` (WebM en Chrome, MP4 en Safari: WhatsApp no los acepta) hasta

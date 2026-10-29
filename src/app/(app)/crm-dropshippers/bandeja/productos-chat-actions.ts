@@ -29,7 +29,7 @@ export interface ProductoDelChat {
 export interface ProductosDelChat {
   pais: { id: string; nombre: string } | null;
   productos: ProductoDelChat[];
-  /** Sin la migración 0179 no se pueden fijar productos (las sugerencias salen igual). */
+  /** Sin la migración 0180 no se pueden fijar productos (las sugerencias salen igual). */
   sePuedeFijar: boolean;
 }
 
@@ -143,6 +143,6 @@ export async function fijarProductoChat(conversacionId: string, skuId: string, f
   const r = fijar
     ? await supabase.from(TABLA).upsert({ conversacion_id: conversacionId, sku_id: skuId, agregado_por: u.nombre || u.email }, { onConflict: "conversacion_id,sku_id", ignoreDuplicates: true })
     : await supabase.from(TABLA).delete().eq("conversacion_id", conversacionId).eq("sku_id", skuId);
-  if (r.error) return { error: /does not exist|schema cache/i.test(r.error.message) ? "Falta correr la migración 0179 en la base." : "No se pudo guardar." };
+  if (r.error) return { error: /does not exist|schema cache/i.test(r.error.message) ? "Falta correr la migración 0180 en la base." : "No se pudo guardar." };
   return { ok: true };
 }

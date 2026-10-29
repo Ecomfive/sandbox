@@ -136,7 +136,7 @@ export function ProductosDelChatFicha({ conversacionId, escribe, alAviso }: { co
               )}
             </div>
           )}
-          {escribe && !datos.sePuedeFijar && <span className="text-[12px] text-[var(--wa-sec)]">Para fijar productos falta correr la migración 0179 en la base.</span>}
+          {escribe && !datos.sePuedeFijar && <span className="text-[12px] text-[var(--wa-sec)]">Para fijar productos falta correr la migración 0180 en la base.</span>}
         </>
       )}
     </div>
