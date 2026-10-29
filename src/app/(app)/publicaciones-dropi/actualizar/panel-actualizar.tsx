@@ -13,6 +13,17 @@ type EstadoExtension = "buscando" | "lista" | "no_instalada" | "recargar";
 /** Los países que se actualizan desde aquí con la cuenta de proveedor. */
 type PaisProveedor = "pa" | "cr";
 const PAISES: PaisProveedor[] = ["pa", "cr"];
+
+/** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026): una anterior no sabe de ese país y no responde por él. */
+const VERSION_PARA: Record<PaisProveedor, string> = { pa: "0.0.0", cr: "0.3.0" };
+/** «0.2.3» es anterior a «0.3.0». */
+const versionAnterior = (tiene: string | null, pide: string) => {
+  if (!tiene) return false;
+  const a = tiene.split(".").map(Number);
+  const b = pide.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
+  return false;
+};
 type EstadoPaso = "espera" | "leyendo" | "procesando" | "listo" | "error";
 interface Paso {
   estado: EstadoPaso;
@@ -68,6 +79,8 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   const [extension, setExtension] = useState<EstadoExtension>("buscando");
   const [version, setVersion] = useState<string | null>(null);
   const [sesiones, setSesiones] = useState<Record<PaisProveedor, SesionDropi | null>>({ pa: null, cr: null });
+  /** Por qué no se pudo revisar la sesión de un país (la extensión no respondió); antes se callaba y la tarjeta quedaba en «Revisando…». */
+  const [fallos, setFallos] = useState<Record<PaisProveedor, string | null>>({ pa: null, cr: null });
   const [corriendo, setCorriendo] = useState<Corriendo | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
   const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr]);
@@ -79,9 +92,15 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   const retomada = useRef(false);
 
   const revisarSesion = useCallback(async (pais: PaisProveedor, abrir: boolean) => {
-    const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais, abrir }, abrir ? 45000 : 10000);
-    setSesiones((x) => ({ ...x, [pais]: s }));
-    return s;
+    try {
+      const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais, abrir }, abrir ? 45000 : 10000);
+      setSesiones((x) => ({ ...x, [pais]: s }));
+      setFallos((x) => ({ ...x, [pais]: null }));
+      return s;
+    } catch (e) {
+      setFallos((x) => ({ ...x, [pais]: e instanceof Error ? e.message : "La extensión no respondió." }));
+      throw e;
+    }
   }, []);
 
   // ¿Está la extensión? (el puente puede tardar un instante en cargar: se pregunta unas veces).
@@ -406,7 +425,17 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
             cuenta={CUENTAS[p].cuenta}
             estado={estadoDe(p)}
             vence={sesiones[p]?.vence ?? null}
-            alAbrir={extension === "lista" ? () => void pedirExtension({ tipo: "mostrar", pais: p }).then(() => revisarSesion(p, false)).catch(() => null) : undefined}
+            fallo={fallos[p]}
+            extensionVieja={extension === "lista" && versionAnterior(version, VERSION_PARA[p]) ? { tiene: version ?? "", pide: VERSION_PARA[p] } : null}
+            origen={CUENTAS[p].origen}
+            alAbrir={
+              extension === "lista"
+                ? () =>
+                    void pedirExtension({ tipo: "mostrar", pais: p }, 10000)
+                      .then(() => revisarSesion(p, false))
+                      .catch((e) => setFallos((x) => ({ ...x, [p]: e instanceof Error ? e.message : "La extensión no respondió." })))
+                : undefined
+            }
             alRevisar={extension === "lista" ? () => void revisarSesion(p, false).catch(() => null) : undefined}
             que={p === "cr" && !ultima.stock_cr ? "Pedidos (desde el 1 de septiembre), cartera, retiros, stock y ventas · la primera vez crea sus publicaciones" : "Pedidos, cartera, retiros, stock y ventas"}
           />
@@ -541,6 +570,9 @@ function TarjetaCuenta({
   que,
   alAbrir,
   alRevisar,
+  fallo = null,
+  extensionVieja = null,
+  origen,
 }: {
   sigla: string;
   titulo: string;
@@ -551,6 +583,12 @@ function TarjetaCuenta({
   que: string;
   alAbrir?: () => void;
   alRevisar?: () => void;
+  /** Por qué no se pudo revisar (la extensión no respondió). */
+  fallo?: string | null;
+  /** La extensión es anterior a la que pide este país. */
+  extensionVieja?: { tiene: string; pide: string } | null;
+  /** La página de Dropi del país, para abrirla aunque la extensión no responda. */
+  origen: string;
 }) {
   const chip: Record<string, [string, string]> = {
     ok: ["Sesión activa", "bg-success/10 text-success"],
@@ -559,7 +597,8 @@ function TarjetaCuenta({
     otra_cuenta: ["Otra cuenta", "bg-warning/10 text-warning"],
     sin_pestana: ["Dropi no está abierto", "bg-muted text-muted-foreground"],
   };
-  const [texto, clase] = estado ? chip[estado] : ["Revisando…", "bg-muted text-muted-foreground"];
+  const sinRespuesta = !!(extensionVieja || fallo) && estado !== "ok";
+  const [texto, clase] = sinRespuesta ? ["Sin respuesta", "bg-destructive/10 text-destructive"] : estado ? chip[estado] : ["Revisando…", "bg-muted text-muted-foreground"];
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -577,7 +616,11 @@ function TarjetaCuenta({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <span>
-          {estado === "ok" && vence
+          {extensionVieja && estado !== "ok"
+            ? `Tu extensión «Ecomfive · Dropi» es la ${extensionVieja.tiene} y ${titulo} necesita la ${extensionVieja.pide}: en chrome://extensions pulsa «Recargar» en ella y después recarga esta página.`
+            : fallo && estado !== "ok"
+              ? `${fallo} Recarga la extensión en chrome://extensions y esta página. Mientras tanto puedes abrir Dropi ${titulo} con el enlace.`
+              : estado === "ok" && vence
             ? `Vence ${fechaHora(vence)}.`
             : estado === "otra_cuenta"
               ? `La pestaña tiene otra cuenta: entra con la ${cuenta}.`
@@ -593,10 +636,18 @@ function TarjetaCuenta({
               Revisar
             </button>
           )}
-          {alAbrir && estado !== "ok" && (
-            <button type="button" className={botonSecundario} onClick={alAbrir}>
+          {sinRespuesta ? (
+            // Sin respuesta de la extensión, el botón igual abre Dropi del país (en una pestaña nueva) para iniciar sesión.
+            <a href={`${origen}/dashboard/home`} target="_blank" rel="noreferrer" className={botonSecundario}>
               Abrir Dropi {titulo}
-            </button>
+            </a>
+          ) : (
+            alAbrir &&
+            estado !== "ok" && (
+              <button type="button" className={botonSecundario} onClick={alAbrir}>
+                Abrir Dropi {titulo}
+              </button>
+            )
           )}
 
         </span>
