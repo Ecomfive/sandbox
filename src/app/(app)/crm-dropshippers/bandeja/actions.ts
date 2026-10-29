@@ -182,6 +182,24 @@ export async function cambiarEstadoConversacion(id: string, estado: "abierta" | 
   return error ? { error: "No se pudo cambiar." } : { ok: true };
 }
 
+/**
+ * «Marcar como no leído» / «Marcar como leído» (clic derecho en un chat de la lista, 29 oct 2026). No leído deja el contador en 1 como mínimo y reabre el chat si estaba
+ * resuelto: vuelve a contar como pendiente de respuesta. Es la misma marca que pone y quita el propio hecho de abrir un chat, así que basta poder abrir el CRM.
+ */
+export async function marcarChatLeido(id: string, leido: boolean): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioBandeja(false);
+  if (!u) return { error: "No tienes acceso." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
+  if (leido) {
+    const { error } = await supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", id).gt("no_leidos", 0);
+    return error ? { error: "No se pudo marcar como leído." } : { ok: true };
+  }
+  const { data } = await supabase.from("whatsapp_conversaciones").select("no_leidos").eq("id", id).maybeSingle();
+  const { error } = await supabase.from("whatsapp_conversaciones").update({ no_leidos: Math.max(1, Number(data?.no_leidos ?? 0)), estado: "abierta" }).eq("id", id);
+  return error ? { error: "No se pudo marcar como no leído." } : { ok: true };
+}
+
 const NOMBRE_AREA: Record<AreaCrm, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
 
 /**
