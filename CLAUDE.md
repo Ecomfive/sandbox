@@ -675,7 +675,7 @@ convenciones técnicas del código.
   con la etiqueta de la fila (`BotonLiquidacionFila`, entre Pausar y Archivar; `BotonLiquidacionFicha` en la ficha; `liquidacion.tsx`, `marcarLiquidacion`
   en `actions.ts`, `motivoLiquidacion`). `cargarPublicaciones` lo lee aparte (sin la migración, ninguna) y a una en liquidación le quita las recomendaciones
   `NO_EN_LIQUIDACION` (combo x2 y subir precio), pero **sigue en margen bajo** (pedido de Alcides): la tarjeta «Margen bajo» la cuenta aparte en `junto`
-  («22 / 13 en liquidación», ámbar), la fila pone el punto del margen en ámbar y dice «En liquidación». Campo de filtro `liquidacion`; no hay tarjeta aparte. Solo del sistema: no pasa por la cola de Dropi.
+  («22 / 13 en liquidación», ámbar), la fila pone el punto del margen en ámbar y la insignia roja sólida «En liquidación» junto al nombre (como «Privado», `bg-destructive text-background`). Campo de filtro `liquidacion`; no hay tarjeta aparte. Solo del sistema: no pasa por la cola de Dropi.
   **Cambiar stock en Dropi** (28 oct 2026, pedido de Alcides; migración 0173, `src/lib/publicaciones/stock-dropi.ts`, con prueba): un séptimo cambio de la cola
   (`tipo = 'stock'`, `datos` = `DatosStock`: bodega, nombre, unidades que deben quedar, `antes` = lo que mostraba la lectura y concepto). En el bloque «Stock» de la
   ficha (`BodegasStockDropi`, `stock-dropi.tsx`) cada bodega de ECOMFIVE (también las sin stock, de `opcionesCrear.bodegas`) tiene un lápiz; la B280 se ve y no se edita.
