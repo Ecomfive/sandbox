@@ -16,8 +16,10 @@ export interface NumeroVista {
 export interface ConversacionVista {
   id: string;
   numeroId: string;
-  /** El nombre del dropshipper en el CRM o, si no está, el de su perfil de WhatsApp (o «Contacto XXXX»). El número nunca viaja a la pantalla. */
+  /** El nombre con que se ve el chat: el que le puso el equipo, el del dropshipper en el CRM, el de su perfil de WhatsApp o «Contacto XXXX». El número nunca viaja a la pantalla. */
   nombre: string;
+  /** El nombre que le puso el equipo (migración 0179), si lo hay: manda sobre los demás. */
+  nombrePersonalizado: string | null;
   nombrePerfil: string | null;
   dropshipperId: string | null;
   codigo: string | null;
@@ -134,6 +136,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       area: c.area as AreaCrm,
       borradaEnApp: null,
       borradoPendiente: false,
+      nombrePersonalizado: null,
     };
   });
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
@@ -141,6 +144,18 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   if (!marcadas.error) {
     const porId = new Map((marcadas.data ?? []).map((x) => [x.id as string, { por: (x.borrada_en_app_por as string | null) ?? null, en: x.borrada_en_app_en as string }]));
     for (const c of conversaciones) c.borradaEnApp = porId.get(c.id) ?? null;
+  }
+  // Los nombres que el equipo les puso a los chats (migración 0179). Sin la columna, ninguno.
+  const nombrados = await supabase.from("whatsapp_conversaciones").select("id, nombre_personalizado").not("nombre_personalizado", "is", null);
+  if (!nombrados.error) {
+    const alias = new Map((nombrados.data ?? []).map((x) => [x.id as string, x.nombre_personalizado as string]));
+    for (const c of conversaciones) {
+      const a = alias.get(c.id);
+      if (a) {
+        c.nombrePersonalizado = a;
+        c.nombre = a;
+      }
+    }
   }
   // Lo que se autorizó borrar se oculta y se marca lo que espera autorización (migración 0172). Sin ella, nada.
   const [ocultas, pendientes] = await Promise.all([conversacionesOcultas(supabase), borradosPendientes(supabase)]);
