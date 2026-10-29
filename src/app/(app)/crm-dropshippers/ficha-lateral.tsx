@@ -22,7 +22,7 @@ import { MostrarTelefono } from "./mostrar-telefono";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
-import { PanelCaso, PanelEditar, PanelNota, PanelPedido, PanelRecomendar } from "./paneles-ficha";
+import { PanelCaso, PanelEditar, PanelNota, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import { ConversacionWhatsapp } from "./conversacion-whatsapp";
 import { EtiquetasDropshipper } from "./etiquetas-dropshipper";
@@ -197,7 +197,6 @@ export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDrops
       {acceso.escribeAtencion && (
         <>
           <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-          <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
           <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
           <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
           <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
