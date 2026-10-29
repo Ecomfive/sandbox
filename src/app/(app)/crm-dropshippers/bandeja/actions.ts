@@ -216,7 +216,9 @@ export async function cambiarEstadoConversacion(id: string, estado: "abierta" | 
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase.from("whatsapp_conversaciones").update({ estado, ...(estado === "resuelta" ? { no_leidos: 0 } : {}) }).eq("id", id);
-  return error ? { error: "No se pudo cambiar." } : { ok: true };
+  if (error) return { error: "No se pudo cambiar." };
+  await registrarAuditoria({ accion: estado === "resuelta" ? "resolver_chat_whatsapp" : "reabrir_chat_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id });
+  return { ok: true };
 }
 
 /**
@@ -230,11 +232,15 @@ export async function marcarChatLeido(id: string, leido: boolean): Promise<{ ok:
   if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
   if (leido) {
     const { error } = await supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", id).gt("no_leidos", 0);
-    return error ? { error: "No se pudo marcar como leído." } : { ok: true };
+    if (error) return { error: "No se pudo marcar como leído." };
+    await registrarAuditoria({ accion: "marcar_leido_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id });
+    return { ok: true };
   }
   const { data } = await supabase.from("whatsapp_conversaciones").select("no_leidos").eq("id", id).maybeSingle();
   const { error } = await supabase.from("whatsapp_conversaciones").update({ no_leidos: Math.max(1, Number(data?.no_leidos ?? 0)), estado: "abierta" }).eq("id", id);
-  return error ? { error: "No se pudo marcar como no leído." } : { ok: true };
+  if (error) return { error: "No se pudo marcar como no leído." };
+  await registrarAuditoria({ accion: "marcar_no_leido_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id });
+  return { ok: true };
 }
 
 
@@ -303,7 +309,9 @@ export async function tomarConversacion(id: string, soltar = false): Promise<{ o
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase.from("whatsapp_conversaciones").update({ asignada_a: soltar ? null : u.id }).eq("id", id);
-  return error ? { error: "No se pudo cambiar." } : { ok: true };
+  if (error) return { error: "No se pudo cambiar." };
+  await registrarAuditoria({ accion: soltar ? "soltar_chat_whatsapp" : "tomar_chat_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id });
+  return { ok: true };
 }
 
 /**
