@@ -8,6 +8,7 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ACCIONES_COMERCIALES, FASES, MODULO_ATENCION, MODULO_COMERCIAL, accesoCrm, areaParaNota, areasVisibles, etiquetaFase } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
+import { enlazarChatsPorTelefono, telefonoDeOtro } from "@/lib/whatsapp/vinculo";
 import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
@@ -37,6 +38,7 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
     if (!tel) return { error: "El teléfono no es válido. Escríbelo con el prefijo del país, p. ej. +57 300 111 2233." };
     contacto_telefono = tel.e164;
     pais_origen = tel.pais;
+    if (await telefonoDeOtro(supabase, tel.e164, null)) return { error: "Ya hay un dropshipper con ese WhatsApp." };
   }
 
   const { data, error } = await supabase
@@ -54,6 +56,8 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
     return { error: errorPais.message };
   }
   await registrarAuditoria({ accion: "crear_dropshipper", entidad: "dropshippers", entidadId: data.id, detalle: `nombre=${nombre}` });
+  // Si ya había chats de ese número, quedan enlazados desde ahora.
+  if (contacto_telefono && (await enlazarChatsPorTelefono(supabase, data.id, contacto_telefono)) > 0) revalidatePath("/crm-dropshippers/bandeja");
   revalidatePath("/crm-dropshippers", "layout");
   return {};
 }
@@ -260,7 +264,10 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
     const tel = normalizarTelefono(telefonoTexto, primero);
     if (!tel) return { error: "El teléfono no es válido. Escríbelo con el prefijo del país, p. ej. +57 300 111 2233." };
     contacto_telefono = tel.e164;
-    if (tel.e164 !== actual.contacto_telefono) pais_origen = tel.pais;
+    if (tel.e164 !== actual.contacto_telefono) {
+      pais_origen = tel.pais;
+      if (await telefonoDeOtro(supabase, tel.e164, id)) return { error: "Ya hay un dropshipper con ese WhatsApp." };
+    }
   }
 
   const { error } = await supabase
@@ -281,6 +288,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
     })
     .eq("id", id);
   if (error) return { error: error.code === "23505" ? "Ya hay un dropshipper con ese WhatsApp." : "No se pudo guardar." };
+  // Los chats sin enlazar de su número quedan enlazados desde ahora (no hace falta esperar a su próximo mensaje).
+  if (contacto_telefono && (await enlazarChatsPorTelefono(supabase, id, contacto_telefono)) > 0) revalidatePath("/crm-dropshippers/bandeja");
 
   const antes: Record<string, string> = {};
   const despues: Record<string, string> = {};

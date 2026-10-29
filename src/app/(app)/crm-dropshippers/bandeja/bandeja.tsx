@@ -10,6 +10,7 @@ import type { AreaCrm } from "@/lib/crm/areas";
 import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { VistaPreviaChat } from "./vista-previa-chat";
+import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
@@ -246,6 +247,7 @@ export function Bandeja({
   const [borrador, setBorrador] = useState("");
   const [verPlantillas, setVerPlantillas] = useState(false);
   const [borrar, setBorrar] = useState<QueBorrar | null>(null);
+  const [vincular, setVincular] = useState(false);
   // La vista previa de los últimos mensajes al pasar el cursor por un chat de la lista (solo con ratón y pantalla ancha).
   const [vista, setVista] = useState<{ id: string; top: number; left: number; mensajes: VistaPreviaMensaje[] | "cargando" | "error" } | null>(null);
   const temporizadorVista = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -900,6 +902,18 @@ export function Bandeja({
         </div>
       )}
 
+      {vincular && sel && (
+        <VentanaVincular
+          conversacionId={sel.id}
+          actual={verDropshipper ? { id: verDropshipper.id, nombre: verDropshipper.nombre } : null}
+          alCerrar={() => setVincular(false)}
+          alListo={(mensaje) => {
+            setVincular(false);
+            mostrarToast(mensaje);
+            void refrescar(sel.id);
+          }}
+        />
+      )}
       {borrar && sel && (
         <PedirBorrado
           conversacionId={sel.id}
@@ -980,7 +994,15 @@ export function Bandeja({
             </>
           ) : !sel.dropshipperId ? (
             <Bloque titulo="No está en el CRM">
-              <p className="m-0 text-[13px] text-[var(--wa-sec)]">Si es un dropshipper, agrégalo (o pon este número en su ficha) y la conversación queda enlazada con el próximo mensaje.</p>
+              <SugerenciasDeVinculo
+                conversacionId={sel.id}
+                escribe={escribe}
+                alAbrirBusqueda={() => setVincular(true)}
+                alListo={(mensaje) => {
+                  mostrarToast(mensaje);
+                  void refrescar(sel.id);
+                }}
+              />
               <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.nombre)}`} className={`text-[14px] font-medium text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
                 Buscarlo en el CRM
               </Link>
@@ -1003,6 +1025,11 @@ export function Bandeja({
                 </svg>
                 Abrir su ficha en el CRM
               </Link>
+              {escribe && (
+                <button type="button" onClick={() => setVincular(true)} className={`py-1 text-left text-[14px] text-[var(--wa-sec)] hover:underline ${anilloFoco}`}>
+                  No es este dropshipper
+                </button>
+              )}
             </div>
           )}
         </aside>
