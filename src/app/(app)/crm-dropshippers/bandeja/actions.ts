@@ -188,8 +188,17 @@ export async function prepararEnvioArchivo(id: string, nombre: string, tamano: n
   if (!Number.isFinite(tamano) || tamano <= 0) return { error: "El archivo está vacío." };
   if (tamano > MAX_BYTES_ENVIO) return { error: `El archivo pesa más de ${MAX_BYTES_ENVIO / 1024 / 1024} MB.` };
   const ruta = `${id}/enviados/${crypto.randomUUID()}-${nombreArchivoSeguro(nombre)}`;
-  const { data, error } = await e.supabase.storage.from(BUCKET_ARCHIVOS).createSignedUploadUrl(ruta);
-  if (error || !data) return { error: "No se pudo preparar la subida del archivo." };
+  const pedir = () => e.supabase.storage.from(BUCKET_ARCHIVOS).createSignedUploadUrl(ruta);
+  let { data, error } = await pedir();
+  // Si el almacén de los archivos todavía no existe (la migración 0169 no se corrió), se crea aquí y se vuelve a pedir el permiso.
+  if (error && /bucket|not found/i.test(error.message ?? "")) {
+    await e.supabase.storage.createBucket(BUCKET_ARCHIVOS, { public: false, fileSizeLimit: 25 * 1024 * 1024 });
+    ({ data, error } = await pedir());
+  }
+  if (error || !data) {
+    console.error("[whatsapp] no se pudo preparar la subida de un archivo:", error?.message);
+    return { error: `No se pudo preparar la subida del archivo${error?.message ? ` (${error.message})` : ""}.` };
+  }
   return { ruta, token: data.token };
 }
 
