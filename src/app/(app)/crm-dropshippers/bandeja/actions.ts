@@ -8,11 +8,12 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
+import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
 import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { claves360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
-import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper } from "./datos-bandeja";
+import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
@@ -53,6 +54,32 @@ export async function ultimosMensajesDropshipper(
     ultimoEntranteEn: (c.ultimo_entrante_en as string | null) ?? null,
     noLeidos: Number(c.no_leidos ?? 0),
   };
+}
+
+/**
+ * Los últimos mensajes de un chat para la vista previa que se despliega al pasar el cursor por la lista (29 oct 2026). **Solo mira**: no marca el chat como leído
+ * (eso pasa al abrirlo). Lo que se autorizó ocultar no sale.
+ */
+export async function vistaPreviaChat(id: string, cantidad = 3): Promise<{ mensajes: VistaPreviaMensaje[] } | { error: string }> {
+  const u = await usuarioBandeja(false);
+  if (!u) return { error: "No tienes acceso." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
+  const n = Math.min(8, Math.max(1, Math.floor(Number(cantidad)) || 3));
+  const [r, ocultos] = await Promise.all([
+    supabase.from("whatsapp_mensajes").select("id, direccion, tipo, texto, momento").eq("conversacion_id", id).order("momento", { ascending: false }).limit(n + 6),
+    mensajesOcultos(supabase, id),
+  ]);
+  if (r.error) return { error: "No se pudieron leer los mensajes." };
+  const mensajes: VistaPreviaMensaje[] = (r.data ?? [])
+    .filter((m) => !ocultos.has(m.id as string))
+    .slice(0, n)
+    .reverse()
+    .map((m) => {
+      const texto = resumenMensaje(m.tipo as string, (m.texto as string | null) ?? null);
+      return { id: m.id as string, direccion: m.direccion as VistaPreviaMensaje["direccion"], texto: texto.length > 500 ? `${texto.slice(0, 500)}…` : texto, momento: m.momento as string };
+    });
+  return { mensajes };
 }
 
 /** Los mensajes de una conversación y su dropshipper. Al abrirla (o mientras está abierta) queda leída. */
