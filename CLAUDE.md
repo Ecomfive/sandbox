@@ -649,6 +649,9 @@ convenciones técnicas del código.
   publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
+  **Íconos en la Actividad** (28 oct 2026, pedido de Alcides): `Actividad` acepta `iconoCambio` (reemplaza el punto gris de un cambio); Gestión de IDs Dropi
+  lo usa con `iconoDeAccion` (`src/lib/publicaciones/icono-actividad.ts`, con prueba: la acción de la auditoría → el ícono de su botón; rojo si termina en
+  `_error`/`_parcial`). Una acción nueva del módulo que no caiga en ningún patrón sale con el punto: agrégala ahí.
   **La competencia en las recomendaciones de precio** (28 oct 2026, pedido de Alcides): `cargarCompetidores` (`competencia-publicaciones.ts`) trae también el
   `stock` y `vendido30` de cada competidor (`unidadesBajadas` de `competencia_historial`, de a 150 productos) y `competidoresEquivalentes` los ordena por precio
   equivalente; «Subir precio» y «Bajar precio frente a la competencia» llevan `Recomendacion.competidores` (hasta `MAX_COMPETIDORES_RECOMENDACION` = 5), que la
