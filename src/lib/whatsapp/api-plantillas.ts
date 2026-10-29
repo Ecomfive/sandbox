@@ -2,8 +2,8 @@
 // (`/message_templates`, con la misma forma que la de Meta); si no, directo con Meta (`WHATSAPP_TOKEN` y `WHATSAPP_WABA_ID`). El sandbox de
 // 360dialog no maneja plantillas. Las claves solo viven en el servidor. Importa con rutas relativas porque también lo usa `scripts/`.
 
-import { construirComponentes, leerListaMeta, type DatosPlantilla, type PlantillaDeMeta } from "./plantillas";
-import { config360, urlBase360 } from "./proveedor";
+import { construirComponentes, leerListaMeta, normalizarIdioma, type DatosPlantilla, type PlantillaDeMeta } from "./plantillas";
+import { claves360, config360, urlBase360, type Config360 } from "./proveedor";
 import { leerErrorEnvio } from "./ventana";
 
 interface Acceso {
@@ -13,9 +13,12 @@ interface Acceso {
   waba: string | null;
 }
 
-/** Con qué se habla con Meta, o por qué todavía no se puede (WhatsApp no está conectado). */
-export function accesoPlantillas(): { acceso: Acceso } | { error: string } {
-  const d360 = config360();
+/**
+ * Con qué se habla con Meta, o por qué todavía no se puede (WhatsApp no está conectado). Sin `canal`, con la clave principal; con `canal`, con la de ese número (30 oct 2026: cada número
+ * de 360dialog tiene su clave y las plantillas viven en la cuenta de WhatsApp Business a la que pertenece ese número).
+ */
+export function accesoPlantillas(canal?: Config360 | null): { acceso: Acceso } | { error: string } {
+  const d360 = canal ?? config360();
   if (d360) {
     if (d360.sandbox) return { error: "El sandbox de 360dialog no maneja plantillas: hace falta conectar el número real." };
     return { acceso: { origen: "360dialog", base: urlBase360(d360), cabeceras: { "D360-API-KEY": d360.clave, "Content-Type": "application/json" }, waba: null } };
@@ -29,11 +32,36 @@ export function accesoPlantillas(): { acceso: Acceso } | { error: string } {
   return { acceso: { origen: "meta", base: `https://graph.facebook.com/${version}`, cabeceras: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, waba } };
 }
 
-/** Si WhatsApp está conectado para manejar plantillas (sin revelar nada de las claves). */
-export function conexionPlantillas(): { conectado: boolean; via: "360dialog" | "meta" | null; motivo: string | null } {
+/** Si WhatsApp está conectado para manejar plantillas (sin revelar nada de las claves) y cuántos números de 360dialog tienen su propia clave. */
+export function conexionPlantillas(): { conectado: boolean; via: "360dialog" | "meta" | null; motivo: string | null; numeros: number } {
   const a = accesoPlantillas();
-  return "acceso" in a ? { conectado: true, via: a.acceso.origen, motivo: null } : { conectado: false, via: null, motivo: a.error };
+  const numeros = canalesPlantillas().length;
+  return "acceso" in a ? { conectado: true, via: a.acceso.origen, motivo: null, numeros } : { conectado: false, via: null, motivo: a.error, numeros };
 }
+
+/** Un número de la empresa con su propia clave de 360dialog. */
+export interface Canal {
+  variable: string;
+  config: Config360;
+}
+
+/** Los números con clave de 360dialog, sin repetir una clave y con la principal primero. Con Meta directo o el sandbox, ninguno. */
+export function canalesPlantillas(): Canal[] {
+  const vistas = new Set<string>();
+  const salida: Canal[] = [];
+  for (const c of claves360()) {
+    if (c.config.sandbox || vistas.has(c.config.clave)) continue;
+    vistas.add(c.config.clave);
+    salida.push({ variable: c.variable, config: c.config });
+  }
+  return salida;
+}
+
+/** Cómo se llama un número en los avisos: «+584220350576», o «el principal» si es la clave sin número. */
+export const etiquetaDeCanal = (variable: string): string => {
+  const n = variable.replace(/^D360_API_KEY_?/, "");
+  return n ? `+${n}` : "el número principal";
+};
 
 const rutaLista = (a: Acceso) => (a.origen === "meta" ? `${a.base}/${a.waba}/message_templates` : `${a.base}/message_templates`);
 const rutaUna = (a: Acceso, id: string) => (a.origen === "meta" ? `${a.base}/${encodeURIComponent(id)}` : `${a.base}/message_templates/${encodeURIComponent(id)}`);
@@ -42,12 +70,14 @@ const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object"
 const texto = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 /** Un error de la API de plantillas en palabras para el equipo (los códigos son los de Meta). */
+export const ERROR_YA_EXISTE = "Ya existe una plantilla con ese nombre y ese idioma.";
+
 export function errorDePlantilla(status: number, cuerpo: unknown): string {
   const e = obj(obj(cuerpo).error);
   const codigo = Number(e.code);
   const sub = Number(e.error_subcode);
   if (status === 401 || status === 403 || codigo === 190) return "WhatsApp rechazó la clave o el token. Revísalo en el servidor.";
-  if (sub === 2388024) return "Ya existe una plantilla con ese nombre y ese idioma.";
+  if (sub === 2388024) return ERROR_YA_EXISTE;
   if (sub === 2388023) return "Ese nombre lo tuvo una plantilla que se borró hace poco: Meta no deja reutilizarlo por 30 días. Usa otro nombre.";
   if (status === 429 || codigo === 80008 || codigo === 4) return "Meta no deja crear más plantillas por ahora (máximo 100 por hora). Inténtalo en un rato.";
   const delUsuario = texto(e.error_user_msg);
@@ -77,8 +107,8 @@ async function llamar(a: Acceso, metodo: "GET" | "POST" | "DELETE", url: string,
 }
 
 /** Manda una plantilla nueva a revisión de Meta. Devuelve su id y cómo la dejó (en revisión, normalmente). */
-export async function crearPlantillaMeta(d: DatosPlantilla): Promise<{ metaId: string; estado: string | null; categoria: string | null } | { error: string }> {
-  const a = accesoPlantillas();
+export async function crearPlantillaMeta(d: DatosPlantilla, canal?: Config360 | null): Promise<{ metaId: string; estado: string | null; categoria: string | null } | { error: string }> {
+  const a = accesoPlantillas(canal);
   if ("error" in a) return a;
   const r = await llamar(a.acceso, "POST", rutaLista(a.acceso), { name: d.nombre.trim(), language: d.idioma, category: d.categoria.toUpperCase(), components: construirComponentes(d) });
   if ("error" in r) return r;
@@ -89,16 +119,16 @@ export async function crearPlantillaMeta(d: DatosPlantilla): Promise<{ metaId: s
 }
 
 /** Cambia el texto de una plantilla ya creada (Meta la vuelve a revisar). El nombre, el idioma y la categoría no se cambian. */
-export async function editarPlantillaMeta(metaId: string, d: DatosPlantilla): Promise<{ ok: true } | { error: string }> {
-  const a = accesoPlantillas();
+export async function editarPlantillaMeta(metaId: string, d: DatosPlantilla, canal?: Config360 | null): Promise<{ ok: true } | { error: string }> {
+  const a = accesoPlantillas(canal);
   if ("error" in a) return a;
   const r = await llamar(a.acceso, "POST", rutaUna(a.acceso, metaId), { components: construirComponentes(d) });
   return "error" in r ? r : { ok: true };
 }
 
 /** Borra una plantilla en Meta: la de ese idioma si se da `metaId`, o todas las de ese nombre. */
-export async function borrarPlantillaMeta(nombre: string, metaId: string | null): Promise<{ ok: true } | { error: string }> {
-  const a = accesoPlantillas();
+export async function borrarPlantillaMeta(nombre: string, metaId: string | null, canal?: Config360 | null): Promise<{ ok: true } | { error: string }> {
+  const a = accesoPlantillas(canal);
   if ("error" in a) return a;
   const consulta = `name=${encodeURIComponent(nombre)}${metaId ? `&hsm_id=${encodeURIComponent(metaId)}` : ""}`;
   const r = await llamar(a.acceso, "DELETE", `${rutaLista(a.acceso)}?${consulta}`);
@@ -108,8 +138,8 @@ export async function borrarPlantillaMeta(nombre: string, metaId: string | null)
 const CAMPOS = "id,name,status,category,language,components,quality_score,rejected_reason";
 
 /** Todas las plantillas de la cuenta, con su estado, calidad y categoría actuales (hasta 1.000). */
-export async function listarPlantillasMeta(): Promise<{ plantillas: PlantillaDeMeta[] } | { error: string }> {
-  const a = accesoPlantillas();
+export async function listarPlantillasMeta(canal?: Config360 | null): Promise<{ plantillas: PlantillaDeMeta[] } | { error: string }> {
+  const a = accesoPlantillas(canal);
   if ("error" in a) return a;
   const plantillas: PlantillaDeMeta[] = [];
   let despues: string | null = null;
@@ -122,4 +152,72 @@ export async function listarPlantillasMeta(): Promise<{ plantillas: PlantillaDeM
     if (!despues || !texto(obj(j.paging).next)) break;
   }
   return { plantillas };
+}
+
+/** Qué pasó con una plantilla en uno de los otros números. «misma cuenta»: ese número comparte la cuenta de WhatsApp Business del principal, así que ya la tiene. */
+export type ResultadoEnCanal = { canal: string; hecho: "creada" | "editada" | "ya estaba" | "misma cuenta" } | { canal: string; error: string };
+
+const mismaPlantilla = (p: PlantillaDeMeta, d: { nombre: string; idioma: string }) => p.nombre === d.nombre && normalizarIdioma(p.idioma) === normalizarIdioma(d.idioma);
+
+/**
+ * Deja la plantilla también en los demás números con clave propia (30 oct 2026: «que ambos números tengan las mismas plantillas»). Las plantillas son de la cuenta de WhatsApp Business,
+ * no del número: si dos números comparten cuenta, el otro ya la ve (misma id) y no se hace nada; si están en cuentas distintas, se crea (o, con `editar`, se cambia) en cada una.
+ * `idPrincipal` es la id de la plantilla en el número principal. Un fallo en un número no frena a los demás.
+ */
+export async function replicarPlantillaEnOtrosNumeros(d: DatosPlantilla, idPrincipal: string | null, editar: boolean): Promise<ResultadoEnCanal[]> {
+  const principal = config360()?.clave;
+  const salida: ResultadoEnCanal[] = [];
+  for (const c of canalesPlantillas()) {
+    if (c.config.clave === principal) continue;
+    const canal = etiquetaDeCanal(c.variable);
+    const lista = await listarPlantillasMeta(c.config);
+    if ("error" in lista) {
+      salida.push({ canal, error: lista.error });
+      continue;
+    }
+    const igual = lista.plantillas.find((p) => mismaPlantilla(p, d));
+    if (igual && idPrincipal && igual.metaId === idPrincipal) {
+      salida.push({ canal, hecho: "misma cuenta" });
+      continue;
+    }
+    if (igual) {
+      if (!editar) {
+        salida.push({ canal, hecho: "ya estaba" });
+        continue;
+      }
+      const r = await editarPlantillaMeta(igual.metaId, d, c.config);
+      salida.push("error" in r ? { canal, error: r.error } : { canal, hecho: "editada" });
+      continue;
+    }
+    const r = await crearPlantillaMeta(d, c.config);
+    if ("error" in r) salida.push(r.error === ERROR_YA_EXISTE ? { canal, hecho: "misma cuenta" } : { canal, error: r.error });
+    else salida.push({ canal, hecho: "creada" });
+  }
+  return salida;
+}
+
+/** Borra la plantilla también en los otros números (cuentas distintas). Lo que no se pueda borrar allá se devuelve como aviso: la del principal ya se borró. */
+export async function borrarPlantillaEnOtrosNumeros(d: { nombre: string; idioma: string }, idPrincipal: string | null): Promise<string[]> {
+  const principal = config360()?.clave;
+  const avisos: string[] = [];
+  for (const c of canalesPlantillas()) {
+    if (c.config.clave === principal) continue;
+    const lista = await listarPlantillasMeta(c.config);
+    if ("error" in lista) continue;
+    const igual = lista.plantillas.find((p) => mismaPlantilla(p, d));
+    if (!igual || (idPrincipal && igual.metaId === idPrincipal)) continue;
+    const r = await borrarPlantillaMeta(d.nombre, igual.metaId, c.config);
+    if ("error" in r) avisos.push(`${etiquetaDeCanal(c.variable)}: ${r.error}`);
+  }
+  return avisos;
+}
+
+/** Las plantillas que ve cada número (cada uno por su clave), para comparar. */
+export async function plantillasPorNumero(): Promise<{ canal: string; plantillas: PlantillaDeMeta[] | null; error: string | null }[]> {
+  const salida: { canal: string; plantillas: PlantillaDeMeta[] | null; error: string | null }[] = [];
+  for (const c of canalesPlantillas()) {
+    const r = await listarPlantillasMeta(c.config);
+    salida.push("error" in r ? { canal: etiquetaDeCanal(c.variable), plantillas: null, error: r.error } : { canal: etiquetaDeCanal(c.variable), plantillas: r.plantillas, error: null });
+  }
+  return salida;
 }

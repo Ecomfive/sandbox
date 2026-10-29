@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
 import { claves360, config360, urlDescarga360, variableClave360 } from "./proveedor";
 import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
+import { canalesPlantillas, etiquetaDeCanal } from "./api-plantillas";
 
 const aviso = (value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value }] }] });
 const META = { display_phone_number: "50760000000", phone_number_id: "1234567890" };
@@ -269,6 +270,25 @@ test("un mensaje editado (de un cliente o desde la app) no es un mensaje nuevo: 
   assert.deepEqual(eco.editados.map((e) => [e.waIdOriginal, e.texto]), [["wamid.MIO", "Hola Michael, te saludo Francis"]]);
 });
 
+
+test("plantillas con varios números: un canal por clave distinta, el principal primero, y su etiqueta", () => {
+  const antes = { ...process.env };
+  try {
+    for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
+    assert.deepEqual(canalesPlantillas(), []);
+    process.env.D360_API_KEY = "clave-a";
+    process.env.D360_API_KEY_584220350576 = "clave-b";
+    process.env.D360_API_KEY_50761234567 = "clave-a"; // la misma clave que la principal: es el mismo número
+    assert.deepEqual(canalesPlantillas().map((c) => c.variable), ["D360_API_KEY", "D360_API_KEY_584220350576"]);
+    process.env.D360_SANDBOX = "1";
+    assert.deepEqual(canalesPlantillas(), []); // el sandbox no maneja plantillas
+  } finally {
+    for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
+    Object.assign(process.env, antes);
+  }
+  assert.equal(etiquetaDeCanal("D360_API_KEY"), "el número principal");
+  assert.equal(etiquetaDeCanal("D360_API_KEY_584220350576"), "+584220350576");
+});
 
 test("360dialog con varios números: cada uno usa su propia clave y, si no tiene, la principal", () => {
   const antes = { ...process.env };

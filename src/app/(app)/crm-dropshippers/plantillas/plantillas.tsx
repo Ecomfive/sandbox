@@ -12,6 +12,7 @@ import type { PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { actualizarEstadoPlantillas, agregarSugerida, eliminarPlantilla, enviarPlantillaABorrador, marcarAlertasVistas } from "./actions";
 import type { AlertaVista, NumeroLimite } from "./datos-plantillas";
 import { FichaPlantilla, type InicioPlantilla } from "./ficha-plantilla";
+import { NumerosPlantillas } from "./numeros-plantillas";
 
 const ESTADO: Record<EstadoPlantilla, { etiqueta: string; tono: Tone }> = {
   borrador: { etiqueta: "Borrador", tono: "neutral" },
@@ -55,7 +56,7 @@ export function Plantillas({
   esAdmin,
 }: {
   inicial: { plantillas: PlantillaGuardada[]; alertas: AlertaVista[]; numeros: NumeroLimite[] };
-  conexion: { conectado: boolean; via: "360dialog" | "meta" | null; motivo: string | null };
+  conexion: { conectado: boolean; via: "360dialog" | "meta" | null; motivo: string | null; numeros: number };
   escribe: boolean;
   esAdmin: boolean;
 }) {
@@ -202,6 +203,7 @@ export function Plantillas({
           <BuscarIcon aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar plantillas" className={`${fieldClass} w-full pl-9`} />
         </label>
+        {conexion.conectado && conexion.numeros > 1 && <NumerosPlantillas escribe={escribe} />}
         {conexion.conectado && (
           <button type="button" disabled={ocupado} onClick={actualizar} className={`${boton} gap-1.5`}>
             <ActualizarIcon aria-hidden="true" className="h-3.5 w-3.5" />

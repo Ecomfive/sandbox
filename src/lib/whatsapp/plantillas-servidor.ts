@@ -3,7 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { armarPersonasConAcceso, type PerfilConRol, type PermisoDeRol, type PermisoPropioDeModulo } from "../acceso-seccion";
-import { borrarPlantillaMeta, crearPlantillaMeta, editarPlantillaMeta, listarPlantillasMeta } from "./api-plantillas";
+import { borrarPlantillaEnOtrosNumeros, borrarPlantillaMeta, crearPlantillaMeta, editarPlantillaMeta, listarPlantillasMeta, replicarPlantillaEnOtrosNumeros, type ResultadoEnCanal } from "./api-plantillas";
 import { alertaDeEvento, extraerEventosCuenta, type AlertaNueva, type EventoCuenta } from "./eventos";
 import {
   alinearVariables,
@@ -143,9 +143,24 @@ export async function enviarPlantillaAMeta(supabase: SupabaseClient, id: string)
   }
   const ahora = new Date().toISOString();
   await supabase.from("whatsapp_plantillas").update({ meta_id: metaId, estado, categoria_actual: categoria, enviada_en: ahora, error_envio: null, motivo: null, actualizado_en: ahora }).eq("id", id);
+  // Los demás números con clave propia reciben la misma plantilla (o su cambio), para que todos tengan las mismas.
+  const otros = await replicarPlantillaEnOtrosNumeros(d, metaId, yaEnMeta);
+  const fallas = otros.filter((r): r is { canal: string; error: string } => "error" in r);
+  const alOtros = otros.filter((r) => "hecho" in r && (r.hecho === "creada" || r.hecho === "editada")).map((r) => r.canal);
   await registrarAlerta(
     supabase,
-    { tipo: "plantilla_enviada", severidad: "info", titulo: `Se mandó a Meta la plantilla «${p.nombre}»`, detalle: "Meta la revisa: suele tardar de unos minutos a 24 horas. Te avisamos cuando responda." },
+    {
+      tipo: "plantilla_enviada",
+      severidad: fallas.length ? "aviso" : "info",
+      titulo: `Se mandó a Meta la plantilla «${p.nombre}»`,
+      detalle: [
+        "Meta la revisa: suele tardar de unos minutos a 24 horas. Te avisamos cuando responda.",
+        alOtros.length ? `También se mandó a ${alOtros.join(" y ")}.` : null,
+        ...fallas.map((f) => `No se pudo mandar a ${f.canal}: ${f.error}`),
+      ]
+        .filter(Boolean)
+        .join(" "),
+    },
     id,
   );
   return { ok: true, editada: yaEnMeta };
@@ -153,11 +168,13 @@ export async function enviarPlantillaAMeta(supabase: SupabaseClient, id: string)
 
 /** Borra la plantilla en Meta (si ya estaba allá) y de la base. Si Meta no la borra, no se borra nada. */
 export async function eliminarPlantillaCompleta(supabase: SupabaseClient, id: string): Promise<{ ok: true } | { error: string }> {
-  const { data } = await supabase.from("whatsapp_plantillas").select("id, nombre, meta_id").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("whatsapp_plantillas").select("id, nombre, idioma, meta_id").eq("id", id).maybeSingle();
   if (!data) return { ok: true };
   if (data.meta_id) {
     const r = await borrarPlantillaMeta(data.nombre as string, data.meta_id as string);
     if ("error" in r) return r;
+    // En los otros números (cuentas distintas) también; un fallo allá no impide borrarla aquí.
+    await borrarPlantillaEnOtrosNumeros({ nombre: data.nombre as string, idioma: (data.idioma as string) ?? "es" }, data.meta_id as string);
   }
   const { error } = await supabase.from("whatsapp_plantillas").delete().eq("id", id);
   return error ? { error: "No se pudo borrar la plantilla." } : { ok: true };
@@ -285,4 +302,25 @@ export async function sincronizarPlantillas(supabase: SupabaseClient): Promise<{
     }
   }
   return { actualizadas, nuevas };
+}
+
+/**
+ * «Igualar números» (30 oct 2026): deja en los demás números con clave propia las plantillas que ya se mandaron a Meta por el principal (en revisión o aprobadas). Las que comparten cuenta
+ * ya están; las de otra cuenta se crean allá. Devuelve cuántas se crearon, cuántas ya estaban y los fallos por número.
+ */
+export async function igualarNumerosDePlantillas(supabase: SupabaseClient): Promise<{ creadas: number; yaEstaban: number; fallas: string[] } | { error: string }> {
+  const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).not("meta_id", "is", null).in("estado", ["pendiente", "aprobada"]);
+  if (error) return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
+  let creadas = 0;
+  let yaEstaban = 0;
+  const fallas: string[] = [];
+  for (const p of (data ?? []) as PlantillaGuardada[]) {
+    const r: ResultadoEnCanal[] = await replicarPlantillaEnOtrosNumeros(datosDe(p), p.meta_id, false);
+    for (const x of r) {
+      if ("error" in x) fallas.push(`${p.nombre} en ${x.canal}: ${x.error}`);
+      else if (x.hecho === "creada") creadas++;
+      else yaEstaban++;
+    }
+  }
+  return { creadas, yaEstaban, fallas };
 }
