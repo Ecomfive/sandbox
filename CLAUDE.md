@@ -1026,7 +1026,7 @@ convenciones técnicas del código.
   `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
   «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
   **Chat en ventana con la ficha del CRM** (29 oct 2026, pedido de Hernán con un bosquejo aprobado): al pulsar un chat de la lista,
-  `bandeja.tsx` lo abre en `Ventana` (`lado="centro"`, `ancho="xl"`; flechas = chat anterior/siguiente de `lista`, `abrirChat`); a la
+  `bandeja.tsx` lo abre en `Ventana` (`lado="centro"`, `ancho="xl"`, `masAncha`: 96rem al centro; flechas = chat anterior/siguiente de `lista`, `abrirChat`); a la
   izquierda `FichaDelChat` (`bandeja/ficha-chat.tsx`) y a la derecha la sección del chat de siempre (con `@container`: bajo `@4xl` se ve
   uno a la vez, «Chat» / «Ficha del dropshipper»). La ficha usa las piezas exportadas de `ficha-lateral.tsx` (`AccionesCrm`, `CifrasDelMes`,
   `CasosAbiertos`, `DatosDropshipper`) con los datos de `fichaCrmDelChat` (acción en `bandeja/actions.ts`: `obtenerDatosCrm(…, soloId)`
@@ -2017,6 +2017,10 @@ convenciones técnicas del código.
   La pestaña **Vínculos** (`/crm-dropshippers/vinculos`) lista los usuarios de Dropi con pedidos que no son de ningún
   dropshipper, de más a menos pedidos, con una sugerencia por parecido del nombre de la tienda (`src/lib/crm/sugerencias.ts`;
   Dropi no manda más datos del dropshipper): se confirma uno a uno, nunca se vincula solo.
+  **Actividad con comentarios** (migración 0184, 29 oct 2026): `ActividadDropshipper` (`actividad-dropshipper.tsx`, el `Actividad` común de
+  Compras) en la ficha del CRM y en la del chat de la bandeja; `actividad-dropshipper-actions.ts` usa el motor de `lib/comentarios` (tablas
+  `dropshipper_comentarios`/`_adjuntos`/`_comentario_reacciones`, bucket `crm-dropshippers`) y toma los cambios de `obtenerLineaDeTiempo`,
+  que ya filtra por área. Los comentarios los ve todo el que abre el CRM.
   **Áreas** (un solo CRM, `src/lib/crm/areas.ts`): Atención = módulo `crm-dropshippers`; Comercial = además el módulo
   `crm-comercial`. Atención **no** ve las notas, seguimientos ni cambios comerciales: se filtran en el servidor
   (`obtenerLineaDeTiempo`, `areaParaNota`); Comercial ve las dos. Captación: `dropshippers.fase` (captado → onboarding →

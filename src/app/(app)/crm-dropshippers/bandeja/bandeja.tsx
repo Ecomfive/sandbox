@@ -959,6 +959,7 @@ export function Bandeja({
           alCerrar={() => setElegido(null)}
           lado="centro"
           ancho="xl"
+          masAncha
           titulo={
             <span className="bandeja-wa contents">
               <span className="flex min-w-0 items-center gap-3">
@@ -1067,7 +1068,7 @@ export function Bandeja({
               </div>
               <section
                 aria-label={`Conversación con ${sel.nombre}`}
-                className={`${vistaAngosta === "chat" ? "flex" : "hidden"} relative min-h-0 w-full min-w-0 flex-col @4xl:flex @4xl:w-[46%] @4xl:max-w-[640px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]`}
+                className={`${vistaAngosta === "chat" ? "flex" : "hidden"} relative min-h-0 w-full min-w-0 flex-col @4xl:flex @4xl:w-[46%] @4xl:max-w-[720px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]`}
                 onDragEnter={(e) => {
                   if (!traeArchivos(e)) return;
                   e.preventDefault();
