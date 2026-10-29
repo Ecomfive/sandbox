@@ -190,8 +190,9 @@ export async function prepararEnvioArchivo(id: string, nombre: string, tamano: n
   const ruta = `${id}/enviados/${crypto.randomUUID()}-${nombreArchivoSeguro(nombre)}`;
   const pedir = () => e.supabase.storage.from(BUCKET_ARCHIVOS).createSignedUploadUrl(ruta);
   let { data, error } = await pedir();
-  // Si el almacén de los archivos todavía no existe (la migración 0169 no se corrió), se crea aquí y se vuelve a pedir el permiso.
-  if (error && /bucket|not found/i.test(error.message ?? "")) {
+  // Si el almacén de los archivos todavía no existe (la migración 0169 no se corrió), se crea aquí y se vuelve a pedir el permiso. Sin almacén, Supabase no dice «bucket»:
+  // contesta «The related resource does not exist» (falla la llave foránea), así que ante cualquier error se intenta crearlo una vez (si ya existía, no pasa nada).
+  if (error) {
     await e.supabase.storage.createBucket(BUCKET_ARCHIVOS, { public: false, fileSizeLimit: 25 * 1024 * 1024 });
     ({ data, error } = await pedir());
   }
