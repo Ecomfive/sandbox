@@ -17,7 +17,8 @@ import {
   SugerenciaIcon,
 } from "@/lib/nav-icons";
 import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
-import { BotonEscalar, LineaDeTiempo, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
+import { ActividadDropshipper } from "./actividad-dropshipper";
+import { BotonEscalar, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
@@ -184,7 +185,8 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       </Bloque>
 
       <Bloque icono={HistorialIcon} titulo="Actividad">
-        <LineaDeTiempo key={`linea-${d.id}`} dropshipperId={d.id} acceso={acceso} version={version} />
+        {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y los cambios filtrados por área. */}
+        <ActividadDropshipper key={`actividad-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version} />
       </Bloque>
     </>
   );
