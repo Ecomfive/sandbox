@@ -1,7 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
-import { accesoCrm, areasVisibles } from "@/lib/crm/areas";
+import { accesoCrm, areaPropia, areasVisibles } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { config360 } from "@/lib/whatsapp/proveedor";
@@ -33,6 +33,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           miId={usuario.id}
           verTelefono={a.verTelefonos}
           areas={areasVisibles(a)}
+          miArea={areaPropia(a)}
           estado360={
             // Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, nunca su valor).
             esAdministrador(usuario)

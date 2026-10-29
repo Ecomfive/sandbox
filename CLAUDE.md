@@ -1018,7 +1018,12 @@ convenciones técnicas del código.
   por persona y por día las consultas (primer entrante tras un saliente), sin responder y la mediana hasta la primera respuesta.
   **360dialog y un solo número** (migración 0168, 28 oct 2026): el área es de cada conversación (`whatsapp_conversaciones.area`; un
   trigger le pone la del número al crearla) y se cambia con `pasarConversacionDeArea` (botón «Pasar a otra área» del chat, nota + auditoría). Todo
-  filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
+  filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Paneles y supervisión** (29 oct 2026, pedido de
+  Hernán): `areaPropia(acceso)` (Dirección > Comercial > Atención) es el panel de cada quien; `bandeja.tsx` muestra un panel por área visible
+  (`panel`, «(tuyo)», pendientes por panel) y `supervisaArea` dice si mira un área de abajo. Supervisando: `abrirConversacion` **no** pone
+  `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
+  «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
+  No se mandan acuses de lectura a WhatsApp. filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
   comercial; +507 Atención): cada número de 360dialog tiene su clave; `config360(numero)` usa `D360_API_KEY_<dígitos del número>` si está y si no
   `D360_API_KEY` (la principal, también la de plantillas). El envío (`NumeroEmpresa` en `api.ts`, `conversacionPermitida().numeroEmpresa`)
   y los archivos usan la del número del chat; `conectarWebhook360` registra el webhook en todas (`claves360`). Con `D360_API_KEY` el envío y los archivos van por
@@ -1050,6 +1055,20 @@ convenciones técnicas del código.
   `ver_telefono_dropshipper` en la auditoría. Se quitaron los enlaces `wa.me` y la búsqueda por número; el campo WhatsApp de la ficha del dropshipper arranca vacío y **vacío = no cambiar** (`actualizarDropshipper`).
   El servidor sigue usando el número para enviar. **Etapa 2 pendiente** (aparte, más riesgosa): cifrar el número en la base (clave del servidor + huella para emparejar) y decidir quién más puede descifrarlo; hoy `whatsapp_conversaciones.telefono`
   y `dropshippers.contacto_telefono` siguen en texto normal y las funciones SQL de WhatsApp, los KPIs, la importación de chats y el emparejamiento dependen de ellos.
+  **Marcar como no leído** (29 oct 2026): clic derecho (o tecla de menú / Mayús + F10) sobre un chat de la lista abre un menú con «Marcar como no leído» —o «Marcar como leído» si tiene mensajes sin leer—, y el encabezado del chat
+  trae el mismo botón. `marcarChatLeido(id, leido)` (`bandeja/actions.ts`; basta poder abrir el CRM, como abrir un chat) deja `no_leidos` en 1 como mínimo y pone `estado = abierta` (así vuelve a «Sin responder»); la lista cambia al
+  instante. Un chat **abierto se cierra** al marcarlo no leído: mientras está abierto, el refresco de cada 8 s lo vuelve a marcar leído (`abrirConversacion`).
+  **Vincular un chat con su dropshipper** (29 oct 2026, migración 0177 `dropshipper_telefonos`: otros números por dropshipper, únicos, RLS sin políticas): un chat se enlaza solo si el número que escribe es el principal
+  (`dropshippers.contacto_telefono`) o uno de los otros de un dropshipper (`dropshipperPorTelefonos`, `src/lib/whatsapp/vinculo.ts`, que usan los mensajes que llegan y «Importar chat»). **Desde el chat**
+  (`bandeja/vincular-chat.tsx`, `vincular-actions.ts`, solo a quien puede escribir en el área del chat): en «No está en el CRM», `sugerirDropshippersParaChat` propone hasta 3 dropshippers cuyo nombre o tienda se
+  parece al nombre del perfil de WhatsApp (`sugerirDropshippers` de `crm/sugerencias.ts`; **nunca se vincula solo por nombre**: un clic lo confirma) y `VentanaVincular` busca por nombre, tienda, código, correo o ID de usuario
+  de Dropi (`buscarDropshippersParaVincular`; no devuelve números ni correos). `vincularChat` enlaza el chat y guarda el número del chat en esa ficha (`guardarTelefonoDelChat`, decide `decidirGuardadoTelefono`, con prueba: principal si
+  no tenía, otro número si ya tenía uno, nada si es de otro dropshipper o no es un número completo) y enlaza los demás chats sin enlazar de ese número; si estaba vinculado con otro, el número y los chats pasan al nuevo.
+  `desvincularChat` («No es este dropshipper») quita el vínculo y también el número de esa ficha y de los chats de ese número que seguían enlazados a ella, para que el próximo mensaje no lo vuelva a enlazar mal.
+  **Retroactivo:** al guardar el número en la ficha (`crearDropshipper`, `editarDropshipper`) los chats sin enlazar de ese número se enlazan al momento (`enlazarChatsPorTelefono`); esas dos acciones rechazan un número que ya es de
+  otro dropshipper (`telefonoDeOtro`, también contra los otros números). Un chat sin número (un id de usuario de WhatsApp) solo se vincula a mano. Auditoría `vincular_chat_dropshipper` y `desvincular_chat_dropshipper`.
+  Dropi no entrega el teléfono ni el correo del dropshipper (solo ID de usuario, nombre y tienda): el vínculo automático con los datos de Dropi sigue pendiente de investigar. Sin la migración 0177 los mensajes, la búsqueda y el vínculo desde el chat siguen funcionando, pero un
+  segundo número no se guarda. Reversa: `supabase/rollbacks/0177_rollback.sql`.
   **Vista previa al pasar el cursor** (29 oct 2026): en la lista de la bandeja, con ratón y pantalla ancha (`hover: hover` y ≥ 1024 px), pasar el cursor (o enfocar con el teclado) un chat que no es el abierto despliega, a los 350 ms, sus últimos mensajes (3 a 8, `vistaPreviaChat` en `bandeja/actions.ts`; **solo mira, no marca leído**; no trae lo oculto); los sin leer van marcados (`VistaPreviaChat`, `vista-previa-chat.tsx`, `fixed` para que la lista que se desplaza no lo recorte, `pointer-events-none`). Se guarda en memoria por chat + último mensaje + no leídos.
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).

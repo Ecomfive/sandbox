@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accesoCrm, areaParaNota, areasVisibles, escribeEnArea } from "./areas";
+import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, supervisaArea } from "./areas";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del CRM)
 const atencion = accesoCrm({ modulos: ["crm-dropshippers"], modulosSoloLectura: [] });
@@ -53,4 +53,17 @@ test("Dirección (CEO) ve las tres áreas y solo ella escribe en la suya", () =>
   assert.equal(areasVisibles(atencion).includes("direccion"), false);
   assert.equal(escribeEnArea(comercial, "direccion"), false);
   assert.equal(escribeEnArea(atencion, "direccion"), false);
+});
+
+test("paneles de la bandeja: cada quien tiene el suyo y supervisa los de abajo sin marcarlos leídos", () => {
+  const direccion = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial", "crm-direccion"], modulosSoloLectura: [] });
+  assert.equal(areaPropia(atencion), "atencion");
+  assert.equal(areaPropia(comercial), "comercial");
+  assert.equal(areaPropia(direccion), "direccion");
+  assert.equal(supervisaArea(atencion, "atencion"), false);
+  assert.equal(supervisaArea(comercial, "comercial"), false);
+  assert.equal(supervisaArea(comercial, "atencion"), true);
+  assert.equal(supervisaArea(direccion, "comercial"), true);
+  assert.equal(supervisaArea(direccion, "atencion"), true);
+  assert.equal(supervisaArea(direccion, "direccion"), false);
 });
