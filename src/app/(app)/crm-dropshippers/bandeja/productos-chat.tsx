@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { cuantoFalta } from "@/lib/crm/productos-chat";
 import { EtapaCotizando, LlegadaCamino } from "../../publicaciones-dropi/llegada-camino";
+import { avisarCuandoLlegue } from "../tareas/actions";
 import { buscarProductosChat, fijarProductoChat, productosDelChat, type ProductoDelChat, type ProductosDelChat } from "./productos-chat-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
@@ -11,9 +12,11 @@ const entero = (n: number) => n.toLocaleString("es-PA");
 /**
  * «Productos que pregunta» en la ficha del chat (pedido de Hernán, 29 oct 2026): los que el dropshipper nombra en sus mensajes salen solos
  * como sugerencia, y cualquiera se fija con «Agregar producto». De cada uno, cuánto viene en camino a su país y cuándo llega, como la
- * columna «En camino» de Gestión de IDs Dropi; así se le responde «llega el 12 nov» sin salir del chat.
+ * columna «En camino» de Gestión de IDs Dropi; así se le responde «llega el 12 nov» sin salir del chat. Lo que viene en camino tiene
+ * «Avisarme cuando llegue» (29 oct 2026): una tarea que se activa cuando llega de verdad, para avisarle al cliente. `alCambio` avisa
+ * que se creó una tarea.
  */
-export function ProductosDelChatFicha({ conversacionId, escribe, alAviso }: { conversacionId: string; escribe: boolean; alAviso: (texto: string) => void }) {
+export function ProductosDelChatFicha({ conversacionId, escribe, alAviso, alCambio }: { conversacionId: string; escribe: boolean; alAviso: (texto: string, error?: boolean) => void; alCambio?: () => void }) {
   const [datos, setDatos] = useState<ProductosDelChat | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
@@ -60,9 +63,19 @@ export function ProductosDelChatFicha({ conversacionId, escribe, alAviso }: { co
     setOcupado(skuId);
     const r = await fijarProductoChat(conversacionId, skuId, si);
     setOcupado(null);
-    if ("error" in r) return alAviso(r.error);
+    if ("error" in r) return alAviso(r.error, true);
     setBuscar("");
     setResultados([]);
+    aplicar(await productosDelChat(conversacionId));
+  };
+
+  const avisar = async (p: ProductoDelChat) => {
+    setOcupado(p.id);
+    const r = await avisarCuandoLlegue(conversacionId, p.id).catch(() => ({ error: "No se pudo crear el aviso." }));
+    setOcupado(null);
+    if ("error" in r) return alAviso(r.error, true);
+    alAviso(`Listo: cuando llegue ${p.nombre}, te sale la tarea de avisarle (y la campana te avisa).`);
+    alCambio?.();
     aplicar(await productosDelChat(conversacionId));
   };
 
@@ -93,6 +106,21 @@ export function ProductosDelChatFicha({ conversacionId, escribe, alAviso }: { co
                 <span className="font-medium leading-tight">{p.nombre}</span>
                 <span className="text-[11.5px] text-[var(--wa-sec)]">{p.fijado ? (p.codigo ?? "") : `Lo nombra en el chat${p.codigo ? ` · ${p.codigo}` : ""}`}</span>
                 <EnCamino p={p} hoy={hoy} />
+                {p.aviso ? (
+                  <span className="mt-0.5 text-[12px] font-medium text-[var(--wa-acento)]">Te avisamos cuando llegue para que le escribas.</span>
+                ) : (
+                  escribe &&
+                  p.enCamino > 0 && (
+                    <button
+                      type="button"
+                      disabled={ocupado === p.id}
+                      onClick={() => void avisar(p)}
+                      className={`mt-0.5 self-start rounded-md border border-[var(--wa-borde)] px-2 py-0.5 text-[12px] font-medium text-[var(--wa-acento)] hover:bg-[var(--wa-panel)] disabled:opacity-50 ${anilloFoco}`}
+                    >
+                      Avisarme cuando llegue
+                    </button>
+                  )
+                )}
               </div>
               {puedeFijar && (
                 <button

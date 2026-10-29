@@ -25,6 +25,8 @@ export interface ConversacionVista {
   nombrePerfil: string | null;
   dropshipperId: string | null;
   codigo: string | null;
+  /** Su dropshipper es VIP (de los que más pedidos mueven; se marca en el CRM o en «Más» de la ficha del chat). */
+  vip: boolean;
   tiendas: string[];
   asignadaA: string | null;
   asignadaAId: string | null;
@@ -125,7 +127,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
+      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel), perfiles:asignada_a(nombre)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
@@ -133,7 +135,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(300);
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
-    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null }>);
+    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null; nivel: string | null }>);
     return {
       id: c.id as string,
       numeroId: c.numero_id as string,
@@ -141,6 +143,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       nombrePerfil: (c.nombre_perfil as string | null) ?? null,
       dropshipperId: (c.dropshipper_id as string | null) ?? null,
       codigo: d?.codigo ?? null,
+      vip: d?.nivel === "vip",
       tiendas: d?.tiendas?.length ? d.tiendas : d?.tienda ? [d.tienda] : [],
       asignadaA: uno(c.perfiles as Uno<{ nombre: string | null }>)?.nombre ?? null,
       asignadaAId: (c.asignada_a as string | null) ?? null,
