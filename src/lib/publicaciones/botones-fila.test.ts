@@ -51,7 +51,7 @@ test("duplicada, sin publicar o sin ID: lo dicen primero", () => {
 test("privada y bodega B280", () => {
   assert.equal(motivoRepublicar({ ...base, tipo: "privado" }), "Una privada no se republica");
   assert.equal(motivoPrivatizar({ ...base, tipo: "privado" }), "Ya es privada");
-  assert.match(motivoApagar({ ...base, bodegaId: 280 })!, /B280/);
+  assert.match(motivoApagar({ ...base, bodegaId: 280 })!, /bodega de Dropi/);
   assert.equal(motivoApagar({ ...base, apagadoPendiente: true }), null, "con un apagado pendiente el botón lo deshace");
 });
 
@@ -61,4 +61,11 @@ test("liquidación: se pone sin ID de Dropi (es del sistema); no en una archivad
   assert.equal(motivoLiquidacion({ ...base, archivada: true }), "Está archivada");
   assert.equal(motivoLiquidacion({ ...base, duplicada: true }), "Es duplicada de otra publicación");
   assert.equal(motivoLiquidacion({ ...base, archivada: true, liquidacion: true }), null);
+});
+
+test("la bodega de Dropi de Costa Rica (B15) cuenta como la B280 de Panamá: no se republica ni se apaga desde aquí", () => {
+  assert.equal(motivoRepublicar({ ...base, bodegaId: 15 }), "Su stock es de la bodega de Dropi");
+  assert.equal(motivoApagar({ ...base, bodegaId: 15 }), "Su stock es de la bodega de Dropi");
+  assert.equal(motivoRepublicar({ ...base, bodegaId: 280 }), "Su stock es de la bodega de Dropi");
+  assert.equal(motivoRepublicar({ ...base, bodegaId: 81 }), null);
 });

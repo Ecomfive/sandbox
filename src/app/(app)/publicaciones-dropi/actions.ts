@@ -9,7 +9,7 @@ import { ESTADOS_PUBLICACION, fulfillmentFijo, TIPOS, UBICACIONES, etiqueta, num
 import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
-import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
+import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { faltantesStock, normalizarDatosStock } from "@/lib/publicaciones/stock-dropi";
 import { faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
@@ -839,7 +839,7 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
   const { data: lectura } = await supabase.from("dropi_productos_proveedor").select("bodegas").eq("pais_id", antes.pais_id).eq("dropi_producto_id", ids[0]).maybeSingle();
   const bodegas = Array.isArray(lectura?.bodegas) ? (lectura!.bodegas as { id: number; stock: number }[]) : null;
   if (bodegas && !bodegas.some((b) => Number(b.id) === d.bodega)) return { error: "Esa bodega no tiene stock de este producto en Dropi." };
-  if (d.bodega === BODEGA_DROPI) return { error: "El stock de la bodega de Dropi (B280) no se mueve desde aquí." };
+  if (esBodegaDropi(d.bodega)) return { error: "El stock de la bodega de Dropi no se mueve desde aquí." };
   const disponible = bodegas ? Number(bodegas.find((b) => Number(b.id) === d.bodega)?.stock ?? 0) : null;
   const faltan = faltantesPrivatizar(d, disponible);
   if (faltan.length) return { error: faltan[0] };
@@ -914,7 +914,7 @@ export async function cambiarStockDropi(id: string, crudo: unknown): Promise<{ e
   let actual: { id: number; stock: number }[] = [];
   for (const l of lecturas ?? []) {
     const bs = Array.isArray(l.bodegas) ? (l.bodegas as { id: number; nombre?: string; stock?: number }[]) : [];
-    for (const b of bs) if (Number(b.id) !== BODEGA_DROPI) bodegas.set(Number(b.id), String(b.nombre ?? ""));
+    for (const b of bs) if (!esBodegaDropi(Number(b.id))) bodegas.set(Number(b.id), String(b.nombre ?? ""));
     if (Number(l.dropi_producto_id) === ids[0]) actual = bs.map((b) => ({ id: Number(b.id), stock: Number(b.stock) || 0 }));
   }
   const d = { ...pedido, nombreBodega: bodegas.get(pedido.bodega) ?? pedido.nombreBodega, antes: lecturas ? (actual.find((b) => b.id === pedido.bodega)?.stock ?? 0) : null };

@@ -5,7 +5,7 @@ import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { LapizIcon } from "@/lib/nav-icons";
-import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
+import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { CONCEPTO_STOCK, MAX_CONCEPTO_STOCK, MAX_UNIDADES_STOCK } from "@/lib/publicaciones/stock-dropi";
 import { cambiarStockDropi } from "./actions";
@@ -45,11 +45,11 @@ export function BodegasStockDropi({
     nombre: b.nombre,
     stock: b.stock,
     pendiente: pendiente.get(b.id) ?? null,
-    editable: editable && b.id !== BODEGA_DROPI,
+    editable: editable && !esBodegaDropi(b.id),
   }));
   if (editable)
     for (const b of bodegasEcomfive)
-      if (b.id !== BODEGA_DROPI && !lista.some((x) => x.id === b.id))
+      if (!esBodegaDropi(b.id) && !lista.some((x) => x.id === b.id))
         lista.push({ id: b.id, nombre: b.nombre, stock: 0, pendiente: pendiente.get(b.id) ?? null, editable: true });
   if (!lista.length) return null;
   return (

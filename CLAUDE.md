@@ -649,6 +649,12 @@ convenciones técnicas del código.
   publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
+  **Costa Rica** (28 oct 2026, pedido de Alcides: lo nuevo de Gestión de IDs vale también ahí). La bodega de Dropi depende del país: `esBodegaDropi`
+  (`automatico.ts`, `BODEGAS_DROPI` = 280 Panamá y 15 «Bodega Dropi San Jose» de Costa Rica; decisión de Alcides: la B15 es de Dropi como la B280) reemplaza
+  las comparaciones con `BODEGA_DROPI` en republicar, apagar, privatizar, el stock de la ficha y las bodegas que se ofrecen. Una bodega de Dropi de otro país se
+  agrega a `BODEGAS_DROPI`. Las recomendaciones de precio van en la moneda del país (`recomendar(p, reglas, moneda)`: texto con `formatoMonto` y, fuera del dólar,
+  precios enteros que terminan en 9) y la página Recomendaciones va dentro de `ProveedorMoneda`. El favorito no cambió (sigue rechazando lo que no es una bodega
+  del proveedor).
   **Íconos en la Actividad** (28 oct 2026, pedido de Alcides): `Actividad` acepta `iconoCambio` (reemplaza el punto gris de un cambio); Gestión de IDs Dropi
   lo usa con `iconoDeAccion` (`src/lib/publicaciones/icono-actividad.ts`, con prueba: la acción de la auditoría → el ícono de su botón; rojo si termina en
   `_error`/`_parcial`). Una acción nueva del módulo que no caiga en ningún patrón sale con el punto: agrégala ahí.

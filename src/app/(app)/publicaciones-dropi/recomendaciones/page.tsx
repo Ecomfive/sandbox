@@ -5,6 +5,9 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPublicaciones } from "../datos-publicaciones";
+import { ProveedorMoneda } from "../moneda-contexto";
+import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
+import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { PanelRecomendaciones, type Sugerida } from "./panel-recomendaciones";
 
 export const metadata = { title: "Recomendaciones · Gestión de IDs Dropi" };
@@ -23,7 +26,9 @@ export default async function RecomendacionesPage({ searchParams }: { searchPara
   const usuario = await requireModulo("publicaciones-dropi");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await cargarPublicaciones(supabase, pais.id, usuario);
+  const [datos, porUsd] = await Promise.all([cargarPublicaciones(supabase, pais.id, usuario), monedaDePais(pais.codigo) === "USD" ? Promise.resolve({}) : tasasUsd(supabase).then((t) => t.porUsd)]);
+  // Los montos en la moneda del país (Costa Rica en colones, con su valor en dólares en pequeño), como en la lista.
+  const moneda = monedaPublicaciones(pais.codigo, porUsd);
   if (!datos) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -44,6 +49,7 @@ export default async function RecomendacionesPage({ searchParams }: { searchPara
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Recomendaciones" oculto />
       <ContadorPestana href="/publicaciones-dropi/recomendaciones" cantidad={sugeridas.length} />
+      <ProveedorMoneda moneda={moneda}>
       <PanelRecomendaciones
         sugeridas={sugeridas}
         decisiones={decisiones}
@@ -53,6 +59,7 @@ export default async function RecomendacionesPage({ searchParams }: { searchPara
         puedeDecidir={!usuario.modulosSoloLectura.includes("publicaciones-dropi") && datos.reglas.disponible}
         faltaMigracion={!datos.reglas.disponible}
       />
+      </ProveedorMoneda>
     </Pagina>
   );
 }

@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
-import { accionesPublicacion, BODEGA_DROPI, enDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
+import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
+import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, competidoresEquivalentes, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion, revisionVencida } from "@/lib/publicaciones/publicacion";
@@ -36,7 +37,7 @@ function opcionesParaCrear(productos: Iterable<ProductoProveedor>): OpcionesCrea
   const bodegas = new Map<number, string>();
   for (const p of productos) {
     for (const c of p.categorias) if (c.trim()) categorias.add(c.trim());
-    for (const b of p.bodegas) if (b.id !== BODEGA_DROPI) bodegas.set(b.id, b.nombre);
+    for (const b of p.bodegas) if (!esBodegaDropi(b.id)) bodegas.set(b.id, b.nombre);
   }
   return {
     categorias: [...categorias].sort((a, b) => a.localeCompare(b, "es")),
@@ -225,6 +226,8 @@ export interface DatosPublicaciones {
  */
 export async function cargarPublicaciones(supabase: SupabaseClient, paisId: string, usuario: UsuarioActual): Promise<DatosPublicaciones | null> {
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  // La moneda del país, para los textos y el redondeo de las recomendaciones de precio (Costa Rica en colones).
+  const monedaPais = Promise.resolve(supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle()).then(({ data }) => monedaPublicaciones(String(data?.codigo ?? "PA"), {}));
   const [filasR, numerosR, reglas, { decisiones, conTareas }, personas] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
@@ -418,6 +421,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail, apagadoPendiente: o.apagadoPendiente, apagadoSinTocar: o.apagadoSinTocar };
     });
 
+  const moneda = await monedaPais;
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.
   const publicados = new Set(filas.filter((f) => !f.archivada && f.sku).map((f) => f.sku!.id));
   const cumplidas: { d: DecisionVista; nombre: string }[] = [];
@@ -467,6 +471,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         competidores: competidoresEquivalentes({ nombre: f.nombre, idsDropi: idsDropi({ id: f.id, dropi_id: f.dropiId }) }, competidores),
       },
       r,
+      moneda,
     );
     // En liquidación (28 oct 2026): sigue en margen bajo (la tarjeta la cuenta aparte, «/ N en liquidación»), pero no se recomienda subir el precio ni armar el combo.
     const recsVigentes = f.liquidacionDesde ? recs.filter((x) => !NO_EN_LIQUIDACION.includes(x.tipo)) : recs;
