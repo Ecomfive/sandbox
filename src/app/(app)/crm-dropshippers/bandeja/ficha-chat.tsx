@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Pastilla, Punto } from "@/components/panel/piezas-panel";
-import { FASES, type AccesoCrm } from "@/lib/crm/areas";
-import type { QuienRespondio } from "@/lib/crm/respondieron";
+import type { AccesoCrm } from "@/lib/crm/areas";
+import { quienesAtienden, type QuienRespondio } from "@/lib/crm/respondieron";
+import { DESDE_EL_CELULAR } from "@/lib/whatsapp/actividad-equipo";
 import { formatearFecha } from "@/lib/formato";
 import { MasIcon } from "@/lib/nav-icons";
 import { ActividadDropshipper } from "../actividad-dropshipper";
@@ -20,6 +21,7 @@ import { ActividadDelClienteFicha } from "./actividad-cliente";
 import { ActividadDelEquipoFicha } from "./actividad-equipo";
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, ResumenDropshipper } from "./datos-bandeja";
+import { GloboCelular, GloboPersona } from "./globo-persona";
 import { ProductosDelChatFicha } from "./productos-chat";
 import { BotonNuevaTarea, TareasDelChat } from "./tareas-chat";
 import { SugerenciasDeVinculo } from "./vincular-chat";
@@ -64,39 +66,6 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
   );
 }
 
-/** En qué fase va el dropshipper (Captado → En onboarding → Activo), como la línea de avance de un pedido. */
-function LineaFase({ fase, ingreso }: { fase: string; ingreso: string | null }) {
-  const actual = Math.max(0, FASES.findIndex((f) => f.valor === fase));
-  return (
-    <ol aria-label="Fase del dropshipper" className="m-0 flex list-none p-0">
-      {FASES.map((f, i) => {
-        const hecho = i < actual;
-        const esActual = i === actual;
-        return (
-          <li key={f.valor} aria-current={esActual ? "step" : undefined} className="relative flex flex-1 flex-col items-center gap-1 text-center">
-            {i > 0 && <span aria-hidden="true" className={`absolute top-[9px] right-1/2 left-[-50%] h-0.5 ${i <= actual ? "bg-[var(--wa-acento)]" : "bg-[var(--wa-borde)]"}`} />}
-            <span
-              aria-hidden="true"
-              className={`relative z-[1] flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-                hecho ? "border-[var(--wa-acento)] bg-[var(--wa-acento)] text-[var(--wa-acento-texto)]" : esActual ? "border-[var(--wa-acento)] bg-[var(--wa-fondo)]" : "border-[var(--wa-borde)] bg-[var(--wa-fondo)]"
-              }`}
-            >
-              {hecho ? (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m5 12 5 5L20 7" />
-                </svg>
-              ) : esActual ? (
-                <span className="h-2 w-2 rounded-full bg-[var(--wa-acento)]" />
-              ) : null}
-            </span>
-            <span className={`text-[12px] ${esActual ? "font-semibold" : i < actual ? "" : "text-[var(--wa-sec)]"}`}>{f.etiqueta}</span>
-            {i === 0 && ingreso && <span className="text-[11px] text-[var(--wa-sec)] tabular-nums">{formatearFecha(ingreso)}</span>}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
 
 /** «Más»: lo que no cabe en la fila de botones (pasar de área, importar, marcar borrado, abrir en el CRM…). */
 function MenuMas({ opciones }: { opciones: OpcionMas[] }) {
@@ -160,22 +129,37 @@ function MenuMas({ opciones }: { opciones: OpcionMas[] }) {
  * Quién respondió en el chat, con su cargo (pedido de Hernán, 29 oct 2026: «si líder comercial o atención»; el cargo es su puesto en Puestos o su
  * área), debajo del responsable del CRM: así se ve de un vistazo si al dropshipper lo atendió Atención, su líder comercial o los dos.
  */
-function QuienesRespondieron({ respondieron }: { respondieron: QuienRespondio[] }) {
-  if (!respondieron.length) return <p className="m-0 text-[12.5px] text-[var(--wa-sec)]">Nadie del equipo le ha respondido todavía en este chat.</p>;
+/**
+ * Quién atiende el chat y quién le ha respondido, como globitos con su foto (29 oct 2026, pedido de Alcides): al pasar el cursor, su nombre y su
+ * cargo. «Lo atiende»: la persona del área del chat y, si alguien intervino o lo tomó, también esa persona. Lo respondido desde el celular va con
+ * un globito de celular.
+ */
+function EquipoDelChat({ sel, respondieron }: { sel: ConversacionVista; respondieron: QuienRespondio[] }) {
+  const asignada = sel.asignadaA ? { nombre: sel.asignadaA, cargo: sel.asignadaCargo, foto: sel.asignadaFoto } : null;
+  const atienden = quienesAtienden(asignada, respondieron, sel.area, DESDE_EL_CELULAR);
   return (
-    <p className="m-0 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] text-[var(--wa-sec)]">
-      <span>Respondieron:</span>
-      {respondieron.map((r) => (
-        <span
-          key={r.nombre}
-          title={`${r.mensajes} ${r.mensajes === 1 ? "mensaje" : "mensajes"} · el último ${formatearFecha(r.ultimo)}`}
-          className="rounded-md bg-[var(--wa-panel)] px-1.5 py-px text-[var(--wa-texto)]"
-        >
-          <span className="font-semibold">{r.nombre}</span>
-          {r.cargo ? ` · ${r.cargo}` : ""}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-[var(--wa-sec)]">
+      <span className="flex items-center gap-1.5">
+        <span>Lo atiende</span>
+        {atienden.length ? (
+          <span className="flex -space-x-1.5">
+            {atienden.map((p) => (
+              <GloboPersona key={p.nombre} nombre={p.nombre} cargo={p.cargo} foto={p.foto} prefijo={p.nombre === sel.asignadaA ? "Lo lleva" : undefined} />
+            ))}
+          </span>
+        ) : (
+          <span className="text-[var(--wa-texto)]">nadie todavía</span>
+        )}
+      </span>
+      {respondieron.length > 0 && (
+        <span className="flex items-center gap-1.5">
+          <span>Respondieron</span>
+          <span className="flex -space-x-1.5">
+            {respondieron.map((r) => (r.nombre === DESDE_EL_CELULAR ? <GloboCelular key={r.nombre} /> : <GloboPersona key={r.nombre} nombre={r.nombre} cargo={r.cargo} foto={r.foto ?? null} />))}
+          </span>
         </span>
-      ))}
-    </p>
+      )}
+    </div>
   );
 }
 
@@ -260,12 +244,11 @@ export function FichaDelChat({
               </Pastilla>
             )}
             <span className="text-[12.5px] text-[var(--wa-sec)]">
-              {[d.paises.join(", "), d.tiendas.join(", "), d.responsable ? `Responsable: ${d.responsable}` : "Sin responsable"].filter(Boolean).join(" · ")}
+              {[d.paises.join(", "), d.tiendas.join(", "), d.ingreso ? `Captado el ${formatearFecha(d.ingreso)}` : null].filter(Boolean).join(" · ")}
             </span>
           </div>
         )}
-        <QuienesRespondieron respondieron={respondieron} />
-        {d && <LineaFase fase={d.fase} ingreso={d.ingreso} />}
+        <EquipoDelChat sel={sel} respondieron={respondieron} />
         <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
           {accionesChat}
           {escribe && <BotonNuevaTarea conversacionId={sel.id} nombre={sel.nombre} clase={claseBotonFicha} alCreada={() => setVersionTareas((v) => v + 1)} alAviso={alAviso} />}

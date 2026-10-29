@@ -17,6 +17,7 @@ import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
 import { VendeEnChat } from "./vende-en";
+import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
@@ -118,24 +119,6 @@ const ES_MARCA_BORRADO = /^.+ (marcó este chat como borrado en la app de WhatsA
 /** La nota que deja «Intervenir» (supervisión): aviso del sistema. */
 const ES_INTERVINO = /^.+ intervino en este chat\.$/;
 const esAvisoDelSistema = (texto: string | null) => ES_CAMBIO_DE_AREA.test(texto ?? "") || ES_MARCA_BORRADO.test(texto ?? "") || ES_INTERVINO.test(texto ?? "");
-
-const iniciales = (nombre: string) =>
-  nombre
-    .replace(/^\+/, "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-/** El color de la foto de cada chat, siempre el mismo para el mismo nombre (oscuros: el texto blanco se lee bien). */
-const COLORES_FOTO = ["#a1517a", "#2f7d6d", "#4a6fa5", "#8a6d1d", "#6b5b95", "#b0573c", "#3d7a8f", "#7a5c3e"];
-function colorFoto(nombre: string): string {
-  let h = 0;
-  for (const c of nombre) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return COLORES_FOTO[h % COLORES_FOTO.length];
-}
 
 type ChatAbierto = { id: string; mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null };
 
@@ -742,6 +725,7 @@ export function Bandeja({
       error: null,
       autor: null,
       autorCargo: null,
+      autorFoto: null,
       momento: ahoraIso(),
       importado: false,
       eliminadoEnWhatsapp: false,
@@ -1471,7 +1455,6 @@ export function Bandeja({
                     ]
                       .filter(Boolean)
                       .join(" · ")}
-                    <BurbujaPersona nombre={sel.asignadaA} tam="cabecera" className="ml-1" />
                     <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
                   </span>
                 </span>

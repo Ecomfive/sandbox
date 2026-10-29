@@ -32,6 +32,9 @@ export interface ConversacionVista {
   tiendas: string[];
   asignadaA: string | null;
   asignadaAId: string | null;
+  /** La foto (Usuarios) y el cargo de quien lo lleva, para su globito. */
+  asignadaFoto: string | null;
+  asignadaCargo: string | null;
   estado: "abierta" | "resuelta";
   noLeidos: number;
   ultimoEntranteEn: string | null;
@@ -82,6 +85,8 @@ export interface MensajeVista {
   autor: string | null;
   /** El cargo de quien lo mandó: su puesto en Puestos o, sin puesto, su área del CRM («Líder comercial», «Atención»…); null si no se sabe. */
   autorCargo: string | null;
+  /** La foto del autor en el sistema (Usuarios), para su globito. */
+  autorFoto: string | null;
   momento: string;
   /** Vino de un chat exportado desde el celular («Importar chat», wa_id «import:…»), no por el webhook. */
   importado: boolean;
@@ -146,7 +151,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas, dropshipper_paises(paises(codigo)), dropshipper_cuentas(plataformas(nombre), paises(codigo))), perfiles:asignada_a(nombre)",
+      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas, dropshipper_paises(paises(codigo)), dropshipper_cuentas(plataformas(nombre), paises(codigo))), perfiles:asignada_a(nombre, avatar_url)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
@@ -170,6 +175,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       tiendas: d?.tiendas?.length ? d.tiendas : d?.tienda ? [d.tienda] : [],
       asignadaA: uno(c.perfiles as Uno<{ nombre: string | null }>)?.nombre ?? null,
       asignadaAId: (c.asignada_a as string | null) ?? null,
+      asignadaFoto: uno(c.perfiles as Uno<{ avatar_url: string | null }>)?.avatar_url ?? null,
+      asignadaCargo: null,
       estado: c.estado as "abierta" | "resuelta",
       noLeidos: Number(c.no_leidos ?? 0),
       ultimoEntranteEn: (c.ultimo_entrante_en as string | null) ?? null,
@@ -205,6 +212,11 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
         c.nombre = a;
       }
     }
+  }
+  // El cargo de quien lleva cada chat, para su globito (los cargos se guardan 5 minutos).
+  if (conversaciones.some((c) => c.asignadaAId)) {
+    const cargos = await cargosDelEquipo(supabase);
+    for (const c of conversaciones) if (c.asignadaAId) c.asignadaCargo = cargos.get(c.asignadaAId) ?? null;
   }
   // Dónde vende cada dropshipper, puesto a mano o quitado (migraciones 0193 y 0194). Sin ellas, solo lo de sus cuentas.
   const conDs = [...new Set(conversaciones.map((c) => c.dropshipperId).filter((x): x is string => !!x))];
@@ -371,7 +383,11 @@ export async function cargarConversacion(
   const reaccionA = new Map((reaccionesR.error ? [] : (reaccionesR.data ?? [])).map((x) => [x.id as string, x.reaccion_a as string]));
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
   const traidos = mensajesR.data ?? [];
-  const cargos = traidos.some((m) => m.autor_id) ? await cargosDelEquipo(supabase) : new Map<string, string>();
+  const autores = [...new Set(traidos.map((m) => m.autor_id as string | null).filter((x): x is string => !!x))];
+  const [cargos, fotosR] = autores.length
+    ? await Promise.all([cargosDelEquipo(supabase), supabase.from("perfiles").select("id, avatar_url").in("id", autores)])
+    : [new Map<string, string>(), { data: [] as { id: string; avatar_url: string | null }[] }];
+  const fotos = new Map((fotosR.data ?? []).map((p) => [p.id as string, (p.avatar_url as string | null) ?? null]));
   const mensajes: MensajeVista[] = traidos
     .filter((m) => !ocultos.has(m.id as string))
     .map((m) => ({
@@ -385,6 +401,7 @@ export async function cargarConversacion(
       error: (m.error as string | null) ?? null,
       autor: (m.autor_nombre as string | null) ?? null,
       autorCargo: (m.autor_id && cargos.get(m.autor_id as string)) || null,
+      autorFoto: (m.autor_id && fotos.get(m.autor_id as string)) || null,
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),

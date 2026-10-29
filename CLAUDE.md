@@ -1212,6 +1212,10 @@ convenciones técnicas del código.
   suma la auditoría de sus chats (`whatsapp_conversaciones` de las áreas que ve la persona, sin mensajes ni «abrir el chat»); `ActividadDelEquipoFicha` solo sale en un chat sin dropshipper.
   **Actividad del equipo** (`bandeja/equipo-actions.ts`, 29 oct 2026, pedido de Alcides): solo la auditoría del chat (`whatsapp_conversaciones`) y de su dropshipper
   (`dropshippers`), armada con `formatearEventoAuditoria` (antes → después); no repite los mensajes del chat y oculta `ACCIONES_COMERCIALES` a quien no ve lo comercial.
+  **Quién atiende, en globitos** (29 oct 2026, pedido de Alcides): arriba de la ficha del chat, `EquipoDelChat` (`ficha-chat.tsx`) dibuja «Lo atiende»
+  (`quienesAtienden`, `src/lib/crm/respondieron.ts`, con prueba: quien lo lleva o intervino + la persona cuyo cargo es del área del chat) y «Respondieron» con
+  `GloboPersona` / `GloboCelular` (`bandeja/globo-persona.tsx`: foto de `perfiles.avatar_url` o iniciales, tooltip «Nombre · Cargo»). `MensajeVista.autorFoto`,
+  `ConversacionVista.asignadaFoto`/`asignadaCargo`. Sin «Sin responsable» ni la línea de fases: solo «Captado el …».
   **La ficha entera, sin pestañas que esconden** (29 oct 2026, pedido de Alcides): `FichaDelChat` dibuja todas sus partes una debajo de la otra
   (`#ficha-chat-<parte>`) y la franja de arriba es un `nav` que lleva a cada una (`irA`); el menú «Más» ya no trae «Abrir su ficha en el CRM».
   **La ficha siempre a la vista** (29 oct 2026, pedido de Alcides): la ventana del chat ya no tiene los botones «Chat / Ficha del dropshipper»; lado a lado desde
