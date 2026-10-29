@@ -16,6 +16,7 @@ import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
 import { Expresiones } from "./expresiones";
 import { GrabarVoz } from "./grabar-voz";
+import { ActividadDelClienteFicha } from "./actividad-cliente";
 import { ProductosDelChatFicha } from "./productos-chat";
 import { EditorNombreContacto } from "./nombre-contacto";
 import { listarRespuestasRapidas, guardarRespuestaRapida, usarRespuestaRapida } from "./rapidas-actions";
@@ -1271,6 +1272,7 @@ export function Bandeja({
                 </span>
               )}
             </div>
+            <ActividadDelClienteFicha key={`actividad-${sel.id}`} conversacionId={sel.id} escribe={escribe && !mirando} />
             <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} alAviso={(texto) => mostrarToast(texto, "destructive")} />
             {verDropshipper ? (
               <>
