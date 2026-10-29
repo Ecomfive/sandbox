@@ -557,7 +557,8 @@ convenciones técnicas del código.
   dropshipper de «Descubrir proveedores» sigue en Chrome con la extensión: las dos no caben en el mismo navegador, por eso México no
   tiene tarjeta en «Actualizar datos»). Hora de México UTC−6 (`dropiDiario`, `OFFSET_HORAS`, `HORAS_DETRAS_UTC`, `creado_dropi`), pesos
   en `formatearMoneda` (`formato.ts`) y en Gestión de IDs (`monedaPublicaciones`: MXN con su valor en dólares). Las fotos de México
-  están en el CDN de Panamá (`cdnDeRuta` ya lo cubre). La primera lectura trae 60 días y crea sus publicaciones (como Costa Rica).
+  están en el CDN de Panamá (`cdnDeRuta` ya lo cubre). La primera lectura trae 60 días y crea sus publicaciones (como Costa Rica). Su cuenta de extracción de proveedor (`cuentas_extraccion`, que pide `ingerirPedidos`) la agrega la
+  migración 0176 (29 oct 2026; en producción ya estaba puesta a mano desde la primera carga).
   **Moneda de cada país** (28 oct 2026, Hernán: «en colones y pequeño el valor en dólares»): los montos de una publicación están en la
   moneda de su país de Dropi (Costa Rica en colones: Dropi da 5.499). `src/lib/publicaciones/moneda.ts` (`monedaPublicaciones`,
   `formatoMonto`, `formatoEnDolares`, `simboloMoneda`, con prueba) y `moneda-contexto.tsx` (`ProveedorMoneda` en `TablaPublicaciones`,
