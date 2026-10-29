@@ -659,6 +659,16 @@ convenciones técnicas del código.
   (`tareasDe`, `src/lib/publicaciones/tareas.ts`, con prueba: responsable = yo, o sin responsable y creadas por mí) y un administrador «De todos» (`?ver=todas`).
   Globo de la pestaña con `contarMisTareasPendientes`; la fila dice «N tareas» (`FilaPublicacion.tareasPendientes`, rojo si alguna atrasada); las atrasadas suman a
   `PendientesHoy.tareasAtrasadas`.
+  **Tareas como en ClickUp** (29 oct 2026, pedido de Alcides; migración 0178: `estado` por_hacer/en_curso/en_revision/hecha, `prioridad` urgente/alta/normal/baja
+  y `archivada_en`): `src/lib/publicaciones/tareas.ts` (con prueba: `ESTADOS_TAREA`, `PRIORIDADES`, `normalizarTarea`, `normalizarCambio`, `ordenarTareas`, `pendiente`
+  = sin hacer y sin archivar). `actualizarTarea(id, cambio)` (`tareas-actions.ts`) cambia cualquier dato (Hecha sella `hecha_en`, otro estado la reabre; cambiar el
+  producto revisa su país; otro responsable recibe aviso) y `buscarPublicacionesParaTarea` busca el producto. Piezas en `tareas-piezas.tsx`: `FilaTarea` (círculo de
+  estado `MenuEstado`, `MenuResponsable`, `MenuFecha` con `EditorFecha` de Compras, `MenuPrioridad`; todos con `PanelCelda`, guardan al instante con
+  `useCambiarTarea` y vuelven atrás si el servidor falla) y `FormularioTarea` (con `BuscadorPublicacion` si no viene el producto). Ficha lateral `ficha-tarea.tsx`
+  (título, descripción y producto editables, Archivar). La pestaña Tareas es un `ListaDatos` con `DEF_TAREAS` (agrupada por estado; `cerrados` = Archivadas,
+  exclusivo) y «Agregar tarea». Cada fila de publicación trae `BotonTareasFila` (`tareas-publicacion.tsx`; azul con pendientes, rojo con atrasadas) que abre las
+  tareas de ese producto. Una tarea de recomendación solo pasa a Hecha (`marcarTareaHecha`). Sin la 0178 todo carga igual (solo Por hacer y Hecha, sin prioridad
+  ni archivar; `conEstados`). Reversa: `supabase/rollbacks/0178_rollback.sql`.
   **Costa Rica** (28 oct 2026, pedido de Alcides: lo nuevo de Gestión de IDs vale también ahí). La bodega de Dropi depende del país: `esBodegaDropi`
   (`automatico.ts`, `BODEGAS_DROPI` = 280 Panamá y 15 «Bodega Dropi San Jose» de Costa Rica; decisión de Alcides: la B15 es de Dropi como la B280) reemplaza
   las comparaciones con `BODEGA_DROPI` en republicar, apagar, privatizar, el stock de la ficha y las bodegas que se ofrecen. Una bodega de Dropi de otro país se

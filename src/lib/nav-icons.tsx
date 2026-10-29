@@ -330,6 +330,16 @@ export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Casilla con visto: las tareas de un producto (Gestión de IDs Dropi). */
+export function TareasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="3.5" />
+      <path d="M8.5 12.2l2.4 2.4 4.6-4.8" />
+    </Icon>
+  );
+}
+
 /** Círculo con visto: "retiros cerrados". */
 export function CerradoIcon(props: SVGProps<SVGSVGElement>) {
   return (
