@@ -2010,6 +2010,10 @@ convenciones técnicas del código.
   La pestaña **Vínculos** (`/crm-dropshippers/vinculos`) lista los usuarios de Dropi con pedidos que no son de ningún
   dropshipper, de más a menos pedidos, con una sugerencia por parecido del nombre de la tienda (`src/lib/crm/sugerencias.ts`;
   Dropi no manda más datos del dropshipper): se confirma uno a uno, nunca se vincula solo.
+  **Actividad con comentarios** (migración 0184, 29 oct 2026): `ActividadDropshipper` (`actividad-dropshipper.tsx`, el `Actividad` común de
+  Compras) en la ficha del CRM y en la del chat de la bandeja; `actividad-dropshipper-actions.ts` usa el motor de `lib/comentarios` (tablas
+  `dropshipper_comentarios`/`_adjuntos`/`_comentario_reacciones`, bucket `crm-dropshippers`) y toma los cambios de `obtenerLineaDeTiempo`,
+  que ya filtra por área. Los comentarios los ve todo el que abre el CRM.
   **Áreas** (un solo CRM, `src/lib/crm/areas.ts`): Atención = módulo `crm-dropshippers`; Comercial = además el módulo
   `crm-comercial`. Atención **no** ve las notas, seguimientos ni cambios comerciales: se filtran en el servidor
   (`obtenerLineaDeTiempo`, `areaParaNota`); Comercial ve las dos. Captación: `dropshippers.fase` (captado → onboarding →
