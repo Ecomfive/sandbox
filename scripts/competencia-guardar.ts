@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { armarAlertas, normalizarCompetencia, type ProductoAlerta, type VistoCompetencia } from "../src/lib/competencia/analisis";
+import { monedaDePais } from "../src/lib/moneda/tipo-cambio";
 import { comparar, type Evento, type ProductoGuardado } from "../src/lib/scraping/comparar";
 import { indexar, yaVisto } from "../src/lib/scraping/cruces";
 
@@ -201,6 +202,8 @@ export async function guardarCompetencia(
         cambios,
         desaparecidos,
         proveedoresNuevos: [...provNuevos.values()],
+        // Los textos de las alertas en la moneda del catálogo (Costa Rica en colones).
+        moneda: monedaDePais(codigo),
       });
       await enTrozos(lista, 500, async (trozo) => {
         revisar(

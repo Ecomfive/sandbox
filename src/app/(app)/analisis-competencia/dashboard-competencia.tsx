@@ -10,6 +10,7 @@ import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { precioEquivalente } from "@/lib/competencia/analisis";
 import type { DatosCompetencia, ProductoC } from "./def-competencia";
 import { filasNuestras } from "./vista-competencia";
+import { useMonedaCompetencia } from "@/components/competencia/moneda-competencia";
 
 const ejes = { tick: { fontSize: 11, fill: "var(--muted-foreground)" }, axisLine: false, tickLine: false } as const;
 const estiloTooltip = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, boxShadow: "0 8px 24px -12px rgb(95 67 209 / 0.45)" };
@@ -31,7 +32,6 @@ function DegradadosNeon() {
 }
 const claseSelect = `h-[34px] max-w-[14rem] rounded-lg border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`;
 const num = (n: number) => n.toLocaleString("es-PA");
-const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const categoriaDe = (p: ProductoC) => (p.categoria ?? "Sin categoría").split(", ")[0];
 const dia = (iso: string) => iso.slice(0, 10);
 const etiquetaDia = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "short" });
@@ -96,6 +96,7 @@ function Miniatura({ url }: { url: string | null }) {
  * alertas por tipo. Mismos colores que los dashboards de Compras y Test productos.
  */
 export function DashboardCompetencia({ datos }: { datos: DatosCompetencia }) {
+  const { precio: usd } = useMonedaCompetencia();
   const [competidor, setCompetidor] = useState("");
   const [categoria, setCategoria] = useState("");
   const [soloIguales, setSoloIguales] = useState(false);
