@@ -1073,7 +1073,10 @@ export function Bandeja({
             ]
           : []),
         ...(verDropshipper
-          ? [{ texto: "Abrir su ficha en el CRM", href: `/crm-dropshippers?abrir=${verDropshipper.id}` }, ...(escribe ? [{ texto: "No es este dropshipper", alPulsar: () => setVincular(true) }] : [])]
+          ? // Sin «Abrir su ficha en el CRM» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí.
+            escribe
+            ? [{ texto: "No es este dropshipper", alPulsar: () => setVincular(true) }]
+            : []
           : escribe && !sel.dropshipperId
             ? [{ texto: "Vincular a un dropshipper", alPulsar: () => setVincular(true) }]
             : []),

@@ -24,7 +24,10 @@ import { ProductosDelChatFicha } from "./productos-chat";
 import { BotonNuevaTarea, TareasDelChat } from "./tareas-chat";
 import { SugerenciasDeVinculo } from "./vincular-chat";
 
-/** Las pestañas de la ficha del chat (29 oct 2026, aprobadas por Hernán sobre el bosquejo). */
+/**
+ * Las partes de la ficha del chat (29 oct 2026, aprobadas por Hernán sobre el bosquejo). Desde el mismo día (pedido de Alcides) la ficha se ve
+ * entera, una parte debajo de la otra, y la franja de arriba solo lleva a cada parte: no hay que abrir nada para ver los datos.
+ */
 const PESTANAS = [
   { id: "resumen", texto: "Resumen" },
   { id: "casos", texto: "Casos" },
@@ -216,6 +219,11 @@ export function FichaDelChat({
   alAviso: (texto: string, error?: boolean) => void;
 }) {
   const [pestana, setPestana] = useState<Pestana>("resumen");
+  const irA = (id: Pestana) => {
+    setPestana(id);
+    const quieto = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(`ficha-chat-${id}`)?.scrollIntoView({ behavior: quieto ? "auto" : "smooth", block: "start" });
+  };
   // Sube cuando algo del CRM se guarda, para volver a pedir la actividad, los seguimientos y las recomendaciones.
   const [version, setVersion] = useState(0);
   // Sube cuando se crea una tarea (con «Tarea» o «Avisarme cuando llegue»), para volver a pedir las del chat.
@@ -263,27 +271,24 @@ export function FichaDelChat({
         </div>
       </div>
 
-      <div role="tablist" aria-label="Ficha del dropshipper" className="sticky top-0 z-[2] flex gap-1 overflow-x-auto border-b border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 [scrollbar-width:none]">
+      <nav aria-label="Ir a una parte de la ficha" className="sticky top-0 z-[2] flex gap-1 overflow-x-auto border-b border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 [scrollbar-width:none]">
         {visibles.map((p) => (
           <button
             key={p.id}
             type="button"
-            role="tab"
-            id={`ficha-chat-${p.id}`}
-            aria-selected={actual === p.id}
-            aria-controls="ficha-chat-panel"
-            onClick={() => setPestana(p.id)}
+            aria-current={actual === p.id ? "true" : undefined}
+            onClick={() => irA(p.id)}
             className={`-mb-px flex-none border-b-2 px-2.5 py-2.5 text-[13.5px] ${actual === p.id ? "border-[var(--wa-acento)] font-semibold text-[var(--wa-acento)]" : "border-transparent text-[var(--wa-sec)] hover:text-[var(--wa-texto)]"} ${anilloFoco}`}
           >
             {p.texto}
             {p.id === "casos" && abiertos.length > 0 && <span className="ml-1 tabular-nums">({abiertos.length})</span>}
           </button>
         ))}
-      </div>
+      </nav>
 
-      <div id="ficha-chat-panel" role="tabpanel" aria-labelledby={`ficha-chat-${actual}`} className="flex flex-col">
-        {actual === "resumen" && (
-          <>
+      <div className="flex flex-col">
+        {visibles.some((p) => p.id === "resumen") && (
+          <div id="ficha-chat-resumen" className="scroll-mt-12">
             {!dropshipper && !sel.dropshipperId && (
               <Seccion titulo="No está en el CRM">
                 <SugerenciasDeVinculo conversacionId={sel.id} escribe={escribe} alAbrirBusqueda={alAbrirVincular} alListo={alVinculado} />
@@ -305,10 +310,11 @@ export function FichaDelChat({
                 </Seccion>
               </>
             )}
-          </>
+          </div>
         )}
-        {actual === "casos" &&
-          (cargando ||
+        {visibles.some((p) => p.id === "casos") && (
+          <div id="ficha-chat-casos" className="scroll-mt-12">
+            {
             (datos && acceso && (
               <Seccion titulo="Casos abiertos">
                 {abiertos.length ? (
@@ -319,20 +325,22 @@ export function FichaDelChat({
                   <span className="text-[13px] text-[var(--wa-sec)]">Sin casos abiertos. Para abrir uno, usa «Nuevo caso».</span>
                 )}
               </Seccion>
-            )))}
-        {actual === "productos" && (
-          <>
+            ))}
+          </div>
+        )}
+        {visibles.some((p) => p.id === "productos") && (
+          <div id="ficha-chat-productos" className="scroll-mt-12">
             <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} puedeAvisar={escribe} alAviso={alAviso} alCambio={() => setVersionTareas((v) => v + 1)} />
             {d && acceso && (
               <Seccion titulo="Productos recomendados">
                 <RecomendacionesDropshipper key={`recomendaciones-${d.id}`} dropshipperId={d.id} version={version} puedeEscribir={acceso.escribeAtencion} />
               </Seccion>
             )}
-            {cargando}
-          </>
+          </div>
         )}
-        {actual === "cuentas" &&
-          (cargando ||
+        {visibles.some((p) => p.id === "cuentas") && (
+          <div id="ficha-chat-cuentas" className="scroll-mt-12">
+            {
             (d && datos && acceso && (
               <>
                 <Seccion titulo="Cuentas">
@@ -351,9 +359,12 @@ export function FichaDelChat({
                   </Seccion>
                 )}
               </>
-            )))}
-        {actual === "ventas" &&
-          (cargando ||
+            ))}
+          </div>
+        )}
+        {visibles.some((p) => p.id === "ventas") && (
+          <div id="ficha-chat-ventas" className="scroll-mt-12">
+            {
             (d && (
               <>
                 <Seccion titulo="Ventas en Dropi">
@@ -363,9 +374,11 @@ export function FichaDelChat({
                   <DesempenoDropshipper key={`desempeno-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
                 </Seccion>
               </>
-            )))}
-        {actual === "actividad" && (
-          <>
+            ))}
+          </div>
+        )}
+        {visibles.some((p) => p.id === "actividad") && (
+          <div id="ficha-chat-actividad" className="scroll-mt-12">
             <ActividadDelEquipoFicha key={`equipo-${sel.id}`} conversacionId={sel.id} version={versionEquipo} />
             {areaDelChat}
             {d && acceso && acceso.comercial && (
@@ -379,8 +392,7 @@ export function FichaDelChat({
                 <ActividadDropshipper key={`actividad-crm-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version} />
               </Seccion>
             )}
-            {cargando}
-          </>
+          </div>
         )}
       </div>
     </div>
