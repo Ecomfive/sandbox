@@ -113,7 +113,7 @@ export async function listarTareas(filtro: "mias" | "todas"): Promise<{ tareas: 
   let q = supabase.from("tareas_dropshipper").select(CAMPOS).or(`estado.neq.hecha,hecha_en.gte.${hace30}`);
   if (filtro === "mias") q = q.eq("responsable_id", u.id);
   const { data, error } = await q.order("vence", { ascending: true, nullsFirst: false }).order("creado_en", { ascending: false }).limit(1000);
-  if (error) return { error: error.message.includes("conversacion_id") ? "Falta correr la migración 0187 (tareas del CRM) en la base." : "No se pudieron cargar las tareas." };
+  if (error) return { error: error.message.includes("conversacion_id") ? "Falta correr la migración 0188 (tareas del CRM) en la base." : "No se pudieron cargar las tareas." };
   const hoy = hoyPanama();
   return { hoy, tareas: ((data ?? []) as unknown as Fila[]).filter((f) => laVe(f, u)).map((f) => vista(f, u, hoy)) };
 }
@@ -142,7 +142,7 @@ async function crearDeChat(
   const supabase = createServiceClient();
   const responsable = c.asignadaA ?? u.id;
   const { error } = await supabase.from("tareas_dropshipper").insert({ ...fila, conversacion_id: c.id, dropshipper_id: c.dropshipperId, responsable_id: responsable, creado_por: u.id });
-  if (error) return { error: error.message.includes("conversacion_id") ? "Falta correr la migración 0187 (tareas del CRM) en la base." : "No se pudo crear la tarea." };
+  if (error) return { error: error.message.includes("conversacion_id") ? "Falta correr la migración 0188 (tareas del CRM) en la base." : "No se pudo crear la tarea." };
   if (responsable !== u.id) {
     const { data: conv } = await supabase.from("whatsapp_conversaciones").select("nombre_personalizado, nombre_perfil, dropshippers(nombre)").eq("id", c.id).maybeSingle();
     const cliente = uno(conv?.dropshippers as Uno<{ nombre: string | null }>)?.nombre ?? conv?.nombre_personalizado ?? conv?.nombre_perfil ?? null;

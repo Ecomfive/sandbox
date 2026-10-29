@@ -304,3 +304,100 @@ export function situacionDelCliente(ultimoDe: string | null, ultimoMensajeEn: st
   if (ultimoDia?.estado === "pendiente") return { tipo: "sin_resolver", dia: ultimoDia.dia, resumen: ultimoDia.resumen };
   return { tipo: "al_dia" };
 }
+
+// ── Análisis completo del cliente ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// «Analizar» / «Volver a analizar» (29 oct 2026): además de leer cada día, la IA mira todo lo que ya se sabe del cliente y arma una lectura más completa: cómo es el trato, qué tan molesto o
+// satisfecho está, qué tan urgente es, si hay riesgo de que deje de trabajar con nosotros, qué prometió el equipo y sigue pendiente, qué oportunidades hay y qué conviene hacer ahora.
+
+export type Sentimiento = "positivo" | "neutral" | "molesto";
+export type Riesgo = "alto" | "medio" | "bajo";
+export type Urgencia = "alta" | "media" | "baja";
+
+export const SENTIMIENTOS: Sentimiento[] = ["positivo", "neutral", "molesto"];
+export const RIESGOS: Riesgo[] = ["alto", "medio", "bajo"];
+export const URGENCIAS: Urgencia[] = ["alta", "media", "baja"];
+export const ETIQUETA_SENTIMIENTO: Record<Sentimiento, string> = { positivo: "Satisfecho", neutral: "Neutral", molesto: "Molesto" };
+
+export interface PerfilCliente {
+  /** Cómo es el trato con este cliente, en pocas líneas. */
+  perfil: string;
+  sentimiento: Sentimiento;
+  /** Qué tan urgente es atenderlo ahora. */
+  urgencia: Urgencia;
+  /** Riesgo de que deje de trabajar con nosotros. */
+  riesgo: Riesgo;
+  /** Lo que el equipo prometió o quedó en hacer y no se ve cumplido. */
+  compromisos: string[];
+  oportunidades: string[];
+  proximaAccion: string;
+}
+
+export const MAX_PERFIL = 420;
+export const MAX_LINEA_PERFIL = 160;
+export const MAX_LINEAS_PERFIL = 4;
+/** Cuántos días de resúmenes se le pasan a la IA para el análisis completo, y cuántos de los más recientes con sus mensajes. */
+export const MAX_DIAS_RESUMEN = 90;
+export const DIAS_RECIENTES_COMPLETOS = 3;
+
+export interface ResumenDeDia {
+  dia: string;
+  estado: EstadoDia;
+  motivos: string[];
+  productos: string[];
+  resumen: string;
+}
+
+/** El pedido del análisis completo: los resúmenes de los días ya analizados (los más recientes) y, de los últimos días, los mensajes tal cual para ver el detalle y el tono. */
+export function pedidoPerfil(resumenes: readonly ResumenDeDia[], recientes: DiaActividad[]): { instrucciones: string; texto: string } {
+  const historial = [...resumenes]
+    .sort((a, b) => a.dia.localeCompare(b.dia))
+    .slice(-MAX_DIAS_RESUMEN)
+    .map((r) => `- ${r.dia} [${ETIQUETA_ESTADO[r.estado]}] ${r.motivos.map(etiquetaDeMotivo).join(", ")}${r.productos.length ? ` · productos: ${r.productos.join(", ")}` : ""}: ${r.resumen}`)
+    .join("\n");
+  const detalle = conversacionParaIA(recientes.slice(-DIAS_RECIENTES_COMPLETOS));
+  return {
+    instrucciones: [
+      "Eres un analista de atención al cliente de una empresa de dropshipping (Ecomfive). Los clientes son dropshippers que venden sus productos y escriben por WhatsApp al equipo.",
+      "Te paso el historial resumido día por día de un cliente y, al final, sus mensajes más recientes tal cual. Haz una lectura completa de ese cliente para quien lo atiende hoy.",
+      `Devuelve SOLO JSON, sin texto antes ni después, con esta forma exacta: {"perfil":"...","sentimiento":"neutral","urgencia":"media","riesgo":"bajo","compromisos":["..."],"oportunidades":["..."],"proxima_accion":"..."}`,
+      `- perfil: cómo es el trato con este cliente y qué suele necesitar, de ${MAX_PERFIL} letras como máximo.`,
+      `- sentimiento: "positivo", "neutral" o "molesto", según el tono de sus mensajes recientes.`,
+      `- urgencia: "alta", "media" o "baja": qué tan urgente es atenderlo ahora (espera respuesta, reclamo sin resolver, algo con fecha).`,
+      `- riesgo: "alto", "medio" o "bajo": qué tan probable es que deje de trabajar con nosotros (quejas repetidas, demoras, tono molesto, deja de escribir).`,
+      `- compromisos: hasta ${MAX_LINEAS_PERFIL} cosas que el equipo prometió o quedó en hacer y no se ve cumplido (por ejemplo "confirmar la fecha de llegada del Cutting Mix"). Lista vacía si no hay.`,
+      `- oportunidades: hasta ${MAX_LINEAS_PERFIL} oportunidades de venta o de ayudarle (productos que le interesan, algo que pidió y se le puede ofrecer). Lista vacía si no hay.`,
+      `- proxima_accion: lo más útil que puede hacer ahora quien lo atiende, en una frase de ${MAX_LINEA_PERFIL} letras como máximo.`,
+      "Cada línea es corta y concreta, sin copiar frases textuales ni poner números de teléfono ni datos personales. No inventes nada que no esté en el historial.",
+    ].join("\n\n"),
+    texto: `Historial por día:\n${historial || "(sin días analizados)"}\n\nMensajes más recientes:\n${detalle || "(sin mensajes)"}`,
+  };
+}
+
+const linea = (t: unknown, max = MAX_LINEA_PERFIL): string => (typeof t === "string" ? t.replace(/\s+/g, " ").trim().slice(0, max) : "");
+const lineas = (v: unknown): string[] => [...new Set((Array.isArray(v) ? v : []).map((x) => linea(x)).filter((x) => x.length >= 3))].slice(0, MAX_LINEAS_PERFIL);
+
+/** Lo que devolvió la IA para el análisis completo, validado. Sin un perfil escrito o con basura devuelve null; un valor fuera de lo permitido se vuelve neutral / media / medio. */
+export function normalizarPerfil(texto: string): PerfilCliente | null {
+  const i = texto.indexOf("{");
+  const j = texto.lastIndexOf("}");
+  if (i < 0 || j <= i) return null;
+  let json: unknown;
+  try {
+    json = JSON.parse(texto.slice(i, j + 1));
+  } catch {
+    return null;
+  }
+  if (!json || typeof json !== "object") return null;
+  const o = json as Record<string, unknown>;
+  const perfil = linea(o.perfil, MAX_PERFIL);
+  if (!perfil) return null;
+  return {
+    perfil,
+    sentimiento: SENTIMIENTOS.includes(o.sentimiento as Sentimiento) ? (o.sentimiento as Sentimiento) : "neutral",
+    urgencia: URGENCIAS.includes(o.urgencia as Urgencia) ? (o.urgencia as Urgencia) : "media",
+    riesgo: RIESGOS.includes(o.riesgo as Riesgo) ? (o.riesgo as Riesgo) : "medio",
+    compromisos: lineas(o.compromisos),
+    oportunidades: lineas(o.oportunidades),
+    proximaAccion: linea(o.proxima_accion),
+  };
+}

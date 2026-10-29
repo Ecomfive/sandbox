@@ -1034,7 +1034,7 @@ convenciones técnicas del código.
   Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
   de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
   del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
-  **Tareas y VIP** (29 oct 2026, migración 0187): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
+  **Tareas y VIP** (29 oct 2026, migración 0188): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
   (puede no tener dropshipper), `sku_id`/`pais_id`/`compras_esperadas`/`llegada_estimada` y el estado nuevo `esperando`. «Tarea»
   (`BotonNuevaTarea`, `bandeja/tareas-chat.tsx`) y «Avisarme cuando llegue» (`ProductosDelChatFicha` → `avisarCuandoLlegue`: guarda las
   compras en camino de ese producto al país del chat, `cargarEnCaminoDatos`) están en `tareas/actions.ts`; quedan a cargo de quien lleva
@@ -1135,6 +1135,11 @@ convenciones técnicas del código.
   `productosDelAnalisis` los junta con los del catálogo (`productosMencionados`, el mismo cruce de «Productos que pregunta») para que cada producto se cuente siempre con el mismo nombre, y quedan como etiquetas «Interés: …» en cada día, en «Productos que le interesan» de la ficha y en
   **«Productos que más interesan»** de la pestaña Motivos (`interesPorProducto`: clientes y días). (5) **Plegar**: `usePlegado` (`bandeja/usar-plegado.ts`, `useSyncExternalStore` + `localStorage`, por chat y por bloque, últimos 300) pliega «Actividad del cliente» y «Actividad del equipo»; plegada,
   la del cliente deja a la vista solo la situación (si tiene algo pendiente).
+  **Análisis completo del cliente y botón permanente** (29 oct 2026, migración 0187 `whatsapp_actividad_cliente`: una fila por chat con `datos` jsonb, `dias_analizados`, modelo y quién; RLS sin políticas; reversa `supabase/rollbacks/0187_rollback.sql`):
+  el botón de la ficha **ya no desaparece**: dice «Analizar toda la conversación con IA» si hay días pendientes y «Volver a analizar con IA» si no (`actividad-cliente.tsx`). Cada pulsación lee los días pendientes (como antes) y, al terminar (`!faltan`), **rehace el análisis completo**
+  (`analizarPerfil`, `actividad-actions.ts`; lógica pura con prueba en `actividad.ts`: `pedidoPerfil` le pasa a la IA los resúmenes de hasta `MAX_DIAS_RESUMEN` = 90 días ya analizados y los mensajes tal cual de los últimos `DIAS_RECIENTES_COMPLETOS` = 3 días; `normalizarPerfil` valida todo lo que
+  devuelve): `PerfilCliente` = perfil (≤ 420 letras), sentimiento (positivo/neutral/molesto), urgencia (alta/media/baja), riesgo de perderlo (alto/medio/bajo), compromisos del equipo sin cumplir, oportunidades y próxima acción. Se ve como «Análisis completo» arriba del bloque
+  (`AnalisisCompleto`) con quién y cuándo lo hizo. Un fallo del análisis completo no tira lo ya analizado por día: sale como aviso (`aviso`). Se anota en «Consumo de IA» como `actividad_cliente_completo`. Sin la 0187 los días se siguen analizando y el análisis completo avisa que falta la migración. `bandeja/page.tsx` tiene `maxDuration = 300`.
   **Quién respondió y con qué cargo** (29 oct 2026, pedido de Hernán: «si líder comercial o atención»; sin migración): cada burbuja del equipo
   lleva el nombre y el cargo de quien la mandó («Jhokser · Líder comercial») y las notas también; dos respuestas seguidas de personas distintas
   ya no se juntan (`seguido` compara el autor). En la ficha del chat (`ficha-chat.tsx`, `QuienesRespondieron`), debajo de las pastillas, «Respondieron:»

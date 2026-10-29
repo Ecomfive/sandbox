@@ -6,7 +6,7 @@
 --     (tiene fecha de llegada o se completa). `llegada_estimada` es la fecha prometida, para mostrarla mientras tanto;
 --   * `activada_en` (cuándo llegó) y `avisada_en` (cuándo se le avisó a su responsable en la campana, para no repetir el aviso).
 -- Código: src/lib/crm/tareas.ts, src/lib/crm/tareas-servidor.ts, src/app/(app)/crm-dropshippers/tareas/.
--- Reversa: supabase/rollbacks/0187_rollback.sql
+-- Reversa: supabase/rollbacks/0188_rollback.sql
 
 alter table tareas_dropshipper alter column dropshipper_id drop not null;
 alter table tareas_dropshipper add column if not exists conversacion_id uuid references whatsapp_conversaciones(id) on delete set null;

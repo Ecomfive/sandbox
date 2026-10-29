@@ -2,13 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
-import { etiquetaDeMotivo, ETIQUETA_ESTADO, type EstadoDia } from "@/lib/whatsapp/actividad";
-import { actividadDelCliente, analizarActividadDelCliente, type ActividadCliente } from "./actividad-actions";
+import { etiquetaDeMotivo, ETIQUETA_ESTADO, ETIQUETA_SENTIMIENTO, type EstadoDia, type Riesgo, type Sentimiento, type Urgencia } from "@/lib/whatsapp/actividad";
+import { actividadDelCliente, analizarActividadDelCliente, type ActividadCliente, type PerfilGuardado } from "./actividad-actions";
 import { usePlegado } from "./usar-plegado";
 
 const DIAS_VISIBLES = 5;
 
 const PUNTO_ESTADO: Record<EstadoDia, string> = { resuelta: "bg-success", pendiente: "bg-warning", sin_consulta: "bg-[var(--wa-sec)]" };
+const PUNTO_SENTIMIENTO: Record<Sentimiento, string> = { positivo: "bg-success", neutral: "bg-[var(--wa-sec)]", molesto: "bg-destructive" };
+const PUNTO_URGENCIA: Record<Urgencia, string> = { alta: "bg-destructive", media: "bg-warning", baja: "bg-success" };
+const PUNTO_RIESGO: Record<Riesgo, string> = { alto: "bg-destructive", medio: "bg-warning", bajo: "bg-success" };
 
 /** «hace 3 h», «hace 2 días»: cuánto lleva esperando. Solo se llama con datos que llegaron del servidor, ya en el navegador. */
 function haceCuanto(iso: string): string {
@@ -23,16 +26,67 @@ function haceCuanto(iso: string): string {
 const fechaDelDia = (dia: string) => new Date(`${dia}T12:00:00`).toLocaleDateString("es-PA", { weekday: "short", day: "numeric", month: "short" });
 const dias = (n: number) => `${n} ${n === 1 ? "día" : "días"}`;
 
+function Indicador({ nombre, valor, punto }: { nombre: string; valor: string; punto: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wa-panel)] px-2.5 py-0.5 text-[12.5px]">
+      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${punto}`} />
+      <span className="text-[var(--wa-sec)]">{nombre}</span> {valor}
+    </span>
+  );
+}
+
+function Lista({ titulo, items }: { titulo: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[12.5px] text-[var(--wa-sec)]">{titulo}</span>
+      <ul className="m-0 flex list-disc flex-col gap-0.5 pl-4 text-[13px]">
+        {items.map((i) => (
+          <li key={i}>{i}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** La lectura completa del cliente que arma la IA: tono, urgencia, riesgo, lo que el equipo prometió y sigue pendiente, oportunidades y qué hacer ahora. */
+function AnalisisCompleto({ p }: { p: PerfilGuardado }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-[var(--wa-borde)] px-2.5 py-2.5">
+      <span className="text-[12.5px] text-[var(--wa-sec)]">Análisis completo</span>
+      <div className="flex flex-wrap gap-1.5">
+        <Indicador nombre="Tono" valor={ETIQUETA_SENTIMIENTO[p.sentimiento]} punto={PUNTO_SENTIMIENTO[p.sentimiento]} />
+        <Indicador nombre="Urgencia" valor={p.urgencia} punto={PUNTO_URGENCIA[p.urgencia]} />
+        <Indicador nombre="Riesgo de perderlo" valor={p.riesgo} punto={PUNTO_RIESGO[p.riesgo]} />
+      </div>
+      <p className="m-0 text-[13px]">{p.perfil}</p>
+      {p.proximaAccion && (
+        <p className="m-0 text-[13px]">
+          <span className="font-semibold">Qué hacer ahora: </span>
+          {p.proximaAccion}
+        </p>
+      )}
+      <Lista titulo="El equipo prometió y sigue pendiente" items={p.compromisos} />
+      <Lista titulo="Oportunidades" items={p.oportunidades} />
+      <span className="text-[11.5px] text-[var(--wa-sec)]">
+        Hecho {haceCuanto(p.analizadoEn)}
+        {p.analizadoPor ? ` por ${p.analizadoPor}` : ""} · con {dias(p.dias)} analizados
+      </span>
+    </div>
+  );
+}
+
 /**
  * «Actividad del cliente» en la ficha del chat (pedido de Jhokser, 29 oct 2026): por qué escribió el dropshipper cada día y por qué productos preguntó, entendido por la IA a partir de
- * sus mensajes, si tiene una consulta sin responder y lo que más repite. «Analizar» revisa **toda la conversación** que esté sin analizar (también sin intervenir el chat) y solo
- * paga la IA por los días nuevos. El bloque se puede plegar para que no ocupe espacio una vez leído; plegado deja a la vista solo si tiene algo pendiente.
+ * sus mensajes, si tiene una consulta sin responder y lo que más repite. «Analizar» revisa **toda la conversación** que esté sin analizar (también sin intervenir el chat) y arma un
+ * **análisis completo** del cliente; el botón se queda siempre, y «Volver a analizar» rehace ese análisis con lo que haya cambiado (mensajes nuevos). Con la flecha de arriba el bloque se
+ * pliega o se despliega; plegado deja a la vista solo si tiene algo pendiente.
  */
 export function ActividadDelClienteFicha({ conversacionId, puedeAnalizar }: { conversacionId: string; puedeAnalizar: boolean }) {
   const [datos, setDatos] = useState<ActividadCliente | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [analizando, setAnalizando] = useState(false);
-  const [avance, setAvance] = useState<string | null>(null);
   const [verTodo, setVerTodo] = useState(false);
   const [plegado, alternarPlegado] = usePlegado(`cliente:${conversacionId}`);
   // La bandeja lo monta de nuevo con cada chat (`key`), así que lo que llega siempre es de este chat.
@@ -52,12 +106,12 @@ export function ActividadDelClienteFicha({ conversacionId, puedeAnalizar }: { co
     };
   }, [conversacionId]);
 
-  /** Analiza toda la conversación: si es larga, el servidor devuelve lo que falta y se vuelve a pedir hasta terminar. */
+  /** Analiza toda la conversación y rehace el análisis completo: si es larga, el servidor devuelve lo que falta y se vuelve a pedir hasta terminar. */
   async function analizar() {
     setAnalizando(true);
     setError(null);
+    setAviso(null);
     for (let vuelta = 0; vuelta < 12; vuelta++) {
-      setAvance("Analizando la conversación…");
       const r = await analizarActividadDelCliente(conversacionId).catch(() => ({ error: "No se pudo analizar. Inténtalo de nuevo." }));
       if (!vigente.current) return;
       if ("error" in r) {
@@ -65,16 +119,17 @@ export function ActividadDelClienteFicha({ conversacionId, puedeAnalizar }: { co
         break;
       }
       setDatos(r);
-      setAvance(r.faltan ? `Analizando la conversación… quedan ${dias(r.faltan)} por revisar` : null);
+      if (r.aviso) setAviso(r.aviso);
       if (!r.faltan || !r.analizados) break;
     }
     setAnalizando(false);
-    setAvance(null);
   }
 
   const lista = datos?.dias ?? [];
   const mostrados = verTodo ? lista : lista.slice(0, DIAS_VISIBLES);
   const pendiente = datos && !datos.falta ? datos.situacion : null;
+  const hayAnalisis = !!datos && (datos.perfil !== null || lista.length > 0);
+  const textoBoton = analizando ? "Analizando…" : datos && datos.porAnalizar > 0 ? "Analizar toda la conversación con IA" : hayAnalisis ? "Volver a analizar con IA" : "Analizar con IA";
 
   return (
     <div className="flex flex-col gap-2.5 border-b-8 border-[var(--wa-panel)] px-5 py-4">
@@ -110,10 +165,10 @@ export function ActividadDelClienteFicha({ conversacionId, puedeAnalizar }: { co
             </p>
           )}
 
-          {plegado ? (
-            lista.length > 0 && <span className="text-[12.5px] text-[var(--wa-sec)]">{dias(lista.length)} analizados · desplegar para leerlos</span>
-          ) : (
+          {!plegado && (
             <>
+              {datos.perfil && <AnalisisCompleto p={datos.perfil} />}
+
               {datos.frecuentes.length > 0 && (
                 <div className="flex flex-col gap-1">
                   <span className="text-[12.5px] text-[var(--wa-sec)]">Lo que más consulta</span>
@@ -178,36 +233,35 @@ export function ActividadDelClienteFicha({ conversacionId, puedeAnalizar }: { co
                 </button>
               )}
               {lista.length === 0 && datos.porAnalizar === 0 && <span className="text-[13px] text-[var(--wa-sec)]">Todavía no hay mensajes para analizar.</span>}
-            </>
-          )}
 
-          {datos.porAnalizar > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] text-[var(--wa-sec)]">
-                {datos.porAnalizar === 1 ? "Hay 1 día con mensajes nuevos o sin analizar." : `Hay ${datos.porAnalizar} días con mensajes nuevos o sin analizar.`}
-              </span>
-              {datos.iaConectada ? (
-                puedeAnalizar ? (
+              <div className="flex flex-col gap-1.5">
+                {datos.porAnalizar > 0 && (
+                  <span className="text-[12.5px] text-[var(--wa-sec)]">
+                    {datos.porAnalizar === 1 ? "Hay 1 día con mensajes nuevos o sin analizar." : `Hay ${datos.porAnalizar} días con mensajes nuevos o sin analizar.`}
+                  </span>
+                )}
+                {!datos.iaConectada ? (
+                  <span className="text-[13px] text-[var(--wa-sec)]">Falta conectar una IA de texto (OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel).</span>
+                ) : puedeAnalizar ? (
                   <button
                     type="button"
                     onClick={() => void analizar()}
                     disabled={analizando}
+                    title={hayAnalisis ? "Lee los mensajes nuevos y rehace el análisis completo del cliente" : "Lee toda la conversación y hace el análisis completo del cliente"}
                     className={`inline-flex min-h-9 items-center justify-center rounded-lg bg-[var(--wa-acento)] px-3 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-60 ${anilloFoco}`}
                   >
-                    {analizando ? "Analizando…" : "Analizar toda la conversación con IA"}
+                    {textoBoton}
                   </button>
-                ) : null
-              ) : (
-                <span className="text-[13px] text-[var(--wa-sec)]">Falta conectar una IA de texto (OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel).</span>
-              )}
-              {avance && (
-                <span role="status" className="text-[12.5px] text-[var(--wa-sec)]">
-                  {avance}
-                </span>
-              )}
-            </div>
+                ) : null}
+              </div>
+            </>
           )}
         </>
+      )}
+      {aviso && (
+        <p role="alert" className="m-0 text-[13px] text-warning">
+          {aviso}
+        </p>
       )}
       {error && (
         <p role="alert" className="m-0 text-[13px] text-destructive">
