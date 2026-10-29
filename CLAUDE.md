@@ -1191,6 +1191,8 @@ convenciones técnicas del código.
   (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
   deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
   ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
+  **La ficha siempre a la vista** (29 oct 2026, pedido de Alcides): la ventana del chat ya no tiene los botones «Chat / Ficha del dropshipper»; lado a lado desde
+  `@4xl` y, más angosta, la ficha arriba (`max-h-[45%]`, se desplaza) y el chat abajo.
   **Un solo juego de etiquetas** (29 oct 2026, pedido de Alcides: salían dos): un chat **con dropshipper** muestra y edita las del dropshipper
   (`dropshippers.etiquetas`, las de ClickUp; `guardarEtiquetasChat` escribe ahí con `escribirEtiquetasDropshipper`, `src/lib/crm/etiquetas-dropshipper.ts`,
   auditoría `etiquetas_dropshipper`); solo un chat sin dropshipper usa `whatsapp_conversaciones.etiquetas`. En la ficha del CRM, «Datos › Etiquetas» es
