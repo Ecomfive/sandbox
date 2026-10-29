@@ -339,7 +339,7 @@ export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: 
                   name="contacto_telefono"
                   autoComplete="off"
                   defaultValue=""
-                  placeholder={d.tieneTelefono ? "Número oculto: déjalo vacío para no cambiarlo" : "Ej: +57 300 111 2233"}
+                  placeholder={d.tieneTelefono ? "Déjalo vacío para no cambiarlo" : "Ej: +57 300 111 2233"}
                   className={`${fieldClass} w-full`}
                 />
               </Campo>

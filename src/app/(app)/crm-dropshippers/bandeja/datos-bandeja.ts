@@ -57,6 +57,14 @@ export interface MensajeVista {
   borradoPendiente: boolean;
 }
 
+/** Un mensaje de la vista previa que se despliega al pasar el cursor por la lista de chats. */
+export interface VistaPreviaMensaje {
+  id: string;
+  direccion: "entrante" | "saliente" | "nota";
+  texto: string;
+  momento: string;
+}
+
 /** Lo que se ve del dropshipper junto al chat. */
 export interface ResumenDropshipper {
   id: string;
