@@ -59,6 +59,11 @@ export function areasVisibles(acceso: AccesoCrm): AreaCrm[] {
   return acceso.comercial ? ["comercial", "atencion"] : ["atencion"];
 }
 
+/** Los números de WhatsApp de la empresa que esta persona puede ver o elegir: los de sus áreas (Atención no ve el número de Comercial; Comercial ve los dos). */
+export function numerosDeAreas<T extends { area: AreaCrm }>(numeros: readonly T[], areas: readonly AreaCrm[]): T[] {
+  return numeros.filter((n) => areas.includes(n.area));
+}
+
 /**
  * En qué área se guarda una nota nueva. Quien pide «comercial» sin poder escribir en Comercial no la puede crear
  * (devuelve null); sin pedir nada, cada quien escribe en su área (Comercial si la tiene, si no Atención).

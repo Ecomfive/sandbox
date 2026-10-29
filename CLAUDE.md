@@ -1045,6 +1045,8 @@ convenciones técnicas del código.
   `ver_telefono_dropshipper` en la auditoría. Se quitaron los enlaces `wa.me` y la búsqueda por número; el campo WhatsApp de la ficha del dropshipper arranca vacío y **vacío = no cambiar** (`actualizarDropshipper`).
   El servidor sigue usando el número para enviar. **Etapa 2 pendiente** (aparte, más riesgosa): cifrar el número en la base (clave del servidor + huella para emparejar) y decidir quién más puede descifrarlo; hoy `whatsapp_conversaciones.telefono`
   y `dropshippers.contacto_telefono` siguen en texto normal y las funciones SQL de WhatsApp, los KPIs, la importación de chats y el emparejamiento dependen de ellos.
+  **Números por área** (29 oct 2026): la bandeja solo ofrece los números de WhatsApp de las áreas de la persona (`numerosDeAreas`, `crm/areas.ts`, con prueba): Atención ve el número de Atención y **no** el de Comercial ni
+  el selector «Todos los números / …» (que sale solo si hay más de un número); Comercial ve los dos y Dirección los tres. Los chats siguen saliendo por su área, vengan del número que vengan; «Importar chat» también ofrece solo esos números.
   **Marcar como no leído** (29 oct 2026): clic derecho (o tecla de menú / Mayús + F10) sobre un chat de la lista abre un menú con «Marcar como no leído» —o «Marcar como leído» si tiene mensajes sin leer—, y el encabezado del chat
   trae el mismo botón. `marcarChatLeido(id, leido)` (`bandeja/actions.ts`; basta poder abrir el CRM, como abrir un chat) deja `no_leidos` en 1 como mínimo y pone `estado = abierta` (así vuelve a «Sin responder»); la lista cambia al
   instante. Un chat **abierto se cierra** al marcarlo no leído: mientras está abierto, el refresco de cada 8 s lo vuelve a marcar leído (`abrirConversacion`).

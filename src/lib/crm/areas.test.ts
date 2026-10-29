@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, supervisaArea } from "./areas";
+import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, numerosDeAreas, supervisaArea } from "./areas";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del CRM)
 const atencion = accesoCrm({ modulos: ["crm-dropshippers"], modulosSoloLectura: [] });
@@ -66,4 +66,15 @@ test("paneles de la bandeja: cada quien tiene el suyo y supervisa los de abajo s
   assert.equal(supervisaArea(direccion, "comercial"), true);
   assert.equal(supervisaArea(direccion, "atencion"), true);
   assert.equal(supervisaArea(direccion, "direccion"), false);
+});
+
+test("cada quien ve solo los números de WhatsApp de sus áreas", () => {
+  const numeros = [
+    { id: "a", area: "atencion" as const },
+    { id: "c", area: "comercial" as const },
+    { id: "d", area: "direccion" as const },
+  ];
+  assert.deepEqual(numerosDeAreas(numeros, areasVisibles(atencion)).map((n) => n.id), ["a"]);
+  assert.deepEqual(numerosDeAreas(numeros, areasVisibles(comercial)).map((n) => n.id), ["a", "c"]);
+  assert.deepEqual(numerosDeAreas(numeros, ["direccion", "comercial", "atencion"]).map((n) => n.id), ["a", "c", "d"]);
 });
