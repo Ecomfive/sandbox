@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
-import { CUENTAS, GRUPOS, LECTORES, LECTORES_PAIS, PARTES, archivoSubido, diasPrimeraLectura, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
+import { CUENTAS, GRUPOS, LECTORES, LECTORES_PAIS, PARTES, PRIMERA_LECTURA_DESDE, archivoSubido, diasPrimeraLectura, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
 import { archivosSubidos, empezarActualizacion, marcarPartesConError, procesarParte, subidasDeLector, terminarActualizacion } from "./actions";
 import type { Corrida, UltimaParte } from "./datos";
 
@@ -88,6 +88,8 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   const detener = useRef(false);
   // Mientras arranca (antes de que el servidor responda) los botones ya no sirven: un doble clic arrancaba dos.
   const arrancando = useRef(false);
+  /** El país al que se le trae todo el historial en esta actualización («Traer historial»), o null para los días de siempre. */
+  const historial = useRef<PaisProveedor | null>(null);
   const [empezando, setEmpezando] = useState(false);
   const retomada = useRef(false);
 
@@ -153,8 +155,9 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
     return false;
   }
 
-  async function actualizar(lectores: ClaveLector[]) {
+  async function actualizar(lectores: ClaveLector[], conHistorial: PaisProveedor | null = null) {
     if (arrancando.current || (corriendo && !corriendo.terminado)) return;
+    historial.current = conHistorial;
     arrancando.current = true;
     setEmpezando(true);
     setError(null);
@@ -198,8 +201,9 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
               subida = s.subida;
             }
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
-            // La primera vez que se leen los pedidos de un país, desde su fecha de arranque (Costa Rica: 1 de septiembre).
-            const primera = lector.startsWith("proveedor") && !ultima[pais === "pa" ? "pedidos" : "pedidos_cr"] ? diasPrimeraLectura(pais) : null;
+            // La primera vez que se leen los pedidos de un país, o con «Traer historial», desde su fecha de arranque (Costa Rica: 1 abr 2026).
+            const primera =
+              lector.startsWith("proveedor") && (historial.current === pais || !ultima[pais === "pa" ? "pedidos" : "pedidos_cr"]) ? diasPrimeraLectura(pais) : null;
             await pedirExtension({ tipo: "lanzar", lector, subida, dias: primera }, 45000);
           } else {
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
@@ -426,6 +430,11 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
             estado={estadoDe(p)}
             vence={sesiones[p]?.vence ?? null}
             fallo={fallos[p]}
+            historial={
+              PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
+                ? { desde: PRIMERA_LECTURA_DESDE[p]!, alPulsar: () => void actualizar([p === "pa" ? "proveedor" : "proveedor_cr"], p) }
+                : null
+            }
             extensionVieja={extension === "lista" && versionAnterior(version, VERSION_PARA[p]) ? { tiene: version ?? "", pide: VERSION_PARA[p] } : null}
             origen={CUENTAS[p].origen}
             alAbrir={
@@ -573,6 +582,7 @@ function TarjetaCuenta({
   fallo = null,
   extensionVieja = null,
   origen,
+  historial = null,
 }: {
   sigla: string;
   titulo: string;
@@ -589,6 +599,8 @@ function TarjetaCuenta({
   extensionVieja?: { tiene: string; pide: string } | null;
   /** La página de Dropi del país, para abrirla aunque la extensión no responda. */
   origen: string;
+  /** «Traer historial»: pedidos y cartera desde la fecha de arranque del país (una vez, o cuando falte algo). */
+  historial?: { desde: string; alPulsar: () => void } | null;
 }) {
   const chip: Record<string, [string, string]> = {
     ok: ["Sesión activa", "bg-success/10 text-success"],
@@ -653,6 +665,16 @@ function TarjetaCuenta({
         </span>
       </div>
       <span className="text-xs text-muted-foreground">{que}</span>
+      {historial && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-sm">
+          <span className="text-muted-foreground">
+            Trae todos los pedidos y la cartera desde el {new Date(`${historial.desde}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, sin repetir lo que ya está. Tarda más que la de todos los días.
+          </span>
+          <button type="button" className={botonSecundario} onClick={historial.alPulsar}>
+            Traer historial completo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
