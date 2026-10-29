@@ -4,6 +4,7 @@
 // decisiones quedan guardadas (`dropi_publicaciones_decisiones`) y son lo que en la fase 2 leerá la IA para aprender. Sin base
 // ni React, con prueba.
 
+import { formatoMonto, MONEDA_DOLAR, type MonedaPublicaciones } from "./moneda";
 import type { Revision } from "./optimizacion";
 import type { Reglas } from "./reglas";
 
@@ -80,16 +81,29 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 /** El margen bruto a un precio: lo que queda después del costo y el fulfillment, sobre el precio. */
 export const margenA = (precio: number, costo: number, fulfillment: number) => (precio > 0 ? (precio - costo - fulfillment) / precio : 0);
 /** Redondea hacia arriba a un precio que termina en 9 (5,37 → 5,39; 8,98 → 8,99). */
-export const precioArriba = (p: number) => r2(Math.ceil(r2((p + 0.01) * 10) - 1e-9) / 10 - 0.01);
+const precioArribaUsd = (p: number) => r2(Math.ceil(r2((p + 0.01) * 10) - 1e-9) / 10 - 0.01);
 /** Redondea hacia abajo a un precio que termina en 9, sin pasar del dado (4,50 → 4,49; 4,49 → 4,49). */
-export const precioAbajo = (p: number) => r2(Math.floor(r2((p + 0.01) * 10) + 1e-9) / 10 - 0.01);
+const precioAbajoUsd = (p: number) => r2(Math.floor(r2((p + 0.01) * 10) + 1e-9) / 10 - 0.01);
+
+export const precioArriba = precioArribaUsd;
+export const precioAbajo = precioAbajoUsd;
 
 const pct = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString("es-PA")} %`;
-const usd = (v: number) => `$${v.toFixed(2)}`;
 
-/** Las recomendaciones de una publicación según las reglas (puede no tener ninguna). */
-export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendacion[] {
+/** En colones (y cualquier moneda que no sea el dólar) los precios son enteros que terminan en 9: 5 450 → 5 449 hacia abajo, 5 451 → 5 459 hacia arriba. */
+const enteroAbajo = (p: number) => Math.floor((p + 1) / 10) * 10 - 1;
+const enteroArriba = (p: number) => Math.ceil((p + 1) / 10) * 10 - 1;
+
+/**
+ * Las recomendaciones de una publicación según las reglas (puede no tener ninguna). Los montos van en la moneda del país (28 oct 2026, Costa Rica en
+ * colones): los textos con su símbolo y los precios redondeados como se ponen en esa moneda.
+ */
+export function recomendar(p: EntradaRecomendacion, reglas: Reglas, moneda: MonedaPublicaciones = MONEDA_DOLAR): Recomendacion[] {
   if (p.archivada || p.precio === null || p.precio <= 0 || p.costo === null || p.margen === null) return [];
+  const usd = (v: number) => formatoMonto(v, moneda);
+  const enDolares = moneda.moneda === "USD";
+  const precioAbajo = enDolares ? precioAbajoUsd : enteroAbajo;
+  const precioArriba = enDolares ? precioArribaUsd : enteroArriba;
   const out: Recomendacion[] = [];
   const ful = p.fulfillment ?? 0;
   const bajo = p.margen < reglas.margen_minimo;

@@ -3,7 +3,7 @@
 // favorito lee el stock de Dropi en ese momento y hace la entrada o la salida que falte (así un reintento no mueve dos veces). La B280 es de
 // Dropi y no se toca. Aquí van las piezas puras (sin base ni red), con prueba que también compara la versión en JavaScript del favorito.
 
-import { BODEGA_DROPI } from "./automatico";
+import { BODEGA_DROPI, esBodegaDropi } from "./automatico";
 import { armarMovimientoStock, stockPorBodega } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
@@ -52,7 +52,7 @@ export function normalizarDatosStock(crudo: unknown): DatosStock {
 /** Lo que impide pedir el cambio (vacío = se puede). `bodegas` son las de ECOMFIVE del país. */
 export function faltantesStock(d: DatosStock, bodegas: { id: number }[]): string[] {
   const faltan: string[] = [];
-  if (d.bodega === BODEGA_DROPI) faltan.push("El stock de la bodega de Dropi (B280) no se mueve desde aquí.");
+  if (esBodegaDropi(d.bodega)) faltan.push("El stock de la bodega de Dropi no se mueve desde aquí.");
   else if (!bodegas.some((b) => b.id === d.bodega)) faltan.push("Elige una bodega de ECOMFIVE.");
   if (!(d.unidades >= 0) || d.unidades > MAX_UNIDADES_STOCK)
     faltan.push(`Escribe las unidades que deben quedar (de 0 a ${MAX_UNIDADES_STOCK.toLocaleString("es-PA")}).`);

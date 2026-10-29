@@ -9,7 +9,7 @@ import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencia
 import type { ComponenteEnCamino, EtapaCotizacion } from "@/lib/compras/en-camino";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
-import { ACCIONES, BODEGA_DROPI, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
+import { ACCIONES, EN_DROPI, esBodegaDropi, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
 import { listaParaReactivar, sePuedePausar } from "@/lib/publicaciones/archivar";
 import type { EstadoBotones } from "@/lib/publicaciones/botones-fila";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
@@ -188,7 +188,7 @@ export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "sto
  * nuestra bodega (lo de la B280 es de Dropi). El servidor lo vuelve a comprobar en `republicarPublicacion`.
  */
 export function puedeRepublicar(f: Pick<FilaPublicacion, "dropiId" | "archivada" | "bodega" | "tipoDropi" | "sinPublicar" | "apagadoPendiente" | "duplicadaDe">): boolean {
-  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && f.bodega?.id !== BODEGA_DROPI && f.tipoDropi !== "privado";
+  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && !esBodegaDropi(f.bodega?.id) && f.tipoDropi !== "privado";
 }
 /** Si tiene una republicación esperando «Aplicar en Dropi» (o que dio error y se reintenta). */
 export const republicacionPendiente = (f: Pick<FilaPublicacion, "cambioDropi">) => f.cambioDropi?.tipo === "republicar" && f.cambioDropi.estado !== "aplicado";
@@ -418,7 +418,7 @@ export function estadoBotones(f: FilaPublicacion): EstadoBotones {
     bodegaId: f.bodega?.id ?? null,
     stock: stockDe(f),
     privado: privadoDe(f),
-    stockPropio: (f.bodegasDropi ?? []).some((b) => b.id !== BODEGA_DROPI && b.stock > 0),
+    stockPropio: (f.bodegasDropi ?? []).some((b) => !esBodegaDropi(b.id) && b.stock > 0),
     liquidacion: !!f.liquidacionDesde,
   };
 }

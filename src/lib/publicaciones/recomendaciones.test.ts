@@ -129,3 +129,17 @@ test("subir o bajar el precio lleva a los competidores (precio, stock y lo vendi
   const sin = recomendar({ archivada: false, esPack: false, precio: 9.9, costo: 1, fulfillment: 0.5, margen: 0.85, netas30: 10, sku: null, combo: null, competidorMasBarato: { proveedor: "P0", precio: 4 }, competidorMinimo: null }, REGLAS_DEFECTO);
   assert.equal(sin.find((r) => r.tipo === "igualar_precio")?.competidores, undefined);
 });
+
+test("en colones (Costa Rica) los textos van con ₡ y los precios son enteros que terminan en 9", () => {
+  const colones = { moneda: "CRC" as const, porUsd: 510 };
+  const recs = recomendar(
+    { archivada: false, esPack: false, precio: 5499, costo: 1000, fulfillment: 500, margen: 0.72, netas30: 10, sku: null, combo: null, competidorMasBarato: { proveedor: "P0", precio: 4975 }, competidorMinimo: { proveedor: "P0", precio: 4975 } },
+    REGLAS_DEFECTO,
+    colones,
+  );
+  const bajar = recs.find((r) => r.tipo === "igualar_precio");
+  assert.ok(bajar);
+  assert.equal(bajar!.datos.precioSugerido, 4969);
+  assert.match(bajar!.titulo, /₡/);
+  assert.doesNotMatch(bajar!.titulo, /\$/);
+});

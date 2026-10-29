@@ -7,6 +7,7 @@ import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { SugerenciaIcon } from "@/lib/nav-icons";
+import { Monto } from "./moneda-contexto";
 import { DECISIONES, DIAS_POSPONER, ESTADOS_TAREA, TIPOS_RECOMENDACION, etiquetaRecomendacion, type CompetidorRecomendacion, type Decision, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { DecisionVista, FilaPublicacion } from "./def-publicaciones";
 import { tipoIADeRecomendacion } from "@/lib/publicaciones/ia/asistente";
@@ -331,7 +332,6 @@ export function RecomendacionesFicha({ p, puedeEscribir, disponible }: { p: Fila
  * 30 días (lo que bajó su stock: Dropi no muestra las ventas de otros), para decidir si igualarse o bajar. Un punto rojo marca al que vende más barato.
  */
 function CompetidoresRecomendacion({ competidores, nuestro }: { competidores: CompetidorRecomendacion[]; nuestro: number | null }) {
-  const usd = (n: number) => `$${n.toFixed(2)}`;
   return (
     <div className="overflow-x-auto rounded-md border border-border">
       <table className="w-full text-sm">
@@ -364,7 +364,7 @@ function CompetidoresRecomendacion({ competidores, nuestro }: { competidores: Co
                 <td className="px-3 py-1.5 text-right whitespace-nowrap tabular-nums">
                   <span className="inline-flex items-center gap-1.5">
                     {masBarato && <span role="img" aria-label="Más barato que nosotros" className="h-1.5 w-1.5 rounded-full bg-destructive" />}
-                    {usd(c.precio)}
+                    <Monto valor={c.precio} />
                   </span>
                 </td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{c.stock.toLocaleString("es-PA")}</td>

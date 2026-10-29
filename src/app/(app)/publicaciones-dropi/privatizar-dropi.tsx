@@ -11,14 +11,14 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { CandadoIcon } from "@/lib/nav-icons";
-import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
+import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { faltantesPrivatizar, inicialesDe, limpiarIniciales, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { buscarDropshippersParaPrivatizar, privatizarPublicacion } from "./actions";
 import { estadoBotones, type FilaPublicacion } from "./def-publicaciones";
 
 /** Las bodegas de ECOMFIVE con stock de este producto en Dropi (la B280 es de Dropi y no se mueve desde aquí), de más a menos stock. */
-const bodegasConStock = (p: FilaPublicacion) => (p.bodegasDropi ?? []).filter((b) => b.id !== BODEGA_DROPI && b.stock > 0).sort((a, b) => b.stock - a.stock);
+const bodegasConStock = (p: FilaPublicacion) => (p.bodegasDropi ?? []).filter((b) => !esBodegaDropi(b.id) && b.stock > 0).sort((a, b) => b.stock - a.stock);
 
 /**
  * Si una publicación se puede privatizar: es una pública con ID de Dropi, activa, ya publicada y con stock en una bodega de ECOMFIVE. Lo usan el
