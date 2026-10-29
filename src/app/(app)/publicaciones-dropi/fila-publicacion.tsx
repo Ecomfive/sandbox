@@ -17,6 +17,7 @@ import { BotonIconoFila } from "./boton-icono-fila";
 import { motivoArchivar, motivoPausar, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
+import { BotonLiquidacionFila } from "./liquidacion";
 import { InsigniaConectado } from "./insignia-conectado";
 import { Monto, useMoneda } from "./moneda-contexto";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
@@ -233,7 +234,7 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
     { nombre: "En Dropi" },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[14rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[16.5rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
           {c.nombre}
@@ -316,6 +317,12 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {paraReactivar(f) ? "Volvió el stock: reactivar" : "Pausada sin stock"}
               </span>
             )}
+            {f.liquidacionDesde && (
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <Punto clase="bg-warning" texto="En liquidación" />
+                En liquidación
+              </span>
+            )}
             {f.archivadoPendiente && !f.apagadoPendiente && (
               <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
                 <Punto clase="bg-destructive" texto="Pendiente en Dropi" />
@@ -363,7 +370,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               "Sin margen"
             ) : (
               <span className="inline-flex items-center gap-1.5 tabular-nums">
-                {(f.nivelMargen === "critico" || f.nivelMargen === "bajo") && <Punto clase="bg-destructive" texto="Margen bajo" />}
+                {!f.liquidacionDesde && (f.nivelMargen === "critico" || f.nivelMargen === "bajo") && <Punto clase="bg-destructive" texto="Margen bajo" />}
                 {Math.round(f.margen * 100)} % de margen bruto
               </span>
             )
@@ -394,12 +401,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
   return (
     <div className="flex items-center">
       <div className="min-w-0 flex-1">{fila}</div>
-      {/* Siempre los mismos cinco botones, en el mismo orden; los que no aplican van apagados y dicen por qué (27 oct 2026). */}
+      {/* Siempre los mismos seis botones, en el mismo orden; los que no aplican van apagados y dicen por qué (27 oct 2026; liquidación, 28 oct). */}
       <div className="mr-3 flex shrink-0 items-center gap-1">
         <BotonRepublicarFila f={f} />
         <BotonPrivatizarFila f={f} />
         <BotonApagarFila f={f} />
         <BotonPausarFila f={f} />
+        <BotonLiquidacionFila f={f} />
         <BotonArchivarFila f={f} />
       </div>
     </div>

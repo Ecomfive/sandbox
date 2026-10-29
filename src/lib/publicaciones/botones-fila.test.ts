@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { motivoApagar, motivoArchivar, motivoPausar, motivoPrivatizar, motivoRepublicar, type EstadoBotones } from "./botones-fila";
+import { motivoApagar, motivoArchivar, motivoLiquidacion, motivoPausar, motivoPrivatizar, motivoRepublicar, type EstadoBotones } from "./botones-fila";
 
 const base: EstadoBotones = {
   dropiId: "8406",
@@ -9,6 +9,7 @@ const base: EstadoBotones = {
   apagadoPendiente: false,
   duplicada: false,
   pausada: false,
+  liquidacion: false,
   archivadaEnDropi: false,
   tipo: "publico",
   bodegaId: 81,
@@ -52,4 +53,12 @@ test("privada y bodega B280", () => {
   assert.equal(motivoPrivatizar({ ...base, tipo: "privado" }), "Ya es privada");
   assert.match(motivoApagar({ ...base, bodegaId: 280 })!, /B280/);
   assert.equal(motivoApagar({ ...base, apagadoPendiente: true }), null, "con un apagado pendiente el botón lo deshace");
+});
+
+test("liquidación: se pone sin ID de Dropi (es del sistema); no en una archivada ni en una duplicada; una en liquidación siempre se saca", () => {
+  assert.equal(motivoLiquidacion(base), null);
+  assert.equal(motivoLiquidacion({ ...base, dropiId: "" }), null);
+  assert.equal(motivoLiquidacion({ ...base, archivada: true }), "Está archivada");
+  assert.equal(motivoLiquidacion({ ...base, duplicada: true }), "Es duplicada de otra publicación");
+  assert.equal(motivoLiquidacion({ ...base, archivada: true, liquidacion: true }), null);
 });

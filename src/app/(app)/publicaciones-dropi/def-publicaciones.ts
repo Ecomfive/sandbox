@@ -130,6 +130,8 @@ export interface FilaPublicacion {
   archivadoPendiente: "archivar" | "restaurar" | null;
   /** Privatizaciones esperando «Aplicar en Dropi» (migración 0155): a quién se le deja, cuántas unidades y bajo qué nombre. */
   privatizaciones: { correo: string; dropshipper: string; unidades: number; nombre: string }[];
+  /** Desde cuándo está en liquidación (migración 0174): sale del aviso de margen bajo y va a la tarjeta «En liquidación». */
+  liquidacionDesde: string | null;
   /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */
   stockPendiente: { bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
@@ -334,6 +336,15 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "enCamino", etiqueta: "Mercancía en camino (unidades)", tipo: "numero", valor: (f) => f.enCamino },
     { id: "enCotizacion", etiqueta: "En cotización (unidades)", tipo: "numero", valor: (f) => f.enCotizacion },
     // «Sin stock» del tablero (25 oct 2026, pedido de Alcides): toda publicación activa en Dropi con 0 unidades, venda o no.
+    // «En liquidación» (28 oct 2026, migración 0174): su margen bajo es a propósito y no cuenta como aviso.
+    {
+      id: "liquidacion",
+      etiqueta: "Liquidación",
+      tipo: "seleccion",
+      valores: (f) => [f.liquidacionDesde ? "si" : "no"],
+      opciones: () => [{ valor: "si", etiqueta: "En liquidación" }, { valor: "no", etiqueta: "Sin liquidar" }],
+      agrupable: true,
+    },
     { id: "sinStock", etiqueta: "Sin stock", tipo: "seleccion", valores: (f) => [sinStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sin stock" }, { valor: "no", etiqueta: "Con stock" }] },
     // «Poco stock» del tablero (27 oct 2026, pedido de Hernán): vende y le quedan menos de 100 unidades.
     { id: "pocoStock", etiqueta: "Poco stock", tipo: "seleccion", valores: (f) => [pocoStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Poco stock" }, { valor: "no", etiqueta: "Stock suficiente o sin ventas" }] },
@@ -408,5 +419,6 @@ export function estadoBotones(f: FilaPublicacion): EstadoBotones {
     stock: stockDe(f),
     privado: privadoDe(f),
     stockPropio: (f.bodegasDropi ?? []).some((b) => b.id !== BODEGA_DROPI && b.stock > 0),
+    liquidacion: !!f.liquidacionDesde,
   };
 }

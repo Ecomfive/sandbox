@@ -20,6 +20,8 @@ export interface EstadoBotones {
   privado: number | null;
   /** Tiene stock en alguna bodega de ECOMFIVE (para privatizar). */
   stockPropio: boolean;
+  /** Está en liquidación (migración 0174). */
+  liquidacion: boolean;
 }
 
 /** Lo que impide casi todo, en el orden en que se le dice a la persona. */
@@ -66,5 +68,13 @@ export function motivoArchivar(e: EstadoBotones): string | null {
   if (e.duplicada) return "Es duplicada: se queda en Archivados";
   if (e.pausada) return "Está pausada: se reactiva con el botón de pausa";
   if (e.apagadoPendiente) return "Tiene un apagado pendiente";
+  return null;
+}
+
+/** Poner en liquidación (o sacarla) es solo del sistema: no hace falta ID de Dropi. Una en liquidación siempre se puede sacar. */
+export function motivoLiquidacion(e: EstadoBotones): string | null {
+  if (e.liquidacion) return null;
+  if (e.duplicada) return "Es duplicada de otra publicación";
+  if (e.archivada) return "Está archivada";
   return null;
 }

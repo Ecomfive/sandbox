@@ -864,6 +864,36 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
 }
 
 /**
+ * «En liquidación» (pedido de Alcides, 28 oct 2026; migración 0174): marca o desmarca una publicación que se está liquidando a propósito. Sale del
+ * aviso de margen bajo y de las recomendaciones de subir el precio o armar el combo, y va a la tarjeta «En liquidación». Solo cambia el sistema.
+ */
+export async function marcarLiquidacion(id: string, enLiquidacion: boolean): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  const supabase = createServiceClient();
+  const { data: actual, error: errorLeer } = await supabase.from("dropi_publicaciones").select("liquidacion_en").eq("id", id).maybeSingle();
+  if (errorLeer) return { error: /liquidacion_en/.test(errorLeer.message) ? "Falta correr en Supabase la migración 0174." : "No se pudo leer la publicación." };
+  const ya = !!actual?.liquidacion_en;
+  if (ya === enLiquidacion) return { detalle: enLiquidacion ? "Ya estaba en liquidación." : "No estaba en liquidación." };
+  const { error } = await supabase
+    .from("dropi_publicaciones")
+    .update({ liquidacion_en: enLiquidacion ? new Date().toISOString() : null, actualizado_en: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { error: "No se pudo guardar." };
+  await registrarAuditoria({
+    accion: enLiquidacion ? "publicacion_liquidacion" : "publicacion_fin_liquidacion",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre}${antes.dropi_id ? ` · ID Dropi ${antes.dropi_id}` : ""}: ${enLiquidacion ? "en liquidación (sale del aviso de margen bajo)" : "fuera de liquidación"}`,
+    antes: { Liquidación: ya ? "Sí" : "No" },
+    despues: { Liquidación: enLiquidacion ? "Sí" : "No" },
+  });
+  revalidatePath(RUTA);
+  return { detalle: enLiquidacion ? "En liquidación: ya no sale como margen bajo." : "Fuera de liquidación." };
+}
+
+/**
  * «Cambiar stock en Dropi» (pedido de Alcides, 28 oct 2026): deja pendiente para «Aplicar en Dropi» que una bodega de ECOMFIVE quede con esas unidades.
  * El sistema no cambia su stock al pedirlo (el stock es el que lee Dropi): cambia cuando el favorito lo confirma. La bodega tiene que ser una de
  * ECOMFIVE del país (las de la lectura de «Mis productos»; nunca la B280) y la publicación tiene que existir en Dropi.
