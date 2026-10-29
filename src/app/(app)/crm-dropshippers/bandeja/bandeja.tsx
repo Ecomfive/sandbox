@@ -2,7 +2,6 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
-import { createPortal } from "react-dom";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -11,16 +10,15 @@ import { supabase } from "@/lib/supabase/client";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
+import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
+import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
+import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
 import { VistaPreviaChat } from "./vista-previa-chat";
-import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
+import { VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
 import { Expresiones } from "./expresiones";
 import { GrabarVoz } from "./grabar-voz";
-import { ActividadDelClienteFicha } from "./actividad-cliente";
-import { ActividadDelEquipoFicha } from "./actividad-equipo";
-import { ProductosDelChatFicha } from "./productos-chat";
 import { EditorNombreContacto } from "./nombre-contacto";
 import { listarRespuestasRapidas, guardarRespuestaRapida, usarRespuestaRapida } from "./rapidas-actions";
 import { VentanaRapidas } from "./respuestas-rapidas";
@@ -29,7 +27,9 @@ import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
-import { PapeleraIcon } from "@/lib/nav-icons";
+import { ChatIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { Ventana } from "@/components/ui/ventana";
+import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 
 /** Qué conversaciones del panel se ven. */
@@ -216,8 +216,6 @@ function Contenido({ m }: { m: MensajeVista }) {
 
 /** Un botón redondo de ícono, como los de la barra de WhatsApp. */
 const botonIcono = `flex h-10 w-10 flex-none items-center justify-center rounded-full text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] disabled:opacity-50 ${anilloFoco}`;
-/** Un botón con texto de la cabecera del chat. */
-const botonPildora = `inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 text-[13px] font-medium hover:bg-[var(--wa-hover)] disabled:opacity-50 ${anilloFoco}`;
 
 /**
  * La bandeja de WhatsApp (26 oct 2026). **Paneles** (29 oct 2026, pedido de Hernán): uno por área; cada quien ve el suyo (`miArea`) y los
@@ -286,8 +284,8 @@ export function Bandeja({
   // Mensajes rápidos del equipo (se ofrecen arriba del cuadro de texto) y el cambio de nombre de un contacto.
   const [rapidas, setRapidas] = useState<RespuestaRapida[]>(RAPIDAS_BASE);
   const [verRapidas, setVerRapidas] = useState(false);
-  /** Dónde se está cambiando el nombre del contacto del chat abierto: en la cabecera o en la ficha. */
-  const [editandoNombre, setEditandoNombre] = useState<"cabecera" | "ficha" | null>(null);
+  /** Si se está cambiando el nombre del contacto del chat abierto (en la cabecera de su ventana). */
+  const [editandoNombre, setEditandoNombre] = useState<"cabecera" | null>(null);
   useEffect(() => {
     let vigente = true;
     listarRespuestasRapidas()
@@ -366,34 +364,10 @@ export function Bandeja({
   useEffect(() => () => {
     if (temporizadorVista.current) clearTimeout(temporizadorVista.current);
   }, []);
-  const [menuArea, setMenuArea] = useState(false);
-  const [verFicha, setVerFicha] = useState(true);
-  // En pantallas angostas (menos de 1280 px) la ficha no cabe al lado: se abre encima de todo al tocar el nombre (29 oct 2026).
-  const [fichaEncima, setFichaEncima] = useState(false);
-  const pantallaAncha = useSyncExternalStore(
-    (avisar) => {
-      const m = window.matchMedia(PANTALLA_ANCHA);
-      m.addEventListener("change", avisar);
-      return () => m.removeEventListener("change", avisar);
-    },
-    () => window.matchMedia(PANTALLA_ANCHA).matches,
-    () => true,
-  );
-  const fichaVisible = pantallaAncha ? verFicha : fichaEncima;
-  const alternarFicha = (abrir?: boolean) => (pantallaAncha ? setVerFicha : setFichaEncima)((v) => abrir ?? !v);
-  // Encima, va en el <body> con un fondo oscuro que la cierra al tocarlo: dentro de la página quedaría encerrada en su recuadro.
-  const comoFicha = (ficha: ReactNode) =>
-    pantallaAncha
-      ? ficha
-      : createPortal(
-          <div className="bandeja-wa fixed inset-0 z-50 flex justify-end bg-black/40" onClick={(e) => e.target === e.currentTarget && setFichaEncima(false)}>
-            {ficha}
-          </div>,
-          document.body,
-        );
+  // La ventana del chat (29 oct 2026): si no caben la ficha y el chat lado a lado, se ve uno a la vez y se cambia con «Chat» / «Ficha».
+  const [vistaAngosta, setVistaAngosta] = useState<"chat" | "ficha">("chat");
   const [enviando, empezar] = useTransition();
   const finRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const textoRef = useRef<HTMLTextAreaElement>(null);
 
   // El refresco va por su propia ruta y no por una acción del servidor: las acciones van en fila y un refresco en curso hacía esperar al envío.
@@ -434,6 +408,22 @@ export function Bandeja({
     };
   }, [elegido, mostrarToast]);
 
+  // La ficha del CRM del dropshipper del chat abierto (29 oct 2026): se pide al abrirlo y otra vez cuando algo de ella se guarda.
+  const [fichaCrm, setFichaCrm] = useState<{ id: string; datos: FichaCrmChat | "error" } | null>(null);
+  const [versionCrm, setVersionCrm] = useState(0);
+  const idDropshipper = (chat && chat.id === elegido ? chat.dropshipper?.id : null) ?? null;
+  useEffect(() => {
+    if (!idDropshipper) return;
+    let vigente = true;
+    fichaCrmDelChat(idDropshipper)
+      .then((r) => vigente && setFichaCrm({ id: idDropshipper, datos: "error" in r ? "error" : r }))
+      .catch(() => vigente && setFichaCrm({ id: idDropshipper, datos: "error" }));
+    return () => {
+      vigente = false;
+    };
+  }, [idDropshipper, versionCrm]);
+  const fichaDelChat = idDropshipper ? (fichaCrm?.id === idDropshipper ? fichaCrm.datos : "cargando") : null;
+
   // Aviso en tiempo real (29 oct 2026): cuando llega o sale un mensaje, el servidor avisa y la bandeja se actualiza al momento. El aviso no
   // trae datos; se piden con los permisos de siempre. Varios avisos seguidos se juntan en un solo refresco.
   const [enVivo, setEnVivo] = useState(false);
@@ -472,23 +462,6 @@ export function Bandeja({
       document.removeEventListener("visibilitychange", alVolver);
     };
   }, [elegido, refrescar, enVivo]);
-
-  // El menú «Pasar a otra área» se cierra al tocar fuera o con Escape.
-  useEffect(() => {
-    if (!menuArea) return;
-    const fuera = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuArea(false);
-    };
-    const tecla = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuArea(false);
-    };
-    document.addEventListener("mousedown", fuera);
-    document.addEventListener("keydown", tecla);
-    return () => {
-      document.removeEventListener("mousedown", fuera);
-      document.removeEventListener("keydown", tecla);
-    };
-  }, [menuArea]);
 
   // Al abrir el chat o con un mensaje nuevo, se baja al final; al sumar mensajes viejos arriba, la vista se queda donde estaba.
   const ultimoId = chat?.mensajes.at(-1)?.id;
@@ -675,12 +648,22 @@ export function Bandeja({
 
   function pasarA(destino: AreaCrm) {
     if (!sel) return;
-    setMenuArea(false);
     const queda = areas.includes(destino);
     accion(() => pasarConversacionDeArea(sel.id, destino), queda ? `Chat pasado a ${areaChat(destino).etiqueta}.` : `Chat pasado a ${areaChat(destino).etiqueta}. Ya no lo verás en tu bandeja.`);
     // Si sigue a la vista, se pasa con él a su nuevo panel.
     if (queda) setPanel(destino);
     else setElegido(null);
+  }
+
+  /** Abre un chat en su ventana: queda leído (en el panel propio; supervisando, no) y se ve el chat primero. */
+  function abrirChat(c: ConversacionVista) {
+    ocultarVistaPrevia();
+    setElegido(c.id);
+    setChat((x) => (x?.id === c.id ? x : null));
+    setVistaAngosta("chat");
+    setEditandoNombre(null);
+    // Al abrirla queda leída (el servidor la marca en `abrirConversacion`), solo en el panel propio: supervisando, no.
+    if (c.area === miArea) setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
   }
 
   if (!datos.numeros.length) {
@@ -721,11 +704,86 @@ export function Bandeja({
   }
 
   const verDropshipper = chat?.id === sel?.id ? chat?.dropshipper : null;
+  // Las flechas de la ventana pasan al chat anterior o siguiente de la lista tal como se ve (filtro, panel y búsqueda).
+  const posicion = sel ? lista.findIndex((c) => c.id === sel.id) : -1;
+  const chatAnterior = posicion > 0 ? lista[posicion - 1] : null;
+  const chatSiguiente = posicion >= 0 && posicion < lista.length - 1 ? lista[posicion + 1] : null;
+
+  // Los botones del chat que abren la fila de la ficha: Intervenir (supervisando) o Tomar / Soltar y Marcar resuelta / Reabrir.
+  const accionesChat =
+    sel && escribe ? (
+      mirando ? (
+        <button
+          type="button"
+          disabled={enviando}
+          className={claseBotonFichaPrincipal}
+          onClick={() => accion(() => intervenirConversacion(sel.id), "Intervienes en este chat: ya puedes responderle.")}
+          title="Tomar el chat para responderle al dropshipper. Queda una nota en el chat."
+        >
+          <ChatIcon className="h-4 w-4" />
+          Intervenir
+        </button>
+      ) : (
+        <>
+          {sel.asignadaAId === miId ? (
+            <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}>
+              <PersonaIcon className="h-4 w-4" />
+              Soltar
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={enviando}
+              className={claseBotonFichaPrincipal}
+              title={sel.asignadaA ? `La lleva ${sel.asignadaA}` : "Que quede a tu cargo"}
+              onClick={() => accion(() => tomarConversacion(sel.id), "La conversación quedó a tu cargo.")}
+            >
+              <PersonaIcon className="h-4 w-4" />
+              Tomar
+            </button>
+          )}
+          {sel.estado === "abierta" ? (
+            <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
+              <CheckIcon className="h-4 w-4" />
+              Resuelta
+            </button>
+          ) : (
+            <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "abierta"), "Conversación reabierta.")}>
+              <ReactivarIcon className="h-4 w-4" />
+              Reabrir
+            </button>
+          )}
+        </>
+      )
+    ) : null;
+
+  // «Más»: lo que antes estaba en la cabecera del chat y en la ficha del costado.
+  const opcionesMas: OpcionMas[] = !sel
+    ? []
+    : [
+        { texto: "Marcar como no leído", alPulsar: () => marcarLeido(sel, false) },
+        ...(escribe && !mirando
+          ? [
+              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar a ${a.etiqueta}`, alPulsar: () => pasarA(a.valor) })),
+              { texto: "Importar chat del celular", alPulsar: () => setImportar({ conversacion: sel }) },
+              {
+                texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
+                alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
+              },
+              ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", alPulsar: () => setBorrar({ tipo: "chat" }) }]),
+            ]
+          : []),
+        ...(verDropshipper
+          ? [{ texto: "Abrir su ficha en el CRM", href: `/crm-dropshippers?abrir=${verDropshipper.id}` }, ...(escribe ? [{ texto: "No es este dropshipper", alPulsar: () => setVincular(true) }] : [])]
+          : escribe && !sel.dropshipperId
+            ? [{ texto: "Vincular a un dropshipper", alPulsar: () => setVincular(true) }]
+            : []),
+      ];
 
   return (
     <div className="bandeja-wa flex min-h-[640px] overflow-hidden rounded-[14px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
       {/* ===== Chats ===== */}
-      <aside aria-label="Conversaciones" className={`${sel ? "hidden lg:flex" : "flex"} w-full flex-col border-[var(--wa-borde)] lg:w-[380px] lg:flex-none lg:border-r`}>
+      <aside aria-label="Conversaciones" className="flex w-full flex-col border-[var(--wa-borde)] lg:w-[380px] lg:flex-none lg:border-r">
         <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
           <div className="flex min-w-0 flex-1 flex-col">
             <h2 className="m-0 text-[22px] font-bold">{areas.length > 1 ? `Panel de ${areaChat(panel).etiqueta}` : "Chats"}</h2>
@@ -756,7 +814,6 @@ export function Bandeja({
                       if (panel === a) return;
                       setPanel(a);
                       setElegido(null);
-                      setMenuArea(false);
                     }}
                     className={`inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-[13px] ${
                       panel === a ? "bg-[var(--wa-fondo)] font-semibold shadow-[0_1px_0.5px_var(--wa-sombra)]" : "text-[var(--wa-sec)] hover:text-[var(--wa-texto)]"
@@ -841,14 +898,7 @@ export function Bandeja({
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    ocultarVistaPrevia();
-                    setElegido(c.id);
-                    setMenuArea(false);
-                    setChat((x) => (x?.id === c.id ? x : null));
-                    // Al abrirla queda leída (el servidor la marca en `abrirConversacion`), solo en el panel propio: supervisando, no.
-                    if (c.area === miArea) setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
-                  }}
+                  onClick={() => abrirChat(c)}
                   aria-current={actual ? "true" : undefined}
                   onFocus={(e) => !actual && verVistaPrevia(c, e.currentTarget)}
                   onBlur={ocultarVistaPrevia}
@@ -892,401 +942,390 @@ export function Bandeja({
         </ul>
       </aside>
 
-      {/* ===== Conversación ===== */}
-      {sel ? (
-        <section
-          aria-label={`Conversación con ${sel.nombre}`}
-          className="relative flex min-w-0 flex-1 flex-col"
-          onDragEnter={(e) => {
-            if (!traeArchivos(e)) return;
-            e.preventDefault();
-            capas.current++;
-            setArrastrando(true);
-          }}
-          onDragOver={(e) => {
-            if (!traeArchivos(e)) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
-          }}
-          onDragLeave={(e) => {
-            if (!traeArchivos(e)) return;
-            capas.current = Math.max(0, capas.current - 1);
-            if (capas.current === 0) setArrastrando(false);
-          }}
-          onDrop={(e) => {
-            if (!traeArchivos(e)) return;
-            e.preventDefault();
-            capas.current = 0;
-            setArrastrando(false);
-            soltarArchivos(e.dataTransfer.files);
-          }}
-        >
-          {arrastrando && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-2 z-30 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--wa-acento)] bg-[color-mix(in_srgb,var(--wa-fondo)_90%,transparent)] text-center"
-            >
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--wa-acento)]">
-                <rect x="3" y="3" width="18" height="18" rx="3" />
-                <circle cx="9" cy="9" r="2" />
-                <path d="m21 15-4.5-4.5L5 21" />
-              </svg>
-              <span className="text-[17px] font-semibold">Suelta aquí para mandárselo a {sel.nombre}</span>
-              <span className="text-[13px] text-[var(--wa-sec)]">Una foto, captura, audio, video o documento. Antes de enviarlo lo ves y le puedes poner un texto.</span>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--wa-borde)] bg-[var(--wa-panel)] px-3 py-2">
-            <button type="button" onClick={() => setElegido(null)} className={`${botonIcono} lg:hidden`} aria-label="Volver a las conversaciones">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M19 12H5M11 18l-6-6 6-6" />
-              </svg>
-            </button>
-            {editandoNombre === "cabecera" ? (
-              <div className="flex min-w-0 flex-[1_1_200px] items-center gap-3">
-                <Foto nombre={sel.nombre} tam="cabecera" />
-                <EditorNombreContacto
-                  key={sel.id}
-                  conversacionId={sel.id}
-                  nombreActual={sel.nombre}
-                  personalizado={sel.nombrePersonalizado}
-                  alCerrar={() => setEditandoNombre(null)}
-                  alListo={(mensaje) => {
-                    setEditandoNombre(null);
-                    mostrarToast(mensaje);
-                    void refrescar(sel.id);
-                  }}
-                />
-              </div>
-            ) : (
-              <>
-              <button
-                type="button"
-                onClick={() => alternarFicha()}
-                aria-expanded={fichaVisible}
-                aria-label={`${fichaVisible ? "Cerrar" : "Ver"} la ficha de ${sel.nombre}`}
-                className={`flex min-w-0 flex-[1_1_200px] items-center gap-3 rounded-lg py-0.5 text-left ${anilloFoco}`}
-              >
+      {/* ===== Sin chat abierto ===== */}
+      {!sel && (
+        <div className="bandeja-wa-chat hidden flex-1 flex-col items-center justify-center gap-2 p-8 text-center lg:flex">
+          <span className="text-[22px] font-light">Bandeja de WhatsApp</span>
+          <span className="max-w-sm text-sm text-[var(--wa-sec)]">Pulsa una conversación para abrirla: a la izquierda la ficha del dropshipper y a la derecha el chat, para responder o dejar una nota privada.</span>
+        </div>
+      )}
+
+      {/* ===== El chat abierto, en su ventana: la ficha del dropshipper a la izquierda y el chat a la derecha (29 oct 2026) ===== */}
+      {sel && (
+        <Ventana
+          abierto
+          alCerrar={() => setElegido(null)}
+          lado="centro"
+          ancho="xl"
+          titulo={
+            <span className="bandeja-wa contents">
+              <span className="flex min-w-0 items-center gap-3">
                 <Foto nombre={sel.nombre} tam="cabecera" />
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-[16px]">{sel.nombre}</span>
-                  <span className="truncate text-[13px] text-[var(--wa-sec)] tabular-nums">
+                  {editandoNombre ? (
+                    <EditorNombreContacto
+                      key={sel.id}
+                      conversacionId={sel.id}
+                      nombreActual={sel.nombre}
+                      personalizado={sel.nombrePersonalizado}
+                      alCerrar={() => setEditandoNombre(null)}
+                      alListo={(mensaje) => {
+                        setEditandoNombre(null);
+                        mostrarToast(mensaje);
+                        void refrescar(sel.id);
+                      }}
+                    />
+                  ) : (
+                    <span className="flex min-w-0 items-center gap-1">
+                      <span className="min-w-0 text-lg leading-tight font-semibold [overflow-wrap:anywhere]">{sel.nombre}</span>
+                      {escribe && (
+                        <button type="button" onClick={() => setEditandoNombre("cabecera")} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8`}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                          </svg>
+                        </button>
+                      )}
+                    </span>
+                  )}
+                  <span className="flex min-w-0 items-center gap-1 truncate text-xs font-normal text-muted-foreground tabular-nums">
                     {[
                       sel.codigo,
                       sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
-                      datos.numeros.length > 1 ? numeroDe.get(sel.numeroId)?.nombre : null,
+                      numeroDe.get(sel.numeroId)?.nombre,
                       sel.asignadaA ? `la lleva ${sel.asignadaA}` : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
+                    <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
                   </span>
                 </span>
-              </button>
-              {escribe && (
-                <button type="button" onClick={() => setEditandoNombre("cabecera")} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8`}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
-                  </svg>
-                </button>
+              </span>
+              <EtiquetaArea area={sel.area} />
+              {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}
+              {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
+              {sel.borradoPendiente && (
+                <Link href="/crm-dropshippers/borrados" className={`rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-medium text-azul hover:underline ${anilloFoco}`}>
+                  Borrado esperando autorización
+                </Link>
               )}
-              </>
-            )}
-            <EtiquetaArea area={sel.area} />
-            {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
-            {sel.borradoPendiente && (
-              <Link href="/crm-dropshippers/borrados" className={`rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-medium text-azul hover:underline ${anilloFoco}`}>
-                Borrado esperando autorización
-              </Link>
-            )}
-            <button type="button" className={botonPildora} onClick={() => marcarLeido(sel, false)}>
-              Marcar como no leído
-            </button>
-            {escribe && mirando && (
-              <button
-                type="button"
-                disabled={enviando}
-                className={`inline-flex min-h-9 items-center rounded-full bg-[var(--wa-acento)] px-3.5 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-50 ${anilloFoco}`}
-                onClick={() => accion(() => intervenirConversacion(sel.id), "Intervienes en este chat: ya puedes responderle.")}
-                title="Tomar el chat para responderle al dropshipper. Queda una nota en el chat."
-              >
-                Intervenir
-              </button>
-            )}
-            {escribe && !mirando && (
-              <>
-                {sel.asignadaAId === miId ? (
-                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}>
-                    Soltar
-                  </button>
-                ) : (
-                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => tomarConversacion(sel.id), "La conversación quedó a tu cargo.")}>
-                    {sel.asignadaA ? `Tomar (la lleva ${sel.asignadaA})` : "Tomar"}
-                  </button>
-                )}
-                <div ref={menuRef} className="relative">
-                  <button type="button" disabled={enviando} aria-haspopup="menu" aria-expanded={menuArea} onClick={() => setMenuArea((v) => !v)} className={botonPildora}>
-                    Pasar a otra área
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </button>
-                  {menuArea && (
-                    <div role="menu" aria-label="Pasar a otra área" className="absolute top-[calc(100%+6px)] right-0 z-20 flex w-64 flex-col rounded-[10px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] p-1.5 shadow-lg">
-                      <p className="m-0 px-2 pt-1 pb-1.5 text-[11.5px] text-[var(--wa-sec)]">El chat pasa a esa área. Quien no la ve deja de verlo.</p>
-                      {AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => (
-                        <button key={a.valor} type="button" role="menuitem" onClick={() => pasarA(a.valor)} className={`flex flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}>
-                          <EtiquetaArea area={a.valor} />
-                          <span className="text-[11.5px] text-[var(--wa-sec)]">{a.para}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button type="button" disabled={enviando} className={botonPildora} onClick={() => setImportar({ conversacion: sel })} title="Traer el historial que quedó en el celular">
-                  Importar chat
-                </button>
+            </span>
+          }
+          navegacion={
+            <>
+              <BotonNavegar texto="Chat anterior" icono={FlechaArribaIcon} activo={!!chatAnterior} alHacerClic={() => chatAnterior && abrirChat(chatAnterior)} />
+              <BotonNavegar texto="Chat siguiente" icono={FlechaAbajoIcon} activo={!!chatSiguiente} alHacerClic={() => chatSiguiente && abrirChat(chatSiguiente)} />
+            </>
+          }
+        >
+          <div className="bandeja-wa @container flex min-h-0 flex-1 flex-col bg-[var(--wa-fondo)] text-[var(--wa-texto)]">
+            {/* Si no caben lado a lado, se ve uno a la vez. */}
+            <div role="group" aria-label="Qué ver" className="flex gap-1 border-b border-[var(--wa-borde)] bg-[var(--wa-panel)] p-1.5 @4xl:hidden">
+              {(["chat", "ficha"] as const).map((v) => (
                 <button
+                  key={v}
                   type="button"
-                  disabled={enviando}
-                  className={botonPildora}
-                  onClick={() => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo.")}
+                  aria-pressed={vistaAngosta === v}
+                  onClick={() => setVistaAngosta(v)}
+                  className={`min-h-8 flex-1 rounded-md text-[13px] ${vistaAngosta === v ? "bg-[var(--wa-fondo)] font-semibold shadow-[0_1px_0.5px_var(--wa-sombra)]" : "text-[var(--wa-sec)]"} ${anilloFoco}`}
                 >
-                  {sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app"}
+                  {v === "chat" ? "Chat" : "Ficha del dropshipper"}
                 </button>
-                {!sel.borradoPendiente && (
-                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => setBorrar({ tipo: "chat" })}>
-                    Pedir borrar el chat
-                  </button>
-                )}
-                {sel.estado === "abierta" ? (
-                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
-                    Marcar resuelta
-                  </button>
-                ) : (
-                  <button type="button" disabled={enviando} className={botonPildora} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "abierta"), "Conversación reabierta.")}>
-                    Reabrir
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-
-          <div ref={chatRef} className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
-            {enNavegador && (
-              <>
-                <p
-                  className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
-                    ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
-                  }`}
-                >
-                  {ventana
-                    ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
-                    : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada. Las notas privadas sí se pueden dejar."}
-                </p>
-                {!ventana && escribe && !mirando && (
-                  <button
-                    type="button"
-                    onClick={() => setVerPlantillas(true)}
-                    className={`mb-2 min-h-9 self-center rounded-full bg-[var(--wa-acento)] px-4 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 ${anilloFoco}`}
-                  >
-                    Enviar plantilla
-                  </button>
-                )}
-              </>
-            )}
-            {enNavegador && sel.borradaEnApp && (
-              <p className="m-0 mb-2 max-w-[560px] self-center rounded-lg bg-warning-soft px-3 py-1.5 text-center text-[12.5px] text-warning">
-                Este chat se borró en la app de WhatsApp Business ({sel.borradaEnApp.por ? `lo marcó ${sel.borradaEnApp.por}` : "marcado"}, {etiquetaDia(sel.borradaEnApp.en)}). Aquí se conserva todo el historial.
-              </p>
-            )}
-            {mensajes && chat?.hayAnteriores && (
-              <button
-                type="button"
-                onClick={() => void verAnteriores()}
-                disabled={cargandoAnteriores}
-                className={`mb-2 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--wa-acento)] shadow-[0_1px_0.5px_var(--wa-sombra)] hover:underline disabled:opacity-60 ${anilloFoco}`}
-              >
-                {cargandoAnteriores ? "Trayendo mensajes anteriores…" : "Ver mensajes anteriores"}
-              </button>
-            )}
-            {!mensajes ? (
-              <p className="m-0 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] text-[var(--wa-sec)]">Cargando…</p>
-            ) : (
-              mensajes.map((m, i) => {
-                const dia = etiquetaDia(m.momento);
-                const previo = mensajes[i - 1];
-                const separador = i === 0 || etiquetaDia(previo.momento) !== dia;
-                // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp).
-                const seguido = !separador && !!previo && previo.direccion === m.direccion && !esAvisoDelSistema(previo.texto);
-                return (
-                  <Fragment key={m.id}>
-                    {separador && (
-                      <span className="my-2 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)] first-letter:uppercase">
-                        {dia}
-                      </span>
-                    )}
-                    {m.importado && (i === 0 || !previo.importado) && (
-                      <span className="my-1.5 self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
-                        Historial importado del celular
-                      </span>
-                    )}
-                    {!m.importado && i > 0 && previo.importado && (
-                      <span className="my-1.5 self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
-                        Desde aquí, mensajes que llegaron al sistema
-                      </span>
-                    )}
-                    <Burbuja
-                      m={m}
-                      seguido={seguido}
-                      alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
-                      alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
-                      // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
-                      alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
-                    />
-                  </Fragment>
-                );
-              })
-            )}
-            <div ref={finRef} />
-          </div>
-
-          {escribe ? (
-            <div className="relative flex flex-col bg-[var(--wa-panel)]">
-              {mirando && (
-                <p className="m-0 border-b border-[var(--wa-borde)] px-4 py-2 text-[12.5px] text-[var(--wa-sec)]">
-                  Estás supervisando el panel de {areaChat(sel.area).etiqueta}: quien lo atiende no ve que abriste este chat y le sigue apareciendo sin leer. Puedes dejar una nota privada
-                  (esa sí la ve); para responderle al dropshipper, toca «Intervenir».
-                </p>
-              )}
-              {!esNota && !bloqueado && (
-                <div className="flex items-center gap-2 px-3 pt-2">
-                  {/* Con el cuadro vacío, los más usados; escribiendo, los que se parecen a lo escrito («hol» → «Hola, ¿cómo estás?»). */}
-                  <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {sugerirRapidas(rapidas, borrador).map((r) => (
-                      <button
-                        key={r.id}
-                        type="button"
-                        title={r.texto}
-                        onClick={() => elegirRapida(r)}
-                        className={`flex-none rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 py-1 text-[13px] whitespace-nowrap hover:bg-[var(--wa-hover)] ${anilloFoco}`}
-                      >
-                        <span className="block max-w-[22rem] truncate">{r.texto}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <button type="button" onClick={() => setVerRapidas(true)} aria-label="Mensajes rápidos: ver, agregar o quitar" title="Mensajes rápidos" className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              <div className="flex items-end gap-2 px-3 py-2">
-                <div role="group" aria-label="Tipo de mensaje" className={`mb-1 flex-none rounded-full bg-[var(--wa-fondo)] p-[3px] ${mirando ? "hidden" : "flex"}`}>
-                  <button
-                    type="button"
-                    aria-pressed={!esNota}
-                    onClick={() => setModo("responder")}
-                    className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${!esNota ? "bg-[var(--wa-acento)] text-[var(--wa-acento-texto)]" : "text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
-                  >
-                    Mensaje
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={esNota}
-                    onClick={() => setModo("nota")}
-                    className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${esNota ? "bg-[var(--wa-nota-acento)] text-[var(--wa-fondo)]" : "text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
-                  >
-                    Nota privada
-                  </button>
-                </div>
-                {!esNota && (
-                  <>
-                    <input
-                      ref={inputArchivo}
-                      type="file"
-                      accept={ACEPTAR_ENVIO}
-                      className="sr-only"
-                      tabIndex={-1}
-                      aria-label="Elegir el archivo que se va a mandar"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        e.target.value = "";
-                        if (f) setArchivo(f);
-                      }}
-                    />
-                    <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label="Adjuntar una foto, audio, video o documento" title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
-                      </svg>
-                    </button>
-                    <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />
-                    <Expresiones
-                      conversacionId={sel.id}
-                      deshabilitado={bloqueado || enviando}
-                      alEmoji={insertarEmoji}
-                      alEnviado={() => void refrescar(sel.id)}
-                      alError={(mensaje) => mostrarToast(mensaje, "destructive")}
-                    />
-                  </>
-                )}
-                <label className="flex min-w-0 flex-1">
-                  <span className="sr-only">{esNota ? "Nota privada para el equipo" : `Mensaje para ${sel.nombre}`}</span>
-                  <textarea
-                    ref={textoRef}
-                    rows={1}
-                    value={borrador}
-                    disabled={bloqueado}
-                    onChange={(e) => setBorrador(e.target.value)}
-                    onPaste={(e) => {
-                      const pegado = e.clipboardData.files[0];
-                      if (pegado && !esNota && !bloqueado && /^image\//.test(pegado.type)) {
-                        e.preventDefault();
-                        setArchivo(pegado);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      // Como en WhatsApp: Enter envía y Mayús + Enter baja de línea.
-                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                        e.preventDefault();
-                        mandar();
-                      }
-                    }}
-                    placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : ventana ? "Escribe un mensaje" : "Fuera de las 24 h: hace falta una plantilla aprobada"}
-                    className={`min-h-[42px] w-full resize-none rounded-lg border-0 px-3.5 py-[10px] text-[15px] leading-[22px] outline-none placeholder:text-[var(--wa-sec)] focus-visible:ring-2 focus-visible:ring-[var(--wa-acento)] disabled:opacity-60 ${
-                      esNota ? "bg-[var(--wa-nota)] text-[var(--wa-nota-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-texto)]"
-                    }`}
-                  />
-                </label>
-                {!esNota && !bloqueado && borrador.trim().length >= 3 && !yaEsRapida(rapidas, borrador) && (
-                  <button type="button" onClick={() => guardarComoRapida(borrador)} aria-label="Guardar lo escrito como mensaje rápido" title="Guardar como mensaje rápido" className={`${botonIcono} mb-px`}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M6 3h12v18l-6-4-6 4V3Z" />
-                      <path d="M12 7v6M9 10h6" />
-                    </svg>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  disabled={enviando || bloqueado || !borrador.trim()}
-                  onClick={mandar}
-                  aria-label={enviando ? "Enviando" : esNota ? "Guardar nota privada" : "Enviar mensaje"}
-                  className={`flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full text-[var(--wa-acento-texto)] disabled:opacity-40 ${esNota ? "bg-[var(--wa-nota-acento)]" : "bg-[var(--wa-acento)]"} ${anilloFoco}`}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M4 12 20 4l-6 16-3-7-7-1Z" />
-                  </svg>
-                </button>
-              </div>
+              ))}
             </div>
-          ) : (
-            <p className="m-0 bg-[var(--wa-panel)] px-4 py-3 text-[13px] text-[var(--wa-sec)]">Tienes acceso de solo lectura al CRM.</p>
-          )}
-        </section>
-      ) : (
-        <div className="bandeja-wa-chat hidden flex-1 flex-col items-center justify-center gap-2 p-8 text-center lg:flex">
-          <span className="text-[22px] font-light">Bandeja de WhatsApp</span>
-          <span className="max-w-sm text-sm text-[var(--wa-sec)]">Elige una conversación de la lista para responder o dejar una nota privada.</span>
-        </div>
+            <div className="flex min-h-0 flex-1">
+              <div className={`${vistaAngosta === "ficha" ? "flex" : "hidden"} min-h-0 min-w-0 flex-1 flex-col @4xl:flex`}>
+                <FichaDelChat
+                  sel={sel}
+                  dropshipper={verDropshipper ?? null}
+                  ficha={fichaDelChat}
+                  alGuardarCrm={() => setVersionCrm((v) => v + 1)}
+                  escribe={escribe}
+                  mirando={mirando}
+                  accionesChat={accionesChat}
+                  opcionesMas={opcionesMas}
+                  areaDelChat={
+                    <Bloque titulo="Área del chat">
+                      <span className="self-start">
+                        <EtiquetaArea area={sel.area} />
+                      </span>
+                      <div className="flex flex-col gap-1 text-[12.5px] text-[var(--wa-sec)]">
+                        {cambiosDeArea.length ? cambiosDeArea.map((m) => <span key={m.id}>{`${m.texto} · ${horaCorta(m.momento)}`}</span>) : <span>Entró a {areaChat(sel.area).etiqueta} con su primer mensaje.</span>}
+                      </div>
+                    </Bloque>
+                  }
+                  versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
+                  alAbrirVincular={() => setVincular(true)}
+                  alVinculado={(mensaje) => {
+                    mostrarToast(mensaje);
+                    void refrescar(sel.id);
+                  }}
+                  alAviso={(texto) => mostrarToast(texto, "destructive")}
+                />
+              </div>
+              <section
+                aria-label={`Conversación con ${sel.nombre}`}
+                className={`${vistaAngosta === "chat" ? "flex" : "hidden"} relative min-h-0 w-full min-w-0 flex-col @4xl:flex @4xl:w-[46%] @4xl:max-w-[640px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]`}
+                onDragEnter={(e) => {
+                  if (!traeArchivos(e)) return;
+                  e.preventDefault();
+                  capas.current++;
+                  setArrastrando(true);
+                }}
+                onDragOver={(e) => {
+                  if (!traeArchivos(e)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                }}
+                onDragLeave={(e) => {
+                  if (!traeArchivos(e)) return;
+                  capas.current = Math.max(0, capas.current - 1);
+                  if (capas.current === 0) setArrastrando(false);
+                }}
+                onDrop={(e) => {
+                  if (!traeArchivos(e)) return;
+                  e.preventDefault();
+                  capas.current = 0;
+                  setArrastrando(false);
+                  soltarArchivos(e.dataTransfer.files);
+                }}
+              >
+                {arrastrando && (
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-2 z-30 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--wa-acento)] bg-[color-mix(in_srgb,var(--wa-fondo)_90%,transparent)] text-center"
+                  >
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--wa-acento)]">
+                      <rect x="3" y="3" width="18" height="18" rx="3" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-4.5-4.5L5 21" />
+                    </svg>
+                    <span className="text-[17px] font-semibold">Suelta aquí para mandárselo a {sel.nombre}</span>
+                    <span className="text-[13px] text-[var(--wa-sec)]">Una foto, captura, audio, video o documento. Antes de enviarlo lo ves y le puedes poner un texto.</span>
+                  </div>
+                )}
+                <div ref={chatRef} className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
+                  {enNavegador && (
+                    <>
+                      <p
+                        className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
+                          ventana ? "bg-[var(--wa-aviso)] text-[var(--wa-sec)]" : "bg-warning-soft text-warning"
+                        }`}
+                      >
+                        {ventana
+                          ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
+                          : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada. Las notas privadas sí se pueden dejar."}
+                      </p>
+                      {!ventana && escribe && !mirando && (
+                        <button
+                          type="button"
+                          onClick={() => setVerPlantillas(true)}
+                          className={`mb-2 min-h-9 self-center rounded-full bg-[var(--wa-acento)] px-4 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 ${anilloFoco}`}
+                        >
+                          Enviar plantilla
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {enNavegador && sel.borradaEnApp && (
+                    <p className="m-0 mb-2 max-w-[560px] self-center rounded-lg bg-warning-soft px-3 py-1.5 text-center text-[12.5px] text-warning">
+                      Este chat se borró en la app de WhatsApp Business ({sel.borradaEnApp.por ? `lo marcó ${sel.borradaEnApp.por}` : "marcado"}, {etiquetaDia(sel.borradaEnApp.en)}). Aquí se conserva todo el historial.
+                    </p>
+                  )}
+                  {mensajes && chat?.hayAnteriores && (
+                    <button
+                      type="button"
+                      onClick={() => void verAnteriores()}
+                      disabled={cargandoAnteriores}
+                      className={`mb-2 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--wa-acento)] shadow-[0_1px_0.5px_var(--wa-sombra)] hover:underline disabled:opacity-60 ${anilloFoco}`}
+                    >
+                      {cargandoAnteriores ? "Trayendo mensajes anteriores…" : "Ver mensajes anteriores"}
+                    </button>
+                  )}
+                  {!mensajes ? (
+                    <p className="m-0 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] text-[var(--wa-sec)]">Cargando…</p>
+                  ) : (
+                    mensajes.map((m, i) => {
+                      const dia = etiquetaDia(m.momento);
+                      const previo = mensajes[i - 1];
+                      const separador = i === 0 || etiquetaDia(previo.momento) !== dia;
+                      // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp).
+                      const seguido = !separador && !!previo && previo.direccion === m.direccion && !esAvisoDelSistema(previo.texto);
+                      return (
+                        <Fragment key={m.id}>
+                          {separador && (
+                            <span className="my-2 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)] first-letter:uppercase">
+                              {dia}
+                            </span>
+                          )}
+                          {m.importado && (i === 0 || !previo.importado) && (
+                            <span className="my-1.5 self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
+                              Historial importado del celular
+                            </span>
+                          )}
+                          {!m.importado && i > 0 && previo.importado && (
+                            <span className="my-1.5 self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
+                              Desde aquí, mensajes que llegaron al sistema
+                            </span>
+                          )}
+                          <Burbuja
+                            m={m}
+                            seguido={seguido}
+                            alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
+                            alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
+                            // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
+                            alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
+                          />
+                        </Fragment>
+                      );
+                    })
+                  )}
+                  <div ref={finRef} />
+                </div>
+
+                {escribe ? (
+                  <div className="relative flex flex-col bg-[var(--wa-panel)]">
+                    {mirando && (
+                      <p className="m-0 border-b border-[var(--wa-borde)] px-4 py-2 text-[12.5px] text-[var(--wa-sec)]">
+                        Estás supervisando el panel de {areaChat(sel.area).etiqueta}: quien lo atiende no ve que abriste este chat y le sigue apareciendo sin leer. Puedes dejar una nota privada
+                        (esa sí la ve); para responderle al dropshipper, toca «Intervenir».
+                      </p>
+                    )}
+                    {/* Arriba, si va como mensaje o como nota privada y, escribiendo un mensaje, los mensajes rápidos: así el cuadro de texto queda ancho. */}
+                    {(!mirando || (!esNota && !bloqueado)) && (
+                      <div className="flex items-center gap-2 px-3 pt-2">
+                        {!mirando && (
+                          <div role="group" aria-label="Tipo de mensaje" className="flex flex-none rounded-full bg-[var(--wa-fondo)] p-[3px]">
+                            <button
+                              type="button"
+                              aria-pressed={!esNota}
+                              onClick={() => setModo("responder")}
+                              className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${!esNota ? "bg-[var(--wa-acento)] text-[var(--wa-acento-texto)]" : "text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+                            >
+                              Mensaje
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={esNota}
+                              onClick={() => setModo("nota")}
+                              className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${esNota ? "bg-[var(--wa-nota-acento)] text-[var(--wa-fondo)]" : "text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+                            >
+                              Nota privada
+                            </button>
+                          </div>
+                        )}
+                        {!esNota && !bloqueado && (
+                          <>
+                            {/* Con el cuadro vacío, los más usados; escribiendo, los que se parecen a lo escrito («hol» → «Hola, ¿cómo estás?»). */}
+                            <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                              {sugerirRapidas(rapidas, borrador).map((r) => (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  title={r.texto}
+                                  onClick={() => elegirRapida(r)}
+                                  className={`flex-none rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 py-1 text-[13px] whitespace-nowrap hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+                                >
+                                  <span className="block max-w-[22rem] truncate">{r.texto}</span>
+                                </button>
+                              ))}
+                            </div>
+                            <button type="button" onClick={() => setVerRapidas(true)} aria-label="Mensajes rápidos: ver, agregar o quitar" title="Mensajes rápidos" className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-end gap-2 px-3 py-2">
+                      {!esNota && (
+                        <>
+                          <input
+                            ref={inputArchivo}
+                            type="file"
+                            accept={ACEPTAR_ENVIO}
+                            className="sr-only"
+                            tabIndex={-1}
+                            aria-label="Elegir el archivo que se va a mandar"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = "";
+                              if (f) setArchivo(f);
+                            }}
+                          />
+                          <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label="Adjuntar una foto, audio, video o documento" title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
+                            </svg>
+                          </button>
+                          <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />
+                          <Expresiones
+                            conversacionId={sel.id}
+                            deshabilitado={bloqueado || enviando}
+                            alEmoji={insertarEmoji}
+                            alEnviado={() => void refrescar(sel.id)}
+                            alError={(mensaje) => mostrarToast(mensaje, "destructive")}
+                          />
+                        </>
+                      )}
+                      <label className="flex min-w-0 flex-1">
+                        <span className="sr-only">{esNota ? "Nota privada para el equipo" : `Mensaje para ${sel.nombre}`}</span>
+                        <textarea
+                          ref={textoRef}
+                          data-enfocar
+                          rows={1}
+                          value={borrador}
+                          disabled={bloqueado}
+                          onChange={(e) => setBorrador(e.target.value)}
+                          onPaste={(e) => {
+                            const pegado = e.clipboardData.files[0];
+                            if (pegado && !esNota && !bloqueado && /^image\//.test(pegado.type)) {
+                              e.preventDefault();
+                              setArchivo(pegado);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // Como en WhatsApp: Enter envía y Mayús + Enter baja de línea.
+                            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                              e.preventDefault();
+                              mandar();
+                            }
+                          }}
+                          placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : ventana ? "Escribe un mensaje" : "Fuera de las 24 h: hace falta una plantilla aprobada"}
+                          className={`min-h-[42px] w-full resize-none rounded-lg border-0 px-3.5 py-[10px] text-[15px] leading-[22px] outline-none placeholder:text-[var(--wa-sec)] focus-visible:ring-2 focus-visible:ring-[var(--wa-acento)] disabled:opacity-60 ${
+                            esNota ? "bg-[var(--wa-nota)] text-[var(--wa-nota-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-texto)]"
+                          }`}
+                        />
+                      </label>
+                      {!esNota && !bloqueado && borrador.trim().length >= 3 && !yaEsRapida(rapidas, borrador) && (
+                        <button type="button" onClick={() => guardarComoRapida(borrador)} aria-label="Guardar lo escrito como mensaje rápido" title="Guardar como mensaje rápido" className={`${botonIcono} mb-px`}>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M6 3h12v18l-6-4-6 4V3Z" />
+                            <path d="M12 7v6M9 10h6" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={enviando || bloqueado || !borrador.trim()}
+                        onClick={mandar}
+                        aria-label={enviando ? "Enviando" : esNota ? "Guardar nota privada" : "Enviar mensaje"}
+                        className={`flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full text-[var(--wa-acento-texto)] disabled:opacity-40 ${esNota ? "bg-[var(--wa-nota-acento)]" : "bg-[var(--wa-acento)]"} ${anilloFoco}`}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M4 12 20 4l-6 16-3-7-7-1Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="m-0 bg-[var(--wa-panel)] px-4 py-3 text-[13px] text-[var(--wa-sec)]">Tienes acceso de solo lectura al CRM.</p>
+                )}
+              </section>
+            </div>
+          </div>
+        </Ventana>
       )}
 
       {menuChat &&
@@ -1373,136 +1412,6 @@ export function Bandeja({
         />
       )}
 
-      {/* ===== Ficha del dropshipper (como «Info del contacto») ===== */}
-      {sel &&
-        fichaVisible &&
-        comoFicha(
-          <aside
-            aria-label="Ficha del dropshipper"
-            className={`flex w-[330px] max-w-full flex-none flex-col overflow-y-auto border-l border-[var(--wa-borde)] bg-[var(--wa-fondo)] ${pantallaAncha ? "" : "h-full shadow-2xl"}`}
-          >
-            <div className="flex items-center gap-3 bg-[var(--wa-panel)] px-3 py-2.5">
-              <button type="button" onClick={() => alternarFicha(false)} aria-label="Cerrar la ficha" className={botonIcono}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              </button>
-              <h2 className="m-0 text-base font-semibold">Ficha del dropshipper</h2>
-            </div>
-            <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
-              <Foto nombre={sel.nombre} tam="ficha" />
-              {editandoNombre === "ficha" ? (
-                <div className="mt-3 flex w-full">
-                  <EditorNombreContacto
-                    key={sel.id}
-                    conversacionId={sel.id}
-                    nombreActual={sel.nombre}
-                    personalizado={sel.nombrePersonalizado}
-                    centrado
-                    alCerrar={() => setEditandoNombre(null)}
-                    alListo={(mensaje) => {
-                      setEditandoNombre(null);
-                      mostrarToast(mensaje);
-                      void refrescar(sel.id);
-                    }}
-                  />
-                </div>
-              ) : (
-                <span className="mt-3 flex max-w-full items-center justify-center gap-1">
-                  <span className="min-w-0 text-xl [overflow-wrap:anywhere]">{sel.nombre}</span>
-                  {escribe && (
-                    <button type="button" onClick={() => setEditandoNombre("ficha")} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8 flex-none`}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
-                      </svg>
-                    </button>
-                  )}
-                </span>
-              )}
-              {(sel.codigo || verTelefono) && (
-                <span className="flex items-center gap-1 text-[15px] text-[var(--wa-sec)] tabular-nums">
-                  {sel.codigo}
-                  <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
-                </span>
-              )}
-            </div>
-            <ActividadDelClienteFicha key={`actividad-${sel.id}`} conversacionId={sel.id} puedeAnalizar={escribe} />
-            <ActividadDelEquipoFicha key={`equipo-${sel.id}`} conversacionId={sel.id} version={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`} />
-            <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} alAviso={(texto) => mostrarToast(texto, "destructive")} />
-            {verDropshipper ? (
-              <>
-                <Bloque titulo="Dónde vende">
-                  <div className="flex flex-wrap gap-1.5">
-                    {[...verDropshipper.tiendas, ...verDropshipper.cuentas].map((t) => (
-                      <span key={t} className="rounded-md bg-[var(--wa-panel)] px-2 py-0.5 text-[13px]">
-                        {t}
-                      </span>
-                    ))}
-                    {!verDropshipper.tiendas.length && !verDropshipper.cuentas.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin tiendas ni cuentas vinculadas.</span>}
-                  </div>
-                </Bloque>
-                <Bloque titulo="Estado">
-                  <span className="self-start rounded-full bg-success-soft px-2 py-px text-xs font-medium text-success capitalize">{verDropshipper.estado}</span>
-                </Bloque>
-                <Bloque titulo="Casos abiertos">
-                  {verDropshipper.casos.length ? (
-                    verDropshipper.casos.map((c) => (
-                      <div key={c.codigo} className="rounded-lg border border-[var(--wa-borde)] px-2.5 py-1.5 text-[13px]">
-                        <span className="block text-[11.5px] text-[var(--wa-sec)] tabular-nums">
-                          {c.codigo}
-                          {c.prioridad === "alta" && <span className="font-semibold text-destructive"> · alta</span>}
-                        </span>
-                        {c.titulo}
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-[13px] text-[var(--wa-sec)]">Sin casos abiertos.</span>
-                  )}
-                </Bloque>
-              </>
-            ) : !sel.dropshipperId ? (
-              <Bloque titulo="No está en el CRM">
-                <SugerenciasDeVinculo
-                  conversacionId={sel.id}
-                  escribe={escribe}
-                  alAbrirBusqueda={() => setVincular(true)}
-                  alListo={(mensaje) => {
-                    mostrarToast(mensaje);
-                    void refrescar(sel.id);
-                  }}
-                />
-                <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.nombre)}`} className={`text-[14px] font-medium text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
-                  Buscarlo en el CRM
-                </Link>
-              </Bloque>
-            ) : null}
-            <Bloque titulo="Área del chat">
-              <span className="self-start">
-                <EtiquetaArea area={sel.area} />
-              </span>
-              <div className="flex flex-col gap-1 text-[12.5px] text-[var(--wa-sec)]">
-                {cambiosDeArea.length ? cambiosDeArea.map((m) => <span key={m.id}>{`${m.texto} · ${horaCorta(m.momento)}`}</span>) : <span>Entró a {areaChat(sel.area).etiqueta} con su primer mensaje.</span>}
-              </div>
-            </Bloque>
-            {verDropshipper && (
-              <div className="px-5 py-4">
-                <Link href={`/crm-dropshippers?abrir=${verDropshipper.id}`} className={`flex items-center gap-3 py-1 text-[15px] text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                    <path d="M20 21a8 8 0 0 0-16 0" />
-                    <circle cx="12" cy="8" r="4" />
-                  </svg>
-                  Abrir su ficha en el CRM
-                </Link>
-                {escribe && (
-                  <button type="button" onClick={() => setVincular(true)} className={`py-1 text-left text-[14px] text-[var(--wa-sec)] hover:underline ${anilloFoco}`}>
-                    No es este dropshipper
-                  </button>
-                )}
-              </div>
-            )}
-          </aside>,
-        )}
-
       {importar && (
         <ImportarChat
           abierto
@@ -1521,9 +1430,6 @@ export function Bandeja({
     </div>
   );
 }
-
-/** Desde este ancho la ficha va al lado del chat; más angosto, se abre encima. */
-const PANTALLA_ANCHA = "(min-width: 1280px)";
 
 /** Un bloque de la ficha, separado del siguiente con la franja gris de WhatsApp. */
 function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {

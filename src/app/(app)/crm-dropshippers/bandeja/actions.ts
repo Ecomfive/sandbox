@@ -3,7 +3,8 @@
 import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
+import { accesoCrm, supervisaArea, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
+import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -17,10 +18,37 @@ import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plant
 import { claves360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { avisoSupervision, BUCKET_ARCHIVOS, chatParaEnviar, mandarMedioGuardado, MAX_PIE, NOMBRE_AREA, permisoDeSubida } from "./enviar-medio";
+import { obtenerDatosCrm } from "../datos-crm";
+import type { FilaCaso, FilaDropshipper } from "../def-crm";
 import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
+
+/** Lo que lleva la ficha del CRM junto al chat (29 oct 2026): el dropshipper con sus cifras del país elegido, sus casos y el acceso. */
+export interface FichaCrmChat {
+  d: FilaDropshipper;
+  casos: FilaCaso[];
+  hoy: string;
+  codigoPais: string;
+  acceso: AccesoCrm;
+}
+
+/**
+ * La ficha del CRM del dropshipper de un chat, para la ventana del chat de la Bandeja. La pide quien puede ver la Bandeja (el CRM se
+ * abre con los mismos módulos), y es la misma ficha que ve en el CRM: cifras del país elegido arriba, casos de ese país.
+ */
+export async function fichaCrmDelChat(dropshipperId: string): Promise<FichaCrmChat | { error: string }> {
+  const u = await usuarioBandeja(false);
+  if (!u) return { error: "No tienes acceso." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const acceso = accesoCrm(u);
+  const datos = await obtenerDatosCrm(supabase, pais.id, areasDe(u), dropshipperId);
+  const d = datos.dropshippers[0];
+  if (!d) return { error: "No se encontró el dropshipper." };
+  return { d, casos: datos.casos, hoy: datos.hoy, codigoPais: pais.codigo, acceso };
+}
 
 /** La lista de conversaciones, para refrescar la bandeja cada pocos segundos. */
 export async function obtenerBandeja(): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | { error: string }> {

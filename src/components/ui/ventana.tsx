@@ -159,7 +159,7 @@ export function Ventana({
           </div>
         </div>
         {/* A pantalla completa el contenido no se estira de lado a lado: se centra con un ancho cómodo de lectura. */}
-        {modo === "completa" ? <div className={`mx-auto flex w-full flex-1 flex-col ${ancho === "xl" ? "max-w-[90rem]" : "max-w-5xl"}`}>{children}</div> : children}
+        {modo === "completa" ? <div className={`mx-auto flex min-h-0 w-full flex-1 flex-col ${ancho === "xl" ? "max-w-[90rem]" : "max-w-5xl"}`}>{children}</div> : children}
       </div>
     </div>,
     document.body

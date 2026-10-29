@@ -1025,6 +1025,15 @@ convenciones técnicas del código.
   (`panel`, «(tuyo)», pendientes por panel) y `supervisaArea` dice si mira un área de abajo. Supervisando: `abrirConversacion` **no** pone
   `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
   «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
+  **Chat en ventana con la ficha del CRM** (29 oct 2026, pedido de Hernán con un bosquejo aprobado): al pulsar un chat de la lista,
+  `bandeja.tsx` lo abre en `Ventana` (`lado="centro"`, `ancho="xl"`; flechas = chat anterior/siguiente de `lista`, `abrirChat`); a la
+  izquierda `FichaDelChat` (`bandeja/ficha-chat.tsx`) y a la derecha la sección del chat de siempre (con `@container`: bajo `@4xl` se ve
+  uno a la vez, «Chat» / «Ficha del dropshipper»). La ficha usa las piezas exportadas de `ficha-lateral.tsx` (`AccionesCrm`, `CifrasDelMes`,
+  `CasosAbiertos`, `DatosDropshipper`) con los datos de `fichaCrmDelChat` (acción en `bandeja/actions.ts`: `obtenerDatosCrm(…, soloId)`
+  del país elegido), en pestañas Resumen, Casos, Productos, Cuentas, Ventas Dropi y Actividad (sin dropshipper: Resumen, Productos y
+  Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
+  de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
+  del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
   **Mensajes no entregados** (29 oct 2026): `type: unsupported` (131051) no trae contenido; `textoDeRespaldo` en `extraer.ts` lee
   `unsupported.type` (`NO_ENTREGADOS`: edit, poll_creation, media_placeholder…) y dice qué mandó y que lo pida de nuevo. No se puede recuperar.
   No se mandan acuses de lectura a WhatsApp. **Al instante** (29 oct 2026): `enviarTexto` en `bandeja.tsx` muestra el mensaje con id
