@@ -690,7 +690,22 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
     .limit(40);
   if (!acceso.comercial) auditoria = auditoria.not("accion", "in", `(${ACCIONES_COMERCIALES.join(",")})`);
 
-  const [notas, casos, tareas, eventos] = await Promise.all([
+  // Lo que el equipo hizo en sus chats de WhatsApp (cambiar el nombre, pasarlo de área, tomarlo, etiquetas…), de las áreas que ve la persona
+  // (29 oct 2026, pedido de Alcides: una sola Actividad con todo). Los mensajes no van: están en el chat.
+  const chats = await supabase.from("whatsapp_conversaciones").select("id").eq("dropshipper_id", id).in("area", areasVisibles(acceso));
+  const idsChats = (chats.data ?? []).map((c) => c.id as string);
+  const deChats = idsChats.length
+    ? supabase
+        .from("historial_auditoria")
+        .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
+        .eq("entidad", "whatsapp_conversaciones")
+        .in("entidad_id", idsChats)
+        .not("accion", "in", "(enviar_archivo_whatsapp,enviar_plantilla_whatsapp,marcar_leido_whatsapp)")
+        .order("creado_en", { ascending: false })
+        .limit(40)
+    : Promise.resolve({ data: [] as { id: number; accion: string; usuario_nombre: string | null; detalle: string | null; antes: Record<string, string> | null; despues: Record<string, string> | null; creado_en: string }[], error: null });
+
+  const [notas, casos, tareas, eventos, eventosChat] = await Promise.all([
     supabase
       .from("interacciones_dropshipper")
       .select("id, tipo, nota, area, creado_en, fecha, perfiles:creado_por(nombre)")
@@ -708,6 +723,7 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
       ? supabase.from("tareas_dropshipper").select("id, titulo, origen, creado_en, hecha_en").eq("dropshipper_id", id).order("creado_en", { ascending: false }).limit(30)
       : Promise.resolve({ data: [] as { id: string; titulo: string; origen: string; creado_en: string; hecha_en: string | null }[], error: null }),
     auditoria,
+    deChats,
   ]);
   if (notas.error || casos.error || tareas.error || eventos.error) return { error: "No se pudo cargar la actividad." };
 
@@ -738,6 +754,9 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
       texto: formatearEventoAuditoria(e),
       creadoEn: e.creado_en,
     });
+  }
+  for (const e of eventosChat.error ? [] : (eventosChat.data ?? [])) {
+    items.push({ id: `w-${e.id}`, area: "general", texto: `${formatearEventoAuditoria(e)} (chat de WhatsApp)`, creadoEn: e.creado_en });
   }
   items.sort((a, b) => Date.parse(b.creadoEn) - Date.parse(a.creadoEn));
   return { items: items.slice(0, 80), verComercial: acceso.comercial };

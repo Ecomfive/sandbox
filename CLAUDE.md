@@ -1195,6 +1195,8 @@ convenciones técnicas del código.
   (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
   deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
   ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
+  **Una sola Actividad** (29 oct 2026, pedido de Alcides): con dropshipper, la ficha del chat solo trae «Actividad» (`ActividadDropshipper`), y `obtenerLineaDeTiempo`
+  suma la auditoría de sus chats (`whatsapp_conversaciones` de las áreas que ve la persona, sin mensajes ni «abrir el chat»); `ActividadDelEquipoFicha` solo sale en un chat sin dropshipper.
   **Actividad del equipo** (`bandeja/equipo-actions.ts`, 29 oct 2026, pedido de Alcides): solo la auditoría del chat (`whatsapp_conversaciones`) y de su dropshipper
   (`dropshippers`), armada con `formatearEventoAuditoria` (antes → después); no repite los mensajes del chat y oculta `ACCIONES_COMERCIALES` a quien no ve lo comercial.
   **La ficha entera, sin pestañas que esconden** (29 oct 2026, pedido de Alcides): `FichaDelChat` dibuja todas sus partes una debajo de la otra

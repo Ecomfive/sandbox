@@ -40,6 +40,9 @@ type Pestana = (typeof PESTANAS)[number]["id"];
 /** Sin dropshipper vinculado no hay casos, cuentas ni ventas: solo lo que sale del chat. */
 const PESTANAS_SIN_CRM: Pestana[] = ["resumen", "productos", "actividad"];
 
+/** Un número que cambia cuando cambia el texto: vuelve a pedir la Actividad (sin desmontarla, así no se pierde un comentario a medias) cuando algo del chat cambia. */
+const huella = (t: string) => [...t].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 1_000_003, 0);
+
 /** Un botón de la fila de acciones, del mismo tamaño que los del CRM (Nuevo caso, Pedido, Nota…). */
 export const claseBotonFicha = `flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover disabled:opacity-50 ${anilloFoco}`;
 /** El principal de la fila (Tomar o Intervenir), en el verde del chat. */
@@ -379,7 +382,8 @@ export function FichaDelChat({
         )}
         {visibles.some((p) => p.id === "actividad") && (
           <div id="ficha-chat-actividad" className="scroll-mt-12">
-            <ActividadDelEquipoFicha key={`equipo-${sel.id}`} conversacionId={sel.id} version={versionEquipo} />
+            {/* Una sola Actividad (29 oct 2026, pedido de Alcides): con dropshipper, la del CRM ya trae lo que el equipo hizo en sus chats; sin él, la del chat. */}
+            {!sel.dropshipperId && <ActividadDelEquipoFicha key={`equipo-${sel.id}`} conversacionId={sel.id} version={versionEquipo} />}
             {areaDelChat}
             {d && acceso && acceso.comercial && (
               <Seccion titulo="Seguimientos">
@@ -387,9 +391,9 @@ export function FichaDelChat({
               </Seccion>
             )}
             {d && acceso && (
-              <Seccion titulo="Actividad en el CRM">
-                {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y los cambios filtrados por área. */}
-                <ActividadDropshipper key={`actividad-crm-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version} />
+              <Seccion titulo="Actividad">
+                {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y todo lo que hizo cada quien en el CRM y en sus chats. */}
+                <ActividadDropshipper key={`actividad-crm-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version * 1_000_003 + huella(versionEquipo)} />
               </Seccion>
             )}
           </div>
