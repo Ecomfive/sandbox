@@ -1,4 +1,4 @@
--- Reversa de 0185_tareas_crm.sql. Las tareas que solo son de un chat (sin dropshipper) se borran, porque la columna vuelve a ser
+-- Reversa de 0186_tareas_crm.sql. Las tareas que solo son de un chat (sin dropshipper) se borran, porque la columna vuelve a ser
 -- obligatoria; las que esperan una llegada vuelven a «pendiente».
 delete from tareas_dropshipper where dropshipper_id is null;
 update tareas_dropshipper set estado = 'pendiente' where estado = 'esperando';

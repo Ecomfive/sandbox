@@ -1034,7 +1034,7 @@ convenciones técnicas del código.
   Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
   de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
   del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
-  **Tareas y VIP** (29 oct 2026, migración 0185): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
+  **Tareas y VIP** (29 oct 2026, migración 0186): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
   (puede no tener dropshipper), `sku_id`/`pais_id`/`compras_esperadas`/`llegada_estimada` y el estado nuevo `esperando`. «Tarea»
   (`BotonNuevaTarea`, `bandeja/tareas-chat.tsx`) y «Avisarme cuando llegue» (`ProductosDelChatFicha` → `avisarCuandoLlegue`: guarda las
   compras en camino de ese producto al país del chat, `cargarEnCaminoDatos`) están en `tareas/actions.ts`; quedan a cargo de quien lleva

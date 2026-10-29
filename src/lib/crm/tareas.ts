@@ -1,5 +1,5 @@
 // Tareas del CRM (29 oct 2026, pedido de Hernán): las que salen de un chat de WhatsApp («avísale cuando llegue el producto que pidió»,
-// «llamarlo el 23 de diciembre») y los seguimientos comerciales, en la misma tabla (`tareas_dropshipper`, migración 0185). Aquí, sin
+// «llamarlo el 23 de diciembre») y los seguimientos comerciales, en la misma tabla (`tareas_dropshipper`, migración 0186). Aquí, sin
 // base ni React: en qué grupo va cada una, cuándo llegó lo que se esperaba y los textos. Prueba: tareas.test.ts.
 
 export type EstadoTarea = "pendiente" | "hecha" | "esperando";
