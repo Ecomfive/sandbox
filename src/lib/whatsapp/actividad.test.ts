@@ -9,6 +9,13 @@ import {
   frecuenciaDeMotivos,
   interesPorProducto,
   MAX_DIAS_POR_PEDIDO,
+  MAX_MENSAJES_POR_DIA,
+  MENSAJES_DE_INICIO,
+  conMotivoPrimero,
+  idDeMotivoNuevo,
+  idsDropiDeProductos,
+  limpiarEtiquetaNueva,
+  resolverMotivoNuevo,
   MAX_LETRAS_MENSAJE,
   MAX_PRODUCTOS_POR_DIA,
   MAX_RESUMEN,
@@ -130,7 +137,7 @@ describe("lo que devuelve la IA", () => {
 
   it("lee el JSON aunque venga rodeado de texto, con sus productos", () => {
     const r = normalizarAnalisis('Claro:\n{"dias":[{"dia":"2026-10-27","motivos":["estado_guia"],"productos":["Cutting Mix"],"resumen":"Preguntó por su guía","estado":"resuelta"}]}\nListo', dias);
-    assert.deepEqual(r, [{ dia: "2026-10-27", motivos: ["estado_guia"], productos: ["Cutting Mix"], resumen: "Preguntó por su guía", estado: "resuelta" }]);
+    assert.deepEqual(r, [{ dia: "2026-10-27", motivos: ["estado_guia"], productos: ["Cutting Mix"], motivoNuevo: null, resumen: "Preguntó por su guía", estado: "resuelta" }]);
   });
 
   it("descarta motivos que no están en la lista, los repetidos y los días que no se pidieron", () => {
@@ -298,5 +305,110 @@ describe("análisis completo del cliente", () => {
     assert.equal(normalizarPerfil('{"perfil":"  "}'), null);
     assert.equal(normalizarPerfil("nada"), null);
     assert.equal(normalizarPerfil("{roto"), null);
+  });
+});
+
+describe("el comienzo de un día largo no se pierde", () => {
+  const mensajes = Array.from({ length: MAX_MENSAJES_POR_DIA + 20 }, (_, i) => m(String(i), i % 2 ? "saliente" : "entrante", `2026-10-28T1${Math.floor(i / 30)}:${String(i % 30).padStart(2, "0")}:00Z`, `mensaje ${i}`));
+  const texto = conversacionParaIA(agruparPorDia(mensajes));
+
+  it("conserva los primeros mensajes y los últimos, y avisa de los del medio", () => {
+    assert.ok(texto.includes("mensaje 0") && texto.includes(`mensaje ${MENSAJES_DE_INICIO - 1}`));
+    assert.ok(texto.includes(`mensaje ${MAX_MENSAJES_POR_DIA + 19}`));
+    // El mensaje 11 (justo después de los de inicio) quedó fuera, y el aviso dice cuántos son.
+    assert.ok(!texto.split("\n").includes(`Cliente: mensaje ${MENSAJES_DE_INICIO + 1}`) && !texto.split("\n").includes(`Equipo: mensaje ${MENSAJES_DE_INICIO + 1}`));
+    assert.ok(texto.includes("(20 mensajes del medio de ese día no se incluyen)"));
+  });
+
+  it("un día corto va completo y sin aviso", () => {
+    const corto = conversacionParaIA(agruparPorDia(mensajes.slice(0, 5)));
+    assert.ok(!corto.includes("del medio"));
+    assert.equal(corto.split("\n").length, 6);
+  });
+});
+
+describe("motivos del caso de un ID de Dropi", () => {
+  it("hay motivos para preguntar por un ID de Dropi y para pedir privatizarlo", () => {
+    assert.equal(etiquetaDeMotivo("consulta_id_dropi"), "Preguntó por un ID de Dropi");
+    assert.equal(etiquetaDeMotivo("privatizar_id"), "Pidió privatizar o reservar un ID");
+  });
+
+  it("el pedido dice que el primer motivo es lo que originó el día y que un ID suelto es una consulta", () => {
+    const p = pedidoActividad(agruparPorDia([m("1", "entrante", "2026-10-27T20:00:00Z", "ID 11446")]));
+    assert.ok(p.instrucciones.includes("originó la conversación"));
+    assert.ok(/solo escribe un ID de Dropi/.test(p.instrucciones) && p.instrucciones.includes("NO es «sin_consulta»"));
+    assert.ok(p.instrucciones.includes("consulta_id_dropi") && p.instrucciones.includes('"motivo_nuevo"') && p.instrucciones.includes('"ID 11446"'));
+  });
+
+  it("los motivos que la IA creó antes se ofrecen en la lista del pedido", () => {
+    const p = pedidoActividad(agruparPorDia([m("1", "entrante", "2026-10-27T20:00:00Z")]), [{ id: "nuevo_garantia_producto", etiqueta: "Preguntó por la garantía de un producto" }]);
+    assert.ok(p.instrucciones.includes("- nuevo_garantia_producto: Preguntó por la garantía de un producto"));
+  });
+});
+
+describe("motivos nuevos que propone la IA", () => {
+  const dias = ["2026-10-27"];
+  const extras = [{ id: "nuevo_garantia_producto", etiqueta: "Preguntó por la garantía de un producto" }];
+  const respuesta = (o: Record<string, unknown>) => JSON.stringify({ dias: [{ dia: "2026-10-27", motivos: [], productos: [], resumen: "x", estado: "pendiente", ...o }] });
+
+  it("limpia la etiqueta propuesta y descarta las que no sirven", () => {
+    assert.equal(limpiarEtiquetaNueva(' «preguntó por la garantía de un producto.» '), "Preguntó por la garantía de un producto");
+    assert.equal(limpiarEtiquetaNueva("otro"), null);
+    assert.equal(limpiarEtiquetaNueva("Garantía"), null);
+    assert.equal(limpiarEtiquetaNueva("a ".repeat(60)), null);
+    assert.equal(limpiarEtiquetaNueva(5), null);
+  });
+
+  it("un motivo nuevo reemplaza a «otro» y queda anotado en el día", () => {
+    const r = normalizarAnalisis(respuesta({ motivos: ["otro"], motivo_nuevo: "Pidió cambiar el correo de su cuenta" }), dias);
+    assert.equal(r[0].motivoNuevo, "Pidió cambiar el correo de su cuenta");
+    assert.deepEqual(r[0].motivos, []);
+  });
+
+  it("acepta como válidos los motivos que la IA creó antes y rechaza los que no existen", () => {
+    assert.deepEqual(normalizarAnalisis(respuesta({ motivos: ["nuevo_garantia_producto"] }), dias, extras)[0].motivos, ["nuevo_garantia_producto"]);
+    assert.deepEqual(normalizarAnalisis(respuesta({ motivos: ["nuevo_garantia_producto"] }), dias)[0].motivos, ["otro"]);
+  });
+
+  it("no crea otro si ya hay uno igual o casi igual", () => {
+    assert.deepEqual(resolverMotivoNuevo("Consultó sobre garantía del producto", extras), { id: "nuevo_garantia_producto", etiqueta: "Preguntó por la garantía de un producto", nuevo: false });
+    assert.equal(resolverMotivoNuevo("Preguntó por un ID de Dropi", [...MOTIVOS]).nuevo, false);
+    assert.equal(resolverMotivoNuevo("Preguntó por tiempos de entrega", [...MOTIVOS]).id, "tiempos_entrega");
+  });
+
+  it("crea uno nuevo, con id en minúsculas sin tildes, cuando de verdad es distinto", () => {
+    const r = resolverMotivoNuevo("Pidió cambiar el correo de su cuenta", [...MOTIVOS, ...extras]);
+    assert.equal(r.nuevo, true);
+    assert.match(r.id, /^nuevo_[a-z0-9_]+$/);
+    assert.ok(r.id.length <= 46);
+    assert.equal(idDeMotivoNuevo("Pidió cambiar el correo"), "nuevo_cambiar_correo");
+  });
+
+  it("lo pone primero en el día sin repetir ni pasar de tres, y sin «otro»", () => {
+    assert.deepEqual(conMotivoPrimero(["otro", "estado_guia", "queja_servicio", "retiro_estado"], "nuevo_x"), ["nuevo_x", "estado_guia", "queja_servicio"]);
+    assert.deepEqual(conMotivoPrimero(["nuevo_x"], "nuevo_x"), ["nuevo_x"]);
+  });
+
+  it("la etiqueta de un motivo propio sale de las que se le pasan, y cuenta en la frecuencia", () => {
+    assert.equal(etiquetaDeMotivo("nuevo_garantia_producto", { nuevo_garantia_producto: "Preguntó por la garantía de un producto" }), "Preguntó por la garantía de un producto");
+    const f = frecuenciaDeMotivos([{ dia: "1", motivos: ["nuevo_garantia_producto"], estado: "pendiente" }], { nuevo_garantia_producto: "Preguntó por la garantía de un producto" });
+    assert.deepEqual(f, [{ id: "nuevo_garantia_producto", etiqueta: "Preguntó por la garantía de un producto", dias: 1 }]);
+  });
+});
+
+describe("productos nombrados por su ID de Dropi", () => {
+  const catalogo = [{ id: "1", nombre: "Cutting Mix", codigo: "CUTTING/MIX" }];
+
+  it("saca los IDs que la IA anotó como «ID 11446»", () => {
+    assert.deepEqual(idsDropiDeProductos(["ID 11446", "id 8179", "Cutting Mix", "ID 12", "ID 11446"]), ["11446", "8179"]);
+  });
+
+  it("cambia el ID por el producto de esa publicación, y si no se conoce lo deja como «ID …»", () => {
+    const porId = new Map([["11446", "Cutting Mix"]]);
+    assert.deepEqual(productosDelAnalisis(["ID 11446", "ID 99999"], catalogo, porId), ["Cutting Mix", "ID 99999"]);
+  });
+
+  it("un ID que corresponde a un producto ya nombrado no lo repite", () => {
+    assert.deepEqual(productosDelAnalisis(["cutting mix", "ID 11446"], catalogo, new Map([["11446", "Cutting Mix"]])), ["Cutting Mix"]);
   });
 });
