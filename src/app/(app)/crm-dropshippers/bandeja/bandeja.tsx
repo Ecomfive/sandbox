@@ -39,7 +39,7 @@ import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 
 /** Qué conversaciones del panel se ven. */
-type Filtro = "sinResponder" | "mias" | "todas";
+type Filtro = "sinResponder" | "mias" | "resueltas" | "todas";
 const REFRESCO_MS = 8000;
 /** Con el aviso en tiempo real conectado (canal-bandeja.ts), el refresco solo queda de respaldo. */
 const REFRESCO_RESPALDO_MS = 30000;
@@ -525,6 +525,7 @@ export function Bandeja({
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
     { id: "sinResponder", texto: "Sin responder", cuenta: delNumero.filter(sinResponder).length },
     { id: "mias", texto: "Mías", cuenta: delNumero.filter((c) => c.asignadaAId === miId).length },
+    { id: "resueltas", texto: "Resueltas", cuenta: delNumero.filter((c) => c.estado === "resuelta").length },
     { id: "todas", texto: "Todas", cuenta: delNumero.length },
   ];
   // Una lista por panel (29 oct 2026): los paneles se ven lado a lado, cada uno con sus chats según el filtro y la búsqueda.
@@ -539,7 +540,7 @@ export function Bandeja({
             (c) =>
               // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
               c.id === elegido ||
-              (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : true),
+              (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "resueltas" ? c.estado === "resuelta" : true),
           )
           .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q))),
       ]),
@@ -1061,7 +1062,7 @@ export function Bandeja({
               )}
               <ul className="m-0 flex-1 list-none overflow-y-auto p-0">
                 {chats.map((c) => filaChat(c, ancha))}
-                {!chats.length && <li className="px-4 py-10 text-center text-sm text-[var(--wa-sec)]">{filtro === "sinResponder" ? "Nada sin responder." : "No hay conversaciones con este filtro."}</li>}
+                {!chats.length && <li className="px-4 py-10 text-center text-sm text-[var(--wa-sec)]">{filtro === "sinResponder" ? "Nada sin responder." : filtro === "resueltas" ? "No hay conversaciones resueltas." : "No hay conversaciones con este filtro."}</li>}
               </ul>
               {a !== miArea && <p className="m-0 border-t border-[var(--wa-borde)] bg-[var(--wa-panel)] px-4 py-2 text-xs text-[var(--wa-sec)]">Supervisión: lo que abras aquí no se marca leído</p>}
             </section>
