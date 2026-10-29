@@ -95,19 +95,19 @@ function VentasDePais({ v, conPais }: { v: VentasDropiPais; conPais: boolean }) 
  * Bloque «Ventas en Dropi» de la ficha de un producto: lo que vendió en Dropi sumando todos los IDs de sus publicaciones (activas y
  * archivadas, públicas, privadas, de la B280…), con las netas por mes y lo que aportó cada ID. Se pide al abrir la ficha.
  */
-export function VentasDropiProducto({ id }: { id: string }) {
+export function VentasDropiProducto({ id, pais }: { id: string; /** Solo ese país (su código), como en Gestión de IDs Dropi; sin él, todos los que la persona ve. */ pais?: string }) {
   const [datos, setDatos] = useState<VentasDropiPais[] | "error" | null>(null);
   const puedeVerVentas = usePuedeAbrir("ventas-dropi");
 
   useEffect(() => {
     let vigente = true;
-    obtenerVentasDropiProducto(id)
+    obtenerVentasDropiProducto(id, pais)
       .then((r) => vigente && setDatos("paises" in r ? r.paises : "error"))
       .catch(() => vigente && setDatos("error"));
     return () => {
       vigente = false;
     };
-  }, [id]);
+  }, [id, pais]);
 
   if (datos === null) return <p className="text-sm text-muted-foreground">Cargando…</p>;
   if (datos === "error")
