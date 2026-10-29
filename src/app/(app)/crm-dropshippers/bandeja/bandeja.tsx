@@ -12,6 +12,7 @@ import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, 
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
+import { GrabarVoz } from "./grabar-voz";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
@@ -939,6 +940,7 @@ export function Bandeja({
                         <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
                       </svg>
                     </button>
+                    <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />
                   </>
                 )}
                 <label className="flex min-w-0 flex-1">
