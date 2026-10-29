@@ -1176,7 +1176,16 @@ export function Bandeja({
           </div>
           <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
             <Foto nombre={sel.nombre} tam="ficha" />
-            <span className="mt-3 text-xl">{sel.nombre}</span>
+            <span className="mt-3 flex max-w-full items-center justify-center gap-1">
+              <span className="min-w-0 text-xl [overflow-wrap:anywhere]">{sel.nombre}</span>
+              {escribe && (
+                <button type="button" onClick={() => setNombreDe({ id: sel.id, nombre: sel.nombre, personalizado: sel.nombrePersonalizado })} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8 flex-none`}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                  </svg>
+                </button>
+              )}
+            </span>
             {(sel.codigo || verTelefono) && (
               <span className="flex items-center gap-1 text-[15px] text-[var(--wa-sec)] tabular-nums">
                 {sel.codigo}
