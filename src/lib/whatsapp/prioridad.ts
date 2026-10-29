@@ -128,6 +128,56 @@ export function ordenarPorUrgencia<T extends ChatParaOrdenar>(chats: readonly T[
   });
 }
 
+// ——— El tablero de la bandeja (29 oct 2026): columnas Alta, Media, Baja y Contestados, como un embudo ———
+
+export type NivelTablero = "alta" | "media" | "baja";
+export type ColumnaTablero = NivelTablero | "contestados";
+
+/** Las columnas del tablero, de izquierda a derecha: de lo más urgente a lo ya contestado. */
+export const COLUMNAS_TABLERO: { id: ColumnaTablero; etiqueta: string }[] = [
+  { id: "alta", etiqueta: "Alta" },
+  { id: "media", etiqueta: "Media" },
+  { id: "baja", etiqueta: "Baja" },
+  { id: "contestados", etiqueta: "Contestados" },
+];
+
+/** En qué nivel va cada grupo: Alta queja, pedido y pagos; Media consulta y comercial; Baja saludos y otros. */
+export const NIVEL_DE_GRUPO: Record<GrupoMotivo, NivelTablero> = { queja: "alta", pedido: "alta", pagos: "alta", consulta: "media", comercial: "media", otro: "baja" };
+const SUBE: Record<NivelTablero, NivelTablero> = { alta: "alta", media: "alta", baja: "media" };
+/** Hasta cuántas horas después de contestar un chat sigue en «Contestados» (esperando al cliente). */
+export const HORAS_CONTESTADOS = 48;
+
+export interface ChatParaTablero extends ChatParaOrdenar {
+  resuelta: boolean;
+}
+
+/**
+ * La columna de un chat en el tablero, o null si no va (resuelto, o contestado hace más de `HORAS_CONTESTADOS`). Un chat que espera va al nivel de su motivo (sin motivo todavía, Media);
+ * si se le venció el plazo sube un nivel (`subio`), para que nada se quede olvidado abajo. Uno que ya no espera va a «Contestados».
+ */
+export function columnaDelChat(c: ChatParaTablero, ahora = Date.now()): { columna: ColumnaTablero; subio: boolean } | null {
+  if (!c.esperandoDesde) {
+    if (c.resuelta) return null;
+    const ultimo = c.ultimoMensajeEn ? new Date(c.ultimoMensajeEn).getTime() : 0;
+    return ahora - ultimo <= HORAS_CONTESTADOS * 3_600_000 ? { columna: "contestados", subio: false } : null;
+  }
+  const nivel = c.grupo ? NIVEL_DE_GRUPO[c.grupo] : "media";
+  const vencido = plazoDelChat(c.esperandoDesde, c.grupo ?? "consulta", c.vip, ahora).estado === "vencido";
+  const destino = vencido ? SUBE[nivel] : nivel;
+  return { columna: destino, subio: destino !== nivel };
+}
+
+/** Los chats repartidos en las columnas del tablero, cada columna por urgencia (Contestados, lo más reciente arriba). No cambia la lista original. */
+export function repartirTablero<T extends ChatParaTablero>(chats: readonly T[], ahora = Date.now()): Record<ColumnaTablero, { chat: T; subio: boolean }[]> {
+  const columnas: Record<ColumnaTablero, { chat: T; subio: boolean }[]> = { alta: [], media: [], baja: [], contestados: [] };
+  for (const c of ordenarPorUrgencia(chats, ahora)) {
+    const d = columnaDelChat(c, ahora);
+    if (!d) continue;
+    columnas[d.columna].push({ chat: c, subio: d.subio });
+  }
+  return columnas;
+}
+
 /** Cómo se dice un plazo: «15 min», «1 h 30 min», «4 h», «2 días». */
 export const textoPlazo = (min: number): string =>
   min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}` : `${Math.floor(min / 1440)} día${min >= 2880 ? "s" : ""}`;

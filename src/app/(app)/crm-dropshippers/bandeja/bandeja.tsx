@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
@@ -37,7 +37,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
-import { GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, textoPlazo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
+import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
 
 /** Qué conversaciones del panel se ven. */
@@ -235,6 +235,25 @@ function BurbujaPersona({ nombre, tam = "lista", vacio = false, className = "" }
   );
 }
 
+/** El color de la franja de arriba de cada columna del tablero. */
+const COLOR_COLUMNA: Record<ColumnaTablero, string> = { alta: "#D92D20", media: "#F79009", baja: "#98A2B3", contestados: "var(--wa-acento)" };
+/** Dónde se recuerda si esta persona usa la lista o el tablero (solo en su navegador). */
+const CLAVE_VISTA = "bandeja-whatsapp-vista";
+
+/**
+ * El estado de un chat en su tarjeta del tablero, como un círculo de color: «!» rojo vencido, «!» ámbar por vencer, verde a tiempo, «–» gris sin plazo y «✓» contestado.
+ * La clase de color es la de su espera (`esperaConPlazo`).
+ */
+function IconoEstado({ clase, signo, texto }: { clase: string; signo: string; texto: string }) {
+  return (
+    <span role="img" aria-label={texto} title={texto} className={`flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-current ${clase}`}>
+      <span aria-hidden="true" className="text-[12px] leading-none font-extrabold text-white">
+        {signo}
+      </span>
+    </span>
+  );
+}
+
 /** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
 function EtiquetaVip() {
   return <span className="inline-flex flex-none items-center rounded-full bg-[var(--wa-texto)] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-[var(--wa-fondo)]">VIP</span>;
@@ -342,6 +361,26 @@ export function Bandeja({
   const [filtro, setFiltro] = useState<Filtro>(abrirInicial ? "todas" : "sinResponder");
   const [numero, setNumero] = useState<string>("todos");
   const [buscar, setBuscar] = useState("");
+  // El tablero (29 oct 2026, pedido de Hernán; bosquejo https://claude.ai/artifact/1KpnHWrczXW3DtQ8Yv65na): un área a la vez, en columnas Alta, Media, Baja y Contestados.
+  const [vistaBandeja, setVistaBandeja] = useState<"lista" | "tablero">("lista");
+  const [areaTablero, setAreaTablero] = useState<AreaCrm>(miArea);
+  const [soloMios, setSoloMios] = useState(false);
+  // La vista elegida se recuerda en el navegador; si no se puede leer, se abre la lista.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(CLAVE_VISTA) === "tablero") setVistaBandeja("tablero");
+    } catch {
+      // Sin almacenamiento: la lista de siempre.
+    }
+  }, []);
+  function cambiarVista(v: "lista" | "tablero") {
+    setVistaBandeja(v);
+    try {
+      window.localStorage.setItem(CLAVE_VISTA, v);
+    } catch {
+      // Sin almacenamiento: vale solo hasta recargar.
+    }
+  }
   const [elegido, setElegido] = useState<string | null>(abrirInicial);
   const [chat, setChat] = useState<ChatAbierto | null>(null);
   /** La ventana «Importar chat»: con el chat abierto o, con `null`, para uno que todavía no existe en la bandeja. */
@@ -606,9 +645,21 @@ export function Bandeja({
     );
   }, [areas, delNumero, filtro, buscar, miId, elegido]);
 
+  // El tablero: los chats del área elegida (y, con «Mis chats», solo los tuyos) repartidos en sus columnas, cada una por urgencia.
+  const tablero = useMemo(() => {
+    const q = buscar.trim().toLowerCase();
+    const chats = delNumero
+      .filter((c) => c.area === areaTablero && (!soloMios || c.asignadaAId === miId))
+      .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)))
+      .map((c) => ({ c, esperandoDesde: esperandoDesde(c), grupo: c.motivo?.grupo ?? null, vip: c.vip, ultimoMensajeEn: c.ultimoMensajeEn, resuelta: c.estado === "resuelta" }));
+    const r = repartirTablero(chats);
+    return COLUMNAS_TABLERO.map((col) => ({ ...col, chats: r[col.id].map((x) => ({ c: x.chat.c, subio: x.subio })) }));
+  }, [delNumero, areaTablero, soloMios, miId, buscar]);
+  const enTablero = vistaBandeja === "tablero";
+
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
-  // La lista del panel del chat abierto: las flechas de su ventana pasan al anterior o al siguiente de esa columna.
-  const lista = sel ? (listas.get(sel.area) ?? []) : [];
+  // La lista del panel del chat abierto (o el tablero, en su orden): las flechas de su ventana pasan al anterior o al siguiente.
+  const lista = sel ? (enTablero ? tablero.flatMap((col) => col.chats.map((x) => x.c)) : (listas.get(sel.area) ?? [])) : [];
   const ventana = sel && enNavegador ? textoVentana(sel.ultimoEntranteEn, new Date(milisegundosAhora())) : null;
   const ultimoEntranteSel = sel?.ultimoEntranteEn ?? null;
   useEffect(() => {
@@ -882,6 +933,73 @@ export function Bandeja({
     );
   }
 
+  /** El clic derecho en un chat de la lista o del tablero: abre su menú (leído, nombre, etiquetas, motivo). */
+  function abrirMenuChat(e: EventoRaton<HTMLElement>, c: ConversacionVista) {
+    e.preventDefault();
+    ocultarVistaPrevia();
+    origenMenu.current = e.currentTarget.querySelector("button");
+    // Con el teclado (tecla de menú o Mayús + F10) no hay posición del cursor: el menú sale junto al chat.
+    const r = e.currentTarget.getBoundingClientRect();
+    const conRaton = e.clientX !== 0 || e.clientY !== 0;
+    // Con el cambio de motivo el menú es más alto: se sube para que quepa.
+    const alto = escribe ? 400 : 70;
+    setMenuChat({ id: c.id, x: Math.min(conRaton ? e.clientX : r.left + 40, window.innerWidth - 300), y: Math.max(8, Math.min(conRaton ? e.clientY : r.bottom - 8, window.innerHeight - alto)) });
+  }
+
+  /**
+   * Un chat en su tarjeta del tablero: nombre, motivo y último mensaje, quién lo lleva, el plazo y su estado. `subio`: se le venció el plazo y pasó al nivel de arriba.
+   * Se abre como en la lista y el clic derecho da el mismo menú.
+   */
+  function tarjetaChat(c: ConversacionVista, subio: boolean) {
+    const espera = enNavegador ? esperaConPlazo(c) : null;
+    const grupo = grupoPorId(c.motivo?.grupo);
+    const estado = espera
+      ? espera.plazo === "Sin plazo"
+        ? { signo: "–", texto: "Sin plazo" }
+        : espera.plazo?.startsWith("Venció")
+          ? { signo: "!", texto: "Plazo vencido" }
+          : espera.clase.includes("warning")
+            ? { signo: "!", texto: "Por vencer" }
+            : { signo: "", texto: espera.plazo ? "A tiempo" : "Esperando respuesta" }
+      : { signo: "✓", texto: "Contestado" };
+    return (
+      <li key={c.id} onContextMenu={(e) => abrirMenuChat(e, c)}>
+        <button
+          type="button"
+          onClick={() => abrirChat(c)}
+          aria-current={c.id === elegido ? "true" : undefined}
+          className={`flex w-full items-start gap-2.5 rounded-lg border border-[var(--wa-borde)] px-3 py-2.5 text-left ${c.id === elegido ? "bg-[var(--wa-sel)]" : "bg-[var(--wa-fondo)] hover:border-[var(--wa-sec)]"} ${anilloFoco}`}
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="flex items-center gap-1.5">
+              <span className="min-w-0 truncate text-[14px] font-semibold">{c.nombre}</span>
+              {c.vip && <EtiquetaVip />}
+              {subio && <span className="flex-none rounded-full bg-destructive/10 px-1.5 text-[10.5px] font-bold text-destructive">subió</span>}
+              {c.noLeidos > 0 && (
+                <span className="ml-auto flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
+                  {c.noLeidos}
+                  <span className="sr-only"> sin leer</span>
+                </span>
+              )}
+            </span>
+            <span className="truncate text-[12.5px] text-[var(--wa-sec)]" title={c.motivo?.resumen ?? undefined}>
+              {grupo ? `${grupo.corto} · ` : ""}
+              {c.ultimoTexto ?? ""}
+            </span>
+            <span className="mt-1 flex items-center gap-1.5 text-[12px]">
+              <BurbujaPersona nombre={c.asignadaA} vacio />
+              <span className="min-w-0 truncate text-[var(--wa-sec)]">{c.asignadaA ?? "Sin asignar"}</span>
+              <span className={`ml-auto flex-none font-semibold tabular-nums ${espera ? espera.clase : "text-[var(--wa-sec)]"}`}>
+                {espera ? (espera.plazo && espera.plazo !== "Sin plazo" ? espera.plazo : `Espera ${espera.texto}`) : enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}
+              </span>
+            </span>
+          </span>
+          <IconoEstado clase={espera ? espera.clase : "text-[var(--wa-sec)]"} signo={estado.signo} texto={estado.texto} />
+        </button>
+      </li>
+    );
+  }
+
   /**
    * Un chat en la lista de su panel. `ancha`: el panel ocupa todo el ancho (Atención, que ve uno solo): suma «Esperando» (cuánto lleva sin
    * respuesta) y «La lleva».
@@ -941,17 +1059,7 @@ export function Bandeja({
         key={c.id}
         onMouseEnter={(e) => c.id !== elegido && verVistaPrevia(c, e.currentTarget)}
         onMouseLeave={ocultarVistaPrevia}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          ocultarVistaPrevia();
-          origenMenu.current = e.currentTarget.querySelector("button");
-          // Con el teclado (tecla de menú o Mayús + F10) no hay posición del cursor: el menú sale junto al chat.
-          const r = e.currentTarget.getBoundingClientRect();
-          const conRaton = e.clientX !== 0 || e.clientY !== 0;
-          // Con el cambio de motivo el menú es más alto: se sube para que quepa.
-          const alto = escribe ? 400 : 70;
-          setMenuChat({ id: c.id, x: Math.min(conRaton ? e.clientX : r.left + 40, window.innerWidth - 300), y: Math.max(8, Math.min(conRaton ? e.clientY : r.bottom - 8, window.innerHeight - alto)) });
-        }}
+        onContextMenu={(e) => abrirMenuChat(e, c)}
       >
         <button
           type="button"
@@ -1086,6 +1194,28 @@ export function Bandeja({
     <div className="bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
       {/* ===== Arriba, para todos los paneles: buscar, número, filtros e «Importar chat» ===== */}
       <div className="flex flex-wrap items-center gap-2.5">
+        <div role="group" aria-label="Cómo ver la bandeja" className="flex h-10 flex-none overflow-hidden rounded-lg border border-[var(--wa-borde)]">
+          {(
+            [
+              { v: "lista", texto: "Lista", trazo: "M4 6h16M4 12h16M4 18h16" },
+              { v: "tablero", texto: "Tablero", trazo: "M5 4v12M12 4v16M19 4v8" },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              aria-pressed={vistaBandeja === o.v}
+              onClick={() => cambiarVista(o.v)}
+              title={o.v === "tablero" ? "Tablero: Alta, Media, Baja y Contestados" : "Lista: los paneles de siempre"}
+              className={`flex items-center gap-1.5 px-3 text-[13px] font-medium ${vistaBandeja === o.v ? "bg-[var(--wa-acento-suave)] text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d={o.trazo} />
+              </svg>
+              {o.texto}
+            </button>
+          ))}
+        </div>
         <label className="flex h-10 min-w-0 flex-[1_1_260px] items-center gap-3 rounded-lg bg-[var(--wa-panel)] px-3.5 text-[var(--wa-sec)] focus-within:ring-2 focus-within:ring-[var(--wa-acento)] sm:max-w-md">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
@@ -1113,7 +1243,29 @@ export function Bandeja({
             </select>
           </label>
         )}
-        <div role="group" aria-label="Qué conversaciones ver" className="flex flex-wrap gap-1.5">
+        {enTablero && areas.length > 1 && (
+          <label className="flex h-10 items-center gap-2 text-[13px] text-[var(--wa-sec)]">
+            Área
+            <select value={areaTablero} onChange={(e) => setAreaTablero(e.target.value as AreaCrm)} className={`h-10 rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] font-semibold text-[var(--wa-texto)] ${anilloFoco}`}>
+              {areas.map((a) => (
+                <option key={a} value={a}>
+                  {areaChat(a).etiqueta}
+                  {a === miArea ? " (tuyo)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {enTablero && (
+          <label className="flex h-10 items-center gap-2 text-[13px] text-[var(--wa-sec)]">
+            Ver
+            <select value={soloMios ? "mios" : "todos"} onChange={(e) => setSoloMios(e.target.value === "mios")} className={`h-10 rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] font-semibold text-[var(--wa-texto)] ${anilloFoco}`}>
+              <option value="todos">Todo el equipo</option>
+              <option value="mios">Mis chats</option>
+            </select>
+          </label>
+        )}
+        <div role="group" aria-label="Qué conversaciones ver" className={`flex flex-wrap gap-1.5 ${enTablero ? "hidden" : ""}`}>
           {opciones.map((o) => (
             <button
               key={o.id}
@@ -1144,8 +1296,67 @@ export function Bandeja({
         )}
       </div>
 
+      {/* ===== El tablero (29 oct 2026): un área a la vez, en columnas Alta, Media, Baja y Contestados ===== */}
+      {enTablero &&
+        (() => {
+          const pendientes = tablero.filter((col) => col.id !== "contestados").flatMap((col) => col.chats);
+          const conEspera = enNavegador ? pendientes.map((x) => esperaConPlazo(x.c)) : [];
+          const vencidos = conEspera.filter((e) => e?.plazo?.startsWith("Venció")).length;
+          const porVencer = conEspera.filter((e) => e && !e.plazo?.startsWith("Venció") && e.clase.includes("warning")).length;
+          const sinMotivo = delNumero.filter((c) => c.area === areaTablero && sinResponder(c) && !c.motivo).length;
+          return (
+            <section aria-label={`Tablero de ${areaChat(areaTablero).etiqueta}`} className="flex max-h-[80vh] min-h-[420px] flex-1 flex-col overflow-hidden rounded-[14px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] lg:max-h-none lg:min-h-0">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-[var(--wa-borde)] px-4 py-3">
+                <span aria-hidden="true" className={`h-2.5 w-2.5 flex-none rounded-full bg-current ${colorDeArea(areaTablero)}`} />
+                <h2 className="m-0 text-[17px] font-bold">{areaChat(areaTablero).etiqueta}</h2>
+                <span className="text-[13px] text-[var(--wa-sec)]">
+                  {pendientes.length} por atender
+                  {vencidos > 0 && <strong className="text-destructive"> · {vencidos} {vencidos === 1 ? "vencido" : "vencidos"}</strong>}
+                  {porVencer > 0 && <strong className="text-warning"> · {porVencer} por vencer</strong>}
+                </span>
+                {escribe && sinMotivo > 0 && (
+                  <button
+                    type="button"
+                    disabled={clasificando}
+                    onClick={clasificarPendientes}
+                    title="La IA lee por qué escribe cada chat que espera respuesta sin motivo: así va a su columna."
+                    className={`ml-auto rounded-full border border-[var(--wa-borde)] px-2.5 py-0.5 text-xs font-semibold text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60 ${anilloFoco}`}
+                  >
+                    {clasificando ? "Leyendo motivos…" : `Leer motivos con IA (${sinMotivo})`}
+                  </button>
+                )}
+              </div>
+              <div className="min-h-0 flex-1 overflow-x-auto bg-[var(--wa-panel)]">
+                <div className="grid h-full min-w-[960px] grid-cols-4">
+                  {tablero.map((col) => {
+                    const venc = enNavegador ? col.chats.filter((x) => esperaConPlazo(x.c)?.plazo?.startsWith("Venció")).length : 0;
+                    const resumen =
+                      col.id === "contestados" ? "esperan al cliente" : col.id === "baja" ? "pueden esperar" : venc ? `${venc} ${venc === 1 ? "vencido" : "vencidos"}` : col.chats.length ? "a tiempo" : "";
+                    return (
+                      <div key={col.id} className="flex min-h-0 flex-col border-r border-[var(--wa-borde)] last:border-r-0">
+                        <div className="border-b border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 pt-2.5 pb-2" style={{ borderTop: `3px solid ${COLOR_COLUMNA[col.id]}` }}>
+                          <h3 className="m-0 text-[15px] font-bold">{col.etiqueta}</h3>
+                          <span className="text-[12px] text-[var(--wa-sec)]">
+                            {col.chats.length} {col.chats.length === 1 ? "chat" : "chats"}
+                            {resumen && ` · ${resumen}`}
+                          </span>
+                        </div>
+                        <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-y-auto p-2.5">
+                          {col.chats.map((x) => tarjetaChat(x.c, x.subio))}
+                          {!col.chats.length && <li className="px-2 py-6 text-center text-[13px] text-[var(--wa-sec)]">Nada aquí.</li>}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {areaTablero !== miArea && <p className="m-0 border-t border-[var(--wa-borde)] bg-[var(--wa-panel)] px-4 py-2 text-xs text-[var(--wa-sec)]">Supervisión: lo que abras aquí no se marca leído</p>}
+            </section>
+          );
+        })()}
+
       {/* ===== Los paneles, lado a lado (29 oct 2026): Atención, que solo ve el suyo, lo tiene a todo lo ancho ===== */}
-      <div className={`grid min-h-0 flex-1 grid-cols-1 gap-3 ${COLUMNAS_PANELES[areas.length] ?? ""}`}>
+      <div className={`grid min-h-0 flex-1 grid-cols-1 gap-3 ${COLUMNAS_PANELES[areas.length] ?? ""} ${enTablero ? "hidden" : ""}`}>
         {areas.map((a) => {
           const chats = listas.get(a) ?? [];
           const pendientes = delNumero.filter((c) => c.area === a && sinResponder(c)).length;

@@ -9,6 +9,8 @@ import {
   plazoDe,
   plazoDelChat,
   urgenciaDe,
+  columnaDelChat,
+  repartirTablero,
   type ChatParaOrdenar,
   type EstadoMotivo,
 } from "./prioridad";
@@ -89,4 +91,26 @@ test("se clasifica solo lo que espera y tiene algo nuevo; lo que puso una person
   assert.equal(hayQueClasificar(dePersona, AHORA), false);
   // Se le contestó y volvió a escribir: la espera nueva es posterior al motivo.
   assert.equal(hayQueClasificar({ ...dePersona, esperandoDesde: hace(2) }, AHORA), true);
+});
+
+test("tablero: cada chat va al nivel de su motivo; vencido sube uno; contestado va a Contestados", () => {
+  const base = { vip: false, resuelta: false, ultimoMensajeEn: hace(1) };
+  assert.deepEqual(columnaDelChat({ ...base, grupo: "queja", esperandoDesde: hace(5) }, AHORA), { columna: "alta", subio: false });
+  assert.deepEqual(columnaDelChat({ ...base, grupo: "comercial", esperandoDesde: hace(30) }, AHORA), { columna: "media", subio: false });
+  assert.deepEqual(columnaDelChat({ ...base, grupo: "consulta", esperandoDesde: hace(130) }, AHORA), { columna: "alta", subio: true });
+  assert.deepEqual(columnaDelChat({ ...base, grupo: "otro", esperandoDesde: hace(3000) }, AHORA), { columna: "baja", subio: false });
+  // Un VIP con saludo tiene plazo (el de comercial): al vencer sube a Media.
+  assert.deepEqual(columnaDelChat({ ...base, vip: true, grupo: "otro", esperandoDesde: hace(300) }, AHORA), { columna: "media", subio: true });
+  // Sin motivo todavía: Media.
+  assert.deepEqual(columnaDelChat({ ...base, grupo: null, esperandoDesde: hace(10) }, AHORA), { columna: "media", subio: false });
+  assert.deepEqual(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null }, AHORA), { columna: "contestados", subio: false });
+  assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null, ultimoMensajeEn: hace(60 * 50) }, AHORA), null);
+  assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null, resuelta: true }, AHORA), null);
+});
+
+test("tablero: cada columna por urgencia y Contestados con lo más reciente arriba", () => {
+  const chat = (id: string, grupo: ChatParaOrdenar["grupo"], espera: number | null, ultimo = 1) => ({ id, grupo, vip: false, resuelta: false, esperandoDesde: espera == null ? null : hace(espera), ultimoMensajeEn: hace(ultimo) });
+  const t = repartirTablero([chat("pagos", "pagos", 10), chat("queja", "queja", 10), chat("viejo", null, null, 300), chat("nuevo", null, null, 5)], AHORA);
+  assert.deepEqual(t.alta.map((x) => x.chat.id), ["queja", "pagos"]);
+  assert.deepEqual(t.contestados.map((x) => x.chat.id), ["nuevo", "viejo"]);
 });
