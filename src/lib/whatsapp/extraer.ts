@@ -17,6 +17,8 @@ export interface MensajeEntrante {
   mediaId: string | null;
   mediaMime: string | null;
   mediaNombre: string | null;
+  /** Una reacción: el id en WhatsApp («wamid…») del mensaje al que se reaccionó; null en lo demás. Sin emoji (`texto` null) = la quitó. */
+  reaccionA: string | null;
   /** ISO. */
   momento: string;
 }
@@ -101,7 +103,7 @@ function textoDeRespaldo(tipoMeta: string, m: Obj, cuerpo: Obj): string {
 }
 
 /** Lo que trae un mensaje de Meta (texto, tipo y archivo), sea uno que llega o uno mandado desde el celular. */
-function contenidoDe(m: Obj): Pick<MensajeEntrante, "tipo" | "texto" | "mediaId" | "mediaMime" | "mediaNombre"> {
+function contenidoDe(m: Obj): Pick<MensajeEntrante, "tipo" | "texto" | "mediaId" | "mediaMime" | "mediaNombre" | "reaccionA"> {
   const tipoMeta = String(m.type ?? "");
   const cuerpo = obj(m[tipoMeta]);
   let contenido: string | null = null;
@@ -121,6 +123,8 @@ function contenidoDe(m: Obj): Pick<MensajeEntrante, "tipo" | "texto" | "mediaId"
     mediaId: conArchivo ? texto(cuerpo.id) : null,
     mediaMime: conArchivo ? texto(cuerpo.mime_type) : null,
     mediaNombre: tipoMeta === "document" ? texto(cuerpo.filename) : null,
+    // A qué mensaje va la reacción (29 oct 2026): la bandeja la dibuja sobre ese mensaje, como WhatsApp.
+    reaccionA: tipoMeta === "reaction" ? texto(cuerpo.message_id) : null,
   };
 }
 

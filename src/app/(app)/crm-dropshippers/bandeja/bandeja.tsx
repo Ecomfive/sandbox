@@ -31,6 +31,7 @@ import { ChatIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, P
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
+import { agruparReacciones, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 
 /** Qué conversaciones del panel se ven. */
 type Filtro = "sinResponder" | "mias" | "todas";
@@ -526,6 +527,8 @@ export function Bandeja({
   const esNota = modo === "nota" || mirando;
   const bloqueado = !escribe || (!esNota && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
+  // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
+  const conReacciones = mensajes ? agruparReacciones(mensajes) : null;
   const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
 
   /** Escribe un emoji donde está el cursor (o al final) y deja el cursor justo después. */
@@ -1145,9 +1148,9 @@ export function Bandeja({
                   {!mensajes ? (
                     <p className="m-0 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] text-[var(--wa-sec)]">Cargando…</p>
                   ) : (
-                    mensajes.map((m, i) => {
+                    (conReacciones?.visibles ?? mensajes).map((m, i, visibles) => {
                       const dia = etiquetaDia(m.momento);
-                      const previo = mensajes[i - 1];
+                      const previo = visibles[i - 1];
                       const separador = i === 0 || etiquetaDia(previo.momento) !== dia;
                       // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp).
                       const seguido = !separador && !!previo && previo.direccion === m.direccion && !esAvisoDelSistema(previo.texto);
@@ -1171,6 +1174,7 @@ export function Bandeja({
                           <Burbuja
                             m={m}
                             seguido={seguido}
+                            reacciones={conReacciones?.reacciones.get(m.id)}
                             alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
                             // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
@@ -1481,12 +1485,15 @@ function BotonRapidaMensaje({ alPulsar }: { alPulsar: () => void }) {
 function Burbuja({
   m,
   seguido,
+  reacciones,
   alPedirBorrar,
   alGuardarRapida,
   alReintentar,
 }: {
   m: MensajeVista;
   seguido: boolean;
+  /** Las reacciones a este mensaje (una por lado), que se dibujan sobre su borde de abajo, como en WhatsApp. */
+  reacciones?: ReaccionVista[];
   alPedirBorrar?: (m: MensajeVista) => void;
   alGuardarRapida?: (texto: string) => void;
   /** Un mensaje que no salió (mostrado al momento de enviar): vuelve a mandarlo. */
@@ -1522,12 +1529,27 @@ function Burbuja({
   }
   const nuestro = m.direccion === "saliente";
   const colita = seguido ? "" : nuestro ? "rounded-tr-none" : "rounded-tl-none";
+  const conReaccion = !!reacciones?.length;
   return (
     <div
-      className={`${margen} group relative max-w-[min(65%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${colita} ${
+      className={`${margen} ${conReaccion ? "mb-4" : ""} group relative max-w-[min(65%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${colita} ${
         nuestro ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
       }`}
     >
+      {conReaccion && (
+        // Como en WhatsApp: el emoji sobre el borde de abajo del mensaje al que se reaccionó.
+        <span
+          role="img"
+          aria-label={`Reacciones: ${reacciones!.map((r) => `${r.emoji} ${r.direccion === "entrante" ? "del dropshipper" : "de la empresa"}`).join(", ")}`}
+          className={`absolute -bottom-3.5 ${nuestro ? "right-2" : "left-2"} z-[1] flex items-center gap-0.5 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-entrante)] px-1.5 py-0.5 text-[14px] leading-none shadow-[0_1px_0.5px_var(--wa-sombra)]`}
+        >
+          {reacciones!.map((r) => (
+            <span key={r.direccion} aria-hidden="true">
+              {r.emoji}
+            </span>
+          ))}
+        </span>
+      )}
       {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
       {nuestro && alGuardarRapida && m.tipo === "texto" && (m.texto?.trim().length ?? 0) >= 3 && <BotonRapidaMensaje alPulsar={() => alGuardarRapida(m.texto ?? "")} />}
       {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
