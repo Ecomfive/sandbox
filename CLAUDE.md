@@ -1025,7 +1025,11 @@ convenciones técnicas del código.
   (`panel`, «(tuyo)», pendientes por panel) y `supervisaArea` dice si mira un área de abajo. Supervisando: `abrirConversacion` **no** pone
   `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
   «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
-  No se mandan acuses de lectura a WhatsApp. filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
+  No se mandan acuses de lectura a WhatsApp. **Productos que pregunta** (29 oct 2026): la ficha del chat (`productos-chat.tsx`,
+  `productos-chat-actions.ts`) cruza los últimos 40 mensajes entrantes con los productos simples de `skus_maestros` (`productosMencionados`
+  en `src/lib/crm/productos-chat.ts`: dos palabras seguidas del nombre o el código) y suma los fijados (tabla `whatsapp_conversacion_productos`,
+  migración 0180); de cada uno, `cargarEnCamino` del país del dropshipper (o del prefijo del número). Bajo 1280 px la ficha se abre encima.
+  filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
   comercial; +507 Atención): cada número de 360dialog tiene su clave; `config360(numero)` usa `D360_API_KEY_<dígitos del número>` si está y si no
   `D360_API_KEY` (la principal, también la de plantillas). El envío (`NumeroEmpresa` en `api.ts`, `conversacionPermitida().numeroEmpresa`)
   y los archivos usan la del número del chat; `conectarWebhook360` registra el webhook en todas (`claves360`). Con `D360_API_KEY` el envío y los archivos van por
@@ -1075,7 +1079,7 @@ convenciones técnicas del código.
   `MAX_SEGUNDOS_VOZ` (5 min); al detener, el audio se decodifica (`AudioContext.decodeAudioData`), se mezcla a mono y se **codifica a MP3 en el navegador** con `@breezystack/lamejs` (LGPL-3.0, 64 kbps, 44,1 kHz; se carga con
   `import()` solo al grabar) y pasa a `EnviarArchivo` para escucharlo y enviarlo como cualquier audio (sale como archivo MP3, no como el globo de voz del celular, que exige OGG/Opus). **La cabecera `Permissions-Policy` de `next.config.ts` tiene que dejar el micrófono a la propia página (`microphone=(self)`)**: con `microphone=()` el navegador lo niega aunque la persona lo haya permitido. Si el almacén `whatsapp-importados` no existe, `prepararEnvioArchivo` lo crea. **Pendiente**: **probar con el número real**
   (no se pudo probar contra 360dialog) y, si se quiere el globo de voz, codificar a OGG/Opus (WebCodecs `AudioEncoder` + empaquetado Ogg).
-  **Emojis, GIF y stickers** (29 oct 2026, migración 0180): la carita junto al micrófono abre `Expresiones` (`bandeja/expresiones.tsx`) con tres pestañas. *Emojis*: `GRUPOS_EMOJIS` (`src/lib/whatsapp/emojis.ts`, con prueba; solo texto,
+  **Emojis, GIF y stickers** (29 oct 2026, migración 0181): la carita junto al micrófono abre `Expresiones` (`bandeja/expresiones.tsx`) con tres pestañas. *Emojis*: `GRUPOS_EMOJIS` (`src/lib/whatsapp/emojis.ts`, con prueba; solo texto,
   los dibuja el sistema operativo) y `insertarEmoji` los escribe en el cursor del cuadro. *GIF*: `buscarGifs` / `enviarGif` (`bandeja/expresiones-actions.ts`) con GIPHY (`GIPHY_API_KEY`, **solo en el servidor**: el navegador recibe id,
   título y una vista pequeña; al enviar el servidor vuelve a pedir el archivo por su id, `src/lib/whatsapp/giphy.ts`, con prueba, y solo acepta direcciones `media*.giphy.com` por https, bajadas con `descargarPublico`). **Un GIF sale
   como video MP4 sin sonido** (no hay otro formato en WhatsApp) con nombre `gif-<id>.mp4`, y el chat lo dibuja con repetición automática, mudo y sin controles (`Contenido`). *Stickers*: WhatsApp exige WebP de 512 × 512
@@ -1083,7 +1087,7 @@ convenciones técnicas del código.
   `whatsapp-importados/stickers/`): `prepararSticker` (permiso firmado) → el navegador sube → `crearSticker` convierte y guarda; `borrarSticker` quita la fila y el archivo (son recursos del equipo, no historial: lo ya mandado a un chat
   conserva su copia, porque `enviarSticker` **copia** el sticker a `<chat>/enviados/`). «GIPHY» manda stickers de ahí con `enviarStickerGiphy`. Todo se manda con `mandarMedioGuardado` (`bandeja/enviar-medio.ts`, compartido con los
   archivos subidos: `chatParaEnviar`, `permisoDeSubida` —crea el bucket si falta—, tipo `sticker` en `TipoEnvio`), con las mismas reglas: poder escribir, no solo supervisar y ventana de 24 h abierta. Sin `GIPHY_API_KEY` las pestañas GIF y
-  GIPHY avisan que falta la clave; emojis y stickers del equipo funcionan igual. Auditoría `crear_sticker_whatsapp`, `eliminar_sticker_whatsapp` y `enviar_archivo_whatsapp`. Reversa: `supabase/rollbacks/0180_rollback.sql`.
+  GIPHY avisan que falta la clave; emojis y stickers del equipo funcionan igual. Auditoría `crear_sticker_whatsapp`, `eliminar_sticker_whatsapp` y `enviar_archivo_whatsapp`. Reversa: `supabase/rollbacks/0181_rollback.sql`.
   **Números por área** (29 oct 2026): la bandeja solo ofrece los números de WhatsApp de las áreas de la persona (`numerosDeAreas`, `crm/areas.ts`, con prueba): Atención ve el número de Atención y **no** el de Comercial ni
   el selector «Todos los números / …» ni la línea «N números de WhatsApp» de la cabecera (salen solo si hay más de un número); Comercial ve los dos y Dirección los tres. Los chats siguen saliendo por su área, vengan del número que vengan; «Importar chat» también ofrece solo esos números.
   **Marcar como no leído** (29 oct 2026): clic derecho (o tecla de menú / Mayús + F10) sobre un chat de la lista abre un menú con «Marcar como no leído» —o «Marcar como leído» si tiene mensajes sin leer—, y el encabezado del chat

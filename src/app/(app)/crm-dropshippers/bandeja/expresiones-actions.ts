@@ -104,7 +104,7 @@ export async function enviarStickerGiphy(conversacionId: string, giphyId: string
   });
 }
 
-/** Los stickers que subió el equipo, con una vista para la lista. `falta`: todavía no se corrió la migración 0180. */
+/** Los stickers que subió el equipo, con una vista para la lista. `falta`: todavía no se corrió la migración 0181. */
 export async function listarStickers(): Promise<{ stickers: StickerEquipo[]; falta: boolean } | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
@@ -152,7 +152,7 @@ export async function crearSticker(ruta: string, nombre: string): Promise<{ stic
   const { data, error } = await supabase.from(TABLA).insert({ nombre: limpio, ruta: rutaFinal, animado: s.animado, creado_por: u.nombre || u.email }).select("id, nombre, animado").single();
   if (error || !data) {
     await supabase.storage.from(BUCKET_ARCHIVOS).remove([rutaFinal]);
-    return { error: error?.code === "42P01" ? "Falta correr la migración 0180 (stickers)." : "No se pudo guardar el sticker." };
+    return { error: error?.code === "42P01" ? "Falta correr la migración 0181 (stickers)." : "No se pudo guardar el sticker." };
   }
   await registrarAuditoria({ accion: "crear_sticker_whatsapp", entidad: TABLA, entidadId: data.id as string, detalle: limpio });
   revalidatePath("/crm-dropshippers/bandeja");

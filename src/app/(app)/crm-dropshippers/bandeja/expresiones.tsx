@@ -88,7 +88,7 @@ export function Expresiones({
     const r = await listarStickers().catch(() => ({ error: "No se pudo abrir la lista." }) as { error: string });
     if ("error" in r) return setAviso(r.error);
     setPropios(r.stickers);
-    setAviso(r.falta ? "Falta correr la migración 0180 (stickers del equipo)." : null);
+    setAviso(r.falta ? "Falta correr la migración 0181 (stickers del equipo)." : null);
   }
 
   function elegirPestana(p: Pestana) {
