@@ -55,6 +55,7 @@ export function Actividad<T extends DatosActividad>({
   puedeComentar = true,
   comentarioResaltado,
   renderCambio = (e) => <CambioTexto e={e} />,
+  iconoCambio,
   arriba,
   placeholder = "Escribe un comentario… usa @ para etiquetar a alguien.",
   version: versionFuera = 0,
@@ -65,6 +66,8 @@ export function Actividad<T extends DatosActividad>({
   puedeComentar?: boolean;
   comentarioResaltado?: string | null;
   renderCambio?: (e: EventoActividad) => ReactNode;
+  /** El ícono de un cambio en lugar del punto gris (el de la acción: archivar, liquidación…); null deja el punto. */
+  iconoCambio?: (e: EventoActividad) => ReactNode;
   arriba?: (datos: T) => ReactNode;
   placeholder?: string;
   /** Súbelo cuando algo de fuera cambió la actividad (una decisión, un cambio guardado) para volver a pedirla. */
@@ -72,7 +75,7 @@ export function Actividad<T extends DatosActividad>({
 }) {
   return (
     <ProveedorAccionesActividad acciones={acciones}>
-      <Feed id={id} obtener={obtener} acciones={acciones} puedeComentar={puedeComentar} comentarioResaltado={comentarioResaltado} renderCambio={renderCambio} arriba={arriba} placeholder={placeholder} versionFuera={versionFuera} />
+      <Feed id={id} obtener={obtener} acciones={acciones} puedeComentar={puedeComentar} comentarioResaltado={comentarioResaltado} renderCambio={renderCambio} iconoCambio={iconoCambio} arriba={arriba} placeholder={placeholder} versionFuera={versionFuera} />
     </ProveedorAccionesActividad>
   );
 }
@@ -84,6 +87,7 @@ function Feed<T extends DatosActividad>({
   puedeComentar,
   comentarioResaltado,
   renderCambio,
+  iconoCambio,
   arriba,
   placeholder,
   versionFuera,
@@ -94,6 +98,7 @@ function Feed<T extends DatosActividad>({
   puedeComentar: boolean;
   comentarioResaltado?: string | null;
   renderCambio: (e: EventoActividad) => ReactNode;
+  iconoCambio?: (e: EventoActividad) => ReactNode;
   arriba?: (datos: T) => ReactNode;
   placeholder: string;
   versionFuera: number;
@@ -246,7 +251,7 @@ function Feed<T extends DatosActividad>({
               </div>
             ) : (
               <div key={`e-${it.e.id}`} className="flex items-start gap-2 py-1 text-[13px]">
-                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-border-control" />
+                {iconoCambio?.(it.e) ?? <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-border-control" />}
                 <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
                   <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                     <span className="font-medium text-foreground">{it.e.autor ?? (it.e.origen.startsWith("clickup") ? "ClickUp" : "Sistema")}</span>
