@@ -11,6 +11,7 @@ import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, marca
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
+import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
@@ -248,6 +249,9 @@ export function Bandeja({
   const [verPlantillas, setVerPlantillas] = useState(false);
   const [borrar, setBorrar] = useState<QueBorrar | null>(null);
   const [vincular, setVincular] = useState(false);
+  // El archivo (foto, audio, video o documento) que se va a mandar por WhatsApp.
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const inputArchivo = useRef<HTMLInputElement | null>(null);
   // Menú del clic derecho sobre un chat de la lista: marcarlo como no leído (vuelve a pendiente de respuesta) o como leído.
   const [menuChat, setMenuChat] = useState<{ id: string; x: number; y: number } | null>(null);
   const menuChatRef = useRef<HTMLDivElement | null>(null);
@@ -915,6 +919,28 @@ export function Bandeja({
                     Nota privada
                   </button>
                 </div>
+                {!esNota && (
+                  <>
+                    <input
+                      ref={inputArchivo}
+                      type="file"
+                      accept={ACEPTAR_ENVIO}
+                      className="sr-only"
+                      tabIndex={-1}
+                      aria-label="Elegir el archivo que se va a mandar"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (f) setArchivo(f);
+                      }}
+                    />
+                    <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label="Adjuntar una foto, audio, video o documento" title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
+                      </svg>
+                    </button>
+                  </>
+                )}
                 <label className="flex min-w-0 flex-1">
                   <span className="sr-only">{esNota ? "Nota privada para el equipo" : `Mensaje para ${sel.nombre}`}</span>
                   <textarea
@@ -923,6 +949,13 @@ export function Bandeja({
                     value={borrador}
                     disabled={bloqueado}
                     onChange={(e) => setBorrador(e.target.value)}
+                    onPaste={(e) => {
+                      const pegado = e.clipboardData.files[0];
+                      if (pegado && !esNota && !bloqueado && /^image\//.test(pegado.type)) {
+                        e.preventDefault();
+                        setArchivo(pegado);
+                      }
+                    }}
                     onKeyDown={(e) => {
                       // Como en WhatsApp: Enter envía y Mayús + Enter baja de línea.
                       if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -978,6 +1011,19 @@ export function Bandeja({
             </div>
           );
         })()}
+      {archivo && sel && (
+        <EnviarArchivo
+          conversacionId={sel.id}
+          nombre={sel.nombre}
+          archivo={archivo}
+          alCerrar={() => setArchivo(null)}
+          alEnviado={() => {
+            setArchivo(null);
+            mostrarToast("Enviado.");
+            void refrescar(sel.id);
+          }}
+        />
+      )}
       {vincular && sel && (
         <VentanaVincular
           conversacionId={sel.id}

@@ -192,6 +192,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   cancelar_borrado_whatsapp: "Canceló una petición de borrado de WhatsApp",
   recuperar_whatsapp: "Recuperó un chat o un mensaje oculto de WhatsApp",
   ver_telefono_dropshipper: "Mostró el número de un dropshipper",
+  enviar_archivo_whatsapp: "Mandó un archivo por WhatsApp",
   vincular_chat_dropshipper: "Vinculó un chat de WhatsApp con un dropshipper",
   desvincular_chat_dropshipper: "Quitó el vínculo de un chat de WhatsApp con un dropshipper",
   crear_plantilla_whatsapp: "Creó la plantilla de WhatsApp",
