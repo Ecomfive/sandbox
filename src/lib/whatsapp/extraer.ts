@@ -108,6 +108,12 @@ export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: 
           const para = texto(m.to);
           const waId = texto(m.id);
           if (!para || !waId) continue;
+          // Lo que el equipo borra «para todos» en la app tampoco se borra aquí: se marca el original (guardar.ts).
+          if (String(m.type ?? "") === "revoke") {
+            const original = texto(obj(m.revoke).original_message_id);
+            if (original) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp) });
+            continue;
+          }
           ecos.push({ phoneNumberId, numeroEmpresa, telefono: conMas(para)!, nombre: null, waId, ...contenidoDe(m), momento: momentoDe(m.timestamp) });
         }
         continue;

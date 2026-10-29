@@ -8,6 +8,8 @@
  * Sin dependencias de servidor a propósito: se usa en acciones, páginas y en las pruebas.
  */
 
+import { puedeVerTelefonos } from "@/lib/whatsapp/telefono-oculto";
+
 export type AreaCrm = "direccion" | "comercial" | "atencion";
 
 export const MODULO_COMERCIAL = "crm-comercial";
@@ -32,6 +34,8 @@ export interface AccesoCrm {
   direccion: boolean;
   /** Puede escribir en los chats de Dirección. */
   escribeDireccion: boolean;
+  /** Puede usar «Mostrar número» (por ahora, solo administradores): los números de los dropshippers no salen escritos en ninguna pantalla. */
+  verTelefonos: boolean;
 }
 
 export function accesoCrm(u: PermisosCrm): AccesoCrm {
@@ -45,6 +49,7 @@ export function accesoCrm(u: PermisosCrm): AccesoCrm {
     escribeComercial: comercial && !u.modulosSoloLectura.includes(MODULO_COMERCIAL),
     direccion,
     escribeDireccion: direccion && !u.modulosSoloLectura.includes(MODULO_DIRECCION),
+    verTelefonos: puedeVerTelefonos(u),
   };
 }
 
