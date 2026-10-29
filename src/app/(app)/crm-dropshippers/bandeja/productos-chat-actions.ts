@@ -1,7 +1,7 @@
 "use server";
 
 import type { EtapaCotizacion } from "@/lib/compras/en-camino";
-import { productosMencionados } from "@/lib/crm/productos-chat";
+import { idsDropiEnTexto, productosDeLaConversacion, type MencionEnChat } from "@/lib/crm/productos-chat";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -16,6 +16,8 @@ export interface ProductoDelChat {
   foto: string | null;
   /** Lo fijó alguien en la ficha; si no, es una sugerencia porque el chat lo nombra. */
   fijado: boolean;
+  /** Dónde y cuándo se habló de él en el chat por última vez (la frase, el ID de Dropi o el análisis con IA); null si solo está fijado. */
+  mencion: MencionEnChat | null;
   enCamino: number;
   /** La llegada más próxima de lo que viene en camino; null si ninguna orden tiene fecha todavía. */
   llegada: string | null;
@@ -58,9 +60,33 @@ async function paisDelChat(supabase: ReturnType<typeof createServiceClient>, tel
   return p ? { id: p.id, nombre: p.nombre } : null;
 }
 
+/** Cuántos mensajes del chat se leen para saber de qué productos se habló (los más recientes): toda la conversación en la práctica. */
+const MENSAJES_A_LEER = 2000;
+
+/** Los mensajes con texto del dropshipper y del equipo, del más nuevo al más viejo, hasta `MENSAJES_A_LEER`. */
+async function textosDelChat(supabase: ReturnType<typeof createServiceClient>, conversacionId: string) {
+  const filas: { texto: string | null; momento: string; direccion: string }[] = [];
+  for (let desde = 0; desde < MENSAJES_A_LEER; desde += 1000) {
+    const { data, error } = await supabase
+      .from("whatsapp_mensajes")
+      .select("texto, momento, direccion")
+      .eq("conversacion_id", conversacionId)
+      .in("direccion", ["entrante", "saliente"])
+      .not("texto", "is", null)
+      .order("momento", { ascending: false })
+      .range(desde, desde + 999);
+    if (error) break;
+    filas.push(...((data ?? []) as typeof filas));
+    if ((data ?? []).length < 1000) break;
+  }
+  return filas;
+}
+
 /**
- * Los productos de la ficha del chat: los fijados y los que el dropshipper nombra en sus últimos mensajes, cada uno con lo que viene en
- * camino a su país y cuándo llega. Solo unidades y fechas, sin costos; respeta el alcance de Compras de la persona.
+ * Los productos de la ficha del chat: los fijados y aquellos de los que se habló en **toda** la conversación (pedido de Hernán, 29 oct 2026:
+ * «que cada que pidan algo lo vayas identificando»): por su nombre, por una palabra que dice cuál entre lo que se vende en su país («la
+ * creatina»), por el ID de Dropi que se nombró y por lo que encontró «Analizar con IA». Cada uno con lo que viene en camino a su país y
+ * cuándo llega. Solo unidades y fechas, sin costos; respeta el alcance de Compras de la persona.
  */
 export async function productosDelChat(conversacionId: string): Promise<ProductosDelChat | { error: string }> {
   const u = await usuarioBandeja(false);
@@ -69,24 +95,72 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
   const c = await conversacionPermitida(supabase, conversacionId, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
 
-  const [pais, fijadosR, mensajesR] = await Promise.all([
+  const [pais, fijadosR, mensajes, analisisR] = await Promise.all([
     paisDelChat(supabase, c.telefono, c.dropshipperId),
     supabase.from(TABLA).select("sku_id, creado_en").eq("conversacion_id", conversacionId).order("creado_en"),
-    supabase.from("whatsapp_mensajes").select("texto").eq("conversacion_id", conversacionId).eq("direccion", "entrante").not("texto", "is", null).order("momento", { ascending: false }).limit(40),
+    textosDelChat(supabase, conversacionId),
+    // Lo que encontró «Analizar con IA» (migración 0183); sin la migración o sin análisis, nada.
+    supabase.from("whatsapp_actividad").select("dia, productos").eq("conversacion_id", conversacionId).order("dia", { ascending: false }),
   ]);
   const sePuedeFijar = !fijadosR.error;
   const fijadosIds = (fijadosR.data ?? []).map((f) => f.sku_id as string);
-  const texto = (mensajesR.data ?? []).map((m) => m.texto as string).join("\n");
+  const analisis = analisisR.error ? [] : ((analisisR.data ?? []) as { dia: string; productos: string[] | null }[]).filter((a) => a.productos?.length);
 
   let catalogo: FilaSku[] = [];
   try {
-    catalogo = texto.trim() ? await traerTodasLasFilas<FilaSku>((d, h) => productosBase(supabase).order("id").range(d, h)) : [];
+    catalogo = mensajes.length || analisis.length ? await traerTodasLasFilas<FilaSku>((d, h) => productosBase(supabase).order("id").range(d, h)) : [];
   } catch {
     // Sin el catálogo no hay sugerencias: los fijados salen igual.
   }
+  const porId = new Map(catalogo.map((p) => [p.id, p]));
+
+  // Lo que se vende en su país (publicaciones de Dropi sin archivar con su producto): con eso «la creatina» es la de allá.
+  let vendidos: FilaSku[] = [];
+  if (pais && catalogo.length) {
+    try {
+      const pubs = await traerTodasLasFilas<{ sku_maestro_id: string }>((d, h) =>
+        supabase.from("dropi_publicaciones").select("sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).or("estado_publicacion.is.null,estado_publicacion.neq.archivado").order("id").range(d, h),
+      );
+      vendidos = [...new Set(pubs.map((x) => x.sku_maestro_id))].map((id) => porId.get(id)).filter((p): p is FilaSku => !!p);
+    } catch {
+      // Sin publicaciones, las palabras sueltas se buscan en todo el catálogo.
+    }
+  }
+
+  // Los ID de Dropi que se nombran en el chat, con su producto (las publicaciones de su país; sin país, si el ID es de un solo producto).
+  const porIdDropi = new Map<string, FilaSku>();
+  const ids = [...new Set(mensajes.flatMap((m) => idsDropiEnTexto(m.texto)))].slice(0, 100);
+  if (ids.length) {
+    let consulta = supabase.from("dropi_publicaciones").select("dropi_id, sku_maestro_id").in("dropi_id", ids).not("sku_maestro_id", "is", null);
+    if (pais) consulta = consulta.eq("pais_id", pais.id);
+    const { data } = await consulta;
+    const filas = (data ?? []) as { dropi_id: string; sku_maestro_id: string }[];
+    const faltan = [...new Set(filas.map((f) => f.sku_maestro_id).filter((id) => !porId.has(id)))];
+    if (faltan.length) for (const p of ((await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").in("id", faltan)).data ?? []) as FilaSku[]) porId.set(p.id, p);
+    for (const id of ids) {
+      const suyos = [...new Set(filas.filter((f) => String(f.dropi_id) === id).map((f) => f.sku_maestro_id))];
+      const p = suyos.length === 1 ? porId.get(suyos[0]) : undefined;
+      if (p) porIdDropi.set(id, p);
+    }
+  }
+
+  const detectados = productosDeLaConversacion(mensajes, catalogo, vendidos, porIdDropi);
+  // Los productos que encontró el análisis con IA (ya con el nombre del catálogo), si el chat no los nombró de otra forma.
+  const porNombre = new Map(catalogo.map((p) => [p.nombre.trim().toLowerCase(), p]));
+  for (const a of analisis) {
+    for (const nombre of a.productos ?? []) {
+      const p = porNombre.get(nombre.trim().toLowerCase());
+      if (!p || detectados.length >= 8) continue;
+      const ya = detectados.find((d) => d.p.id === p.id);
+      if (ya) continue;
+      detectados.push({ p, mencion: { como: "analisis", cita: nombre, momento: `${a.dia}T12:00:00Z`, direccion: "entrante", veces: 1 } });
+    }
+  }
+  const mencionDe = new Map(detectados.map((d) => [d.p.id, d.mencion]));
+
   const fijados: FilaSku[] = fijadosIds.length ? (((await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").in("id", fijadosIds)).data ?? []) as FilaSku[]) : [];
   const fijadosEnOrden = fijadosIds.map((id) => fijados.find((f) => f.id === id)).filter((f): f is FilaSku => !!f);
-  const sugeridos = productosMencionados(texto, catalogo).filter((p) => !fijadosIds.includes(p.id));
+  const sugeridos = detectados.map((d) => d.p).filter((p) => !fijadosIds.includes(p.id));
   const lista = [...fijadosEnOrden.map((p) => ({ p, fijado: true })), ...sugeridos.map((p) => ({ p, fijado: false }))];
   if (!lista.length) return { pais, productos: [], sePuedeFijar };
 
@@ -102,6 +176,7 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
         codigo: p.codigo,
         foto: p.foto_url,
         fijado,
+        mencion: mencionDe.get(p.id) ?? null,
         enCamino: v?.unidades ?? 0,
         llegada: v?.llegada ?? null,
         sinFecha: v?.sinFecha ?? 0,
