@@ -35,7 +35,25 @@ export interface Recomendacion {
   resultado: string;
   /** Los números con que se calculó (quedan guardados con la decisión). */
   datos: Record<string, number | string | null>;
+  /**
+   * De subir o bajar el precio (28 oct 2026, pedido de Alcides): quién más vende lo mismo, del más barato al más caro, con su precio equivalente,
+   * su stock y lo que vendió en 30 días, para decidir si igualarse o bajar.
+   */
+  competidores?: CompetidorRecomendacion[];
 }
+
+export interface CompetidorRecomendacion {
+  proveedor: string;
+  nombre: string;
+  /** Su precio llevado al tamaño del nuestro. */
+  precio: number;
+  stock: number;
+  /** Unidades que bajó su stock en 30 días. */
+  vendido30: number;
+}
+
+/** Cuántos competidores lleva una recomendación de precio. */
+export const MAX_COMPETIDORES_RECOMENDACION = 5;
 
 export interface EntradaRecomendacion {
   archivada: boolean;
@@ -54,6 +72,8 @@ export interface EntradaRecomendacion {
   competidorMasBarato: { proveedor: string; precio: number } | null;
   /** El precio equivalente más bajo de la competencia con stock, aunque sea más caro que el nuestro. */
   competidorMinimo: { proveedor: string; precio: number } | null;
+  /** Todos los que venden lo mismo con stock, del más barato al más caro (para mostrarlos en la recomendación de precio). */
+  competidores?: CompetidorRecomendacion[];
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -75,6 +95,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
   const bajo = p.margen < reglas.margen_minimo;
   const ventas = p.netas30 ?? 0;
   const baseMotivo = `Margen ${pct(p.margen)}, menor a tu mínimo de ${pct(reglas.margen_minimo)}`;
+  const competidores = (p.competidores ?? []).slice(0, MAX_COMPETIDORES_RECOMENDACION);
 
   // Combo x2: el fulfillment se paga una vez por pedido, así que dos unidades en un pedido reparten ese costo y suben el margen.
   if (bajo && !p.esPack && p.sku?.tipo === "simple" && ventas >= reglas.combo_min_ventas && !p.combo?.publicado) {
@@ -107,6 +128,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
         motivo: `${baseMotivo}. Nadie lo vende más barato${tope ? `; ${tope}` : ""}.`,
         resultado: `A ${usd(precio)} el margen sería ${pct(margenNuevo)}${margenNuevo < reglas.margen_minimo ? " (todavía bajo el mínimo, para no pasar a la competencia)" : ""}.`,
         datos: { margen: p.margen, precio: p.precio, costo: p.costo, fulfillment: ful, precioSugerido: precio, margenNuevo: Math.round(margenNuevo * 10000) / 10000, competidor: p.competidorMinimo?.proveedor ?? null, precioCompetidor: p.competidorMinimo?.precio ?? null },
+        ...(competidores.length ? { competidores } : {}),
       });
   }
 
@@ -121,6 +143,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
         motivo: `${p.competidorMasBarato.proveedor} vende lo mismo a ${usd(p.competidorMasBarato.precio)} (precio equivalente) y tiene stock; nosotros, a ${usd(p.precio)}.`,
         resultado: `A ${usd(precio)} el margen quedaría en ${pct(margenNuevo)} (tu crítico es ${pct(reglas.margen_critico)}).`,
         datos: { margen: p.margen, precio: p.precio, costo: p.costo, fulfillment: ful, precioSugerido: precio, margenNuevo: Math.round(margenNuevo * 10000) / 10000, competidor: p.competidorMasBarato.proveedor, precioCompetidor: p.competidorMasBarato.precio },
+        ...(competidores.length ? { competidores } : {}),
       });
   }
   return out;

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { precioEquivalente } from "@/lib/competencia/analisis";
+import { precioEquivalente, unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 
 export interface CompetidorBarato {
@@ -8,19 +8,30 @@ export interface CompetidorBarato {
   precio: number;
 }
 
+/** Un competidor que vende lo mismo que un producto nuestro en Dropi, con su stock y lo que vendió (lo que bajó su stock) en 30 días. */
+export interface CompetidorDePublicacion {
+  nombre: string;
+  proveedor: string;
+  precio: number | null;
+  stock: number;
+  /** Unidades que bajó su stock en los últimos 30 días (`unidadesBajadas`): Dropi no muestra las ventas de otros. */
+  vendido30: number;
+}
+
 /**
  * Los competidores de cada producto nuestro en Dropi (Análisis de competencia, migración 0108), por el ID de Dropi de nuestro
- * producto: los que lo venden igual (por nombre o foto), siguen publicados y tienen stock. Sin la tabla o sin búsquedas, vacío.
+ * producto: los que lo venden igual (por nombre o foto), siguen publicados y tienen stock, con lo que vendieron en 30 días (28 oct 2026:
+ * para decidir si igualar o bajar el precio). Sin la tabla o sin búsquedas, vacío.
  */
-export async function cargarCompetidores(supabase: SupabaseClient, paisId: string): Promise<Map<number, { nombre: string; proveedor: string; precio: number | null }[]>> {
-  const out = new Map<number, { nombre: string; proveedor: string; precio: number | null }[]>();
+export async function cargarCompetidores(supabase: SupabaseClient, paisId: string): Promise<Map<number, CompetidorDePublicacion[]>> {
+  const out = new Map<number, CompetidorDePublicacion[]>();
   try {
     const [nuestros, otros] = await Promise.all([
       traerTodasLasFilas<{ id: string; dropi_producto_id: number }>((d, h) => supabase.from("competencia_productos").select("id, dropi_producto_id").eq("pais_id", paisId).eq("es_nuestro", true).order("id").range(d, h)),
-      traerTodasLasFilas<{ igual_a: string; nombre: string; proveedor_nombre: string; precio: number | null }>((d, h) =>
+      traerTodasLasFilas<{ id: string; igual_a: string; nombre: string; proveedor_nombre: string; precio: number | null; stock: number | null }>((d, h) =>
         supabase
           .from("competencia_productos")
-          .select("igual_a, nombre, proveedor_nombre, precio")
+          .select("id, igual_a, nombre, proveedor_nombre, precio, stock")
           .eq("pais_id", paisId)
           .eq("es_nuestro", false)
           .eq("estado", "activo")
@@ -31,10 +42,17 @@ export async function cargarCompetidores(supabase: SupabaseClient, paisId: strin
       ),
     ]);
     const dropiDe = new Map(nuestros.map((n) => [n.id, Number(n.dropi_producto_id)]));
-    for (const o of otros) {
-      const dropiId = dropiDe.get(o.igual_a);
-      if (dropiId === undefined) continue;
-      out.set(dropiId, [...(out.get(dropiId) ?? []), { nombre: o.nombre, proveedor: o.proveedor_nombre, precio: o.precio === null ? null : Number(o.precio) }]);
+    const deNuestros = otros.filter((o) => dropiDe.has(o.igual_a));
+    const vendido = await vendidoEn30Dias(
+      supabase,
+      deNuestros.map((o) => o.id),
+    );
+    for (const o of deNuestros) {
+      const dropiId = dropiDe.get(o.igual_a)!;
+      out.set(dropiId, [
+        ...(out.get(dropiId) ?? []),
+        { nombre: o.nombre, proveedor: o.proveedor_nombre, precio: o.precio === null ? null : Number(o.precio), stock: Number(o.stock ?? 0), vendido30: vendido.get(o.id) ?? 0 },
+      ]);
     }
   } catch {
     // Sin la migración 0108: sin competencia.
@@ -42,10 +60,41 @@ export async function cargarCompetidores(supabase: SupabaseClient, paisId: strin
   return out;
 }
 
+/** Lo que bajó el stock de cada producto de la competencia en los últimos 30 días (`competencia_historial`, de a 150 productos). */
+async function vendidoEn30Dias(supabase: SupabaseClient, ids: string[]): Promise<Map<string, number>> {
+  const cambios = new Map<string, CambioStock[]>();
+  const desde = new Date(Date.now() - 31 * 86_400_000).toISOString();
+  for (let i = 0; i < ids.length; i += 150) {
+    const parte = ids.slice(i, i + 150);
+    const filas = await traerTodasLasFilas<{ id: string; producto_id: string; fecha: string; stock: number | null; stock_antes: number | null }>((d, h) =>
+      supabase.from("competencia_historial").select("id, producto_id, fecha, stock, stock_antes").in("producto_id", parte).eq("evento", "stock").gte("fecha", desde).order("id").range(d, h),
+    );
+    for (const f of filas) {
+      if (f.stock === null || f.stock_antes === null) continue;
+      cambios.set(f.producto_id, [...(cambios.get(f.producto_id) ?? []), { fecha: f.fecha, stock: Number(f.stock), stockAntes: Number(f.stock_antes) }]);
+    }
+  }
+  return new Map([...cambios].map(([id, c]) => [id, unidadesBajadas(c, 30)]));
+}
+
+/** Los competidores de un producto nuestro con su precio llevado al tamaño del nuestro, del más barato al más caro (para la recomendación de precio). */
+export function competidoresEquivalentes(
+  nuestro: { nombre: string; idsDropi: number[] },
+  competidores: Map<number, CompetidorDePublicacion[]>,
+): { proveedor: string; nombre: string; precio: number; stock: number; vendido30: number }[] {
+  const out: { proveedor: string; nombre: string; precio: number; stock: number; vendido30: number }[] = [];
+  for (const id of nuestro.idsDropi)
+    for (const c of competidores.get(id) ?? []) {
+      const eq = precioEquivalente(nuestro.nombre, c).precio;
+      if (eq !== null && eq > 0) out.push({ proveedor: c.proveedor, nombre: c.nombre, precio: Math.round(eq * 100) / 100, stock: c.stock, vendido30: c.vendido30 });
+    }
+  return out.sort((a, b) => a.precio - b.precio);
+}
+
 /** El competidor más barato que nosotros (a precio equivalente), o null si nadie vende lo mismo más barato. */
 export function competidorMasBarato(
   nuestro: { nombre: string; precio: number | null; idsDropi: number[] },
-  competidores: Map<number, { nombre: string; proveedor: string; precio: number | null }[]>,
+  competidores: Map<number, CompetidorDePublicacion[]>,
 ): CompetidorBarato | null {
   if (nuestro.precio === null) return null;
   let mejor: CompetidorBarato | null = null;
@@ -60,7 +109,7 @@ export function competidorMasBarato(
 /** El precio equivalente más bajo de la competencia con stock (aunque sea más caro que el nuestro), o null sin competencia. */
 export function competidorMinimo(
   nuestro: { nombre: string; idsDropi: number[] },
-  competidores: Map<number, { nombre: string; proveedor: string; precio: number | null }[]>,
+  competidores: Map<number, CompetidorDePublicacion[]>,
 ): CompetidorBarato | null {
   let mejor: CompetidorBarato | null = null;
   for (const id of nuestro.idsDropi)

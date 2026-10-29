@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
-import { DECISIONES, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { DECISIONES, MAX_COMPETIDORES_RECOMENDACION, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { REGLAS, leerValorRegla, mostrarRegla, revisarReglas, type ClaveRegla, type Reglas } from "@/lib/publicaciones/reglas";
 import { encolarCambio, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
@@ -29,7 +29,13 @@ function limpiarRecomendacion(r: unknown) {
     else if (typeof v === "string") datos[k] = v.slice(0, 120);
     else if (v === null) datos[k] = null;
   }
-  return { titulo: corto(o.titulo, 300), motivo: corto(o.motivo, 600), resultado: corto(o.resultado, 600), datos };
+  // Los competidores que se vieron al decidir (subir o bajar el precio), limpios: quedan guardados con la decisión.
+  const competidores = (Array.isArray(o.competidores) ? o.competidores : [])
+    .slice(0, MAX_COMPETIDORES_RECOMENDACION)
+    .map((c) => (c && typeof c === "object" ? (c as Record<string, unknown>) : {}))
+    .map((c) => ({ proveedor: corto(c.proveedor, 120), nombre: corto(c.nombre, 200), precio: Number(c.precio), stock: Number(c.stock), vendido30: Number(c.vendido30) }))
+    .filter((c) => c.proveedor && [c.precio, c.stock, c.vendido30].every((n) => Number.isFinite(n) && n >= 0 && n < 1e7));
+  return { titulo: corto(o.titulo, 300), motivo: corto(o.motivo, 600), resultado: corto(o.resultado, 600), datos, ...(competidores.length ? { competidores } : {}) };
 }
 
 /**

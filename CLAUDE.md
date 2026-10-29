@@ -649,6 +649,10 @@ convenciones técnicas del código.
   publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
+  **La competencia en las recomendaciones de precio** (28 oct 2026, pedido de Alcides): `cargarCompetidores` (`competencia-publicaciones.ts`) trae también el
+  `stock` y `vendido30` de cada competidor (`unidadesBajadas` de `competencia_historial`, de a 150 productos) y `competidoresEquivalentes` los ordena por precio
+  equivalente; «Subir precio» y «Bajar precio frente a la competencia» llevan `Recomendacion.competidores` (hasta `MAX_COMPETIDORES_RECOMENDACION` = 5), que la
+  tarjeta muestra en una tabla (`CompetidoresRecomendacion`, punto rojo al más barato que nosotros) y que `limpiarRecomendacion` guarda con la decisión.
   **En liquidación** (28 oct 2026, pedido de Alcides; migración 0174 `dropi_publicaciones.liquidacion_en`): un producto con margen bajo a propósito se marca
   con la etiqueta de la fila (`BotonLiquidacionFila`, entre Pausar y Archivar; `BotonLiquidacionFicha` en la ficha; `liquidacion.tsx`, `marcarLiquidacion`
   en `actions.ts`, `motivoLiquidacion`). `cargarPublicaciones` lo lee aparte (sin la migración, ninguna) y a una en liquidación le quita la acción `margen_bajo`

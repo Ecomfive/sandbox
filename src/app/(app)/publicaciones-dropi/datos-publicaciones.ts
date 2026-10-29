@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
 import { accionesPublicacion, BODEGA_DROPI, enDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
-import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
+import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, competidoresEquivalentes, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion, revisionVencida } from "@/lib/publicaciones/publicacion";
 import { estadoTarea, etiquetaRecomendacion, NO_EN_LIQUIDACION, NO_EN_PRIVADAS, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
@@ -464,6 +464,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         combo: combo ? { codigo: combo.codigo, publicado: comboPublicado } : null,
         competidorMasBarato: f.competidorMasBarato,
         competidorMinimo: f.competidorMinimo,
+        competidores: competidoresEquivalentes({ nombre: f.nombre, idsDropi: idsDropi({ id: f.id, dropi_id: f.dropiId }) }, competidores),
       },
       r,
     );
