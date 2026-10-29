@@ -301,7 +301,7 @@ export function FichaDelChat({
                   <CifrasDelMes d={d} codigoPais={datos.codigoPais} hoy={datos.hoy} />
                 </Seccion>
                 <Seccion titulo="Datos">
-                  <DatosDropshipper d={d} hoy={datos.hoy} acceso={acceso} />
+                  <DatosDropshipper d={d} hoy={datos.hoy} acceso={acceso} conEtiquetas={false} />
                 </Seccion>
               </>
             )}

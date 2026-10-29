@@ -26,6 +26,7 @@ import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
 import { PanelCaso, PanelEditar, PanelNota, PanelPedido, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import { ConversacionWhatsapp } from "./conversacion-whatsapp";
+import { EtiquetasDropshipper } from "./etiquetas-dropshipper";
 import {
   etiquetaAntiguedad,
   etiquetaCanal,
@@ -265,8 +266,11 @@ export function CasosAbiertos({ abiertos, acceso }: { abiertos: FilaCaso[]; acce
   );
 }
 
-/** Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, responsable, etiquetas… */
-export function DatosDropshipper({ d, hoy, acceso }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm }) {
+/**
+ * Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, responsable, etiquetas (editables, como en ClickUp)… En la ficha del chat
+ * `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
+ */
+export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm; conEtiquetas?: boolean }) {
   return (
     <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
       {[
@@ -277,7 +281,7 @@ export function DatosDropshipper({ d, hoy, acceso }: { d: FilaDropshipper; hoy: 
         ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
         ...(d.etapa ? [["Etapa", d.etapa]] : []),
         ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
-        ["Etiquetas", d.etiquetas.length ? d.etiquetas.map((e) => <Etiqueta key={e}>{e}</Etiqueta>) : "—"],
+        ...(conEtiquetas ? [["Etiquetas", <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />]] : []),
         ...(d.email ? [["Correo", d.email]] : []),
         ...(d.notas ? [["Notas", d.notas]] : []),
       ].map(([titulo, valor]) => (

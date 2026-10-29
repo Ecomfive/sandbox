@@ -1180,6 +1180,12 @@ convenciones técnicas del código.
   (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
   deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
   ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
+  **Un solo juego de etiquetas** (29 oct 2026, pedido de Alcides: salían dos): un chat **con dropshipper** muestra y edita las del dropshipper
+  (`dropshippers.etiquetas`, las de ClickUp; `guardarEtiquetasChat` escribe ahí con `escribirEtiquetasDropshipper`, `src/lib/crm/etiquetas-dropshipper.ts`,
+  auditoría `etiquetas_dropshipper`); solo un chat sin dropshipper usa `whatsapp_conversaciones.etiquetas`. En la ficha del CRM, «Datos › Etiquetas» es
+  `EtiquetasDropshipper` (`crm-dropshippers/etiquetas-dropshipper.tsx`, `etiquetas-actions.ts`: `etiquetasCrmDisponibles`, `guardarEtiquetasDropshipper`,
+  `guardarColorEtiquetaCrm`); en la ficha del chat esa línea no sale (`DatosDropshipper conEtiquetas={false}`) porque van arriba. Los colores son los de
+  `whatsapp_etiquetas` para todo el CRM. «Editar» del dropshipper ya no trae el campo de etiquetas separadas por coma (`editarDropshipper` solo las toca si vienen).
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
 - **Plantillas de aviso de llegada** (29 oct 2026, pedido de Jhokser; sin migración): un cliente pregunta por mercancía, se le dice para qué fecha llega y se crea la tarea «Avisar cuando llegue» (`avisarCuandoLlegue`, `crm-dropshippers/tareas/actions.ts`);
