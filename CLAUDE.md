@@ -558,7 +558,8 @@ convenciones técnicas del código.
   tiene tarjeta en «Actualizar datos»). Hora de México UTC−6 (`dropiDiario`, `OFFSET_HORAS`, `HORAS_DETRAS_UTC`, `creado_dropi`), pesos
   en `formatearMoneda` (`formato.ts`) y en Gestión de IDs (`monedaPublicaciones`: MXN con su valor en dólares). Las fotos de México
   están en el CDN de Panamá (`cdnDeRuta` ya lo cubre). La primera lectura trae 60 días y crea sus publicaciones (como Costa Rica). Su cuenta de extracción de proveedor (`cuentas_extraccion`, que pide `ingerirPedidos`) la agrega la
-  migración 0176 (29 oct 2026; en producción ya estaba puesta a mano desde la primera carga).
+  migración 0176 (29 oct 2026; en producción ya estaba puesta a mano desde la primera carga). Desde el 29 oct 2026 México se
+  puede elegir en la barra (`PAISES_NAV` sin `pronto`), así se ve en Gestión de IDs y en todo el sistema.
   **Moneda de cada país** (28 oct 2026, Hernán: «en colones y pequeño el valor en dólares»): los montos de una publicación están en la
   moneda de su país de Dropi (Costa Rica en colones: Dropi da 5.499). `src/lib/publicaciones/moneda.ts` (`monedaPublicaciones`,
   `formatoMonto`, `formatoEnDolares`, `simboloMoneda`, con prueba) y `moneda-contexto.tsx` (`ProveedorMoneda` en `TablaPublicaciones`,
@@ -1039,11 +1040,12 @@ convenciones técnicas del código.
   recupera, no autoriza por encima); los KPIs siguen contando los chats ocultos. Todo se lee con consultas aparte que ignoran el error: sin la migración la bandeja carga igual. Auditoría:
   `pedir/autorizar/rechazar/cancelar_borrado_whatsapp` y `recuperar_whatsapp`. Reversa: `supabase/rollbacks/0172_rollback.sql`.
   **Números ocultos, etapa 1** (28 oct 2026, pedido de Jhokser): el WhatsApp de un dropshipper **no viaja a ninguna pantalla** (ni siquiera para quien lo puede ver): `ConversacionVista` y `FilaDropshipper` ya no
-  traen `telefono` (solo `tieneTelefono`), el chat sin nombre se llama `nombreSinNumero(id)` («Contacto FB19») y la ficha dice «Número oculto». `MostrarTelefono` (`crm-dropshippers/mostrar-telefono.tsx`) pide el número
-  con `mostrarTelefono(tipo, id)` (`telefono-actions.ts`), que **solo entrega a un administrador** (`puedeVerTelefonos`, `src/lib/whatsapp/telefono-oculto.ts`, con prueba; el botón sale con `AccesoCrm.verTelefonos`) y deja
+  traen `telefono` (solo `tieneTelefono`), el chat sin nombre se llama `nombreSinNumero(id)` («Contacto FB19») y la pantalla **no dice nada** (ni «Número oculto»). `MostrarTelefono` (`crm-dropshippers/mostrar-telefono.tsx`) pide el número
+  con `mostrarTelefono(tipo, id)` (`telefono-actions.ts`), que **solo entrega a un administrador** (`puedeVerTelefonos`, `src/lib/whatsapp/telefono-oculto.ts`, con prueba; a quien no es administrador no se le dibuja nada y a un administrador solo un ícono de ojo, con `AccesoCrm.verTelefonos`) y deja
   `ver_telefono_dropshipper` en la auditoría. Se quitaron los enlaces `wa.me` y la búsqueda por número; el campo WhatsApp de la ficha del dropshipper arranca vacío y **vacío = no cambiar** (`actualizarDropshipper`).
   El servidor sigue usando el número para enviar. **Etapa 2 pendiente** (aparte, más riesgosa): cifrar el número en la base (clave del servidor + huella para emparejar) y decidir quién más puede descifrarlo; hoy `whatsapp_conversaciones.telefono`
   y `dropshippers.contacto_telefono` siguen en texto normal y las funciones SQL de WhatsApp, los KPIs, la importación de chats y el emparejamiento dependen de ellos.
+  **Vista previa al pasar el cursor** (29 oct 2026): en la lista de la bandeja, con ratón y pantalla ancha (`hover: hover` y ≥ 1024 px), pasar el cursor (o enfocar con el teclado) un chat que no es el abierto despliega, a los 350 ms, sus últimos mensajes (3 a 8, `vistaPreviaChat` en `bandeja/actions.ts`; **solo mira, no marca leído**; no trae lo oculto); los sin leer van marcados (`VistaPreviaChat`, `vista-previa-chat.tsx`, `fixed` para que la lista que se desplaza no lo recorte, `pointer-events-none`). Se guarda en memoria por chat + último mensaje + no leídos.
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
 - **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del

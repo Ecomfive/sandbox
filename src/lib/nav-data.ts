@@ -175,7 +175,8 @@ export interface PaisNav {
 export const PAISES_NAV: PaisNav[] = [
   { codigo: "CR", nombre: "Costa Rica" },
   { codigo: "PA", nombre: "Panamá" },
-  { codigo: "MX", nombre: "México", pronto: true },
+  // México abierto el 29 oct 2026 (Hernán): sus datos de Dropi ya están cargados.
+  { codigo: "MX", nombre: "México" },
   { codigo: "HN", nombre: "Honduras", pronto: true },
   { codigo: "VE", nombre: "Venezuela", pronto: true },
 ];

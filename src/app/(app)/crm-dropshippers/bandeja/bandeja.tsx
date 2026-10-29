@@ -7,8 +7,9 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion } from "./actions";
-import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper } from "./datos-bandeja";
+import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
+import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
+import { VistaPreviaChat } from "./vista-previa-chat";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
@@ -245,6 +246,34 @@ export function Bandeja({
   const [borrador, setBorrador] = useState("");
   const [verPlantillas, setVerPlantillas] = useState(false);
   const [borrar, setBorrar] = useState<QueBorrar | null>(null);
+  // La vista previa de los últimos mensajes al pasar el cursor por un chat de la lista (solo con ratón y pantalla ancha).
+  const [vista, setVista] = useState<{ id: string; top: number; left: number; mensajes: VistaPreviaMensaje[] | "cargando" | "error" } | null>(null);
+  const temporizadorVista = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cacheVista = useRef(new Map<string, VistaPreviaMensaje[]>());
+  const ocultarVistaPrevia = useCallback(() => {
+    if (temporizadorVista.current) clearTimeout(temporizadorVista.current);
+    temporizadorVista.current = null;
+    setVista(null);
+  }, []);
+  const verVistaPrevia = useCallback((c: ConversacionVista, el: HTMLElement) => {
+    if (typeof window === "undefined" || !window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) return;
+    if (temporizadorVista.current) clearTimeout(temporizadorVista.current);
+    temporizadorVista.current = setTimeout(async () => {
+      const r = el.getBoundingClientRect();
+      const top = Math.max(8, Math.min(r.top, window.innerHeight - 336));
+      const left = Math.max(8, Math.min(r.right + 8, window.innerWidth - 360));
+      const clave = `${c.id}|${c.ultimoMensajeEn}|${c.noLeidos}`;
+      const guardado = cacheVista.current.get(clave);
+      if (guardado) return setVista({ id: c.id, top, left, mensajes: guardado });
+      setVista({ id: c.id, top, left, mensajes: "cargando" });
+      const res = await vistaPreviaChat(c.id, Math.min(8, Math.max(3, c.noLeidos))).catch(() => ({ error: "x" }));
+      if (!("error" in res)) cacheVista.current.set(clave, res.mensajes);
+      setVista((v) => (v?.id === c.id ? { ...v, mensajes: "error" in res ? "error" : res.mensajes } : v));
+    }, 350);
+  }, []);
+  useEffect(() => () => {
+    if (temporizadorVista.current) clearTimeout(temporizadorVista.current);
+  }, []);
   const [menuArea, setMenuArea] = useState(false);
   const [verFicha, setVerFicha] = useState(true);
   const [enviando, empezar] = useTransition();
@@ -548,10 +577,11 @@ export function Bandeja({
           {lista.map((c) => {
             const actual = c.id === elegido;
             return (
-              <li key={c.id}>
+              <li key={c.id} onMouseEnter={(e) => c.id !== elegido && verVistaPrevia(c, e.currentTarget)} onMouseLeave={ocultarVistaPrevia}>
                 <button
                   type="button"
                   onClick={() => {
+                    ocultarVistaPrevia();
                     setElegido(c.id);
                     setMenuArea(false);
                     setChat((x) => (x?.id === c.id ? x : null));
@@ -559,6 +589,8 @@ export function Bandeja({
                     if (c.area === miArea) setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
                   }}
                   aria-current={actual ? "true" : undefined}
+                  onFocus={(e) => !actual && verVistaPrevia(c, e.currentTarget)}
+                  onBlur={ocultarVistaPrevia}
                   className={`flex w-full items-center gap-3 pl-3.5 text-left ${actual ? "bg-[var(--wa-sel)]" : "hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
                 >
                   <Foto nombre={c.nombre} tam="lista" />
@@ -591,6 +623,7 @@ export function Bandeja({
                     )}
                   </span>
                 </button>
+                {vista?.id === c.id && <VistaPreviaChat nombre={c.nombre} mensajes={vista.mensajes} noLeidos={c.noLeidos} top={vista.top} left={vista.left} />}
               </li>
             );
           })}
@@ -618,11 +651,14 @@ export function Bandeja({
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-[16px]">{sel.nombre}</span>
                 <span className="truncate text-[13px] text-[var(--wa-sec)] tabular-nums">
-                  Número oculto
-                  {sel.codigo ? ` · ${sel.codigo}` : ""}
-                  {sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? ` · «${sel.nombrePerfil}» en WhatsApp` : ""}
-                  {datos.numeros.length > 1 ? ` · ${numeroDe.get(sel.numeroId)?.nombre}` : ""}
-                  {sel.asignadaA ? ` · la lleva ${sel.asignadaA}` : ""}
+                  {[
+                    sel.codigo,
+                    sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
+                    datos.numeros.length > 1 ? numeroDe.get(sel.numeroId)?.nombre : null,
+                    sel.asignadaA ? `la lleva ${sel.asignadaA}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               </span>
             </button>
@@ -904,10 +940,12 @@ export function Bandeja({
           <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
             <Foto nombre={sel.nombre} tam="ficha" />
             <span className="mt-3 text-xl">{sel.nombre}</span>
-            <span className="text-[15px] text-[var(--wa-sec)] tabular-nums">
-              <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
-              {sel.codigo ? ` · ${sel.codigo}` : ""}
-            </span>
+            {(sel.codigo || verTelefono) && (
+              <span className="flex items-center gap-1 text-[15px] text-[var(--wa-sec)] tabular-nums">
+                {sel.codigo}
+                <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
+              </span>
+            )}
           </div>
           {verDropshipper ? (
             <>

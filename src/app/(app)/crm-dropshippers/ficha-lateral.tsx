@@ -208,7 +208,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       <Bloque icono={PersonaIcon} titulo="Datos">
         <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
           {[
-            ["Teléfono", d.tieneTelefono ? <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede={acceso.verTelefonos} /> : "—"],
+            ...(d.tieneTelefono && acceso.verTelefonos ? [["Teléfono", <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede />]] : []),
             ["Ciudad", d.ciudad ?? "—"],
             ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
             ["Responsable", d.responsable ?? "Sin asignar"],
