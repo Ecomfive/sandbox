@@ -90,7 +90,7 @@ function BotonPausarFila({ f }: { f: FilaPublicacion }) {
       nombre={f.nombre}
       onClick={cambiar}
       ocupado={pendiente}
-      clase={reactivarYa ? "text-success hover:bg-success-soft" : undefined}
+      activo={estaPausada ? (reactivarYa ? "verde" : "azul") : undefined}
     />
   );
 }
@@ -117,6 +117,7 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
       nombre={f.nombre}
       onClick={cambiar}
       ocupado={pendiente}
+      activo={archivar ? undefined : "rojo"}
     />
   );
 }
@@ -149,7 +150,7 @@ function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
         nombre={f.nombre}
         onClick={() => !yaPendiente && setConfirmando(true)}
         ocupado={enviando}
-        clase={yaPendiente ? "cursor-default text-destructive" : undefined}
+        activo={yaPendiente ? "rojo" : undefined}
       />
     </>
   );

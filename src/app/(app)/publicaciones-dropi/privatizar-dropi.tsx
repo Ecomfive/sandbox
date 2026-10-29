@@ -223,7 +223,14 @@ export function BotonPrivatizarFila({ f }: { f: FilaPublicacion }) {
   // Siempre se ve (27 oct 2026): si no se puede privatizar, va apagado y dice por qué.
   return (
     <>
-      <BotonIconoFila texto="Privatizar en Dropi" motivo={motivoPrivatizar(estadoBotones(f))} icono={CandadoIcon} nombre={f.nombre} onClick={() => setAbierta(true)} />
+      <BotonIconoFila
+        texto={f.privatizaciones.length ? "Privatizar en Dropi (hay una pendiente)" : "Privatizar en Dropi"}
+        motivo={motivoPrivatizar(estadoBotones(f))}
+        icono={CandadoIcon}
+        nombre={f.nombre}
+        onClick={() => setAbierta(true)}
+        activo={f.privatizaciones.length ? "violeta" : undefined}
+      />
       {abierta && <VentanaPrivatizar p={f} alCerrar={() => setAbierta(false)} />}
     </>
   );
