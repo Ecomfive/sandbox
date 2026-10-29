@@ -1025,6 +1025,8 @@ convenciones técnicas del código.
   (`panel`, «(tuyo)», pendientes por panel) y `supervisaArea` dice si mira un área de abajo. Supervisando: `abrirConversacion` **no** pone
   `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
   «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
+  **Mensajes no entregados** (29 oct 2026): `type: unsupported` (131051) no trae contenido; `textoDeRespaldo` en `extraer.ts` lee
+  `unsupported.type` (`NO_ENTREGADOS`: edit, poll_creation, media_placeholder…) y dice qué mandó y que lo pida de nuevo. No se puede recuperar.
   No se mandan acuses de lectura a WhatsApp. **Al instante** (29 oct 2026): `enviarTexto` en `bandeja.tsx` muestra el mensaje con id
   «local-…» y estado «enviando» antes de que responda el servidor (`enviarWhatsapp`/`notaWhatsapp` devuelven `mensajeId` y `momento`); si falla,
   queda «fallido» con «Reintentar» (no si dice «Se envió…»). El refresco va por `POST /api/whatsapp/bandeja` (ruta, no acción: las acciones

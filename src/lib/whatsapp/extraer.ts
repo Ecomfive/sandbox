@@ -60,13 +60,40 @@ const momentoDe = (segundos: unknown): string => {
 const conMas = (n: string | null): string | null => (n ? (n.startsWith("+") ? n : `+${n.replace(/\D/g, "")}`) : null);
 
 /**
+ * Qué mandó la persona cuando WhatsApp avisa un mensaje que no entrega a la plataforma (`type: unsupported`, error 131051 «Message type
+ * unknown»): Meta no manda el contenido, solo su clase en `unsupported.type` (29 oct 2026). Si el número también está en la app WhatsApp
+ * Business del celular (coexistencia), ahí sí se ve.
+ */
+const NO_ENTREGADOS: Record<string, string> = {
+  edit: "Editó un mensaje",
+  poll_creation: "Mandó una encuesta",
+  poll_update: "Votó en una encuesta",
+  gif: "Mandó un GIF",
+  group_invite: "Mandó una invitación a un grupo",
+  keep_in_chat: "Guardó un mensaje temporal en el chat",
+  link_preview: "Mandó un enlace",
+  media_placeholder: "Mandó una foto o un video que WhatsApp no entrega (por ejemplo, de «ver una vez»)",
+  image: "Mandó una foto que WhatsApp no entrega (por ejemplo, de «ver una vez» o en un álbum)",
+  pin: "Fijó un mensaje en el chat",
+  reaction: "Reaccionó a un mensaje",
+  location: "Mandó una ubicación en tiempo real",
+  order: "Mandó un pedido",
+  product: "Mandó un producto de un catálogo",
+};
+
+/**
  * Qué decir de un mensaje que no trae texto ni archivo que el sistema sepa leer (un tipo nuevo, uno que WhatsApp no entrega…): en vez de un «Mensaje» vacío, lo que se sabe de él, con
  * el tipo que mandó Meta, para que el equipo vea que llegó algo y de qué clase (29 oct 2026).
  */
 function textoDeRespaldo(tipoMeta: string, m: Obj, cuerpo: Obj): string {
   const error = obj(lista(m.errors)[0]);
   const motivo = texto(error.title) ?? texto(error.message);
-  if (tipoMeta === "unsupported") return `Mensaje que WhatsApp no deja leer a la plataforma${motivo ? ` (${motivo})` : ""}.`;
+  if (tipoMeta === "unsupported") {
+    const clase = texto(obj(m.unsupported).type);
+    const que = clase ? NO_ENTREGADOS[clase] : undefined;
+    if (que) return `${que}. WhatsApp no lo entrega a la plataforma: pídele que lo mande de nuevo como mensaje normal.`;
+    return `Mensaje que WhatsApp no deja leer a la plataforma${clase ? ` (${clase})` : motivo ? ` (${motivo})` : ""}. Pídele que lo mande de nuevo como mensaje normal.`;
+  }
   if (tipoMeta === "request_welcome") return "Abrió el chat desde un anuncio o un enlace.";
   if (tipoMeta === "order") return "Pedido desde el catálogo de WhatsApp.";
   if (tipoMeta === "system") return texto(cuerpo.body) ?? "Aviso del sistema de WhatsApp.";
