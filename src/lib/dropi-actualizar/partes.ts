@@ -90,10 +90,11 @@ export const lectoresDe = (partes: ClaveParte[]): ClaveLector[] =>
   [...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr].filter((l) => PARTES.some((p) => p.lector === l && partes.includes(p.clave)));
 
 /**
- * La primera lectura de pedidos de Costa Rica trae desde el 1 de septiembre (28 oct 2026, Hernán: los pedidos que había llegaban hasta
- * el 17 de septiembre y la lectura normal trae 30 días); la cartera, lo mismo. Después, los días de siempre.
+ * Desde cuándo traer los pedidos y la cartera de un país en su primera lectura y con «Traer historial». Costa Rica: desde el 1 de abril de
+ * 2026 (29 oct 2026, Hernán: todo lo que hay en Dropi desde que se empezó; la primera venta fue el 17 de abril). Antes era el 1 de
+ * septiembre. Después, cada actualización trae los días de siempre (30 de pedidos, 7 de cartera); los retiros siempre llegan completos.
  */
-export const PRIMERA_LECTURA_DESDE: Partial<Record<CodigoPaisDropi, string>> = { cr: "2026-09-01" };
+export const PRIMERA_LECTURA_DESDE: Partial<Record<CodigoPaisDropi, string>> = { cr: "2026-04-01" };
 
 /** Cuántos días pedirle al lector la primera vez de un país (`null` = los de siempre). */
 export function diasPrimeraLectura(pais: CodigoPaisDropi, hoy = new Date()): { pedidos: number; cartera: number } | null {

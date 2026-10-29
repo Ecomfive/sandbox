@@ -71,11 +71,11 @@ test("Costa Rica: sus partes, sus lectores en app.dropi.cr y sus archivos con ot
   assert.equal(sesionValida("cr", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "otra_cuenta");
 });
 
-test("la primera lectura de Costa Rica trae desde el 1 de septiembre; Panamá, los días de siempre", () => {
-  assert.deepEqual(diasPrimeraLectura("cr", new Date("2026-10-28T15:00:00Z")), { pedidos: 58, cartera: 58 });
-  assert.equal(diasPrimeraLectura("pa", new Date("2026-10-28T15:00:00Z")), null);
+test("la primera lectura (y «Traer historial») de Costa Rica trae desde el 1 de abril de 2026; Panamá, los días de siempre", () => {
+  assert.deepEqual(diasPrimeraLectura("cr", new Date("2026-10-29T15:00:00Z")), { pedidos: 212, cartera: 212 });
+  assert.equal(diasPrimeraLectura("pa", new Date("2026-10-29T15:00:00Z")), null);
   // Si ya pasaron menos de 30 días desde esa fecha, bastan los de siempre.
-  assert.equal(diasPrimeraLectura("cr", new Date("2026-09-20T15:00:00Z")), null);
+  assert.equal(diasPrimeraLectura("cr", new Date("2026-04-20T15:00:00Z")), null);
 });
 
 test("qué lectores corren según lo elegido, y quién ve el botón", () => {
