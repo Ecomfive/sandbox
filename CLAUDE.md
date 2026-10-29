@@ -128,7 +128,9 @@ convenciones técnicas del código.
   (`src/components/accesos/`) muestra quién tiene acceso a la sección: sale de
   los roles (`permisos_rol` + `perfiles`, ver `src/lib/accesos-actions.ts`), es
   solo lectura y consulta al abrirse; dar acceso se hace en Usuarios y roles. Se
-  llama «Accesos» y no «Compartir» porque no comparte ni da permisos.
+  llama «Accesos» y no «Compartir» porque no comparte ni da permisos. **Solo para administradores** (29 oct 2026, pedido de
+  Hernán): `BarraMigas` lo muestra con `verAccesos` (`esAdministrador` en el layout) y `obtenerAccesoSeccion` lo vuelve a exigir;
+  ya no trae «Copiar vínculo».
 - **Ancho de las páginas.** El contenido de toda página (y de su `loading.tsx`,
   para que no salte al cargar) va dentro de `<Pagina ancho="...">`
   (`src/components/ui/pagina.tsx`), no en un `<main>` con `max-w-*` a mano:
