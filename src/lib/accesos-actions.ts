@@ -2,17 +2,20 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { armarPersonasConAcceso, type AccesoSeccion, type PerfilConRol, type PermisoDeRol, type PermisoPropioDeModulo } from "@/lib/acceso-seccion";
 import { MODULOS } from "@/lib/modulos";
 import { moduloDeHref } from "@/lib/nav-data";
 
 /**
- * Quién tiene acceso a la sección (módulo) que contiene esta ruta. Solo lo ve quien ya tiene acceso a
- * ese módulo, y es solo lectura: dar acceso sigue haciéndose en Usuarios y roles.
+ * Quién tiene acceso a la sección (módulo) que contiene esta ruta. Solo lo ve un administrador que tiene acceso a ese módulo
+ * (29 oct 2026, pedido de Hernán: antes lo veía cualquiera con el módulo), y es solo lectura: dar acceso sigue haciéndose en
+ * Usuarios y roles.
  */
 export async function obtenerAccesoSeccion(moduloHref: string): Promise<AccesoSeccion> {
   const usuario = await getUsuarioActual();
   if (!usuario) throw new Error("No hay sesión activa.");
+  if (!esAdministrador(usuario)) throw new Error("Solo un administrador ve los accesos.");
 
   const clave = moduloDeHref(moduloHref);
   if (!MODULOS.some((m) => m.clave === clave)) throw new Error("Sección desconocida.");

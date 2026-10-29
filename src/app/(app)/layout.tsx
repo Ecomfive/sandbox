@@ -80,7 +80,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
-          <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} />
+          <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>
       </div>
