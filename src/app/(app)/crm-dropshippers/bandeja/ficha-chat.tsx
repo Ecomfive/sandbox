@@ -391,10 +391,11 @@ export function FichaDelChat({
               </Seccion>
             )}
             {d && acceso && (
-              <Seccion titulo="Actividad">
-                {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y todo lo que hizo cada quien en el CRM y en sus chats. */}
+              // La misma Actividad de Compras y Gestión de IDs (comentarios, emojis, archivos y quién hizo qué), con su propio encabezado y los
+              // colores del sistema, no los del chat.
+              <div className="bg-background text-foreground">
                 <ActividadDropshipper key={`actividad-crm-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version * 1_000_003 + huella(versionEquipo)} />
-              </Seccion>
+              </div>
             )}
           </div>
         )}

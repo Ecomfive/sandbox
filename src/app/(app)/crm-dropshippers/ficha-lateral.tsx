@@ -12,7 +12,6 @@ import {
   EstadoIcon,
   FlechaAbajoIcon,
   FlechaArribaIcon,
-  HistorialIcon,
   PersonaIcon,
   SugerenciaIcon,
 } from "@/lib/nav-icons";
@@ -185,10 +184,8 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
         <DesempenoDropshipper key={`desempeno-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
       </Bloque>
 
-      <Bloque icono={HistorialIcon} titulo="Actividad">
-        {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y los cambios filtrados por área. */}
-        <ActividadDropshipper key={`actividad-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version} />
-      </Bloque>
+      {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y los cambios filtrados por área. Trae su propio encabezado. */}
+      <ActividadDropshipper key={`actividad-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version} />
     </>
   );
 }

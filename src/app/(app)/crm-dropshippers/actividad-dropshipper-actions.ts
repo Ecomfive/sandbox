@@ -40,7 +40,8 @@ export async function obtenerActividadDropshipper(id: string): Promise<DatosActi
   if (!(await permitido(id))) return { error: "Dropshipper no válido." };
   const [comentarios, linea] = await Promise.all([motor.leerComentarios(CFG, id, usuario.id), obtenerLineaDeTiempo(id)]);
   if ("error" in linea) return { error: linea.error };
-  const eventos = linea.items.map((i) => ({ id: i.id, campo: "linea", antes: null, despues: null, ocurridoEn: i.creadoEn, autor: null, origen: "sistema", texto: i.texto }));
+  // Como en Compras y Gestión de IDs: quién lo hizo va aparte del cambio (sin nombre, lo hizo el sistema).
+  const eventos = linea.items.map((i) => ({ id: i.id, campo: "linea", antes: null, despues: null, ocurridoEn: i.creadoEn, autor: i.autor ?? null, origen: "sistema", texto: i.detalle ?? i.texto }));
   // Sin la migración 0184 la actividad se ve igual, solo con los cambios.
   return { comentarios: "error" in comentarios ? [] : comentarios.comentarios, adjuntos: [], eventos };
 }
