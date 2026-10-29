@@ -14,7 +14,9 @@ import {
   MAX_RESUMEN,
   MOTIVOS,
   normalizarAnalisis,
+  normalizarPerfil,
   pedidoActividad,
+  pedidoPerfil,
   productosDelAnalisis,
   situacionDelCliente,
   textoParaIA,
@@ -249,5 +251,52 @@ describe("situación del cliente", () => {
   it("si no, está al día", () => {
     assert.deepEqual(situacionDelCliente("saliente", "2026-10-28T15:00:00Z", ultimo("resuelta")), { tipo: "al_dia" });
     assert.deepEqual(situacionDelCliente(null, null, null), { tipo: "al_dia" });
+  });
+});
+
+describe("análisis completo del cliente", () => {
+  const resumenes = [
+    { dia: "2026-10-28", estado: "resuelta" as const, motivos: ["llegada_mercancia"], productos: ["Cutting Mix"], resumen: "Preguntó cuándo llega el Cutting Mix" },
+    { dia: "2026-10-27", estado: "pendiente" as const, motivos: ["queja_servicio"], productos: [], resumen: "Se quejó de una demora" },
+  ];
+
+  it("el pedido lleva el historial por día en orden, los mensajes recientes y la forma del JSON", () => {
+    const p = pedidoPerfil(resumenes, agruparPorDia([m("1", "entrante", "2026-10-28T20:00:00Z", "¿Ya llegó el cutting?")]));
+    assert.ok(p.texto.indexOf("2026-10-27") < p.texto.indexOf("2026-10-28"));
+    assert.ok(p.texto.includes("Preguntó cuándo llega mercancía") && p.texto.includes("productos: Cutting Mix") && p.texto.includes("Cliente: ¿Ya llegó el cutting?"));
+    assert.ok(p.instrucciones.includes('"proxima_accion"') && p.instrucciones.includes("compromisos"));
+  });
+
+  it("sin días analizados lo dice", () => {
+    assert.ok(pedidoPerfil([], []).texto.includes("(sin días analizados)"));
+  });
+
+  it("lee el perfil aunque venga rodeado de texto y lo limpia", () => {
+    const r = normalizarPerfil('Aquí va:\n{"perfil":" Cliente   activo que pregunta mucho por stock ","sentimiento":"molesto","urgencia":"alta","riesgo":"alto","compromisos":["Confirmar llegada","Confirmar llegada",""],"oportunidades":["Ofrecer Cutting Mix"],"proxima_accion":"Responderle hoy con la fecha"}');
+    assert.deepEqual(r, {
+      perfil: "Cliente activo que pregunta mucho por stock",
+      sentimiento: "molesto",
+      urgencia: "alta",
+      riesgo: "alto",
+      compromisos: ["Confirmar llegada"],
+      oportunidades: ["Ofrecer Cutting Mix"],
+      proximaAccion: "Responderle hoy con la fecha",
+    });
+  });
+
+  it("un valor fuera de lo permitido se vuelve neutral, media o medio; las listas se recortan", () => {
+    const r = normalizarPerfil(JSON.stringify({ perfil: "x", sentimiento: "furioso", urgencia: "altísima", riesgo: "nulo", compromisos: ["tarea a1", "tarea b2", "tarea c3", "tarea d4", "tarea e5", "tarea f6"], oportunidades: "no es lista" }));
+    assert.equal(r?.sentimiento, "neutral");
+    assert.equal(r?.urgencia, "media");
+    assert.equal(r?.riesgo, "medio");
+    assert.equal(r?.compromisos.length, 4);
+    assert.deepEqual(r?.oportunidades, []);
+    assert.equal(r?.proximaAccion, "");
+  });
+
+  it("sin perfil escrito o con basura no hay análisis", () => {
+    assert.equal(normalizarPerfil('{"perfil":"  "}'), null);
+    assert.equal(normalizarPerfil("nada"), null);
+    assert.equal(normalizarPerfil("{roto"), null);
   });
 });
