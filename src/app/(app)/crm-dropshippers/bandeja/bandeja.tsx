@@ -12,7 +12,9 @@ import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { FichaCrmChat } from "./actions";
-import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
+import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
+import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
+import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -39,7 +41,7 @@ const REFRESCO_MS = 8000;
 const REFRESCO_RESPALDO_MS = 30000;
 
 /** Lo que devuelve el refresco (`/api/whatsapp/bandeja`): la lista de chats y los últimos mensajes del chat abierto. */
-type Refresco = { bandeja: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] }; chat: { id: string; mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | null };
+type Refresco = { bandeja: DatosBandeja; chat: { id: string; mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | null };
 
 /** Un mensaje que se muestra apenas se toca enviar, antes de que el servidor responda (id «local-…»). */
 const esLocal = (m: MensajeVista) => m.id.startsWith("local-");
@@ -236,7 +238,7 @@ export function Bandeja({
   miArea,
   estado360 = null,
 }: {
-  inicial: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] };
+  inicial: DatosBandeja;
   abrirInicial: string | null;
   escribe: boolean;
   miId: string;
@@ -598,6 +600,50 @@ export function Bandeja({
       });
   }
 
+  // Las etiquetas de los chats, como en ClickUp (migración 0185): se ven al momento y vuelven a como estaban si el servidor no las guarda.
+  const [etiquetando, setEtiquetando] = useState<string | null>(null);
+  const anclaEtiquetas = useRef<HTMLElement | null>(null);
+  const manejoEtiquetas: ManejoEtiquetas = useMemo(() => {
+    const ponerEtiquetas = (id: string, etiquetas: string[]) => setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === id ? { ...x, etiquetas } : x)) }));
+    return {
+      todas: [...new Set([...Object.keys(datos.colores ?? {}), ...datos.conversaciones.flatMap((c) => c.etiquetas ?? [])])],
+      colores: datos.colores ?? {},
+      cambiar: (id, etiquetas) => {
+        const antes = datos.conversaciones.find((c) => c.id === id)?.etiquetas ?? [];
+        ponerEtiquetas(id, etiquetas);
+        void guardarEtiquetasChat(id, etiquetas)
+          .then((r) => ("error" in r ? (ponerEtiquetas(id, antes), mostrarToast(r.error, "destructive")) : ponerEtiquetas(id, r.etiquetas)))
+          .catch(() => {
+            ponerEtiquetas(id, antes);
+            mostrarToast("No se pudieron guardar las etiquetas.", "destructive");
+          });
+      },
+      cambiarColor: (nombre, color) => {
+        const antes = datos.colores?.[nombre];
+        const poner = (c: string | undefined) => setDatos((d) => ({ ...d, colores: Object.fromEntries(Object.entries({ ...d.colores, [nombre]: c }).filter(([, v]) => v)) as Record<string, string> }));
+        poner(color);
+        void guardarColorEtiquetaChat(nombre, color)
+          .then((r) => {
+            if ("error" in r) {
+              poner(antes);
+              mostrarToast(r.error, "destructive");
+            }
+          })
+          .catch(() => {
+            poner(antes);
+            mostrarToast("No se pudo guardar el color.", "destructive");
+          });
+      },
+    };
+  }, [datos.colores, datos.conversaciones, mostrarToast]);
+
+  /** «Etiquetas» del clic derecho: el selector se abre junto al chat de la lista. */
+  function etiquetarDesdeLista(id: string) {
+    anclaEtiquetas.current = origenMenu.current;
+    setMenuChat(null);
+    setEtiquetando(id);
+  }
+
   /** Marca un chat como leído o no leído. Un chat abierto se cierra al marcarlo no leído (si no, seguiría contando como leído al refrescar). */
   function marcarLeido(c: ConversacionVista, leido: boolean) {
     setMenuChat(null);
@@ -923,18 +969,19 @@ export function Bandeja({
                         </span>
                       )}
                     </span>
-                    {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || datos.numeros.length > 1) && (
+                    {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || datos.numeros.length > 1 || c.etiquetas.length > 0) && (
                       <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
                         {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
                         {c.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">Borrado en la app</span>}
                         {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
+                        <PastillasEtiquetas etiquetas={c.etiquetas} colores={manejoEtiquetas.colores} />
                         {datos.numeros.length > 1 && <span>{numeroDe.get(c.numeroId)?.nombre}</span>}
                         {c.asignadaA && <span>· {c.asignadaA}</span>}
                       </span>
                     )}
                   </span>
                 </button>
-                {vista?.id === c.id && <VistaPreviaChat nombre={c.nombre} mensajes={vista.mensajes} noLeidos={c.noLeidos} top={vista.top} left={vista.left} />}
+                {vista?.id === c.id && <VistaPreviaChat nombre={c.nombre} etiquetas={<PastillasEtiquetas etiquetas={c.etiquetas} colores={manejoEtiquetas.colores} />} mensajes={vista.mensajes} noLeidos={c.noLeidos} top={vista.top} left={vista.left} />}
               </li>
             );
           })}
@@ -1043,6 +1090,7 @@ export function Bandeja({
                   escribe={escribe}
                   mirando={mirando}
                   accionesChat={accionesChat}
+                  etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
                   opcionesMas={opcionesMas}
                   areaDelChat={
                     <Bloque titulo="Área del chat">
@@ -1358,7 +1406,34 @@ export function Bandeja({
                   Cambiar el nombre
                 </button>
               )}
+              {escribe && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => etiquetarDesdeLista(c.id)}
+                  className={`rounded-md px-3 py-2 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+                >
+                  Etiquetas
+                </button>
+              )}
             </div>
+          );
+        })()}
+      {etiquetando &&
+        (() => {
+          const c = datos.conversaciones.find((x) => x.id === etiquetando);
+          if (!c) return null;
+          return (
+            <SelectorEtiquetasChat
+              ancla={anclaEtiquetas}
+              conversacionId={c.id}
+              etiquetas={c.etiquetas}
+              manejo={manejoEtiquetas}
+              alCerrar={(m) => {
+                setEtiquetando(null);
+                if (m === "escape") anclaEtiquetas.current?.focus();
+              }}
+            />
           );
         })()}
       {verRapidas && <VentanaRapidas rapidas={rapidas} setRapidas={setRapidas} puedeEditar={escribe && !rapidas.some((r) => r.id.startsWith("base-"))} alCerrar={() => setVerRapidas(false)} />}

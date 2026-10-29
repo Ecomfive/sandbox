@@ -161,6 +161,7 @@ export function FichaDelChat({
   escribe,
   mirando,
   accionesChat,
+  etiquetas,
   opcionesMas,
   areaDelChat,
   versionEquipo,
@@ -176,6 +177,8 @@ export function FichaDelChat({
   mirando: boolean;
   /** Los botones del chat que van primero en la fila (Tomar o Intervenir, Marcar resuelta). */
   accionesChat: ReactNode;
+  /** Las etiquetas del chat (como en ClickUp), arriba de todo. */
+  etiquetas: ReactNode;
   opcionesMas: OpcionMas[];
   /** El apartado «Área del chat», que arma la Bandeja con los cambios de área. */
   areaDelChat: ReactNode;
@@ -204,6 +207,7 @@ export function FichaDelChat({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="flex flex-col gap-3 border-b border-[var(--wa-borde)] px-5 pt-3.5 pb-4">
+        {etiquetas}
         {d && (
           <div className="flex flex-wrap items-center gap-1.5">
             <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>

@@ -20,7 +20,7 @@ import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { avisoSupervision, BUCKET_ARCHIVOS, chatParaEnviar, mandarMedioGuardado, MAX_PIE, NOMBRE_AREA, permisoDeSubida } from "./enviar-medio";
 import { obtenerDatosCrm } from "../datos-crm";
 import type { FilaCaso, FilaDropshipper } from "../def-crm";
-import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
+import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type DatosBandeja, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
@@ -51,7 +51,7 @@ export async function fichaCrmDelChat(dropshipperId: string): Promise<FichaCrmCh
 }
 
 /** La lista de conversaciones, para refrescar la bandeja cada pocos segundos. */
-export async function obtenerBandeja(): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | { error: string }> {
+export async function obtenerBandeja(): Promise<DatosBandeja | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   return (await cargarBandeja(createServiceClient(), u)) ?? { error: "Falta correr la migración 0158 (WhatsApp)." };
