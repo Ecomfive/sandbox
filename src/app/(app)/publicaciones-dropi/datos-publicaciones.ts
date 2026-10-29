@@ -194,7 +194,7 @@ async function guardarCumplidas(supabase: SupabaseClient, cumplidas: { d: Decisi
 }
 
 /** Las personas activas del sistema, para elegir quién hace una tarea. */
-async function cargarPersonas(supabase: SupabaseClient): Promise<{ id: string; nombre: string }[]> {
+export async function cargarPersonas(supabase: SupabaseClient): Promise<{ id: string; nombre: string }[]> {
   const { data } = await supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre");
   return (data ?? []).map((p) => ({ id: p.id as string, nombre: ((p.nombre as string | null) || (p.email as string | null) || "Sin nombre").trim() }));
 }
@@ -261,6 +261,17 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const liquidacionR = await traerTodasConError<{ id: string; liquidacion_en: string | null }>((desde, hasta) =>
     supabase.from("dropi_publicaciones").select("id, liquidacion_en").eq("pais_id", paisId).not("liquidacion_en", "is", null).order("id").range(desde, hasta),
   );
+  // Las tareas escritas a mano sin resolver (migración 0175), para la marca de la fila: sin la migración, ninguna.
+  const tareasR = await traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null).order("id").range(desde, hasta),
+  );
+  const tareasDe = new Map<string, { total: number; atrasadas: number }>();
+  for (const t of tareasR.error ? [] : (tareasR.data ?? [])) {
+    const x = tareasDe.get(t.publicacion_id) ?? { total: 0, atrasadas: 0 };
+    x.total++;
+    if (t.plazo && t.plazo < hoy) x.atrasadas++;
+    tareasDe.set(t.publicacion_id, x);
+  }
   const liquidacionEn = new Map(liquidacionR.error ? [] : (liquidacionR.data ?? []).map((n) => [n.id, n.liquidacion_en as string]));
 
   const datos = filasR.data ?? [];
@@ -405,6 +416,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
+      tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.

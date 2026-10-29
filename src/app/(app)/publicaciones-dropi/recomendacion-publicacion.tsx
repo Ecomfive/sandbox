@@ -26,6 +26,9 @@ export function ProveedorTareas({ children, ...valor }: Tareas & { children: Rea
   return <ContextoTareas.Provider value={valor}>{children}</ContextoTareas.Provider>;
 }
 
+/** A quién se le puede asignar una tarea y quién es la persona (también para las tareas escritas a mano). */
+export const usePersonasTareas = () => useContext(ContextoTareas);
+
 const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 const botonClaro = `inline-flex h-9 items-center rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
 // Las tres decisiones con su color (pedido de Alcides, 25 oct 2026): aceptar en verde, rechazar en rojo suave y posponer en ámbar suave.

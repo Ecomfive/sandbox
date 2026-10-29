@@ -5,6 +5,7 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPublicaciones } from "../datos-publicaciones";
+import { contarMisTareasPendientes } from "../tareas-actions";
 import { ProveedorMoneda } from "../moneda-contexto";
 import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -49,6 +50,7 @@ export default async function RecomendacionesPage({ searchParams }: { searchPara
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Recomendaciones" oculto />
       <ContadorPestana href="/publicaciones-dropi/recomendaciones" cantidad={sugeridas.length} />
+      <ContadorPestana href="/publicaciones-dropi/tareas" cargar={contarMisTareasPendientes} />
       <ProveedorMoneda moneda={moneda}>
       <PanelRecomendaciones
         sugeridas={sugeridas}

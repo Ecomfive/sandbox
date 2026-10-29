@@ -74,6 +74,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   dropi_privatizar_cancelado: "Deshizo la privatización antes de aplicarla en Dropi",
   dropi_privatizada: "La privatizó en Dropi",
   dropi_privatizar_error: "No pudo privatizarla en Dropi",
+  crear_tarea_publicacion: "Agregó una tarea",
+  resolver_tarea_publicacion: "Resolvió una tarea",
   publicacion_liquidacion: "La puso en liquidación",
   publicacion_fin_liquidacion: "La sacó de liquidación",
   dropi_stock_pendiente: "Dejó pendiente un cambio de stock en Dropi",

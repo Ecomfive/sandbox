@@ -107,7 +107,7 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
       tipo: "tarea",
       titulo: `Tarea en Gestión de IDs Dropi: ${rec.titulo || etiquetaRecomendacion(tipo)}`.slice(0, 300),
       texto: `${pub.nombre} · para el ${tarea.plazo}${nota ? ` · «${nota}»` : ""}`.slice(0, 600),
-      href: "/publicaciones-dropi/recomendaciones?ver=por_hacer",
+      href: "/publicaciones-dropi/tareas",
       autor_id: usuario.id,
       autor_nombre: usuario.nombre ?? usuario.email ?? null,
     });

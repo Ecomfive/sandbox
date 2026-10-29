@@ -318,6 +318,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {paraReactivar(f) ? "Volvió el stock: reactivar" : "Pausada sin stock"}
               </span>
             )}
+            {f.tareasPendientes.total > 0 && (
+              <span className={`inline-flex items-center gap-1.5 font-medium ${f.tareasPendientes.atrasadas ? "text-destructive" : ""}`}>
+                <Punto clase={f.tareasPendientes.atrasadas ? "bg-destructive" : "bg-warning"} texto={f.tareasPendientes.atrasadas ? "Tarea atrasada" : "Tarea pendiente"} />
+                {f.tareasPendientes.total === 1 ? "1 tarea" : `${f.tareasPendientes.total} tareas`}
+                {f.tareasPendientes.atrasadas ? " · atrasada" : ""}
+              </span>
+            )}
             {f.liquidacionDesde && (
               <span className="inline-flex items-center gap-1.5 font-medium">
                 <Punto clase="bg-warning" texto="En liquidación" />

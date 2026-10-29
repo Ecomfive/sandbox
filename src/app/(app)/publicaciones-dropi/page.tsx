@@ -1,6 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
+import { contarMisTareasPendientes } from "./tareas-actions";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeActualizarDropi } from "@/lib/dropi-actualizar/partes";
@@ -50,6 +51,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
       <ContadorPestana href="/publicaciones-dropi/recomendaciones" cantidad={datos.filas.reduce((n, f) => n + f.recomendaciones.length, 0)} />
+      <ContadorPestana href="/publicaciones-dropi/tareas" cargar={contarMisTareasPendientes} />
       <TablaPublicaciones
         publicaciones={datos.filas}
         opcionesSku={datos.opcionesSku}
