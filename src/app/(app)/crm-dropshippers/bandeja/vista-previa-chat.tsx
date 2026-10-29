@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { VistaPreviaMensaje } from "./datos-bandeja";
 
 function hora(iso: string): string {
@@ -12,7 +13,7 @@ function hora(iso: string): string {
  * Los últimos mensajes de un chat, que se despliegan al pasar el cursor por la lista de la bandeja (29 oct 2026): así se lee lo que no se ha leído sin
  * abrir el chat ni marcarlo leído. Es solo para mirar (`pointer-events-none`); `fixed` para que la lista, que se desplaza, no lo recorte.
  */
-export function VistaPreviaChat({ nombre, mensajes, noLeidos, top, left }: { nombre: string; mensajes: VistaPreviaMensaje[] | "cargando" | "error"; noLeidos: number; top: number; left: number }) {
+export function VistaPreviaChat({ nombre, etiquetas, mensajes, noLeidos, top, left }: { nombre: string; etiquetas?: ReactNode; mensajes: VistaPreviaMensaje[] | "cargando" | "error"; noLeidos: number; top: number; left: number }) {
   // Los que aún no se han leído son los últimos mensajes del dropshipper, tantos como diga el contador de la lista.
   const sinLeer = new Set<string>();
   if (Array.isArray(mensajes)) {
@@ -31,6 +32,7 @@ export function VistaPreviaChat({ nombre, mensajes, noLeidos, top, left }: { nom
       className="pointer-events-none fixed z-50 hidden max-h-80 w-[min(22rem,calc(100vw-1.5rem))] flex-col gap-1.5 overflow-hidden rounded-xl border border-[var(--wa-borde)] bg-[var(--wa-fondo)] p-3 text-[13.5px] leading-snug text-[var(--wa-texto)] shadow-[0_8px_24px_var(--wa-sombra)] lg:flex"
     >
       <span className="truncate text-xs font-semibold text-[var(--wa-sec)]">{nombre}</span>
+      {etiquetas}
       {mensajes === "cargando" && <span className="text-[var(--wa-sec)]">Cargando…</span>}
       {mensajes === "error" && <span className="text-destructive">No se pudieron cargar los mensajes.</span>}
       {Array.isArray(mensajes) && !mensajes.length && <span className="text-[var(--wa-sec)]">Todavía no hay mensajes.</span>}

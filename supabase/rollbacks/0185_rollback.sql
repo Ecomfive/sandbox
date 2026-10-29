@@ -1,3 +1,4 @@
--- Reversa de 0185_whatsapp_reacciones.sql: las reacciones vuelven a verse como mensajes sueltos.
-drop index if exists whatsapp_mensajes_reaccion_a_idx;
-alter table whatsapp_mensajes drop column if exists reaccion_a;
+-- Reversa de 0185_whatsapp_etiquetas.sql: quita las etiquetas de los chats y sus colores.
+drop table if exists whatsapp_etiquetas;
+drop index if exists whatsapp_conversaciones_etiquetas_idx;
+alter table whatsapp_conversaciones drop column if exists etiquetas;

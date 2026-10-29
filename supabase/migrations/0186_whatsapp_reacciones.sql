@@ -2,7 +2,7 @@
 -- un mensaje suelto «Reaccionó ❤️». Meta manda en cada reacción el id («wamid…») del mensaje reaccionado; se guarda aquí. La reacción
 -- sigue siendo una fila de `whatsapp_mensajes` (tipo 'reaccion', texto = el emoji; sin emoji = la quitó) y la bandeja la dibuja sobre
 -- el mensaje cuyo `wa_id` es `reaccion_a`. Las reacciones de antes no lo traen: la bandeja las pone sobre el último mensaje del otro lado.
--- Reversa: supabase/rollbacks/0185_rollback.sql
+-- Reversa: supabase/rollbacks/0186_rollback.sql
 
 alter table whatsapp_mensajes add column if not exists reaccion_a text;
 

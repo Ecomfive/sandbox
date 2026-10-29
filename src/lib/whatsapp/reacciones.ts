@@ -8,7 +8,7 @@ export interface MensajeConReaccion {
   texto: string | null;
   /** El id en WhatsApp («wamid…») del mensaje. */
   waId?: string | null;
-  /** En una reacción, el `waId` del mensaje reaccionado (migración 0185); null en las de antes. */
+  /** En una reacción, el `waId` del mensaje reaccionado (migración 0186); null en las de antes. */
   reaccionA?: string | null;
 }
 
@@ -21,7 +21,7 @@ export interface ReaccionVista {
 /**
  * Separa las reacciones de los mensajes: devuelve los mensajes que se dibujan (sin las reacciones) y, por id de mensaje, las reacciones que
  * lleva. Cada lado tiene una sola reacción por mensaje (la última; una sin emoji la quita), igual que WhatsApp. Una reacción se pone sobre
- * el mensaje cuyo `waId` es su `reaccionA`; las de antes de la migración 0185 no lo traen y van sobre el último mensaje anterior del otro
+ * el mensaje cuyo `waId` es su `reaccionA`; las de antes de la migración 0186 no lo traen y van sobre el último mensaje anterior del otro
  * lado (a lo que se suele reaccionar). Si el mensaje reaccionado no está entre los cargados, la reacción no se ve (como en WhatsApp, que
  * tampoco la muestra suelta).
  */
