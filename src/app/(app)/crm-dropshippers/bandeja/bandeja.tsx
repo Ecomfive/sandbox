@@ -516,7 +516,6 @@ export function Bandeja({
     );
   }
 
-  const unNumero = datos.numeros.length === 1 ? datos.numeros[0] : null;
   const verDropshipper = chat?.id === sel?.id ? chat?.dropshipper : null;
 
   return (
@@ -526,13 +525,10 @@ export function Bandeja({
         <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
           <div className="flex min-w-0 flex-1 flex-col">
             <h2 className="m-0 text-[22px] font-bold">{areas.length > 1 ? `Panel de ${areaChat(panel).etiqueta}` : "Chats"}</h2>
-            <span className="truncate text-[12.5px] text-[var(--wa-sec)] tabular-nums">
-              {supervisandoPanel
-                ? "Supervisión: lo que abras aquí no se marca leído"
-                : unNumero
-                  ? `${unNumero.nombre} · ${unNumero.numero}`
-                  : `${datos.numeros.length} números de WhatsApp`}
-            </span>
+            {/* Con un solo número a la vista (Atención) no se dice nada: solo se cuenta cuando hay más de uno. */}
+            {(supervisandoPanel || datos.numeros.length > 1) && (
+              <span className="truncate text-[12.5px] text-[var(--wa-sec)] tabular-nums">{supervisandoPanel ? "Supervisión: lo que abras aquí no se marca leído" : `${datos.numeros.length} números de WhatsApp`}</span>
+            )}
           </div>
           {escribe && (
             <button type="button" onClick={() => setImportar({ conversacion: null })} className={botonIcono} aria-label="Importar un chat exportado desde el celular" title="Importar un chat del celular">
