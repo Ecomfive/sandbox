@@ -21,6 +21,7 @@ import { ActividadDelEquipoFicha } from "./actividad-equipo";
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, ResumenDropshipper } from "./datos-bandeja";
 import { ProductosDelChatFicha } from "./productos-chat";
+import { BotonNuevaTarea, TareasDelChat } from "./tareas-chat";
 import { SugerenciasDeVinculo } from "./vincular-chat";
 
 /** Las pestañas de la ficha del chat (29 oct 2026, aprobadas por Hernán sobre el bosquejo). */
@@ -185,6 +186,7 @@ export function FichaDelChat({
   escribe,
   mirando,
   accionesChat,
+  etiquetas,
   opcionesMas,
   areaDelChat,
   respondieron,
@@ -201,6 +203,8 @@ export function FichaDelChat({
   mirando: boolean;
   /** Los botones del chat que van primero en la fila (Tomar o Intervenir, Marcar resuelta). */
   accionesChat: ReactNode;
+  /** Las etiquetas del chat (como en ClickUp), arriba de todo. */
+  etiquetas: ReactNode;
   opcionesMas: OpcionMas[];
   /** El apartado «Área del chat», que arma la Bandeja con los cambios de área. */
   areaDelChat: ReactNode;
@@ -209,11 +213,13 @@ export function FichaDelChat({
   versionEquipo: string;
   alAbrirVincular: () => void;
   alVinculado: (mensaje: string) => void;
-  alAviso: (texto: string) => void;
+  alAviso: (texto: string, error?: boolean) => void;
 }) {
   const [pestana, setPestana] = useState<Pestana>("resumen");
   // Sube cuando algo del CRM se guarda, para volver a pedir la actividad, los seguimientos y las recomendaciones.
   const [version, setVersion] = useState(0);
+  // Sube cuando se crea una tarea (con «Tarea» o «Avisarme cuando llegue»), para volver a pedir las del chat.
+  const [versionTareas, setVersionTareas] = useState(0);
   const datos = ficha && typeof ficha === "object" ? ficha : null;
   const d = datos?.d ?? null;
   const acceso: AccesoCrm | null = datos?.acceso ?? null;
@@ -231,6 +237,7 @@ export function FichaDelChat({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="flex flex-col gap-3 border-b border-[var(--wa-borde)] px-5 pt-3.5 pb-4">
+        {etiquetas}
         {d && (
           <div className="flex flex-wrap items-center gap-1.5">
             <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
@@ -250,6 +257,7 @@ export function FichaDelChat({
         {d && <LineaFase fase={d.fase} ingreso={d.ingreso} />}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
           {accionesChat}
+          {escribe && <BotonNuevaTarea conversacionId={sel.id} nombre={sel.nombre} clase={claseBotonFicha} alCreada={() => setVersionTareas((v) => v + 1)} alAviso={alAviso} />}
           {d && acceso && <AccionesCrm d={d} codigoPais={datos!.codigoPais} acceso={acceso} alGuardar={guardado} />}
           <MenuMas opciones={opcionesMas} />
         </div>
@@ -284,6 +292,7 @@ export function FichaDelChat({
                 </Link>
               </Seccion>
             )}
+            <TareasDelChat key={`tareas-${sel.id}`} conversacionId={sel.id} version={versionTareas} alAviso={alAviso} />
             <ActividadDelClienteFicha key={`actividad-${sel.id}`} conversacionId={sel.id} puedeAnalizar={escribe} />
             {cargando}
             {d && datos && acceso && (
@@ -292,7 +301,7 @@ export function FichaDelChat({
                   <CifrasDelMes d={d} codigoPais={datos.codigoPais} hoy={datos.hoy} />
                 </Seccion>
                 <Seccion titulo="Datos">
-                  <DatosDropshipper d={d} hoy={datos.hoy} acceso={acceso} />
+                  <DatosDropshipper d={d} hoy={datos.hoy} acceso={acceso} conEtiquetas={false} />
                 </Seccion>
               </>
             )}
@@ -313,7 +322,7 @@ export function FichaDelChat({
             )))}
         {actual === "productos" && (
           <>
-            <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} alAviso={alAviso} />
+            <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} puedeAvisar={escribe} alAviso={alAviso} alCambio={() => setVersionTareas((v) => v + 1)} />
             {d && acceso && (
               <Seccion titulo="Productos recomendados">
                 <RecomendacionesDropshipper key={`recomendaciones-${d.id}`} dropshipperId={d.id} version={version} puedeEscribir={acceso.escribeAtencion} />

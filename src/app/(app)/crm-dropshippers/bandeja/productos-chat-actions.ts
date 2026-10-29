@@ -2,11 +2,11 @@
 
 import type { EtapaCotizacion } from "@/lib/compras/en-camino";
 import { idsDropiEnTexto, productosDeLaConversacion, type MencionEnChat } from "@/lib/crm/productos-chat";
-import { normalizarTelefono } from "@/lib/crm/telefono";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { conversacionPermitida, usuarioBandeja } from "./datos-bandeja";
+import { paisDelChat } from "./pais-chat";
 
 /** Un producto en la ficha del chat, con lo que viene en camino al país del dropshipper (como «En camino» de Gestión de IDs Dropi). */
 export interface ProductoDelChat {
@@ -26,6 +26,8 @@ export interface ProductoDelChat {
   /** Lo que todavía se cotiza (01 - Cotizar y 02 - Cotizado): se piensa pedir, aún no viene. */
   cotizando: number;
   etapa: EtapaCotizacion | null;
+  /** Hay una tarea esperando que llegue este producto para avisarle al cliente (29 oct 2026), con la llegada que se le prometió. */
+  aviso: { llegadaEstimada: string | null } | null;
 }
 
 export interface ProductosDelChat {
@@ -41,24 +43,6 @@ const ES_ID = (s: string) => /^[0-9a-f-]{36}$/i.test(s);
 /** Los productos que se ofrecen: los simples (no variantes ni combos) que no están descontinuados. */
 const productosBase = (supabase: ReturnType<typeof createServiceClient>) =>
   supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").is("padre_id", null).eq("tipo", "simple").neq("clase", "descontinuado");
-
-/**
- * El país del chat, para saber qué viene en camino: el del dropshipper vinculado (o el de su primera cuenta de Dropi) y, si no está en el
- * CRM, el del prefijo de su número (+507 → Panamá).
- */
-async function paisDelChat(supabase: ReturnType<typeof createServiceClient>, telefono: string, dropshipperId: string | null): Promise<{ id: string; nombre: string } | null> {
-  const paises = ((await supabase.from("paises").select("id, codigo, nombre")).data ?? []) as { id: string; codigo: string; nombre: string }[];
-  if (dropshipperId) {
-    const { data } = await supabase.from("dropshippers").select("pais_id, dropshipper_cuentas(pais_id)").eq("id", dropshipperId).maybeSingle();
-    const cuentas = (data?.dropshipper_cuentas ?? []) as { pais_id: string | null }[];
-    const id = (data?.pais_id as string | null) ?? cuentas.find((c) => c.pais_id)?.pais_id ?? null;
-    const p = paises.find((x) => x.id === id);
-    if (p) return { id: p.id, nombre: p.nombre };
-  }
-  const codigo = normalizarTelefono(telefono)?.pais;
-  const p = paises.find((x) => x.codigo === codigo);
-  return p ? { id: p.id, nombre: p.nombre } : null;
-}
 
 /** Cuántos mensajes del chat se leen para saber de qué productos se habló (los más recientes): toda la conversación en la práctica. */
 const MENSAJES_A_LEER = 2000;
@@ -95,13 +79,16 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
   const c = await conversacionPermitida(supabase, conversacionId, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
 
-  const [pais, fijadosR, mensajes, analisisR] = await Promise.all([
+  const [pais, fijadosR, mensajes, analisisR, avisosR] = await Promise.all([
     paisDelChat(supabase, c.telefono, c.dropshipperId),
     supabase.from(TABLA).select("sku_id, creado_en").eq("conversacion_id", conversacionId).order("creado_en"),
     textosDelChat(supabase, conversacionId),
     // Lo que encontró «Analizar con IA» (migración 0183); sin la migración o sin análisis, nada.
     supabase.from("whatsapp_actividad").select("dia, productos").eq("conversacion_id", conversacionId).order("dia", { ascending: false }),
+    // Las tareas «avisarle cuando llegue» de este chat (sin la migración 0188, ninguna).
+    supabase.from("tareas_dropshipper").select("sku_id, llegada_estimada").eq("conversacion_id", conversacionId).eq("estado", "esperando"),
   ]);
+  const avisos = new Map(((avisosR.error ? [] : avisosR.data) ?? []).map((a) => [a.sku_id as string, { llegadaEstimada: (a.llegada_estimada as string | null) ?? null }]));
   const sePuedeFijar = !fijadosR.error;
   const fijadosIds = (fijadosR.data ?? []).map((f) => f.sku_id as string);
   const analisis = analisisR.error ? [] : ((analisisR.data ?? []) as { dia: string; productos: string[] | null }[]).filter((a) => a.productos?.length);
@@ -183,6 +170,7 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
         sinEnvio: v?.sinEnvio ?? 0,
         cotizando: cotizando.get(p.id) ?? 0,
         etapa: etapasCotizando.get(p.id) ?? null,
+        aviso: avisos.get(p.id) ?? null,
       };
     }),
   };

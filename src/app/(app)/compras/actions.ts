@@ -1,6 +1,8 @@
 ﻿"use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { activarTareasDeLlegada } from "@/lib/crm/tareas-servidor";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
@@ -348,6 +350,8 @@ export async function vistaPreviaCompra(clave: string): Promise<{ codigo: string
 /** Edita cualquier dato de una compra ya creada — todo junto, desde su ficha. */
 export async function actualizarCompra(formData: FormData): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("compras");
+  // Si con esto llega una compra (fecha de llegada o completada), se activan las tareas del CRM que la esperaban (29 oct 2026).
+  after(() => activarTareasDeLlegada(createServiceClient()));
   const limites = restriccionesDe(usuario.afinado.compras);
   const id = formData.get("id") as string;
   const nombreEscrito = String(formData.get("nombre") ?? "").trim();
@@ -436,6 +440,7 @@ export async function actualizarCampoCompra(
   bruto: unknown,
 ): Promise<{ error?: string; cerradoEn?: string | null; planificacion?: string | null }> {
   await requireModuloEscritura("compras");
+  after(() => activarTareasDeLlegada(createServiceClient()));
   if (typeof id !== "string" || !ES_ID(id)) return { error: "Compra no válida." };
   const def = campoEditable(String(campo));
   if (!def) return { error: "Ese dato no se edita aquí." };
@@ -507,6 +512,7 @@ export async function actualizarCampoComprasLote(
   modo: ModoLote = "poner",
 ): Promise<{ error?: string; aplicadas?: { id: string; valor: ValorCampo; cerradoEn?: string | null; planificacion?: string | null }[]; omitidas?: number }> {
   await requireModuloEscritura("compras");
+  after(() => activarTareasDeLlegada(createServiceClient()));
   const bloqueada = await accionBloqueadaEnCompras("lote");
   if (bloqueada) return { error: bloqueada };
   if (!celdaEditable(await restriccionesActuales(), String(campo))) return { error: SIN_PERMISO_DATO };

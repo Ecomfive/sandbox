@@ -1034,6 +1034,18 @@ convenciones técnicas del código.
   Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
   de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
   del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
+  **Tareas y VIP** (29 oct 2026, migración 0188): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
+  (puede no tener dropshipper), `sku_id`/`pais_id`/`compras_esperadas`/`llegada_estimada` y el estado nuevo `esperando`. «Tarea»
+  (`BotonNuevaTarea`, `bandeja/tareas-chat.tsx`) y «Avisarme cuando llegue» (`ProductosDelChatFicha` → `avisarCuandoLlegue`: guarda las
+  compras en camino de ese producto al país del chat, `cargarEnCaminoDatos`) están en `tareas/actions.ts`; quedan a cargo de quien lleva
+  el chat (`asignada_a`, si no quien la crea; aviso «asignada» si es otra persona). `activarTareasDeLlegada` (`src/lib/crm/tareas-servidor.ts`;
+  `llegoLoEsperado` en `tareas.ts`: una compra esperada con `fecha_llegada` o `completado`) las pasa a pendiente con fecha de hoy, a cargo
+  de quien lleva el chat entonces, y avisa en la campana (`notificaciones_usuario`, tipo `tarea`, enlace `bandeja?abrir=`); corre con
+  `after()` en `actualizarCompra`/`actualizarCampoCompra`/`actualizarCampoComprasLote`, al abrir el panel o la ficha y en el cron
+  `notificaciones-diarias`, que además avisa lo que vence hoy (`avisarTareasDeHoy`, una vez: `avisada_en`). Panel: `/crm-dropshippers/tareas`
+  (`PanelTareas`, grupos de `grupoDeTarea`; «Mías»/«Todas»: se ve lo propio, lo del área de su chat o, sin chat, lo comercial). VIP:
+  `dropshippers.nivel = 'vip'` (al 29 oct ninguno marcado); `ConversacionVista.vip`, `EtiquetaVip` en la lista y la cabecera, y «Marcar
+  como VIP» / «Quitar VIP» (`cambiarVip`, a `regular`) en «Más».
   **Mensajes no entregados** (29 oct 2026): `type: unsupported` (131051) no trae contenido; `textoDeRespaldo` en `extraer.ts` lee
   `unsupported.type` (`NO_ENTREGADOS`: edit, poll_creation, media_placeholder…) y dice qué mandó y que lo pida de nuevo. No se puede recuperar.
   No se mandan acuses de lectura a WhatsApp. **Al instante** (29 oct 2026): `enviarTexto` en `bandeja.tsx` muestra el mensaje con id
@@ -1069,6 +1081,12 @@ convenciones técnicas del código.
   del sistema —`ES_MARCA_BORRADO`, se dibuja como aviso— y la auditoría `marcar_chat_borrado_app`) y la insignia «Borrado en la app» en el chat y en la lista. **Meta no documenta ningún aviso
   cuando se borra un chat entero en la app**, así que la marca la pone una persona. Sí hay aviso cuando el dropshipper borra un mensaje «para todos» (`type: revoke` en `messages`):
   `extraerAviso` lo devuelve en `revocados` (no crea un mensaje) y `guardarRevocados` marca el original (`whatsapp_mensajes.eliminado_en_whatsapp_en`), que se muestra con su texto y la
+  **Filtro «Resueltas»** (29 oct 2026, pedido de Jhokser; sin migración): la lista de la bandeja tiene `Filtro` = `sinResponder` | `mias` | `resueltas` | `todas` (`bandeja.tsx`); «Resueltas» muestra los chats con `estado = resuelta` (se marcan con «Resuelta» y se reabren con «Reabrir» o solos cuando el dropshipper vuelve a escribir, `whatsapp_registrar_entrante`) y su conteo sale junto al botón. El chat abierto se queda en la lista aunque ya no cumpla el filtro.
+  **Reaccionar desde el sistema** (29 oct 2026, pedido de Jhokser; sin migración, usa `reaccion_a` de la 0186): al pasar el cursor sobre una burbuja sale `ReaccionarMensaje` (`bandeja.tsx`: carita al lado de fuera de la burbuja, siempre visible con `[@media(hover:none)]`) con
+  `REACCIONES_RAPIDAS` (👍 ❤️ 😂 😮 😢 🙏, `src/lib/whatsapp/reacciones.ts`); pulsar la ya puesta la quita (`miReaccion`). `reaccionarAMensaje(chat, mensaje, emoji)` (`bandeja/reaccion-actions.ts`) usa `chatParaEnviar` (escribir en el área, no solo supervisar, ventana de 24 h), valida el emoji (`emojiDeReaccion`: uno
+  solo; «» = quitar), exige que el mensaje sea del chat, entrante o saliente, con `wa_id` (no `import:`), que no sea reacción ni esté oculto, lo manda con `enviarReaccionWhatsapp` (`api.ts`: `type: "reaction"`, `message_id` = su wamid, emoji vacío quita) y deja una fila `reaccion` saliente con `reaccion_a`,
+  que `agruparReacciones` ya dibuja sobre el mensaje (una por lado). No cambia el orden del chat ni los no leídos. En «Actividad del equipo» sale como «Reaccionó con 👍 a un mensaje». Si falta la 0186 avisa. **Pendiente de probar con el número real** (360dialog).
+  **Reacciones sobre el mensaje** (29 oct 2026, pedido de Hernán, migración 0186): Meta manda en cada reacción `reaction.message_id`; `contenidoDe` lo deja en `MensajeEntrante.reaccionA` y `guardarEntrantes` lo guarda en `whatsapp_mensajes.reaccion_a` (la reacción sigue siendo una fila tipo «reaccion», texto = emoji; sin emoji = la quitó). La bandeja no la dibuja como mensaje: `agruparReacciones` (`src/lib/whatsapp/reacciones.ts`, con prueba) la pone sobre el mensaje cuyo `wa_id` es `reaccion_a` (una por lado, la última manda) y `Burbuja` la pinta como pastilla sobre el borde de abajo; las de antes de la 0186 van sobre el último mensaje del otro lado. `cargarConversacion` lee `reaccion_a` aparte (sin la columna, carga igual).
   marca «Lo eliminó en WhatsApp quien lo mandó». Las marcas se leen con consultas aparte que ignoran el error, así que sin la migración la bandeja sigue cargando (sin marcas). Reversa:
   `supabase/rollbacks/0171_rollback.sql`.
   **Borrar pide autorización** (28 oct 2026, pedido de Jhokser; migración 0172): quien escribe en el CRM no borra un chat ni un mensaje por su cuenta: lo **pide** (`pedirBorrado`,
@@ -1130,6 +1148,11 @@ convenciones técnicas del código.
   `productosDelAnalisis` los junta con los del catálogo (`productosMencionados`, el mismo cruce de «Productos que pregunta») para que cada producto se cuente siempre con el mismo nombre, y quedan como etiquetas «Interés: …» en cada día, en «Productos que le interesan» de la ficha y en
   **«Productos que más interesan»** de la pestaña Motivos (`interesPorProducto`: clientes y días). (5) **Plegar**: `usePlegado` (`bandeja/usar-plegado.ts`, `useSyncExternalStore` + `localStorage`, por chat y por bloque, últimos 300) pliega «Actividad del cliente» y «Actividad del equipo»; plegada,
   la del cliente deja a la vista solo la situación (si tiene algo pendiente).
+  **Análisis completo del cliente y botón permanente** (29 oct 2026, migración 0187 `whatsapp_actividad_cliente`: una fila por chat con `datos` jsonb, `dias_analizados`, modelo y quién; RLS sin políticas; reversa `supabase/rollbacks/0187_rollback.sql`):
+  el botón de la ficha **ya no desaparece**: dice «Analizar toda la conversación con IA» si hay días pendientes y «Volver a analizar con IA» si no (`actividad-cliente.tsx`). Cada pulsación lee los días pendientes (como antes) y, al terminar (`!faltan`), **rehace el análisis completo**
+  (`analizarPerfil`, `actividad-actions.ts`; lógica pura con prueba en `actividad.ts`: `pedidoPerfil` le pasa a la IA los resúmenes de hasta `MAX_DIAS_RESUMEN` = 90 días ya analizados y los mensajes tal cual de los últimos `DIAS_RECIENTES_COMPLETOS` = 3 días; `normalizarPerfil` valida todo lo que
+  devuelve): `PerfilCliente` = perfil (≤ 420 letras), sentimiento (positivo/neutral/molesto), urgencia (alta/media/baja), riesgo de perderlo (alto/medio/bajo), compromisos del equipo sin cumplir, oportunidades y próxima acción. Se ve como «Análisis completo» arriba del bloque
+  (`AnalisisCompleto`) con quién y cuándo lo hizo. Un fallo del análisis completo no tira lo ya analizado por día: sale como aviso (`aviso`). Se anota en «Consumo de IA» como `actividad_cliente_completo`. Sin la 0187 los días se siguen analizando y el análisis completo avisa que falta la migración. `bandeja/page.tsx` tiene `maxDuration = 300`.
   **Quién respondió y con qué cargo** (29 oct 2026, pedido de Hernán: «si líder comercial o atención»; sin migración): cada burbuja del equipo
   lleva el nombre y el cargo de quien la mandó («Jhokser · Líder comercial») y las notas también; dos respuestas seguidas de personas distintas
   ya no se juntan (`seguido` compara el autor). En la ficha del chat (`ficha-chat.tsx`, `QuienesRespondieron`), debajo de las pastillas, «Respondieron:»
@@ -1160,8 +1183,26 @@ convenciones técnicas del código.
   Dropi no entrega el teléfono ni el correo del dropshipper (solo ID de usuario, nombre y tienda): el vínculo automático con los datos de Dropi sigue pendiente de investigar. Sin la migración 0177 los mensajes, la búsqueda y el vínculo desde el chat siguen funcionando, pero un
   segundo número no se guarda. Reversa: `supabase/rollbacks/0177_rollback.sql`.
   **Vista previa al pasar el cursor** (29 oct 2026): en la lista de la bandeja, con ratón y pantalla ancha (`hover: hover` y ≥ 1024 px), pasar el cursor (o enfocar con el teclado) un chat que no es el abierto despliega, a los 350 ms, sus últimos mensajes (3 a 8, `vistaPreviaChat` en `bandeja/actions.ts`; **solo mira, no marca leído**; no trae lo oculto); los sin leer van marcados (`VistaPreviaChat`, `vista-previa-chat.tsx`, `fixed` para que la lista que se desplaza no lo recorte, `pointer-events-none`). Se guarda en memoria por chat + último mensaje + no leídos.
+  **Etiquetas de los chats** (migración 0185, 29 oct 2026, pedido de Alcides; como las de ClickUp y Compras): `whatsapp_conversaciones.etiquetas text[]` y el color por
+  nombre en `whatsapp_etiquetas`. Las piezas son comunes: `PanelEtiquetas`, `PastillaEtiqueta`, `colorEtiqueta` y `COLORES_ETIQUETA` en
+  `src/components/etiquetas/etiquetas.tsx` (Compras las reexporta desde `compras/selector-etiquetas.tsx`) y las reglas en `src/lib/etiquetas.ts`
+  (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
+  deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
+  ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
+  **Un solo juego de etiquetas** (29 oct 2026, pedido de Alcides: salían dos): un chat **con dropshipper** muestra y edita las del dropshipper
+  (`dropshippers.etiquetas`, las de ClickUp; `guardarEtiquetasChat` escribe ahí con `escribirEtiquetasDropshipper`, `src/lib/crm/etiquetas-dropshipper.ts`,
+  auditoría `etiquetas_dropshipper`); solo un chat sin dropshipper usa `whatsapp_conversaciones.etiquetas`. En la ficha del CRM, «Datos › Etiquetas» es
+  `EtiquetasDropshipper` (`crm-dropshippers/etiquetas-dropshipper.tsx`, `etiquetas-actions.ts`: `etiquetasCrmDisponibles`, `guardarEtiquetasDropshipper`,
+  `guardarColorEtiquetaCrm`); en la ficha del chat esa línea no sale (`DatosDropshipper conEtiquetas={false}`) porque van arriba. Los colores son los de
+  `whatsapp_etiquetas` para todo el CRM. «Editar» del dropshipper ya no trae el campo de etiquetas separadas por coma (`editarDropshipper` solo las toca si vienen).
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
+- **Plantillas de aviso de llegada** (29 oct 2026, pedido de Jhokser; sin migración): un cliente pregunta por mercancía, se le dice para qué fecha llega y se crea la tarea «Avisar cuando llegue» (`avisarCuandoLlegue`, `crm-dropshippers/tareas/actions.ts`);
+  el día que llega de verdad, el aviso por WhatsApp pasadas las 24 h solo puede ir con una plantilla. `PLANTILLAS_SUGERIDAS` ahora tiene un `grupo` (`retomar` o `llegada`) y 3 plantillas de **Utilidad** del grupo `llegada`: `aviso_llegada_producto`, `aviso_llegada_varios` y
+  `aviso_llegada_cambio_fecha` (primer nombre sale solo; producto y fecha son `manual`, se escriben al enviar; la prueba exige que pasen `validarPlantilla` sin avisos y que no suenen a promoción, para que Meta no las pase a Marketing). `src/lib/whatsapp/plantillas-llegada.ts`:
+  `asegurarBorradoresDeLlegada` (al crear la tarea deja como **borrador** las que falten, idempotente por nombre; auditoría `crear_plantilla_whatsapp`) y `enviarBorradoresDeLlegada` (las manda a Meta **una cada dos minutos**, la regla de `enviarPlantillaAMeta`, con `after()` y un
+  presupuesto de 270 s; lo que falte sale en la próxima llamada; no manda las que ya tienen `error_envio`). **El envío a Meta está apagado** hasta definir `PLANTILLAS_LLEGADA_AUTO_META=1` en Vercel: mientras tanto todo queda en borrador aunque `D360_API_KEY` exista. `scripts/crear-plantillas-llegada.ts [--aplicar]`
+  las deja en el sistema sin esperar a la primera tarea. **Falta** (otra etapa): mandar el aviso al cliente cuando la tarea se activa (hoy solo avisa a la campana de quien lleva el chat) y llenar las variables con el producto y la fecha de la tarea.
 - **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del
   último mensaje de un dropshipper solo se le escribe con una plantilla que Meta aprobó. Se crean, se cambian y se mandan a Meta desde el sistema. Tablas:
   `whatsapp_plantillas` (por nombre e idioma; `categoria` = la pedida, `categoria_actual` = la que Meta le puso; `estado` borrador → pendiente → aprobada /

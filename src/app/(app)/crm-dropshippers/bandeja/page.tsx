@@ -11,6 +11,8 @@ import { cargarBandeja } from "./datos-bandeja";
 export const metadata = { title: "Bandeja de WhatsApp" };
 
 export const dynamic = "force-dynamic";
+// «Analizar con IA» en la ficha del chat puede tardar en una conversación larga.
+export const maxDuration = 300;
 
 /** CRM Dropshippers › Bandeja de WhatsApp (26 oct 2026): los chats de los números de la empresa, para contestar desde el sistema. */
 export default async function BandejaWhatsappPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {

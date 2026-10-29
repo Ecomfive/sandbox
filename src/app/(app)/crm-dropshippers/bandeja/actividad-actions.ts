@@ -12,7 +12,9 @@ import {
   frecuenciaDeMotivos,
   interesPorProducto,
   normalizarAnalisis,
+  normalizarPerfil,
   pedidoActividad,
+  pedidoPerfil,
   productosDelAnalisis,
   situacionDelCliente,
   tramosDeDias,
@@ -23,6 +25,7 @@ import {
   type FrecuenciaMotivo,
   type InteresEnProducto,
   type MensajeActividad,
+  type PerfilCliente,
   type SituacionCliente,
 } from "@/lib/whatsapp/actividad";
 import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
@@ -53,7 +56,17 @@ export interface DiaDelCliente {
   estado: EstadoDia;
 }
 
+/** El análisis completo de un cliente (migración 0187) con cuándo y quién lo hizo. */
+export interface PerfilGuardado extends PerfilCliente {
+  analizadoEn: string;
+  analizadoPor: string | null;
+  /** Con cuántos días analizados se hizo. */
+  dias: number;
+}
+
 export interface ActividadCliente {
+  /** La lectura completa del cliente; null si todavía no se hizo o falta la migración 0187. */
+  perfil: PerfilGuardado | null;
   dias: DiaDelCliente[];
   frecuentes: FrecuenciaMotivo[];
   /** Los productos por los que más preguntó este cliente. */
@@ -108,6 +121,18 @@ async function guardados(supabase: Supabase, id: string): Promise<{ filas: FilaG
   };
 }
 
+/** El análisis completo guardado de un chat. `falta`: todavía no se corrió la migración 0187. */
+async function perfilGuardado(supabase: Supabase, id: string): Promise<{ perfil: PerfilGuardado | null; falta: boolean }> {
+  const { data, error } = await supabase.from("whatsapp_actividad_cliente").select("datos, dias_analizados, analizado_en, analizado_por").eq("conversacion_id", id).maybeSingle();
+  if (error) return { perfil: null, falta: true };
+  if (!data) return { perfil: null, falta: false };
+  const d = (data.datos ?? {}) as Record<string, unknown>;
+  // Se vuelve a validar lo guardado con las mismas reglas que lo que devuelve la IA.
+  const perfil = normalizarPerfil(JSON.stringify({ ...d, proxima_accion: d.proximaAccion }));
+  if (!perfil) return { perfil: null, falta: false };
+  return { perfil: { ...perfil, analizadoEn: data.analizado_en as string, analizadoPor: (data.analizado_por as string | null) ?? null, dias: Number(data.dias_analizados ?? 0) }, falta: false };
+}
+
 const mapaDeGuardados = (filas: FilaGuardada[]): Map<string, DiaGuardado> => new Map(filas.map((f) => [f.dia, { firma: f.firma, version: f.version }]));
 
 /** Los productos del catálogo (simples, no descontinuados) para darle a los nombres que escribe la IA el nombre de siempre. */
@@ -123,15 +148,17 @@ export async function actividadDelCliente(conversacionId: string): Promise<Activ
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, conversacionId, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
-  const [msgs, g, conv] = await Promise.all([
+  const [msgs, g, conv, pf] = await Promise.all([
     mensajesDelChat(supabase, c.id, false),
     guardados(supabase, c.id),
     supabase.from("whatsapp_conversaciones").select("ultimo_de, ultimo_mensaje_en").eq("id", c.id).maybeSingle(),
+    perfilGuardado(supabase, c.id),
   ]);
   const dias = diasPorAnalizar(agruparPorDia(msgs), mapaDeGuardados(g.filas));
   const ultimo = g.filas[0] ?? null;
   const interes = interesPorProducto(g.filas.map((f) => ({ cliente: c.id, productos: f.productos })));
   return {
+    perfil: pf.perfil,
     dias: g.filas.slice(0, DIAS_EN_FICHA).map((f) => ({ dia: f.dia, motivos: f.motivos, productos: f.productos, resumen: f.resumen, estado: f.estado })),
     frecuentes: frecuenciaDeMotivos(g.filas),
     productos: interes.map((p) => ({ nombre: p.nombre, dias: p.dias })).slice(0, 8),
@@ -208,10 +235,35 @@ async function analizarChat(supabase: Supabase, u: UsuarioActual, id: string, li
 }
 
 /**
+ * El análisis completo del cliente: la IA mira el historial de todos los días ya analizados y los mensajes de los últimos días y arma una lectura más amplia (trato, tono, urgencia,
+ * riesgo, compromisos del equipo sin cumplir, oportunidades y qué hacer ahora). Se rehace cada vez: lo que cambió desde la última vez (mensajes nuevos) entra en la lectura nueva.
+ */
+async function analizarPerfil(supabase: Supabase, u: UsuarioActual, id: string): Promise<{ hecho: true } | { omitido: string } | { error: string }> {
+  const [msgs, g] = await Promise.all([mensajesDelChat(supabase, id, true), guardados(supabase, id)]);
+  if (g.falta || !g.filas.length) return { omitido: "Todavía no hay días analizados." };
+  const pedido = pedidoPerfil(g.filas, agruparPorDia(msgs));
+  const r = await pedirIA({ instrucciones: pedido.instrucciones, texto: pedido.texto, imagenes: [] }, false, {
+    operacion: "actividad_cliente_completo",
+    modulo: "crm-dropshippers",
+    usuario: { id: u.id, nombre: u.nombre ?? null, email: u.email },
+    referencia: id,
+  });
+  if ("error" in r) return { error: r.error };
+  const perfil = normalizarPerfil(r.texto);
+  if (!perfil) return { error: "La IA no devolvió un análisis completo que se pueda guardar. Vuelve a intentarlo." };
+  const { error } = await supabase.from("whatsapp_actividad_cliente").upsert(
+    { conversacion_id: id, datos: perfil, dias_analizados: g.filas.length, modelo: modeloDeTexto(), analizado_por: u.nombre || u.email, analizado_en: new Date().toISOString() },
+    { onConflict: "conversacion_id" },
+  );
+  if (error) return { error: error.code === "42P01" ? "Falta correr la migración 0187 (análisis completo del cliente)." : "No se pudo guardar el análisis completo." };
+  return { hecho: true };
+}
+
+/**
  * «Analizar con IA» en la ficha del chat: todos los días sin analizar de la conversación. No hace falta intervenir el chat ni poder escribir en su área (solo mira y guarda el
  * análisis): basta poder escribir en el CRM, porque **cuesta crédito de IA**. Si la conversación es muy larga, devuelve `faltan` y la ficha lo vuelve a pedir.
  */
-export async function analizarActividadDelCliente(conversacionId: string): Promise<(ActividadCliente & { analizados: number; faltan: number }) | { error: string }> {
+export async function analizarActividadDelCliente(conversacionId: string): Promise<(ActividadCliente & { analizados: number; faltan: number; aviso: string | null }) | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const supabase = createServiceClient();
@@ -219,10 +271,21 @@ export async function analizarActividadDelCliente(conversacionId: string): Promi
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
   const r = await analizarChat(supabase, u, c.id, PRESUPUESTO_FICHA_MS);
   if ("error" in r) return r;
-  if (r.analizados) await registrarAuditoria({ accion: "analizar_actividad_whatsapp", entidad: "whatsapp_conversaciones", entidadId: c.id, detalle: `Analizó ${r.analizados} ${r.analizados === 1 ? "día" : "días"} con IA` });
+  // El análisis completo se hace al terminar de leer los días; un fallo aquí no tira lo ya analizado, solo se avisa.
+  let aviso: string | null = null;
+  let completo = false;
+  if (!r.faltan) {
+    const pf = await analizarPerfil(supabase, u, c.id);
+    if ("error" in pf) aviso = pf.error;
+    else completo = "hecho" in pf;
+  }
+  if (r.analizados || completo) {
+    const partes = [r.analizados ? `${r.analizados} ${r.analizados === 1 ? "día" : "días"}` : null, completo ? "análisis completo" : null].filter(Boolean);
+    await registrarAuditoria({ accion: "analizar_actividad_whatsapp", entidad: "whatsapp_conversaciones", entidadId: c.id, detalle: `Analizó con IA: ${partes.join(" y ")}` });
+  }
   const a = await actividadDelCliente(c.id);
   if ("error" in a) return a;
-  return { ...a, analizados: r.analizados, faltan: r.faltan };
+  return { ...a, analizados: r.analizados, faltan: r.faltan, aviso };
 }
 
 export interface MotivoRecurrente extends FrecuenciaMotivo {

@@ -13,8 +13,12 @@ import type { AreaCrm } from "@/lib/crm/areas";
 import { quienesRespondieron } from "@/lib/crm/respondieron";
 import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { FichaCrmChat } from "./actions";
-import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
+import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
+import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
+import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
+import { reaccionarAMensaje } from "./reaccion-actions";
+import { cambiarVip } from "../tareas/actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
@@ -32,15 +36,16 @@ import { ChatIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, P
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
+import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 
 /** Qué conversaciones del panel se ven. */
-type Filtro = "sinResponder" | "mias" | "todas";
+type Filtro = "sinResponder" | "mias" | "resueltas" | "todas";
 const REFRESCO_MS = 8000;
 /** Con el aviso en tiempo real conectado (canal-bandeja.ts), el refresco solo queda de respaldo. */
 const REFRESCO_RESPALDO_MS = 30000;
 
 /** Lo que devuelve el refresco (`/api/whatsapp/bandeja`): la lista de chats y los últimos mensajes del chat abierto. */
-type Refresco = { bandeja: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] }; chat: { id: string; mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | null };
+type Refresco = { bandeja: DatosBandeja; chat: { id: string; mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | null };
 
 /** Un mensaje que se muestra apenas se toca enviar, antes de que el servidor responda (id «local-…»). */
 const esLocal = (m: MensajeVista) => m.id.startsWith("local-");
@@ -57,6 +62,21 @@ const AREAS_CHAT: { valor: AreaCrm; etiqueta: string; clase: string; para: strin
   { valor: "direccion", etiqueta: "Dirección", clase: "bg-primario-suave text-primario", para: "Solo la ve el CEO" },
 ];
 const areaChat = (a: AreaCrm) => AREAS_CHAT.find((x) => x.valor === a) ?? AREAS_CHAT[0];
+/** El color del punto de cada panel: el del texto de su etiqueta. */
+const colorDeArea = (a: AreaCrm) => areaChat(a).clase.split(" ").find((x) => x.startsWith("text-")) ?? "";
+/** Cuántas columnas en pantalla ancha, según los paneles que ve la persona (clases escritas enteras para que Tailwind las genere). */
+const COLUMNAS_PANELES: Record<number, string> = { 2: "lg:grid-cols-2", 3: "lg:grid-cols-3" };
+
+/**
+ * Cuánto lleva un chat sin respuesta, desde el último mensaje del dropshipper: «8 min», «1 h 15 min», «2 días». Verde hasta 15 minutos,
+ * ámbar hasta la hora y rojo después. Se calcula al dibujar (la bandeja se refresca sola).
+ */
+function esperaDe(desde: string | null): { texto: string; clase: string } | null {
+  if (!desde) return null;
+  const min = Math.max(0, Math.floor((Date.now() - new Date(desde).getTime()) / 60_000));
+  const texto = min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}` : `${Math.floor(min / 1440)} día${min >= 2880 ? "s" : ""}`;
+  return { texto, clase: min < 15 ? "text-[var(--wa-acento)]" : min < 60 ? "text-warning" : "text-destructive" };
+}
 
 /** Respuestas de un toque para lo que más se repite en Atención. */
 /** Los mensajes rápidos de siempre: se usan mientras no exista la tabla de la migración 0179. */
@@ -162,6 +182,11 @@ function Foto({ nombre, tam }: { nombre: string; tam: "lista" | "cabecera" | "fi
   );
 }
 
+/** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
+function EtiquetaVip() {
+  return <span className="inline-flex flex-none items-center rounded-full bg-[var(--wa-texto)] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-[var(--wa-fondo)]">VIP</span>;
+}
+
 /** La etiqueta de color de un área, con su punto. */
 function EtiquetaArea({ area }: { area: AreaCrm }) {
   const a = areaChat(area);
@@ -222,7 +247,9 @@ const botonIcono = `flex h-10 w-10 flex-none items-center justify-center rounded
  * La bandeja de WhatsApp (26 oct 2026). **Paneles** (29 oct 2026, pedido de Hernán): uno por área; cada quien ve el suyo (`miArea`) y los
  * de las áreas de abajo (`areas`), que supervisa en silencio: abrir un chat de otro panel no lo marca leído (actions.ts) y para responder
  * hay que «Intervenir»; las notas privadas sí se dejan. Desde el 28 oct 2026 se ve y se usa como WhatsApp (pedido de Hernán; prototipo
- * https://claude.ai/artifact/RGtk9mxmht8nzneUX75ucx): a la izquierda «Chats» con el buscador, los filtros (Sin responder, Mías, Todas y,
+ * https://claude.ai/artifact/RGtk9mxmht8nzneUX75ucx). Desde el 29 oct 2026 los paneles se ven **lado a lado** (bosquejo
+ * https://claude.ai/artifact/2ijPiMamnVQpDmp7iTzqgE), con el buscador y los filtros arriba para todos; Atención, que ve uno solo, lo tiene a
+ * todo lo ancho con «Esperando» y «La lleva». Antes: a la izquierda «Chats» con el buscador, los filtros (Sin responder, Mías, Todas y,
  * con más de un área, cada área) y la lista; al centro la conversación con burbujas, palomitas y la barra para escribir (Enter envía,
  * Mayús + Enter baja de línea), donde también se deja una nota privada; a la derecha, la ficha del dropshipper, que se abre y se cierra
  * tocando su nombre. Se refresca sola cada pocos segundos mientras está a la vista. Los colores propios viven en `.bandeja-wa` (globals.css).
@@ -237,7 +264,7 @@ export function Bandeja({
   miArea,
   estado360 = null,
 }: {
-  inicial: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] };
+  inicial: DatosBandeja;
   abrirInicial: string | null;
   escribe: boolean;
   miId: string;
@@ -260,13 +287,6 @@ export function Bandeja({
   );
   const [datos, setDatos] = useState(inicial);
   const [filtro, setFiltro] = useState<Filtro>(abrirInicial ? "todas" : "sinResponder");
-  // El panel que se mira: el del chat pedido con ?abrir=, si no el propio (o, si el propio está vacío, el primero con chats).
-  const [panel, setPanel] = useState<AreaCrm>(() => {
-    const pedido = inicial.conversaciones.find((c) => c.id === abrirInicial)?.area;
-    if (pedido) return pedido;
-    if (inicial.conversaciones.some((c) => c.area === miArea)) return miArea;
-    return areas.find((a) => inicial.conversaciones.some((c) => c.area === a)) ?? miArea;
-  });
   const [numero, setNumero] = useState<string>("todos");
   const [buscar, setBuscar] = useState("");
   const [elegido, setElegido] = useState<string | null>(abrirInicial);
@@ -352,7 +372,8 @@ export function Bandeja({
     temporizadorVista.current = setTimeout(async () => {
       const r = el.getBoundingClientRect();
       const top = Math.max(8, Math.min(r.top, window.innerHeight - 336));
-      const left = Math.max(8, Math.min(r.right + 8, window.innerWidth - 360));
+      // A la derecha del chat o, en la última columna (no cabe), a su izquierda.
+      const left = r.right + 368 <= window.innerWidth ? r.right + 8 : Math.max(8, r.left - 368);
       const clave = `${c.id}|${c.ultimoMensajeEn}|${c.noLeidos}`;
       const guardado = cacheVista.current.get(clave);
       if (guardado) return setVista({ id: c.id, top, left, mensajes: guardado });
@@ -500,26 +521,35 @@ export function Bandeja({
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
   const delNumero = useMemo(() => datos.conversaciones.filter((c) => numero === "todos" || c.numeroId === numero), [datos.conversaciones, numero]);
-  const deNumero = useMemo(() => delNumero.filter((c) => c.area === panel), [delNumero, panel]);
+  // Los filtros cuentan los chats de todos los paneles que se ven.
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
-    { id: "sinResponder", texto: "Sin responder", cuenta: deNumero.filter(sinResponder).length },
-    { id: "mias", texto: "Mías", cuenta: deNumero.filter((c) => c.asignadaAId === miId).length },
-    { id: "todas", texto: "Todas", cuenta: deNumero.length },
+    { id: "sinResponder", texto: "Sin responder", cuenta: delNumero.filter(sinResponder).length },
+    { id: "mias", texto: "Mías", cuenta: delNumero.filter((c) => c.asignadaAId === miId).length },
+    { id: "resueltas", texto: "Resueltas", cuenta: delNumero.filter((c) => c.estado === "resuelta").length },
+    { id: "todas", texto: "Todas", cuenta: delNumero.length },
   ];
-  const supervisandoPanel = panel !== miArea;
-  const lista = useMemo(() => {
+  // Una lista por panel (29 oct 2026): los paneles se ven lado a lado, cada uno con sus chats según el filtro y la búsqueda.
+  const listas = useMemo(() => {
     const q = buscar.trim().toLowerCase();
-    return deNumero
-      .filter(
-        (c) =>
-          // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
-          c.id === elegido ||
-          (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : true),
-      )
-      .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)));
-  }, [deNumero, filtro, buscar, miId, elegido]);
+    return new Map(
+      areas.map((a) => [
+        a,
+        delNumero
+          .filter((c) => c.area === a)
+          .filter(
+            (c) =>
+              // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
+              c.id === elegido ||
+              (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "resueltas" ? c.estado === "resuelta" : true),
+          )
+          .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q))),
+      ]),
+    );
+  }, [areas, delNumero, filtro, buscar, miId, elegido]);
 
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
+  // La lista del panel del chat abierto: las flechas de su ventana pasan al anterior o al siguiente de esa columna.
+  const lista = sel ? (listas.get(sel.area) ?? []) : [];
   const ventana = sel && enNavegador ? textoVentana(sel.ultimoEntranteEn) : null;
   // Supervisión: un chat de otro panel se mira sin dejar rastro; para responderle al dropshipper hay que «Intervenir» (queda a su cargo).
   const supervisando = !!sel && sel.area !== miArea;
@@ -527,6 +557,8 @@ export function Bandeja({
   const esNota = modo === "nota" || mirando;
   const bloqueado = !escribe || (!esNota && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
+  // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
+  const conReacciones = mensajes ? agruparReacciones(mensajes) : null;
   const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
 
   /** Escribe un emoji donde está el cursor (o al final) y deja el cursor justo después. */
@@ -556,6 +588,14 @@ export function Bandeja({
     setArchivo(f);
   }
   const traeArchivos = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+
+  /** Reacciona con un emoji a un mensaje del chat (o quita la reacción con un emoji vacío) y vuelve a pedir el chat para verla puesta. */
+  async function reaccionar(m: MensajeVista, emoji: string) {
+    if (!sel) return;
+    const r = await reaccionarAMensaje(sel.id, m.id, emoji).catch(() => ({ error: "No se pudo reaccionar. Inténtalo de nuevo." }));
+    if ("error" in r) mostrarToast(r.error, "destructive");
+    await refrescar(sel.id);
+  }
 
   function mandar() {
     if (!sel || !borrador.trim() || bloqueado) return;
@@ -598,6 +638,50 @@ export function Bandeja({
         });
         if (!("error" in r)) void refrescar(chatId);
       });
+  }
+
+  // Las etiquetas de los chats, como en ClickUp (migración 0185): se ven al momento y vuelven a como estaban si el servidor no las guarda.
+  const [etiquetando, setEtiquetando] = useState<string | null>(null);
+  const anclaEtiquetas = useRef<HTMLElement | null>(null);
+  const manejoEtiquetas: ManejoEtiquetas = useMemo(() => {
+    const ponerEtiquetas = (id: string, etiquetas: string[]) => setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === id ? { ...x, etiquetas } : x)) }));
+    return {
+      todas: [...new Set([...Object.keys(datos.colores ?? {}), ...datos.conversaciones.flatMap((c) => c.etiquetas ?? [])])],
+      colores: datos.colores ?? {},
+      cambiar: (id, etiquetas) => {
+        const antes = datos.conversaciones.find((c) => c.id === id)?.etiquetas ?? [];
+        ponerEtiquetas(id, etiquetas);
+        void guardarEtiquetasChat(id, etiquetas)
+          .then((r) => ("error" in r ? (ponerEtiquetas(id, antes), mostrarToast(r.error, "destructive")) : ponerEtiquetas(id, r.etiquetas)))
+          .catch(() => {
+            ponerEtiquetas(id, antes);
+            mostrarToast("No se pudieron guardar las etiquetas.", "destructive");
+          });
+      },
+      cambiarColor: (nombre, color) => {
+        const antes = datos.colores?.[nombre];
+        const poner = (c: string | undefined) => setDatos((d) => ({ ...d, colores: Object.fromEntries(Object.entries({ ...d.colores, [nombre]: c }).filter(([, v]) => v)) as Record<string, string> }));
+        poner(color);
+        void guardarColorEtiquetaChat(nombre, color)
+          .then((r) => {
+            if ("error" in r) {
+              poner(antes);
+              mostrarToast(r.error, "destructive");
+            }
+          })
+          .catch(() => {
+            poner(antes);
+            mostrarToast("No se pudo guardar el color.", "destructive");
+          });
+      },
+    };
+  }, [datos.colores, datos.conversaciones, mostrarToast]);
+
+  /** «Etiquetas» del clic derecho: el selector se abre junto al chat de la lista. */
+  function etiquetarDesdeLista(id: string) {
+    anclaEtiquetas.current = origenMenu.current;
+    setMenuChat(null);
+    setEtiquetando(id);
   }
 
   /** Marca un chat como leído o no leído. Un chat abierto se cierra al marcarlo no leído (si no, seguiría contando como leído al refrescar). */
@@ -652,9 +736,8 @@ export function Bandeja({
     if (!sel) return;
     const queda = areas.includes(destino);
     accion(() => pasarConversacionDeArea(sel.id, destino), queda ? `Chat pasado a ${areaChat(destino).etiqueta}.` : `Chat pasado a ${areaChat(destino).etiqueta}. Ya no lo verás en tu bandeja.`);
-    // Si sigue a la vista, se pasa con él a su nuevo panel.
-    if (queda) setPanel(destino);
-    else setElegido(null);
+    // Si sigue a la vista, aparece en la columna de su nuevo panel; si no, se cierra.
+    if (!queda) setElegido(null);
   }
 
   /** Abre un chat en su ventana: queda leído (en el panel propio; supervisando, no) y se ve el chat primero. */
@@ -705,8 +788,89 @@ export function Bandeja({
     );
   }
 
+  /**
+   * Un chat en la lista de su panel. `ancha`: el panel ocupa todo el ancho (Atención, que ve uno solo): suma «Esperando» (cuánto lleva sin
+   * respuesta) y «La lleva».
+   */
+  function filaChat(c: ConversacionVista, ancha: boolean) {
+    const actual = c.id === elegido;
+    // El número solo se dice si el chat llegó por el de otra área: el de su panel ya está en la cabecera de la columna.
+    const otroNumero = datos.numeros.length > 1 && numeroDe.get(c.numeroId)?.area !== c.area ? (numeroDe.get(c.numeroId)?.nombre ?? null) : null;
+    const datosFila = (
+      <>
+        <span className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
+          {c.vip && <EtiquetaVip />}
+          <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-sm text-[var(--wa-sec)]">
+          {c.ultimoDe === "saliente" && <Palomitas estado="entregado" />}
+          {c.ultimoDe === "nota" && <span className="flex-none font-medium text-[var(--wa-nota-acento)]">Nota:</span>}
+          <span className={`min-w-0 flex-1 truncate ${c.noLeidos ? "font-medium text-[var(--wa-texto)]" : ""}`}>{c.ultimoTexto ?? ""}</span>
+          {c.noLeidos > 0 && (
+            <span className="flex h-5 min-w-5 flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1.5 text-xs font-semibold text-[var(--wa-acento-texto)] tabular-nums">
+              {c.noLeidos}
+              <span className="sr-only"> sin leer</span>
+            </span>
+          )}
+        </span>
+        {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || otroNumero || c.etiquetas.length > 0) && (
+          <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
+            {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
+            {c.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">Borrado en la app</span>}
+            {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
+            <PastillasEtiquetas etiquetas={c.etiquetas} colores={manejoEtiquetas.colores} />
+            {otroNumero && <span>Por {otroNumero}</span>}
+            {c.asignadaA && <span className={ancha ? "lg:hidden" : undefined}>La lleva {c.asignadaA}</span>}
+          </span>
+        )}
+      </>
+    );
+    const espera = enNavegador && sinResponder(c) ? esperaDe(c.ultimoEntranteEn) : null;
+    return (
+      <li
+        key={c.id}
+        onMouseEnter={(e) => c.id !== elegido && verVistaPrevia(c, e.currentTarget)}
+        onMouseLeave={ocultarVistaPrevia}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          ocultarVistaPrevia();
+          origenMenu.current = e.currentTarget.querySelector("button");
+          // Con el teclado (tecla de menú o Mayús + F10) no hay posición del cursor: el menú sale junto al chat.
+          const r = e.currentTarget.getBoundingClientRect();
+          const conRaton = e.clientX !== 0 || e.clientY !== 0;
+          setMenuChat({ id: c.id, x: Math.min(conRaton ? e.clientX : r.left + 40, window.innerWidth - 230), y: Math.min(conRaton ? e.clientY : r.bottom - 8, window.innerHeight - 70) });
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => abrirChat(c)}
+          aria-current={actual ? "true" : undefined}
+          onFocus={(e) => !actual && verVistaPrevia(c, e.currentTarget)}
+          onBlur={ocultarVistaPrevia}
+          className={`flex w-full items-center gap-3 pl-3.5 text-left ${actual ? "bg-[var(--wa-sel)]" : "hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+        >
+          <Foto nombre={c.nombre} tam="lista" />
+          {ancha ? (
+            <span className="flex min-w-0 flex-1 items-center gap-4 border-b border-[var(--wa-borde)] py-3 pr-3.5">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">{datosFila}</span>
+              <span className={`hidden w-[140px] flex-none items-center gap-1.5 text-[13px] font-semibold tabular-nums lg:flex ${espera ? espera.clase : "font-normal text-[var(--wa-sec)]"}`}>
+                {espera && <span aria-hidden="true" className="h-2 w-2 flex-none rounded-full bg-current" />}
+                {espera ? espera.texto : c.estado === "resuelta" ? "Resuelta" : "Respondido"}
+              </span>
+              <span className="hidden w-[160px] flex-none truncate text-[13px] text-[var(--wa-sec)] lg:block">{c.asignadaA ?? "Sin asignar"}</span>
+            </span>
+          ) : (
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5 border-b border-[var(--wa-borde)] py-3 pr-3.5">{datosFila}</span>
+          )}
+        </button>
+        {vista?.id === c.id && <VistaPreviaChat nombre={c.nombre} etiquetas={<PastillasEtiquetas etiquetas={c.etiquetas} colores={manejoEtiquetas.colores} />} mensajes={vista.mensajes} noLeidos={c.noLeidos} top={vista.top} left={vista.left} />}
+      </li>
+    );
+  }
+
   const verDropshipper = chat?.id === sel?.id ? chat?.dropshipper : null;
-  // Las flechas de la ventana pasan al chat anterior o siguiente de la lista tal como se ve (filtro, panel y búsqueda).
+  // Las flechas de la ventana pasan al chat anterior o siguiente de su columna tal como se ve (filtro y búsqueda).
   const posicion = sel ? lista.findIndex((c) => c.id === sel.id) : -1;
   const chatAnterior = posicion > 0 ? lista[posicion - 1] : null;
   const chatSiguiente = posicion >= 0 && posicion < lista.length - 1 ? lista[posicion + 1] : null;
@@ -775,6 +939,23 @@ export function Bandeja({
               ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
+        ...(verDropshipper && fichaDelChat && typeof fichaDelChat === "object" && (fichaDelChat.acceso.escribeAtencion || fichaDelChat.acceso.escribeComercial)
+          ? [
+              {
+                texto: fichaDelChat.d.nivel === "vip" ? "Quitar VIP" : "Marcar como VIP",
+                alPulsar: () => {
+                  const vip = fichaDelChat.d.nivel !== "vip";
+                  const id = sel.id;
+                  empezar(async () => {
+                    const r = await cambiarVip(fichaDelChat.d.id, vip).catch(() => ({ error: "No se pudo cambiar el nivel." }));
+                    mostrarToast("error" in r ? r.error : vip ? "Marcado como VIP: se ve en la lista de chats y en su ficha." : "Ya no es VIP.", "error" in r ? "destructive" : undefined);
+                    setVersionCrm((v) => v + 1);
+                    await refrescar(id);
+                  });
+                },
+              },
+            ]
+          : []),
         ...(verDropshipper
           ? [{ texto: "Abrir su ficha en el CRM", href: `/crm-dropshippers?abrir=${verDropshipper.id}` }, ...(escribe ? [{ texto: "No es este dropshipper", alPulsar: () => setVincular(true) }] : [])]
           : escribe && !sel.dropshipperId
@@ -783,177 +964,115 @@ export function Bandeja({
       ];
 
   return (
-    <div className="bandeja-wa flex min-h-[640px] overflow-hidden rounded-[14px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
-      {/* ===== Chats ===== */}
-      <aside aria-label="Conversaciones" className="flex w-full flex-col border-[var(--wa-borde)] lg:w-[380px] lg:flex-none lg:border-r">
-        <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h2 className="m-0 text-[22px] font-bold">{areas.length > 1 ? `Panel de ${areaChat(panel).etiqueta}` : "Chats"}</h2>
-            {/* Con un solo número a la vista (Atención) no se dice nada: solo se cuenta cuando hay más de uno. */}
-            {(supervisandoPanel || datos.numeros.length > 1) && (
-              <span className="truncate text-[12.5px] text-[var(--wa-sec)] tabular-nums">{supervisandoPanel ? "Supervisión: lo que abras aquí no se marca leído" : `${datos.numeros.length} números de WhatsApp`}</span>
-            )}
-          </div>
-          {escribe && (
-            <button type="button" onClick={() => setImportar({ conversacion: null })} className={botonIcono} aria-label="Importar un chat exportado desde el celular" title="Importar un chat del celular">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
-              </svg>
+    <div className="bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
+      {/* ===== Arriba, para todos los paneles: buscar, número, filtros e «Importar chat» ===== */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label className="flex h-10 min-w-0 flex-[1_1_260px] items-center gap-3 rounded-lg bg-[var(--wa-panel)] px-3.5 text-[var(--wa-sec)] focus-within:ring-2 focus-within:ring-[var(--wa-acento)] sm:max-w-md">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <span className="sr-only">Buscar conversación</span>
+          <input
+            type="search"
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            placeholder={areas.length > 1 ? "Buscar en los paneles: nombre, código o tienda" : "Buscar nombre, código o tienda"}
+            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[var(--wa-texto)] outline-none placeholder:text-[var(--wa-sec)]"
+          />
+        </label>
+        {datos.numeros.length > 1 && (
+          <label className="flex">
+            <span className="sr-only">Número de la empresa</span>
+            <select value={numero} onChange={(e) => setNumero(e.target.value)} className={`h-10 max-w-[200px] rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] ${anilloFoco}`}>
+              <option value="todos">Todos los números</option>
+              {datos.numeros.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div role="group" aria-label="Qué conversaciones ver" className="flex flex-wrap gap-1.5">
+          {opciones.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              aria-pressed={filtro === o.id}
+              onClick={() => setFiltro(o.id)}
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] ${
+                filtro === o.id ? "bg-[var(--wa-acento-suave)] font-semibold text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-sec)] hover:bg-[var(--wa-borde)]"
+              } ${anilloFoco}`}
+            >
+              {o.texto}
+              {o.cuenta > 0 && <span className="tabular-nums">{o.cuenta}</span>}
             </button>
-          )}
+          ))}
         </div>
-        <div className="flex flex-col gap-2 px-3 pt-2 pb-2.5">
-          {areas.length > 1 && (
-            <div role="group" aria-label="Paneles" className="flex rounded-lg bg-[var(--wa-panel)] p-[3px]">
-              {areas.map((a) => {
-                const pendientes = delNumero.filter((c) => c.area === a && sinResponder(c)).length;
-                return (
-                  <button
-                    key={a}
-                    type="button"
-                    aria-pressed={panel === a}
-                    onClick={() => {
-                      if (panel === a) return;
-                      setPanel(a);
-                      setElegido(null);
-                    }}
-                    className={`inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-[13px] ${
-                      panel === a ? "bg-[var(--wa-fondo)] font-semibold shadow-[0_1px_0.5px_var(--wa-sombra)]" : "text-[var(--wa-sec)] hover:text-[var(--wa-texto)]"
-                    } ${anilloFoco}`}
-                  >
-                    {areaChat(a).etiqueta}
-                    {a === miArea && <span className="text-[11px] font-normal text-[var(--wa-sec)]">(tuyo)</span>}
-                    {pendientes > 0 && (
-                      <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
-                        {pendientes}
-                        <span className="sr-only"> sin responder</span>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <label className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-lg bg-[var(--wa-panel)] px-3.5 text-[var(--wa-sec)] focus-within:ring-2 focus-within:ring-[var(--wa-acento)]">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.5-3.5" />
-              </svg>
-              <span className="sr-only">Buscar conversación</span>
-              <input
-                type="search"
-                value={buscar}
-                onChange={(e) => setBuscar(e.target.value)}
-                placeholder="Buscar nombre, teléfono o tienda"
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[var(--wa-texto)] outline-none placeholder:text-[var(--wa-sec)]"
-              />
-            </label>
-            {datos.numeros.length > 1 && (
-              <label className="flex">
-                <span className="sr-only">Número de la empresa</span>
-                <select value={numero} onChange={(e) => setNumero(e.target.value)} className={`h-10 max-w-[150px] rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] ${anilloFoco}`}>
-                  <option value="todos">Todos los números</option>
-                  {datos.numeros.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </div>
-          <div role="group" aria-label="Qué conversaciones ver" className="flex flex-wrap gap-1.5">
-            {opciones.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                aria-pressed={filtro === o.id}
-                onClick={() => setFiltro(o.id)}
-                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px] ${
-                  filtro === o.id ? "bg-[var(--wa-acento-suave)] font-semibold text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-sec)] hover:bg-[var(--wa-borde)]"
-                } ${anilloFoco}`}
-              >
-                {o.texto}
-                {o.cuenta > 0 && <span className="tabular-nums">{o.cuenta}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-        <ul className="m-0 flex-1 list-none overflow-y-auto p-0">
-          {lista.map((c) => {
-            const actual = c.id === elegido;
-            return (
-              <li
-                key={c.id}
-                onMouseEnter={(e) => c.id !== elegido && verVistaPrevia(c, e.currentTarget)}
-                onMouseLeave={ocultarVistaPrevia}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  ocultarVistaPrevia();
-                  origenMenu.current = e.currentTarget.querySelector("button");
-                  // Con el teclado (tecla de menú o Mayús + F10) no hay posición del cursor: el menú sale junto al chat.
-                  const r = e.currentTarget.getBoundingClientRect();
-                  const conRaton = e.clientX !== 0 || e.clientY !== 0;
-                  setMenuChat({ id: c.id, x: Math.min(conRaton ? e.clientX : r.left + 40, window.innerWidth - 230), y: Math.min(conRaton ? e.clientY : r.bottom - 8, window.innerHeight - 70) });
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => abrirChat(c)}
-                  aria-current={actual ? "true" : undefined}
-                  onFocus={(e) => !actual && verVistaPrevia(c, e.currentTarget)}
-                  onBlur={ocultarVistaPrevia}
-                  className={`flex w-full items-center gap-3 pl-3.5 text-left ${actual ? "bg-[var(--wa-sel)]" : "hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
-                >
-                  <Foto nombre={c.nombre} tam="lista" />
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5 border-b border-[var(--wa-borde)] py-3 pr-3.5">
-                    <span className="flex items-baseline gap-2">
-                      <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
-                      <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-sm text-[var(--wa-sec)]">
-                      {c.ultimoDe === "saliente" && <Palomitas estado="entregado" />}
-                      {c.ultimoDe === "nota" && (
-                        <span className="flex-none font-medium text-[var(--wa-nota-acento)]">Nota:</span>
-                      )}
-                      <span className={`min-w-0 flex-1 truncate ${c.noLeidos ? "font-medium text-[var(--wa-texto)]" : ""}`}>{c.ultimoTexto ?? ""}</span>
-                      {c.noLeidos > 0 && (
-                        <span className="flex h-5 min-w-5 flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1.5 text-xs font-semibold text-[var(--wa-acento-texto)] tabular-nums">
-                          {c.noLeidos}
-                          <span className="sr-only"> sin leer</span>
-                        </span>
-                      )}
-                    </span>
-                    {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || datos.numeros.length > 1) && (
-                      <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
-                        {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
-                        {c.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">Borrado en la app</span>}
-                        {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
-                        {datos.numeros.length > 1 && <span>{numeroDe.get(c.numeroId)?.nombre}</span>}
-                        {c.asignadaA && <span>· {c.asignadaA}</span>}
-                      </span>
-                    )}
-                  </span>
-                </button>
-                {vista?.id === c.id && <VistaPreviaChat nombre={c.nombre} mensajes={vista.mensajes} noLeidos={c.noLeidos} top={vista.top} left={vista.left} />}
-              </li>
-            );
-          })}
-          {!lista.length && <li className="px-4 py-10 text-center text-sm text-[var(--wa-sec)]">{filtro === "sinResponder" ? "Nada sin responder." : "No hay conversaciones con este filtro."}</li>}
-        </ul>
-      </aside>
+        {escribe && (
+          <button
+            type="button"
+            onClick={() => setImportar({ conversacion: null })}
+            title="Importar un chat exportado desde el celular"
+            className={`ml-auto inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 text-[13px] font-medium text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+            </svg>
+            Importar chat
+          </button>
+        )}
+      </div>
 
-      {/* ===== Sin chat abierto ===== */}
-      {!sel && (
-        <div className="bandeja-wa-chat hidden flex-1 flex-col items-center justify-center gap-2 p-8 text-center lg:flex">
-          <span className="text-[22px] font-light">Bandeja de WhatsApp</span>
-          <span className="max-w-sm text-sm text-[var(--wa-sec)]">Pulsa una conversación para abrirla: a la izquierda la ficha del dropshipper y a la derecha el chat, para responder o dejar una nota privada.</span>
-        </div>
-      )}
+      {/* ===== Los paneles, lado a lado (29 oct 2026): Atención, que solo ve el suyo, lo tiene a todo lo ancho ===== */}
+      <div className={`grid min-h-0 flex-1 grid-cols-1 gap-3 ${COLUMNAS_PANELES[areas.length] ?? ""}`}>
+        {areas.map((a) => {
+          const chats = listas.get(a) ?? [];
+          const pendientes = delNumero.filter((c) => c.area === a && sinResponder(c)).length;
+          const numerosDelArea = datos.numeros.filter((n) => n.area === a).map((n) => n.nombre);
+          const ancha = areas.length === 1;
+          return (
+            <section
+              key={a}
+              aria-label={`Panel de ${areaChat(a).etiqueta}`}
+              className="flex max-h-[75vh] min-h-[360px] flex-col overflow-hidden rounded-[14px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] lg:max-h-none lg:min-h-0"
+            >
+              <div className="flex items-start gap-2.5 border-b border-[var(--wa-borde)] px-4 pt-3.5 pb-3">
+                <span aria-hidden="true" className={`mt-[7px] h-2.5 w-2.5 flex-none rounded-full bg-current ${colorDeArea(a)}`} />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <h2 className="m-0 text-[17px] font-bold">
+                    {areaChat(a).etiqueta}
+                    {a === miArea && areas.length > 1 && <span className="ml-1.5 text-xs font-normal text-[var(--wa-sec)]">(tuyo)</span>}
+                  </h2>
+                  <span className="truncate text-[12.5px] text-[var(--wa-sec)]">
+                    {numerosDelArea.length ? numerosDelArea.join(" · ") : a === "direccion" ? "Sus chats propios, que nadie más ve" : "Sin número propio"}
+                  </span>
+                </div>
+                {pendientes > 0 && (
+                  <span className="flex h-6 flex-none items-center rounded-full bg-[var(--wa-acento)] px-2.5 text-xs font-semibold text-[var(--wa-acento-texto)] tabular-nums">{pendientes} sin responder</span>
+                )}
+              </div>
+              {ancha && chats.length > 0 && (
+                <div aria-hidden="true" className="hidden items-center gap-4 border-b border-[var(--wa-borde)] bg-[var(--wa-panel)] py-2 pr-3.5 pl-[76px] text-[11.5px] font-semibold tracking-wide text-[var(--wa-sec)] uppercase lg:flex">
+                  <span className="flex-1">Chat</span>
+                  <span className="w-[140px] flex-none">Esperando</span>
+                  <span className="w-[160px] flex-none">La lleva</span>
+                </div>
+              )}
+              <ul className="m-0 flex-1 list-none overflow-y-auto p-0">
+                {chats.map((c) => filaChat(c, ancha))}
+                {!chats.length && <li className="px-4 py-10 text-center text-sm text-[var(--wa-sec)]">{filtro === "sinResponder" ? "Nada sin responder." : filtro === "resueltas" ? "No hay conversaciones resueltas." : "No hay conversaciones con este filtro."}</li>}
+              </ul>
+              {a !== miArea && <p className="m-0 border-t border-[var(--wa-borde)] bg-[var(--wa-panel)] px-4 py-2 text-xs text-[var(--wa-sec)]">Supervisión: lo que abras aquí no se marca leído</p>}
+            </section>
+          );
+        })}
+      </div>
 
       {/* ===== El chat abierto, en su ventana: la ficha del dropshipper a la izquierda y el chat a la derecha (29 oct 2026) ===== */}
-      {sel && (
+      {/* Solo en el navegador: abierto desde un enlace (`?abrir=`, el aviso de una tarea o «WhatsApp» del CRM) el servidor no tiene dónde dibujarla. */}
+      {sel && enNavegador && (
         <Ventana
           abierto
           alCerrar={() => setElegido(null)}
@@ -1003,6 +1122,7 @@ export function Bandeja({
                   </span>
                 </span>
               </span>
+              {sel.vip && <EtiquetaVip />}
               <EtiquetaArea area={sel.area} />
               {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}
               {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
@@ -1045,6 +1165,7 @@ export function Bandeja({
                   escribe={escribe}
                   mirando={mirando}
                   accionesChat={accionesChat}
+                  etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
                   opcionesMas={opcionesMas}
                   areaDelChat={
                     <Bloque titulo="Área del chat">
@@ -1063,7 +1184,7 @@ export function Bandeja({
                     mostrarToast(mensaje);
                     void refrescar(sel.id);
                   }}
-                  alAviso={(texto) => mostrarToast(texto, "destructive")}
+                  alAviso={(texto, error) => mostrarToast(texto, error ? "destructive" : undefined)}
                 />
               </div>
               <section
@@ -1148,9 +1269,9 @@ export function Bandeja({
                   {!mensajes ? (
                     <p className="m-0 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1.5 text-[12.5px] text-[var(--wa-sec)]">Cargando…</p>
                   ) : (
-                    mensajes.map((m, i) => {
+                    (conReacciones?.visibles ?? mensajes).map((m, i, visibles) => {
                       const dia = etiquetaDia(m.momento);
-                      const previo = mensajes[i - 1];
+                      const previo = visibles[i - 1];
                       const separador = i === 0 || etiquetaDia(previo.momento) !== dia;
                       // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp). Si responde otra persona del
                       // equipo no se juntan, para que se vea quién mandó cada cosa (con su área).
@@ -1175,8 +1296,11 @@ export function Bandeja({
                           <Burbuja
                             m={m}
                             seguido={seguido}
+                            reacciones={conReacciones?.reacciones.get(m.id)}
                             alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
+                            // Se reacciona a lo que ya tiene su id en WhatsApp, con la ventana de 24 h abierta y no solo supervisando.
+                            alReaccionar={escribe && !mirando && ventana && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" ? (emoji) => void reaccionar(m, emoji) : undefined}
                             // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
                             alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
                           />
@@ -1362,7 +1486,34 @@ export function Bandeja({
                   Cambiar el nombre
                 </button>
               )}
+              {escribe && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => etiquetarDesdeLista(c.id)}
+                  className={`rounded-md px-3 py-2 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+                >
+                  Etiquetas
+                </button>
+              )}
             </div>
+          );
+        })()}
+      {etiquetando &&
+        (() => {
+          const c = datos.conversaciones.find((x) => x.id === etiquetando);
+          if (!c) return null;
+          return (
+            <SelectorEtiquetasChat
+              ancla={anclaEtiquetas}
+              conversacionId={c.id}
+              etiquetas={c.etiquetas}
+              manejo={manejoEtiquetas}
+              alCerrar={(m) => {
+                setEtiquetando(null);
+                if (m === "escape") anclaEtiquetas.current?.focus();
+              }}
+            />
           );
         })()}
       {verRapidas && <VentanaRapidas rapidas={rapidas} setRapidas={setRapidas} puedeEditar={escribe && !rapidas.some((r) => r.id.startsWith("base-"))} alCerrar={() => setVerRapidas(false)} />}
@@ -1482,15 +1633,90 @@ function BotonRapidaMensaje({ alPulsar }: { alPulsar: () => void }) {
   );
 }
 
+/**
+ * «Reaccionar» a un mensaje, como en WhatsApp (29 oct 2026): un botón con una carita al lado de la burbuja (al pasar el cursor, o siempre en pantallas táctiles) abre una barra con
+ * seis reacciones. Elegir la que ya se había puesto la quita. La reacción de la empresa sale sobre el mensaje, junto a la del dropshipper.
+ */
+function ReaccionarMensaje({ nuestro, actual, alElegir }: { nuestro: boolean; actual: string | null; alElegir: (emoji: string) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const raiz = useRef<HTMLSpanElement>(null);
+  const boton = useRef<HTMLButtonElement>(null);
+
+  // Escape o un clic fuera cierran la barra y el foco vuelve al botón.
+  useEffect(() => {
+    if (!abierto) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setAbierto(false);
+      boton.current?.focus();
+    };
+    const alPulsar = (e: PointerEvent) => {
+      if (raiz.current && !raiz.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("keydown", alTeclear);
+    document.addEventListener("pointerdown", alPulsar);
+    return () => {
+      document.removeEventListener("keydown", alTeclear);
+      document.removeEventListener("pointerdown", alPulsar);
+    };
+  }, [abierto]);
+
+  return (
+    <span ref={raiz} className={`absolute top-1/2 -translate-y-1/2 ${nuestro ? "-left-9" : "-right-9"}`}>
+      <button
+        ref={boton}
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-haspopup="true"
+        aria-label="Reaccionar a este mensaje"
+        title="Reaccionar"
+        className={`flex h-7 w-7 items-center justify-center rounded-full bg-[var(--wa-fondo)] text-[var(--wa-sec)] shadow-[0_1px_2px_var(--wa-sombra)] group-hover:opacity-100 hover:text-[var(--wa-acento)] focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${abierto ? "opacity-100" : "opacity-0"} ${anilloFoco}`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8.5 14a4.5 4.5 0 0 0 7 0" />
+          <path d="M9 9.5h.01M15 9.5h.01" />
+        </svg>
+      </button>
+      {abierto && (
+        <span role="group" aria-label="Elige una reacción" className={`absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] p-1 shadow-[0_4px_16px_var(--wa-sombra)] ${nuestro ? "right-0" : "left-0"}`}>
+          {REACCIONES_RAPIDAS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              aria-pressed={actual === e}
+              aria-label={actual === e ? `Quitar la reacción ${e}` : `Reaccionar con ${e}`}
+              onClick={() => {
+                setAbierto(false);
+                alElegir(actual === e ? "" : e);
+              }}
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none hover:bg-[var(--wa-hover)] ${actual === e ? "bg-[var(--wa-hover)]" : ""} ${anilloFoco}`}
+            >
+              {e}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Burbuja({
   m,
   seguido,
+  reacciones,
   alPedirBorrar,
   alGuardarRapida,
+  alReaccionar,
   alReintentar,
 }: {
   m: MensajeVista;
   seguido: boolean;
+  /** Reaccionar a este mensaje con un emoji (vacío = quitar la reacción del equipo); solo si se puede. */
+  alReaccionar?: (emoji: string) => void;
+  /** Las reacciones a este mensaje (una por lado), que se dibujan sobre su borde de abajo, como en WhatsApp. */
+  reacciones?: ReaccionVista[];
   alPedirBorrar?: (m: MensajeVista) => void;
   alGuardarRapida?: (texto: string) => void;
   /** Un mensaje que no salió (mostrado al momento de enviar): vuelve a mandarlo. */
@@ -1527,12 +1753,28 @@ function Burbuja({
   }
   const nuestro = m.direccion === "saliente";
   const colita = seguido ? "" : nuestro ? "rounded-tr-none" : "rounded-tl-none";
+  const conReaccion = !!reacciones?.length;
   return (
     <div
-      className={`${margen} group relative max-w-[min(65%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${colita} ${
+      className={`${margen} ${conReaccion ? "mb-4" : ""} group relative max-w-[min(65%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${colita} ${
         nuestro ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
       }`}
     >
+      {conReaccion && (
+        // Como en WhatsApp: el emoji sobre el borde de abajo del mensaje al que se reaccionó.
+        <span
+          role="img"
+          aria-label={`Reacciones: ${reacciones!.map((r) => `${r.emoji} ${r.direccion === "entrante" ? "del dropshipper" : "de la empresa"}`).join(", ")}`}
+          className={`absolute -bottom-3.5 ${nuestro ? "right-2" : "left-2"} z-[1] flex items-center gap-0.5 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-entrante)] px-1.5 py-0.5 text-[14px] leading-none shadow-[0_1px_0.5px_var(--wa-sombra)]`}
+        >
+          {reacciones!.map((r) => (
+            <span key={r.direccion} aria-hidden="true">
+              {r.emoji}
+            </span>
+          ))}
+        </span>
+      )}
+      {alReaccionar && <ReaccionarMensaje nuestro={nuestro} actual={miReaccion(reacciones)} alElegir={alReaccionar} />}
       {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
       {nuestro && alGuardarRapida && m.tipo === "texto" && (m.texto?.trim().length ?? 0) >= 3 && <BotonRapidaMensaje alPulsar={() => alGuardarRapida(m.texto ?? "")} />}
       {nuestro && m.autor && !seguido && (

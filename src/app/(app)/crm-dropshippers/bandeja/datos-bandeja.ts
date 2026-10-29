@@ -25,6 +25,8 @@ export interface ConversacionVista {
   nombrePerfil: string | null;
   dropshipperId: string | null;
   codigo: string | null;
+  /** Su dropshipper es VIP (de los que más pedidos mueven; se marca en el CRM o en «Más» de la ficha del chat). */
+  vip: boolean;
   tiendas: string[];
   asignadaA: string | null;
   asignadaAId: string | null;
@@ -40,6 +42,15 @@ export interface ConversacionVista {
   borradaEnApp: { por: string | null; en: string } | null;
   /** Hay una petición de borrar este chat esperando autorización (migración 0172). */
   borradoPendiente: boolean;
+  /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
+  etiquetas: string[];
+}
+
+/** Lo que carga la Bandeja: los números, los chats y el color elegido de cada etiqueta (por su nombre). */
+export interface DatosBandeja {
+  numeros: NumeroVista[];
+  conversaciones: ConversacionVista[];
+  colores: Record<string, string>;
 }
 
 export interface MensajeVista {
@@ -61,6 +72,10 @@ export interface MensajeVista {
   eliminadoEnWhatsapp: boolean;
   /** Hay una petición de borrar este mensaje esperando autorización (migración 0172). */
   borradoPendiente: boolean;
+  /** Su id en WhatsApp («wamid…»): las reacciones apuntan a él. */
+  waId?: string | null;
+  /** En una reacción, el `waId` del mensaje reaccionado (migración 0186): la bandeja la dibuja sobre ese mensaje. */
+  reaccionA?: string | null;
 }
 
 /** Un mensaje de la vista previa que se despliega al pasar el cursor por la lista de chats. */
@@ -103,16 +118,16 @@ export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u)
  * Los números de la empresa y las conversaciones (las 300 más recientes) que esta persona puede ver: las de las áreas que ve. El área es
  * de cada conversación desde la migración 0168, así un solo número sirve a todo el equipo. `null` si falta la migración 0158.
  */
-export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | null> {
+export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<DatosBandeja | null> {
   const areas = areasDe(usuario);
   const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (numerosR.error) return null;
   const numeros = (numerosR.data ?? []) as NumeroVista[];
-  if (!numeros.length) return { numeros, conversaciones: [] };
+  if (!numeros.length) return { numeros, conversaciones: [], colores: {} };
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda), perfiles:asignada_a(nombre)",
+      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas), perfiles:asignada_a(nombre)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
@@ -120,7 +135,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(300);
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
-    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null }>);
+    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null; nivel: string | null; etiquetas: string[] | null }>);
     return {
       id: c.id as string,
       numeroId: c.numero_id as string,
@@ -128,6 +143,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       nombrePerfil: (c.nombre_perfil as string | null) ?? null,
       dropshipperId: (c.dropshipper_id as string | null) ?? null,
       codigo: d?.codigo ?? null,
+      vip: d?.nivel === "vip",
       tiendas: d?.tiendas?.length ? d.tiendas : d?.tienda ? [d.tienda] : [],
       asignadaA: uno(c.perfiles as Uno<{ nombre: string | null }>)?.nombre ?? null,
       asignadaAId: (c.asignada_a as string | null) ?? null,
@@ -141,6 +157,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       borradaEnApp: null,
       borradoPendiente: false,
       nombrePersonalizado: null,
+      // Con dropshipper, las etiquetas son las suyas (las mismas de su ficha del CRM); sin él, las del chat.
+      etiquetas: d ? (d.etiquetas ?? []) : [],
     };
   });
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
@@ -161,11 +179,22 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       }
     }
   }
+  // Las etiquetas de los chats y el color de cada una (migración 0185). Sin ella, ninguna.
+  const colores: Record<string, string> = {};
+  const [etiquetadas, coloresR] = await Promise.all([
+    supabase.from("whatsapp_conversaciones").select("id, etiquetas").neq("etiquetas", "{}"),
+    supabase.from("whatsapp_etiquetas").select("nombre, color"),
+  ]);
+  if (!etiquetadas.error) {
+    const porId = new Map((etiquetadas.data ?? []).map((x) => [x.id as string, (x.etiquetas as string[] | null) ?? []]));
+    for (const c of conversaciones) if (!c.dropshipperId) c.etiquetas = porId.get(c.id) ?? [];
+  }
+  if (!coloresR.error) for (const x of coloresR.data ?? []) colores[x.nombre as string] = x.color as string;
   // Lo que se autorizó borrar se oculta y se marca lo que espera autorización (migración 0172). Sin ella, nada.
   const [ocultas, pendientes] = await Promise.all([conversacionesOcultas(supabase), borradosPendientes(supabase)]);
   for (const c of conversaciones) c.borradoPendiente = pendientes.chats.has(c.id);
   // Solo se ofrecen los números de las áreas de la persona (Atención no ve el de Comercial ni su selector). Los chats ya salen por su área, venga del número que venga.
-  return { numeros: numerosDeAreas(numeros, areas), conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)) };
+  return { numeros: numerosDeAreas(numeros, areas), conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)), colores };
 }
 
 /**
@@ -267,7 +296,13 @@ export async function cargarConversacion(
     // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
     supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
   ]);
-  const [ocultos, pendientes] = await Promise.all([mensajesOcultos(supabase, id), borradosPendientes(supabase)]);
+  const [ocultos, pendientes, reaccionesR] = await Promise.all([
+    mensajesOcultos(supabase, id),
+    borradosPendientes(supabase),
+    // A qué mensaje va cada reacción (migración 0186), aparte: sin la columna la conversación se carga igual.
+    supabase.from("whatsapp_mensajes").select("id, reaccion_a").eq("conversacion_id", id).eq("tipo", "reaccion").not("reaccion_a", "is", null),
+  ]);
+  const reaccionA = new Map((reaccionesR.error ? [] : (reaccionesR.data ?? [])).map((x) => [x.id as string, x.reaccion_a as string]));
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
   const traidos = mensajesR.data ?? [];
   const cargos = traidos.some((m) => m.autor_id) ? await cargosDelEquipo(supabase) : new Map<string, string>();
@@ -288,6 +323,8 @@ export async function cargarConversacion(
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),
       borradoPendiente: pendientes.mensajes.has(m.id as string),
+      waId: (m.wa_id as string | null) ?? null,
+      reaccionA: reaccionA.get(m.id as string) ?? null,
     }))
     .reverse();
   const d = dsR.data as {

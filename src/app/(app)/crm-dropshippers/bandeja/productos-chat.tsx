@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { cuantoFalta, type MencionEnChat } from "@/lib/crm/productos-chat";
 import { EtapaCotizando, LlegadaCamino } from "../../publicaciones-dropi/llegada-camino";
+import { avisarCuandoLlegue } from "../tareas/actions";
 import { buscarProductosChat, fijarProductoChat, productosDelChat, type ProductoDelChat, type ProductosDelChat } from "./productos-chat-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
@@ -22,9 +23,25 @@ function textoMencion(m: MencionEnChat): string {
  * «Productos que pregunta» en la ficha del chat (pedido de Hernán, 29 oct 2026): los que se nombran en toda la conversación (por nombre, por
  * una palabra como «la creatina», por el ID de Dropi o por el análisis con IA) salen solos como sugerencia, diciendo cuándo y cómo se pidieron,
  * y cualquiera se fija con «Agregar producto». De cada uno, cuánto viene en camino a su país y cuándo llega, como la
- * columna «En camino» de Gestión de IDs Dropi; así se le responde «llega el 12 nov» sin salir del chat.
+ * columna «En camino» de Gestión de IDs Dropi; así se le responde «llega el 12 nov» sin salir del chat. Lo que viene en camino tiene
+ * «Avisarme cuando llegue» (29 oct 2026): una tarea que se activa cuando llega de verdad, para avisarle al cliente. `alCambio` avisa
+ * que se creó una tarea.
  */
-export function ProductosDelChatFicha({ conversacionId, escribe, alAviso }: { conversacionId: string; escribe: boolean; alAviso: (texto: string) => void }) {
+export function ProductosDelChatFicha({
+  conversacionId,
+  escribe,
+  puedeAvisar = escribe,
+  alAviso,
+  alCambio,
+}: {
+  conversacionId: string;
+  /** Fijar y quitar productos (no supervisando). */
+  escribe: boolean;
+  /** «Avisarme cuando llegue»: también supervisando, como «Tarea». */
+  puedeAvisar?: boolean;
+  alAviso: (texto: string, error?: boolean) => void;
+  alCambio?: () => void;
+}) {
   const [datos, setDatos] = useState<ProductosDelChat | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
@@ -71,9 +88,19 @@ export function ProductosDelChatFicha({ conversacionId, escribe, alAviso }: { co
     setOcupado(skuId);
     const r = await fijarProductoChat(conversacionId, skuId, si);
     setOcupado(null);
-    if ("error" in r) return alAviso(r.error);
+    if ("error" in r) return alAviso(r.error, true);
     setBuscar("");
     setResultados([]);
+    aplicar(await productosDelChat(conversacionId));
+  };
+
+  const avisar = async (p: ProductoDelChat) => {
+    setOcupado(p.id);
+    const r = await avisarCuandoLlegue(conversacionId, p.id).catch(() => ({ error: "No se pudo crear el aviso." }));
+    setOcupado(null);
+    if ("error" in r) return alAviso(r.error, true);
+    alAviso(`Listo: cuando llegue ${p.nombre}, te sale la tarea de avisarle (y la campana te avisa).`);
+    alCambio?.();
     aplicar(await productosDelChat(conversacionId));
   };
 
@@ -109,6 +136,21 @@ export function ProductosDelChatFicha({ conversacionId, escribe, alAviso }: { co
                   !p.fijado && <span className="text-[11.5px] text-[var(--wa-sec)]">Lo nombra en el chat</span>
                 )}
                 <EnCamino p={p} hoy={hoy} />
+                {p.aviso ? (
+                  <span className="mt-0.5 text-[12px] font-medium text-[var(--wa-acento)]">Te avisamos cuando llegue para que le escribas.</span>
+                ) : (
+                  puedeAvisar &&
+                  p.enCamino > 0 && (
+                    <button
+                      type="button"
+                      disabled={ocupado === p.id}
+                      onClick={() => void avisar(p)}
+                      className={`mt-0.5 self-start rounded-md border border-[var(--wa-borde)] px-2 py-0.5 text-[12px] font-medium text-[var(--wa-acento)] hover:bg-[var(--wa-panel)] disabled:opacity-50 ${anilloFoco}`}
+                    >
+                      Avisarme cuando llegue
+                    </button>
+                  )
+                )}
               </div>
               {puedeFijar && (
                 <button

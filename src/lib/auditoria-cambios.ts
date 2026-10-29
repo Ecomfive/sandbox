@@ -205,6 +205,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   reabrir_chat_whatsapp: "Reabrió el chat",
   marcar_leido_whatsapp: "Marcó el chat como leído",
   marcar_no_leido_whatsapp: "Marcó el chat como no leído",
+  etiquetas_whatsapp: "Cambió las etiquetas del chat",
+  etiquetas_dropshipper: "Cambió las etiquetas del dropshipper",
   tomar_chat_whatsapp: "Tomó el chat",
   soltar_chat_whatsapp: "Soltó el chat",
   crear_sticker_whatsapp: "Agregó un sticker de WhatsApp a la lista del equipo",

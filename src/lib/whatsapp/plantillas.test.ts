@@ -21,7 +21,7 @@ import {
   vistaPrevia,
   type DatosPlantilla,
 } from "./plantillas";
-import { PLANTILLAS_SUGERIDAS } from "./plantillas-sugeridas";
+import { PLANTILLAS_DE_LLEGADA, PLANTILLAS_SUGERIDAS } from "./plantillas-sugeridas";
 
 const base: DatosPlantilla = {
   nombre: "retomar_compra",
@@ -214,10 +214,11 @@ describe("lo que dice Meta", () => {
 });
 
 describe("plantillas sugeridas", () => {
-  it("son 5, con nombres distintos que acepta Meta", () => {
-    assert.equal(PLANTILLAS_SUGERIDAS.length, 5);
-    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.nombre)).size, 5);
-    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.clave)).size, 5);
+  it("son 8 (5 para retomar y 3 de aviso de llegada), con nombres distintos que acepta Meta", () => {
+    assert.equal(PLANTILLAS_SUGERIDAS.length, 8);
+    assert.equal(PLANTILLAS_SUGERIDAS.filter((p) => p.grupo === "retomar").length, 5);
+    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.nombre)).size, 8);
+    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.clave)).size, 8);
   });
   for (const p of PLANTILLAS_SUGERIDAS) {
     it(`${p.nombre}: pasa la revisión sin errores ni avisos`, () => {
@@ -227,11 +228,27 @@ describe("plantillas sugeridas", () => {
     });
   }
   it("las de retomar una conversación son Marketing: así las trata Meta", () => {
-    for (const p of PLANTILLAS_SUGERIDAS.filter((x) => x.clave !== "seguimiento_consulta")) assert.equal(p.categoria, "marketing");
+    for (const p of PLANTILLAS_SUGERIDAS.filter((x) => x.grupo === "retomar" && x.clave !== "seguimiento_consulta")) assert.equal(p.categoria, "marketing");
     assert.equal(PLANTILLAS_SUGERIDAS.find((p) => p.clave === "seguimiento_consulta")?.categoria, "utility");
   });
   it("todas dejan decir que no", () => {
     for (const p of PLANTILLAS_SUGERIDAS.filter((x) => x.categoria === "marketing")) assert.ok(p.botones.some((b) => /\bno\b/i.test(b)), p.nombre);
+  });
+});
+
+describe("plantillas de aviso de llegada", () => {
+  it("son tres y de Utilidad: responden a algo que el cliente pidió y no promocionan", () => {
+    assert.deepEqual(PLANTILLAS_DE_LLEGADA.map((p) => p.clave), ["aviso_llegada_producto", "aviso_llegada_varios", "aviso_llegada_cambio_fecha"]);
+    for (const p of PLANTILLAS_DE_LLEGADA) assert.equal(p.categoria, "utility", p.nombre);
+  });
+  it("el producto y la fecha se escriben al enviar; el nombre sale solo", () => {
+    for (const p of PLANTILLAS_DE_LLEGADA) {
+      assert.equal(p.variables[0].campo, "primer_nombre", p.nombre);
+      assert.ok(p.variables.slice(1).every((v) => v.campo === "manual" && v.etiqueta), p.nombre);
+    }
+  });
+  it("ninguna invita a comprar ni a volver: no se confunden con Marketing", () => {
+    for (const p of PLANTILLAS_DE_LLEGADA) assert.ok(!/descuento|oferta|promoci|aprovecha|compra ahora/i.test(p.cuerpo), p.nombre);
   });
 });
 
