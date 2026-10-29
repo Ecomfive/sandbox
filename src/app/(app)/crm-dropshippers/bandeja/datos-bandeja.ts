@@ -5,7 +5,7 @@ import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { esGrupo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
-import { compraEn, paisesDondeVende } from "@/lib/whatsapp/origen-chat";
+import { dondeVende, paisesDondeVende, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
@@ -46,8 +46,8 @@ export interface ConversacionVista {
   borradoPendiente: boolean;
   /** Dónde vende (códigos ISO): los países de su dropshipper en el CRM y de sus cuentas. No sale del prefijo del número (alguien de Colombia vende en Costa Rica). */
   paises: string[];
-  /** Por dónde compra: las plataformas de las cuentas de su dropshipper («Dropi»). */
-  compraEn: string[];
+  /** Dónde vende: plataforma y país, de sus cuentas vinculadas y lo puesto a mano en el chat (migración 0193). */
+  vendeEn: VendeEn[];
   /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
   etiquetas: string[];
   /** Desde cuándo espera respuesta: su primer mensaje sin contestar (migración 0189). Sin la migración, null y se usa `ultimoEntranteEn`. */
@@ -184,8 +184,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       etiquetas: d ? (d.etiquetas ?? []) : [],
       esperandoDesde: null,
       motivo: null,
-      paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas),
-      compraEn: compraEn(cuentas),
+      vendeEn: dondeVende(cuentas, []),
+      paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas.filter((x): x is { plataforma: string | null; pais: string } => !!x.pais)),
     };
   });
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
@@ -203,6 +203,26 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       if (a) {
         c.nombrePersonalizado = a;
         c.nombre = a;
+      }
+    }
+  }
+  // Dónde vende cada dropshipper, puesto a mano (migración 0193). Sin ella, solo lo de sus cuentas.
+  const conDs = [...new Set(conversaciones.map((c) => c.dropshipperId).filter((x): x is string => !!x))];
+  if (conDs.length) {
+    const manual = await supabase.from("dropshipper_vende_en").select("dropshipper_id, plataformas(nombre), paises(codigo)").in("dropshipper_id", conDs);
+    if (!manual.error) {
+      const porDs = new Map<string, { plataforma: string; pais: string }[]>();
+      for (const m of manual.data ?? []) {
+        const plataforma = uno(m.plataformas as Uno<{ nombre: string }>)?.nombre;
+        const pais = uno(m.paises as Uno<{ codigo: string }>)?.codigo;
+        if (!plataforma || !pais) continue;
+        porDs.set(m.dropshipper_id as string, [...(porDs.get(m.dropshipper_id as string) ?? []), { plataforma, pais }]);
+      }
+      for (const c of conversaciones) {
+        const extra = c.dropshipperId ? porDs.get(c.dropshipperId) : undefined;
+        if (!extra) continue;
+        c.vendeEn = dondeVende(c.vendeEn, extra);
+        c.paises = [...new Set([...c.paises, ...extra.map((e) => e.pais)])];
       }
     }
   }
