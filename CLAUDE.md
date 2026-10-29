@@ -649,6 +649,14 @@ convenciones técnicas del código.
   publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
+  **Tareas a mano** (28 oct 2026, pedido de Alcides; migración 0175 `dropi_publicaciones_tareas`: título, nota, responsable, plazo, quién la creó y hecha_*;
+  RLS sin políticas): bloque «Tareas» de la ficha (`TareasPublicacion`, `tareas-publicacion.tsx`; `FormularioTarea` y `LineaTarea` en `tareas-piezas.tsx`, dentro
+  del formulario de la ficha: Enter no lo envía) con `crearTareaPublicacion` / `resolverTareaPublicacion` / `obtenerTareasPublicacion` (`tareas-actions.ts`; aviso
+  «Para ti» si le toca a otra persona; auditoría `crear_/resolver_tarea_publicacion`). Pestaña **Tareas** (`/publicaciones-dropi/tareas`, `lista-tareas.tsx`):
+  `cargarTareas` (`tareas-datos.ts`) junta las manuales y las de recomendaciones aceptadas (0128) del país, pendientes y hechas de 30 días; cada persona ve las suyas
+  (`tareasDe`, `src/lib/publicaciones/tareas.ts`, con prueba: responsable = yo, o sin responsable y creadas por mí) y un administrador «De todos» (`?ver=todas`).
+  Globo de la pestaña con `contarMisTareasPendientes`; la fila dice «N tareas» (`FilaPublicacion.tareasPendientes`, rojo si alguna atrasada); las atrasadas suman a
+  `PendientesHoy.tareasAtrasadas`.
   **Costa Rica** (28 oct 2026, pedido de Alcides: lo nuevo de Gestión de IDs vale también ahí). La bodega de Dropi depende del país: `esBodegaDropi`
   (`automatico.ts`, `BODEGAS_DROPI` = 280 Panamá y 15 «Bodega Dropi San Jose» de Costa Rica; decisión de Alcides: la B15 es de Dropi como la B280) reemplaza
   las comparaciones con `BODEGA_DROPI` en republicar, apagar, privatizar, el stock de la ficha y las bodegas que se ofrecen. Una bodega de Dropi de otro país se

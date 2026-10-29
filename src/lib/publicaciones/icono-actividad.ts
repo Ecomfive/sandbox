@@ -41,7 +41,7 @@ export function iconoDeAccion(accion: string, texto = ""): { icono: IconoActivid
   if (/^ia_/.test(accion)) return de("ia");
   if (/vincular_sku/.test(accion)) return de("vincular");
   if (accion === "decidir_recomendacion_publicacion") return de("recomendacion");
-  if (accion === "tarea_hecha_publicacion") return de("tarea");
+  if (accion === "tarea_hecha_publicacion" || accion === "crear_tarea_publicacion" || accion === "resolver_tarea_publicacion") return de("tarea");
   if (/^eliminar_/.test(accion)) return de("eliminar");
   if (/^crear_|_crear_|^dropi_publicada$/.test(accion)) return de("crear");
   if (accion === "marcar_publicacion_duplicada") return de("estado");

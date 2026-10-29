@@ -23,6 +23,8 @@ test("cada acción lleva el ícono de su botón", () => {
   assert.equal(icono("ia_titulos_publicacion"), "ia");
   assert.equal(icono("vincular_sku_publicacion"), "vincular");
   assert.equal(icono("decidir_recomendacion_publicacion"), "recomendacion");
+  assert.equal(icono("crear_tarea_publicacion"), "tarea");
+  assert.equal(icono("resolver_tarea_publicacion"), "tarea");
   assert.equal(icono("crear_publicacion_dropi"), "crear");
   assert.equal(icono("eliminar_comentario_publicacion"), "eliminar");
   assert.equal(icono("restaurar_nombre_dropi"), "dropi");

@@ -41,6 +41,7 @@ import { BotonPrivatizarDropi, puedePrivatizar } from "./privatizar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { BodegasStockDropi } from "./stock-dropi";
 import { BotonLiquidacionFicha } from "./liquidacion";
+import { TareasPublicacion } from "./tareas-publicacion";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
@@ -541,6 +542,7 @@ function ContenidoFicha({
         )}
 
         <RecomendacionesFicha p={p} puedeEscribir={puedeEscribir} disponible={decisionesDisponibles} />
+        <TareasPublicacion key={`tareas-${p.id}`} p={p} puedeEscribir={puedeEscribir} />
         {!p.archivada && <OptimizacionFicha p={p} puedeEscribir={puedeEscribir} />}
 
         <fieldset disabled={!puedeEscribir} className="m-0 flex min-w-0 flex-col divide-y divide-border border-0 p-5">

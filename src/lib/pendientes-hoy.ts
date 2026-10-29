@@ -60,6 +60,7 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
     { count: tareasAtrasadas },
     creditosIA,
     { count: sinStockPorRevisar },
+    { count: tareasManualesAtrasadas },
   ] = await Promise.all([
     supabase
       .from("alertas_inventario_no_retornado")
@@ -86,6 +87,13 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
     creditosPorAcabarse(supabase).catch(() => []),
     // Sin la migración 0167 la consulta falla y cuenta cero.
     supabase.from("compras_alertas_sin_stock").select("*", { count: "exact", head: true }).eq("pais_id", paisId).eq("estado", "abierta"),
+    // Las tareas escritas a mano en Gestión de IDs Dropi que pasaron su fecha (migración 0175); sin ella, cero.
+    supabase
+      .from("dropi_publicaciones_tareas")
+      .select("id, dropi_publicaciones!inner(pais_id)", { count: "exact", head: true })
+      .eq("dropi_publicaciones.pais_id", paisId)
+      .is("hecha_en", null)
+      .lt("plazo", new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" })),
   ]);
 
   const plataformasConSaldo = new Set((saldos ?? []).map((s) => s.plataforma_id));
@@ -101,7 +109,7 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
     lotesVencidos: lotes.vencidos,
     lotesPorVencer: lotes.porVencer,
     competidoresNuevos: competidoresNuevos ?? 0,
-    tareasAtrasadas: tareasAtrasadas ?? 0,
+    tareasAtrasadas: (tareasAtrasadas ?? 0) + (tareasManualesAtrasadas ?? 0),
     creditosIA: creditosIA.length,
     sinStockPorRevisar: sinStockPorRevisar ?? 0,
   };
