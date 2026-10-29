@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
-import { textoVentana } from "@/lib/whatsapp/ventana";
+import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { quienesRespondieron } from "@/lib/crm/respondieron";
 import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
@@ -28,7 +28,7 @@ import { EditorNombreContacto } from "./nombre-contacto";
 import { listarRespuestasRapidas, guardarRespuestaRapida, usarRespuestaRapida } from "./rapidas-actions";
 import { VentanaRapidas } from "./respuestas-rapidas";
 import { sugerirRapidas, validarRapida, yaEsRapida, type RespuestaRapida } from "@/lib/whatsapp/rapidas";
-import { EnviarPlantilla } from "./enviar-plantilla";
+import { EnviarPlantilla, PlantillasEnLinea } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
@@ -146,6 +146,9 @@ function unirMensajes(antes: MensajeVista[], nuevos: MensajeVista[]): MensajeVis
   for (const m of nuevos) porId.set(m.id, m);
   return [...porId.values()].sort((a, b) => (a.momento < b.momento ? -1 : a.momento > b.momento ? 1 : 0));
 }
+
+/** La hora de ahora en milisegundos (fuera del render, para los temporizadores de la ventana de 24 h). */
+const milisegundosAhora = () => Date.now();
 
 const sinResponder = (c: ConversacionVista) => c.estado === "abierta" && (c.noLeidos > 0 || c.ultimoDe === "entrante");
 
@@ -350,6 +353,10 @@ export function Bandeja({
   const [modo, setModo] = useState<"responder" | "nota">("responder");
   const [borrador, setBorrador] = useState("");
   const [verPlantillas, setVerPlantillas] = useState(false);
+  /** La plantilla que se pulsó en el aviso de «fuera de las 24 h»: la ventana de plantillas se abre con ella ya elegida. */
+  const [plantillaInicial, setPlantillaInicial] = useState<string | null>(null);
+  // Un latido que vuelve a dibujar el chat para que la ventana de 24 h se cierre sola apenas se cumple (sin esperar a que llegue algo): cada 30 s y justo al vencer. La hora se lee al dibujar.
+  const [, setLatido] = useState(0);
   const [borrar, setBorrar] = useState<QueBorrar | null>(null);
   const [vincular, setVincular] = useState(false);
   // Mensajes rápidos del equipo (se ofrecen arriba del cuadro de texto) y el cambio de nombre de un contacto.
@@ -602,7 +609,17 @@ export function Bandeja({
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
   // La lista del panel del chat abierto: las flechas de su ventana pasan al anterior o al siguiente de esa columna.
   const lista = sel ? (listas.get(sel.area) ?? []) : [];
-  const ventana = sel && enNavegador ? textoVentana(sel.ultimoEntranteEn) : null;
+  const ventana = sel && enNavegador ? textoVentana(sel.ultimoEntranteEn, new Date(milisegundosAhora())) : null;
+  const ultimoEntranteSel = sel?.ultimoEntranteEn ?? null;
+  useEffect(() => {
+    const cada = setInterval(() => setLatido((n) => n + 1), 30_000);
+    const vence = ultimoEntranteSel ? Date.parse(ultimoEntranteSel) + HORAS_VENTANA * 3_600_000 - milisegundosAhora() : 0;
+    const alVencer = vence > 0 ? setTimeout(() => setLatido((n) => n + 1), vence + 250) : null;
+    return () => {
+      clearInterval(cada);
+      if (alVencer) clearTimeout(alVencer);
+    };
+  }, [ultimoEntranteSel]);
   // Supervisión: un chat de otro panel se mira sin dejar rastro; para responderle al dropshipper hay que «Intervenir» (queda a su cargo).
   const supervisando = !!sel && sel.area !== miArea;
   const mirando = supervisando && sel?.asignadaAId !== miId;
@@ -1338,15 +1355,6 @@ export function Bandeja({
                           ? `Puedes responder con texto libre: ${ventana} de las 24 h desde su último mensaje.`
                           : "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada. Las notas privadas sí se pueden dejar."}
                       </p>
-                      {!ventana && escribe && !mirando && (
-                        <button
-                          type="button"
-                          onClick={() => setVerPlantillas(true)}
-                          className={`mb-2 min-h-9 self-center rounded-full bg-[var(--wa-acento)] px-4 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 ${anilloFoco}`}
-                        >
-                          Enviar plantilla
-                        </button>
-                      )}
                     </>
                   )}
                   {enNavegador && sel.borradaEnApp && (
@@ -1416,6 +1424,21 @@ export function Bandeja({
                         Estás supervisando el panel de {areaChat(sel.area).etiqueta}: quien lo atiende no ve que abriste este chat y le sigue apareciendo sin leer. Puedes dejar una nota privada
                         (esa sí la ve); para responderle al dropshipper, toca «Intervenir».
                       </p>
+                    )}
+                    {/* Fuera de las 24 h el cuadro de texto está apagado: se avisa aquí mismo y se ofrecen las plantillas que Meta ya aprobó (30 oct 2026). */}
+                    {enNavegador && !ventana && escribe && !mirando && !esNota && (
+                      <PlantillasEnLinea
+                        key={sel.id}
+                        conversacionId={sel.id}
+                        alElegir={(id) => {
+                          setPlantillaInicial(id);
+                          setVerPlantillas(true);
+                        }}
+                        alVerTodas={() => {
+                          setPlantillaInicial(null);
+                          setVerPlantillas(true);
+                        }}
+                      />
                     )}
                     {/* Arriba, si va como mensaje o como nota privada y, escribiendo un mensaje, los mensajes rápidos: así el cuadro de texto queda ancho. */}
                     {(!mirando || (!esNota && !bloqueado)) && (
@@ -1677,6 +1700,7 @@ export function Bandeja({
         <EnviarPlantilla
           conversacionId={sel.id}
           nombre={sel.nombre}
+          plantillaInicial={plantillaInicial}
           alCerrar={() => setVerPlantillas(false)}
           alEnviado={() => {
             setVerPlantillas(false);
