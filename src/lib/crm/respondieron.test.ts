@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { areaDeModulos, cargoDePersona, quienesRespondieron } from "./respondieron";
+import { areaDeModulos, cargoDePersona, quienesAtienden, quienesRespondieron } from "./respondieron";
 
 test("el área de una persona es la de más arriba que tiene", () => {
   assert.equal(areaDeModulos(["crm-dropshippers"]), "atencion");
@@ -42,4 +42,17 @@ test("quién respondió: una vez por persona, la más reciente primero, sin nota
     { nombre: "Ana", cargo: "Atención", mensajes: 2, ultimo: "2026-10-29T10:03:00Z" },
   ]);
   assert.deepEqual(quienesRespondieron([]), []);
+});
+
+test("quién atiende: la persona del área y quien intervino", () => {
+  const nicole = { nombre: "Nicole Muñoz", cargo: "Atención al cliente", mensajes: 3, ultimo: "2026-10-29T10:00:00Z", foto: "n.jpg" };
+  const alcides = { nombre: "Alcides Andrade", cargo: "COO", mensajes: 1, ultimo: "2026-10-29T11:00:00Z", foto: null };
+  const celular = { nombre: "Desde el celular", cargo: null, mensajes: 2, ultimo: "2026-10-29T12:00:00Z" };
+  // Sin intervenir: solo Nicole (la del área), aunque Alcides escribió después.
+  assert.deepEqual(quienesAtienden(null, [celular, alcides, nicole], "atencion").map((p) => p.nombre), ["Nicole Muñoz"]);
+  // Interviniendo: Alcides y Nicole.
+  assert.deepEqual(quienesAtienden({ nombre: "Alcides Andrade", cargo: "COO", foto: null }, [alcides, nicole], "atencion").map((p) => p.nombre), ["Alcides Andrade", "Nicole Muñoz"]);
+  // Nadie del área: la última persona que respondió.
+  assert.deepEqual(quienesAtienden(null, [alcides], "comercial").map((p) => p.nombre), ["Alcides Andrade"]);
+  assert.deepEqual(quienesAtienden(null, [celular], "atencion"), []);
 });

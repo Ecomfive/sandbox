@@ -42,24 +42,52 @@ export interface QuienRespondio {
   mensajes: number;
   /** Su último mensaje (ISO). */
   ultimo: string;
+  /** Su foto en el sistema (Usuarios), si tiene. */
+  foto?: string | null;
 }
 
 /**
  * Las personas del equipo que le escribieron al dropshipper en este chat, una vez cada una y la más reciente primero. Solo los mensajes
  * salientes con autor: las notas privadas no son respuestas y lo que se mandó desde la app del celular no dice quién fue.
  */
-export function quienesRespondieron(mensajes: readonly { direccion: string; autor: string | null; autorCargo?: string | null; momento: string }[]): QuienRespondio[] {
+export function quienesRespondieron(mensajes: readonly { direccion: string; autor: string | null; autorCargo?: string | null; autorFoto?: string | null; momento: string }[]): QuienRespondio[] {
   const porNombre = new Map<string, QuienRespondio>();
   for (const m of mensajes) {
     const nombre = m.autor?.trim();
     if (m.direccion !== "saliente" || !nombre) continue;
     const antes = porNombre.get(nombre);
-    if (!antes) porNombre.set(nombre, { nombre, cargo: m.autorCargo ?? null, mensajes: 1, ultimo: m.momento });
+    if (!antes) porNombre.set(nombre, { nombre, cargo: m.autorCargo ?? null, mensajes: 1, ultimo: m.momento, ...(m.autorFoto ? { foto: m.autorFoto } : {}) });
     else {
       antes.mensajes++;
       if (m.momento > antes.ultimo) antes.ultimo = m.momento;
       if (!antes.cargo && m.autorCargo) antes.cargo = m.autorCargo;
+      if (!antes.foto && m.autorFoto) antes.foto = m.autorFoto;
     }
   }
   return [...porNombre.values()].sort((a, b) => (a.ultimo < b.ultimo ? 1 : a.ultimo > b.ultimo ? -1 : 0));
+}
+
+/** Una persona en un globito: su nombre, su cargo y su foto. */
+export interface PersonaGlobo {
+  nombre: string;
+  cargo: string | null;
+  foto: string | null;
+}
+
+const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+/** La palabra con que se reconoce un área en un cargo («Atención al cliente», «Líder comercial»). */
+const PALABRA_AREA: Record<AreaCrm, string> = { atencion: "atencion", comercial: "comercial", direccion: "direccion" };
+
+/**
+ * Quién atiende el chat (29 oct 2026, pedido de Alcides): quien lo tomó o intervino (`asignada`) y la persona del área del chat que le ha
+ * respondido (su cargo dice el área: «Atención al cliente» en Atención, «Líder comercial» en Comercial); si nadie del área ha respondido, la última
+ * persona que respondió que no sea quien intervino. Lo de «Desde el celular» no es una persona. Sin repetir; quien lo lleva primero.
+ */
+export function quienesAtienden(asignada: PersonaGlobo | null, respondieron: readonly QuienRespondio[], area: AreaCrm, celular = "Desde el celular"): PersonaGlobo[] {
+  const personas = respondieron.filter((r) => r.nombre !== celular);
+  const delArea = personas.filter((r) => r.cargo && sinAcentos(r.cargo).includes(PALABRA_AREA[area]));
+  const delChat = delArea.length ? delArea : personas.filter((r) => r.nombre !== asignada?.nombre).slice(0, 1);
+  const lista: PersonaGlobo[] = asignada ? [asignada] : [];
+  for (const r of delChat) if (!lista.some((p) => p.nombre === r.nombre)) lista.push({ nombre: r.nombre, cargo: r.cargo, foto: r.foto ?? null });
+  return lista;
 }
