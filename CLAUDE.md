@@ -1152,6 +1152,12 @@ convenciones técnicas del código.
   Dropi no entrega el teléfono ni el correo del dropshipper (solo ID de usuario, nombre y tienda): el vínculo automático con los datos de Dropi sigue pendiente de investigar. Sin la migración 0177 los mensajes, la búsqueda y el vínculo desde el chat siguen funcionando, pero un
   segundo número no se guarda. Reversa: `supabase/rollbacks/0177_rollback.sql`.
   **Vista previa al pasar el cursor** (29 oct 2026): en la lista de la bandeja, con ratón y pantalla ancha (`hover: hover` y ≥ 1024 px), pasar el cursor (o enfocar con el teclado) un chat que no es el abierto despliega, a los 350 ms, sus últimos mensajes (3 a 8, `vistaPreviaChat` en `bandeja/actions.ts`; **solo mira, no marca leído**; no trae lo oculto); los sin leer van marcados (`VistaPreviaChat`, `vista-previa-chat.tsx`, `fixed` para que la lista que se desplaza no lo recorte, `pointer-events-none`). Se guarda en memoria por chat + último mensaje + no leídos.
+  **Etiquetas de los chats** (migración 0185, 29 oct 2026, pedido de Alcides; como las de ClickUp y Compras): `whatsapp_conversaciones.etiquetas text[]` y el color por
+  nombre en `whatsapp_etiquetas`. Las piezas son comunes: `PanelEtiquetas`, `PastillaEtiqueta`, `colorEtiqueta` y `COLORES_ETIQUETA` en
+  `src/components/etiquetas/etiquetas.tsx` (Compras las reexporta desde `compras/selector-etiquetas.tsx`) y las reglas en `src/lib/etiquetas.ts`
+  (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
+  deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
+  ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
 - **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del
