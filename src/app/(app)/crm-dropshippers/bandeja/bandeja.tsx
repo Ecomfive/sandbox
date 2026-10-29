@@ -193,7 +193,7 @@ function Contenido({ m }: { m: MensajeVista }) {
       {m.texto ? (
         <span className="whitespace-pre-wrap break-words">{m.texto}</span>
       ) : (
-        !m.conArchivo && !m.mediaNombre && m.tipo !== "reaccion" && <span className="text-[var(--wa-sec)]">Mensaje que el sistema todavía no muestra ({m.tipo}).</span>
+        !m.conArchivo && !m.mediaNombre && m.tipo !== "reaccion" && <span className="text-[var(--wa-sec)]">{m.tipo === "otro" ? "Mensaje que WhatsApp no entregó a la plataforma. Pídele que lo mande de nuevo como mensaje normal." : `Mensaje que el sistema todavía no muestra (${m.tipo}).`}</span>
       )}
     </>
   );
