@@ -14,6 +14,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   dropshippers: "crm-dropshippers",
   whatsapp_conversaciones: "crm-dropshippers",
   whatsapp_plantillas: "crm-dropshippers",
+  whatsapp_respuestas_rapidas: "crm-dropshippers",
   wms_compras: "compras",
   wms_rutas_envio: "compras",
   retiros: "retiros",
