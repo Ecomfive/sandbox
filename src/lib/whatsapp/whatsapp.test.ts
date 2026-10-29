@@ -91,8 +91,8 @@ test("estados de lo que mandó el equipo: en español, y el motivo si falló", (
 });
 
 test("lo que no es de WhatsApp o viene incompleto se ignora sin romper", () => {
-  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [], ecos: [], revocados: [] });
-  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [], ecos: [], revocados: [] });
+  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [], ecos: [], revocados: [], editados: [] });
+  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [], ecos: [], revocados: [], editados: [] });
   assert.deepEqual(extraerAviso(aviso({ metadata: {}, messages: [{ from: "1", id: "x", type: "text", text: { body: "hola" } }] })).mensajes, []);
   assert.deepEqual(extraerAviso(aviso({ metadata: META, messages: [{ id: "sin-remitente", type: "text" }] })).mensajes, []);
 });
@@ -230,6 +230,43 @@ test("un mensaje que el equipo borra «para todos» desde la app (eco revoke) no
   });
   assert.deepEqual(revocados, [{ waIdOriginal: "wamid.MIO", momento: new Date(1793040100 * 1000).toISOString() }]);
   assert.deepEqual(ecos.map((e) => e.waId), ["wamid.T"]);
+});
+
+
+test("un mensaje editado (de un cliente o desde la app) no es un mensaje nuevo: trae el original y el texto nuevo", () => {
+  const edit = (id: string, original: string, mensaje: unknown, extra: object = {}) => ({ ...extra, id, timestamp: "1793040300", type: "edit", edit: { original_message_id: original, message: mensaje } });
+  const cliente = extraerAviso(
+    aviso({
+      metadata: META,
+      messages: [
+        edit("wamid.E1", "wamid.ORIG", { type: "text", text: { body: "Hola Michael, un gusto" } }, { from: "50761112233" }),
+        edit("wamid.E2", "wamid.FOTO", { type: "image", image: { caption: "Pie nuevo", id: "9", mime_type: "image/jpeg" } }, { from: "50761112233" }),
+        edit("wamid.E3", "wamid.SIN", { type: "image", image: { id: "9", mime_type: "image/jpeg" } }, { from: "50761112233" }),
+        edit("wamid.E4", "", { type: "text", text: { body: "sin original" } }, { from: "50761112233" }),
+      ],
+    }),
+  );
+  assert.equal(cliente.mensajes.length, 0);
+  assert.deepEqual(cliente.editados, [
+    { waIdOriginal: "wamid.ORIG", texto: "Hola Michael, un gusto", momento: new Date(1793040300 * 1000).toISOString() },
+    { waIdOriginal: "wamid.FOTO", texto: "Pie nuevo", momento: new Date(1793040300 * 1000).toISOString() },
+  ]);
+  const eco = extraerAviso({
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "WABA",
+        changes: [
+          {
+            field: "smb_message_echoes",
+            value: { metadata: META, message_echoes: [edit("wamid.E5", "wamid.MIO", { type: "text", text: { body: "Hola Michael, te saludo Francis" } }, { from: "50760000000", to: "50761112233" })] },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(eco.ecos.length, 0);
+  assert.deepEqual(eco.editados.map((e) => [e.waIdOriginal, e.texto]), [["wamid.MIO", "Hola Michael, te saludo Francis"]]);
 });
 
 
