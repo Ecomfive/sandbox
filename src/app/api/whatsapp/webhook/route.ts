@@ -8,7 +8,7 @@ import { guardarEntrantes, guardarEstados, guardarRevocados } from "@/lib/whatsa
 import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const MAX_CUERPO = 1_000_000;
 
