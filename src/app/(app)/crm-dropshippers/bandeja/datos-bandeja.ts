@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
-import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, numerosDeAreas, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, numerosDeAreas, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
+import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 
@@ -52,6 +54,8 @@ export interface MensajeVista {
   estado: string;
   error: string | null;
   autor: string | null;
+  /** El cargo de quien lo mandó: su puesto en Puestos o, sin puesto, su área del CRM («Líder comercial», «Atención»…); null si no se sabe. */
+  autorCargo: string | null;
   momento: string;
   /** Vino de un chat exportado desde el celular («Importar chat», wa_id «import:…»), no por el webhook. */
   importado: boolean;
@@ -201,6 +205,41 @@ export async function conversacionPermitida(
   };
 }
 
+/** El cargo de cada persona del CRM, guardado unos minutos: la bandeja se refresca cada 8 s y los puestos y permisos casi no cambian. */
+let cargosGuardados: { hasta: number; mapa: Map<string, string> } | null = null;
+
+/**
+ * El cargo con que se muestra junto a su nombre a quien respondió en un chat (`cargoDePersona`): su puesto en Puestos o, sin puesto, su área
+ * del CRM por permisos (Dirección > Comercial > Atención). Si algo falla, un mapa vacío: los mensajes salen igual, solo con el nombre.
+ */
+async function cargosDelEquipo(supabase: SupabaseClient): Promise<Map<string, string>> {
+  if (cargosGuardados && cargosGuardados.hasta > Date.now()) return cargosGuardados.mapa;
+  try {
+    const modulos = [MODULO_DIRECCION, MODULO_COMERCIAL, MODULO_ATENCION];
+    const [listas, puestosR, ocupantesR] = await Promise.all([
+      Promise.all(modulos.map((m) => personasConModulos(supabase, [m]))),
+      supabase.from("puestos").select("id, nombre, activo"),
+      supabase.from("puesto_personas").select("puesto_id, usuario_id, principal"),
+    ]);
+    const puestos = puestosR.error ? [] : (puestosR.data ?? []).map((p) => ({ id: p.id as string, nombre: String(p.nombre ?? ""), activo: p.activo !== false }));
+    const ocupantes = ocupantesR.error ? [] : (ocupantesR.data ?? []).map((o) => ({ puestoId: o.puesto_id as string, usuarioId: o.usuario_id as string, principal: !!o.principal }));
+    const dePersona = new Map<string, string[]>();
+    listas.forEach((personas, i) => {
+      for (const p of personas) dePersona.set(p.id, [...(dePersona.get(p.id) ?? []), modulos[i]]);
+    });
+    for (const o of ocupantes) if (!dePersona.has(o.usuarioId)) dePersona.set(o.usuarioId, []);
+    const mapa = new Map<string, string>();
+    for (const [id, suyos] of dePersona) {
+      const cargo = cargoDePersona(id, puestos, ocupantes, areaDeModulos(suyos));
+      if (cargo) mapa.set(id, cargo);
+    }
+    cargosGuardados = { hasta: Date.now() + 5 * 60_000, mapa };
+    return mapa;
+  } catch {
+    return new Map();
+  }
+}
+
 /** Cuántos mensajes se traen de una vez; si vinieron todos, hay más viejos para «Ver mensajes anteriores». */
 export const MENSAJES_POR_VEZ = 300;
 
@@ -217,7 +256,7 @@ export async function cargarConversacion(
 ): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null }> {
   let consulta = supabase
     .from("whatsapp_mensajes")
-    .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_nombre, momento, wa_id")
+    .select("id, direccion, tipo, texto, media_id, media_nombre, estado, error, autor_id, autor_nombre, momento, wa_id")
     .eq("conversacion_id", id);
   if (antesDe) consulta = consulta.lt("momento", antesDe);
   const [mensajesR, dsR, casosR, eliminadosR] = await Promise.all([
@@ -234,6 +273,7 @@ export async function cargarConversacion(
   const [ocultos, pendientes] = await Promise.all([mensajesOcultos(supabase, id), borradosPendientes(supabase)]);
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
   const traidos = mensajesR.data ?? [];
+  const cargos = traidos.some((m) => m.autor_id) ? await cargosDelEquipo(supabase) : new Map<string, string>();
   const mensajes: MensajeVista[] = traidos
     .filter((m) => !ocultos.has(m.id as string))
     .map((m) => ({
@@ -246,6 +286,7 @@ export async function cargarConversacion(
       estado: m.estado as string,
       error: (m.error as string | null) ?? null,
       autor: (m.autor_nombre as string | null) ?? null,
+      autorCargo: (m.autor_id && cargos.get(m.autor_id as string)) || null,
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),

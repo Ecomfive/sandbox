@@ -1134,6 +1134,13 @@ convenciones técnicas del código.
   `productosDelAnalisis` los junta con los del catálogo (`productosMencionados`, el mismo cruce de «Productos que pregunta») para que cada producto se cuente siempre con el mismo nombre, y quedan como etiquetas «Interés: …» en cada día, en «Productos que le interesan» de la ficha y en
   **«Productos que más interesan»** de la pestaña Motivos (`interesPorProducto`: clientes y días). (5) **Plegar**: `usePlegado` (`bandeja/usar-plegado.ts`, `useSyncExternalStore` + `localStorage`, por chat y por bloque, últimos 300) pliega «Actividad del cliente» y «Actividad del equipo»; plegada,
   la del cliente deja a la vista solo la situación (si tiene algo pendiente).
+  **Quién respondió y con qué cargo** (29 oct 2026, pedido de Hernán: «si líder comercial o atención»; sin migración): cada burbuja del equipo
+  lleva el nombre y el cargo de quien la mandó («Jhokser · Líder comercial») y las notas también; dos respuestas seguidas de personas distintas
+  ya no se juntan (`seguido` compara el autor). En la ficha del chat (`ficha-chat.tsx`, `QuienesRespondieron`), debajo de las pastillas, «Respondieron:»
+  con cada persona una vez, la más reciente primero (sin notas ni mensajes sin autor). El cargo (`MensajeVista.autorCargo`, de `cargosDelEquipo` en
+  `datos-bandeja.ts`, guardado 5 min) es el **puesto principal activo de la persona en Puestos** (`puestos` + `puesto_personas`; lo eligió Hernán
+  porque todos los del CRM son Admin con las tres áreas) y, sin puesto, su área del CRM por permisos (`ETIQUETA_AREA_PERSONA`: Dirección,
+  Líder comercial, Atención). Lógica pura con prueba en `src/lib/crm/respondieron.ts` (`areaDeModulos`, `cargoDePersona`, `quienesRespondieron`).
   **Actividad del equipo en un chat** (29 oct 2026, pedido de Jhokser; sin migración): bloque `ActividadDelEquipoFicha` (`bandeja/actividad-equipo.tsx`) en la ficha del chat, debajo de «Actividad del cliente», con filtro por persona y «Ver más».
   `actividadDelEquipo(chat, antesDe?)` (`bandeja/equipo-actions.ts`, basta poder abrir el chat) junta, de 15 en 15 y del más nuevo al más viejo, lo que dejó cada persona en `whatsapp_mensajes` (respuestas, plantillas, archivos y notas con `autor_nombre`; no cuenta lo del
   dropshipper, lo ocultado ni las notas que escribe el propio sistema, `esNotaDelSistema`) y lo que quedó en `historial_auditoria` con `entidad = whatsapp_conversaciones` y `entidad_id` = el chat (cambiar el nombre, vincular, pasar de área, intervenir, resolver,
