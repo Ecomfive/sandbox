@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
-import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, numerosDeAreas, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
 import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 
@@ -145,7 +145,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   // Lo que se autorizó borrar se oculta y se marca lo que espera autorización (migración 0172). Sin ella, nada.
   const [ocultas, pendientes] = await Promise.all([conversacionesOcultas(supabase), borradosPendientes(supabase)]);
   for (const c of conversaciones) c.borradoPendiente = pendientes.chats.has(c.id);
-  return { numeros, conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)) };
+  // Solo se ofrecen los números de las áreas de la persona (Atención no ve el de Comercial ni su selector). Los chats ya salen por su área, venga del número que venga.
+  return { numeros: numerosDeAreas(numeros, areas), conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)) };
 }
 
 /**
