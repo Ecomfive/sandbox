@@ -28,6 +28,7 @@ export function Ventana({
   lado = "centro",
   ancho = "md",
   navegacion,
+  masAncha = false,
   children,
 }: {
   abierto: boolean;
@@ -39,6 +40,8 @@ export function Ventana({
   ancho?: "sm" | "md" | "lg" | "xl";
   /** Botones de la cabecera junto a «Cerrar» (p. ej. pasar al registro anterior o siguiente). */
   navegacion?: ReactNode;
+  /** La ventana grande (`xl`), más ancha todavía al centro y a pantalla completa: la del chat de la Bandeja (29 oct 2026). */
+  masAncha?: boolean;
   children: ReactNode;
 }) {
   const ficha = esFicha(lado, ancho);
@@ -130,7 +133,7 @@ export function Ventana({
     modo === "lateral"
       ? `animate-entrar-derecha flex h-full w-full ${ancho === "xl" ? "max-w-3xl" : anchoClase} flex-col overflow-y-auto border-l border-border bg-card shadow-xl`
       : modo === "centro"
-        ? `animate-entrar-centro flex h-[92vh] w-full ${ancho === "xl" ? "max-w-7xl" : "max-w-4xl"} flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-2xl`
+        ? `animate-entrar-centro flex h-[92vh] w-full ${ancho === "xl" ? (masAncha ? "max-w-[96rem]" : "max-w-7xl") : "max-w-4xl"} flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-2xl`
         : modo === "completa"
           ? "animate-entrar-centro flex h-full w-full flex-col overflow-y-auto bg-card"
           : `max-h-[90vh] w-full ${anchoClase} overflow-y-auto rounded-xl border border-border bg-card shadow-xl`;
@@ -159,7 +162,7 @@ export function Ventana({
           </div>
         </div>
         {/* A pantalla completa el contenido no se estira de lado a lado: se centra con un ancho cómodo de lectura. */}
-        {modo === "completa" ? <div className={`mx-auto flex min-h-0 w-full flex-1 flex-col ${ancho === "xl" ? "max-w-[90rem]" : "max-w-5xl"}`}>{children}</div> : children}
+        {modo === "completa" ? <div className={`mx-auto flex min-h-0 w-full flex-1 flex-col ${ancho === "xl" ? (masAncha ? "max-w-[110rem]" : "max-w-[90rem]") : "max-w-5xl"}`}>{children}</div> : children}
       </div>
     </div>,
     document.body
