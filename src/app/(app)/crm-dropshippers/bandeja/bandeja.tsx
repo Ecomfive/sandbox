@@ -7,6 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
+import { nombrePais } from "@/lib/paises-mundo";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
@@ -260,6 +261,32 @@ function EtiquetaVip() {
 }
 
 /** La etiqueta de color de un área, con su punto. */
+/**
+ * Dónde vende el cliente y por dónde compra (29 oct 2026, pedido de Alcides): la atención recibe chats de varios países. Sale del CRM, no del
+ * prefijo del número.
+ */
+function OrigenCliente({ paises, compra }: { paises: string[]; compra: string[] }) {
+  if (!paises.length && !compra.length) return null;
+  return (
+    <>
+      {paises.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-border-control px-2 py-px text-[11px] font-semibold">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
+          </svg>
+          <span className="text-muted-foreground">Vende en</span> {paises.map(nombrePais).join(", ")}
+        </span>
+      )}
+      {compra.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-border-control px-2 py-px text-[11px] font-semibold">
+          <span className="font-medium text-muted-foreground">Compra por</span> {compra.join(", ")}
+        </span>
+      )}
+    </>
+  );
+}
+
 function EtiquetaArea({ area }: { area: AreaCrm }) {
   const a = areaChat(area);
   return (
@@ -1028,7 +1055,7 @@ export function Bandeja({
             </span>
           )}
         </span>
-        {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || otroNumero || c.etiquetas.length > 0 || grupo || espera) && (
+        {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || otroNumero || c.etiquetas.length > 0 || grupo || espera || c.paises.length > 0) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
             {grupo && c.motivo && (
               <span
@@ -1042,6 +1069,12 @@ export function Bandeja({
               <span className={`font-semibold tabular-nums ${espera.clase} ${ancha ? "lg:hidden" : ""}`}>
                 {espera.texto}
                 {espera.plazo && <span className="font-normal"> · {espera.plazo}</span>}
+              </span>
+            )}
+            {c.paises.length > 0 && (
+              <span title={`Vende en ${c.paises.map(nombrePais).join(", ")}`} className="rounded-full border border-[var(--wa-borde)] px-1.5 py-px font-semibold text-[var(--wa-texto)]">
+                <span className="sr-only">Vende en {c.paises.map(nombrePais).join(", ")}</span>
+                <span aria-hidden="true">{c.paises.join(" · ")}</span>
               </span>
             )}
             {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
@@ -1466,6 +1499,7 @@ export function Bandeja({
               </span>
               {sel.vip && <EtiquetaVip />}
               <EtiquetaArea area={sel.area} />
+              <OrigenCliente paises={sel.paises} compra={sel.compraEn} />
               {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}
               {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
               {sel.borradoPendiente && (

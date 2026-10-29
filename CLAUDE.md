@@ -1199,6 +1199,9 @@ convenciones técnicas del código.
   (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
   deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
   ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
+  **Dónde vende y por dónde compra** (29 oct 2026, pedido de Alcides): `ConversacionVista.paises` y `compraEn` salen del CRM (`dropshipper_paises` y
+  `dropshipper_cuentas` del dropshipper vinculado; `src/lib/whatsapp/origen-chat.ts`, con prueba), **nunca del prefijo del número** (alguien de Colombia vende en Costa Rica).
+  Encabezado del chat: «Vende en …» y «Compra por …» (`OrigenCliente`); lista: los códigos (PA · CR).
   **La Actividad se ve como en Compras** (29 oct 2026): sin `Seccion` ni `Bloque` alrededor (trae su propio encabezado), con los colores del sistema dentro del chat, y cada cambio con
   su autor aparte (`ItemLinea.autor`/`detalle`).
   **Una sola Actividad** (29 oct 2026, pedido de Alcides): con dropshipper, la ficha del chat solo trae «Actividad» (`ActividadDropshipper`), y `obtenerLineaDeTiempo`
