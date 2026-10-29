@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
+import { MonedaCompetencia } from "@/components/competencia/moneda-competencia";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
+import { monedaDePais } from "@/lib/moneda/tipo-cambio";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarDatosCompetencia } from "./datos-competencia";
@@ -29,10 +31,11 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
           Todavía no hay búsquedas del catálogo de Dropi de {datos.pais}. La primera se corre con la sesión de dropshipper de ese país.
         </p>
       ) : (
-        <>
+        // Los precios en la moneda del catálogo del país: Panamá en dólares, Costa Rica en colones.
+        <MonedaCompetencia moneda={monedaDePais(pais.codigo)}>
           <ResumenCompetencia datos={datos} />
           {children(datos, !usuario.modulosSoloLectura.includes("analisis-competencia"))}
-        </>
+        </MonedaCompetencia>
       )}
     </Pagina>
   );
