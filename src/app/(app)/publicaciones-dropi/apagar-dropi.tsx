@@ -228,7 +228,7 @@ export function BotonApagarFila({ f }: { f: FilaPublicacion }) {
   const texto = f.apagadoPendiente ? "Deshacer apagado" : "Apagar en Dropi";
   return (
     <>
-      <BotonIconoFila texto={texto} motivo={motivoApagar(estadoBotones(f))} icono={f.apagadoPendiente ? DeshacerIcon : ApagarIcon} nombre={f.nombre} onClick={() => setAbierta(true)} />
+      <BotonIconoFila texto={texto} motivo={motivoApagar(estadoBotones(f))} icono={f.apagadoPendiente ? DeshacerIcon : ApagarIcon} nombre={f.nombre} onClick={() => setAbierta(true)} activo={f.apagadoPendiente ? "rojo" : undefined} />
       {abierta && (f.apagadoPendiente ? <VentanaDeshacerApagado p={f} abierta alCerrar={() => setAbierta(false)} /> : <VentanaApagarDropi p={f} abierta alCerrar={() => setAbierta(false)} />)}
     </>
   );

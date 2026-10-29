@@ -24,7 +24,7 @@ function useLiquidacion(f: FilaPublicacion) {
 
 /**
  * «En liquidación» de la fila (pedido de Alcides, 28 oct 2026): un producto con margen bajo que se liquida a propósito sale del aviso de margen bajo y
- * va a la tarjeta «En liquidación». Con la marca puesta, el ícono va en ámbar y el mismo botón la quita. Solo cambia el sistema, no Dropi.
+ * va a la tarjeta «En liquidación». Con la marca puesta, el ícono va en blanco sobre un círculo rojo y el mismo botón la quita. Solo cambia el sistema, no Dropi.
  */
 export function BotonLiquidacionFila({ f }: { f: FilaPublicacion }) {
   const { en, pendiente, cambiar, motivo } = useLiquidacion(f);
@@ -36,7 +36,7 @@ export function BotonLiquidacionFila({ f }: { f: FilaPublicacion }) {
       nombre={f.nombre}
       onClick={cambiar}
       ocupado={pendiente}
-      clase={en ? "text-warning hover:bg-warning-soft" : undefined}
+      activo={en ? "rojo" : undefined}
     />
   );
 }
