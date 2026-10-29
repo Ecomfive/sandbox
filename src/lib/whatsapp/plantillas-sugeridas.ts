@@ -6,8 +6,12 @@
 
 import type { Categoria, VariablePlantilla } from "./plantillas";
 
+/** «retomar»: para volver a hablar con alguien. «llegada»: avisar a quien preguntó por un producto que ya llegó o que su fecha cambió (la tarea «Avisar cuando llegue»). */
+export type GrupoSugerida = "retomar" | "llegada";
+
 export interface PlantillaSugerida {
   clave: string;
+  grupo: GrupoSugerida;
   nombre: string;
   titulo: string;
   categoria: Categoria;
@@ -21,6 +25,7 @@ export interface PlantillaSugerida {
 export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
   {
     clave: "retomar_conversacion",
+    grupo: "retomar",
     nombre: "retomar_conversacion",
     titulo: "Retomar una conversación",
     categoria: "marketing",
@@ -31,6 +36,7 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
   },
   {
     clave: "seguimiento_consulta",
+    grupo: "retomar",
     nombre: "seguimiento_consulta",
     titulo: "Seguimiento de una consulta",
     categoria: "utility",
@@ -41,6 +47,7 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
   },
   {
     clave: "producto_con_stock",
+    grupo: "retomar",
     nombre: "producto_con_stock",
     titulo: "Un producto volvió a tener stock",
     categoria: "marketing",
@@ -54,6 +61,7 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
   },
   {
     clave: "tienda_sin_pedidos",
+    grupo: "retomar",
     nombre: "tienda_sin_pedidos",
     titulo: "Una tienda sin pedidos",
     categoria: "marketing",
@@ -67,6 +75,7 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
   },
   {
     clave: "novedades_catalogo",
+    grupo: "retomar",
     nombre: "novedades_catalogo",
     titulo: "Productos nuevos del catálogo",
     categoria: "marketing",
@@ -78,4 +87,53 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
       { campo: "manual", ejemplo: "belleza", etiqueta: "Categoría" },
     ],
   },
+  // Avisos de llegada (29 oct 2026, pedido de Jhokser). Un cliente pregunta por mercancía, se le dice para qué fecha llega y se crea la tarea «Avisar cuando llegue»;
+  // cuando llega de verdad, el aviso por WhatsApp (pasadas las 24 h de su último mensaje) solo puede ir con una plantilla. Son de Utilidad: responden a algo que la
+  // persona pidió y no promocionan nada. Si Meta la pasa a Marketing, el sistema avisa. Los productos y la fecha se escriben al enviar (`manual`).
+  {
+    clave: "aviso_llegada_producto",
+    grupo: "llegada",
+    nombre: "aviso_llegada_producto",
+    titulo: "Llegó el producto que preguntó",
+    categoria: "utility",
+    paraQue: "Cuando llega un producto por el que el cliente preguntó y quedamos en avisarle.",
+    cuerpo: "Hola {{1}}, te avisamos que ya llegó el producto {{2}} que nos preguntaste. Ya está disponible para tus pedidos. Si necesitas ayuda con algo, responde a este mensaje.",
+    botones: ["Gracias por avisar", "Quiero pedirlo"],
+    variables: [
+      { campo: "primer_nombre", ejemplo: "María" },
+      { campo: "manual", ejemplo: "Crema reparadora", etiqueta: "Producto" },
+    ],
+  },
+  {
+    clave: "aviso_llegada_varios",
+    grupo: "llegada",
+    nombre: "aviso_llegada_varios",
+    titulo: "Llegaron varios productos que preguntó",
+    categoria: "utility",
+    paraQue: "Cuando llegan varios productos por los que el cliente preguntó, en un solo aviso.",
+    cuerpo: "Hola {{1}}, ya llegó la mercancía que esperabas: {{2}}. Ya está disponible para tus pedidos. Si necesitas ayuda con algo, responde a este mensaje.",
+    botones: ["Gracias por avisar", "Quiero pedir"],
+    variables: [
+      { campo: "primer_nombre", ejemplo: "María" },
+      { campo: "manual", ejemplo: "Crema reparadora y Aceite de semilla de calabaza", etiqueta: "Productos" },
+    ],
+  },
+  {
+    clave: "aviso_llegada_cambio_fecha",
+    grupo: "llegada",
+    nombre: "aviso_llegada_cambio_fecha",
+    titulo: "La llegada cambió de fecha",
+    categoria: "utility",
+    paraQue: "Cuando la fecha de llegada que se le prometió al cliente cambió.",
+    cuerpo: "Hola {{1}}, sobre el producto {{2}} que nos preguntaste: la llegada cambió y ahora esperamos que sea el {{3}}. Apenas esté disponible te avisamos por este mismo chat.",
+    botones: ["Entendido", "Tengo una pregunta"],
+    variables: [
+      { campo: "primer_nombre", ejemplo: "María" },
+      { campo: "manual", ejemplo: "Crema reparadora", etiqueta: "Producto" },
+      { campo: "manual", ejemplo: "12 de noviembre", etiqueta: "Nueva fecha" },
+    ],
+  },
 ];
+
+/** Las plantillas de aviso de llegada. */
+export const PLANTILLAS_DE_LLEGADA = PLANTILLAS_SUGERIDAS.filter((p) => p.grupo === "llegada");

@@ -285,7 +285,7 @@ export function Plantillas({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-col">
               <h2 id="sugeridas" className="m-0 text-base font-semibold">
-                Plantillas sugeridas para retomar conversaciones
+                Plantillas sugeridas
               </h2>
               <p className="m-0 text-xs text-muted-foreground">Listas para usar. Se agregan como borrador y las mandas a Meta cuando quieras.</p>
             </div>
