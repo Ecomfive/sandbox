@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import type { UsuarioActual } from "@/lib/auth";
 import { cargarEnCaminoDatos } from "@/lib/compras/en-camino-datos";
@@ -10,6 +11,7 @@ import { activarTareasDeLlegada, avisarTarea } from "@/lib/crm/tareas-servidor";
 import { hoyPanama } from "@/lib/proveedor/fechas";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { createServiceClient } from "@/lib/supabase/server";
+import { asegurarBorradoresDeLlegada, enviarBorradoresDeLlegada } from "@/lib/whatsapp/plantillas-llegada";
 import { areasDe, conversacionPermitida, usuarioBandeja } from "../bandeja/datos-bandeja";
 import { paisDelChat } from "../bandeja/pais-chat";
 
@@ -171,7 +173,8 @@ export async function crearTareaChat(conversacionId: string, datos: { titulo: st
 
 /**
  * «Avisarme cuando llegue» en un producto del chat: una tarea que espera las compras que vienen en camino de ese producto al país del chat y
- * se activa cuando una llega de verdad. Si ya hay una esperando ese producto en este chat, no se repite.
+ * se activa cuando una llega de verdad. Si ya hay una esperando ese producto en este chat, no se repite. **Al crearla quedan en el sistema, como borrador, las plantillas de aviso de
+ * llegada** (las que falten): el aviso por WhatsApp pasadas las 24 h solo puede ir con una plantilla. Con `PLANTILLAS_LLEGADA_AUTO_META=1` además se mandan a Meta, una cada dos minutos.
  */
 export async function avisarCuandoLlegue(conversacionId: string, skuId: string): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
@@ -191,7 +194,7 @@ export async function avisarCuandoLlegue(conversacionId: string, skuId: string):
   ]);
   const compras = [...new Set((porProducto.get(skuId) ?? []).map((a) => a.compraId))];
   if (!compras.length) return { error: "Ese producto no tiene nada en camino a este país: no hay llegada que esperar." };
-  return crearDeChat(u, c, {
+  const creada = await crearDeChat(u, c, {
     titulo: tituloAvisoLlegada(String(sku?.nombre ?? "el producto")),
     origen: "llegada",
     estado: "esperando",
@@ -200,6 +203,14 @@ export async function avisarCuandoLlegue(conversacionId: string, skuId: string):
     compras_esperadas: compras,
     llegada_estimada: camino.get(skuId)?.llegada ?? null,
   });
+  if ("error" in creada) return creada;
+  // Las plantillas de aviso de llegada: borrador en el sistema y, si el envío automático está encendido, a Meta una cada dos minutos (después de responder, sin hacer esperar a la persona).
+  const { creadas } = await asegurarBorradoresDeLlegada(supabase, { id: u.id, nombre: u.nombre || u.email });
+  if (creadas.length) await registrarAuditoria({ accion: "crear_plantilla_whatsapp", entidad: "whatsapp_plantillas", detalle: `Borradores de aviso de llegada: ${creadas.join(", ")}` });
+  after(async () => {
+    await enviarBorradoresDeLlegada(supabase).catch(() => undefined);
+  });
+  return creada;
 }
 
 /** Marca una tarea hecha (o la vuelve a abrir). Una que esperaba una llegada y se marca hecha deja de esperar. */
