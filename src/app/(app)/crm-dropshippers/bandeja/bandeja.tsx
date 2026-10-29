@@ -1463,7 +1463,11 @@ export function Bandeja({
                     {[
                       sel.codigo,
                       sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
-                      numeroDe.get(sel.numeroId)?.nombre,
+                      // El área ya va en su etiqueta de color al lado: no se repite en el nombre del número («Ecomfive · Atención» → «Ecomfive»).
+                      (numeroDe.get(sel.numeroId)?.nombre ?? "")
+                        .split(/\s*·\s*/)
+                        .filter((parte) => parte && parte.toLowerCase() !== areaChat(sel.area).etiqueta.toLowerCase())
+                        .join(" · ") || null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
