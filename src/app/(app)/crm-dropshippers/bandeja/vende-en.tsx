@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { claseCampoPanel, PanelCelda } from "@/app/(app)/compras/panel-celda";
 import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { bandera, nombrePais, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { cambiarVendeEn, crearPlataformaVenta, eliminarPlataformaVenta, opcionesVendeEn, renombrarPlataformaVenta } from "./vende-en-actions";
@@ -136,20 +137,22 @@ export function VendeEnChat({
         <PastillaVendeEn key={`${v.plataforma}|${v.pais}`} v={v} alQuitar={puede ? () => cambiar(v.plataforma, v.pais, false) : undefined} />
       ))}
       {puede && (
-        <button
-          ref={boton}
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={abierto}
-          onClick={() => setAbierto((x) => !x)}
-          className={`inline-flex h-6 items-center gap-1 rounded-full border border-dashed border-border-control px-2 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
-          </svg>
-          {vendeEn.length ? "Editar dónde vende" : "Dónde vende"}
-        </button>
+        // Solo el ícono del lápiz (29 oct 2026, pedido de Alcides); el tooltip y el aria-label dicen qué hace.
+        <Tooltip texto={vendeEn.length ? "Editar dónde vende" : "Agregar dónde vende"}>
+          <button
+            ref={boton}
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={abierto}
+            aria-label={vendeEn.length ? "Editar dónde vende" : "Agregar dónde vende"}
+            onClick={() => setAbierto((x) => !x)}
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-border-control text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+            </svg>
+          </button>
+        </Tooltip>
       )}
       {abierto && (
         <PanelCelda
