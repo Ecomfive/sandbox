@@ -8,9 +8,16 @@ import { modeloDeTexto, pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/p
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   agruparPorDia,
+  conMotivoPrimero,
   diasPorAnalizar,
   frecuenciaDeMotivos,
+  idsDropiDeProductos,
   interesPorProducto,
+  MAX_MOTIVOS_NUEVOS_POR_PEDIDO,
+  MAX_MOTIVOS_PROPIOS,
+  MOTIVOS,
+  resolverMotivoNuevo,
+  type Motivo,
   normalizarAnalisis,
   normalizarPerfil,
   pedidoActividad,
@@ -69,6 +76,8 @@ export interface ActividadCliente {
   perfil: PerfilGuardado | null;
   dias: DiaDelCliente[];
   frecuentes: FrecuenciaMotivo[];
+  /** Las etiquetas de los motivos que la IA fue creando (id → etiqueta), para mostrar los de los días ya analizados. */
+  etiquetas: Record<string, string>;
   /** Los productos por los que más preguntó este cliente. */
   productos: { nombre: string; dias: number }[];
   situacion: SituacionCliente;
@@ -141,6 +150,31 @@ async function catalogoDeProductos(supabase: Supabase): Promise<ProductoParaCruz
   return (data ?? []).map((p) => ({ id: p.id as string, nombre: p.nombre as string, codigo: (p.codigo as string | null) ?? null }));
 }
 
+/** Los motivos que la IA fue creando (migración 0190). `disponible`: falta la migración si es false (entonces no se crean motivos nuevos, solo se usa la lista fija). */
+async function cargarMotivosPropios(supabase: Supabase): Promise<{ lista: Motivo[]; disponible: boolean }> {
+  const { data, error } = await supabase.from("whatsapp_actividad_motivos").select("id, etiqueta").order("creado_en", { ascending: true }).limit(200);
+  if (error) return { lista: [], disponible: false };
+  return { lista: (data ?? []).map((m) => ({ id: m.id as string, etiqueta: m.etiqueta as string })), disponible: true };
+}
+
+const comoEtiquetas = (lista: readonly Motivo[]): Record<string, string> => Object.fromEntries(lista.map((m) => [m.id, m.etiqueta]));
+
+/** El nombre del producto de cada ID de Dropi que la IA anotó como «ID 11446»: el del producto vinculado a esa publicación o, si no lo tiene, el de la publicación. */
+async function nombresPorIdDropi(supabase: Supabase, ids: string[]): Promise<Map<string, string>> {
+  const salida = new Map<string, string>();
+  if (!ids.length) return salida;
+  const { data } = await supabase.from("dropi_publicaciones").select("dropi_id, nombre, sku_maestro_id").in("dropi_id", ids);
+  const filas = (data ?? []) as { dropi_id: string; nombre: string | null; sku_maestro_id: string | null }[];
+  const skuIds = [...new Set(filas.map((f) => f.sku_maestro_id).filter((x): x is string => !!x))];
+  const { data: skus } = skuIds.length ? await supabase.from("skus_maestros").select("id, nombre").in("id", skuIds) : { data: [] };
+  const nombreSku = new Map((skus ?? []).map((k) => [k.id as string, k.nombre as string]));
+  for (const f of filas) {
+    const nombre = (f.sku_maestro_id ? nombreSku.get(f.sku_maestro_id) : null) ?? f.nombre;
+    if (nombre && !salida.has(f.dropi_id)) salida.set(f.dropi_id, nombre);
+  }
+  return salida;
+}
+
 /** La actividad ya analizada de un chat y cuánto falta por analizar. Basta poder abrir el chat. */
 export async function actividadDelCliente(conversacionId: string): Promise<ActividadCliente | { error: string }> {
   const u = await usuarioBandeja(false);
@@ -148,19 +182,22 @@ export async function actividadDelCliente(conversacionId: string): Promise<Activ
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, conversacionId, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
-  const [msgs, g, conv, pf] = await Promise.all([
+  const [msgs, g, conv, pf, propios] = await Promise.all([
     mensajesDelChat(supabase, c.id, false),
     guardados(supabase, c.id),
     supabase.from("whatsapp_conversaciones").select("ultimo_de, ultimo_mensaje_en").eq("id", c.id).maybeSingle(),
     perfilGuardado(supabase, c.id),
+    cargarMotivosPropios(supabase),
   ]);
+  const etiquetas = comoEtiquetas(propios.lista);
   const dias = diasPorAnalizar(agruparPorDia(msgs), mapaDeGuardados(g.filas));
   const ultimo = g.filas[0] ?? null;
   const interes = interesPorProducto(g.filas.map((f) => ({ cliente: c.id, productos: f.productos })));
   return {
     perfil: pf.perfil,
     dias: g.filas.slice(0, DIAS_EN_FICHA).map((f) => ({ dia: f.dia, motivos: f.motivos, productos: f.productos, resumen: f.resumen, estado: f.estado })),
-    frecuentes: frecuenciaDeMotivos(g.filas),
+    frecuentes: frecuenciaDeMotivos(g.filas, etiquetas),
+    etiquetas,
     productos: interes.map((p) => ({ nombre: p.nombre, dias: p.dias })).slice(0, 8),
     situacion: situacionDelCliente((conv.data?.ultimo_de as string | null) ?? null, (conv.data?.ultimo_mensaje_en as string | null) ?? null, ultimo ? { dia: ultimo.dia, estado: ultimo.estado, resumen: ultimo.resumen } : null),
     porAnalizar: g.falta ? 0 : dias.length,
@@ -175,7 +212,7 @@ export async function actividadDelCliente(conversacionId: string): Promise<Activ
  */
 async function analizarChat(supabase: Supabase, u: UsuarioActual, id: string, limiteMs: number): Promise<{ analizados: number; faltan: number } | { error: string }> {
   const inicio = Date.now();
-  const [msgs, g, catalogo] = await Promise.all([mensajesDelChat(supabase, id, true), guardados(supabase, id), catalogoDeProductos(supabase)]);
+  const [msgs, g, catalogo, propios] = await Promise.all([mensajesDelChat(supabase, id, true), guardados(supabase, id), catalogoDeProductos(supabase), cargarMotivosPropios(supabase)]);
   if (g.falta) return { error: "Falta correr la migración 0183 (productos y versión de la actividad del cliente)." };
   const pendientes = diasPorAnalizar(agruparPorDia(msgs), mapaDeGuardados(g.filas));
   if (!pendientes.length) return { analizados: 0, faltan: 0 };
@@ -183,9 +220,24 @@ async function analizarChat(supabase: Supabase, u: UsuarioActual, id: string, li
   let analizados = 0;
   let primerError: string | null = null;
   const modelo = modeloDeTexto();
+  // Los motivos nuevos que la IA propone en esta pasada (con tope) y los que ya existen, compartidos por los tramos que corren a la vez.
+  let motivosNuevos = 0;
+
+  /** Un motivo nuevo propuesto por la IA: si ya existe uno igual o parecido se usa ese; si no, se crea (con tope) y queda para los próximos análisis. Devuelve el id a poner en el día, o null. */
+  const motivoParaDia = async (etiqueta: string): Promise<string | null> => {
+    const r = resolverMotivoNuevo(etiqueta, [...MOTIVOS, ...propios.lista]);
+    if (!r.nuevo) return r.id;
+    if (!propios.disponible || propios.lista.length >= MAX_MOTIVOS_PROPIOS || motivosNuevos >= MAX_MOTIVOS_NUEVOS_POR_PEDIDO) return null;
+    motivosNuevos += 1;
+    const { error } = await supabase.from("whatsapp_actividad_motivos").upsert({ id: r.id, etiqueta: r.etiqueta, conversacion_id: id }, { onConflict: "id", ignoreDuplicates: true });
+    if (error) return null;
+    propios.lista.push({ id: r.id, etiqueta: r.etiqueta });
+    await registrarAuditoria({ accion: "crear_motivo_actividad", entidad: "whatsapp_actividad_motivos", detalle: r.etiqueta });
+    return r.id;
+  };
 
   const hacerTramo = async (tramo: typeof pendientes): Promise<number> => {
-    const pedido = pedidoActividad(tramo);
+    const pedido = pedidoActividad(tramo, propios.lista);
     const r = await pedirIA({ instrucciones: pedido.instrucciones, texto: pedido.texto, imagenes: [] }, false, {
       operacion: "actividad_cliente",
       modulo: "crm-dropshippers",
@@ -196,17 +248,24 @@ async function analizarChat(supabase: Supabase, u: UsuarioActual, id: string, li
       primerError ??= r.error;
       return 0;
     }
-    const analisis: AnalisisDia[] = normalizarAnalisis(r.texto, tramo.map((d) => d.dia));
+    const analisis: AnalisisDia[] = normalizarAnalisis(r.texto, tramo.map((d) => d.dia), propios.lista);
     if (!analisis.length) {
       primerError ??= "La IA no devolvió un análisis que se pueda guardar. Inténtalo de nuevo.";
       return 0;
     }
     const porDia = new Map(tramo.map((d) => [d.dia, d]));
+    // Los productos que la IA anotó por su ID de Dropi se cambian por el nombre del producto de esa publicación.
+    const porIdDropi = await nombresPorIdDropi(supabase, idsDropiDeProductos(analisis.flatMap((a) => a.productos)));
+    for (const a of analisis) {
+      if (!a.motivoNuevo) continue;
+      const idMotivo = await motivoParaDia(a.motivoNuevo);
+      a.motivos = idMotivo ? conMotivoPrimero(a.motivos, idMotivo) : a.motivos.length ? a.motivos : ["otro"];
+    }
     const filas = analisis.map((a) => ({
       conversacion_id: id,
       dia: a.dia,
       motivos: a.motivos,
-      productos: productosDelAnalisis(a.productos, catalogo),
+      productos: productosDelAnalisis(a.productos, catalogo, porIdDropi),
       resumen: a.resumen,
       estado: a.estado,
       mensajes: porDia.get(a.dia)?.mensajes.length ?? 0,
@@ -241,7 +300,8 @@ async function analizarChat(supabase: Supabase, u: UsuarioActual, id: string, li
 async function analizarPerfil(supabase: Supabase, u: UsuarioActual, id: string): Promise<{ hecho: true } | { omitido: string } | { error: string }> {
   const [msgs, g] = await Promise.all([mensajesDelChat(supabase, id, true), guardados(supabase, id)]);
   if (g.falta || !g.filas.length) return { omitido: "Todavía no hay días analizados." };
-  const pedido = pedidoPerfil(g.filas, agruparPorDia(msgs));
+  const propios = await cargarMotivosPropios(supabase);
+  const pedido = pedidoPerfil(g.filas, agruparPorDia(msgs), comoEtiquetas(propios.lista));
   const r = await pedirIA({ instrucciones: pedido.instrucciones, texto: pedido.texto, imagenes: [] }, false, {
     operacion: "actividad_cliente_completo",
     modulo: "crm-dropshippers",
@@ -342,7 +402,8 @@ export async function motivosRecurrentes(dias: number): Promise<MotivosRecurrent
   }
   const visibles = await chatsVisibles(supabase, u, [...new Set(filas.map((f) => f.conversacion_id))]);
   const mias = filas.filter((f) => visibles.has(f.conversacion_id));
-  const motivos: MotivoRecurrente[] = frecuenciaDeMotivos(mias).map((f) => {
+  const propios = await cargarMotivosPropios(supabase);
+  const motivos: MotivoRecurrente[] = frecuenciaDeMotivos(mias, comoEtiquetas(propios.lista)).map((f) => {
     const con = mias.filter((x) => x.estado !== "sin_consulta" && x.motivos.includes(f.id));
     return { ...f, clientes: new Set(con.map((x) => x.conversacion_id)).size, ejemplos: con.slice(0, 3).map((x) => ({ dia: x.dia, resumen: x.resumen })) };
   });

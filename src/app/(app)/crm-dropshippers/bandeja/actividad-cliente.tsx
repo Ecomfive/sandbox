@@ -209,7 +209,7 @@ export function ActividadDelClienteFicha({ conversacionId, puedeAnalizar }: { co
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           {d.motivos.map((m) => (
                             <span key={m} className="rounded-md bg-[var(--wa-panel)] px-1.5 py-px text-[11.5px] text-[var(--wa-sec)]">
-                              {etiquetaDeMotivo(m)}
+                              {etiquetaDeMotivo(m, datos.etiquetas)}
                             </span>
                           ))}
                         </div>
