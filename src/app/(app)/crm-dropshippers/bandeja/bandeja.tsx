@@ -17,7 +17,7 @@ import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
 import { Expresiones } from "./expresiones";
 import { GrabarVoz } from "./grabar-voz";
 import { ProductosDelChatFicha } from "./productos-chat";
-import { VentanaNombreContacto } from "./nombre-contacto";
+import { EditorNombreContacto } from "./nombre-contacto";
 import { listarRespuestasRapidas, guardarRespuestaRapida, usarRespuestaRapida } from "./rapidas-actions";
 import { VentanaRapidas } from "./respuestas-rapidas";
 import { sugerirRapidas, validarRapida, yaEsRapida, type RespuestaRapida } from "@/lib/whatsapp/rapidas";
@@ -269,7 +269,8 @@ export function Bandeja({
   // Mensajes rápidos del equipo (se ofrecen arriba del cuadro de texto) y el cambio de nombre de un contacto.
   const [rapidas, setRapidas] = useState<RespuestaRapida[]>(RAPIDAS_BASE);
   const [verRapidas, setVerRapidas] = useState(false);
-  const [nombreDe, setNombreDe] = useState<{ id: string; nombre: string; personalizado: string | null } | null>(null);
+  /** Dónde se está cambiando el nombre del contacto del chat abierto: en la cabecera o en la ficha. */
+  const [editandoNombre, setEditandoNombre] = useState<"cabecera" | "ficha" | null>(null);
   useEffect(() => {
     let vigente = true;
     listarRespuestasRapidas()
@@ -792,34 +793,54 @@ export function Bandeja({
                 <path d="M19 12H5M11 18l-6-6 6-6" />
               </svg>
             </button>
-            <button
-              type="button"
-              onClick={() => alternarFicha()}
-              aria-expanded={fichaVisible}
-              aria-label={`${fichaVisible ? "Cerrar" : "Ver"} la ficha de ${sel.nombre}`}
-              className={`flex min-w-0 flex-[1_1_200px] items-center gap-3 rounded-lg py-0.5 text-left ${anilloFoco}`}
-            >
-              <Foto nombre={sel.nombre} tam="cabecera" />
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate text-[16px]">{sel.nombre}</span>
-                <span className="truncate text-[13px] text-[var(--wa-sec)] tabular-nums">
-                  {[
-                    sel.codigo,
-                    sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
-                    datos.numeros.length > 1 ? numeroDe.get(sel.numeroId)?.nombre : null,
-                    sel.asignadaA ? `la lleva ${sel.asignadaA}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+            {editandoNombre === "cabecera" ? (
+              <div className="flex min-w-0 flex-[1_1_200px] items-center gap-3">
+                <Foto nombre={sel.nombre} tam="cabecera" />
+                <EditorNombreContacto
+                  key={sel.id}
+                  conversacionId={sel.id}
+                  nombreActual={sel.nombre}
+                  personalizado={sel.nombrePersonalizado}
+                  alCerrar={() => setEditandoNombre(null)}
+                  alListo={(mensaje) => {
+                    setEditandoNombre(null);
+                    mostrarToast(mensaje);
+                    void refrescar(sel.id);
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+              <button
+                type="button"
+                onClick={() => alternarFicha()}
+                aria-expanded={fichaVisible}
+                aria-label={`${fichaVisible ? "Cerrar" : "Ver"} la ficha de ${sel.nombre}`}
+                className={`flex min-w-0 flex-[1_1_200px] items-center gap-3 rounded-lg py-0.5 text-left ${anilloFoco}`}
+              >
+                <Foto nombre={sel.nombre} tam="cabecera" />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-[16px]">{sel.nombre}</span>
+                  <span className="truncate text-[13px] text-[var(--wa-sec)] tabular-nums">
+                    {[
+                      sel.codigo,
+                      sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
+                      datos.numeros.length > 1 ? numeroDe.get(sel.numeroId)?.nombre : null,
+                      sel.asignadaA ? `la lleva ${sel.asignadaA}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 </span>
-              </span>
-            </button>
-            {escribe && (
-              <button type="button" onClick={() => setNombreDe({ id: sel.id, nombre: sel.nombre, personalizado: sel.nombrePersonalizado })} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8`}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
-                </svg>
               </button>
+              {escribe && (
+                <button type="button" onClick={() => setEditandoNombre("cabecera")} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8`}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                  </svg>
+                </button>
+              )}
+              </>
             )}
             <EtiquetaArea area={sel.area} />
             {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
@@ -1134,7 +1155,8 @@ export function Bandeja({
                   role="menuitem"
                   onClick={() => {
                     setMenuChat(null);
-                    setNombreDe({ id: c.id, nombre: c.nombre, personalizado: c.nombrePersonalizado });
+                    setElegido(c.id);
+                    setEditandoNombre("cabecera");
                   }}
                   className={`rounded-md px-3 py-2 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}
                 >
@@ -1145,19 +1167,6 @@ export function Bandeja({
           );
         })()}
       {verRapidas && <VentanaRapidas rapidas={rapidas} setRapidas={setRapidas} puedeEditar={escribe && !rapidas.some((r) => r.id.startsWith("base-"))} alCerrar={() => setVerRapidas(false)} />}
-      {nombreDe && (
-        <VentanaNombreContacto
-          conversacionId={nombreDe.id}
-          nombreActual={nombreDe.nombre}
-          personalizado={nombreDe.personalizado}
-          alCerrar={() => setNombreDe(null)}
-          alListo={(mensaje) => {
-            setNombreDe(null);
-            mostrarToast(mensaje);
-            void refrescar(elegido);
-          }}
-        />
-      )}
       {archivo && sel && (
         <EnviarArchivo
           conversacionId={sel.id}
@@ -1227,16 +1236,34 @@ export function Bandeja({
             </div>
             <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
               <Foto nombre={sel.nombre} tam="ficha" />
-              <span className="mt-3 flex max-w-full items-center justify-center gap-1">
-                <span className="min-w-0 text-xl [overflow-wrap:anywhere]">{sel.nombre}</span>
-                {escribe && (
-                  <button type="button" onClick={() => setNombreDe({ id: sel.id, nombre: sel.nombre, personalizado: sel.nombrePersonalizado })} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8 flex-none`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
-                    </svg>
-                  </button>
-                )}
-              </span>
+              {editandoNombre === "ficha" ? (
+                <div className="mt-3 flex w-full">
+                  <EditorNombreContacto
+                    key={sel.id}
+                    conversacionId={sel.id}
+                    nombreActual={sel.nombre}
+                    personalizado={sel.nombrePersonalizado}
+                    centrado
+                    alCerrar={() => setEditandoNombre(null)}
+                    alListo={(mensaje) => {
+                      setEditandoNombre(null);
+                      mostrarToast(mensaje);
+                      void refrescar(sel.id);
+                    }}
+                  />
+                </div>
+              ) : (
+                <span className="mt-3 flex max-w-full items-center justify-center gap-1">
+                  <span className="min-w-0 text-xl [overflow-wrap:anywhere]">{sel.nombre}</span>
+                  {escribe && (
+                    <button type="button" onClick={() => setEditandoNombre("ficha")} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8 flex-none`}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                      </svg>
+                    </button>
+                  )}
+                </span>
+              )}
               {(sel.codigo || verTelefono) && (
                 <span className="flex items-center gap-1 text-[15px] text-[var(--wa-sec)] tabular-nums">
                   {sel.codigo}
