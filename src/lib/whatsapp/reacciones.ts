@@ -58,3 +58,22 @@ export function agruparReacciones<M extends MensajeConReaccion>(mensajes: M[]): 
   }
   return { visibles, reacciones };
 }
+
+/** Las reacciones rápidas que se ofrecen al pasar el cursor sobre un mensaje (las mismas seis que WhatsApp). */
+export const REACCIONES_RAPIDAS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+/**
+ * El emoji de una reacción que se puede mandar: uno solo (un grafema, con sus tonos de piel o su variante), nada de texto. Devuelve el emoji limpio, «» para quitar la reacción
+ * (una cadena vacía) o null si no sirve.
+ */
+export function emojiDeReaccion(texto: unknown): string | null {
+  if (typeof texto !== "string") return null;
+  const t = texto.trim();
+  if (!t) return "";
+  if (t.length > 16 || !/\p{Extended_Pictographic}/u.test(t)) return null;
+  const grafemas = [...new Intl.Segmenter("es", { granularity: "grapheme" }).segment(t)];
+  return grafemas.length === 1 ? t : null;
+}
+
+/** El emoji con que el equipo reaccionó a un mensaje, si lo hizo (para marcarlo en la barra y quitarlo al volver a pulsarlo). */
+export const miReaccion = (reacciones: readonly ReaccionVista[] | undefined): string | null => reacciones?.find((r) => r.direccion === "saliente")?.emoji ?? null;

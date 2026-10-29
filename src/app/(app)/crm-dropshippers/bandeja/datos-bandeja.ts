@@ -43,7 +43,7 @@ export interface ConversacionVista {
   borradaEnApp: { por: string | null; en: string } | null;
   /** Hay una petición de borrar este chat esperando autorización (migración 0172). */
   borradoPendiente: boolean;
-  /** Sus etiquetas, como en ClickUp (migración 0185). Sin la migración, ninguna. */
+  /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
   etiquetas: string[];
   /** Desde cuándo espera respuesta: su primer mensaje sin contestar (migración 0189). Sin la migración, null y se usa `ultimoEntranteEn`. */
   esperandoDesde: string | null;
@@ -139,7 +139,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel), perfiles:asignada_a(nombre)",
+      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas), perfiles:asignada_a(nombre)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
@@ -147,7 +147,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(300);
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
-    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null; nivel: string | null }>);
+    const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null; nivel: string | null; etiquetas: string[] | null }>);
     return {
       id: c.id as string,
       numeroId: c.numero_id as string,
@@ -169,7 +169,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       borradaEnApp: null,
       borradoPendiente: false,
       nombrePersonalizado: null,
-      etiquetas: [],
+      // Con dropshipper, las etiquetas son las suyas (las mismas de su ficha del CRM); sin él, las del chat.
+      etiquetas: d ? (d.etiquetas ?? []) : [],
       esperandoDesde: null,
       motivo: null,
     };
@@ -200,7 +201,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   ]);
   if (!etiquetadas.error) {
     const porId = new Map((etiquetadas.data ?? []).map((x) => [x.id as string, (x.etiquetas as string[] | null) ?? []]));
-    for (const c of conversaciones) c.etiquetas = porId.get(c.id) ?? [];
+    for (const c of conversaciones) if (!c.dropshipperId) c.etiquetas = porId.get(c.id) ?? [];
   }
   if (!coloresR.error) for (const x of coloresR.data ?? []) colores[x.nombre as string] = x.color as string;
   // La espera y el motivo de cada chat (migración 0189). Sin ella, la bandeja ordena y mide como antes.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agruparReacciones, type MensajeConReaccion } from "./reacciones";
+import { agruparReacciones, emojiDeReaccion, miReaccion, REACCIONES_RAPIDAS, type MensajeConReaccion } from "./reacciones";
 
 let n = 0;
 const msj = (direccion: MensajeConReaccion["direccion"], texto: string, waId: string | null = `w${++n}`): MensajeConReaccion => ({ id: `m${++n}`, direccion, tipo: "texto", texto, waId, reaccionA: null });
@@ -41,4 +41,31 @@ test("si el mensaje reaccionado no está cargado, la reacción no se ve suelta",
   const { visibles, reacciones } = agruparReacciones([a, reaccion("saliente", "👍", "wa-que-no-esta")]);
   assert.deepEqual(visibles.map((m) => m.id), [a.id]);
   assert.equal(reacciones.size, 0);
+});
+
+test("ofrece seis reacciones rápidas y todas son un solo emoji válido", () => {
+  assert.equal(REACCIONES_RAPIDAS.length, 6);
+  for (const e of REACCIONES_RAPIDAS) assert.equal(emojiDeReaccion(e), e);
+});
+
+test("acepta un emoji (con variante o tono de piel) y una cadena vacía para quitar la reacción", () => {
+  assert.equal(emojiDeReaccion("  👍🏽 "), "👍🏽");
+  assert.equal(emojiDeReaccion("❤️"), "❤️");
+  assert.equal(emojiDeReaccion(""), "");
+  assert.equal(emojiDeReaccion("   "), "");
+});
+
+test("rechaza texto, varios emojis y lo que no es una cadena", () => {
+  assert.equal(emojiDeReaccion("hola"), null);
+  assert.equal(emojiDeReaccion("👍👍"), null);
+  assert.equal(emojiDeReaccion("👍 ok"), null);
+  assert.equal(emojiDeReaccion(5), null);
+  assert.equal(emojiDeReaccion(undefined), null);
+  assert.equal(emojiDeReaccion("a".repeat(40)), null);
+});
+
+test("dice con qué emoji reaccionó el equipo", () => {
+  assert.equal(miReaccion([{ emoji: "👍", direccion: "entrante" }, { emoji: "❤️", direccion: "saliente" }]), "❤️");
+  assert.equal(miReaccion([{ emoji: "👍", direccion: "entrante" }]), null);
+  assert.equal(miReaccion(undefined), null);
 });
