@@ -1,5 +1,6 @@
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
+import { dropshipperPorTelefonos } from "./vinculo";
 import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
 
 /**
@@ -12,8 +13,8 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
   const supabase = createServiceClient();
   // El dropshipper de cada teléfono: el CRM guarda el WhatsApp en formato internacional (src/lib/crm/telefono.ts).
   const telefonos = [...new Set(mensajes.map((m) => normalizarTelefono(m.telefono)?.e164 ?? m.telefono))];
-  const { data } = await supabase.from("dropshippers").select("id, contacto_telefono").in("contacto_telefono", telefonos);
-  const dropshipperDe = new Map((data ?? []).map((d) => [d.contacto_telefono as string, d.id as string]));
+  // Su número principal o uno de sus otros números (migración 0177).
+  const dropshipperDe = await dropshipperPorTelefonos(supabase, telefonos);
   for (const m of [...mensajes].sort((a, b) => a.momento.localeCompare(b.momento))) {
     const telefono = normalizarTelefono(m.telefono)?.e164 ?? m.telefono;
     const { error } = await supabase.rpc(desdeCelular ? "whatsapp_registrar_saliente_celular" : "whatsapp_registrar_entrante", {

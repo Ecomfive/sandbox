@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, escribeEnArea, type AreaCrm } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
+import { dropshipperPorTelefonos } from "@/lib/whatsapp/vinculo";
 import { createServiceClient } from "@/lib/supabase/server";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { aUtc, tipoDeArchivo, type TipoImportado } from "@/lib/whatsapp/importar";
@@ -58,7 +59,7 @@ export async function conversacionParaImportar(numeroId: string, telefono: strin
     if (!(await conversacionPermitida(supabase, existe.id as string, u, true))) return { error: "Ya hay un chat con ese número, pero es de un área donde no puedes escribir." };
     return { id: existe.id as string, creada: false };
   }
-  const { data: ds } = await supabase.from("dropshippers").select("id").eq("contacto_telefono", tel.e164).limit(1).maybeSingle();
+  const dropshipperId = (await dropshipperPorTelefonos(supabase, [tel.e164])).get(tel.e164) ?? null;
   const { data: nueva, error } = await supabase
     .from("whatsapp_conversaciones")
     .insert({
@@ -66,7 +67,7 @@ export async function conversacionParaImportar(numeroId: string, telefono: strin
       telefono: tel.e164,
       area,
       nombre_perfil: nombre?.trim().slice(0, 120) || null,
-      dropshipper_id: (ds?.id as string | undefined) ?? null,
+      dropshipper_id: dropshipperId,
       estado: "resuelta",
     })
     .select("id")
