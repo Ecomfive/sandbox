@@ -414,7 +414,6 @@ export function Bandeja({
     if (temporizadorVista.current) clearTimeout(temporizadorVista.current);
   }, []);
   // La ventana del chat (29 oct 2026): si no caben la ficha y el chat lado a lado, se ve uno a la vez y se cambia con «Chat» / «Ficha».
-  const [vistaAngosta, setVistaAngosta] = useState<"chat" | "ficha">("chat");
   const [enviando, empezar] = useTransition();
   const finRef = useRef<HTMLDivElement>(null);
   const textoRef = useRef<HTMLTextAreaElement>(null);
@@ -801,7 +800,6 @@ export function Bandeja({
     ocultarVistaPrevia();
     setElegido(c.id);
     setChat((x) => (x?.id === c.id ? x : null));
-    setVistaAngosta("chat");
     setEditandoNombre(null);
     // Al abrirla queda leída (el servidor la marca en `abrirConversacion`), solo en el panel propio: supervisando, no.
     if (c.area === miArea) setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, noLeidos: 0 } : x)) }));
@@ -1229,22 +1227,9 @@ export function Bandeja({
           }
         >
           <div className="bandeja-wa @container flex min-h-0 flex-1 flex-col bg-[var(--wa-fondo)] text-[var(--wa-texto)]">
-            {/* Si no caben lado a lado, se ve uno a la vez. */}
-            <div role="group" aria-label="Qué ver" className="flex gap-1 border-b border-[var(--wa-borde)] bg-[var(--wa-panel)] p-1.5 @4xl:hidden">
-              {(["chat", "ficha"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  aria-pressed={vistaAngosta === v}
-                  onClick={() => setVistaAngosta(v)}
-                  className={`min-h-8 flex-1 rounded-md text-[13px] ${vistaAngosta === v ? "bg-[var(--wa-fondo)] font-semibold shadow-[0_1px_0.5px_var(--wa-sombra)]" : "text-[var(--wa-sec)]"} ${anilloFoco}`}
-                >
-                  {v === "chat" ? "Chat" : "Ficha del dropshipper"}
-                </button>
-              ))}
-            </div>
-            <div className="flex min-h-0 flex-1">
-              <div className={`${vistaAngosta === "ficha" ? "flex" : "hidden"} min-h-0 min-w-0 flex-1 flex-col @4xl:flex`}>
+            {/* La ficha del dropshipper siempre se ve con el chat (29 oct 2026, pedido de Alcides): al lado si caben, y si la ventana es angosta, arriba del chat. */}
+            <div className="flex min-h-0 flex-1 flex-col @4xl:flex-row">
+              <div className="flex max-h-[45%] min-h-0 min-w-0 flex-none flex-col @4xl:max-h-none @4xl:flex-1">
                 <FichaDelChat
                   sel={sel}
                   dropshipper={verDropshipper ?? null}
@@ -1277,7 +1262,7 @@ export function Bandeja({
               </div>
               <section
                 aria-label={`Conversación con ${sel.nombre}`}
-                className={`${vistaAngosta === "chat" ? "flex" : "hidden"} relative min-h-0 w-full min-w-0 flex-col @4xl:flex @4xl:w-[46%] @4xl:max-w-[720px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]`}
+                className={`relative flex min-h-0 w-full min-w-0 flex-1 flex-col border-t border-[var(--wa-borde)] @4xl:w-[46%] @4xl:border-t-0 @4xl:max-w-[720px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]`}
                 onDragEnter={(e) => {
                   if (!traeArchivos(e)) return;
                   e.preventDefault();

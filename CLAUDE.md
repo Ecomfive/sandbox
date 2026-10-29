@@ -1058,6 +1058,14 @@ convenciones técnicas del código.
   `productos-chat-actions.ts`) cruza los últimos 40 mensajes entrantes con los productos simples de `skus_maestros` (`productosMencionados`
   en `src/lib/crm/productos-chat.ts`: dos palabras seguidas del nombre o el código) y suma los fijados (tabla `whatsapp_conversacion_productos`,
   migración 0180); de cada uno, `cargarEnCamino` del país del dropshipper (o del prefijo del número). Bajo 1280 px la ficha se abre encima.
+  **Recuerda toda la conversación** (29 oct 2026, Hernán: «que cada que pidan algo lo vayas identificando»): `productosDelChat` lee hasta
+  2.000 mensajes (`textosDelChat`, entrantes y salientes) y `productosDeLaConversacion` (`src/lib/crm/productos-chat.ts`, con prueba) junta,
+  el más reciente primero y con cuántas veces: lo que nombra el dropshipper y se vende en su país (publicaciones sin archivar con producto) más
+  lo nombrado con dos palabras seguidas aunque no se venda allá, sin repetir versiones de lo mismo; si no nombra ninguno, **una sola palabra**
+  que diga cuál entre lo que se vende en su país (`productosPorPalabra`: «la creatina», de 5 letras o más, 1 a 3 productos, sin
+  `PALABRAS_DE_CHARLA`); los **ID de Dropi** nombrados por cualquiera («el ID es 51188», o el número solo: `idsDropiEnTexto`) con el producto de
+  esa publicación en su país; y los productos de «Analizar con IA» (`whatsapp_actividad.productos`). Cada uno dice en la ficha de dónde salió
+  (`ProductoDelChat.mencion`: «Lo pidió el 29 oct: “Para la creatina”», «Se le pasó el ID 51188 · 29 oct», «Lo encontró el análisis con IA del…»).
   filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
   comercial; +507 Atención): cada número de 360dialog tiene su clave; `config360(numero)` usa `D360_API_KEY_<dígitos del número>` si está y si no
   `D360_API_KEY` (la principal, también la de plantillas). El envío (`NumeroEmpresa` en `api.ts`, `conversacionPermitida().numeroEmpresa`)
@@ -1184,6 +1192,8 @@ convenciones técnicas del código.
   (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
   deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
   ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
+  **La ficha siempre a la vista** (29 oct 2026, pedido de Alcides): la ventana del chat ya no tiene los botones «Chat / Ficha del dropshipper»; lado a lado desde
+  `@4xl` y, más angosta, la ficha arriba (`max-h-[45%]`, se desplaza) y el chat abajo.
   **Un solo juego de etiquetas** (29 oct 2026, pedido de Alcides: salían dos): un chat **con dropshipper** muestra y edita las del dropshipper
   (`dropshippers.etiquetas`, las de ClickUp; `guardarEtiquetasChat` escribe ahí con `escribirEtiquetasDropshipper`, `src/lib/crm/etiquetas-dropshipper.ts`,
   auditoría `etiquetas_dropshipper`); solo un chat sin dropshipper usa `whatsapp_conversaciones.etiquetas`. En la ficha del CRM, «Datos › Etiquetas» es

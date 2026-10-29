@@ -2,16 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
-import { cuantoFalta } from "@/lib/crm/productos-chat";
+import { cuantoFalta, type MencionEnChat } from "@/lib/crm/productos-chat";
 import { EtapaCotizando, LlegadaCamino } from "../../publicaciones-dropi/llegada-camino";
 import { avisarCuandoLlegue } from "../tareas/actions";
 import { buscarProductosChat, fijarProductoChat, productosDelChat, type ProductoDelChat, type ProductosDelChat } from "./productos-chat-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
+const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" });
+
+/** De dónde salió el producto: «Lo pidió el 29 oct: “Para la creatina”», «Se le pasó el ID 51188 · 29 oct» o el análisis con IA. */
+function textoMencion(m: MencionEnChat): string {
+  const cuando = fechaCorta(m.momento);
+  const veces = m.veces > 1 ? ` · ${m.veces} veces` : "";
+  if (m.como === "id") return `${m.direccion === "saliente" ? "Se le pasó el" : "Preguntó por el"} ${m.cita} · ${cuando}${veces}`;
+  if (m.como === "analisis") return `Lo encontró el análisis con IA del ${cuando}`;
+  return `Lo pidió el ${cuando}: «${m.cita}»${veces}`;
+}
 
 /**
- * «Productos que pregunta» en la ficha del chat (pedido de Hernán, 29 oct 2026): los que el dropshipper nombra en sus mensajes salen solos
- * como sugerencia, y cualquiera se fija con «Agregar producto». De cada uno, cuánto viene en camino a su país y cuándo llega, como la
+ * «Productos que pregunta» en la ficha del chat (pedido de Hernán, 29 oct 2026): los que se nombran en toda la conversación (por nombre, por
+ * una palabra como «la creatina», por el ID de Dropi o por el análisis con IA) salen solos como sugerencia, diciendo cuándo y cómo se pidieron,
+ * y cualquiera se fija con «Agregar producto». De cada uno, cuánto viene en camino a su país y cuándo llega, como la
  * columna «En camino» de Gestión de IDs Dropi; así se le responde «llega el 12 nov» sin salir del chat. Lo que viene en camino tiene
  * «Avisarme cuando llegue» (29 oct 2026): una tarea que se activa cuando llega de verdad, para avisarle al cliente. `alCambio` avisa
  * que se creó una tarea.
@@ -118,7 +129,12 @@ export function ProductosDelChatFicha({
               )}
               <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[13px] [overflow-wrap:anywhere]">
                 <span className="font-medium leading-tight">{p.nombre}</span>
-                <span className="text-[11.5px] text-[var(--wa-sec)]">{p.fijado ? (p.codigo ?? "") : `Lo nombra en el chat${p.codigo ? ` · ${p.codigo}` : ""}`}</span>
+                {p.codigo && <span className="text-[11.5px] text-[var(--wa-sec)]">{p.codigo}</span>}
+                {p.mencion ? (
+                  <span className="text-[11.5px] text-[var(--wa-sec)] italic">{textoMencion(p.mencion)}</span>
+                ) : (
+                  !p.fijado && <span className="text-[11.5px] text-[var(--wa-sec)]">Lo nombra en el chat</span>
+                )}
                 <EnCamino p={p} hoy={hoy} />
                 {p.aviso ? (
                   <span className="mt-0.5 text-[12px] font-medium text-[var(--wa-acento)]">Te avisamos cuando llegue para que le escribas.</span>
