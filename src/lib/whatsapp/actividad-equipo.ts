@@ -51,6 +51,8 @@ export function eventoDeMensaje(m: { id: string; direccion: string; tipo: string
     return { ...base, clase: "nota", texto: texto ? `Dejó una nota privada: «${texto}»` : "Dejó una nota privada" };
   }
   if (m.direccion !== "saliente") return null;
+  // Una reacción de la empresa a un mensaje: el emoji va en el texto (vacío = quitó la reacción).
+  if (m.tipo === "reaccion") return { ...base, clase: "mensaje", texto: texto ? `Reaccionó con ${texto} a un mensaje` : "Quitó su reacción a un mensaje" };
   if (m.tipo in ARCHIVO) return { ...base, clase: "archivo", texto: texto ? `${ARCHIVO[m.tipo]}: «${texto}»` : ARCHIVO[m.tipo] };
   if (m.tipo === "plantilla") return { ...base, clase: "mensaje", texto: texto ? `Mandó una plantilla: «${texto}»` : "Mandó una plantilla" };
   const verbo = m.autor === DESDE_EL_CELULAR ? "Respondió desde el celular" : "Respondió";

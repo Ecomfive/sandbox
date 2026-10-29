@@ -236,7 +236,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
   const ciudad = texto(formData, "ciudad") || null;
   const contacto_email = texto(formData, "contacto_email").toLowerCase() || null;
   const notas = texto(formData, "notas") || null;
-  const etiquetas = lista(texto(formData, "etiquetas"), 30);
+  // Las etiquetas se editan aparte (`guardarEtiquetasDropshipper`): solo se tocan si vienen en el formulario.
+  const etiquetas = formData.has("etiquetas") ? lista(texto(formData, "etiquetas"), 30) : undefined;
   const productos = lista(texto(formData, "productos"), 60);
 
   if (!ES_ID(id)) return { error: "Dropshipper no válido." };
@@ -282,7 +283,7 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
       contacto_email,
       contacto_telefono,
       notas,
-      etiquetas,
+      ...(etiquetas !== undefined ? { etiquetas } : {}),
       productos,
       ...(pais_origen !== undefined ? { pais_origen } : {}),
     })
