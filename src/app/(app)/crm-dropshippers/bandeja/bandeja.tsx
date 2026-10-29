@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { VisorImagen } from "@/components/ui/visor-imagen";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
@@ -149,12 +150,18 @@ function EtiquetaArea({ area }: { area: AreaCrm }) {
 /** El contenido de un mensaje: su texto y, si trae un archivo, la foto, el audio, el video o el enlace para bajarlo. */
 function Contenido({ m }: { m: MensajeVista }) {
   const src = `/api/whatsapp/media/${m.id}`;
+  // Una foto se abre en un visor sobre la misma página (centrada, con su texto y «Descargar»), no en una pestaña con la imagen suelta.
+  const [ampliada, setAmpliada] = useState(false);
+  const cerrarVisor = useCallback(() => setAmpliada(false), []);
   return (
     <>
       {m.conArchivo && m.tipo === "imagen" && (
-        <a href={src} target="_blank" rel="noreferrer" className={`mb-1 block ${anilloFoco}`}>
-          <img src={src} alt={m.texto ? `Foto: ${m.texto}` : "Foto que mandó por WhatsApp"} loading="lazy" className="max-h-72 max-w-full rounded-md object-contain" />
-        </a>
+        <>
+          <button type="button" onClick={() => setAmpliada(true)} aria-label="Ver la foto en grande" className={`mb-1 block cursor-pointer ${anilloFoco}`}>
+            <img src={src} alt={m.texto ? `Foto: ${m.texto}` : "Foto de la conversación"} loading="lazy" className="max-h-72 max-w-full rounded-md object-contain" />
+          </button>
+          <VisorImagen src={ampliada ? src : null} alt={m.texto ? `Foto: ${m.texto}` : "Foto de la conversación"} onClose={cerrarVisor} pie={m.texto} descargar={{ href: src, nombre: m.mediaNombre || "foto" }} />
+        </>
       )}
       {m.conArchivo && m.tipo === "sticker" && <img src={src} alt="Sticker" loading="lazy" className="h-28 w-28 object-contain" />}
       {m.conArchivo && m.tipo === "audio" && <audio controls preload="none" src={src} className="max-w-full" />}
