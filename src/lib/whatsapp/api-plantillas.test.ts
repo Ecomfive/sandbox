@@ -42,7 +42,7 @@ describe("accesoPlantillas", () => {
       assert.equal(a.acceso.base, "https://waba-v2.360dialog.io");
       assert.equal(a.acceso.cabeceras["D360-API-KEY"], "clave");
     }
-    assert.deepEqual(conexionPlantillas(), { conectado: true, via: "360dialog", motivo: null });
+    assert.deepEqual(conexionPlantillas(), { conectado: true, via: "360dialog", motivo: null, numeros: 1 });
   });
   it("el sandbox de 360dialog no maneja plantillas", () => {
     limpiar();
