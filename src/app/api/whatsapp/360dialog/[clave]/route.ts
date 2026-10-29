@@ -9,7 +9,7 @@ import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 import { NUMERO_360_SIN_ID } from "@/lib/whatsapp/proveedor";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // El historial del celular (`history`) llega en tandas grandes: hasta lo que acepta Vercel (4,5 MB).
 const MAX_CUERPO = 4_400_000;

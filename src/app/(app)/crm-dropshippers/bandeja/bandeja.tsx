@@ -37,6 +37,8 @@ import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
+import { GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, textoPlazo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
+import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
 
 /** Qué conversaciones del panel se ven. */
 type Filtro = "sinResponder" | "mias" | "resueltas" | "todas";
@@ -77,6 +79,31 @@ function esperaDe(desde: string | null): { texto: string; clase: string } | null
   const texto = min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}` : `${Math.floor(min / 1440)} día${min >= 2880 ? "s" : ""}`;
   return { texto, clase: min < 15 ? "text-[var(--wa-acento)]" : min < 60 ? "text-warning" : "text-destructive" };
 }
+
+/** Desde cuándo espera un chat sin responder: su primer mensaje sin contestar (migración 0189) o, sin ella, el último del dropshipper. */
+const esperandoDesde = (c: ConversacionVista) => (sinResponder(c) ? (c.esperandoDesde ?? c.ultimoEntranteEn) : null);
+
+/**
+ * La espera con el plazo de su motivo (src/lib/whatsapp/prioridad.ts): verde a tiempo, ámbar cerca de vencer y rojo vencido, con «Vence en…» o «Venció hace…».
+ * Sin motivo, los colores de siempre.
+ */
+function esperaConPlazo(c: ConversacionVista): { texto: string; clase: string; plazo: string | null } | null {
+  const desde = esperandoDesde(c);
+  const base = esperaDe(desde);
+  if (!desde || !base) return null;
+  if (!c.motivo) return { ...base, plazo: null };
+  const p = plazoDelChat(desde, c.motivo.grupo, c.vip);
+  if (p.restan == null) return { texto: base.texto, clase: "text-[var(--wa-sec)]", plazo: "Sin plazo" };
+  return {
+    texto: base.texto,
+    clase: p.estado === "vencido" ? "text-destructive" : p.estado === "cerca" ? "text-warning" : "text-[var(--wa-acento)]",
+    plazo: p.restan > 0 ? `Vence en ${textoPlazo(p.restan)}` : `Venció hace ${textoPlazo(-p.restan)}`,
+  };
+}
+
+/** Los chats por urgencia: los que esperan, por lo gastado del plazo de su motivo; luego los demás, por su último mensaje. */
+const porUrgencia = (cs: ConversacionVista[]) =>
+  ordenarPorUrgencia(cs.map((c) => ({ c, esperandoDesde: esperandoDesde(c), grupo: c.motivo?.grupo ?? null, vip: c.vip, ultimoMensajeEn: c.ultimoMensajeEn }))).map((x) => x.c);
 
 /** Respuestas de un toque para lo que más se repite en Atención. */
 /** Los mensajes rápidos de siempre: se usan mientras no exista la tabla de la migración 0179. */
@@ -534,15 +561,18 @@ export function Bandeja({
     return new Map(
       areas.map((a) => [
         a,
-        delNumero
-          .filter((c) => c.area === a)
-          .filter(
-            (c) =>
-              // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
-              c.id === elegido ||
-              (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "resueltas" ? c.estado === "resuelta" : true),
-          )
-          .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q))),
+        // Por urgencia (migración 0189): arriba el que tiene el plazo de su motivo más gastado o vencido.
+        porUrgencia(
+          delNumero
+            .filter((c) => c.area === a)
+            .filter(
+              (c) =>
+                // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
+                c.id === elegido ||
+                (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "resueltas" ? c.estado === "resuelta" : true),
+            )
+            .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q))),
+        ),
       ]),
     );
   }, [areas, delNumero, filtro, buscar, miId, elegido]);
@@ -698,6 +728,32 @@ export function Bandeja({
       .catch(() => mostrarToast("No se pudo marcar.", "destructive"));
   }
 
+  /** Corrige el motivo de un chat (clic derecho › Motivo): queda puesto por la persona y le sirve de ejemplo a la IA. */
+  function cambiarMotivo(c: ConversacionVista, grupo: GrupoMotivo) {
+    setMenuChat(null);
+    setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? { ...x, motivo: { grupo, resumen: null, por: "persona" as const, porNombre: null } } : x)) }));
+    void cambiarMotivoChat(c.id, grupo)
+      .then((r) => {
+        mostrarToast("error" in r ? r.error : `Motivo: ${grupoPorId(grupo)?.etiqueta ?? grupo}.`, "error" in r ? "destructive" : undefined);
+        return refrescar(null);
+      })
+      .catch(() => mostrarToast("No se pudo cambiar el motivo.", "destructive"));
+  }
+
+  /** «Leer motivos»: la IA lee por qué escribe cada chat que espera respuesta sin motivo (de a 15 por toque). */
+  const [clasificando, setClasificando] = useState(false);
+  function clasificarPendientes() {
+    setClasificando(true);
+    void clasificarChatsPendientes()
+      .then((r) => {
+        if ("error" in r) return mostrarToast(r.error, "destructive");
+        mostrarToast(`${r.clasificados} ${r.clasificados === 1 ? "chat quedó" : "chats quedaron"} con motivo.${r.quedan ? ` Quedan ${r.quedan}: vuelve a pulsar.` : ""}`);
+        return refrescar(null);
+      })
+      .catch(() => mostrarToast("No se pudieron leer los motivos.", "destructive"))
+      .finally(() => setClasificando(false));
+  }
+
   /** Pone un mensaje rápido en el cuadro de texto (no lo envía: se puede cambiar antes) y anota que se usó. */
   function elegirRapida(r: RespuestaRapida) {
     setBorrador(r.texto);
@@ -796,6 +852,8 @@ export function Bandeja({
     const actual = c.id === elegido;
     // El número solo se dice si el chat llegó por el de otra área: el de su panel ya está en la cabecera de la columna.
     const otroNumero = datos.numeros.length > 1 && numeroDe.get(c.numeroId)?.area !== c.area ? (numeroDe.get(c.numeroId)?.nombre ?? null) : null;
+    const espera = enNavegador ? esperaConPlazo(c) : null;
+    const grupo = grupoPorId(c.motivo?.grupo);
     const datosFila = (
       <>
         <span className="flex items-baseline gap-2">
@@ -814,8 +872,22 @@ export function Bandeja({
             </span>
           )}
         </span>
-        {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || otroNumero || c.etiquetas.length > 0) && (
+        {(!c.dropshipperId || c.estado === "resuelta" || c.asignadaA || c.borradaEnApp || otroNumero || c.etiquetas.length > 0 || grupo || espera) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11.5px] text-[var(--wa-sec)]">
+            {grupo && c.motivo && (
+              <span
+                title={`${grupo.etiqueta}${c.motivo.resumen ? `: ${c.motivo.resumen}` : ""} (${c.motivo.por === "persona" ? `lo puso ${c.motivo.porNombre ?? "el equipo"}` : "lo leyó la IA"})`}
+                className="rounded-full border border-[var(--wa-borde)] px-2 py-px font-medium text-[var(--wa-texto)]"
+              >
+                <span aria-hidden="true">{grupo.emoji}</span> {grupo.corto}
+              </span>
+            )}
+            {espera && (
+              <span className={`font-semibold tabular-nums ${espera.clase} ${ancha ? "lg:hidden" : ""}`}>
+                {espera.texto}
+                {espera.plazo && <span className="font-normal"> · {espera.plazo}</span>}
+              </span>
+            )}
             {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
             {c.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">Borrado en la app</span>}
             {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
@@ -826,7 +898,6 @@ export function Bandeja({
         )}
       </>
     );
-    const espera = enNavegador && sinResponder(c) ? esperaDe(c.ultimoEntranteEn) : null;
     return (
       <li
         key={c.id}
@@ -839,7 +910,9 @@ export function Bandeja({
           // Con el teclado (tecla de menú o Mayús + F10) no hay posición del cursor: el menú sale junto al chat.
           const r = e.currentTarget.getBoundingClientRect();
           const conRaton = e.clientX !== 0 || e.clientY !== 0;
-          setMenuChat({ id: c.id, x: Math.min(conRaton ? e.clientX : r.left + 40, window.innerWidth - 230), y: Math.min(conRaton ? e.clientY : r.bottom - 8, window.innerHeight - 70) });
+          // Con el cambio de motivo el menú es más alto: se sube para que quepa.
+          const alto = escribe ? 400 : 70;
+          setMenuChat({ id: c.id, x: Math.min(conRaton ? e.clientX : r.left + 40, window.innerWidth - 300), y: Math.max(8, Math.min(conRaton ? e.clientY : r.bottom - 8, window.innerHeight - alto)) });
         }}
       >
         <button
@@ -854,9 +927,12 @@ export function Bandeja({
           {ancha ? (
             <span className="flex min-w-0 flex-1 items-center gap-4 border-b border-[var(--wa-borde)] py-3 pr-3.5">
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">{datosFila}</span>
-              <span className={`hidden w-[140px] flex-none items-center gap-1.5 text-[13px] font-semibold tabular-nums lg:flex ${espera ? espera.clase : "font-normal text-[var(--wa-sec)]"}`}>
-                {espera && <span aria-hidden="true" className="h-2 w-2 flex-none rounded-full bg-current" />}
-                {espera ? espera.texto : c.estado === "resuelta" ? "Resuelta" : "Respondido"}
+              <span className={`hidden w-[140px] flex-none flex-col text-[13px] font-semibold tabular-nums lg:flex ${espera ? espera.clase : "font-normal text-[var(--wa-sec)]"}`}>
+                <span className="flex items-center gap-1.5">
+                  {espera && <span aria-hidden="true" className="h-2 w-2 flex-none rounded-full bg-current" />}
+                  {espera ? espera.texto : c.estado === "resuelta" ? "Resuelta" : "Respondido"}
+                </span>
+                {espera?.plazo && <span className="pl-3.5 text-[11.5px] font-normal">{espera.plazo}</span>}
               </span>
               <span className="hidden w-[160px] flex-none truncate text-[13px] text-[var(--wa-sec)] lg:block">{c.asignadaA ?? "Sin asignar"}</span>
             </span>
@@ -1030,6 +1106,7 @@ export function Bandeja({
         {areas.map((a) => {
           const chats = listas.get(a) ?? [];
           const pendientes = delNumero.filter((c) => c.area === a && sinResponder(c)).length;
+          const sinMotivo = delNumero.filter((c) => c.area === a && sinResponder(c) && !c.motivo).length;
           const numerosDelArea = datos.numeros.filter((n) => n.area === a).map((n) => n.nombre);
           const ancha = areas.length === 1;
           return (
@@ -1048,6 +1125,17 @@ export function Bandeja({
                   <span className="truncate text-[12.5px] text-[var(--wa-sec)]">
                     {numerosDelArea.length ? numerosDelArea.join(" · ") : a === "direccion" ? "Sus chats propios, que nadie más ve" : "Sin número propio"}
                   </span>
+                  {escribe && sinMotivo > 0 && (
+                    <button
+                      type="button"
+                      disabled={clasificando}
+                      onClick={clasificarPendientes}
+                      title="La IA lee por qué escribe cada chat que espera respuesta sin motivo: así se ordena por su plazo."
+                      className={`mt-1.5 self-start rounded-full border border-[var(--wa-borde)] px-2.5 py-0.5 text-xs font-semibold text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60 ${anilloFoco}`}
+                    >
+                      {clasificando ? "Leyendo motivos…" : `Leer motivos con IA (${sinMotivo})`}
+                    </button>
+                  )}
                 </div>
                 {pendientes > 0 && (
                   <span className="flex h-6 flex-none items-center rounded-full bg-[var(--wa-acento)] px-2.5 text-xs font-semibold text-[var(--wa-acento-texto)] tabular-nums">{pendientes} sin responder</span>
@@ -1495,6 +1583,26 @@ export function Bandeja({
                 >
                   Etiquetas
                 </button>
+              )}
+              {escribe && (
+                <div role="group" aria-label="Motivo del chat" className="mt-1 flex flex-col border-t border-[var(--wa-borde)] pt-1">
+                  <span className="px-3 pt-1 pb-0.5 text-[11.5px] font-semibold tracking-wide text-[var(--wa-sec)] uppercase">Motivo · plazo</span>
+                  {GRUPOS.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={c.motivo?.grupo === g.id}
+                      onClick={() => cambiarMotivo(c, g.id)}
+                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+                    >
+                      <span aria-hidden="true">{g.emoji}</span>
+                      <span className="flex-1">{g.etiqueta}</span>
+                      <span className="text-xs text-[var(--wa-sec)] tabular-nums">{g.plazoMin ? textoPlazo(g.plazoMin) : "—"}</span>
+                      {c.motivo?.grupo === g.id && <CheckIcon className="h-4 w-4 flex-none text-[var(--wa-acento)]" />}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           );
