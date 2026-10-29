@@ -2,52 +2,133 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { anilloFoco, fieldClass } from "@/components/ui/field";
-import { SinFotoIcon } from "@/lib/nav-icons";
+import { ListaDatos } from "@/components/tabla/lista-datos";
+import type { IconoComp } from "@/components/tabla/botones-vista";
+import type { NombreFilas } from "@/lib/tabla/pie";
+import { BotonAgregar } from "@/components/ui/boton-agregar";
+import { anilloFoco } from "@/components/ui/field";
+import { Ventana } from "@/components/ui/ventana";
+import { CalendarioIcon, EstadoIcon, PersonaIcon, ProductoIcon, TareasIcon } from "@/lib/nav-icons";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
-import { ESTADOS_TAREA_MANUAL, estadoTarea, ordenarTareas, type EstadoTarea, type TareaVista } from "@/lib/publicaciones/tareas";
+import { ESTADOS_TAREA, PRIORIDADES, VENCIMIENTOS, etiquetaEstado, ordenarTareas, pendiente, vencimiento, type TareaVista, type Vencimiento } from "@/lib/publicaciones/tareas";
+import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
+import { FichaTarea } from "../ficha-tarea";
 import type { PublicacionDeTarea } from "../tareas-datos";
-import { LineaTarea } from "../tareas-piezas";
+import { BanderaIcon, CirculoEstado, COLUMNAS_TAREA, FilaTarea, FormularioTarea } from "../tareas-piezas";
+
+/** Una tarea de la lista con lo que se calcula para filtrar: cómo va su fecha y su producto. */
+export interface FilaTareaLista extends TareaVista {
+  vence: Vencimiento | null;
+  producto: PublicacionDeTarea | null;
+}
+
+const NOMBRE: NombreFilas = { singular: "tarea", plural: "tareas" };
+const BanderaCampo: IconoComp = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M5 21V4M5 4h11l-2.5 4.5L16 13H5" />
+  </svg>
+);
+const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, responsable: PersonaIcon, prioridad: BanderaCampo, vence: CalendarioIcon, plazo: CalendarioIcon, producto: ProductoIcon, origen: TareasIcon, archivo: TareasIcon };
+
+const DEF_TAREAS: DefTabla<FilaTareaLista> = {
+  clave: "tareas-dropi",
+  campos: [
+    { id: "nombre", etiqueta: "Tarea", tipo: "texto", valor: (t) => `${t.titulo} ${t.nota ?? ""}` },
+    {
+      id: "estado",
+      etiqueta: "Estado",
+      tipo: "seleccion",
+      valores: (t) => [t.estado],
+      opciones: () => ESTADOS_TAREA.map((e) => ({ valor: e.valor, etiqueta: e.etiqueta })),
+      agrupable: true,
+      ordenGrupos: ESTADOS_TAREA.map((e) => e.valor),
+      colorValor: (v) => ESTADOS_TAREA.find((e) => e.valor === v)?.color,
+    },
+    { id: "responsable", etiqueta: "Le toca a", tipo: "seleccion", valores: (t) => [t.responsableNombre ?? SIN_VALOR], etiquetaSinValor: "Sin asignar", agrupable: true },
+    {
+      id: "prioridad",
+      etiqueta: "Prioridad",
+      tipo: "seleccion",
+      valores: (t) => [t.prioridad ?? SIN_VALOR],
+      opciones: () => [...PRIORIDADES.map((p) => ({ valor: p.valor, etiqueta: p.etiqueta })), { valor: SIN_VALOR, etiqueta: "Sin prioridad" }],
+      agrupable: true,
+      ordenGrupos: [...PRIORIDADES.map((p) => p.valor), SIN_VALOR],
+      colorValor: (v) => PRIORIDADES.find((p) => p.valor === v)?.color,
+    },
+    {
+      id: "vence",
+      etiqueta: "Vencimiento",
+      tipo: "seleccion",
+      valores: (t) => [t.vence ?? "hecha"],
+      opciones: () => [...VENCIMIENTOS.map((v) => ({ valor: v.valor, etiqueta: v.etiqueta })), { valor: "hecha", etiqueta: "Hecha" }],
+      agrupable: true,
+      ordenGrupos: [...VENCIMIENTOS.map((v) => v.valor), "hecha"],
+    },
+    { id: "plazo", etiqueta: "Para cuándo", tipo: "fecha", valor: (t) => t.plazo },
+    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (t) => (t.producto ? `${numeroPublicacion(t.producto.numero)} ${t.producto.nombre} ${t.producto.dropiId ?? ""}` : "") },
+    {
+      id: "origen",
+      etiqueta: "Origen",
+      tipo: "seleccion",
+      valores: (t) => [t.origen],
+      opciones: () => [
+        { valor: "manual", etiqueta: "Escrita a mano" },
+        { valor: "recomendacion", etiqueta: "De una recomendación" },
+      ],
+      agrupable: true,
+    },
+    {
+      id: "archivo",
+      etiqueta: "Archivo",
+      tipo: "seleccion",
+      valores: (t) => [t.archivadaEn ? "archivada" : "activa"],
+      opciones: () => [
+        { valor: "activa", etiqueta: "Activa" },
+        { valor: "archivada", etiqueta: "Archivada" },
+      ],
+    },
+  ],
+  cerrados: { etiqueta: "Archivadas", esCerrado: (t) => !!t.archivadaEn, campoEstado: "archivo", valoresCerrados: ["archivada"], ocultosPorDefecto: true, exclusivo: true },
+  csvAntes: [
+    { etiqueta: "Tarea", valor: (t) => t.titulo },
+    { etiqueta: "Producto", valor: (t) => (t.producto ? `${numeroPublicacion(t.producto.numero)} · ${t.producto.nombre}` : "") },
+  ],
+  vistaInicial: { agrupar: "estado" },
+};
 
 const pestana = (activa: boolean) =>
   `inline-flex min-h-9 items-center rounded-md px-3 text-sm font-medium ${activa ? "bg-foreground text-background" : "border border-border-control bg-card hover:bg-muted"} ${anilloFoco}`;
 
-/** La publicación de una tarea: foto, PUB-0000 y nombre; abre su ficha. */
-function Publicacion({ p }: { p: PublicacionDeTarea | undefined }) {
-  if (!p) return <span className="h-10 w-10 shrink-0 rounded-md bg-muted" />;
+function Encabezado() {
   return (
-    <Link href={`/publicaciones-dropi?abrir=${p.id}`} className={`flex w-full shrink-0 items-center gap-2 rounded-md sm:w-56 ${anilloFoco}`}>
-      {p.fotoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.fotoUrl} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" loading="lazy" />
-      ) : (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
-          <SinFotoIcon className="h-4 w-4" />
-        </span>
-      )}
-      <span className="flex min-w-0 flex-col">
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {numeroPublicacion(p.numero)}
-          {p.dropiId ? ` · ID ${p.dropiId}` : ""}
-        </span>
-        <span className="truncate text-sm font-medium hover:underline">{p.nombre}</span>
+    <div className={`hidden items-center gap-x-3 px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${COLUMNAS_TAREA}`}>
+      <span />
+      <span>Tarea</span>
+      <span>Producto</span>
+      <span className="text-center">Quién</span>
+      <span className="pl-1.5">Para cuándo</span>
+      <span className="text-center">
+        <span className="sr-only">Prioridad</span>
+        <BanderaIcon prioridad={null} className="mx-auto h-3.5 w-3.5" />
       </span>
-    </Link>
+    </div>
   );
 }
 
 /**
- * La pestaña «Tareas»: las pendientes agrupadas (atrasadas, para hoy, próximas y sin fecha) y las hechas de los últimos 30 días. «Mis tareas» son las
- * que le tocan a la persona; un administrador puede pasar a «De todos» y elegir a una persona.
+ * La pestaña «Tareas» (29 oct 2026, al estilo de ClickUp, pedido de Alcides): las tareas agrupadas por estado (Por hacer, En curso, En revisión, Hecha),
+ * cada fila con su estado, producto, quién, para cuándo y prioridad que se cambian ahí mismo, y su ficha a la derecha. «Archivadas» muestra las que se
+ * archivaron. «Mis tareas» son las que le tocan a la persona; un administrador puede pasar a «De todos».
  */
 export function ListaTareas({
   tareas: iniciales,
-  publicaciones,
+  publicaciones: pubsIniciales,
   hoy,
   todas,
   puedeVerTodas,
   puedeEscribir,
   faltaMigracion,
+  conEstados,
 }: {
   tareas: TareaVista[];
   publicaciones: Record<string, PublicacionDeTarea>;
@@ -56,26 +137,22 @@ export function ListaTareas({
   puedeVerTodas: boolean;
   puedeEscribir: boolean;
   faltaMigracion: boolean;
+  conEstados: boolean;
 }) {
   const [tareas, setTareas] = useState(iniciales);
-  const [verHechas, setVerHechas] = useState(false);
-  const [persona, setPersona] = useState("");
-  const personas = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const t of tareas) if (t.responsableId && !t.hechaEn) m.set(t.responsableId, t.responsableNombre ?? "Sin nombre");
-    return [...m].sort((a, b) => a[1].localeCompare(b[1], "es"));
-  }, [tareas]);
-  const visibles = ordenarTareas(
-    tareas.filter((t) => !persona || t.responsableId === persona),
-    hoy,
-  );
-  const pendientes = visibles.filter((t) => !t.hechaEn);
-  const hechas = visibles.filter((t) => t.hechaEn);
-  const grupos = ESTADOS_TAREA_MANUAL.filter((e) => e.valor !== "hecha")
-    .map((e) => ({ ...e, tareas: pendientes.filter((t) => estadoTarea(t, hoy) === e.valor) }))
-    .filter((g) => g.tareas.length > 0);
-  const cambiar = (t: TareaVista) => setTareas((ts) => ts.map((x) => (x.id === t.id ? t : x)));
-  const color: Partial<Record<EstadoTarea, string>> = { atrasada: "bg-destructive", hoy: "bg-warning" };
+  const [publicaciones, setPublicaciones] = useState(pubsIniciales);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [orden, setOrden] = useState<string[]>([]);
+  const [agregando, setAgregando] = useState(false);
+
+  const filas = useMemo<FilaTareaLista[]>(() => ordenarTareas(tareas).map((t) => ({ ...t, vence: vencimiento(t, hoy), producto: publicaciones[t.publicacionId] ?? null })), [tareas, publicaciones, hoy]);
+  const pendientes = filas.filter(pendiente).length;
+  const cambiar = (t: TareaVista, p?: PublicacionDeTarea) => {
+    setTareas((ts) => ts.map((x) => (x.id === t.id ? t : x)));
+    if (p) setPublicaciones((ps) => ({ ...ps, [p.id]: p }));
+  };
+  const abiertaT = filas.find((t) => t.id === abierta);
+  const i = orden.indexOf(abierta ?? "");
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,62 +167,87 @@ export function ListaTareas({
             </Link>
           </nav>
         )}
-        {todas && personas.length > 1 && (
-          <select aria-label="Filtrar por persona" value={persona} onChange={(e) => setPersona(e.target.value)} className={`${fieldClass} w-auto`}>
-            <option value="">Todas las personas</option>
-            {personas.map(([id, nombre]) => (
-              <option key={id} value={id}>
-                {nombre}
-              </option>
-            ))}
-          </select>
-        )}
         <span className="text-sm text-muted-foreground tabular-nums">
-          {pendientes.length} {pendientes.length === 1 ? "pendiente" : "pendientes"}
+          {pendientes} {pendientes === 1 ? "pendiente" : "pendientes"}
         </span>
       </div>
 
-      {faltaMigracion && (
+      {(faltaMigracion || !conEstados) && (
         <p role="alert" className="m-0 flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
           <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning" />
-          Falta correr en Supabase la migración 0175: solo se ven las tareas de las recomendaciones.
+          {faltaMigracion
+            ? "Falta correr en Supabase la migración 0175: solo se ven las tareas de las recomendaciones."
+            : "Falta correr en Supabase la migración 0178: por ahora solo Por hacer y Hecha, sin prioridad ni archivar."}
         </p>
       )}
 
-      {grupos.length === 0 ? (
-        <div className="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-          {todas ? "Nadie tiene tareas pendientes." : "No tienes tareas pendientes."} Se agregan desde la ficha de una publicación, en el bloque «Tareas».
-        </div>
-      ) : (
-        grupos.map((g) => (
-          <section key={g.valor} aria-labelledby={`grupo-${g.valor}`} className="rounded-lg border border-border bg-card">
-            <h2 id={`grupo-${g.valor}`} className="m-0 flex items-center gap-2 rounded-t-lg border-b border-border bg-muted px-4 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {color[g.valor] && <span aria-hidden="true" className={`h-2 w-2 rounded-full ${color[g.valor]}`} />}
-              {g.etiqueta} · {g.tareas.length}
-            </h2>
-            <ul className="m-0 flex list-none flex-col divide-y divide-border px-4 py-0">
-              {g.tareas.map((t) => (
-                <LineaTarea key={`${t.origen}-${t.id}`} t={t} hoy={hoy} puedeEscribir={puedeEscribir} mostrarResponsable={todas} antes={<Publicacion p={publicaciones[t.publicacionId]} />} alResolver={cambiar} />
-              ))}
-            </ul>
-          </section>
-        ))
-      )}
+      <ListaDatos
+        def={DEF_TAREAS}
+        filas={filas}
+        iconos={ICONOS}
+        nombre={NOMBRE}
+        claveFila={(t) => `${t.origen}-${t.id}`}
+        variante="filas"
+        encabezado={<Encabezado />}
+        renderFila={(t, enOrden) => (
+          <FilaTarea
+            t={t}
+            hoy={hoy}
+            publicacion={t.producto}
+            conEstados={conEstados}
+            puedeEscribir={puedeEscribir}
+            alCambiar={cambiar}
+            alAbrir={() => {
+              setOrden(enOrden.map((x) => x.id));
+              setAbierta(t.id);
+            }}
+          />
+        )}
+        etiquetaGrupo={(campo, grupo) =>
+          campo === "estado" ? (
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <CirculoEstado estado={grupo.clave as TareaVista["estado"]} />
+              {etiquetaEstado(grupo.clave)}
+            </span>
+          ) : campo === "prioridad" ? (
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <BanderaIcon prioridad={grupo.clave === SIN_VALOR ? null : (grupo.clave as TareaVista["prioridad"])} />
+              {grupo.etiqueta}
+            </span>
+          ) : (
+            <span className="font-semibold">{grupo.etiqueta}</span>
+          )
+        }
+        accionPrincipal={puedeEscribir && !faltaMigracion ? <BotonAgregar etiqueta="Agregar tarea" onClick={() => setAgregando(true)} /> : undefined}
+        vacio={todas ? "Nadie tiene tareas. Se agregan con «Agregar tarea» o con el botón de tareas de cada producto." : "No tienes tareas. Se agregan con «Agregar tarea» o con el botón de tareas de cada producto."}
+      />
 
-      {hechas.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <button type="button" onClick={() => setVerHechas((v) => !v)} aria-expanded={verHechas} className={`self-start text-sm text-muted-foreground underline-offset-2 hover:underline ${anilloFoco}`}>
-            {verHechas ? "Ocultar las hechas" : `Ver las ${hechas.length} hechas de los últimos 30 días`}
-          </button>
-          {verHechas && (
-            <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border bg-card px-4 py-0">
-              {hechas.map((t) => (
-                <LineaTarea key={`${t.origen}-${t.id}`} t={t} hoy={hoy} puedeEscribir={false} mostrarResponsable={todas} antes={<Publicacion p={publicaciones[t.publicacionId]} />} alResolver={cambiar} />
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      <Ventana abierto={agregando} alCerrar={() => setAgregando(false)} lado="derecha" ancho="lg" titulo="Nueva tarea">
+        {agregando && (
+          <div className="px-5 py-5">
+            <FormularioTarea
+              alCancelar={() => setAgregando(false)}
+              alCrear={(t, p) => {
+                setTareas((ts) => [t, ...ts]);
+                setPublicaciones((ps) => ({ ...ps, [p.id]: p }));
+                setAgregando(false);
+              }}
+            />
+          </div>
+        )}
+      </Ventana>
+
+      <FichaTarea
+        t={abiertaT}
+        publicacion={abiertaT?.producto}
+        hoy={hoy}
+        conEstados={conEstados}
+        puedeEscribir={puedeEscribir}
+        alCambiar={cambiar}
+        alCerrar={() => setAbierta(null)}
+        anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
+        siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
+      />
     </div>
   );
 }

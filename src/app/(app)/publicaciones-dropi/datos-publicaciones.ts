@@ -261,10 +261,15 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const liquidacionR = await traerTodasConError<{ id: string; liquidacion_en: string | null }>((desde, hasta) =>
     supabase.from("dropi_publicaciones").select("id, liquidacion_en").eq("pais_id", paisId).not("liquidacion_en", "is", null).order("id").range(desde, hasta),
   );
-  // Las tareas escritas a mano sin resolver (migración 0175), para la marca de la fila: sin la migración, ninguna.
-  const tareasR = await traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) =>
-    supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null).order("id").range(desde, hasta),
-  );
+  // Las tareas escritas a mano sin resolver ni archivar (migraciones 0175 y 0178), para la marca de la fila: sin la 0178 cuentan también las archivadas
+  // (no hay) y sin la 0175, ninguna.
+  const leerTareas = (sinArchivadas: boolean) =>
+    traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) => {
+      const q = supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null);
+      return (sinArchivadas ? q.is("archivada_en", null) : q).order("id").range(desde, hasta);
+    });
+  let tareasR = await leerTareas(true);
+  if (tareasR.error) tareasR = await leerTareas(false);
   const tareasDe = new Map<string, { total: number; atrasadas: number }>();
   for (const t of tareasR.error ? [] : (tareasR.data ?? [])) {
     const x = tareasDe.get(t.publicacion_id) ?? { total: 0, atrasadas: 0 };
