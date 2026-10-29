@@ -1201,7 +1201,9 @@ convenciones técnicas del código.
   ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
   **Dónde vende** (29 oct 2026, pedido de Alcides; migración 0193 `dropshipper_vende_en`: plataforma + país por dropshipper, RLS sin políticas): `ConversacionVista.vendeEn`
   junta sus cuentas vinculadas (`dropshipper_cuentas`) y lo puesto a mano (`dondeVende`, `src/lib/whatsapp/origen-chat.ts`, con prueba; `bandera` = emoji del país) y
-  `paises` suma los de su ficha; **nunca sale del prefijo del número**. Junto al nombre del chat, `VendeEnChat` (`bandeja/vende-en.tsx`, como las etiquetas: país con su
+  `paises` suma los de su ficha; **nunca sale del prefijo del número**. **Lista propia** (migración 0194 `crm_plataformas_venta`, única sin mayúsculas; `dropshipper_vende_en.plataforma_venta_id` + `oculto`):
+  «Dónde vende» no usa `plataformas` (la de Configuración y Retiros). Se crea, renombra y borra desde el selector (`crearPlataformaVenta`, `renombrarPlataformaVenta`,
+  `eliminarPlataformaVenta`); cada pastilla tiene ✕ y quitar lo de una cuenta vinculada guarda una fila `oculto` (la cuenta no se toca; `dondeVende` la salta). Junto al nombre del chat, `VendeEnChat` (`bandeja/vende-en.tsx`, como las etiquetas: país con su
   bandera y plataformas de `plataformas`; lo de una cuenta vinculada no se quita) guarda con `cambiarVendeEn` (`vende-en-actions.ts`: escribir en el área del chat, chat con
   dropshipper, auditoría `vende_en_dropshipper`). La lista de chats muestra las banderas. Sin la 0193, solo lo de las cuentas.
   **La Actividad se ve como en Compras** (29 oct 2026): sin `Seccion` ni `Bloque` alrededor (trae su propio encabezado), con los colores del sistema dentro del chat, y cada cambio con

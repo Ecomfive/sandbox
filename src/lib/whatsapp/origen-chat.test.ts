@@ -12,6 +12,12 @@ test("dónde vende junta cuentas y lo puesto a mano, sin repetir", () => {
   );
 });
 
+test("una fila oculta quita lo de una cuenta, sin mirar mayúsculas", () => {
+  assert.deepEqual(dondeVende([{ plataforma: "Dropi", pais: "PA" }, { plataforma: "Dropi", pais: "CR" }], [{ plataforma: "dropi", pais: "PA", oculto: true }]), [
+    { plataforma: "Dropi", pais: "CR", manual: false },
+  ]);
+});
+
 test("países donde vende, sin repetir", () => {
   assert.deepEqual(paisesDondeVende(["CR", null], [{ pais: "MX" }, { pais: "CR" }]), ["CR", "MX"]);
 });
