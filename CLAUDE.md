@@ -1034,6 +1034,10 @@ convenciones técnicas del código.
   Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
   de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
   del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
+  **Eliminar etiquetas y empezar de cero** (29 oct 2026, pedido de Hernán, migración 0191): `PanelEtiquetas` acepta `alEliminar` (papelera con
+  confirmación en cada etiqueta; solo la pasa `EtiquetasDropshipper`); `eliminarEtiquetaCrm` (`crm-dropshippers/etiquetas-actions.ts`) la
+  quita de todos los dropshippers y chats y borra su color. La 0191 guardó las etiquetas que había en `dropshippers_etiquetas_respaldo` y
+  las vació (la reversa las devuelve).
   **Tareas y VIP** (29 oct 2026, migración 0188): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
   (puede no tener dropshipper), `sku_id`/`pais_id`/`compras_esperadas`/`llegada_estimada` y el estado nuevo `esperando`. «Tarea»
   (`BotonNuevaTarea`, `bandeja/tareas-chat.tsx`) y «Avisarme cuando llegue» (`ProductosDelChatFicha` → `avisarCuandoLlegue`: guarda las

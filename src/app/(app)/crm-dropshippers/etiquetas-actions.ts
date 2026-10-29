@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual } from "@/lib/auth";
 import { colorValido, limpiarEtiqueta, normalizarEtiquetas } from "@/lib/etiquetas";
 import { escribirEtiquetasDropshipper } from "@/lib/crm/etiquetas-dropshipper";
@@ -53,4 +54,35 @@ export async function guardarColorEtiquetaCrm(nombre: string, color: string): Pr
   const { error } = await createServiceClient().from("whatsapp_etiquetas").upsert({ nombre: limpio, color, actualizado_en: new Date().toISOString() }, { onConflict: "nombre" });
   if (error) return { error: "No se pudo guardar el color (¿falta la migración 0185?)." };
   return { ok: true };
+}
+
+/**
+ * Elimina una etiqueta del CRM (29 oct 2026, pedido de Hernán: «que las etiquetas se puedan borrar después de creadas»): la quita de todos los
+ * dropshippers y chats que la tienen y borra su color, así deja de ofrecerse en el selector. Queda en la auditoría con cuántos la tenían.
+ */
+export async function eliminarEtiquetaCrm(nombre: string): Promise<{ dropshippers: number; chats: number } | { error: string }> {
+  const u = await getUsuarioActual();
+  if (!u || !puedeEscribir(u)) return { error: "No tienes permiso para modificar el CRM." };
+  const limpio = limpiarEtiqueta(nombre);
+  if (!limpio || limpio !== nombre) return { error: "Etiqueta no válida." };
+  const supabase = createServiceClient();
+  const [ds, chats] = await Promise.all([
+    supabase.from("dropshippers").select("id, etiquetas").contains("etiquetas", [nombre]).range(0, 4999),
+    supabase.from("whatsapp_conversaciones").select("id, etiquetas").contains("etiquetas", [nombre]).range(0, 4999),
+  ]);
+  if (ds.error) return { error: "No se pudo eliminar la etiqueta." };
+  const sinElla = (l: unknown) => ((l as string[] | null) ?? []).filter((e) => e !== nombre);
+  for (const d of ds.data ?? []) {
+    const { error } = await supabase.from("dropshippers").update({ etiquetas: sinElla(d.etiquetas) }).eq("id", d.id);
+    if (error) return { error: "No se pudo eliminar la etiqueta de todos los dropshippers. Inténtalo de nuevo." };
+  }
+  for (const c of chats.error ? [] : (chats.data ?? [])) {
+    const { error } = await supabase.from("whatsapp_conversaciones").update({ etiquetas: sinElla(c.etiquetas) }).eq("id", c.id);
+    if (error) return { error: "No se pudo eliminar la etiqueta de todos los chats. Inténtalo de nuevo." };
+  }
+  await supabase.from("whatsapp_etiquetas").delete().eq("nombre", nombre);
+  const cuantos = { dropshippers: ds.data?.length ?? 0, chats: chats.error ? 0 : (chats.data?.length ?? 0) };
+  await registrarAuditoria({ accion: "eliminar_etiqueta_crm", entidad: "dropshippers", detalle: `${nombre} · ${cuantos.dropshippers} dropshippers, ${cuantos.chats} chats` });
+  revalidatePath("/crm-dropshippers", "layout");
+  return cuantos;
 }

@@ -5,7 +5,7 @@ import { PanelEtiquetas, PastillaEtiqueta } from "@/components/etiquetas/etiquet
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { EtiquetaIcon } from "@/lib/nav-icons";
-import { etiquetasCrmDisponibles, guardarColorEtiquetaCrm, guardarEtiquetasDropshipper } from "./etiquetas-actions";
+import { eliminarEtiquetaCrm, etiquetasCrmDisponibles, guardarColorEtiquetaCrm, guardarEtiquetasDropshipper } from "./etiquetas-actions";
 
 type Disponibles = { todas: string[]; colores: Record<string, string> };
 // Las etiquetas y colores del CRM se piden una vez por página, al primer uso.
@@ -21,6 +21,7 @@ const cargar = () =>
 /**
  * Las etiquetas de un dropshipper en su ficha del CRM, como en ClickUp (29 oct 2026, pedido de Alcides): pastillas con su color y «Editar
  * etiquetas» abre el selector para ponerlas, quitarlas, crearlas y elegir su color. Son las mismas que se editan arriba de la ficha del chat.
+ * La papelera de cada una la elimina de todo el CRM (29 oct 2026, pedido de Hernán).
  */
 export function EtiquetasDropshipper({ dropshipperId, iniciales, puedeEscribir }: { dropshipperId: string; iniciales: string[]; puedeEscribir: boolean }) {
   const { mostrarToast } = useToast();
@@ -63,6 +64,20 @@ export function EtiquetasDropshipper({ dropshipperId, iniciales, puedeEscribir }
       .catch(() => poner(antes));
   }
 
+  function eliminar(nombre: string) {
+    void eliminarEtiquetaCrm(nombre)
+      .then((r) => {
+        if ("error" in r) return mostrarToast(r.error, "destructive");
+        // Las demás fichas de la página vuelven a pedir la lista sin ella.
+        pedido = null;
+        setEtiquetas((l) => l.filter((e) => e !== nombre));
+        setDisp((d) => ({ todas: d.todas.filter((e) => e !== nombre), colores: Object.fromEntries(Object.entries(d.colores).filter(([n]) => n !== nombre)) }));
+        const en = [r.dropshippers && `${r.dropshippers} dropshipper${r.dropshippers === 1 ? "" : "s"}`, r.chats && `${r.chats} chat${r.chats === 1 ? "" : "s"}`].filter(Boolean).join(" y ");
+        mostrarToast(`Etiqueta «${nombre}» eliminada${en ? ` de ${en}` : ""}.`);
+      })
+      .catch(() => mostrarToast("No se pudo eliminar la etiqueta.", "destructive"));
+  }
+
   return (
     <span className="flex flex-wrap items-center gap-1">
       {etiquetas.map((e) => (
@@ -91,6 +106,7 @@ export function EtiquetasDropshipper({ dropshipperId, iniciales, puedeEscribir }
           colores={disp.colores}
           alCambiar={cambiar}
           alColor={cambiarColor}
+          alEliminar={eliminar}
           alCerrar={(m) => {
             setAbierto(false);
             if (m === "escape") boton.current?.focus();
