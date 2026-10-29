@@ -13,19 +13,30 @@ import { formatoMonto } from "@/lib/publicaciones/moneda";
 /** Nuestro proveedor en Dropi: lo que vende se compara con todo lo demás. */
 export const NUESTRO_PROVEEDOR = /^ecomfive$/i;
 
+/**
+ * Nuestro proveedor en el Dropi de cada país, por su id de usuario, cuando no se llama ECOMFIVE (29 oct 2026): en Costa Rica la cuenta
+ * de proveedor sale como «Alcides» (id 27; sus 66 productos públicos son las publicaciones de Gestión de IDs de Costa Rica).
+ */
+export const NUESTRO_PROVEEDOR_ID: Record<string, number[]> = { cr: [27] };
+
+/** Si un proveedor del catálogo de ese país (código «pa», «cr») somos nosotros. */
+export const esNuestroProveedor = (proveedorId: number, nombre: string, pais?: string): boolean =>
+  NUESTRO_PROVEEDOR.test(nombre) || (!!pais && (NUESTRO_PROVEEDOR_ID[pais.toLowerCase()] ?? []).includes(proveedorId));
+
 export interface VistoCompetencia extends ProductoVisto {
   proveedorId: number;
   proveedorNombre: string;
   esNuestro: boolean;
 }
 
-export function normalizarCompetencia(o: unknown): VistoCompetencia | null {
+/** Un producto del catálogo de Dropi con su proveedor. `pais` («cr») reconoce a nuestro proveedor de ese país aunque no se llame ECOMFIVE. */
+export function normalizarCompetencia(o: unknown, pais?: string): VistoCompetencia | null {
   const v = normalizarDropi(o);
   const u = (o as { user?: { id?: unknown; name?: unknown } } | null)?.user;
   const proveedorId = Number(u?.id);
   const proveedorNombre = typeof u?.name === "string" ? u.name.trim() : "";
   if (!v || !Number.isFinite(proveedorId) || !proveedorNombre) return null;
-  return { ...v, proveedorId, proveedorNombre, esNuestro: NUESTRO_PROVEEDOR.test(proveedorNombre) };
+  return { ...v, proveedorId, proveedorNombre, esNuestro: esNuestroProveedor(proveedorId, proveedorNombre, pais) };
 }
 
 export type TipoAlerta = "bajo_precio" | "mas_barato" | "bajo_stock" | "competidor_nuevo" | "desaparecio";

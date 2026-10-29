@@ -80,7 +80,8 @@ export async function guardarCompetencia(
   try {
     // 1. Lo guardado, lo leído y la comparación (precio, stock, nuevos, desaparecidos).
     const antes = await todas(supabase, pais.id);
-    const vistos = l.productos.map(normalizarCompetencia).filter((v): v is VistoCompetencia => v !== null);
+    // Con el país, para reconocer a nuestro proveedor aunque no se llame ECOMFIVE (en Costa Rica es «Alcides»).
+    const vistos = l.productos.map((o) => normalizarCompetencia(o, codigo)).filter((v): v is VistoCompetencia => v !== null);
     const unicos = new Map(vistos.map((v) => [v.dropiId, v]));
     const guardados: ProductoGuardado[] = antes.map((g) => ({
       id: g.id,
