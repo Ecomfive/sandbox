@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Pastilla, Punto } from "@/components/panel/piezas-panel";
 import { FASES, type AccesoCrm } from "@/lib/crm/areas";
+import type { QuienRespondio } from "@/lib/crm/respondieron";
 import { formatearFecha } from "@/lib/formato";
 import { MasIcon } from "@/lib/nav-icons";
 import { ActividadDropshipper } from "../actividad-dropshipper";
@@ -149,6 +150,29 @@ function MenuMas({ opciones }: { opciones: OpcionMas[] }) {
 }
 
 /**
+ * Quién respondió en el chat, con su cargo (pedido de Hernán, 29 oct 2026: «si líder comercial o atención»; el cargo es su puesto en Puestos o su
+ * área), debajo del responsable del CRM: así se ve de un vistazo si al dropshipper lo atendió Atención, su líder comercial o los dos.
+ */
+function QuienesRespondieron({ respondieron }: { respondieron: QuienRespondio[] }) {
+  if (!respondieron.length) return <p className="m-0 text-[12.5px] text-[var(--wa-sec)]">Nadie del equipo le ha respondido todavía en este chat.</p>;
+  return (
+    <p className="m-0 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] text-[var(--wa-sec)]">
+      <span>Respondieron:</span>
+      {respondieron.map((r) => (
+        <span
+          key={r.nombre}
+          title={`${r.mensajes} ${r.mensajes === 1 ? "mensaje" : "mensajes"} · el último ${formatearFecha(r.ultimo)}`}
+          className="rounded-md bg-[var(--wa-panel)] px-1.5 py-px text-[var(--wa-texto)]"
+        >
+          <span className="font-semibold">{r.nombre}</span>
+          {r.cargo ? ` · ${r.cargo}` : ""}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/**
  * La ficha del dropshipper en la ventana del chat de la Bandeja (29 oct 2026, pedido de Hernán sobre su referencia): arriba sus pastillas,
  * la fase y una fila de botones (los del chat: Tomar, Marcar resuelta…; los del CRM: Nuevo caso, Pedido, Nota…; y «Más»), y debajo
  * pestañas con todo lo del CRM. Sin dropshipper vinculado, solo lo que sale del chat y cómo vincularlo.
@@ -163,6 +187,7 @@ export function FichaDelChat({
   accionesChat,
   opcionesMas,
   areaDelChat,
+  respondieron,
   versionEquipo,
   alAbrirVincular,
   alVinculado,
@@ -179,6 +204,8 @@ export function FichaDelChat({
   opcionesMas: OpcionMas[];
   /** El apartado «Área del chat», que arma la Bandeja con los cambios de área. */
   areaDelChat: ReactNode;
+  /** Quién del equipo le escribió al dropshipper en este chat y con qué cargo (su puesto o su área; la más reciente primero). */
+  respondieron: QuienRespondio[];
   versionEquipo: string;
   alAbrirVincular: () => void;
   alVinculado: (mensaje: string) => void;
@@ -219,6 +246,7 @@ export function FichaDelChat({
             </span>
           </div>
         )}
+        <QuienesRespondieron respondieron={respondieron} />
         {d && <LineaFase fase={d.fase} ingreso={d.ingreso} />}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
           {accionesChat}
