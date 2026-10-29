@@ -59,19 +59,35 @@ const momentoDe = (segundos: unknown): string => {
 };
 const conMas = (n: string | null): string | null => (n ? (n.startsWith("+") ? n : `+${n.replace(/\D/g, "")}`) : null);
 
+/**
+ * Qué decir de un mensaje que no trae texto ni archivo que el sistema sepa leer (un tipo nuevo, uno que WhatsApp no entrega…): en vez de un «Mensaje» vacío, lo que se sabe de él, con
+ * el tipo que mandó Meta, para que el equipo vea que llegó algo y de qué clase (29 oct 2026).
+ */
+function textoDeRespaldo(tipoMeta: string, m: Obj, cuerpo: Obj): string {
+  const error = obj(lista(m.errors)[0]);
+  const motivo = texto(error.title) ?? texto(error.message);
+  if (tipoMeta === "unsupported") return `Mensaje que WhatsApp no deja leer a la plataforma${motivo ? ` (${motivo})` : ""}.`;
+  if (tipoMeta === "request_welcome") return "Abrió el chat desde un anuncio o un enlace.";
+  if (tipoMeta === "order") return "Pedido desde el catálogo de WhatsApp.";
+  if (tipoMeta === "system") return texto(cuerpo.body) ?? "Aviso del sistema de WhatsApp.";
+  return `Mensaje de tipo «${tipoMeta || "desconocido"}» que el sistema todavía no sabe mostrar.`;
+}
+
 /** Lo que trae un mensaje de Meta (texto, tipo y archivo), sea uno que llega o uno mandado desde el celular. */
 function contenidoDe(m: Obj): Pick<MensajeEntrante, "tipo" | "texto" | "mediaId" | "mediaMime" | "mediaNombre"> {
   const tipoMeta = String(m.type ?? "");
   const cuerpo = obj(m[tipoMeta]);
   let contenido: string | null = null;
   if (tipoMeta === "text") contenido = texto(obj(m.text).body);
-  else if (tipoMeta === "button") contenido = texto(obj(m.button).text);
-  else if (tipoMeta === "interactive") contenido = texto(obj(cuerpo.button_reply).title) ?? texto(obj(cuerpo.list_reply).title);
+  else if (tipoMeta === "button") contenido = texto(obj(m.button).text) ?? texto(obj(m.button).payload);
+  else if (tipoMeta === "interactive") contenido = texto(obj(cuerpo.button_reply).title) ?? texto(obj(cuerpo.list_reply).title) ?? texto(obj(cuerpo.nfm_reply).body);
   else if (tipoMeta === "reaction") contenido = texto(cuerpo.emoji);
   else if (tipoMeta === "location")
     contenido = [texto(cuerpo.name), texto(cuerpo.address), cuerpo.latitude !== undefined ? `${cuerpo.latitude}, ${cuerpo.longitude}` : null].filter(Boolean).join(" · ") || null;
   else contenido = texto(cuerpo.caption);
   const conArchivo = ["image", "audio", "voice", "video", "document", "sticker"].includes(tipoMeta);
+  // Sin texto y sin archivo (y que no sea una reacción, una ubicación o un contacto, que se muestran por su tipo): se dice qué llegó.
+  if (contenido === null && !conArchivo && !["reaction", "location", "contacts"].includes(tipoMeta)) contenido = textoDeRespaldo(tipoMeta, m, cuerpo);
   return {
     tipo: TIPOS[tipoMeta] ?? "otro",
     texto: contenido,
@@ -155,7 +171,7 @@ const ETIQUETA_TIPO: Record<string, string> = {
 /** Lo que se ve de un mensaje en la lista de conversaciones: su texto o, si no trae, qué es («Foto», «Audio»). */
 export function resumenMensaje(tipo: string, contenido: string | null): string {
   const t = (contenido ?? "").replace(/\s+/g, " ").trim();
-  if (tipo === "texto") return t.slice(0, 160) || "Mensaje";
+  if (tipo === "texto" || tipo === "otro") return t.slice(0, 160) || "Mensaje";
   const etiqueta = ETIQUETA_TIPO[tipo] ?? "Mensaje";
   return t ? `${etiqueta}: ${t}`.slice(0, 160) : etiqueta;
 }
