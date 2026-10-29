@@ -1074,7 +1074,7 @@ export function Bandeja({
               key={o.id}
               type="button"
               aria-pressed={filtro === o.id}
-              onClick={() => setFiltro(o.id)}
+              onClick={() => setFiltro(filtro === o.id && o.id !== "todas" ? "todas" : o.id)}
               className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] ${
                 filtro === o.id ? "bg-[var(--wa-acento-suave)] font-semibold text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-sec)] hover:bg-[var(--wa-borde)]"
               } ${anilloFoco}`}
@@ -1887,6 +1887,7 @@ function Burbuja({
         className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
       >
         {m.importado && <span className="sr-only">Importado del celular, </span>}
+        {m.editado && <span>editado</span>}
         {horaMensaje(m.momento)}
         {nuestro && !m.importado && <Palomitas estado={m.estado} />}
       </span>

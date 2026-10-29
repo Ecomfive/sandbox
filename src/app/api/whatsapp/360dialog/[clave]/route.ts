@@ -3,7 +3,7 @@ import { tokenDeVerificacionValido } from "@/lib/instagram/firma";
 import { createServiceClient } from "@/lib/supabase/server";
 import { extraerEventosCuenta, hayCamposNuevos, resumenDeAviso } from "@/lib/whatsapp/eventos";
 import { extraerAviso } from "@/lib/whatsapp/extraer";
-import { guardarEntrantes, guardarEstados, guardarRevocados } from "@/lib/whatsapp/guardar";
+import { guardarEditados, guardarEntrantes, guardarEstados, guardarRevocados } from "@/lib/whatsapp/guardar";
 import { guardarAvisoCrudo, traeHistorial } from "@/lib/whatsapp/historial-meta";
 import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 import { NUMERO_360_SIN_ID } from "@/lib/whatsapp/proveedor";
@@ -38,10 +38,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
   if (hayCamposNuevos(resumen.campos)) console.log(`[whatsapp] ${"360dialog"} aviso con campos: ${resumen.campos.join(", ") || "(ninguno)"}; claves: ${resumen.claves.join(", ")}`);
   // El historial y los contactos del celular llegan una sola vez: se guardan tal cual antes de contestar (historial-meta.ts).
   if (traeHistorial(resumen.campos) && !(await guardarAvisoCrudo(crudo, resumen.campos))) return new NextResponse("No se pudo guardar", { status: 500 });
-  const { mensajes, estados, ecos, revocados } = extraerAviso(aviso, NUMERO_360_SIN_ID);
+  const { mensajes, estados, ecos, revocados, editados } = extraerAviso(aviso, NUMERO_360_SIN_ID);
   // Plantillas aprobadas o rechazadas, calidad, categoría, límite del número y restricciones de la cuenta.
   const eventos = extraerEventosCuenta(aviso, true);
-  if (mensajes.length || estados.length || ecos.length || eventos.length || revocados.length) {
+  if (mensajes.length || estados.length || ecos.length || eventos.length || revocados.length || editados.length) {
     after(async () => {
       await aplicarEventosCuenta(createServiceClient(), eventos);
       await guardarEntrantes(mensajes);
@@ -49,7 +49,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
       await guardarEstados(estados);
       // Lo que se borró «para todos» en WhatsApp se marca, nunca se borra aquí.
       await guardarRevocados(revocados);
+      await guardarEditados(editados);
     });
   }
-  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length, revocados: revocados.length });
+  return NextResponse.json({ mensajes: mensajes.length, estados: estados.length, ecos: ecos.length, eventos: eventos.length, revocados: revocados.length, editados: editados.length });
 }
