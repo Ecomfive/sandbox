@@ -58,7 +58,8 @@ export function PastillaEtiqueta({ nombre, color }: { nombre: string; color?: st
 /**
  * El selector de etiquetas de ClickUp, bajo el botón que lo abre: «Buscar o añadir etiquetas…»; pulsar una la pone o la quita, escribir una
  * nueva y Enter la crea, y el círculo de cada una elige su color (vale para todos los registros que la tengan). Lo usan Compras y la Bandeja de
- * WhatsApp; cada módulo guarda a su manera (`alCambiar`, `alColor`).
+ * WhatsApp; cada módulo guarda a su manera (`alCambiar`, `alColor`). Con `alEliminar` (el CRM) cada etiqueta tiene además una papelera que, tras
+ * confirmar, la elimina de todos los registros.
  */
 export function PanelEtiquetas({
   ancla,
@@ -69,6 +70,7 @@ export function PanelEtiquetas({
   alCambiar,
   alColor,
   alCerrar,
+  alEliminar,
 }: {
   ancla: RefObject<HTMLElement | null>;
   /** El nombre del panel para lectores de pantalla («Etiquetas de la compra»). */
@@ -81,8 +83,11 @@ export function PanelEtiquetas({
   alCambiar: (etiquetas: string[]) => void;
   alColor: (nombre: string, color: string) => void;
   alCerrar: (motivo: MotivoCierre) => void;
+  /** Elimina la etiqueta de todos los registros (se pregunta antes). Sin esto, no se ofrece. */
+  alEliminar?: (nombre: string) => void;
 }) {
   const [pintando, setPintando] = useState<string | null>(null);
+  const [borrando, setBorrando] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const campo = useRef<HTMLInputElement>(null);
 
@@ -158,7 +163,44 @@ export function PanelEtiquetas({
                 >
                   <span aria-hidden="true" style={{ backgroundColor: actual }} className="h-3 w-3 rounded-full ring-1 ring-border" />
                 </button>
+                {alEliminar && (
+                  <button
+                    type="button"
+                    aria-label={`Eliminar la etiqueta ${e}`}
+                    title="Eliminar etiqueta"
+                    aria-expanded={borrando === e}
+                    onClick={() => {
+                      setPintando(null);
+                      setBorrando((b) => (b === e ? null : e));
+                    }}
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive ${anilloFoco}`}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                    </svg>
+                  </button>
+                )}
               </span>
+              {alEliminar && borrando === e && (
+                <span role="group" aria-label={`Eliminar ${e}`} className="mx-1 mb-1 flex flex-col gap-1.5 rounded-md bg-destructive-soft px-2 py-1.5 text-xs text-destructive">
+                  Se quita de todos los registros que la tienen y deja de ofrecerse.
+                  <span className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBorrando(null);
+                        alEliminar(e);
+                      }}
+                      className={`rounded-md bg-destructive px-2 py-0.5 font-medium text-white hover:opacity-90 ${anilloFoco}`}
+                    >
+                      Eliminar
+                    </button>
+                    <button type="button" onClick={() => setBorrando(null)} className={`rounded-md px-2 py-0.5 text-foreground hover:bg-muted ${anilloFoco}`}>
+                      Cancelar
+                    </button>
+                  </span>
+                </span>
+              )}
               {pintando === e && (
                 <span role="group" aria-label={`Colores para ${e}`} className="flex flex-wrap gap-1.5 px-2 pt-1 pb-2">
                   {COLORES_ETIQUETA.map((color) => (
