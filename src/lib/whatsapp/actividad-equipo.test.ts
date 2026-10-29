@@ -75,3 +75,10 @@ describe("orden y personas", () => {
     ]);
   });
 });
+
+describe("reacciones del equipo", () => {
+  it("una reacción dice con qué emoji y no se confunde con una respuesta", () => {
+    assert.equal(eventoDeMensaje(msg({ tipo: "reaccion", texto: "👍" }))?.texto, "Reaccionó con 👍 a un mensaje");
+    assert.equal(eventoDeMensaje(msg({ tipo: "reaccion", texto: null }))?.texto, "Quitó su reacción a un mensaje");
+  });
+});
