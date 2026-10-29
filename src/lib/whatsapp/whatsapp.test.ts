@@ -54,7 +54,7 @@ test("fotos, documentos, botones y ubicaciones: el pie o el texto, y el archivo 
       ["documento", null, "MEDIA2", "guia.pdf"],
       ["texto", "Sí, confirmo", null, null],
       ["ubicacion", "Bodega · 8.98, -79.52", null, null],
-      ["otro", null, null, null],
+      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma.", null, null],
     ],
   );
   assert.equal(resumenMensaje("imagen", "Llegó así"), "Foto: Llegó así");
@@ -248,4 +248,21 @@ test("360dialog con varios números: cada uno usa su propia clave y, si no tiene
     for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
     Object.assign(process.env, antes);
   }
+});
+
+test("un mensaje sin texto que el sistema no sabe leer dice qué llegó, no un «Mensaje» vacío", () => {
+  const caso = (m: Record<string, unknown>) =>
+    extraerAviso(aviso({ metadata: META, contacts: [{ wa_id: "50761112233", profile: { name: "Ana" } }], messages: [{ from: "50761112233", id: "wamid.X", timestamp: "1700000000", ...m }] })).mensajes[0];
+  const sinSoporte = caso({ type: "unsupported", errors: [{ code: 131051, title: "Message type is not currently supported" }] });
+  assert.match(sinSoporte.texto ?? "", /no deja leer.*not currently supported/);
+  assert.equal(sinSoporte.tipo, "otro");
+  assert.match(caso({ type: "request_welcome" }).texto ?? "", /anuncio o un enlace/);
+  assert.match(caso({ type: "algo_nuevo" }).texto ?? "", /«algo_nuevo»/);
+  // Un botón de plantilla sin texto usa su contenido; un formulario (flow) usa su cuerpo.
+  assert.equal(caso({ type: "button", button: { payload: "Sí quiero" } }).texto, "Sí quiero");
+  assert.equal(caso({ type: "interactive", interactive: { type: "nfm_reply", nfm_reply: { body: "Enviado" } } }).texto, "Enviado");
+  // Lo que ya se mostraba bien no cambia.
+  assert.equal(caso({ type: "text", text: { body: "hola" } }).texto, "hola");
+  assert.equal(caso({ type: "reaction", reaction: { emoji: "👍" } }).texto, "👍");
+  assert.equal(caso({ type: "image", image: { id: "m1", mime_type: "image/jpeg" } }).texto, null);
 });
