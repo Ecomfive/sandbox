@@ -5,7 +5,7 @@ import { nombrePais } from "@/lib/paises-mundo";
 
 export { nombrePais };
 
-/** Una plataforma en un país: «Dropi» en «PA». `manual` = lo puso el equipo (se puede quitar); si no, sale de una cuenta vinculada. */
+/** Una plataforma en un país: «Dropi» en «PA». `manual` = lo puso el equipo; si no, sale de una cuenta vinculada. Los dos se pueden quitar. */
 export interface VendeEn {
   plataforma: string;
   pais: string;
@@ -18,11 +18,26 @@ export function bandera(codigo: string): string {
   return String.fromCodePoint(...[...codigo].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 }
 
-/** Dónde vende, sin repetir: primero lo de las cuentas vinculadas y luego lo puesto a mano. Ordenado por país y plataforma. */
-export function dondeVende(cuentas: readonly { plataforma: string | null; pais: string | null }[], manuales: readonly { plataforma: string; pais: string }[]): VendeEn[] {
+const clave = (plataforma: string, pais: string) => `${plataforma.trim().toLowerCase()}|${pais}`;
+
+/**
+ * Dónde vende, sin repetir: lo de las cuentas vinculadas y lo puesto a mano (migraciones 0193 y 0194). Una fila `oculto` quita de la lista lo que
+ * venía de una cuenta (la cuenta no se toca). Los nombres se comparan sin mayúsculas. Ordenado por país y plataforma.
+ */
+export function dondeVende(
+  cuentas: readonly { plataforma: string | null; pais: string | null }[],
+  manuales: readonly { plataforma: string; pais: string; oculto?: boolean }[],
+): VendeEn[] {
+  const ocultos = new Set(manuales.filter((m) => m.oculto).map((m) => clave(m.plataforma, m.pais)));
   const vistos = new Map<string, VendeEn>();
-  for (const c of cuentas) if (c.plataforma && c.pais) vistos.set(`${c.plataforma}|${c.pais}`, { plataforma: c.plataforma, pais: c.pais, manual: false });
-  for (const m of manuales) if (!vistos.has(`${m.plataforma}|${m.pais}`)) vistos.set(`${m.plataforma}|${m.pais}`, { plataforma: m.plataforma, pais: m.pais, manual: true });
+  for (const c of cuentas) {
+    if (!c.plataforma || !c.pais || ocultos.has(clave(c.plataforma, c.pais))) continue;
+    vistos.set(clave(c.plataforma, c.pais), { plataforma: c.plataforma, pais: c.pais, manual: false });
+  }
+  for (const m of manuales) {
+    if (m.oculto || vistos.has(clave(m.plataforma, m.pais))) continue;
+    vistos.set(clave(m.plataforma, m.pais), { plataforma: m.plataforma, pais: m.pais, manual: true });
+  }
   return [...vistos.values()].sort((a, b) => a.pais.localeCompare(b.pais) || a.plataforma.localeCompare(b.plataforma, "es"));
 }
 

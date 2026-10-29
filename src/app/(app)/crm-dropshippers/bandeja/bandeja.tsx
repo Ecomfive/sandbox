@@ -1488,6 +1488,7 @@ export function Bandeja({
                     ),
                   }))
                 }
+                alCambioLista={() => void refrescar(sel.id)}
               />
               {sel.paises
                 .filter((p) => !sel.vendeEn.some((v) => v.pais === p))

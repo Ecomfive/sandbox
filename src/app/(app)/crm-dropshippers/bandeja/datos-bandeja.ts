@@ -206,23 +206,23 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       }
     }
   }
-  // Dónde vende cada dropshipper, puesto a mano (migración 0193). Sin ella, solo lo de sus cuentas.
+  // Dónde vende cada dropshipper, puesto a mano o quitado (migraciones 0193 y 0194). Sin ellas, solo lo de sus cuentas.
   const conDs = [...new Set(conversaciones.map((c) => c.dropshipperId).filter((x): x is string => !!x))];
   if (conDs.length) {
-    const manual = await supabase.from("dropshipper_vende_en").select("dropshipper_id, plataformas(nombre), paises(codigo)").in("dropshipper_id", conDs);
+    const manual = await supabase.from("dropshipper_vende_en").select("dropshipper_id, oculto, crm_plataformas_venta(nombre), paises(codigo)").in("dropshipper_id", conDs);
     if (!manual.error) {
-      const porDs = new Map<string, { plataforma: string; pais: string }[]>();
+      const porDs = new Map<string, { plataforma: string; pais: string; oculto: boolean }[]>();
       for (const m of manual.data ?? []) {
-        const plataforma = uno(m.plataformas as Uno<{ nombre: string }>)?.nombre;
+        const plataforma = uno(m.crm_plataformas_venta as Uno<{ nombre: string }>)?.nombre;
         const pais = uno(m.paises as Uno<{ codigo: string }>)?.codigo;
         if (!plataforma || !pais) continue;
-        porDs.set(m.dropshipper_id as string, [...(porDs.get(m.dropshipper_id as string) ?? []), { plataforma, pais }]);
+        porDs.set(m.dropshipper_id as string, [...(porDs.get(m.dropshipper_id as string) ?? []), { plataforma, pais, oculto: !!m.oculto }]);
       }
       for (const c of conversaciones) {
         const extra = c.dropshipperId ? porDs.get(c.dropshipperId) : undefined;
         if (!extra) continue;
         c.vendeEn = dondeVende(c.vendeEn, extra);
-        c.paises = [...new Set([...c.paises, ...extra.map((e) => e.pais)])];
+        c.paises = [...new Set([...c.paises, ...c.vendeEn.map((e) => e.pais)])];
       }
     }
   }
