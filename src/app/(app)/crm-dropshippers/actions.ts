@@ -669,6 +669,9 @@ export interface ItemLinea {
   area: "comercial" | "atencion" | "general";
   texto: string;
   creadoEn: string;
+  /** Quién lo hizo, y lo que hizo sin su nombre: la Actividad común los muestra por separado, como en Compras. */
+  autor?: string | null;
+  detalle?: string;
 }
 
 /**
@@ -734,6 +737,8 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
       id: `n-${n.id}`,
       area: n.area === "comercial" ? "comercial" : "atencion",
       texto: `${autor ? `${autor}: ` : ""}${etiquetaTipo(n.tipo)} — ${n.nota}`,
+      autor,
+      detalle: `${etiquetaTipo(n.tipo)} — ${n.nota}`,
       creadoEn: n.creado_en ?? `${n.fecha}T12:00:00Z`,
     });
   }
@@ -752,11 +757,20 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
       id: `a-${e.id}`,
       area: ACCIONES_COMERCIALES.includes(e.accion) ? "comercial" : "general",
       texto: formatearEventoAuditoria(e),
+      autor: e.usuario_nombre,
+      detalle: formatearEventoAuditoria({ ...e, usuario_nombre: null }),
       creadoEn: e.creado_en,
     });
   }
   for (const e of eventosChat.error ? [] : (eventosChat.data ?? [])) {
-    items.push({ id: `w-${e.id}`, area: "general", texto: `${formatearEventoAuditoria(e)} (chat de WhatsApp)`, creadoEn: e.creado_en });
+    items.push({
+      id: `w-${e.id}`,
+      area: "general",
+      texto: `${formatearEventoAuditoria(e)} (chat de WhatsApp)`,
+      autor: e.usuario_nombre,
+      detalle: `${formatearEventoAuditoria({ ...e, usuario_nombre: null })} (chat de WhatsApp)`,
+      creadoEn: e.creado_en,
+    });
   }
   items.sort((a, b) => Date.parse(b.creadoEn) - Date.parse(a.creadoEn));
   return { items: items.slice(0, 80), verComercial: acceso.comercial };
