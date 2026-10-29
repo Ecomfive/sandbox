@@ -1,20 +1,17 @@
 "use client";
 
 import { useState, type ComponentType } from "react";
-import { CampoMenciones } from "@/components/ui/campo-menciones";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, DropshipperIcon, EtiquetaIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { recomendarProducto } from "../sugerencias-clientes/actions";
 import { FichaSugerencia } from "../sugerencias-clientes/ficha-sugerencia";
-import type { AccesoCrm } from "@/lib/crm/areas";
 import { CampoTiendas } from "./campo-tiendas";
-import { crearCaso, editarDropshipper, registrarInteraccion } from "./actions";
-import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, TIPOS_INTERACCION, nombrePais, type FilaDropshipper } from "./def-crm";
+import { crearCaso, editarDropshipper } from "./actions";
+import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, nombrePais, type FilaDropshipper } from "./def-crm";
 
-const hoy = () => new Date().toLocaleDateString("en-CA"); // AAAA-MM-DD en la hora de quien lo usa
 
 /** Los datos mínimos de un dropshipper para elegirlo en una lista. */
 export interface OpcionDropshipper {
@@ -147,63 +144,6 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
             <CampoPais id="campo-pais-caso" paises={paises.length ? paises : [codigoPais]} inicial={codigoPais} />
           </Seccion>
         </>
-      )}
-    </FichaCrear>
-  );
-}
-
-/** Una nota o contacto con el dropshipper (llamada, WhatsApp…): queda en su historial de interacciones. */
-export function PanelNota({ d, acceso, alGuardar }: { d: FilaDropshipper; acceso: AccesoCrm; alGuardar?: () => void }) {
-  return (
-    <FichaCrear
-      alGuardar={alGuardar}
-      titulo="Nueva nota"
-      etiquetaCrear="Guardar nota"
-      action={registrarInteraccion}
-      mensajeExito="Nota guardada"
-      ocultos={{ dropshipper_id: d.id }}
-      boton={(abrir) => <BotonAccion texto="Nota" icono={EtiquetaIcon} alHacerClic={abrir} />}
-    >
-      {({ faltante, invalido }) => (
-        <Seccion icono={CalendarioIcon} titulo="Nota">
-          {acceso.escribeComercial && (
-            <Campo etiqueta="Área" id="campo-area-nota">
-              <select id="campo-area-nota" name="area" defaultValue="comercial" className={`${fieldClass} w-full`}>
-                <option value="comercial">Comercial (privada)</option>
-                <option value="atencion">Atención</option>
-              </select>
-            </Campo>
-          )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta="Tipo" id="campo-tipo-nota">
-              <select id="campo-tipo-nota" name="tipo" defaultValue="whatsapp" className={`${fieldClass} w-full`}>
-                <Opciones lista={TIPOS_INTERACCION} />
-              </select>
-            </Campo>
-            <Campo etiqueta="Fecha" id="campo-fecha-nota" obligatorio faltante={faltante}>
-              <input
-                id="campo-fecha-nota"
-                type="date"
-                name="fecha"
-                required
-                aria-invalid={invalido("campo-fecha-nota")}
-                defaultValue={hoy()}
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-          </div>
-          <Campo etiqueta="Nota" id="campo-texto-nota" obligatorio faltante={faltante}>
-            <CampoMenciones
-              id="campo-texto-nota"
-              name="nota"
-              required
-              filas={4}
-              enfocar
-              ariaInvalid={invalido("campo-texto-nota")}
-              placeholder="Ej: Confirmó que empieza a enviar pedidos la próxima semana (usa @ para etiquetar a alguien)"
-            />
-          </Campo>
-        </Seccion>
       )}
     </FichaCrear>
   );

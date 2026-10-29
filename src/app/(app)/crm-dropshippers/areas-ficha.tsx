@@ -8,18 +8,15 @@ import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { formatearFecha, formatearTiempoRelativo } from "@/lib/formato";
-import { FASES, type AccesoCrm } from "@/lib/crm/areas";
-import { CalendarioIcon, EstadoIcon, PersonaIcon } from "@/lib/nav-icons";
+import type { AccesoCrm } from "@/lib/crm/areas";
+import { CalendarioIcon, PersonaIcon } from "@/lib/nav-icons";
 import {
   completarSeguimiento,
   crearSeguimiento,
   escalarCaso,
-  obtenerLideresComerciales,
   obtenerLineaDeTiempo,
   obtenerSeguimientos,
-  transferirDropshipper,
   type ItemLinea,
-  type LiderComercial,
   type Seguimiento,
 } from "./actions";
 import type { FilaDropshipper } from "./def-crm";
@@ -96,65 +93,6 @@ export function PanelSeguimiento({ d, alGuardar }: { d: FilaDropshipper; alGuard
           </Campo>
           <Campo etiqueta="Detalle" id="campo-detalle-seguimiento">
             <textarea id="campo-detalle-seguimiento" name="detalle" rows={3} className={`${fieldClass} w-full resize-y`} />
-          </Campo>
-        </Seccion>
-      )}
-    </FichaCrear>
-  );
-}
-
-/** Fase de captación y líder comercial: aquí se hace la «transferencia» de un captado a un líder. */
-export function PanelFase({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: () => void }) {
-  const [lideres, setLideres] = useState<LiderComercial[] | "error" | null>(null);
-  return (
-    <FichaCrear
-      alGuardar={alGuardar}
-      titulo="Fase y líder comercial"
-      etiquetaCrear="Guardar"
-      action={transferirDropshipper}
-      mensajeExito="Guardado"
-      ocultos={{ dropshipper_id: d.id }}
-      alAbrir={() => {
-        setLideres(null);
-        obtenerLideresComerciales()
-          .then((r) => setLideres("lideres" in r ? r.lideres : "error"))
-          .catch(() => setLideres("error"));
-      }}
-      boton={(abrir) => <BotonAccion texto="Fase" icono={EstadoIcon} alHacerClic={abrir} />}
-    >
-      {() => (
-        <Seccion icono={PersonaIcon} titulo="Captación">
-          <Campo etiqueta="Fase" id="campo-fase-ds">
-            <select id="campo-fase-ds" name="fase" defaultValue={d.fase} className={`${fieldClass} w-full`}>
-              {FASES.map((f) => (
-                <option key={f.valor} value={f.valor}>
-                  {f.etiqueta}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo etiqueta="Líder comercial" id="campo-lider-ds">
-            {lideres === "error" ? (
-              <p id="campo-lider-ds" role="alert" className="py-1 text-xs text-destructive">
-                No se pudo cargar la lista de líderes.
-              </p>
-            ) : (
-              <select
-                id="campo-lider-ds"
-                name="responsable_id"
-                disabled={lideres === null}
-                defaultValue={d.responsableId ?? ""}
-                key={Array.isArray(lideres) ? "listo" : "cargando"}
-                className={`${fieldClass} w-full`}
-              >
-                <option value="">{lideres === null ? "Cargando…" : "Sin asignar"}</option>
-                {(Array.isArray(lideres) ? lideres : []).map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.nombre}
-                  </option>
-                ))}
-              </select>
-            )}
           </Campo>
         </Seccion>
       )}

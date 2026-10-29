@@ -15,14 +15,14 @@ import {
   PersonaIcon,
   SugerenciaIcon,
 } from "@/lib/nav-icons";
-import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
+import type { AccesoCrm } from "@/lib/crm/areas";
 import { ActividadDropshipper } from "./actividad-dropshipper";
-import { BotonEscalar, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
+import { BotonEscalar, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
-import { PanelCaso, PanelEditar, PanelNota, PanelRecomendar } from "./paneles-ficha";
+import { PanelCaso, PanelEditar, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import { ConversacionWhatsapp } from "./conversacion-whatsapp";
 import { EtiquetasDropshipper } from "./etiquetas-dropshipper";
@@ -111,7 +111,6 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
         <div className="flex flex-wrap gap-1.5">
           <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
           <Pastilla tono={d.nivel === "vip" ? "oscuro" : "neutro"}>{etiquetaNivel(d.nivel)}</Pastilla>
-          {d.fase !== "activo" && <Pastilla tono="aviso">{etiquetaFase(d.fase)}</Pastilla>}
           {abiertos.length > 0 && (
             <Pastilla>
               <Punto />
@@ -190,24 +189,21 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
   );
 }
 
-/** Los botones de la ficha que abren una ventana del CRM (caso, pedido, nota, recomendar, editar; seguimiento y fase en Comercial). */
+/**
+ * Los botones de la ficha que abren una ventana del CRM: caso, recomendar y editar; seguimiento en Comercial. Sin «Pedido», «Nota» ni «Fase»
+ * (29 oct 2026, pedido de Alcides): lo que se anotaba en una nota va como comentario en la Actividad.
+ */
 export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDropshipper; codigoPais: string; acceso: AccesoCrm; alGuardar: () => void }) {
   return (
     <>
       {acceso.escribeAtencion && (
         <>
           <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-          <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
           <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
           <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
         </>
       )}
-      {acceso.escribeComercial && (
-        <>
-          <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />
-          <PanelFase key={`fase-${d.id}`} d={d} alGuardar={alGuardar} />
-        </>
-      )}
+      {acceso.escribeComercial && <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />}
     </>
   );
 }
