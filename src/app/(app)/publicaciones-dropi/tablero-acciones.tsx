@@ -7,7 +7,7 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, EtiquetaIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
@@ -42,7 +42,7 @@ interface Tarjeta {
   /** El color de esa línea: rojo (lo que alarma) o verde (lo que va bien, como lo que viene en camino). */
   extraColor?: "rojo" | "verde";
   /** Un segundo número junto al grande, tras una barra: «/ 300» (el total) o «/ 6 en camino». */
-  junto?: (abiertas: FilaPublicacion[]) => { n: number; texto?: string; color?: "verde" };
+  junto?: (abiertas: FilaPublicacion[]) => { n: number; texto?: string; color?: "verde" | "ambar" };
   /** Cuenta también las archivadas (las pausadas por falta de stock están en Archivados). */
   todas?: boolean;
 }
@@ -75,18 +75,14 @@ const TARJETAS: Tarjeta[] = [
     junto: (abiertas) => ({ n: abiertas.length }),
     atajo: { id: "activas", etiqueta: "Activas en Dropi", ayuda: "Filtrar la lista: activas en Dropi", filtro: seleccion("publicacion", "activo") },
   },
-  { ...porAccion("margen_bajo", MargenIcon, "rojo"), extra: (abiertas, r) => {
+  {
+    ...porAccion("margen_bajo", MargenIcon, "rojo"),
+    extra: (abiertas, r) => {
       const n = abiertas.filter((f) => f.nivelMargen === "critico").length;
       return n ? `${n} en crítico (menos de ${Math.round(r.margen_critico * 100)} %)` : null;
-    } },
-  {
-    id: "liquidacion",
-    titulo: "En liquidación",
-    icono: EtiquetaIcon,
-    color: "ambar",
-    detalle: "Margen bajo a propósito: no cuentan como margen bajo",
-    cuenta: (f) => !!f.liquidacionDesde,
-    atajo: { id: "liquidacion", etiqueta: "En liquidación", ayuda: "Filtrar la lista: en liquidación", filtro: seleccion("liquidacion", "si") },
+    },
+    // Las que se están liquidando a propósito siguen en margen bajo y se cuentan junto al número: «22 / 13 en liquidación» (28 oct 2026).
+    junto: (abiertas) => ({ n: abiertas.filter((f) => f.acciones.includes("margen_bajo") && !!f.liquidacionDesde).length, texto: "en liquidación", color: "ambar" }),
   },
   porAccion("ventas_caida", VentasIcon, "ambar"),
   porAccion("bajar_precio", AnalisisCompetenciaIcon, "rojo"),
@@ -161,7 +157,7 @@ const TARJETAS: Tarjeta[] = [
 ];
 
 /** Una tarjeta del tablero: ícono de color, título y el número grande. Es un botón que pone o quita su filtro en la lista. */
-function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; valor: number; junto: { n: number; texto?: string; color?: "verde" } | null; extra: string | null; detalle: string; def: DefTabla<FilaPublicacion> }) {
+function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; valor: number; junto: { n: number; texto?: string; color?: "verde" | "ambar" } | null; extra: string | null; detalle: string; def: DefTabla<FilaPublicacion> }) {
   const [filtros, cambiarFiltros] = useFiltros(def);
   const activa = atajoActivo(filtros, t.atajo);
   const c = COLORES[t.color];
@@ -184,7 +180,7 @@ function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; v
       <span className="flex items-baseline gap-1">
         <span className={`text-3xl leading-none font-semibold tabular-nums ${c.numero}`}>{valor.toLocaleString("es-PA")}</span>
         {junto && (
-          <span className={`text-sm tabular-nums ${junto.color === "verde" ? "font-medium text-success" : "text-muted-foreground"}`}>
+          <span className={`text-sm tabular-nums ${junto.color === "verde" ? "font-medium text-success" : junto.color === "ambar" ? "font-medium text-warning" : "text-muted-foreground"}`}>
             / {junto.n.toLocaleString("es-PA")}
             {junto.texto && ` ${junto.texto}`}
           </span>

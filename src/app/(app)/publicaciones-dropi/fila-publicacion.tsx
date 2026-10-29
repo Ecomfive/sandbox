@@ -370,7 +370,8 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               "Sin margen"
             ) : (
               <span className="inline-flex items-center gap-1.5 tabular-nums">
-                {!f.liquidacionDesde && (f.nivelMargen === "critico" || f.nivelMargen === "bajo") && <Punto clase="bg-destructive" texto="Margen bajo" />}
+                {(f.nivelMargen === "critico" || f.nivelMargen === "bajo") &&
+                  (f.liquidacionDesde ? <Punto clase="bg-warning" texto="Margen bajo, en liquidación" /> : <Punto clase="bg-destructive" texto="Margen bajo" />)}
                 {Math.round(f.margen * 100)} % de margen bruto
               </span>
             )

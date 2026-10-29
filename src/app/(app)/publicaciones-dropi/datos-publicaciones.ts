@@ -468,8 +468,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       },
       r,
     );
-    // En liquidación (28 oct 2026): el margen bajo es a propósito, así que no es un aviso ni se recomienda subir el precio o armar el combo.
-    if (f.liquidacionDesde) f.acciones = f.acciones.filter((a) => a !== "margen_bajo");
+    // En liquidación (28 oct 2026): sigue en margen bajo (la tarjeta la cuenta aparte, «/ N en liquidación»), pero no se recomienda subir el precio ni armar el combo.
     const recsVigentes = f.liquidacionDesde ? recs.filter((x) => !NO_EN_LIQUIDACION.includes(x.tipo)) : recs;
     f.recomendaciones = pendientes([...recsVigentes, ...recomendarOptimizacion(f.revisiones, f.archivada, privada)], f.decisiones, hoy);
   }
