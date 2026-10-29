@@ -56,7 +56,7 @@ export interface DiaDelCliente {
   estado: EstadoDia;
 }
 
-/** El análisis completo de un cliente (migración 0186) con cuándo y quién lo hizo. */
+/** El análisis completo de un cliente (migración 0187) con cuándo y quién lo hizo. */
 export interface PerfilGuardado extends PerfilCliente {
   analizadoEn: string;
   analizadoPor: string | null;
@@ -65,7 +65,7 @@ export interface PerfilGuardado extends PerfilCliente {
 }
 
 export interface ActividadCliente {
-  /** La lectura completa del cliente; null si todavía no se hizo o falta la migración 0186. */
+  /** La lectura completa del cliente; null si todavía no se hizo o falta la migración 0187. */
   perfil: PerfilGuardado | null;
   dias: DiaDelCliente[];
   frecuentes: FrecuenciaMotivo[];
@@ -121,7 +121,7 @@ async function guardados(supabase: Supabase, id: string): Promise<{ filas: FilaG
   };
 }
 
-/** El análisis completo guardado de un chat. `falta`: todavía no se corrió la migración 0186. */
+/** El análisis completo guardado de un chat. `falta`: todavía no se corrió la migración 0187. */
 async function perfilGuardado(supabase: Supabase, id: string): Promise<{ perfil: PerfilGuardado | null; falta: boolean }> {
   const { data, error } = await supabase.from("whatsapp_actividad_cliente").select("datos, dias_analizados, analizado_en, analizado_por").eq("conversacion_id", id).maybeSingle();
   if (error) return { perfil: null, falta: true };
@@ -255,7 +255,7 @@ async function analizarPerfil(supabase: Supabase, u: UsuarioActual, id: string):
     { conversacion_id: id, datos: perfil, dias_analizados: g.filas.length, modelo: modeloDeTexto(), analizado_por: u.nombre || u.email, analizado_en: new Date().toISOString() },
     { onConflict: "conversacion_id" },
   );
-  if (error) return { error: error.code === "42P01" ? "Falta correr la migración 0186 (análisis completo del cliente)." : "No se pudo guardar el análisis completo." };
+  if (error) return { error: error.code === "42P01" ? "Falta correr la migración 0187 (análisis completo del cliente)." : "No se pudo guardar el análisis completo." };
   return { hecho: true };
 }
 

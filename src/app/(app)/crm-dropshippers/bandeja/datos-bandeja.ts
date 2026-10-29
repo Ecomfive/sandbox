@@ -70,6 +70,10 @@ export interface MensajeVista {
   eliminadoEnWhatsapp: boolean;
   /** Hay una petición de borrar este mensaje esperando autorización (migración 0172). */
   borradoPendiente: boolean;
+  /** Su id en WhatsApp («wamid…»): las reacciones apuntan a él. */
+  waId?: string | null;
+  /** En una reacción, el `waId` del mensaje reaccionado (migración 0186): la bandeja la dibuja sobre ese mensaje. */
+  reaccionA?: string | null;
 }
 
 /** Un mensaje de la vista previa que se despliega al pasar el cursor por la lista de chats. */
@@ -288,7 +292,13 @@ export async function cargarConversacion(
     // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
     supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
   ]);
-  const [ocultos, pendientes] = await Promise.all([mensajesOcultos(supabase, id), borradosPendientes(supabase)]);
+  const [ocultos, pendientes, reaccionesR] = await Promise.all([
+    mensajesOcultos(supabase, id),
+    borradosPendientes(supabase),
+    // A qué mensaje va cada reacción (migración 0186), aparte: sin la columna la conversación se carga igual.
+    supabase.from("whatsapp_mensajes").select("id, reaccion_a").eq("conversacion_id", id).eq("tipo", "reaccion").not("reaccion_a", "is", null),
+  ]);
+  const reaccionA = new Map((reaccionesR.error ? [] : (reaccionesR.data ?? [])).map((x) => [x.id as string, x.reaccion_a as string]));
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
   const traidos = mensajesR.data ?? [];
   const cargos = traidos.some((m) => m.autor_id) ? await cargosDelEquipo(supabase) : new Map<string, string>();
@@ -309,6 +319,8 @@ export async function cargarConversacion(
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),
       borradoPendiente: pendientes.mensajes.has(m.id as string),
+      waId: (m.wa_id as string | null) ?? null,
+      reaccionA: reaccionA.get(m.id as string) ?? null,
     }))
     .reverse();
   const d = dsR.data as {

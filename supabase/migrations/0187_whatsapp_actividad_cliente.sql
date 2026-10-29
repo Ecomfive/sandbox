@@ -1,6 +1,6 @@
 -- CRM Dropshippers › Actividad del cliente: análisis completo por chat (pedido de Jhokser, 29 oct 2026). Una fila por chat con la lectura que hace la IA de todo lo que se sabe del cliente
 -- (cómo es el trato, tono, urgencia, riesgo de que se vaya, lo que el equipo prometió y sigue pendiente, oportunidades y qué hacer ahora). Se rehace cada vez que se pulsa «Volver a analizar».
--- Código: src/app/(app)/crm-dropshippers/bandeja/actividad-actions.ts. Reversa: supabase/rollbacks/0186_rollback.sql
+-- Código: src/app/(app)/crm-dropshippers/bandeja/actividad-actions.ts. Reversa: supabase/rollbacks/0187_rollback.sql
 
 create table if not exists whatsapp_actividad_cliente (
   id uuid primary key default uuid_v7(),
