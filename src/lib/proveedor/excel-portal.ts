@@ -6,7 +6,8 @@ import type { Textos } from "./textos";
 
 // Qué columnas y qué filas lleva el Excel de cada pestaña del portal del proveedor (28 oct 2026): las mismas que se ven en pantalla, en el
 // idioma de la persona, pero con los números y las fechas como valores (no como texto con «$» o «12 nov»). Puro: la pantalla le pasa los
-// textos y la traducción; el archivo se arma con `filasAXlsx`.
+// textos y la traducción; el archivo se arma con `filasAXlsx`. Desde el 29 oct 2026 cada hoja abre con la foto de referencia (y Cotizados
+// también con la foto real), como miniatura dentro de la celda: la celda lleva la dirección de la foto y `filasAXlsx` la trae.
 
 export interface ContextoExcel {
   t: Textos;
@@ -29,14 +30,17 @@ export interface HojaExcel {
 
 const dia = (momento: string | null) => (momento ? diaPanama(momento) : null);
 
-/** Producto, código y destino: lo que abre cada pestaña de pedidos. */
+const columnaFoto = (titulo: string): ColumnaExcel => ({ titulo, tipo: "imagen", ancho: 11 });
+
+/** Foto, producto, código y destino: lo que abre cada pestaña de pedidos. */
 const columnasBase = (t: Textos): ColumnaExcel[] => [
+  columnaFoto(t.colFotoReferencia),
   { titulo: t.colProducto, tipo: "texto", ancho: 38 },
   { titulo: t.colCodigo, tipo: "texto", ancho: 16 },
   { titulo: t.colDestino, tipo: "texto", ancho: 10 },
   { titulo: t.colVia, tipo: "texto", ancho: 18 },
 ];
-const celdasBase = (p: PedidoPortal, c: ContextoExcel): CeldaExcel[] => [c.tr(p.producto), p.referencia, p.paisCodigo, c.via(p)];
+const celdasBase = (p: PedidoPortal, c: ContextoExcel): CeldaExcel[] => [p.fotoReferencia, c.tr(p.producto), p.referencia, p.paisCodigo, c.via(p)];
 
 export function hojaPorCotizar(pedidos: PedidoPortal[], c: ContextoExcel): HojaExcel {
   return {
@@ -45,17 +49,24 @@ export function hojaPorCotizar(pedidos: PedidoPortal[], c: ContextoExcel): HojaE
   };
 }
 
-export function hojaCotizados(pedidos: PedidoPortal[], c: ContextoExcel): HojaExcel {
+/** `fotos` son las fotos reales que mandó el proveedor (por pedido), las mismas que se ven en la pestaña. */
+export function hojaCotizados(pedidos: PedidoPortal[], c: ContextoExcel, fotos: Record<string, string> = {}): HojaExcel {
+  const [referencia, ...base] = columnasBase(c.t);
   return {
     columnas: [
-      ...columnasBase(c.t),
+      referencia,
+      columnaFoto(c.t.colFotoReal),
+      ...base,
       { titulo: c.t.colPedidas, tipo: "entero" },
       { titulo: c.t.colUnidades, tipo: "entero" },
       { titulo: c.t.colPorUnidad, tipo: "dinero" },
       { titulo: c.t.colTotal, tipo: "dinero" },
       { titulo: c.t.colComentario, tipo: "texto", ancho: 44 },
     ],
-    filas: pedidos.map((p) => ({ id: p.id, celdas: [...celdasBase(p, c), p.unidadesPedidas, p.unidades, p.costoUnitario, p.montoTotal, c.tr(p.comentarioProveedor)] })),
+    filas: pedidos.map((p) => {
+      const [foto, ...base] = celdasBase(p, c);
+      return { id: p.id, celdas: [foto, fotos[p.id] ?? null, ...base, p.unidadesPedidas, p.unidades, p.costoUnitario, p.montoTotal, c.tr(p.comentarioProveedor)] };
+    }),
   };
 }
 
@@ -106,6 +117,7 @@ export function hojaPagos(filas: FilaRegistro[], c: ContextoExcel): HojaExcel {
   const tipoDe = (campo: CampoRegistro): ColumnaExcel["tipo"] => (TIPO_CAMPO[campo] === "fecha" ? "fecha" : campo === "unidades" ? "entero" : "dinero");
   return {
     columnas: [
+      columnaFoto(c.t.colFotoReferencia),
       { titulo: c.t.colProducto, tipo: "texto", ancho: 38 },
       { titulo: c.t.colCodigo, tipo: "texto", ancho: 16 },
       { titulo: c.t.colDestino, tipo: "texto", ancho: 10 },
@@ -113,7 +125,7 @@ export function hojaPagos(filas: FilaRegistro[], c: ContextoExcel): HojaExcel {
     ],
     filas: filas.map((f) => ({
       id: f.fila,
-      celdas: [c.tr(String(f.valores.producto ?? "")), f.referencia, f.paisCodigo, ...CAMPOS_PAGOS.map(({ campo }) => f.valores[campo] ?? null)],
+      celdas: [f.foto, c.tr(String(f.valores.producto ?? "")), f.referencia, f.paisCodigo, ...CAMPOS_PAGOS.map(({ campo }) => f.valores[campo] ?? null)],
     })),
   };
 }

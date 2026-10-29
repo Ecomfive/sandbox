@@ -4,13 +4,15 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { extraerEventosCuenta, hayCamposNuevos, resumenDeAviso } from "@/lib/whatsapp/eventos";
 import { extraerAviso } from "@/lib/whatsapp/extraer";
 import { guardarEntrantes, guardarEstados, guardarRevocados } from "@/lib/whatsapp/guardar";
+import { guardarAvisoCrudo, traeHistorial } from "@/lib/whatsapp/historial-meta";
 import { aplicarEventosCuenta } from "@/lib/whatsapp/plantillas-servidor";
 import { NUMERO_360_SIN_ID } from "@/lib/whatsapp/proveedor";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const MAX_CUERPO = 1_000_000;
+// El historial del celular (`history`) llega en tandas grandes: hasta lo que acepta Vercel (4,5 MB).
+const MAX_CUERPO = 4_400_000;
 
 /**
  * El webhook de WhatsApp por 360dialog (28 oct 2026, ver `src/lib/whatsapp/proveedor.ts`). 360dialog reenvía los avisos de Meta con el
@@ -34,6 +36,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
   // Si llega algo que la bandeja no entiende (o de otra forma), queda una línea en los registros: solo nombres, nunca el contenido.
   const resumen = resumenDeAviso(aviso);
   if (hayCamposNuevos(resumen.campos)) console.log(`[whatsapp] ${"360dialog"} aviso con campos: ${resumen.campos.join(", ") || "(ninguno)"}; claves: ${resumen.claves.join(", ")}`);
+  // El historial y los contactos del celular llegan una sola vez: se guardan tal cual antes de contestar (historial-meta.ts).
+  if (traeHistorial(resumen.campos) && !(await guardarAvisoCrudo(crudo, resumen.campos))) return new NextResponse("No se pudo guardar", { status: 500 });
   const { mensajes, estados, ecos, revocados } = extraerAviso(aviso, NUMERO_360_SIN_ID);
   // Plantillas aprobadas o rechazadas, calidad, categoría, límite del número y restricciones de la cuenta.
   const eventos = extraerEventosCuenta(aviso, true);

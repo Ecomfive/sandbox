@@ -17,7 +17,8 @@ import {
   SugerenciaIcon,
 } from "@/lib/nav-icons";
 import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
-import { BotonEscalar, LineaDeTiempo, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
+import { ActividadDropshipper } from "./actividad-dropshipper";
+import { BotonEscalar, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
@@ -67,7 +68,7 @@ function GraficaPedidos({ serie, hoy }: { serie: number[]; hoy: string }) {
   );
 }
 
-function Bloque({ icono: Icono, titulo, children }: { icono: typeof PersonaIcon; titulo: string; children: ReactNode }) {
+export function Bloque({ icono: Icono, titulo, children }: { icono: typeof PersonaIcon; titulo: string; children: ReactNode }) {
   return (
     <section className="border-b border-border p-3.5 last:border-b-0">
       <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold tracking-[0.05em] text-muted-foreground uppercase">
@@ -139,21 +140,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
               WhatsApp
             </span>
           )}
-          {acceso.escribeAtencion && (
-            <>
-              <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-              <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-              <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
-              <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
-              <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
-            </>
-          )}
-          {acceso.escribeComercial && (
-            <>
-              <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />
-              <PanelFase key={`fase-${d.id}`} d={d} alGuardar={alGuardar} />
-            </>
-          )}
+          <AccionesCrm d={d} codigoPais={codigoPais} acceso={acceso} alGuardar={alGuardar} />
         </div>
       </div>
 
@@ -162,69 +149,17 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       </Bloque>
 
       <Bloque icono={EstadoIcon} titulo="Desempeño">
-        <div className="mb-3 grid grid-cols-3 gap-2">
-          {[
-            ["Pedidos mes", d.pedidosMes ? String(d.pedidosMes) : "—"],
-            ["Ventas mes", d.ventasMes ? montoCorto(d.ventasMes, codigoPais) : "—"],
-            ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-          ].map(([titulo, valor]) => (
-            <div key={titulo} className="min-w-0 rounded-lg border border-border px-2.5 py-2">
-              <p className="m-0 text-[11.5px] text-muted-foreground">{titulo}</p>
-              <p className="m-0 truncate text-base font-semibold tabular-nums">{valor}</p>
-            </div>
-          ))}
-        </div>
-        {d.pedidosPorMes.length > 0 && d.pedidosMes > 0 ? (
-          <GraficaPedidos serie={d.pedidosPorMes} hoy={hoy} />
-        ) : (
-          <p className="m-0 text-xs text-muted-foreground">Todavía no tiene pedidos registrados este mes.</p>
-        )}
-        {d.ventasMes > 0 && <p className="mt-2 mb-0 text-xs text-muted-foreground tabular-nums">Ventas exactas: {formatearMoneda(d.ventasMes, codigoPais)}</p>}
+        <CifrasDelMes d={d} codigoPais={codigoPais} hoy={hoy} />
       </Bloque>
 
       {abiertos.length > 0 && (
         <Bloque icono={AlertaIcon} titulo="Casos abiertos">
-          <ul className="-my-2.5 -mx-3.5 m-0 flex list-none flex-col p-0">
-            {abiertos.map((c) => (
-              <li key={c.id} className="flex items-start gap-2.5 border-b border-border px-3.5 py-2.5 last:border-b-0">
-                <Punto tono={c.prioridad === "alta" ? "peligro" : "aviso"} className="mt-1.5" />
-                <div className="min-w-0 flex-1">
-                  <p className="m-0 text-[13px] font-medium">{c.titulo}</p>
-                  <p className="m-0 text-xs text-muted-foreground">
-                    {etiquetaTipoCaso(c.tipo)} · {etiquetaEstadoCaso(c.estado)}
-                    {c.numeroPedido ? ` · ${c.numeroPedido}` : ""} · {etiquetaCanal(c.canal)}
-                  </p>
-                </div>
-                <div className="ml-auto flex flex-col items-end gap-1">
-                  <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{etiquetaAntiguedad(c.horasAbierto)}</span>
-                  {acceso.escribeAtencion && <BotonEscalar casoId={c.id} escalado={c.escalado} />}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <CasosAbiertos abiertos={abiertos} acceso={acceso} />
         </Bloque>
       )}
 
       <Bloque icono={PersonaIcon} titulo="Datos">
-        <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
-          {[
-            ...(d.tieneTelefono && acceso.verTelefonos ? [["Teléfono", <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede />]] : []),
-            ["Ciudad", d.ciudad ?? "—"],
-            ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
-            ["Responsable", d.responsable ?? "Sin asignar"],
-            ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-            ...(d.etapa ? [["Etapa", d.etapa]] : []),
-            ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
-            ["Etiquetas", d.etiquetas.length ? d.etiquetas.map((e) => <Etiqueta key={e}>{e}</Etiqueta>) : "—"],
-            ...(d.email ? [["Correo", d.email]] : []),
-            ...(d.notas ? [["Notas", d.notas]] : []),
-          ].map(([titulo, valor]) => (
-            <div key={String(titulo)} className="contents">
-              <dt className="text-muted-foreground">{titulo}</dt>
-              <dd className="m-0 min-w-0">{valor}</dd>
-            </div>
-          ))}
-        </dl>
+        <DatosDropshipper d={d} hoy={hoy} acceso={acceso} />
       </Bloque>
 
       <Bloque icono={SugerenciaIcon} titulo="Productos recomendados">
@@ -250,9 +185,108 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       </Bloque>
 
       <Bloque icono={HistorialIcon} titulo="Actividad">
-        <LineaDeTiempo key={`linea-${d.id}`} dropshipperId={d.id} acceso={acceso} version={version} />
+        {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y los cambios filtrados por área. */}
+        <ActividadDropshipper key={`actividad-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version} />
       </Bloque>
     </>
+  );
+}
+
+/** Los botones de la ficha que abren una ventana del CRM (caso, pedido, nota, recomendar, editar; seguimiento y fase en Comercial). */
+export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDropshipper; codigoPais: string; acceso: AccesoCrm; alGuardar: () => void }) {
+  return (
+    <>
+      {acceso.escribeAtencion && (
+        <>
+          <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
+          <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
+          <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
+          <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
+          <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
+        </>
+      )}
+      {acceso.escribeComercial && (
+        <>
+          <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />
+          <PanelFase key={`fase-${d.id}`} d={d} alGuardar={alGuardar} />
+        </>
+      )}
+    </>
+  );
+}
+
+/** Pedidos y ventas del mes, el último pedido y la gráfica de seis meses. */
+export function CifrasDelMes({ d, codigoPais, hoy }: { d: FilaDropshipper; codigoPais: string; hoy: string }) {
+  return (
+    <>
+      <div className="mb-3 grid grid-cols-3 gap-2">
+        {[
+          ["Pedidos mes", d.pedidosMes ? String(d.pedidosMes) : "—"],
+          ["Ventas mes", d.ventasMes ? montoCorto(d.ventasMes, codigoPais) : "—"],
+          ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
+        ].map(([titulo, valor]) => (
+          <div key={titulo} className="min-w-0 rounded-lg border border-border px-2.5 py-2">
+            <p className="m-0 text-[11.5px] text-muted-foreground">{titulo}</p>
+            <p className="m-0 truncate text-base font-semibold tabular-nums">{valor}</p>
+          </div>
+        ))}
+      </div>
+      {d.pedidosPorMes.length > 0 && d.pedidosMes > 0 ? (
+        <GraficaPedidos serie={d.pedidosPorMes} hoy={hoy} />
+      ) : (
+        <p className="m-0 text-xs text-muted-foreground">Todavía no tiene pedidos registrados este mes.</p>
+      )}
+      {d.ventasMes > 0 && <p className="mt-2 mb-0 text-xs text-muted-foreground tabular-nums">Ventas exactas: {formatearMoneda(d.ventasMes, codigoPais)}</p>}
+    </>
+  );
+}
+
+/** Los casos abiertos del dropshipper, con «Escalar» para quien escribe en Atención. */
+export function CasosAbiertos({ abiertos, acceso }: { abiertos: FilaCaso[]; acceso: AccesoCrm }) {
+  return (
+    <ul className="-my-2.5 -mx-3.5 m-0 flex list-none flex-col p-0">
+      {abiertos.map((c) => (
+        <li key={c.id} className="flex items-start gap-2.5 border-b border-border px-3.5 py-2.5 last:border-b-0">
+          <Punto tono={c.prioridad === "alta" ? "peligro" : "aviso"} className="mt-1.5" />
+          <div className="min-w-0 flex-1">
+            <p className="m-0 text-[13px] font-medium">{c.titulo}</p>
+            <p className="m-0 text-xs text-muted-foreground">
+              {etiquetaTipoCaso(c.tipo)} · {etiquetaEstadoCaso(c.estado)}
+              {c.numeroPedido ? ` · ${c.numeroPedido}` : ""} · {etiquetaCanal(c.canal)}
+            </p>
+          </div>
+          <div className="ml-auto flex flex-col items-end gap-1">
+            <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{etiquetaAntiguedad(c.horasAbierto)}</span>
+            {acceso.escribeAtencion && <BotonEscalar casoId={c.id} escalado={c.escalado} />}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, responsable, etiquetas… */
+export function DatosDropshipper({ d, hoy, acceso }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm }) {
+  return (
+    <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
+      {[
+        ...(d.tieneTelefono && acceso.verTelefonos ? [["Teléfono", <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede />]] : []),
+        ["Ciudad", d.ciudad ?? "—"],
+        ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
+        ["Responsable", d.responsable ?? "Sin asignar"],
+        ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
+        ...(d.etapa ? [["Etapa", d.etapa]] : []),
+        ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
+        ["Etiquetas", d.etiquetas.length ? d.etiquetas.map((e) => <Etiqueta key={e}>{e}</Etiqueta>) : "—"],
+        ...(d.email ? [["Correo", d.email]] : []),
+        ...(d.notas ? [["Notas", d.notas]] : []),
+      ].map(([titulo, valor]) => (
+        <div key={String(titulo)} className="contents">
+          <dt className="text-muted-foreground">{titulo}</dt>
+          <dd className="m-0 min-w-0">{valor}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

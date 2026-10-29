@@ -1,5 +1,6 @@
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
+import { avisarBandeja } from "./aviso-bandeja";
 import { dropshipperPorTelefonos } from "./vinculo";
 import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
 
@@ -35,6 +36,7 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
     if (error) console.error(`WhatsApp: no se pudo guardar un mensaje${desdeCelular ? " mandado desde el celular" : ""}`, m.waId, error.message);
   }
   if (!desdeCelular) await volverAMostrarSiOcultos(supabase, telefonos);
+  await avisarBandeja();
 }
 
 /**
@@ -61,6 +63,7 @@ export async function guardarEstados(estados: EstadoEntrante[]): Promise<void> {
     const anteriores = ORDEN_ESTADO.slice(0, ORDEN_ESTADO.indexOf(e.estado));
     await supabase.from("whatsapp_mensajes").update({ estado: e.estado }).eq("wa_id", e.waId).in("estado", anteriores);
   }
+  await avisarBandeja();
 }
 
 /**
@@ -74,4 +77,5 @@ export async function guardarRevocados(revocados: RevocadoEntrante[]): Promise<v
     const { error } = await supabase.from("whatsapp_mensajes").update({ eliminado_en_whatsapp_en: r.momento }).eq("wa_id", r.waIdOriginal).is("eliminado_en_whatsapp_en", null);
     if (error) console.error("WhatsApp: no se pudo marcar un mensaje eliminado en WhatsApp", r.waIdOriginal, error.message);
   }
+  await avisarBandeja();
 }

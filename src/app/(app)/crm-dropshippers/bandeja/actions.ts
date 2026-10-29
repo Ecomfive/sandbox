@@ -3,11 +3,13 @@
 import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
+import { accesoCrm, supervisaArea, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
+import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
+import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
@@ -16,13 +18,40 @@ import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plant
 import { claves360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { avisoSupervision, BUCKET_ARCHIVOS, chatParaEnviar, mandarMedioGuardado, MAX_PIE, NOMBRE_AREA, permisoDeSubida } from "./enviar-medio";
-import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
+import { obtenerDatosCrm } from "../datos-crm";
+import type { FilaCaso, FilaDropshipper } from "../def-crm";
+import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type DatosBandeja, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
 
+/** Lo que lleva la ficha del CRM junto al chat (29 oct 2026): el dropshipper con sus cifras del país elegido, sus casos y el acceso. */
+export interface FichaCrmChat {
+  d: FilaDropshipper;
+  casos: FilaCaso[];
+  hoy: string;
+  codigoPais: string;
+  acceso: AccesoCrm;
+}
+
+/**
+ * La ficha del CRM del dropshipper de un chat, para la ventana del chat de la Bandeja. La pide quien puede ver la Bandeja (el CRM se
+ * abre con los mismos módulos), y es la misma ficha que ve en el CRM: cifras del país elegido arriba, casos de ese país.
+ */
+export async function fichaCrmDelChat(dropshipperId: string): Promise<FichaCrmChat | { error: string }> {
+  const u = await usuarioBandeja(false);
+  if (!u) return { error: "No tienes acceso." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const acceso = accesoCrm(u);
+  const datos = await obtenerDatosCrm(supabase, pais.id, areasDe(u), dropshipperId);
+  const d = datos.dropshippers[0];
+  if (!d) return { error: "No se encontró el dropshipper." };
+  return { d, casos: datos.casos, hoy: datos.hoy, codigoPais: pais.codigo, acceso };
+}
+
 /** La lista de conversaciones, para refrescar la bandeja cada pocos segundos. */
-export async function obtenerBandeja(): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | { error: string }> {
+export async function obtenerBandeja(): Promise<DatosBandeja | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   return (await cargarBandeja(createServiceClient(), u)) ?? { error: "Falta correr la migración 0158 (WhatsApp)." };
@@ -114,7 +143,8 @@ export async function mensajesAnteriores(id: string, antesDe: string): Promise<{
  * Responde por WhatsApp con texto libre. Solo dentro de las 24 h desde el último mensaje del dropshipper (regla de Meta); pasado ese
  * plazo hace falta una plantilla aprobada. Queda en la conversación con quién lo mandó, y si nadie la llevaba, la toma quien responde.
  */
-export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: true } | { error: string }> {
+/** Además del ok, el mensaje guardado: la bandeja cambia por él el que mostró al momento de tocar enviar. */
+export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: true; mensajeId: string; momento: string } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const cuerpo = String(texto ?? "").trim();
@@ -130,24 +160,29 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   if ("error" in r) return { error: r.error };
   const ahora = new Date().toISOString();
   const autor = u.nombre || u.email;
-  const { error } = await supabase.from("whatsapp_mensajes").insert({
-    conversacion_id: id,
-    direccion: "saliente",
-    tipo: "texto",
-    texto: cuerpo,
-    wa_id: r.waId,
-    estado: "enviado",
-    autor_id: u.id,
-    autor_nombre: autor,
-    momento: ahora,
-  });
+  const { data: guardado, error } = await supabase
+    .from("whatsapp_mensajes")
+    .insert({
+      conversacion_id: id,
+      direccion: "saliente",
+      tipo: "texto",
+      texto: cuerpo,
+      wa_id: r.waId,
+      estado: "enviado",
+      autor_id: u.id,
+      autor_nombre: autor,
+      momento: ahora,
+    })
+    .select("id")
+    .single();
   // Ya salió por WhatsApp: si no se pudo anotar, se avisa (no se reintenta, para no mandarlo dos veces).
-  if (error) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
+  if (error || !guardado) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
   await supabase
     .from("whatsapp_conversaciones")
     .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje("texto", cuerpo), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
     .eq("id", id);
-  return { ok: true };
+  await avisarBandeja();
+  return { ok: true, mensajeId: guardado.id as string, momento: ahora };
 }
 
 /**
@@ -194,7 +229,7 @@ export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre:
 }
 
 /** Una nota privada en la conversación: la ve el equipo, nunca el dropshipper (no sale por WhatsApp). */
-export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: true } | { error: string }> {
+export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: true; mensajeId: string; momento: string } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const cuerpo = String(texto ?? "").trim();
@@ -202,10 +237,15 @@ export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: tru
   if (cuerpo.length > MAX_TEXTO) return { error: `La nota es muy larga (máximo ${MAX_TEXTO} caracteres).` };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
-  const { error } = await supabase
+  const momento = new Date().toISOString();
+  const { data: guardada, error } = await supabase
     .from("whatsapp_mensajes")
-    .insert({ conversacion_id: id, direccion: "nota", tipo: "texto", texto: cuerpo, estado: "enviado", autor_id: u.id, autor_nombre: u.nombre || u.email });
-  return error ? { error: "No se pudo guardar la nota." } : { ok: true };
+    .insert({ conversacion_id: id, direccion: "nota", tipo: "texto", texto: cuerpo, estado: "enviado", autor_id: u.id, autor_nombre: u.nombre || u.email, momento })
+    .select("id")
+    .single();
+  if (error || !guardada) return { error: "No se pudo guardar la nota." };
+  await avisarBandeja();
+  return { ok: true, mensajeId: guardada.id as string, momento };
 }
 
 /** Marca la conversación resuelta (sale de «Sin responder» aunque tenga no leídos) o la vuelve a abrir. Un mensaje nuevo la reabre sola. */
@@ -270,6 +310,7 @@ export async function pasarConversacionDeArea(id: string, area: string): Promise
     autor_nombre: autor,
   });
   await registrarAuditoria({ accion: "pasar_area_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `${NOMBRE_AREA[c.area]} → ${NOMBRE_AREA[destino]}` });
+  await avisarBandeja();
   return { ok: true };
 }
 
@@ -339,6 +380,7 @@ export async function intervenirConversacion(id: string): Promise<{ ok: true } |
     autor_nombre: autor,
   });
   await registrarAuditoria({ accion: "intervenir_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `Panel de ${NOMBRE_AREA[c.area]}` });
+  await avisarBandeja();
   return { ok: true };
 }
 
@@ -506,5 +548,6 @@ export async function enviarPlantillaConversacion(id: string, plantillaId: strin
     .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje("plantilla", texto), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
     .eq("id", id);
   await registrarAuditoria({ accion: "enviar_plantilla_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: p.nombre });
+  await avisarBandeja();
   return { ok: true };
 }

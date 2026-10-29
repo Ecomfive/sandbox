@@ -938,7 +938,7 @@ convenciones técnicas del código.
   al proveedor lo de Ecomfive le sale «Ecomfive», sin nombres. **Confirmado**: `PedidoPortal.confirmadoEn` = la última vez que la compra
   pasó a `produccion` (`cargarConfirmaciones`, solo de los pedidos en producción y enviados, de 100 en 100), columna en «En producción» y
   «Enviado».
-  **Descargar en Excel** (28 oct 2026, pedido de Jhokser): cada pestaña del portal (y del Tablero, que es el mismo `PortalChin`) trae `BotonExcel` (`src/components/proveedor/boton-excel.tsx`) en la cabecera de su tarjeta: baja un `.xlsx` con las filas que dejan el buscador y el país (en Pagos, todas, no solo las 100 a la vista) o, si la persona marcó casillas (`SeleccionProveedor`/`ColumnaCasilla`, `seleccion.tsx`: una sola selección que se limpia al cambiar de pestaña), solo esas ("Descargar selección (N)"). El archivo se arma en el navegador con SheetJS (`filasAXlsx`, `src/lib/proveedor/excel.ts`, cargado con `import()` al pulsar; números y fechas como valores, texto siempre como texto, nunca fórmula) y lo que lleva cada pestaña sale de `excel-portal.ts` (`hojaPorCotizar`, `hojaCotizados`, `hojaProduccion`, `hojaEnviados`, `hojaPagos`; con prueba): las mismas columnas de la pantalla, en el idioma de la persona y con lo escrito por personas ya traducido (`tr`). Textos nuevos en los dos idiomas (`descargarExcel`…, los comprueba `idioma.test.ts`). Una pestaña nueva del portal con tabla debe armar su hoja ahí y poner su `BotonExcel` y sus `ColumnaCasilla`.
+  **Descargar en Excel** (28 oct 2026, pedido de Jhokser): cada pestaña del portal (y del Tablero, que es el mismo `PortalChin`) trae `BotonExcel` (`src/components/proveedor/boton-excel.tsx`) en la cabecera de su tarjeta: baja un `.xlsx` con las filas que dejan el buscador y el país (en Pagos, todas, no solo las 100 a la vista) o, si la persona marcó casillas (`SeleccionProveedor`/`ColumnaCasilla`, `seleccion.tsx`: una sola selección que se limpia al cambiar de pestaña), solo esas ("Descargar selección (N)"). El archivo se arma en el navegador con ExcelJS (`filasAXlsx`, `src/lib/proveedor/excel.ts`, asíncrona, cargada con `import()` al pulsar; números y fechas como valores, texto siempre como texto, nunca fórmula). **Fotos** (29 oct 2026, pedido de Hernán): una columna `tipo: "imagen"` lleva en la celda la dirección de la foto y `filasAXlsx(…, cargarImagen)` la pone como miniatura anclada a la celda (cuadro de 64 px, fila más alta; cada dirección se trae una vez, 6 a la vez; si falla, la celda queda vacía). `BotonExcel` pasa `miniatura`, que la trae con `fetch` y la achica en un canvas a JPEG de 128 px (Excel solo admite PNG/JPEG/GIF y las fotos pueden ser WEBP). Cada hoja abre con la foto de referencia y Cotizados también con la real (`hojaCotizados(…, fotos)`, las firmadas de la pestaña). Por eso se cambió de SheetJS (su versión gratuita no escribe imágenes; SheetJS sigue para leer Excel en extractos y retiros) y lo que lleva cada pestaña sale de `excel-portal.ts` (`hojaPorCotizar`, `hojaCotizados`, `hojaProduccion`, `hojaEnviados`, `hojaPagos`; con prueba): las mismas columnas de la pantalla, en el idioma de la persona y con lo escrito por personas ya traducido (`tr`). Textos nuevos en los dos idiomas (`descargarExcel`…, los comprueba `idioma.test.ts`). Una pestaña nueva del portal con tabla debe armar su hoja ahí y poner su `BotonExcel` y sus `ColumnaCasilla`.
   **Buscador y país** (26 oct 2026, pedido de Hernán y Francis): arriba de las pestañas del portal (el de Shen Zhen y el Tablero)
   `BarraFiltroPortal` (`src/components/proveedor/filtro-portal.tsx`, contexto `FiltroPortalProveedor` / `useFiltroPortal`; lógica pura en
   `src/lib/proveedor/filtro.ts`, con prueba: cada palabra en el nombre, su traducción o el código, sin acentos) filtra todas las pestañas y sus
@@ -1025,7 +1025,24 @@ convenciones técnicas del código.
   (`panel`, «(tuyo)», pendientes por panel) y `supervisaArea` dice si mira un área de abajo. Supervisando: `abrirConversacion` **no** pone
   `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
   «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
-  No se mandan acuses de lectura a WhatsApp. **Productos que pregunta** (29 oct 2026): la ficha del chat (`productos-chat.tsx`,
+  **Chat en ventana con la ficha del CRM** (29 oct 2026, pedido de Hernán con un bosquejo aprobado): al pulsar un chat de la lista,
+  `bandeja.tsx` lo abre en `Ventana` (`lado="centro"`, `ancho="xl"`, `masAncha`: 96rem al centro; flechas = chat anterior/siguiente de `lista`, `abrirChat`); a la
+  izquierda `FichaDelChat` (`bandeja/ficha-chat.tsx`) y a la derecha la sección del chat de siempre (con `@container`: bajo `@4xl` se ve
+  uno a la vez, «Chat» / «Ficha del dropshipper»). La ficha usa las piezas exportadas de `ficha-lateral.tsx` (`AccionesCrm`, `CifrasDelMes`,
+  `CasosAbiertos`, `DatosDropshipper`) con los datos de `fichaCrmDelChat` (acción en `bandeja/actions.ts`: `obtenerDatosCrm(…, soloId)`
+  del país elegido), en pestañas Resumen, Casos, Productos, Cuentas, Ventas Dropi y Actividad (sin dropshipper: Resumen, Productos y
+  Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
+  de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
+  del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
+  **Mensajes no entregados** (29 oct 2026): `type: unsupported` (131051) no trae contenido; `textoDeRespaldo` en `extraer.ts` lee
+  `unsupported.type` (`NO_ENTREGADOS`: edit, poll_creation, media_placeholder…) y dice qué mandó y que lo pida de nuevo. No se puede recuperar.
+  No se mandan acuses de lectura a WhatsApp. **Al instante** (29 oct 2026): `enviarTexto` en `bandeja.tsx` muestra el mensaje con id
+  «local-…» y estado «enviando» antes de que responda el servidor (`enviarWhatsapp`/`notaWhatsapp` devuelven `mensajeId` y `momento`); si falla,
+  queda «fallido» con «Reintentar» (no si dice «Se envió…»). El refresco va por `POST /api/whatsapp/bandeja` (ruta, no acción: las acciones
+  van en fila y frenaban el envío), con los últimos 40 mensajes unidos a los que hay, y al volver a la pestaña. Aviso en vivo: `avisarBandeja()`
+  (`src/lib/whatsapp/aviso-bandeja.ts`, broadcast de Supabase Realtime por REST con la clave de servicio, sin datos) desde `guardar.ts` y las
+  acciones que guardan mensajes; la bandeja escucha `CANAL_BANDEJA` con el cliente anon y refresca (8 s sin aviso, 30 s con aviso).
+  **Productos que pregunta** (29 oct 2026): la ficha del chat (`productos-chat.tsx`,
   `productos-chat-actions.ts`) cruza los últimos 40 mensajes entrantes con los productos simples de `skus_maestros` (`productosMencionados`
   en `src/lib/crm/productos-chat.ts`: dos palabras seguidas del nombre o el código) y suma los fijados (tabla `whatsapp_conversacion_productos`,
   migración 0180); de cada uno, `cargarEnCamino` del país del dropshipper (o del prefijo del número). Bajo 1280 px la ficha se abre encima.
@@ -1105,11 +1122,18 @@ convenciones técnicas del código.
   `productosDelAnalisis` los junta con los del catálogo (`productosMencionados`, el mismo cruce de «Productos que pregunta») para que cada producto se cuente siempre con el mismo nombre, y quedan como etiquetas «Interés: …» en cada día, en «Productos que le interesan» de la ficha y en
   **«Productos que más interesan»** de la pestaña Motivos (`interesPorProducto`: clientes y días). (5) **Plegar**: `usePlegado` (`bandeja/usar-plegado.ts`, `useSyncExternalStore` + `localStorage`, por chat y por bloque, últimos 300) pliega «Actividad del cliente» y «Actividad del equipo»; plegada,
   la del cliente deja a la vista solo la situación (si tiene algo pendiente).
-  **Análisis completo del cliente y botón permanente** (29 oct 2026, migración 0184 `whatsapp_actividad_cliente`: una fila por chat con `datos` jsonb, `dias_analizados`, modelo y quién; RLS sin políticas; reversa `supabase/rollbacks/0184_rollback.sql`):
+  **Análisis completo del cliente y botón permanente** (29 oct 2026, migración 0186 `whatsapp_actividad_cliente`: una fila por chat con `datos` jsonb, `dias_analizados`, modelo y quién; RLS sin políticas; reversa `supabase/rollbacks/0186_rollback.sql`):
   el botón de la ficha **ya no desaparece**: dice «Analizar toda la conversación con IA» si hay días pendientes y «Volver a analizar con IA» si no (`actividad-cliente.tsx`). Cada pulsación lee los días pendientes (como antes) y, al terminar (`!faltan`), **rehace el análisis completo**
   (`analizarPerfil`, `actividad-actions.ts`; lógica pura con prueba en `actividad.ts`: `pedidoPerfil` le pasa a la IA los resúmenes de hasta `MAX_DIAS_RESUMEN` = 90 días ya analizados y los mensajes tal cual de los últimos `DIAS_RECIENTES_COMPLETOS` = 3 días; `normalizarPerfil` valida todo lo que
   devuelve): `PerfilCliente` = perfil (≤ 420 letras), sentimiento (positivo/neutral/molesto), urgencia (alta/media/baja), riesgo de perderlo (alto/medio/bajo), compromisos del equipo sin cumplir, oportunidades y próxima acción. Se ve como «Análisis completo» arriba del bloque
-  (`AnalisisCompleto`) con quién y cuándo lo hizo. Un fallo del análisis completo no tira lo ya analizado por día: sale como aviso (`aviso`). Se anota en «Consumo de IA» como `actividad_cliente_completo`. Sin la 0184 los días se siguen analizando y el análisis completo avisa que falta la migración. `bandeja/page.tsx` tiene `maxDuration = 300`.
+  (`AnalisisCompleto`) con quién y cuándo lo hizo. Un fallo del análisis completo no tira lo ya analizado por día: sale como aviso (`aviso`). Se anota en «Consumo de IA» como `actividad_cliente_completo`. Sin la 0186 los días se siguen analizando y el análisis completo avisa que falta la migración. `bandeja/page.tsx` tiene `maxDuration = 300`.
+  **Quién respondió y con qué cargo** (29 oct 2026, pedido de Hernán: «si líder comercial o atención»; sin migración): cada burbuja del equipo
+  lleva el nombre y el cargo de quien la mandó («Jhokser · Líder comercial») y las notas también; dos respuestas seguidas de personas distintas
+  ya no se juntan (`seguido` compara el autor). En la ficha del chat (`ficha-chat.tsx`, `QuienesRespondieron`), debajo de las pastillas, «Respondieron:»
+  con cada persona una vez, la más reciente primero (sin notas ni mensajes sin autor). El cargo (`MensajeVista.autorCargo`, de `cargosDelEquipo` en
+  `datos-bandeja.ts`, guardado 5 min) es el **puesto principal activo de la persona en Puestos** (`puestos` + `puesto_personas`; lo eligió Hernán
+  porque todos los del CRM son Admin con las tres áreas) y, sin puesto, su área del CRM por permisos (`ETIQUETA_AREA_PERSONA`: Dirección,
+  Líder comercial, Atención). Lógica pura con prueba en `src/lib/crm/respondieron.ts` (`areaDeModulos`, `cargoDePersona`, `quienesRespondieron`).
   **Actividad del equipo en un chat** (29 oct 2026, pedido de Jhokser; sin migración): bloque `ActividadDelEquipoFicha` (`bandeja/actividad-equipo.tsx`) en la ficha del chat, debajo de «Actividad del cliente», con filtro por persona y «Ver más».
   `actividadDelEquipo(chat, antesDe?)` (`bandeja/equipo-actions.ts`, basta poder abrir el chat) junta, de 15 en 15 y del más nuevo al más viejo, lo que dejó cada persona en `whatsapp_mensajes` (respuestas, plantillas, archivos y notas con `autor_nombre`; no cuenta lo del
   dropshipper, lo ocultado ni las notas que escribe el propio sistema, `esNotaDelSistema`) y lo que quedó en `historial_auditoria` con `entidad = whatsapp_conversaciones` y `entidad_id` = el chat (cambiar el nombre, vincular, pasar de área, intervenir, resolver,
@@ -1133,6 +1157,12 @@ convenciones técnicas del código.
   Dropi no entrega el teléfono ni el correo del dropshipper (solo ID de usuario, nombre y tienda): el vínculo automático con los datos de Dropi sigue pendiente de investigar. Sin la migración 0177 los mensajes, la búsqueda y el vínculo desde el chat siguen funcionando, pero un
   segundo número no se guarda. Reversa: `supabase/rollbacks/0177_rollback.sql`.
   **Vista previa al pasar el cursor** (29 oct 2026): en la lista de la bandeja, con ratón y pantalla ancha (`hover: hover` y ≥ 1024 px), pasar el cursor (o enfocar con el teclado) un chat que no es el abierto despliega, a los 350 ms, sus últimos mensajes (3 a 8, `vistaPreviaChat` en `bandeja/actions.ts`; **solo mira, no marca leído**; no trae lo oculto); los sin leer van marcados (`VistaPreviaChat`, `vista-previa-chat.tsx`, `fixed` para que la lista que se desplaza no lo recorte, `pointer-events-none`). Se guarda en memoria por chat + último mensaje + no leídos.
+  **Etiquetas de los chats** (migración 0185, 29 oct 2026, pedido de Alcides; como las de ClickUp y Compras): `whatsapp_conversaciones.etiquetas text[]` y el color por
+  nombre en `whatsapp_etiquetas`. Las piezas son comunes: `PanelEtiquetas`, `PastillaEtiqueta`, `colorEtiqueta` y `COLORES_ETIQUETA` en
+  `src/components/etiquetas/etiquetas.tsx` (Compras las reexporta desde `compras/selector-etiquetas.tsx`) y las reglas en `src/lib/etiquetas.ts`
+  (`normalizarEtiquetas`, con prueba). En la Bandeja (`etiquetas-chat.tsx`, `etiquetas-actions.ts`: `guardarEtiquetasChat` pide escribir en el área del chat y
+  deja auditoría `etiquetas_whatsapp`; `guardarColorEtiquetaChat`): se editan arriba de la ficha del chat y con clic derecho en la lista › «Etiquetas», y se
+  ven en la lista y en la vista previa. `cargarBandeja` devuelve `DatosBandeja` con `colores`; sin la migración, ningún chat tiene etiquetas.
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
 - **CRM Dropshippers › Plantillas de WhatsApp** (`/crm-dropshippers/plantillas`, módulo `crm-dropshippers`, migración 0170, 28 oct 2026, pedido de Jhokser). Pasadas 24 h del
@@ -1998,6 +2028,10 @@ convenciones técnicas del código.
   La pestaña **Vínculos** (`/crm-dropshippers/vinculos`) lista los usuarios de Dropi con pedidos que no son de ningún
   dropshipper, de más a menos pedidos, con una sugerencia por parecido del nombre de la tienda (`src/lib/crm/sugerencias.ts`;
   Dropi no manda más datos del dropshipper): se confirma uno a uno, nunca se vincula solo.
+  **Actividad con comentarios** (migración 0184, 29 oct 2026): `ActividadDropshipper` (`actividad-dropshipper.tsx`, el `Actividad` común de
+  Compras) en la ficha del CRM y en la del chat de la bandeja; `actividad-dropshipper-actions.ts` usa el motor de `lib/comentarios` (tablas
+  `dropshipper_comentarios`/`_adjuntos`/`_comentario_reacciones`, bucket `crm-dropshippers`) y toma los cambios de `obtenerLineaDeTiempo`,
+  que ya filtra por área. Los comentarios los ve todo el que abre el CRM.
   **Áreas** (un solo CRM, `src/lib/crm/areas.ts`): Atención = módulo `crm-dropshippers`; Comercial = además el módulo
   `crm-comercial`. Atención **no** ve las notas, seguimientos ni cambios comerciales: se filtran en el servidor
   (`obtenerLineaDeTiempo`, `areaParaNota`); Comercial ve las dos. Captación: `dropshippers.fase` (captado → onboarding →
