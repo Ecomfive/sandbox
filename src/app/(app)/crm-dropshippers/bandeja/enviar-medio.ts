@@ -4,6 +4,7 @@
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
 import { createServiceClient } from "@/lib/supabase/server";
+import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { enviarArchivoWhatsapp, subirMedioWhatsapp } from "@/lib/whatsapp/api";
 import { TIPO_DE_MENSAJE, type TipoEnvio } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
@@ -110,5 +111,6 @@ export async function mandarMedioGuardado(
     .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje(tipo, llevaPie ? a.pie : null), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
     .eq("id", c.id);
   await registrarAuditoria({ accion: "enviar_archivo_whatsapp", entidad: "whatsapp_conversaciones", entidadId: c.id, detalle: `Mandó ${DESCRIPCION[a.tipo]}` });
+  await avisarBandeja();
   return { ok: true };
 }

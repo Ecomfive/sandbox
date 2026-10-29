@@ -8,6 +8,7 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
+import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
@@ -114,7 +115,8 @@ export async function mensajesAnteriores(id: string, antesDe: string): Promise<{
  * Responde por WhatsApp con texto libre. Solo dentro de las 24 h desde el último mensaje del dropshipper (regla de Meta); pasado ese
  * plazo hace falta una plantilla aprobada. Queda en la conversación con quién lo mandó, y si nadie la llevaba, la toma quien responde.
  */
-export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: true } | { error: string }> {
+/** Además del ok, el mensaje guardado: la bandeja cambia por él el que mostró al momento de tocar enviar. */
+export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: true; mensajeId: string; momento: string } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const cuerpo = String(texto ?? "").trim();
@@ -130,24 +132,29 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   if ("error" in r) return { error: r.error };
   const ahora = new Date().toISOString();
   const autor = u.nombre || u.email;
-  const { error } = await supabase.from("whatsapp_mensajes").insert({
-    conversacion_id: id,
-    direccion: "saliente",
-    tipo: "texto",
-    texto: cuerpo,
-    wa_id: r.waId,
-    estado: "enviado",
-    autor_id: u.id,
-    autor_nombre: autor,
-    momento: ahora,
-  });
+  const { data: guardado, error } = await supabase
+    .from("whatsapp_mensajes")
+    .insert({
+      conversacion_id: id,
+      direccion: "saliente",
+      tipo: "texto",
+      texto: cuerpo,
+      wa_id: r.waId,
+      estado: "enviado",
+      autor_id: u.id,
+      autor_nombre: autor,
+      momento: ahora,
+    })
+    .select("id")
+    .single();
   // Ya salió por WhatsApp: si no se pudo anotar, se avisa (no se reintenta, para no mandarlo dos veces).
-  if (error) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
+  if (error || !guardado) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
   await supabase
     .from("whatsapp_conversaciones")
     .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje("texto", cuerpo), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
     .eq("id", id);
-  return { ok: true };
+  await avisarBandeja();
+  return { ok: true, mensajeId: guardado.id as string, momento: ahora };
 }
 
 /**
@@ -194,7 +201,7 @@ export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre:
 }
 
 /** Una nota privada en la conversación: la ve el equipo, nunca el dropshipper (no sale por WhatsApp). */
-export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: true } | { error: string }> {
+export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: true; mensajeId: string; momento: string } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const cuerpo = String(texto ?? "").trim();
@@ -202,10 +209,15 @@ export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: tru
   if (cuerpo.length > MAX_TEXTO) return { error: `La nota es muy larga (máximo ${MAX_TEXTO} caracteres).` };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
-  const { error } = await supabase
+  const momento = new Date().toISOString();
+  const { data: guardada, error } = await supabase
     .from("whatsapp_mensajes")
-    .insert({ conversacion_id: id, direccion: "nota", tipo: "texto", texto: cuerpo, estado: "enviado", autor_id: u.id, autor_nombre: u.nombre || u.email });
-  return error ? { error: "No se pudo guardar la nota." } : { ok: true };
+    .insert({ conversacion_id: id, direccion: "nota", tipo: "texto", texto: cuerpo, estado: "enviado", autor_id: u.id, autor_nombre: u.nombre || u.email, momento })
+    .select("id")
+    .single();
+  if (error || !guardada) return { error: "No se pudo guardar la nota." };
+  await avisarBandeja();
+  return { ok: true, mensajeId: guardada.id as string, momento };
 }
 
 /** Marca la conversación resuelta (sale de «Sin responder» aunque tenga no leídos) o la vuelve a abrir. Un mensaje nuevo la reabre sola. */
@@ -270,6 +282,7 @@ export async function pasarConversacionDeArea(id: string, area: string): Promise
     autor_nombre: autor,
   });
   await registrarAuditoria({ accion: "pasar_area_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `${NOMBRE_AREA[c.area]} → ${NOMBRE_AREA[destino]}` });
+  await avisarBandeja();
   return { ok: true };
 }
 
@@ -339,6 +352,7 @@ export async function intervenirConversacion(id: string): Promise<{ ok: true } |
     autor_nombre: autor,
   });
   await registrarAuditoria({ accion: "intervenir_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `Panel de ${NOMBRE_AREA[c.area]}` });
+  await avisarBandeja();
   return { ok: true };
 }
 
@@ -506,5 +520,6 @@ export async function enviarPlantillaConversacion(id: string, plantillaId: strin
     .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje("plantilla", texto), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
     .eq("id", id);
   await registrarAuditoria({ accion: "enviar_plantilla_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: p.nombre });
+  await avisarBandeja();
   return { ok: true };
 }

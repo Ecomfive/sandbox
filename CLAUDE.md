@@ -1027,7 +1027,13 @@ convenciones técnicas del código.
   «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
   **Mensajes no entregados** (29 oct 2026): `type: unsupported` (131051) no trae contenido; `textoDeRespaldo` en `extraer.ts` lee
   `unsupported.type` (`NO_ENTREGADOS`: edit, poll_creation, media_placeholder…) y dice qué mandó y que lo pida de nuevo. No se puede recuperar.
-  No se mandan acuses de lectura a WhatsApp. **Productos que pregunta** (29 oct 2026): la ficha del chat (`productos-chat.tsx`,
+  No se mandan acuses de lectura a WhatsApp. **Al instante** (29 oct 2026): `enviarTexto` en `bandeja.tsx` muestra el mensaje con id
+  «local-…» y estado «enviando» antes de que responda el servidor (`enviarWhatsapp`/`notaWhatsapp` devuelven `mensajeId` y `momento`); si falla,
+  queda «fallido» con «Reintentar» (no si dice «Se envió…»). El refresco va por `POST /api/whatsapp/bandeja` (ruta, no acción: las acciones
+  van en fila y frenaban el envío), con los últimos 40 mensajes unidos a los que hay, y al volver a la pestaña. Aviso en vivo: `avisarBandeja()`
+  (`src/lib/whatsapp/aviso-bandeja.ts`, broadcast de Supabase Realtime por REST con la clave de servicio, sin datos) desde `guardar.ts` y las
+  acciones que guardan mensajes; la bandeja escucha `CANAL_BANDEJA` con el cliente anon y refresca (8 s sin aviso, 30 s con aviso).
+  **Productos que pregunta** (29 oct 2026): la ficha del chat (`productos-chat.tsx`,
   `productos-chat-actions.ts`) cruza los últimos 40 mensajes entrantes con los productos simples de `skus_maestros` (`productosMencionados`
   en `src/lib/crm/productos-chat.ts`: dos palabras seguidas del nombre o el código) y suma los fijados (tabla `whatsapp_conversacion_productos`,
   migración 0180); de cada uno, `cargarEnCamino` del país del dropshipper (o del prefijo del número). Bajo 1280 px la ficha se abre encima.
