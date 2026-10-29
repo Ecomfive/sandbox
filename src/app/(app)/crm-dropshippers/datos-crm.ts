@@ -25,16 +25,16 @@ const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) 
  * El chat de WhatsApp de cada dropshipper (migración 0158) en los números de las áreas que ve la persona: la conversación más
  * reciente y la suma de no leídos de todas. Sin la migración (o sin áreas), ninguno.
  */
-async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<Map<string, ChatDropshipper>> {
+async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[], soloId?: string): Promise<Map<string, ChatDropshipper>> {
   const chats = new Map<string, ChatDropshipper>();
   if (!areas.length) return chats;
-  const { data, error } = await supabase
+  let consulta = supabase
     .from("whatsapp_conversaciones")
     .select("id, dropshipper_id, estado, no_leidos, ultimo_texto, ultimo_mensaje_en, ultimo_de")
     .not("dropshipper_id", "is", null)
-    .in("area", areas)
-    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
-    .limit(2000);
+    .in("area", areas);
+  if (soloId) consulta = consulta.eq("dropshipper_id", soloId);
+  const { data, error } = await consulta.order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(2000);
   if (error) return chats;
   // Un chat que se autorizó borrar (migración 0172) ya no cuenta.
   const ocultas = await conversacionesOcultas(supabase);
@@ -62,37 +62,38 @@ async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<
 /**
  * Lo que necesita el CRM para dibujarse: la base. Las sumas por
  * dropshipper (pedidos y ventas del mes, último pedido, casos abiertos) las hace Postgres en la vista
- * `crm_dropshippers_resumen` (migración 0062), no JavaScript.
+ * `crm_dropshippers_resumen` (migración 0062), no JavaScript. Con `soloId` trae solo ese dropshipper y sus casos (la ficha del chat
+ * de la Bandeja de WhatsApp, 29 oct 2026).
  */
-export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, areasWhatsapp: AreaCrm[] = []): Promise<DatosCrm> {
+export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, areasWhatsapp: AreaCrm[] = [], soloId?: string): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
     "id, codigo, nombre, tienda, tiendas, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
-  const consultaDropshippers = (conCuentas: boolean) =>
-    supabase
+  const consultaDropshippers = (conCuentas: boolean) => {
+    const q = supabase
       .from("dropshippers")
       .select(
         conCuentas
           ? `${CAMPOS_DROPSHIPPER}, dropshipper_cuentas(id, id_externo, tienda_nombre, plataformas(nombre), paises(codigo))`
           : CAMPOS_DROPSHIPPER,
-      )
-      .order("nombre")
-      .limit(2000);
+      );
+    return (soloId ? q.eq("id", soloId) : q).order("nombre").limit(2000);
+  };
+  const consultaSumas = supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos").eq("pais_id", paisId);
+  const consultaCasos = supabase
+    .from("casos_dropshipper")
+    .select(
+      "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, escalado_en, dropshipper_id, dropshippers(nombre), perfiles:responsable_id(nombre)",
+    )
+    .eq("pais_id", paisId);
 
   const [conCuentas, { data: sumas }, { data: casosBd }, chats] = await Promise.all([
     consultaDropshippers(true),
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
-    supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos").eq("pais_id", paisId),
-    supabase
-      .from("casos_dropshipper")
-      .select(
-        "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, escalado_en, dropshipper_id, dropshippers(nombre), perfiles:responsable_id(nombre)",
-      )
-      .eq("pais_id", paisId)
-      .order("abierto_en", { ascending: false })
-      .limit(500),
-    cargarChats(supabase, areasWhatsapp),
+    soloId ? consultaSumas.eq("id", soloId) : consultaSumas,
+    (soloId ? consultaCasos.eq("dropshipper_id", soloId) : consultaCasos).order("abierto_en", { ascending: false }).limit(500),
+    cargarChats(supabase, areasWhatsapp, soloId),
   ]);
 
   // Plan B: si la migración 0065 (cuentas vinculadas) todavía no se corrió, el directorio se lee sin ellas.
