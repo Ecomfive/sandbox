@@ -28,6 +28,7 @@ const ES = {
   colPorUnidad: "Por unidad",
   colTotal: "Total",
   colFotoReal: "Foto real",
+  colFotoReferencia: "Foto de referencia",
   colEstado: "Estado",
   colFechaEnvio: "Fecha de envío",
   colEnviado: "Enviado",
@@ -171,6 +172,7 @@ const ES = {
   colComentario: "Comentario",
   colPedidas: "Unidades pedidas",
   excelError: "No se pudo crear el Excel.",
+  excelPreparando: "Preparando Excel…",
 };
 
 export type Textos = typeof ES;
@@ -194,6 +196,7 @@ const ZH: Textos = {
   colPorUnidad: "单价",
   colTotal: "总价",
   colFotoReal: "实物照片",
+  colFotoReferencia: "参考照片",
   colEstado: "状态",
   colFechaEnvio: "发货日期",
   colEnviado: "发货日期",
@@ -336,6 +339,7 @@ const ZH: Textos = {
   colComentario: "备注",
   colPedidas: "下单数量",
   excelError: "无法生成 Excel。",
+  excelPreparando: "正在生成 Excel…",
 };
 
 export const TEXTOS: Record<Idioma, Textos> = { es: ES, zh: ZH };

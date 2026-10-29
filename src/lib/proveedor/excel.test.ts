@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
-import { filasAXlsx, nombreArchivoExcel, nombreHoja } from "./excel";
+import { filasAXlsx, nombreArchivoExcel, nombreHoja, type CargarImagen } from "./excel";
 
 const leer = (bytes: Uint8Array) => XLSX.read(bytes, { type: "array", cellDates: true });
 
-test("el Excel lleva los títulos, los números como números y las fechas como fechas", () => {
-  const bytes = filasAXlsx(
+test("el Excel lleva los títulos, los números como números y las fechas como fechas", async () => {
+  const bytes = await filasAXlsx(
     "En producción",
     [
       { titulo: "Producto", tipo: "texto" },
@@ -33,21 +34,52 @@ test("el Excel lleva los títulos, los números como números y las fechas como 
   assert.equal(XLSX.utils.sheet_to_json(hoja).length, 2);
 });
 
-test("un texto que parece fórmula queda como texto", () => {
-  const hoja = leer(filasAXlsx("Datos", [{ titulo: "Nota", tipo: "texto" }], [["=1+1"], ["+cmd|' /C calc'!A0"]])).Sheets["Datos"];
+test("un texto que parece fórmula queda como texto", async () => {
+  const hoja = leer(await filasAXlsx("Datos", [{ titulo: "Nota", tipo: "texto" }], [["=1+1"], ["+cmd|' /C calc'!A0"]])).Sheets["Datos"];
   assert.equal(hoja["A2"].t, "s");
   assert.equal(hoja["A2"].f, undefined);
   assert.equal(hoja["A2"].v, "=1+1");
   assert.equal(hoja["A3"].t, "s");
 });
 
-test("sin filas el archivo igual trae los títulos; una fecha mal escrita o un número que no lo es quedan como texto", () => {
-  const vacio = leer(filasAXlsx("X", [{ titulo: "A" }, { titulo: "B", tipo: "fecha" }], [])).Sheets["X"];
+test("sin filas el archivo igual trae los títulos; una fecha mal escrita o un número que no lo es quedan como texto", async () => {
+  const vacio = leer(await filasAXlsx("X", [{ titulo: "A" }, { titulo: "B", tipo: "fecha" }], [])).Sheets["X"];
   assert.equal(vacio["A1"].v, "A");
   assert.equal(vacio["B1"].v, "B");
-  const raro = leer(filasAXlsx("X", [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Monto", tipo: "dinero" }], [["12 nov", "mucho"]])).Sheets["X"];
+  const raro = leer(await filasAXlsx("X", [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Monto", tipo: "dinero" }], [["12 nov", "mucho"]])).Sheets["X"];
   assert.equal(raro["A2"].v, "12 nov");
   assert.equal(raro["B2"].v, "mucho");
+});
+
+// Un PNG de 1×1 píxel.
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+
+test("las fotos van dentro de su celda: cada dirección se trae una vez y la que falla deja la celda vacía", async () => {
+  const pedidas: string[] = [];
+  const cargar: CargarImagen = async (url) => {
+    pedidas.push(url);
+    return url.includes("rota") ? null : { base64: `data:image/png;base64,${PNG}`, extension: "png", ancho: 200, alto: 100 };
+  };
+  const columnas = [{ titulo: "Foto", tipo: "imagen" as const }, { titulo: "Producto", tipo: "texto" as const }];
+  const bytes = await filasAXlsx("Fotos", columnas, [["https://x/a.png", "Uno"], ["https://x/a.png", "Dos"], ["https://x/rota.png", "Tres"], [null, "Cuatro"]], cargar);
+  assert.deepEqual(pedidas.sort(), ["https://x/a.png", "https://x/rota.png"]);
+  const libro = new ExcelJS.Workbook();
+  await libro.xlsx.load(bytes as unknown as ArrayBuffer);
+  const ws = libro.getWorksheet("Fotos")!;
+  const imagenes = ws.getImages();
+  assert.equal(imagenes.length, 2);
+  assert.deepEqual(imagenes.map((i) => i.range.tl.nativeRow).sort(), [1, 2]);
+  assert.ok(imagenes.every((i) => i.range.tl.nativeCol === 0));
+  assert.equal(ws.getRow(2).height, ws.getRow(3).height);
+  assert.ok((ws.getRow(2).height ?? 0) > 30, "la fila con foto es más alta");
+  // La celda de la foto no lleva la dirección como texto.
+  const hoja = leer(bytes).Sheets["Fotos"];
+  assert.equal(hoja["A2"], undefined);
+  assert.equal(hoja["B4"].v, "Tres");
+  // Sin quien traiga las fotos, el archivo sale igual, sin imágenes.
+  const sinFotos = new ExcelJS.Workbook();
+  await sinFotos.xlsx.load((await filasAXlsx("Fotos", columnas, [["https://x/a.png", "Uno"]])) as unknown as ArrayBuffer);
+  assert.equal(sinFotos.getWorksheet("Fotos")!.getImages().length, 0);
 });
 
 test("nombre de la hoja y del archivo", () => {
