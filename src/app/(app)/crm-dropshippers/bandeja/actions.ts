@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { type AreaCrm } from "@/lib/crm/areas";
+import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
@@ -16,6 +16,15 @@ import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usua
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
+
+/**
+ * Supervisión (29 oct 2026): quien mira un chat de un área de abajo (Comercial en Atención, Dirección en las dos) no le responde al
+ * dropshipper hasta «Intervenir» (el chat queda a su cargo). Devuelve el aviso, o null si puede responder.
+ */
+function avisoSupervision(u: { modulos: string[]; modulosSoloLectura: string[]; id: string }, c: { area: AreaCrm; asignadaA: string | null }): string | null {
+  if (!supervisaArea(accesoCrm(u), c.area) || c.asignadaA === u.id) return null;
+  return `Estás supervisando el panel de ${NOMBRE_AREA[c.area]}: para responderle, toca «Intervenir».`;
+}
 
 /** La lista de conversaciones, para refrescar la bandeja cada pocos segundos. */
 export async function obtenerBandeja(): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | { error: string }> {
@@ -55,14 +64,17 @@ export async function ultimosMensajesDropshipper(
   };
 }
 
-/** Los mensajes de una conversación y su dropshipper. Al abrirla (o mientras está abierta) queda leída. */
+/**
+ * Los mensajes de una conversación y su dropshipper. Al abrirla (o mientras está abierta) queda leída, **solo si es del área propia** de
+ * quien la abre: un supervisor (Comercial mirando Atención, Dirección mirando las dos) la ve sin marcarla, y Atención no se entera.
+ */
 export async function abrirConversacion(id: string): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null } | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
-  await supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", id).gt("no_leidos", 0);
+  if (!supervisaArea(accesoCrm(u), c.area)) await supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", id).gt("no_leidos", 0);
   return cargarConversacion(supabase, id, c.dropshipperId);
 }
 
@@ -90,6 +102,8 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  const supervisando = avisoSupervision(u, c);
+  if (supervisando) return { error: supervisando };
   if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
   const r = await enviarTextoWhatsapp({ phoneNumberId: c.phoneNumberId, numero: c.numeroEmpresa }, c.telefono, cuerpo);
   if ("error" in r) return { error: r.error };
@@ -209,6 +223,34 @@ export async function tomarConversacion(id: string, soltar = false): Promise<{ o
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase.from("whatsapp_conversaciones").update({ asignada_a: soltar ? null : u.id }).eq("id", id);
   return error ? { error: "No se pudo cambiar." } : { ok: true };
+}
+
+/**
+ * «Intervenir» (supervisión, 29 oct 2026): quien supervisa un chat de un área de abajo lo toma para responderle al dropshipper. Queda a su
+ * cargo (sale «la lleva …») y una nota en el chat lo dice, así quien lo atendía sabe que alguien más está respondiendo.
+ */
+export async function intervenirConversacion(id: string): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const supabase = createServiceClient();
+  const c = await conversacionPermitida(supabase, id, u, true);
+  if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  if (!supervisaArea(accesoCrm(u), c.area)) return { error: "Este chat es de tu panel: respóndelo directo." };
+  if (c.asignadaA === u.id) return { ok: true };
+  const { error } = await supabase.from("whatsapp_conversaciones").update({ asignada_a: u.id }).eq("id", id);
+  if (error) return { error: "No se pudo intervenir." };
+  const autor = u.nombre || u.email;
+  await supabase.from("whatsapp_mensajes").insert({
+    conversacion_id: id,
+    direccion: "nota",
+    tipo: "texto",
+    texto: `${autor} intervino en este chat.`,
+    estado: "enviado",
+    autor_id: u.id,
+    autor_nombre: autor,
+  });
+  await registrarAuditoria({ accion: "intervenir_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `Panel de ${NOMBRE_AREA[c.area]}` });
+  return { ok: true };
 }
 
 /**
@@ -341,6 +383,8 @@ export async function enviarPlantillaConversacion(id: string, plantillaId: strin
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  const supervisando = avisoSupervision(u, c);
+  if (supervisando) return { error: supervisando };
   const { data } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("id", plantillaId).maybeSingle();
   const p = data as PlantillaGuardada | null;
   if (!p) return { error: "La plantilla ya no existe." };

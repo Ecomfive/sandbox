@@ -1007,7 +1007,12 @@ convenciones técnicas del código.
   por persona y por día las consultas (primer entrante tras un saliente), sin responder y la mediana hasta la primera respuesta.
   **360dialog y un solo número** (migración 0168, 28 oct 2026): el área es de cada conversación (`whatsapp_conversaciones.area`; un
   trigger le pone la del número al crearla) y se cambia con `pasarConversacionDeArea` (botón «Pasar a otra área» del chat, nota + auditoría). Todo
-  filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
+  filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Paneles y supervisión** (29 oct 2026, pedido de
+  Hernán): `areaPropia(acceso)` (Dirección > Comercial > Atención) es el panel de cada quien; `bandeja.tsx` muestra un panel por área visible
+  (`panel`, «(tuyo)», pendientes por panel) y `supervisaArea` dice si mira un área de abajo. Supervisando: `abrirConversacion` **no** pone
+  `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
+  «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
+  No se mandan acuses de lectura a WhatsApp. filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
   comercial; +507 Atención): cada número de 360dialog tiene su clave; `config360(numero)` usa `D360_API_KEY_<dígitos del número>` si está y si no
   `D360_API_KEY` (la principal, también la de plantillas). El envío (`NumeroEmpresa` en `api.ts`, `conversacionPermitida().numeroEmpresa`)
   y los archivos usan la del número del chat; `conectarWebhook360` registra el webhook en todas (`claves360`). Con `D360_API_KEY` el envío y los archivos van por

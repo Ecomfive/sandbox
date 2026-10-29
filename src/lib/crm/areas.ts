@@ -79,6 +79,21 @@ export function escribeEnArea(acceso: AccesoCrm, area: AreaCrm): boolean {
   return area === "comercial" ? acceso.escribeComercial : acceso.escribeAtencion || acceso.escribeComercial;
 }
 
+/**
+ * El área propia de cada quien en la bandeja (pedido de Hernán, 29 oct 2026): la de más arriba que tiene. Es su panel; los de las áreas de
+ * abajo los supervisa (Comercial mira Atención; Dirección mira Comercial y Atención).
+ */
+export function areaPropia(acceso: AccesoCrm): AreaCrm {
+  if (acceso.direccion) return "direccion";
+  return acceso.comercial ? "comercial" : "atencion";
+}
+
+/**
+ * Si mira esa área como supervisor (no es la suya): al abrir sus chats **no los marca leídos** —quien la atiende no se entera— y para
+ * responderle al dropshipper primero tiene que «Intervenir» (el chat queda a su cargo). Las notas privadas sí las puede dejar.
+ */
+export const supervisaArea = (acceso: AccesoCrm, area: AreaCrm) => area !== areaPropia(acceso);
+
 /** Acciones de la auditoría que son del trabajo comercial y no se muestran a Atención. */
 export const ACCIONES_COMERCIALES = [
   "crear_seguimiento_dropshipper",
