@@ -728,8 +728,8 @@ function ContenidoFicha({
 
           {/* Las ventas de todo el producto vinculado, con todos sus IDs de Dropi (activos, archivados, públicos y privados), como en Producto. */}
           {p.sku && corteVentas && (
-            <Seccion icono={MargenIcon} titulo="Ventas del producto en Dropi (todos sus IDs)">
-              <VentasDropiProducto key={p.sku.id} id={p.sku.id} />
+            <Seccion icono={MargenIcon} titulo={`Ventas del producto en Dropi en ${nombrePais} (todos sus IDs)`}>
+              <VentasDropiProducto key={`${p.sku.id}-${codigoPais}`} id={p.sku.id} pais={codigoPais} />
             </Seccion>
           )}
 
