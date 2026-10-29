@@ -302,6 +302,10 @@ export function Bandeja({
   // El archivo (foto, audio, video o documento) que se va a mandar por WhatsApp.
   const [archivo, setArchivo] = useState<File | null>(null);
   const inputArchivo = useRef<HTMLInputElement | null>(null);
+  // Arrastrar una foto o una captura sobre el chat para mandarla (29 oct 2026). `capas` cuenta las entradas y salidas del arrastre por los
+  // elementos de adentro, para no apagar el aviso «Suelta aquí» al pasar por encima de un mensaje.
+  const [arrastrando, setArrastrando] = useState(false);
+  const capas = useRef(0);
   // Menú del clic derecho sobre un chat de la lista: marcarlo como no leído (vuelve a pendiente de respuesta) o como leído.
   const [menuChat, setMenuChat] = useState<{ id: string; x: number; y: number } | null>(null);
   const menuChatRef = useRef<HTMLDivElement | null>(null);
@@ -562,6 +566,22 @@ export function Bandeja({
       campo?.setSelectionRange(desde + emoji.length, desde + emoji.length);
     });
   }
+
+  /**
+   * Un archivo soltado sobre el chat: abre la misma ventana que el clip (vista previa y texto al pie). Si no se le puede escribir, dice por qué;
+   * con varios, va el primero (WhatsApp manda uno por mensaje).
+   */
+  function soltarArchivos(lista: FileList) {
+    const f = lista[0];
+    if (!f || !sel) return;
+    if (mirando) return mostrarToast("Estás supervisando este chat: para mandarle un archivo, toca «Intervenir».", "destructive");
+    if (!escribe) return mostrarToast("No tienes permiso para escribir en este chat.", "destructive");
+    if (!ventana) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
+    if (lista.length > 1) mostrarToast("Se manda un archivo a la vez: va el primero.");
+    setModo("responder");
+    setArchivo(f);
+  }
+  const traeArchivos = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
 
   function mandar() {
     if (!sel || !borrador.trim() || bloqueado) return;
@@ -874,7 +894,47 @@ export function Bandeja({
 
       {/* ===== Conversación ===== */}
       {sel ? (
-        <section aria-label={`Conversación con ${sel.nombre}`} className="flex min-w-0 flex-1 flex-col">
+        <section
+          aria-label={`Conversación con ${sel.nombre}`}
+          className="relative flex min-w-0 flex-1 flex-col"
+          onDragEnter={(e) => {
+            if (!traeArchivos(e)) return;
+            e.preventDefault();
+            capas.current++;
+            setArrastrando(true);
+          }}
+          onDragOver={(e) => {
+            if (!traeArchivos(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }}
+          onDragLeave={(e) => {
+            if (!traeArchivos(e)) return;
+            capas.current = Math.max(0, capas.current - 1);
+            if (capas.current === 0) setArrastrando(false);
+          }}
+          onDrop={(e) => {
+            if (!traeArchivos(e)) return;
+            e.preventDefault();
+            capas.current = 0;
+            setArrastrando(false);
+            soltarArchivos(e.dataTransfer.files);
+          }}
+        >
+          {arrastrando && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-2 z-30 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--wa-acento)] bg-[color-mix(in_srgb,var(--wa-fondo)_90%,transparent)] text-center"
+            >
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--wa-acento)]">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-4.5-4.5L5 21" />
+              </svg>
+              <span className="text-[17px] font-semibold">Suelta aquí para mandárselo a {sel.nombre}</span>
+              <span className="text-[13px] text-[var(--wa-sec)]">Una foto, captura, audio, video o documento. Antes de enviarlo lo ves y le puedes poner un texto.</span>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 border-b border-[var(--wa-borde)] bg-[var(--wa-panel)] px-3 py-2">
             <button type="button" onClick={() => setElegido(null)} className={`${botonIcono} lg:hidden`} aria-label="Volver a las conversaciones">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
