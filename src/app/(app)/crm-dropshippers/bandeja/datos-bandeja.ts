@@ -203,13 +203,14 @@ export const MENSAJES_POR_VEZ = 300;
 
 /**
  * Los mensajes de una conversación (los 300 más recientes, del más viejo al más nuevo; con `antesDe`, los 300 anteriores a esa hora) y
- * el resumen de su dropshipper.
+ * el resumen de su dropshipper. Con `limite`, solo los más recientes: el refresco de la bandeja trae los últimos 40 y los une a los que ya tiene.
  */
 export async function cargarConversacion(
   supabase: SupabaseClient,
   id: string,
   dropshipperId: string | null,
   antesDe?: string,
+  limite = MENSAJES_POR_VEZ,
 ): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null }> {
   let consulta = supabase
     .from("whatsapp_mensajes")
@@ -217,7 +218,7 @@ export async function cargarConversacion(
     .eq("conversacion_id", id);
   if (antesDe) consulta = consulta.lt("momento", antesDe);
   const [mensajesR, dsR, casosR, eliminadosR] = await Promise.all([
-    consulta.order("momento", { ascending: false }).limit(MENSAJES_POR_VEZ),
+    consulta.order("momento", { ascending: false }).limit(limite),
     dropshipperId
       ? supabase.from("dropshippers").select("id, nombre, codigo, estado, tiendas, tienda, dropshipper_cuentas(plataformas(nombre), paises(codigo))").eq("id", dropshipperId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -268,5 +269,5 @@ export async function cargarConversacion(
         casos: ((casosR.data ?? []) as { numero: number; titulo: string; prioridad: string }[]).map((c) => ({ codigo: `CAS-${String(c.numero).padStart(4, "0")}`, titulo: c.titulo, prioridad: c.prioridad })),
       }
     : null;
-  return { mensajes, hayAnteriores: traidos.length === MENSAJES_POR_VEZ, dropshipper };
+  return { mensajes, hayAnteriores: traidos.length === limite, dropshipper };
 }

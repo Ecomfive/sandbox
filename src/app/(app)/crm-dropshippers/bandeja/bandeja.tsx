@@ -7,9 +7,11 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
+import { supabase } from "@/lib/supabase/client";
+import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
+import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
@@ -33,6 +35,19 @@ import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 /** Qué conversaciones del panel se ven. */
 type Filtro = "sinResponder" | "mias" | "todas";
 const REFRESCO_MS = 8000;
+/** Con el aviso en tiempo real conectado (canal-bandeja.ts), el refresco solo queda de respaldo. */
+const REFRESCO_RESPALDO_MS = 30000;
+
+/** Lo que devuelve el refresco (`/api/whatsapp/bandeja`): la lista de chats y los últimos mensajes del chat abierto. */
+type Refresco = { bandeja: { numeros: NumeroVista[]; conversaciones: ConversacionVista[] }; chat: { id: string; mensajes: MensajeVista[]; dropshipper: ResumenDropshipper | null } | null };
+
+/** Un mensaje que se muestra apenas se toca enviar, antes de que el servidor responda (id «local-…»). */
+const esLocal = (m: MensajeVista) => m.id.startsWith("local-");
+const idLocal = () => `local-${crypto.randomUUID()}`;
+const ahoraIso = () => new Date().toISOString();
+
+/** El turno de cada refresco: si dos se cruzan, vale el último que se pidió (hay una sola bandeja por página). */
+const vueltas = { pedidas: 0, aplicada: 0 };
 
 /** Las áreas de un chat, con el color de su etiqueta y para qué es cada una (boceto https://claude.ai/artifact/Sn3pB4cdUixXk6WdRh4kr8). */
 const AREAS_CHAT: { valor: AreaCrm; etiqueta: string; clase: string; para: string }[] = [
@@ -377,17 +392,29 @@ export function Bandeja({
   const menuRef = useRef<HTMLDivElement>(null);
   const textoRef = useRef<HTMLTextAreaElement>(null);
 
+  // El refresco va por su propia ruta y no por una acción del servidor: las acciones van en fila y un refresco en curso hacía esperar al envío.
+  // Trae solo los últimos mensajes del chat abierto y los une a los que ya hay. Si dos refrescos se cruzan, vale el último que se pidió.
   const refrescar = useCallback(async (id: string | null) => {
-    const b = await obtenerBandeja().catch(() => null);
-    if (b && !("error" in b)) setDatos(b);
-    if (id) {
-      const c = await abrirConversacion(id).catch(() => null);
-      if (c && !("error" in c))
-        setChat((antes) =>
-          antes && antes.id !== id ? antes : antes ? { ...antes, ...c, mensajes: unirMensajes(antes.mensajes, c.mensajes), hayAnteriores: antes.hayAnteriores } : { id, ...c },
-        );
-    }
+    const n = ++vueltas.pedidas;
+    const r = await fetch("/api/whatsapp/bandeja", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat: id }), cache: "no-store" }).catch(() => null);
+    const json = r?.ok ? ((await r.json().catch(() => null)) as Refresco | null) : null;
+    if (!json || n < vueltas.aplicada) return;
+    vueltas.aplicada = n;
+    setDatos(json.bandeja);
+    const c = json.chat;
+    if (c)
+      setChat((antes) =>
+        antes && antes.id !== c.id
+          ? antes
+          : antes
+            ? { ...antes, dropshipper: c.dropshipper, mensajes: unirMensajes(antes.mensajes, c.mensajes) }
+            : { id: c.id, mensajes: c.mensajes, dropshipper: c.dropshipper, hayAnteriores: true },
+      );
   }, []);
+  const elegidoRef = useRef(elegido);
+  useEffect(() => {
+    elegidoRef.current = elegido;
+  }, [elegido]);
 
   // Al elegir una conversación se traen sus mensajes (y queda leída).
   useEffect(() => {
@@ -403,13 +430,44 @@ export function Bandeja({
     };
   }, [elegido, mostrarToast]);
 
-  // Se refresca sola mientras la pestaña del navegador está a la vista.
+  // Aviso en tiempo real (29 oct 2026): cuando llega o sale un mensaje, el servidor avisa y la bandeja se actualiza al momento. El aviso no
+  // trae datos; se piden con los permisos de siempre. Varios avisos seguidos se juntan en un solo refresco.
+  const [enVivo, setEnVivo] = useState(false);
   useEffect(() => {
-    const t = setInterval(() => {
+    let espera: ReturnType<typeof setTimeout> | null = null;
+    const canal = supabase
+      .channel(CANAL_BANDEJA)
+      .on("broadcast", { event: EVENTO_NOVEDAD }, () => {
+        if (espera || document.visibilityState !== "visible") return;
+        espera = setTimeout(() => {
+          espera = null;
+          void refrescar(elegidoRef.current);
+        }, 250);
+      })
+      .subscribe((estado) => setEnVivo(estado === "SUBSCRIBED"));
+    return () => {
+      if (espera) clearTimeout(espera);
+      void supabase.removeChannel(canal);
+    };
+  }, [refrescar]);
+
+  // Se refresca sola mientras la pestaña está a la vista (con el aviso conectado, solo de respaldo), y al volver a ella, en el momento.
+  useEffect(() => {
+    const t = setInterval(
+      () => {
+        if (document.visibilityState === "visible") void refrescar(elegido);
+      },
+      enVivo ? REFRESCO_RESPALDO_MS : REFRESCO_MS,
+    );
+    const alVolver = () => {
       if (document.visibilityState === "visible") void refrescar(elegido);
-    }, REFRESCO_MS);
-    return () => clearInterval(t);
-  }, [elegido, refrescar]);
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, [elegido, refrescar, enVivo]);
 
   // El menú «Pasar a otra área» se cierra al tocar fuera o con Escape.
   useEffect(() => {
@@ -507,16 +565,44 @@ export function Bandeja({
 
   function mandar() {
     if (!sel || !borrador.trim() || bloqueado) return;
-    const texto = borrador;
-    empezar(async () => {
-      const r = await (esNota ? notaWhatsapp(sel.id, texto) : enviarWhatsapp(sel.id, texto)).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
-      if ("error" in r) {
-        mostrarToast(r.error, "destructive");
-        return;
-      }
-      setBorrador("");
-      await refrescar(sel.id);
-    });
+    enviarTexto(sel.id, borrador, esNota);
+    setBorrador("");
+  }
+
+  /**
+   * Manda un texto (o guarda una nota) mostrándolo **al momento** en el chat con su reloj, como WhatsApp (29 oct 2026): antes no se veía hasta
+   * que el servidor respondía y la bandeja se recargaba. Cuando responde, se cambia por el guardado; si falla, queda en rojo con «Reintentar».
+   * `reemplaza`: el que falló y se reintenta.
+   */
+  function enviarTexto(chatId: string, texto: string, nota: boolean, reemplaza?: string) {
+    const local: MensajeVista = {
+      id: idLocal(),
+      direccion: nota ? "nota" : "saliente",
+      tipo: "texto",
+      texto: texto.trim(),
+      mediaNombre: null,
+      conArchivo: false,
+      estado: "enviando",
+      error: null,
+      autor: null,
+      momento: ahoraIso(),
+      importado: false,
+      eliminadoEnWhatsapp: false,
+      borradoPendiente: false,
+    };
+    setChat((c) => (c && c.id === chatId ? { ...c, mensajes: [...c.mensajes.filter((m) => m.id !== reemplaza), local] } : c));
+    void (nota ? notaWhatsapp(chatId, texto) : enviarWhatsapp(chatId, texto))
+      .catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }))
+      .then((r) => {
+        if ("error" in r) mostrarToast(r.error, "destructive");
+        setChat((c) => {
+          if (!c || c.id !== chatId) return c;
+          if ("error" in r) return { ...c, mensajes: c.mensajes.map((m) => (m.id === local.id ? { ...m, estado: "fallido", error: r.error } : m)) };
+          // El refresco puede haber traído ya el guardado: se une por su id, sin repetirlo.
+          return { ...c, mensajes: unirMensajes(c.mensajes.filter((m) => m.id !== local.id), [{ ...local, id: r.mensajeId, momento: r.momento, estado: "enviado" }]) };
+        });
+        if (!("error" in r)) void refrescar(chatId);
+      });
   }
 
   /** Marca un chat como leído o no leído. Un chat abierto se cierra al marcarlo no leído (si no, seguiría contando como leído al refrescar). */
@@ -988,7 +1074,14 @@ export function Bandeja({
                         Desde aquí, mensajes que llegaron al sistema
                       </span>
                     )}
-                    <Burbuja m={m} seguido={seguido} alPedirBorrar={escribe && !mirando ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined} alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined} />
+                    <Burbuja
+                      m={m}
+                      seguido={seguido}
+                      alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
+                      alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
+                      // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
+                      alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
+                    />
                   </Fragment>
                 );
               })
@@ -1418,7 +1511,20 @@ function BotonRapidaMensaje({ alPulsar }: { alPulsar: () => void }) {
   );
 }
 
-function Burbuja({ m, seguido, alPedirBorrar, alGuardarRapida }: { m: MensajeVista; seguido: boolean; alPedirBorrar?: (m: MensajeVista) => void; alGuardarRapida?: (texto: string) => void }) {
+function Burbuja({
+  m,
+  seguido,
+  alPedirBorrar,
+  alGuardarRapida,
+  alReintentar,
+}: {
+  m: MensajeVista;
+  seguido: boolean;
+  alPedirBorrar?: (m: MensajeVista) => void;
+  alGuardarRapida?: (texto: string) => void;
+  /** Un mensaje que no salió (mostrado al momento de enviar): vuelve a mandarlo. */
+  alReintentar?: () => void;
+}) {
   if (m.direccion === "nota" && esAvisoDelSistema(m.texto)) {
     return (
       <span className="my-1.5 self-center rounded-lg bg-[var(--wa-chip)] px-3 py-1 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
@@ -1439,7 +1545,11 @@ function Burbuja({ m, seguido, alPedirBorrar, alGuardarRapida }: { m: MensajeVis
           Nota privada{m.autor ? ` · ${m.autor}` : ""}
         </span>
         <Contenido m={m} />
-        <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-nota-acento)]">{horaMensaje(m.momento)}</span>
+        <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-nota-acento)]">
+          {horaMensaje(m.momento)}
+          {m.estado === "enviando" && " · Guardando…"}
+        </span>
+        <Fallo m={m} alReintentar={alReintentar} />
       </div>
     );
   }
@@ -1468,7 +1578,21 @@ function Burbuja({ m, seguido, alPedirBorrar, alGuardarRapida }: { m: MensajeVis
         {horaMensaje(m.momento)}
         {nuestro && !m.importado && <Palomitas estado={m.estado} />}
       </span>
-      {m.estado === "fallido" && m.error && <span className="clear-both block pt-1 text-[11.5px] text-destructive">{m.error}</span>}
+      <Fallo m={m} alReintentar={alReintentar} />
     </div>
+  );
+}
+
+/** Por qué no salió un mensaje (o no se guardó una nota) y, si se puede, «Reintentar». */
+function Fallo({ m, alReintentar }: { m: MensajeVista; alReintentar?: () => void }) {
+  return (
+    <>
+      {m.estado === "fallido" && m.error && <span className="clear-both block pt-1 text-[11.5px] text-destructive">{m.error}</span>}
+      {alReintentar && (
+        <button type="button" onClick={alReintentar} className={`clear-both mt-1 block text-[12.5px] font-semibold text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
+          Reintentar
+        </button>
+      )}
+    </>
   );
 }
