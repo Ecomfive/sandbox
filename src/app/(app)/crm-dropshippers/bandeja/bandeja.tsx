@@ -14,6 +14,7 @@ import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectar
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
+import { cambiarVip } from "../tareas/actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
@@ -159,6 +160,11 @@ function Foto({ nombre, tam }: { nombre: string; tam: "lista" | "cabecera" | "fi
       {iniciales(nombre)}
     </span>
   );
+}
+
+/** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
+function EtiquetaVip() {
+  return <span className="inline-flex flex-none items-center rounded-full bg-[var(--wa-texto)] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-[var(--wa-fondo)]">VIP</span>;
 }
 
 /** La etiqueta de color de un área, con su punto. */
@@ -773,6 +779,23 @@ export function Bandeja({
               ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
+        ...(verDropshipper && fichaDelChat && typeof fichaDelChat === "object" && (fichaDelChat.acceso.escribeAtencion || fichaDelChat.acceso.escribeComercial)
+          ? [
+              {
+                texto: fichaDelChat.d.nivel === "vip" ? "Quitar VIP" : "Marcar como VIP",
+                alPulsar: () => {
+                  const vip = fichaDelChat.d.nivel !== "vip";
+                  const id = sel.id;
+                  empezar(async () => {
+                    const r = await cambiarVip(fichaDelChat.d.id, vip).catch(() => ({ error: "No se pudo cambiar el nivel." }));
+                    mostrarToast("error" in r ? r.error : vip ? "Marcado como VIP: se ve en la lista de chats y en su ficha." : "Ya no es VIP.", "error" in r ? "destructive" : undefined);
+                    setVersionCrm((v) => v + 1);
+                    await refrescar(id);
+                  });
+                },
+              },
+            ]
+          : []),
         ...(verDropshipper
           ? [{ texto: "Abrir su ficha en el CRM", href: `/crm-dropshippers?abrir=${verDropshipper.id}` }, ...(escribe ? [{ texto: "No es este dropshipper", alPulsar: () => setVincular(true) }] : [])]
           : escribe && !sel.dropshipperId
@@ -908,6 +931,7 @@ export function Bandeja({
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5 border-b border-[var(--wa-borde)] py-3 pr-3.5">
                     <span className="flex items-baseline gap-2">
                       <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
+                      {c.vip && <EtiquetaVip />}
                       <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
                     </span>
                     <span className="flex items-center gap-1.5 text-sm text-[var(--wa-sec)]">
@@ -1001,6 +1025,7 @@ export function Bandeja({
                   </span>
                 </span>
               </span>
+              {sel.vip && <EtiquetaVip />}
               <EtiquetaArea area={sel.area} />
               {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}
               {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
@@ -1060,7 +1085,7 @@ export function Bandeja({
                     mostrarToast(mensaje);
                     void refrescar(sel.id);
                   }}
-                  alAviso={(texto) => mostrarToast(texto, "destructive")}
+                  alAviso={(texto, error) => mostrarToast(texto, error ? "destructive" : undefined)}
                 />
               </div>
               <section

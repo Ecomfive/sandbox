@@ -1034,6 +1034,18 @@ convenciones técnicas del código.
   Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
   de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
   del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
+  **Tareas y VIP** (29 oct 2026, migración 0185): las tareas son `tareas_dropshipper` (la tabla de los seguimientos) con `conversacion_id`
+  (puede no tener dropshipper), `sku_id`/`pais_id`/`compras_esperadas`/`llegada_estimada` y el estado nuevo `esperando`. «Tarea»
+  (`BotonNuevaTarea`, `bandeja/tareas-chat.tsx`) y «Avisarme cuando llegue» (`ProductosDelChatFicha` → `avisarCuandoLlegue`: guarda las
+  compras en camino de ese producto al país del chat, `cargarEnCaminoDatos`) están en `tareas/actions.ts`; quedan a cargo de quien lleva
+  el chat (`asignada_a`, si no quien la crea; aviso «asignada» si es otra persona). `activarTareasDeLlegada` (`src/lib/crm/tareas-servidor.ts`;
+  `llegoLoEsperado` en `tareas.ts`: una compra esperada con `fecha_llegada` o `completado`) las pasa a pendiente con fecha de hoy, a cargo
+  de quien lleva el chat entonces, y avisa en la campana (`notificaciones_usuario`, tipo `tarea`, enlace `bandeja?abrir=`); corre con
+  `after()` en `actualizarCompra`/`actualizarCampoCompra`/`actualizarCampoComprasLote`, al abrir el panel o la ficha y en el cron
+  `notificaciones-diarias`, que además avisa lo que vence hoy (`avisarTareasDeHoy`, una vez: `avisada_en`). Panel: `/crm-dropshippers/tareas`
+  (`PanelTareas`, grupos de `grupoDeTarea`; «Mías»/«Todas»: se ve lo propio, lo del área de su chat o, sin chat, lo comercial). VIP:
+  `dropshippers.nivel = 'vip'` (al 29 oct ninguno marcado); `ConversacionVista.vip`, `EtiquetaVip` en la lista y la cabecera, y «Marcar
+  como VIP» / «Quitar VIP» (`cambiarVip`, a `regular`) en «Más».
   **Mensajes no entregados** (29 oct 2026): `type: unsupported` (131051) no trae contenido; `textoDeRespaldo` en `extraer.ts` lee
   `unsupported.type` (`NO_ENTREGADOS`: edit, poll_creation, media_placeholder…) y dice qué mandó y que lo pida de nuevo. No se puede recuperar.
   No se mandan acuses de lectura a WhatsApp. **Al instante** (29 oct 2026): `enviarTexto` en `bandeja.tsx` muestra el mensaje con id

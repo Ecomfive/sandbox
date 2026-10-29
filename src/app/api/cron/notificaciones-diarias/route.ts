@@ -3,6 +3,7 @@ import { esPeticionDeCron } from "@/lib/seguridad/cron";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { enviarCorreo } from "@/lib/notificaciones/correo";
+import { activarTareasDeLlegada, avisarTareasDeHoy } from "@/lib/crm/tareas-servidor";
 
 const SITIO = "https://mom-beta-proveduria.vercel.app";
 
@@ -21,6 +22,11 @@ export async function GET(request: Request) {
     .filter(Boolean);
 
   const supabase = createServiceClient();
+  // Tareas del CRM (29 oct 2026): se activan las que esperaban un producto que ya llegó y a cada responsable le llega en la campana lo
+  // que es para hoy. Va antes del correo y no depende de él.
+  await activarTareasDeLlegada(supabase);
+  await avisarTareasDeHoy(supabase);
+
   const { data: paises } = await supabase.from("paises").select("id, codigo, nombre").order("nombre");
 
   const secciones: string[] = [];
