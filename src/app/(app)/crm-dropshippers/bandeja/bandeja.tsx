@@ -1070,7 +1070,8 @@ export function Bandeja({
       </div>
 
       {/* ===== El chat abierto, en su ventana: la ficha del dropshipper a la izquierda y el chat a la derecha (29 oct 2026) ===== */}
-      {sel && (
+      {/* Solo en el navegador: abierto desde un enlace (`?abrir=`, el aviso de una tarea o «WhatsApp» del CRM) el servidor no tiene dónde dibujarla. */}
+      {sel && enNavegador && (
         <Ventana
           abierto
           alCerrar={() => setElegido(null)}
