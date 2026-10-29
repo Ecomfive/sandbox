@@ -209,6 +209,29 @@ function Foto({ nombre, tam }: { nombre: string; tam: "lista" | "cabecera" | "fi
   );
 }
 
+/**
+ * Quién lleva el chat, como un globo redondo con sus iniciales (30 oct 2026): al pasar el cursor dice «La lleva …». Sin `nombre` dibuja un círculo vacío de línea punteada («Sin asignar»)
+ * si `vacio`, o nada. No es enfocable ni un botón (va dentro de la fila, que ya es un botón): el nombre completo lo da `title` y, a los lectores de pantalla, `aria-label`.
+ */
+function BurbujaPersona({ nombre, tam = "lista", vacio = false, className = "" }: { nombre: string | null; tam?: "lista" | "cabecera"; vacio?: boolean; className?: string }) {
+  const medida = tam === "cabecera" ? "h-7 w-7 text-[11px]" : "h-6 w-6 text-[10px]";
+  if (!nombre) {
+    if (!vacio) return null;
+    return <span role="img" aria-label="Sin asignar" title="Sin asignar" className={`inline-flex flex-none rounded-full border border-dashed border-[var(--wa-borde)] ${medida} ${className}`} />;
+  }
+  return (
+    <span
+      role="img"
+      aria-label={`La lleva ${nombre}`}
+      title={`La lleva ${nombre}`}
+      style={{ backgroundColor: colorFoto(nombre) }}
+      className={`inline-flex flex-none cursor-default items-center justify-center rounded-full font-semibold text-white ${medida} ${className}`}
+    >
+      <span aria-hidden="true">{iniciales(nombre)}</span>
+    </span>
+  );
+}
+
 /** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
 function EtiquetaVip() {
   return <span className="inline-flex flex-none items-center rounded-full bg-[var(--wa-texto)] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-[var(--wa-fondo)]">VIP</span>;
@@ -891,7 +914,7 @@ export function Bandeja({
             {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
             <PastillasEtiquetas etiquetas={c.etiquetas} colores={manejoEtiquetas.colores} />
             {otroNumero && <span>Por {otroNumero}</span>}
-            {c.asignadaA && <span className={ancha ? "lg:hidden" : undefined}>La lleva {c.asignadaA}</span>}
+            <BurbujaPersona nombre={c.asignadaA} className={ancha ? "lg:hidden" : undefined} />
           </span>
         )}
       </>
@@ -932,7 +955,9 @@ export function Bandeja({
                 </span>
                 {espera?.plazo && <span className="pl-3.5 text-[11.5px] font-normal">{espera.plazo}</span>}
               </span>
-              <span className="hidden w-[160px] flex-none truncate text-[13px] text-[var(--wa-sec)] lg:block">{c.asignadaA ?? "Sin asignar"}</span>
+              <span className="hidden w-[160px] flex-none items-center lg:flex">
+                <BurbujaPersona nombre={c.asignadaA} vacio />
+              </span>
             </span>
           ) : (
             <span className="flex min-w-0 flex-1 flex-col gap-0.5 border-b border-[var(--wa-borde)] py-3 pr-3.5">{datosFila}</span>
@@ -1074,7 +1099,7 @@ export function Bandeja({
               key={o.id}
               type="button"
               aria-pressed={filtro === o.id}
-              onClick={() => setFiltro(o.id)}
+              onClick={() => setFiltro(filtro === o.id && o.id !== "todas" ? "todas" : o.id)}
               className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] ${
                 filtro === o.id ? "bg-[var(--wa-acento-suave)] font-semibold text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-sec)] hover:bg-[var(--wa-borde)]"
               } ${anilloFoco}`}
@@ -1200,10 +1225,10 @@ export function Bandeja({
                       sel.codigo,
                       sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
                       numeroDe.get(sel.numeroId)?.nombre,
-                      sel.asignadaA ? `la lleva ${sel.asignadaA}` : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
+                    <BurbujaPersona nombre={sel.asignadaA} tam="cabecera" className="ml-1" />
                     <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
                   </span>
                 </span>
@@ -1887,6 +1912,7 @@ function Burbuja({
         className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
       >
         {m.importado && <span className="sr-only">Importado del celular, </span>}
+        {m.editado && <span>editado</span>}
         {horaMensaje(m.momento)}
         {nuestro && !m.importado && <Palomitas estado={m.estado} />}
       </span>

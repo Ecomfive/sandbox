@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { avisarBandeja } from "./aviso-bandeja";
 import { clasificarPorTelefonos } from "./clasificar";
 import { dropshipperPorTelefonos } from "./vinculo";
-import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
+import { ORDEN_ESTADO, resumenMensaje, type EditadoEntrante, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
 
 /**
  * Guarda los mensajes que llegan por el webhook (migración 0158): cada uno en su conversación (número de la empresa + teléfono del
@@ -67,6 +67,30 @@ export async function guardarEstados(estados: EstadoEntrante[]): Promise<void> {
     }
     const anteriores = ORDEN_ESTADO.slice(0, ORDEN_ESTADO.indexOf(e.estado));
     await supabase.from("whatsapp_mensajes").update({ estado: e.estado }).eq("wa_id", e.waId).in("estado", anteriores);
+  }
+  await avisarBandeja();
+}
+
+/**
+ * Aplica las ediciones: el mensaje original se queda con el texto nuevo y se guarda el primero que tuvo (`texto_antes`) y cuándo se editó (`editado_en`, migración 0191). Nada se pierde: una
+ * segunda edición no pisa el `texto_antes`. Sin la migración no se cambia nada (el texto de antes se perdería); un original que el sistema no tiene se ignora.
+ */
+export async function guardarEditados(editados: EditadoEntrante[]): Promise<void> {
+  if (!editados.length) return;
+  const supabase = createServiceClient();
+  // En el orden en que se hicieron: dos ediciones seguidas dejan la última.
+  for (const e of [...editados].sort((a, b) => (a.momento < b.momento ? -1 : 1))) {
+    const { data, error } = await supabase.from("whatsapp_mensajes").select("id, texto, texto_antes").eq("wa_id", e.waIdOriginal).maybeSingle();
+    if (error) {
+      console.error("WhatsApp: no se pudo leer un mensaje editado (¿falta la migración 0191?)", e.waIdOriginal, error.message);
+      continue;
+    }
+    if (!data || data.texto === e.texto) continue;
+    const { error: falla } = await supabase
+      .from("whatsapp_mensajes")
+      .update({ texto: e.texto, texto_antes: (data.texto_antes as string | null) ?? (data.texto as string | null), editado_en: e.momento })
+      .eq("id", data.id as string);
+    if (falla) console.error("WhatsApp: no se pudo guardar la edición de un mensaje", e.waIdOriginal, falla.message);
   }
   await avisarBandeja();
 }

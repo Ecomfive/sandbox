@@ -88,6 +88,8 @@ export interface MensajeVista {
   waId?: string | null;
   /** En una reacción, el `waId` del mensaje reaccionado (migración 0186): la bandeja la dibuja sobre ese mensaje. */
   reaccionA?: string | null;
+  /** Su autor lo editó en WhatsApp (migración 0191): el texto ya es el nuevo y se marca «editado». */
+  editado?: boolean;
 }
 
 /** Un mensaje de la vista previa que se despliega al pasar el cursor por la lista de chats. */
@@ -326,12 +328,15 @@ export async function cargarConversacion(
     // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
     supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
   ]);
-  const [ocultos, pendientes, reaccionesR] = await Promise.all([
+  const [ocultos, pendientes, reaccionesR, editadosR] = await Promise.all([
     mensajesOcultos(supabase, id),
     borradosPendientes(supabase),
     // A qué mensaje va cada reacción (migración 0186), aparte: sin la columna la conversación se carga igual.
     supabase.from("whatsapp_mensajes").select("id, reaccion_a").eq("conversacion_id", id).eq("tipo", "reaccion").not("reaccion_a", "is", null),
+    // Los que su autor editó en WhatsApp (migración 0191), aparte: sin la columna ninguno sale marcado.
+    supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("editado_en", "is", null),
   ]);
+  const editados = new Set((editadosR.error ? [] : (editadosR.data ?? [])).map((x) => x.id as string));
   const reaccionA = new Map((reaccionesR.error ? [] : (reaccionesR.data ?? [])).map((x) => [x.id as string, x.reaccion_a as string]));
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
   const traidos = mensajesR.data ?? [];
@@ -355,6 +360,7 @@ export async function cargarConversacion(
       borradoPendiente: pendientes.mensajes.has(m.id as string),
       waId: (m.wa_id as string | null) ?? null,
       reaccionA: reaccionA.get(m.id as string) ?? null,
+      editado: editados.has(m.id as string),
     }))
     .reverse();
   const d = dsR.data as {

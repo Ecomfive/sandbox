@@ -32,6 +32,17 @@ export interface RevocadoEntrante {
   momento: string;
 }
 
+/**
+ * Un mensaje que su autor editó en WhatsApp (`type: edit`, solo con la app WhatsApp Business conectada, dentro de los 15 minutos de mandarlo). No es un mensaje nuevo: trae el id del original
+ * (`edit.original_message_id`) y el contenido nuevo (`edit.message`). El original se queda en el sistema con el texto nuevo y el de antes guardado (30 oct 2026).
+ */
+export interface EditadoEntrante {
+  waIdOriginal: string;
+  /** El texto nuevo (o el pie de la foto o del documento). */
+  texto: string;
+  momento: string;
+}
+
 export type EstadoMensaje = "enviado" | "entregado" | "leido" | "fallido";
 
 export interface EstadoEntrante {
@@ -135,12 +146,25 @@ function contenidoDe(m: Obj): Pick<MensajeEntrante, "tipo" | "texto" | "mediaId"
  * Con `sinMetadata` (avisos de 360dialog, que llegan por su propia dirección): se aceptan sin `object` y, si no traen el número de la
  * empresa (el sandbox no lo manda), se usa ese id. Quien escribe sin teléfono compartido llega con su id de usuario (`from_user_id`).
  */
-export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: MensajeEntrante[]; estados: EstadoEntrante[]; ecos: MensajeEntrante[]; revocados: RevocadoEntrante[] } {
+/** Una edición: el id del mensaje original y el texto nuevo (null si no trae texto que mostrar). */
+function edicionDe(m: Obj): { waIdOriginal: string; texto: string } | null {
+  if (String(m.type ?? "") !== "edit") return null;
+  const e = obj(m.edit);
+  const original = texto(e.original_message_id);
+  const nuevo = texto(contenidoDe(obj(e.message)).texto);
+  return original && nuevo ? { waIdOriginal: original, texto: nuevo } : null;
+}
+
+export function extraerAviso(
+  aviso: unknown,
+  sinMetadata?: string,
+): { mensajes: MensajeEntrante[]; estados: EstadoEntrante[]; ecos: MensajeEntrante[]; revocados: RevocadoEntrante[]; editados: EditadoEntrante[] } {
   const mensajes: MensajeEntrante[] = [];
   const estados: EstadoEntrante[] = [];
   const ecos: MensajeEntrante[] = [];
   const revocados: RevocadoEntrante[] = [];
-  if (obj(aviso).object !== "whatsapp_business_account" && !(sinMetadata && obj(aviso).object === undefined)) return { mensajes, estados, ecos, revocados };
+  const editados: EditadoEntrante[] = [];
+  if (obj(aviso).object !== "whatsapp_business_account" && !(sinMetadata && obj(aviso).object === undefined)) return { mensajes, estados, ecos, revocados, editados };
   for (const entrada of lista(obj(aviso).entry)) {
     for (const cambio of lista(obj(entrada).changes)) {
       const campo = obj(cambio).field;
@@ -161,6 +185,12 @@ export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: 
             if (original) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp) });
             continue;
           }
+          // Una edición no es un mensaje nuevo: cambia el texto del original (guardar.ts). Una que no trae texto se ignora.
+          if (String(m.type ?? "") === "edit") {
+            const ed = edicionDe(m);
+            if (ed) editados.push({ ...ed, momento: momentoDe(m.timestamp) });
+            continue;
+          }
           ecos.push({ phoneNumberId, numeroEmpresa, telefono: conMas(para)!, nombre: null, waId, ...contenidoDe(m), momento: momentoDe(m.timestamp) });
         }
         continue;
@@ -171,6 +201,11 @@ export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: 
         if (String(m.type ?? "") === "revoke") {
           const original = texto(obj(m.revoke).original_message_id);
           if (original) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp) });
+          continue;
+        }
+        if (String(m.type ?? "") === "edit") {
+          const ed = edicionDe(m);
+          if (ed) editados.push({ ...ed, momento: momentoDe(m.timestamp) });
           continue;
         }
         const de = texto(m.from);
@@ -191,7 +226,7 @@ export function extraerAviso(aviso: unknown, sinMetadata?: string): { mensajes: 
       }
     }
   }
-  return { mensajes, estados, ecos, revocados };
+  return { mensajes, estados, ecos, revocados, editados };
 }
 
 const ETIQUETA_TIPO: Record<string, string> = {

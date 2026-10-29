@@ -1,8 +1,3 @@
--- Reversa de 0191_crm_etiquetas_desde_cero.sql: devuelve a cada dropshipper las etiquetas que tenía (se suman a las que tenga ahora) y
--- borra la copia.
-update dropshippers d
-set etiquetas = (select array(select distinct unnest(d.etiquetas || r.etiquetas)))
-from dropshippers_etiquetas_respaldo r
-where r.dropshipper_id = d.id;
-
-drop table if exists dropshippers_etiquetas_respaldo;
+-- Reversa de 0191_whatsapp_mensajes_editados.sql: se pierde el texto de antes de los mensajes editados y la marca «editado» (el texto nuevo se queda).
+alter table whatsapp_mensajes drop column if exists texto_antes;
+alter table whatsapp_mensajes drop column if exists editado_en;
