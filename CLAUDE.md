@@ -1117,7 +1117,9 @@ convenciones técnicas del código.
   búsqueda anterior (`comparar`), calcula huellas, empareja con `yaVisto` contra lo nuestro y arma las alertas
   (`armarAlertas`; la primera búsqueda de un país no deja alertas). «Stock vendido» = suma de las bajadas de stock en 1/7/30
   días (`unidadesBajadas`), porque Dropi no muestra ventas ajenas. Panamá, 14 oct 2026: 1.452 productos de 93 proveedores
-  leídos en 10 s; ECOMFIVE tiene 178. **Pestañas** (`PESTANAS_POR_MODULO`, simplificado a pedido el 14 oct 2026): **Competidores**
+  leídos en 10 s; ECOMFIVE tiene 178. **Costa Rica** (29 oct 2026): `app.dropi.cr` (no .co.cr), sesión de dropshipper en el navegador
+  integrado; 649 productos de 36 proveedores. Allí nuestro proveedor se llama «Alcides» (id 27): `NUESTRO_PROVEEDOR_ID` +
+  `esNuestroProveedor` (`normalizarCompetencia(o, pais)`). Los precios van en la moneda del país (`MonedaCompetencia`, colones). **Pestañas** (`PESTANAS_POR_MODULO`, simplificado a pedido el 14 oct 2026): **Competidores**
   (`/analisis-competencia`, `VistaCompetidores`: novedades = alertas arriba, buscador, filtros de un toque y la lista de
   competidores en acordeón; cada uno muestra sus productos, los iguales a los nuestros primero, y cada producto despliega
   `HistorialCompetencia`) y **Resumen** (`/analisis-competencia/resumen`, `dashboard-competencia.tsx`). Las dos usan
