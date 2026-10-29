@@ -1273,7 +1273,7 @@ export function Bandeja({
                 </span>
               )}
             </div>
-            <ActividadDelClienteFicha key={`actividad-${sel.id}`} conversacionId={sel.id} escribe={escribe && !mirando} />
+            <ActividadDelClienteFicha key={`actividad-${sel.id}`} conversacionId={sel.id} puedeAnalizar={escribe} />
             <ActividadDelEquipoFicha key={`equipo-${sel.id}`} conversacionId={sel.id} version={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`} />
             <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} alAviso={(texto) => mostrarToast(texto, "destructive")} />
             {verDropshipper ? (
