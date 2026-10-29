@@ -5,7 +5,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, EtiquetaIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
@@ -281,6 +281,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 <span className="truncate">Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>
               </span>
             )}
+            {/* En liquidación: insignia roja sólida junto al nombre, como «Privado» (29 oct 2026, pedido de Alcides; antes era un punto). */}
+            {f.liquidacionDesde && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-background">
+                <EtiquetaIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+                En liquidación
+              </span>
+            )}
           </span>
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
@@ -323,12 +330,6 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 <Punto clase={f.tareasPendientes.atrasadas ? "bg-destructive" : "bg-warning"} texto={f.tareasPendientes.atrasadas ? "Tarea atrasada" : "Tarea pendiente"} />
                 {f.tareasPendientes.total === 1 ? "1 tarea" : `${f.tareasPendientes.total} tareas`}
                 {f.tareasPendientes.atrasadas ? " · atrasada" : ""}
-              </span>
-            )}
-            {f.liquidacionDesde && (
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <Punto clase="bg-warning" texto="En liquidación" />
-                En liquidación
               </span>
             )}
             {f.archivadoPendiente && !f.apagadoPendiente && (
