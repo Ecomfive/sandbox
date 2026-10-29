@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase/client";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
+import { quienesRespondieron } from "@/lib/crm/respondieron";
 import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
@@ -578,6 +579,7 @@ export function Bandeja({
       estado: "enviando",
       error: null,
       autor: null,
+      autorCargo: null,
       momento: ahoraIso(),
       importado: false,
       eliminadoEnWhatsapp: false,
@@ -1053,6 +1055,7 @@ export function Bandeja({
                       </div>
                     </Bloque>
                   }
+                  respondieron={quienesRespondieron(mensajes ?? [])}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
                   alVinculado={(mensaje) => {
@@ -1148,8 +1151,9 @@ export function Bandeja({
                       const dia = etiquetaDia(m.momento);
                       const previo = mensajes[i - 1];
                       const separador = i === 0 || etiquetaDia(previo.momento) !== dia;
-                      // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp).
-                      const seguido = !separador && !!previo && previo.direccion === m.direccion && !esAvisoDelSistema(previo.texto);
+                      // Seguidos del mismo lado se juntan y solo el primero lleva la colita (como en WhatsApp). Si responde otra persona del
+                      // equipo no se juntan, para que se vea quién mandó cada cosa (con su área).
+                      const seguido = !separador && !!previo && previo.direccion === m.direccion && previo.autor === m.autor && !esAvisoDelSistema(previo.texto);
                       return (
                         <Fragment key={m.id}>
                           {separador && (
@@ -1509,6 +1513,7 @@ function Burbuja({
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
           Nota privada{m.autor ? ` · ${m.autor}` : ""}
+          {m.autor && m.autorCargo ? ` (${m.autorCargo})` : ""}
         </span>
         <Contenido m={m} />
         <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-nota-acento)]">
@@ -1529,7 +1534,12 @@ function Burbuja({
     >
       {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
       {nuestro && alGuardarRapida && m.tipo === "texto" && (m.texto?.trim().length ?? 0) >= 3 && <BotonRapidaMensaje alPulsar={() => alGuardarRapida(m.texto ?? "")} />}
-      {nuestro && m.autor && !seguido && <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">{m.autor}</span>}
+      {nuestro && m.autor && !seguido && (
+        <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">
+          {m.autor}
+          {m.autorCargo && <span className="font-normal"> · {m.autorCargo}</span>}
+        </span>
+      )}
       <Contenido m={m} />
       {m.eliminadoEnWhatsapp && (
         <span className="mt-1 block text-[11.5px] font-medium text-[var(--wa-sec)] italic">
