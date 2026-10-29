@@ -40,6 +40,7 @@ import { BotonApagarDropi, puedeApagar } from "./apagar-dropi";
 import { BotonPrivatizarDropi, puedePrivatizar } from "./privatizar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { BodegasStockDropi } from "./stock-dropi";
+import { BotonLiquidacionFicha } from "./liquidacion";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
@@ -474,6 +475,7 @@ function ContenidoFicha({
                 ) : (
                   <BotonAccionApagado icono={PausaIcon} texto="Pausar por falta de stock" motivo={motivoPausar(botones) ?? "No disponible"} />
                 ))}
+              {!sinGuardar && puedeArchivar && <BotonLiquidacionFicha f={p} />}
               {!sinGuardar && puedeArchivar &&
                 (motivoArchivar(botones) === null ? (
                   <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={() => archivar()}>

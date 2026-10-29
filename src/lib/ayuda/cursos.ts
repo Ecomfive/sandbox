@@ -229,7 +229,7 @@ export const CURSOS: Curso[] = [
       {
         titulo: "Archivar, pausar y los botones de cada fila",
         parrafos: [
-          "Una publicación con ID de Dropi no se elimina: se archiva. Cada fila tiene siempre los mismos cinco botones, en este orden: Republicar, Privatizar, Apagar, Pausar y Archivar. El que no se puede usar se ve apagado y, al pasar el cursor, dice por qué.",
+          "Una publicación con ID de Dropi no se elimina: se archiva. Cada fila tiene siempre los mismos seis botones, en este orden: Republicar, Privatizar, Apagar, Pausar, Liquidación y Archivar. El que no se puede usar se ve apagado y, al pasar el cursor, dice por qué.",
           "Si una publicación se queda sin stock, puedes archivarla del todo o pausarla con «Pausar por falta de stock». En Dropi las dos la archivan (la competencia no ve que se agotó), pero la pausada sigue en la lista y en la tarjeta «Sin stock».",
           "Cuando Dropi le vuelve a ver unidades a una pausada, la fila dice «Volvió el stock: reactivar» en verde: el botón de pausa pasa a «Reactivar» y la saca de Archivados.",
         ],

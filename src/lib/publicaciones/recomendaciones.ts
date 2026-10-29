@@ -157,6 +157,9 @@ const TITULO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
  */
 export const NO_EN_PRIVADAS: TipoRecomendacion[] = ["optimizar_titulo", "mas_fotos"];
 
+/** Lo que no se recomienda a una publicación en liquidación (migración 0174): su margen bajo es a propósito. */
+export const NO_EN_LIQUIDACION: TipoRecomendacion[] = ["combo_x2", "subir_precio"];
+
 /**
  * Las recomendaciones de optimización a partir de la revisión: una por cosa que arreglar en Dropi (el título junta sus cuatro
  * puntos). «Para qué sirve» sin confirmar cuenta para el título; «Sin datos» y «No aplica» no. En una privada, sin

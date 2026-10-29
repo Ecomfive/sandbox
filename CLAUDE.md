@@ -649,6 +649,11 @@ convenciones técnicas del código.
   publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
+  **En liquidación** (28 oct 2026, pedido de Alcides; migración 0174 `dropi_publicaciones.liquidacion_en`): un producto con margen bajo a propósito se marca
+  con la etiqueta de la fila (`BotonLiquidacionFila`, entre Pausar y Archivar; `BotonLiquidacionFicha` en la ficha; `liquidacion.tsx`, `marcarLiquidacion`
+  en `actions.ts`, `motivoLiquidacion`). `cargarPublicaciones` lo lee aparte (sin la migración, ninguna) y a una en liquidación le quita la acción `margen_bajo`
+  y las recomendaciones `NO_EN_LIQUIDACION` (combo x2 y subir precio); la fila no pone el punto rojo de margen y dice «En liquidación». Tarjeta y campo de
+  filtro `liquidacion`. Solo del sistema: no pasa por la cola de Dropi.
   **Cambiar stock en Dropi** (28 oct 2026, pedido de Alcides; migración 0173, `src/lib/publicaciones/stock-dropi.ts`, con prueba): un séptimo cambio de la cola
   (`tipo = 'stock'`, `datos` = `DatosStock`: bodega, nombre, unidades que deben quedar, `antes` = lo que mostraba la lectura y concepto). En el bloque «Stock» de la
   ficha (`BodegasStockDropi`, `stock-dropi.tsx`) cada bodega de ECOMFIVE (también las sin stock, de `opcionesCrear.bodegas`) tiene un lápiz; la B280 se ve y no se edita.

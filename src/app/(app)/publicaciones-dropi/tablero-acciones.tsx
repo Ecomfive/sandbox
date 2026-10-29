@@ -7,7 +7,7 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, EtiquetaIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
@@ -79,6 +79,15 @@ const TARJETAS: Tarjeta[] = [
       const n = abiertas.filter((f) => f.nivelMargen === "critico").length;
       return n ? `${n} en crítico (menos de ${Math.round(r.margen_critico * 100)} %)` : null;
     } },
+  {
+    id: "liquidacion",
+    titulo: "En liquidación",
+    icono: EtiquetaIcon,
+    color: "ambar",
+    detalle: "Margen bajo a propósito: no cuentan como margen bajo",
+    cuenta: (f) => !!f.liquidacionDesde,
+    atajo: { id: "liquidacion", etiqueta: "En liquidación", ayuda: "Filtrar la lista: en liquidación", filtro: seleccion("liquidacion", "si") },
+  },
   porAccion("ventas_caida", VentasIcon, "ambar"),
   porAccion("bajar_precio", AnalisisCompetenciaIcon, "rojo"),
   porAccion("verificar_dropshipper", DropshipperIcon, "azul"),

@@ -5,7 +5,7 @@ import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/cr
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion, revisionVencida } from "@/lib/publicaciones/publicacion";
-import { estadoTarea, etiquetaRecomendacion, NO_EN_PRIVADAS, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { estadoTarea, etiquetaRecomendacion, NO_EN_LIQUIDACION, NO_EN_PRIVADAS, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
@@ -254,6 +254,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     supabase.from("dropi_publicaciones").select("id, pausada_en").eq("pais_id", paisId).not("pausada_en", "is", null).order("id").range(desde, hasta),
   );
   const pausadaEn = new Map(pausadasR.error ? [] : (pausadasR.data ?? []).map((n) => [n.id, n.pausada_en as string]));
+  // Las que están en liquidación (migración 0174), igual: sin la migración, ninguna.
+  const liquidacionR = await traerTodasConError<{ id: string; liquidacion_en: string | null }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones").select("id, liquidacion_en").eq("pais_id", paisId).not("liquidacion_en", "is", null).order("id").range(desde, hasta),
+  );
+  const liquidacionEn = new Map(liquidacionR.error ? [] : (liquidacionR.data ?? []).map((n) => [n.id, n.liquidacion_en as string]));
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
@@ -396,6 +401,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       stockPendiente: (cambiosDropi.ajustandoStock.get(d.id as string) ?? []).map(({ bodega, nombreBodega, unidades, antes }) => ({ bodega, nombreBodega, unidades, antes })),
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
+      liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
       grupo: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.
@@ -461,7 +467,10 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       },
       r,
     );
-    f.recomendaciones = pendientes([...recs, ...recomendarOptimizacion(f.revisiones, f.archivada, privada)], f.decisiones, hoy);
+    // En liquidación (28 oct 2026): el margen bajo es a propósito, así que no es un aviso ni se recomienda subir el precio o armar el combo.
+    if (f.liquidacionDesde) f.acciones = f.acciones.filter((a) => a !== "margen_bajo");
+    const recsVigentes = f.liquidacionDesde ? recs.filter((x) => !NO_EN_LIQUIDACION.includes(x.tipo)) : recs;
+    f.recomendaciones = pendientes([...recsVigentes, ...recomendarOptimizacion(f.revisiones, f.archivada, privada)], f.decisiones, hoy);
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
