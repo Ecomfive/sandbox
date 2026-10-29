@@ -16,7 +16,21 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  * «Avisarme cuando llegue» (29 oct 2026): una tarea que se activa cuando llega de verdad, para avisarle al cliente. `alCambio` avisa
  * que se creó una tarea.
  */
-export function ProductosDelChatFicha({ conversacionId, escribe, alAviso, alCambio }: { conversacionId: string; escribe: boolean; alAviso: (texto: string, error?: boolean) => void; alCambio?: () => void }) {
+export function ProductosDelChatFicha({
+  conversacionId,
+  escribe,
+  puedeAvisar = escribe,
+  alAviso,
+  alCambio,
+}: {
+  conversacionId: string;
+  /** Fijar y quitar productos (no supervisando). */
+  escribe: boolean;
+  /** «Avisarme cuando llegue»: también supervisando, como «Tarea». */
+  puedeAvisar?: boolean;
+  alAviso: (texto: string, error?: boolean) => void;
+  alCambio?: () => void;
+}) {
   const [datos, setDatos] = useState<ProductosDelChat | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
@@ -109,7 +123,7 @@ export function ProductosDelChatFicha({ conversacionId, escribe, alAviso, alCamb
                 {p.aviso ? (
                   <span className="mt-0.5 text-[12px] font-medium text-[var(--wa-acento)]">Te avisamos cuando llegue para que le escribas.</span>
                 ) : (
-                  escribe &&
+                  puedeAvisar &&
                   p.enCamino > 0 && (
                     <button
                       type="button"

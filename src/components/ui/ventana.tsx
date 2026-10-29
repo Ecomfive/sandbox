@@ -122,7 +122,8 @@ export function Ventana({
     return () => observador.disconnect();
   }, [abierto]);
 
-  if (!abierto) return null;
+  // En el servidor no hay `document.body` donde dibujarla: la ventana se abre ya en el navegador.
+  if (!abierto || typeof document === "undefined") return null;
 
   const anchoClase = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-6xl" }[ancho];
   // Cómo se dibuja cada modo: la barra lateral (el panel de siempre; la ventana grande, más angosta), el cuadro al centro y la

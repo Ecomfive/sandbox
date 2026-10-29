@@ -322,7 +322,7 @@ export function FichaDelChat({
             )))}
         {actual === "productos" && (
           <>
-            <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} alAviso={alAviso} alCambio={() => setVersionTareas((v) => v + 1)} />
+            <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} puedeAvisar={escribe} alAviso={alAviso} alCambio={() => setVersionTareas((v) => v + 1)} />
             {d && acceso && (
               <Seccion titulo="Productos recomendados">
                 <RecomendacionesDropshipper key={`recomendaciones-${d.id}`} dropshipperId={d.id} version={version} puedeEscribir={acceso.escribeAtencion} />
