@@ -14,6 +14,7 @@ import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, 
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
+import { Expresiones } from "./expresiones";
 import { GrabarVoz } from "./grabar-voz";
 import { ProductosDelChatFicha } from "./productos-chat";
 import { VentanaNombreContacto } from "./nombre-contacto";
@@ -172,7 +173,8 @@ function Contenido({ m }: { m: MensajeVista }) {
       )}
       {m.conArchivo && m.tipo === "sticker" && <img src={src} alt="Sticker" loading="lazy" className="h-28 w-28 object-contain" />}
       {m.conArchivo && m.tipo === "audio" && <audio controls preload="none" src={src} className="max-w-full" />}
-      {m.conArchivo && m.tipo === "video" && <video controls preload="none" src={src} className="max-h-72 max-w-full rounded-md" />}
+      {m.conArchivo && m.tipo === "video" && m.mediaNombre?.startsWith("gif-") && <video autoPlay loop muted playsInline preload="auto" src={src} aria-label="GIF" className="max-h-60 max-w-full rounded-md" />}
+      {m.conArchivo && m.tipo === "video" && !m.mediaNombre?.startsWith("gif-") && <video controls preload="none" src={src} className="max-h-72 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "documento" && (
         <a href={src} target="_blank" rel="noreferrer" className={`mb-1 flex items-center gap-2 rounded-md bg-[var(--wa-panel)] px-2 py-2 text-[13px] font-medium ${anilloFoco}`}>
           <span aria-hidden="true" className="flex h-8 w-7 flex-none items-center justify-center rounded bg-[var(--wa-acento)] text-[9px] font-bold text-[var(--wa-acento-texto)]">
@@ -487,6 +489,18 @@ export function Bandeja({
   const bloqueado = !escribe || (!esNota && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
+
+  /** Escribe un emoji donde está el cursor (o al final) y deja el cursor justo después. */
+  function insertarEmoji(emoji: string) {
+    const campo = textoRef.current;
+    const desde = campo?.selectionStart ?? borrador.length;
+    const hasta = campo?.selectionEnd ?? borrador.length;
+    setBorrador(borrador.slice(0, desde) + emoji + borrador.slice(hasta));
+    requestAnimationFrame(() => {
+      campo?.focus();
+      campo?.setSelectionRange(desde + emoji.length, desde + emoji.length);
+    });
+  }
 
   function mandar() {
     if (!sel || !borrador.trim() || bloqueado) return;
@@ -960,7 +974,7 @@ export function Bandeja({
           </div>
 
           {escribe ? (
-            <div className="flex flex-col bg-[var(--wa-panel)]">
+            <div className="relative flex flex-col bg-[var(--wa-panel)]">
               {mirando && (
                 <p className="m-0 border-b border-[var(--wa-borde)] px-4 py-2 text-[12.5px] text-[var(--wa-sec)]">
                   Estás supervisando el panel de {areaChat(sel.area).etiqueta}: quien lo atiende no ve que abriste este chat y le sigue apareciendo sin leer. Puedes dejar una nota privada
@@ -1030,6 +1044,13 @@ export function Bandeja({
                       </svg>
                     </button>
                     <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />
+                    <Expresiones
+                      conversacionId={sel.id}
+                      deshabilitado={bloqueado || enviando}
+                      alEmoji={insertarEmoji}
+                      alEnviado={() => void refrescar(sel.id)}
+                      alError={(mensaje) => mostrarToast(mensaje, "destructive")}
+                    />
                   </>
                 )}
                 <label className="flex min-w-0 flex-1">
