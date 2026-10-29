@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -14,6 +15,7 @@ import { VistaPreviaChat } from "./vista-previa-chat";
 import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
 import { GrabarVoz } from "./grabar-voz";
+import { ProductosDelChatFicha } from "./productos-chat";
 import { EnviarPlantilla } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
@@ -322,6 +324,29 @@ export function Bandeja({
   }, []);
   const [menuArea, setMenuArea] = useState(false);
   const [verFicha, setVerFicha] = useState(true);
+  // En pantallas angostas (menos de 1280 px) la ficha no cabe al lado: se abre encima de todo al tocar el nombre (29 oct 2026).
+  const [fichaEncima, setFichaEncima] = useState(false);
+  const pantallaAncha = useSyncExternalStore(
+    (avisar) => {
+      const m = window.matchMedia(PANTALLA_ANCHA);
+      m.addEventListener("change", avisar);
+      return () => m.removeEventListener("change", avisar);
+    },
+    () => window.matchMedia(PANTALLA_ANCHA).matches,
+    () => true,
+  );
+  const fichaVisible = pantallaAncha ? verFicha : fichaEncima;
+  const alternarFicha = (abrir?: boolean) => (pantallaAncha ? setVerFicha : setFichaEncima)((v) => abrir ?? !v);
+  // Encima, va en el <body> con un fondo oscuro que la cierra al tocarlo: dentro de la página quedaría encerrada en su recuadro.
+  const comoFicha = (ficha: ReactNode) =>
+    pantallaAncha
+      ? ficha
+      : createPortal(
+          <div className="bandeja-wa fixed inset-0 z-50 flex justify-end bg-black/40" onClick={(e) => e.target === e.currentTarget && setFichaEncima(false)}>
+            {ficha}
+          </div>,
+          document.body,
+        );
   const [enviando, empezar] = useTransition();
   const finRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -711,9 +736,9 @@ export function Bandeja({
             </button>
             <button
               type="button"
-              onClick={() => setVerFicha((v) => !v)}
-              aria-expanded={verFicha}
-              aria-label={`${verFicha ? "Cerrar" : "Ver"} la ficha de ${sel.nombre}`}
+              onClick={() => alternarFicha()}
+              aria-expanded={fichaVisible}
+              aria-label={`${fichaVisible ? "Cerrar" : "Ver"} la ficha de ${sel.nombre}`}
               className={`flex min-w-0 flex-[1_1_200px] items-center gap-3 rounded-lg py-0.5 text-left ${anilloFoco}`}
             >
               <Foto nombre={sel.nombre} tam="cabecera" />
@@ -1072,99 +1097,105 @@ export function Bandeja({
       )}
 
       {/* ===== Ficha del dropshipper (como «Info del contacto») ===== */}
-      {sel && verFicha && (
-        <aside aria-label="Ficha del dropshipper" className="hidden w-[330px] flex-none flex-col overflow-y-auto border-l border-[var(--wa-borde)] bg-[var(--wa-fondo)] xl:flex">
-          <div className="flex items-center gap-3 bg-[var(--wa-panel)] px-3 py-2.5">
-            <button type="button" onClick={() => setVerFicha(false)} aria-label="Cerrar la ficha" className={botonIcono}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
-            <h2 className="m-0 text-base font-semibold">Ficha del dropshipper</h2>
-          </div>
-          <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
-            <Foto nombre={sel.nombre} tam="ficha" />
-            <span className="mt-3 text-xl">{sel.nombre}</span>
-            {(sel.codigo || verTelefono) && (
-              <span className="flex items-center gap-1 text-[15px] text-[var(--wa-sec)] tabular-nums">
-                {sel.codigo}
-                <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
-              </span>
-            )}
-          </div>
-          {verDropshipper ? (
-            <>
-              <Bloque titulo="Dónde vende">
-                <div className="flex flex-wrap gap-1.5">
-                  {[...verDropshipper.tiendas, ...verDropshipper.cuentas].map((t) => (
-                    <span key={t} className="rounded-md bg-[var(--wa-panel)] px-2 py-0.5 text-[13px]">
-                      {t}
-                    </span>
-                  ))}
-                  {!verDropshipper.tiendas.length && !verDropshipper.cuentas.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin tiendas ni cuentas vinculadas.</span>}
-                </div>
-              </Bloque>
-              <Bloque titulo="Estado">
-                <span className="self-start rounded-full bg-success-soft px-2 py-px text-xs font-medium text-success capitalize">{verDropshipper.estado}</span>
-              </Bloque>
-              <Bloque titulo="Casos abiertos">
-                {verDropshipper.casos.length ? (
-                  verDropshipper.casos.map((c) => (
-                    <div key={c.codigo} className="rounded-lg border border-[var(--wa-borde)] px-2.5 py-1.5 text-[13px]">
-                      <span className="block text-[11.5px] text-[var(--wa-sec)] tabular-nums">
-                        {c.codigo}
-                        {c.prioridad === "alta" && <span className="font-semibold text-destructive"> · alta</span>}
-                      </span>
-                      {c.titulo}
-                    </div>
-                  ))
-                ) : (
-                  <span className="text-[13px] text-[var(--wa-sec)]">Sin casos abiertos.</span>
-                )}
-              </Bloque>
-            </>
-          ) : !sel.dropshipperId ? (
-            <Bloque titulo="No está en el CRM">
-              <SugerenciasDeVinculo
-                conversacionId={sel.id}
-                escribe={escribe}
-                alAbrirBusqueda={() => setVincular(true)}
-                alListo={(mensaje) => {
-                  mostrarToast(mensaje);
-                  void refrescar(sel.id);
-                }}
-              />
-              <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.nombre)}`} className={`text-[14px] font-medium text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
-                Buscarlo en el CRM
-              </Link>
-            </Bloque>
-          ) : null}
-          <Bloque titulo="Área del chat">
-            <span className="self-start">
-              <EtiquetaArea area={sel.area} />
-            </span>
-            <div className="flex flex-col gap-1 text-[12.5px] text-[var(--wa-sec)]">
-              {cambiosDeArea.length ? cambiosDeArea.map((m) => <span key={m.id}>{`${m.texto} · ${horaCorta(m.momento)}`}</span>) : <span>Entró a {areaChat(sel.area).etiqueta} con su primer mensaje.</span>}
-            </div>
-          </Bloque>
-          {verDropshipper && (
-            <div className="px-5 py-4">
-              <Link href={`/crm-dropshippers?abrir=${verDropshipper.id}`} className={`flex items-center gap-3 py-1 text-[15px] text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <path d="M20 21a8 8 0 0 0-16 0" />
-                  <circle cx="12" cy="8" r="4" />
+      {sel &&
+        fichaVisible &&
+        comoFicha(
+          <aside
+            aria-label="Ficha del dropshipper"
+            className={`flex w-[330px] max-w-full flex-none flex-col overflow-y-auto border-l border-[var(--wa-borde)] bg-[var(--wa-fondo)] ${pantallaAncha ? "" : "h-full shadow-2xl"}`}
+          >
+            <div className="flex items-center gap-3 bg-[var(--wa-panel)] px-3 py-2.5">
+              <button type="button" onClick={() => alternarFicha(false)} aria-label="Cerrar la ficha" className={botonIcono}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
                 </svg>
-                Abrir su ficha en el CRM
-              </Link>
-              {escribe && (
-                <button type="button" onClick={() => setVincular(true)} className={`py-1 text-left text-[14px] text-[var(--wa-sec)] hover:underline ${anilloFoco}`}>
-                  No es este dropshipper
-                </button>
+              </button>
+              <h2 className="m-0 text-base font-semibold">Ficha del dropshipper</h2>
+            </div>
+            <div className="flex flex-col items-center gap-1 border-b-8 border-[var(--wa-panel)] px-4 pt-6 pb-5 text-center">
+              <Foto nombre={sel.nombre} tam="ficha" />
+              <span className="mt-3 text-xl">{sel.nombre}</span>
+              {(sel.codigo || verTelefono) && (
+                <span className="flex items-center gap-1 text-[15px] text-[var(--wa-sec)] tabular-nums">
+                  {sel.codigo}
+                  <MostrarTelefono tipo="conversacion" id={sel.id} puede={verTelefono} />
+                </span>
               )}
             </div>
-          )}
-        </aside>
-      )}
+            <ProductosDelChatFicha key={sel.id} conversacionId={sel.id} escribe={escribe && !mirando} alAviso={(texto) => mostrarToast(texto, "destructive")} />
+            {verDropshipper ? (
+              <>
+                <Bloque titulo="Dónde vende">
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...verDropshipper.tiendas, ...verDropshipper.cuentas].map((t) => (
+                      <span key={t} className="rounded-md bg-[var(--wa-panel)] px-2 py-0.5 text-[13px]">
+                        {t}
+                      </span>
+                    ))}
+                    {!verDropshipper.tiendas.length && !verDropshipper.cuentas.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin tiendas ni cuentas vinculadas.</span>}
+                  </div>
+                </Bloque>
+                <Bloque titulo="Estado">
+                  <span className="self-start rounded-full bg-success-soft px-2 py-px text-xs font-medium text-success capitalize">{verDropshipper.estado}</span>
+                </Bloque>
+                <Bloque titulo="Casos abiertos">
+                  {verDropshipper.casos.length ? (
+                    verDropshipper.casos.map((c) => (
+                      <div key={c.codigo} className="rounded-lg border border-[var(--wa-borde)] px-2.5 py-1.5 text-[13px]">
+                        <span className="block text-[11.5px] text-[var(--wa-sec)] tabular-nums">
+                          {c.codigo}
+                          {c.prioridad === "alta" && <span className="font-semibold text-destructive"> · alta</span>}
+                        </span>
+                        {c.titulo}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-[13px] text-[var(--wa-sec)]">Sin casos abiertos.</span>
+                  )}
+                </Bloque>
+              </>
+            ) : !sel.dropshipperId ? (
+              <Bloque titulo="No está en el CRM">
+                <SugerenciasDeVinculo
+                  conversacionId={sel.id}
+                  escribe={escribe}
+                  alAbrirBusqueda={() => setVincular(true)}
+                  alListo={(mensaje) => {
+                    mostrarToast(mensaje);
+                    void refrescar(sel.id);
+                  }}
+                />
+                <Link href={`/crm-dropshippers?buscar=${encodeURIComponent(sel.nombrePerfil ?? sel.nombre)}`} className={`text-[14px] font-medium text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
+                  Buscarlo en el CRM
+                </Link>
+              </Bloque>
+            ) : null}
+            <Bloque titulo="Área del chat">
+              <span className="self-start">
+                <EtiquetaArea area={sel.area} />
+              </span>
+              <div className="flex flex-col gap-1 text-[12.5px] text-[var(--wa-sec)]">
+                {cambiosDeArea.length ? cambiosDeArea.map((m) => <span key={m.id}>{`${m.texto} · ${horaCorta(m.momento)}`}</span>) : <span>Entró a {areaChat(sel.area).etiqueta} con su primer mensaje.</span>}
+              </div>
+            </Bloque>
+            {verDropshipper && (
+              <div className="px-5 py-4">
+                <Link href={`/crm-dropshippers?abrir=${verDropshipper.id}`} className={`flex items-center gap-3 py-1 text-[15px] text-[var(--wa-acento)] hover:underline ${anilloFoco}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <path d="M20 21a8 8 0 0 0-16 0" />
+                    <circle cx="12" cy="8" r="4" />
+                  </svg>
+                  Abrir su ficha en el CRM
+                </Link>
+                {escribe && (
+                  <button type="button" onClick={() => setVincular(true)} className={`py-1 text-left text-[14px] text-[var(--wa-sec)] hover:underline ${anilloFoco}`}>
+                    No es este dropshipper
+                  </button>
+                )}
+              </div>
+            )}
+          </aside>,
+        )}
 
       {importar && (
         <ImportarChat
@@ -1184,6 +1215,9 @@ export function Bandeja({
     </div>
   );
 }
+
+/** Desde este ancho la ficha va al lado del chat; más angosto, se abre encima. */
+const PANTALLA_ANCHA = "(min-width: 1280px)";
 
 /** Un bloque de la ficha, separado del siguiente con la franja gris de WhatsApp. */
 function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
