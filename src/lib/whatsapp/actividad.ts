@@ -21,11 +21,16 @@ export const MOTIVOS: Motivo[] = [
   { id: "catalogo", etiqueta: "Pidió el catálogo o productos nuevos" },
   { id: "producto_privado", etiqueta: "Pidió un producto privado o exclusivo" },
   { id: "producto_defectuoso", etiqueta: "Reportó un producto dañado o defectuoso" },
+  { id: "consulta_id_dropi", etiqueta: "Preguntó por un ID de Dropi" },
+  { id: "privatizar_id", etiqueta: "Pidió privatizar o reservar un ID" },
+  { id: "material_producto", etiqueta: "Pidió fotos, videos o material de un producto" },
   // Pedidos y guías
   { id: "estado_guia", etiqueta: "Preguntó por el estado de una guía" },
   { id: "entrega_demorada", etiqueta: "Reclamó una entrega demorada" },
   { id: "novedad_entrega", etiqueta: "Consultó por una novedad de entrega" },
   { id: "cambio_cancelacion", etiqueta: "Pidió cancelar o cambiar un pedido" },
+  { id: "cobertura_envio", etiqueta: "Preguntó por cobertura o zonas de envío" },
+  { id: "tiempos_entrega", etiqueta: "Preguntó por tiempos de entrega" },
   { id: "devolucion_solicitud", etiqueta: "Pidió una devolución" },
   { id: "devolucion_estado", etiqueta: "Preguntó por una devolución en curso" },
   // Dinero
@@ -61,10 +66,15 @@ const MOTIVOS_ANTERIORES: Record<string, string> = {
 };
 
 const ID_MOTIVOS = new Set(MOTIVOS.map((m) => m.id));
-export const etiquetaDeMotivo = (id: string): string => MOTIVOS.find((m) => m.id === id)?.etiqueta ?? MOTIVOS_ANTERIORES[id] ?? id;
+/** La etiqueta de un motivo: de la lista fija, de los que la IA fue creando (`extra`: id → etiqueta) o, si es de la primera versión, la de entonces. */
+export const etiquetaDeMotivo = (id: string, extra?: Readonly<Record<string, string>>): string => MOTIVOS.find((m) => m.id === id)?.etiqueta ?? extra?.[id] ?? MOTIVOS_ANTERIORES[id] ?? id;
 
-/** Cuántas veces cambió lo que se le pide a la IA. Un día analizado con una versión anterior se vuelve a analizar (los motivos de la v1 eran más generales y no traía productos). */
-export const VERSION_ANALISIS = 2;
+/**
+ * Cuántas veces cambió lo que se le pide a la IA. Un día analizado con una versión anterior se vuelve a analizar. v2: motivos más específicos y productos. v3 (29 oct 2026, el caso de
+ * José Sinisterra: empezó preguntando por un ID de Dropi y no se registró): motivos de IDs y más, el primer motivo es lo que originó el día, los primeros mensajes de un día largo ya no
+ * se pierden y la IA puede proponer un motivo nuevo cuando ninguno sirve.
+ */
+export const VERSION_ANALISIS = 3;
 
 /** Cómo quedó la consulta de ese día: resuelta, sin resolver o sin pregunta (solo informó o saludó). */
 export type EstadoDia = "resuelta" | "pendiente" | "sin_consulta";
@@ -78,6 +88,8 @@ export const MAX_RESUMEN = 280;
 /** Lo que se le manda a la IA por pedido: un tramo de días, con tope de mensajes por día y de letras por mensaje. Una conversación larga se analiza en varios pedidos. */
 export const MAX_DIAS_POR_PEDIDO = 14;
 export const MAX_MENSAJES_POR_DIA = 40;
+/** De un día con más mensajes que `MAX_MENSAJES_POR_DIA`, los primeros que se conservan (lo que originó la conversación) además de los últimos. */
+export const MENSAJES_DE_INICIO = 10;
 export const MAX_LETRAS_MENSAJE = 400;
 
 export interface MensajeActividad {
@@ -157,28 +169,42 @@ export function textoParaIA(m: MensajeActividad): string {
   return limpio.length > MAX_LETRAS_MENSAJE ? `${limpio.slice(0, MAX_LETRAS_MENSAJE)}…` : limpio;
 }
 
-/** La conversación de esos días, lista para el pedido: un bloque por día con «Cliente:» y «Equipo:». Si un día trae muchos mensajes, se quedan los últimos. */
+/**
+ * La conversación de esos días, lista para el pedido: un bloque por día con «Cliente:» y «Equipo:». Si un día trae más de `MAX_MENSAJES_POR_DIA` mensajes se quitan los **del medio**: se
+ * conservan los primeros (`MENSAJES_DE_INICIO`, que son lo que originó la conversación) y los últimos. Antes se quedaban solo los últimos y un día largo perdía su comienzo.
+ */
 export function conversacionParaIA(dias: DiaActividad[]): string {
+  const linea = (m: MensajeActividad) => `${m.direccion === "entrante" ? "Cliente" : "Equipo"}: ${textoParaIA(m)}`;
   return dias
     .map((d) => {
-      const ms = d.mensajes.slice(-MAX_MENSAJES_POR_DIA);
-      const omitidos = d.mensajes.length - ms.length;
-      return [`## ${d.dia}`, ...(omitidos > 0 ? [`(${omitidos} mensajes anteriores de ese día no se incluyen)`] : []), ...ms.map((m) => `${m.direccion === "entrante" ? "Cliente" : "Equipo"}: ${textoParaIA(m)}`)].join("\n");
+      if (d.mensajes.length <= MAX_MENSAJES_POR_DIA) return [`## ${d.dia}`, ...d.mensajes.map(linea)].join("\n");
+      const inicio = d.mensajes.slice(0, MENSAJES_DE_INICIO);
+      const final = d.mensajes.slice(-(MAX_MENSAJES_POR_DIA - MENSAJES_DE_INICIO));
+      const omitidos = d.mensajes.length - inicio.length - final.length;
+      return [`## ${d.dia}`, ...inicio.map(linea), `(${omitidos} mensajes del medio de ese día no se incluyen)`, ...final.map(linea)].join("\n");
     })
     .join("\n\n");
 }
 
-export function pedidoActividad(dias: DiaActividad[]): { instrucciones: string; texto: string } {
-  const lista = MOTIVOS.map((m) => `- ${m.id}: ${m.etiqueta}`).join("\n");
+/** Lo máximo que la IA puede inventar de motivos nuevos en un mismo pedido, y cuántos motivos propios puede llegar a haber en total (para que la lista no se llene de variantes). */
+export const MAX_MOTIVOS_NUEVOS_POR_PEDIDO = 3;
+export const MAX_MOTIVOS_PROPIOS = 60;
+
+/** `extras`: los motivos que la IA fue creando antes (se ofrecen como uno más de la lista). */
+export function pedidoActividad(dias: DiaActividad[], extras: readonly Motivo[] = []): { instrucciones: string; texto: string } {
+  const lista = [...MOTIVOS, ...extras].map((m) => `- ${m.id}: ${m.etiqueta}`).join("\n");
   return {
     instrucciones: [
       "Eres un analista de atención al cliente de una empresa de dropshipping (Ecomfive). Los clientes son dropshippers que venden sus productos y escriben por WhatsApp al equipo.",
       "Te paso la conversación separada por días. Para CADA día di por qué escribió el cliente, con una frase corta en español, los motivos que correspondan y los productos por los que preguntó.",
-      `Motivos permitidos (usa solo estos ids, máximo ${MAX_MOTIVOS_POR_DIA} por día, el principal primero; elige el más específico que corresponda):\n${lista}`,
-      `Productos: escribe el nombre de cada producto por el que el cliente preguntó o mostró interés, tal como se nombró en la conversación (por ejemplo "Cutting Mix", "Aceite de semilla de calabaza"), sin cantidades ni precios, máximo ${MAX_PRODUCTOS_POR_DIA} por día. Si no nombró ninguno, una lista vacía. No inventes productos y no pongas categorías generales como "suplementos".`,
+      `Motivos permitidos (usa solo estos ids, máximo ${MAX_MOTIVOS_POR_DIA} por día; elige el más específico que corresponda):\n${lista}`,
+      "El PRIMER motivo de cada día es el que originó la conversación ese día: lo primero que el cliente preguntó o pidió (lo que dice en sus primeros mensajes), aunque después se hable de otras cosas. No lo reemplaces por un motivo de lo que pasó después.",
+      "Un mensaje cuenta como consulta aunque no tenga signos de pregunta: si el cliente solo escribe un ID de Dropi, el nombre de un producto o un número de guía, está preguntando por eso (por su disponibilidad, estado o precio). Eso NO es «sin_consulta».",
+      `Si de verdad ningún motivo permitido describe el motivo principal del día, escribe en "motivo_nuevo" una etiqueta corta (de 3 a 8 palabras, empezando con un verbo en pasado: «Preguntó por…», «Pidió…», «Reportó…», «Consultó…») y no uses "otro" para ese día. Úsalo solo cuando no sirva ninguno, no para una variante de uno que ya existe, y no más de ${MAX_MOTIVOS_NUEVOS_POR_PEDIDO} veces en total. Si ya describes bien el motivo con un id de la lista, deja "motivo_nuevo" vacío.`,
+      `Productos: escribe el nombre de cada producto por el que el cliente preguntó o mostró interés, tal como se nombró en la conversación (por ejemplo "Cutting Mix", "Aceite de semilla de calabaza"), sin cantidades ni precios, máximo ${MAX_PRODUCTOS_POR_DIA} por día. Si solo dio el ID de Dropi de un producto (un número), escribe "ID 11446" con ese número. Si no nombró ninguno, una lista vacía. No inventes productos y no pongas categorías generales como "suplementos".`,
       'Estado de cada día: "resuelta" si el equipo respondió lo que preguntó, "pendiente" si el cliente quedó esperando una respuesta o una solución, "sin_consulta" si solo saludó o informó algo.',
       `El resumen dice qué pasó y, si preguntó por productos, los nombra; sin copiar frases textuales, sin números de teléfono ni datos personales, de ${MAX_RESUMEN} letras como máximo.`,
-      'Responde SOLO con JSON, sin texto antes ni después, con esta forma: {"dias":[{"dia":"AAAA-MM-DD","motivos":["llegada_mercancia"],"productos":["Cutting Mix"],"resumen":"...","estado":"resuelta"}]}. Incluye todos los días que te paso, ninguno más.',
+      'Responde SOLO con JSON, sin texto antes ni después, con esta forma: {"dias":[{"dia":"AAAA-MM-DD","motivos":["llegada_mercancia"],"motivo_nuevo":"","productos":["Cutting Mix"],"resumen":"...","estado":"resuelta"}]}. Incluye todos los días que te paso, ninguno más.',
     ].join("\n\n"),
     texto: conversacionParaIA(dias),
   };
@@ -189,14 +215,31 @@ export interface AnalisisDia {
   motivos: string[];
   /** Los nombres que escribió la IA; se juntan con los del catálogo en `productosDelAnalisis`. */
   productos: string[];
+  /** Una etiqueta nueva que propuso la IA porque ningún motivo servía (limpia); null si no propuso ninguna. Se junta con las que ya existen en `resolverMotivoNuevo`. */
+  motivoNuevo: string | null;
   resumen: string;
   estado: EstadoDia;
 }
 
 const limpiarProducto = (t: string) => t.replace(/\s+/g, " ").trim().replace(/^[«"'“]+|[»"'”.,;:]+$/g, "").trim().slice(0, MAX_NOMBRE_PRODUCTO);
 
-/** Lo que devolvió la IA, validado: solo los días pedidos, solo motivos de la lista (sin repetir), productos limpios, resumen recortado y un estado válido. Lo que no sirve se descarta. */
-export function normalizarAnalisis(texto: string, diasPedidos: string[]): AnalisisDia[] {
+export const MIN_ETIQUETA = 8;
+export const MAX_ETIQUETA = 70;
+
+/** Una etiqueta propuesta por la IA, limpia: sin comillas ni punto final, de `MIN_ETIQUETA` a `MAX_ETIQUETA` letras y de al menos dos palabras; si no sirve, null. */
+export function limpiarEtiquetaNueva(t: unknown): string | null {
+  if (typeof t !== "string") return null;
+  const e = t.replace(/\s+/g, " ").trim().replace(/^[«"'“]+|[»"'”.,;:]+$/g, "").trim();
+  if (e.length < MIN_ETIQUETA || e.length > MAX_ETIQUETA || e.split(" ").length < 2) return null;
+  return e.charAt(0).toUpperCase() + e.slice(1);
+}
+
+/**
+ * Lo que devolvió la IA, validado: solo los días pedidos, solo motivos de la lista (sin repetir; `extras` son los que la IA creó antes), productos limpios, resumen recortado, un estado
+ * válido y, si propuso uno, su motivo nuevo. Lo que no sirve se descarta.
+ */
+export function normalizarAnalisis(texto: string, diasPedidos: string[], extras: readonly Motivo[] = []): AnalisisDia[] {
+  const permitidos = new Set([...ID_MOTIVOS, ...extras.map((m) => m.id)]);
   const i = texto.indexOf("{");
   const j = texto.lastIndexOf("}");
   if (i < 0 || j <= i) return [];
@@ -216,25 +259,66 @@ export function normalizarAnalisis(texto: string, diasPedidos: string[]): Analis
     const o = x as Record<string, unknown>;
     const dia = typeof o.dia === "string" ? o.dia.trim() : "";
     if (!pedidos.has(dia) || vistos.has(dia)) continue;
-    const motivos = [...new Set((Array.isArray(o.motivos) ? o.motivos : []).filter((m): m is string => typeof m === "string" && ID_MOTIVOS.has(m)))].slice(0, MAX_MOTIVOS_POR_DIA);
+    const motivos = [...new Set((Array.isArray(o.motivos) ? o.motivos : []).filter((m): m is string => typeof m === "string" && permitidos.has(m)))].slice(0, MAX_MOTIVOS_POR_DIA);
     const productos = [...new Set((Array.isArray(o.productos) ? o.productos : []).filter((p): p is string => typeof p === "string").map(limpiarProducto).filter((p) => p.length >= 2))].slice(0, MAX_PRODUCTOS_POR_DIA);
     const resumen = (typeof o.resumen === "string" ? o.resumen : "").replace(/\s+/g, " ").trim().slice(0, MAX_RESUMEN);
     if (!resumen) continue;
     const estado = ESTADOS_DIA.includes(o.estado as EstadoDia) ? (o.estado as EstadoDia) : "sin_consulta";
     vistos.add(dia);
-    salida.push({ dia, motivos: motivos.length ? motivos : ["otro"], productos, resumen, estado });
+    // Un motivo nuevo propuesto reemplaza a «otro»: es justo lo que no cabía en la lista.
+    const motivoNuevo = limpiarEtiquetaNueva(o.motivo_nuevo);
+    const conOtro = motivos.filter((m) => m !== "otro");
+    salida.push({ dia, motivos: motivoNuevo ? conOtro : motivos.length ? motivos : ["otro"], productos, motivoNuevo, resumen, estado });
   }
   return salida;
+}
+
+const sinTildes = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+/** Los verbos con que empiezan las etiquetas y las palabras de relleno: no distinguen un motivo de otro al compararlos. */
+const PALABRAS_VACIAS = new Set(["preguntó", "pregunto", "pidió", "pidio", "reportó", "reporto", "consultó", "consulto", "solicitó", "solicito", "quiso", "quería", "queria", "de", "del", "la", "el", "los", "las", "un", "una", "por", "para", "sobre", "que", "con", "en", "y", "o", "al", "su", "sus"]);
+const palabrasClave = (t: string): string[] => [...new Set(sinTildes(t).replace(/[^a-z0-9ñ ]+/g, " ").split(" ").filter((w) => w.length > 2 && !PALABRAS_VACIAS.has(w)))];
+
+/** El id de un motivo propio a partir de su etiqueta: «nuevo_» y las palabras clave en minúsculas sin tildes (hasta 40 letras). */
+export function idDeMotivoNuevo(etiqueta: string): string {
+  const base = palabrasClave(etiqueta).join("_").replace(/_+/g, "_").slice(0, 40).replace(/_$/, "");
+  return `nuevo_${base || "motivo"}`;
+}
+
+/**
+ * Qué hacer con un motivo nuevo que propuso la IA: si ya existe uno igual o muy parecido (las mismas palabras clave, o casi: 70 % o más) se usa ese y no se crea otro; si no, sale
+ * un motivo nuevo con su id. Así «Preguntó por la garantía de un producto» y «Consultó sobre garantía del producto» no se vuelven dos.
+ */
+export function resolverMotivoNuevo(etiqueta: string, existentes: readonly Motivo[]): { id: string; etiqueta: string; nuevo: boolean } {
+  const claves = palabrasClave(etiqueta);
+  const id = idDeMotivoNuevo(etiqueta);
+  for (const m of existentes) {
+    if (m.id === id) return { id: m.id, etiqueta: m.etiqueta, nuevo: false };
+    const otras = palabrasClave(m.etiqueta);
+    if (!otras.length || !claves.length) continue;
+    const comunes = claves.filter((w) => otras.includes(w)).length;
+    if (comunes / new Set([...claves, ...otras]).size >= 0.7) return { id: m.id, etiqueta: m.etiqueta, nuevo: false };
+  }
+  return { id, etiqueta, nuevo: true };
+}
+
+/** Pone un motivo (el que salió de `resolverMotivoNuevo`) como el primero de un día, sin repetir ni pasar de `MAX_MOTIVOS_POR_DIA`. */
+export const conMotivoPrimero = (motivos: readonly string[], id: string): string[] => [id, ...motivos.filter((m) => m !== id && m !== "otro")].slice(0, MAX_MOTIVOS_POR_DIA);
+
+/** Los IDs de Dropi que la IA anotó como «ID 11446» en los productos de un día. */
+export function idsDropiDeProductos(nombres: readonly string[]): string[] {
+  return [...new Set(nombres.map((n) => /^ID\s*(\d{3,7})$/i.exec(n.trim())?.[1]).filter((x): x is string => !!x))];
 }
 
 /**
  * Los productos de un día con el nombre del catálogo cuando se reconocen («cutting mix» → «Cutting Mix»), para que contar el interés por producto siempre use el mismo nombre;
  * el que no está en el catálogo se queda como lo escribió la IA. Sin repetidos.
  */
-export function productosDelAnalisis(nombres: readonly string[], catalogo: ProductoParaCruzar[]): string[] {
+export function productosDelAnalisis(nombres: readonly string[], catalogo: ProductoParaCruzar[], porIdDropi: ReadonlyMap<string, string> = new Map()): string[] {
   const salida: string[] = [];
   for (const n of nombres) {
-    const nombre = productosMencionados(n, catalogo, 1)[0]?.nombre ?? n;
+    // «ID 11446»: el producto de esa publicación de Dropi, si se conoce.
+    const idDropi = /^ID\s*(\d{3,7})$/i.exec(n.trim())?.[1];
+    const nombre = (idDropi ? porIdDropi.get(idDropi) : undefined) ?? (idDropi ? `ID ${idDropi}` : (productosMencionados(n, catalogo, 1)[0]?.nombre ?? n));
     if (!salida.some((s) => s.toLowerCase() === nombre.toLowerCase())) salida.push(nombre);
   }
   return salida;
@@ -254,7 +338,7 @@ export interface FrecuenciaMotivo {
 }
 
 /** Cuántos días apareció cada motivo, de más a menos frecuente (empata por el orden de la lista). Los días «sin consulta» no cuentan: no hay inquietud. */
-export function frecuenciaDeMotivos(filas: readonly FilaActividad[]): FrecuenciaMotivo[] {
+export function frecuenciaDeMotivos(filas: readonly FilaActividad[], extra?: Readonly<Record<string, string>>): FrecuenciaMotivo[] {
   const cuentas = new Map<string, number>();
   for (const f of filas) {
     if (f.estado === "sin_consulta") continue;
@@ -262,7 +346,7 @@ export function frecuenciaDeMotivos(filas: readonly FilaActividad[]): Frecuencia
   }
   const conocidos = MOTIVOS.filter((m) => cuentas.has(m.id)).map((m) => ({ id: m.id, etiqueta: m.etiqueta, dias: cuentas.get(m.id) ?? 0 }));
   // Los de la primera versión que ya no están en la lista siguen contando hasta que ese día se vuelva a analizar.
-  const anteriores = [...cuentas.entries()].filter(([id]) => !ID_MOTIVOS.has(id)).map(([id, dias]) => ({ id, etiqueta: etiquetaDeMotivo(id), dias }));
+  const anteriores = [...cuentas.entries()].filter(([id]) => !ID_MOTIVOS.has(id)).map(([id, dias]) => ({ id, etiqueta: etiquetaDeMotivo(id, extra), dias }));
   return [...conocidos, ...anteriores].sort((a, b) => b.dias - a.dias);
 }
 
@@ -348,11 +432,11 @@ export interface ResumenDeDia {
 }
 
 /** El pedido del análisis completo: los resúmenes de los días ya analizados (los más recientes) y, de los últimos días, los mensajes tal cual para ver el detalle y el tono. */
-export function pedidoPerfil(resumenes: readonly ResumenDeDia[], recientes: DiaActividad[]): { instrucciones: string; texto: string } {
+export function pedidoPerfil(resumenes: readonly ResumenDeDia[], recientes: DiaActividad[], extra?: Readonly<Record<string, string>>): { instrucciones: string; texto: string } {
   const historial = [...resumenes]
     .sort((a, b) => a.dia.localeCompare(b.dia))
     .slice(-MAX_DIAS_RESUMEN)
-    .map((r) => `- ${r.dia} [${ETIQUETA_ESTADO[r.estado]}] ${r.motivos.map(etiquetaDeMotivo).join(", ")}${r.productos.length ? ` · productos: ${r.productos.join(", ")}` : ""}: ${r.resumen}`)
+    .map((r) => `- ${r.dia} [${ETIQUETA_ESTADO[r.estado]}] ${r.motivos.map((m) => etiquetaDeMotivo(m, extra)).join(", ")}${r.productos.length ? ` · productos: ${r.productos.join(", ")}` : ""}: ${r.resumen}`)
     .join("\n");
   const detalle = conversacionParaIA(recientes.slice(-DIAS_RECIENTES_COMPLETOS));
   return {

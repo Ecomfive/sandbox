@@ -198,6 +198,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   renombrar_contacto_whatsapp: "Cambió el nombre de un contacto de WhatsApp",
   enviar_archivo_whatsapp: "Mandó un archivo por WhatsApp",
   analizar_actividad_whatsapp: "Analizó con IA por qué escribe un dropshipper",
+  crear_motivo_actividad: "La IA creó un motivo nuevo de contacto",
   pasar_area_whatsapp: "Pasó el chat a otra área",
   intervenir_whatsapp: "Intervino en el chat",
   importar_chat_whatsapp: "Importó el chat desde el celular",

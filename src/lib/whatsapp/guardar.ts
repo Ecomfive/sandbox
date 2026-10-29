@@ -1,6 +1,7 @@
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
 import { avisarBandeja } from "./aviso-bandeja";
+import { clasificarPorTelefonos } from "./clasificar";
 import { dropshipperPorTelefonos } from "./vinculo";
 import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
 
@@ -39,6 +40,8 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
   }
   if (!desdeCelular) await volverAMostrarSiOcultos(supabase, telefonos);
   await avisarBandeja();
+  // El motivo de los chats que esperan respuesta, leído por la IA (migración 0189): la bandeja los ordena por su plazo.
+  if (!desdeCelular && (await clasificarPorTelefonos(supabase, telefonos)) > 0) await avisarBandeja();
 }
 
 /**

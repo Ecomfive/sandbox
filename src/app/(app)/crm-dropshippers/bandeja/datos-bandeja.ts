@@ -4,6 +4,7 @@ import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERC
 import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
+import { esGrupo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
@@ -44,6 +45,17 @@ export interface ConversacionVista {
   borradoPendiente: boolean;
   /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
   etiquetas: string[];
+  /** Desde cuándo espera respuesta: su primer mensaje sin contestar (migración 0189). Sin la migración, null y se usa `ultimoEntranteEn`. */
+  esperandoDesde: string | null;
+  /** El motivo del chat (migración 0189): lo lee la IA o lo corrige el equipo. Decide el plazo y el orden de la lista. */
+  motivo: MotivoVista | null;
+}
+
+export interface MotivoVista {
+  grupo: GrupoMotivo;
+  resumen: string | null;
+  por: "ia" | "persona";
+  porNombre: string | null;
 }
 
 /** Lo que carga la Bandeja: los números, los chats y el color elegido de cada etiqueta (por su nombre). */
@@ -159,6 +171,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       nombrePersonalizado: null,
       // Con dropshipper, las etiquetas son las suyas (las mismas de su ficha del CRM); sin él, las del chat.
       etiquetas: d ? (d.etiquetas ?? []) : [],
+      esperandoDesde: null,
+      motivo: null,
     };
   });
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
@@ -190,6 +204,22 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     for (const c of conversaciones) if (!c.dropshipperId) c.etiquetas = porId.get(c.id) ?? [];
   }
   if (!coloresR.error) for (const x of coloresR.data ?? []) colores[x.nombre as string] = x.color as string;
+  // La espera y el motivo de cada chat (migración 0189). Sin ella, la bandeja ordena y mide como antes.
+  const conMotivo = await supabase
+    .from("whatsapp_conversaciones")
+    .select("id, esperando_desde, motivo_grupo, motivo_resumen, motivo_por, motivo_por_nombre")
+    .or("esperando_desde.not.is.null,motivo_grupo.not.is.null")
+    .limit(5000);
+  if (!conMotivo.error) {
+    const porId = new Map((conMotivo.data ?? []).map((x) => [x.id as string, x]));
+    for (const c of conversaciones) {
+      const x = porId.get(c.id);
+      if (!x) continue;
+      c.esperandoDesde = (x.esperando_desde as string | null) ?? null;
+      if (esGrupo(x.motivo_grupo))
+        c.motivo = { grupo: x.motivo_grupo, resumen: (x.motivo_resumen as string | null) ?? null, por: x.motivo_por === "persona" ? "persona" : "ia", porNombre: (x.motivo_por_nombre as string | null) ?? null };
+    }
+  }
   // Lo que se autorizó borrar se oculta y se marca lo que espera autorización (migración 0172). Sin ella, nada.
   const [ocultas, pendientes] = await Promise.all([conversacionesOcultas(supabase), borradosPendientes(supabase)]);
   for (const c of conversaciones) c.borradoPendiente = pendientes.chats.has(c.id);
