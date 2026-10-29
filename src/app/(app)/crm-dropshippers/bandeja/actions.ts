@@ -7,27 +7,19 @@ import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
-import { enviarArchivoWhatsapp, enviarPlantillaWhatsapp, enviarTextoWhatsapp, subirMedioWhatsapp } from "@/lib/whatsapp/api";
-import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO, TIPO_DE_MENSAJE } from "@/lib/whatsapp/archivos";
+import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
+import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
 import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { claves360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
+import { avisoSupervision, BUCKET_ARCHIVOS, chatParaEnviar, mandarMedioGuardado, MAX_PIE, NOMBRE_AREA, permisoDeSubida } from "./enviar-medio";
 import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
-
-/**
- * Supervisión (29 oct 2026): quien mira un chat de un área de abajo (Comercial en Atención, Dirección en las dos) no le responde al
- * dropshipper hasta «Intervenir» (el chat queda a su cargo). Devuelve el aviso, o null si puede responder.
- */
-function avisoSupervision(u: { modulos: string[]; modulosSoloLectura: string[]; id: string }, c: { area: AreaCrm; asignadaA: string | null }): string | null {
-  if (!supervisaArea(accesoCrm(u), c.area) || c.asignadaA === u.id) return null;
-  return `Estás supervisando el panel de ${NOMBRE_AREA[c.area]}: para responderle, toca «Intervenir».`;
-}
 
 /** La lista de conversaciones, para refrescar la bandeja cada pocos segundos. */
 export async function obtenerBandeja(): Promise<{ numeros: NumeroVista[]; conversaciones: ConversacionVista[] } | { error: string }> {
@@ -158,26 +150,6 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   return { ok: true };
 }
 
-/** Donde quedan los archivos que se mandan (el bucket de los chats importados, migración 0169): `<chat>/enviados/…`. El chat los muestra con `/api/whatsapp/media/<mensaje>`. */
-const BUCKET_ARCHIVOS = "whatsapp-importados";
-/** Un texto al pie de una foto, un video o un documento: WhatsApp admite hasta 1024 caracteres. */
-const MAX_PIE = 1024;
-
-type ChatParaEnviar = NonNullable<Awaited<ReturnType<typeof conversacionPermitida>>>;
-
-/** Lo que hace falta para mandarle algo a un dropshipper: poder escribir en el chat, no estar solo supervisando y la ventana de 24 h abierta. */
-async function chatParaEnviar(id: string): Promise<{ u: NonNullable<Awaited<ReturnType<typeof usuarioBandeja>>>; c: ChatParaEnviar; supabase: ReturnType<typeof createServiceClient> } | { error: string }> {
-  const u = await usuarioBandeja(true);
-  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
-  const supabase = createServiceClient();
-  const c = await conversacionPermitida(supabase, id, u, true);
-  if (!c) return { error: "Esa conversación no existe o no es de tu área." };
-  const supervisando = avisoSupervision(u, c);
-  if (supervisando) return { error: supervisando };
-  if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
-  return { u, c, supabase };
-}
-
 /**
  * Primer paso de mandar un archivo (foto, audio, video o documento, 29 oct 2026): da el permiso firmado para que el navegador lo suba directo al almacenamiento (una acción del
  * servidor no admite archivos grandes). Todavía no se manda nada: `enviarArchivoPorWhatsapp` revisa el contenido y lo manda.
@@ -188,19 +160,9 @@ export async function prepararEnvioArchivo(id: string, nombre: string, tamano: n
   if (!Number.isFinite(tamano) || tamano <= 0) return { error: "El archivo está vacío." };
   if (tamano > MAX_BYTES_ENVIO) return { error: `El archivo pesa más de ${MAX_BYTES_ENVIO / 1024 / 1024} MB.` };
   const ruta = `${id}/enviados/${crypto.randomUUID()}-${nombreArchivoSeguro(nombre)}`;
-  const pedir = () => e.supabase.storage.from(BUCKET_ARCHIVOS).createSignedUploadUrl(ruta);
-  let { data, error } = await pedir();
-  // Si el almacén de los archivos todavía no existe (la migración 0169 no se corrió), se crea aquí y se vuelve a pedir el permiso. Sin almacén, Supabase no dice «bucket»:
-  // contesta «The related resource does not exist» (falla la llave foránea), así que ante cualquier error se intenta crearlo una vez (si ya existía, no pasa nada).
-  if (error) {
-    await e.supabase.storage.createBucket(BUCKET_ARCHIVOS, { public: false, fileSizeLimit: 25 * 1024 * 1024 });
-    ({ data, error } = await pedir());
-  }
-  if (error || !data) {
-    console.error("[whatsapp] no se pudo preparar la subida de un archivo:", error?.message);
-    return { error: `No se pudo preparar la subida del archivo${error?.message ? ` (${error.message})` : ""}.` };
-  }
-  return { ruta, token: data.token };
+  const permiso = await permisoDeSubida(e.supabase, ruta);
+  if ("error" in permiso) return permiso;
+  return { ruta, token: permiso.token };
 }
 
 /**
@@ -210,7 +172,7 @@ export async function prepararEnvioArchivo(id: string, nombre: string, tamano: n
 export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre: string, texto: string): Promise<{ ok: true } | { error: string }> {
   const e = await chatParaEnviar(id);
   if ("error" in e) return e;
-  const { u, c, supabase } = e;
+  const { supabase } = e;
   if (typeof ruta !== "string" || !ruta.startsWith(`${id}/enviados/`) || ruta.includes("..")) return { error: "Archivo no válido." };
   const quitar = () => supabase.storage.from(BUCKET_ARCHIVOS).remove([ruta]);
 
@@ -228,42 +190,7 @@ export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre:
     return { error: clase.error };
   }
   const pie = String(texto ?? "").trim().slice(0, MAX_PIE);
-  const de = { phoneNumberId: c.phoneNumberId, numero: c.numeroEmpresa };
-  const subida = await subirMedioWhatsapp(de, bytes, clase.mime, nombreMostrado);
-  if ("error" in subida) {
-    await quitar();
-    return { error: subida.error };
-  }
-  const r = await enviarArchivoWhatsapp(de, c.telefono, clase.tipo, subida.id, { texto: pie, nombre: nombreMostrado });
-  if ("error" in r) {
-    await quitar();
-    return { error: r.error };
-  }
-  const ahora = new Date().toISOString();
-  const tipo = TIPO_DE_MENSAJE[clase.tipo];
-  const llevaPie = clase.tipo !== "audio" && pie;
-  const { error } = await supabase.from("whatsapp_mensajes").insert({
-    conversacion_id: id,
-    direccion: "saliente",
-    tipo,
-    texto: llevaPie ? pie : null,
-    media_id: `storage:${ruta}`,
-    media_mime: clase.mime,
-    media_nombre: nombreMostrado,
-    wa_id: r.waId,
-    estado: "enviado",
-    autor_id: u.id,
-    autor_nombre: u.nombre || u.email,
-    momento: ahora,
-  });
-  // Ya salió por WhatsApp: si no se pudo anotar, se avisa (no se reintenta, para no mandarlo dos veces).
-  if (error) return { error: "Se envió, pero no se pudo guardar en el historial. Recarga la bandeja." };
-  await supabase
-    .from("whatsapp_conversaciones")
-    .update({ ultimo_mensaje_en: ahora, ultimo_texto: resumenMensaje(tipo, llevaPie ? pie : null), ultimo_de: "saliente", no_leidos: 0, ...(c.asignadaA ? {} : { asignada_a: u.id }) })
-    .eq("id", id);
-  await registrarAuditoria({ accion: "enviar_archivo_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `Mandó ${tipo === "imagen" ? "una foto" : tipo === "audio" ? "un audio" : tipo === "video" ? "un video" : "un documento"}` });
-  return { ok: true };
+  return mandarMedioGuardado(e, { bytes, nombre: nombreMostrado, pie, ruta, tipo: clase.tipo, mime: clase.mime });
 }
 
 /** Una nota privada en la conversación: la ve el equipo, nunca el dropshipper (no sale por WhatsApp). */
@@ -310,7 +237,6 @@ export async function marcarChatLeido(id: string, leido: boolean): Promise<{ ok:
   return error ? { error: "No se pudo marcar como no leído." } : { ok: true };
 }
 
-const NOMBRE_AREA: Record<AreaCrm, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
 
 /**
  * «Pasar a otra área» (un solo número para todo el equipo, migración 0168): el chat pasa a Atención, Comercial o Dirección y deja de

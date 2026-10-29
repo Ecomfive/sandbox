@@ -7,7 +7,7 @@
 
 import { detectarImagen } from "@/lib/seguridad/imagen";
 
-export type TipoEnvio = "imagen" | "audio" | "video" | "documento";
+export type TipoEnvio = "imagen" | "audio" | "video" | "documento" | "sticker";
 
 export interface ArchivoParaWhatsapp {
   tipo: TipoEnvio;
@@ -16,14 +16,14 @@ export interface ArchivoParaWhatsapp {
 }
 
 const MB = 1024 * 1024;
-export const LIMITE_ENVIO: Record<TipoEnvio, number> = { imagen: 5 * MB, audio: 16 * MB, video: 16 * MB, documento: 16 * MB };
+export const LIMITE_ENVIO: Record<TipoEnvio, number> = { imagen: 5 * MB, audio: 16 * MB, video: 16 * MB, documento: 16 * MB, sticker: 500 * 1024 };
 /** El tamaño más grande que se acepta subir (el de un audio, un video o un documento). */
 export const MAX_BYTES_ENVIO = 16 * MB;
 
 export const MENSAJE_NO_SOPORTADO =
   "No se puede mandar ese archivo por WhatsApp. Se aceptan fotos JPG o PNG, audios MP3, M4A, OGG (Opus) o AMR, video MP4 y documentos PDF, Word, Excel, PowerPoint o de texto.";
 
-const ARTICULO: Record<TipoEnvio, string> = { imagen: "una foto", audio: "un audio", video: "un video", documento: "un documento" };
+const ARTICULO: Record<TipoEnvio, string> = { imagen: "una foto", audio: "un audio", video: "un video", documento: "un documento", sticker: "un sticker" };
 const ascii = (b: Uint8Array, desde: number, largo: number) => String.fromCharCode(...b.slice(desde, desde + largo));
 const extensionDe = (nombre: string) => (/\.([a-z0-9]+)$/i.exec(nombre)?.[1] ?? "").toLowerCase();
 
@@ -117,7 +117,7 @@ export function motivoDeRechazoEnvio(archivo: { tamano: number; nombre: string; 
 }
 
 /** Lo que va en cada clase de mensaje de WhatsApp (`tipo` de la tabla `whatsapp_mensajes`). */
-export const TIPO_DE_MENSAJE: Record<TipoEnvio, string> = { imagen: "imagen", audio: "audio", video: "video", documento: "documento" };
+export const TIPO_DE_MENSAJE: Record<TipoEnvio, string> = { imagen: "imagen", audio: "audio", video: "video", documento: "documento", sticker: "sticker" };
 
 /** Las clases que llevan texto al pie (el audio no). */
-export const LLEVA_TEXTO: Record<TipoEnvio, boolean> = { imagen: true, audio: false, video: true, documento: true };
+export const LLEVA_TEXTO: Record<TipoEnvio, boolean> = { imagen: true, audio: false, video: true, documento: true, sticker: false };

@@ -75,7 +75,7 @@ export async function subirMedioWhatsapp({ phoneNumberId, numero }: NumeroEmpres
 
 /** Manda un archivo ya subido (`mediaId`): foto, audio, video o documento, con su texto al pie (menos el audio, que no lo lleva). */
 export async function enviarArchivoWhatsapp(de: NumeroEmpresa, para: string, tipo: TipoEnvio, mediaId: string, opciones: { texto?: string; nombre?: string } = {}): Promise<{ waId: string } | { error: string }> {
-  const clave = tipo === "imagen" ? "image" : tipo === "documento" ? "document" : tipo;
+  const clave = tipo === "imagen" ? "image" : tipo === "documento" ? "document" : tipo; // video, audio y sticker se llaman igual
   const cuerpo: Record<string, unknown> = { id: mediaId };
   if (opciones.texto && LLEVA_TEXTO[tipo]) cuerpo.caption = opciones.texto;
   if (tipo === "documento" && opciones.nombre) cuerpo.filename = opciones.nombre;

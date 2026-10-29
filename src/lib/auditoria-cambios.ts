@@ -197,6 +197,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   eliminar_respuesta_rapida: "Quitó un mensaje rápido de WhatsApp",
   renombrar_contacto_whatsapp: "Cambió el nombre de un contacto de WhatsApp",
   enviar_archivo_whatsapp: "Mandó un archivo por WhatsApp",
+  crear_sticker_whatsapp: "Agregó un sticker de WhatsApp a la lista del equipo",
+  eliminar_sticker_whatsapp: "Quitó un sticker de WhatsApp de la lista del equipo",
   vincular_chat_dropshipper: "Vinculó un chat de WhatsApp con un dropshipper",
   desvincular_chat_dropshipper: "Quitó el vínculo de un chat de WhatsApp con un dropshipper",
   crear_plantilla_whatsapp: "Creó la plantilla de WhatsApp",
