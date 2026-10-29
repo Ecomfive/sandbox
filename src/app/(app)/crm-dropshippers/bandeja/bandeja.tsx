@@ -17,6 +17,7 @@ import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper,
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
+import { reaccionarAMensaje } from "./reaccion-actions";
 import { cambiarVip } from "../tareas/actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -35,7 +36,7 @@ import { ChatIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, P
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
-import { agruparReacciones, type ReaccionVista } from "@/lib/whatsapp/reacciones";
+import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 
 /** Qué conversaciones del panel se ven. */
 type Filtro = "sinResponder" | "mias" | "todas";
@@ -586,6 +587,14 @@ export function Bandeja({
     setArchivo(f);
   }
   const traeArchivos = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+
+  /** Reacciona con un emoji a un mensaje del chat (o quita la reacción con un emoji vacío) y vuelve a pedir el chat para verla puesta. */
+  async function reaccionar(m: MensajeVista, emoji: string) {
+    if (!sel) return;
+    const r = await reaccionarAMensaje(sel.id, m.id, emoji).catch(() => ({ error: "No se pudo reaccionar. Inténtalo de nuevo." }));
+    if ("error" in r) mostrarToast(r.error, "destructive");
+    await refrescar(sel.id);
+  }
 
   function mandar() {
     if (!sel || !borrador.trim() || bloqueado) return;
@@ -1288,6 +1297,8 @@ export function Bandeja({
                             reacciones={conReacciones?.reacciones.get(m.id)}
                             alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
+                            // Se reacciona a lo que ya tiene su id en WhatsApp, con la ventana de 24 h abierta y no solo supervisando.
+                            alReaccionar={escribe && !mirando && ventana && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" ? (emoji) => void reaccionar(m, emoji) : undefined}
                             // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
                             alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
                           />
@@ -1620,16 +1631,88 @@ function BotonRapidaMensaje({ alPulsar }: { alPulsar: () => void }) {
   );
 }
 
+/**
+ * «Reaccionar» a un mensaje, como en WhatsApp (29 oct 2026): un botón con una carita al lado de la burbuja (al pasar el cursor, o siempre en pantallas táctiles) abre una barra con
+ * seis reacciones. Elegir la que ya se había puesto la quita. La reacción de la empresa sale sobre el mensaje, junto a la del dropshipper.
+ */
+function ReaccionarMensaje({ nuestro, actual, alElegir }: { nuestro: boolean; actual: string | null; alElegir: (emoji: string) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const raiz = useRef<HTMLSpanElement>(null);
+  const boton = useRef<HTMLButtonElement>(null);
+
+  // Escape o un clic fuera cierran la barra y el foco vuelve al botón.
+  useEffect(() => {
+    if (!abierto) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setAbierto(false);
+      boton.current?.focus();
+    };
+    const alPulsar = (e: PointerEvent) => {
+      if (raiz.current && !raiz.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener("keydown", alTeclear);
+    document.addEventListener("pointerdown", alPulsar);
+    return () => {
+      document.removeEventListener("keydown", alTeclear);
+      document.removeEventListener("pointerdown", alPulsar);
+    };
+  }, [abierto]);
+
+  return (
+    <span ref={raiz} className={`absolute top-1/2 -translate-y-1/2 ${nuestro ? "-left-9" : "-right-9"}`}>
+      <button
+        ref={boton}
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-haspopup="true"
+        aria-label="Reaccionar a este mensaje"
+        title="Reaccionar"
+        className={`flex h-7 w-7 items-center justify-center rounded-full bg-[var(--wa-fondo)] text-[var(--wa-sec)] shadow-[0_1px_2px_var(--wa-sombra)] group-hover:opacity-100 hover:text-[var(--wa-acento)] focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${abierto ? "opacity-100" : "opacity-0"} ${anilloFoco}`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8.5 14a4.5 4.5 0 0 0 7 0" />
+          <path d="M9 9.5h.01M15 9.5h.01" />
+        </svg>
+      </button>
+      {abierto && (
+        <span role="group" aria-label="Elige una reacción" className={`absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] p-1 shadow-[0_4px_16px_var(--wa-sombra)] ${nuestro ? "right-0" : "left-0"}`}>
+          {REACCIONES_RAPIDAS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              aria-pressed={actual === e}
+              aria-label={actual === e ? `Quitar la reacción ${e}` : `Reaccionar con ${e}`}
+              onClick={() => {
+                setAbierto(false);
+                alElegir(actual === e ? "" : e);
+              }}
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none hover:bg-[var(--wa-hover)] ${actual === e ? "bg-[var(--wa-hover)]" : ""} ${anilloFoco}`}
+            >
+              {e}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Burbuja({
   m,
   seguido,
   reacciones,
   alPedirBorrar,
   alGuardarRapida,
+  alReaccionar,
   alReintentar,
 }: {
   m: MensajeVista;
   seguido: boolean;
+  /** Reaccionar a este mensaje con un emoji (vacío = quitar la reacción del equipo); solo si se puede. */
+  alReaccionar?: (emoji: string) => void;
   /** Las reacciones a este mensaje (una por lado), que se dibujan sobre su borde de abajo, como en WhatsApp. */
   reacciones?: ReaccionVista[];
   alPedirBorrar?: (m: MensajeVista) => void;
@@ -1689,6 +1772,7 @@ function Burbuja({
           ))}
         </span>
       )}
+      {alReaccionar && <ReaccionarMensaje nuestro={nuestro} actual={miReaccion(reacciones)} alElegir={alReaccionar} />}
       {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
       {nuestro && alGuardarRapida && m.tipo === "texto" && (m.texto?.trim().length ?? 0) >= 3 && <BotonRapidaMensaje alPulsar={() => alGuardarRapida(m.texto ?? "")} />}
       {nuestro && m.autor && !seguido && (

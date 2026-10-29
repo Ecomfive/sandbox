@@ -82,6 +82,14 @@ export async function enviarArchivoWhatsapp(de: NumeroEmpresa, para: string, tip
   return enviarMensajeWhatsapp(de, para, { type: clave, [clave]: cuerpo });
 }
 
+/**
+ * Reacciona con un emoji a un mensaje (el `wamid` del mensaje, de quien sea). Con `emoji` vacío quita la reacción que ya se había puesto. Solo dentro de las 24 horas del último
+ * mensaje del dropshipper, como todo lo que se manda.
+ */
+export async function enviarReaccionWhatsapp(de: NumeroEmpresa, para: string, mensajeWaId: string, emoji: string): Promise<{ waId: string } | { error: string }> {
+  return enviarMensajeWhatsapp(de, para, { type: "reaction", reaction: { message_id: mensajeWaId, emoji } });
+}
+
 async function enviarMensajeWhatsapp({ phoneNumberId, numero }: NumeroEmpresa, para: string, contenido: Record<string, unknown>): Promise<{ waId: string } | { error: string }> {
   // Un teléfono va en `to` (solo dígitos); un id de usuario de WhatsApp sin teléfono (BSUID, el sandbox lo usa a veces) en `recipient`.
   const destino = /^\+?\d+$/.test(para) ? { to: para.replace(/\D/g, "") } : { recipient: para };
