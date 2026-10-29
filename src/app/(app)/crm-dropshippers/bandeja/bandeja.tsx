@@ -7,7 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
+import { abrirConversacion, cambiarEstadoConversacion, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, obtenerBandeja, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { ConversacionVista, MensajeVista, NumeroVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { SugerenciasDeVinculo, VentanaVincular } from "./vincular-chat";
@@ -248,6 +248,38 @@ export function Bandeja({
   const [verPlantillas, setVerPlantillas] = useState(false);
   const [borrar, setBorrar] = useState<QueBorrar | null>(null);
   const [vincular, setVincular] = useState(false);
+  // Menú del clic derecho sobre un chat de la lista: marcarlo como no leído (vuelve a pendiente de respuesta) o como leído.
+  const [menuChat, setMenuChat] = useState<{ id: string; x: number; y: number } | null>(null);
+  const menuChatRef = useRef<HTMLDivElement | null>(null);
+  const origenMenu = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!menuChat) return;
+    const cerrar = () => setMenuChat(null);
+    const fuera = (e: Event) => {
+      if (!menuChatRef.current?.contains(e.target as Node)) cerrar();
+    };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        cerrar();
+        origenMenu.current?.focus();
+      }
+    };
+    menuChatRef.current?.querySelector<HTMLElement>("button")?.focus();
+    document.addEventListener("pointerdown", fuera);
+    document.addEventListener("contextmenu", fuera);
+    document.addEventListener("keydown", tecla);
+    window.addEventListener("scroll", cerrar, true);
+    window.addEventListener("resize", cerrar);
+    window.addEventListener("blur", cerrar);
+    return () => {
+      document.removeEventListener("pointerdown", fuera);
+      document.removeEventListener("contextmenu", fuera);
+      document.removeEventListener("keydown", tecla);
+      window.removeEventListener("scroll", cerrar, true);
+      window.removeEventListener("resize", cerrar);
+      window.removeEventListener("blur", cerrar);
+    };
+  }, [menuChat]);
   // La vista previa de los últimos mensajes al pasar el cursor por un chat de la lista (solo con ratón y pantalla ancha).
   const [vista, setVista] = useState<{ id: string; top: number; left: number; mensajes: VistaPreviaMensaje[] | "cargando" | "error" } | null>(null);
   const temporizadorVista = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -411,6 +443,20 @@ export function Bandeja({
       setBorrador("");
       await refrescar(sel.id);
     });
+  }
+
+  /** Marca un chat como leído o no leído. Un chat abierto se cierra al marcarlo no leído (si no, seguiría contando como leído al refrescar). */
+  function marcarLeido(c: ConversacionVista, leido: boolean) {
+    setMenuChat(null);
+    if (!leido && c.id === elegido) setElegido(null);
+    setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? (leido ? { ...x, noLeidos: 0 } : { ...x, noLeidos: Math.max(1, x.noLeidos), estado: "abierta" as const }) : x)) }));
+    void marcarChatLeido(c.id, leido)
+      .then((r) => {
+        if ("error" in r) mostrarToast(r.error, "destructive");
+        else mostrarToast(leido ? "Marcado como leído." : "Marcado como no leído: vuelve a estar pendiente de respuesta.");
+        return refrescar(null);
+      })
+      .catch(() => mostrarToast("No se pudo marcar.", "destructive"));
   }
 
   function accion(fn: () => Promise<{ ok: true } | { error: string }>, ok: string) {
@@ -579,7 +625,20 @@ export function Bandeja({
           {lista.map((c) => {
             const actual = c.id === elegido;
             return (
-              <li key={c.id} onMouseEnter={(e) => c.id !== elegido && verVistaPrevia(c, e.currentTarget)} onMouseLeave={ocultarVistaPrevia}>
+              <li
+                key={c.id}
+                onMouseEnter={(e) => c.id !== elegido && verVistaPrevia(c, e.currentTarget)}
+                onMouseLeave={ocultarVistaPrevia}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  ocultarVistaPrevia();
+                  origenMenu.current = e.currentTarget.querySelector("button");
+                  // Con el teclado (tecla de menú o Mayús + F10) no hay posición del cursor: el menú sale junto al chat.
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const conRaton = e.clientX !== 0 || e.clientY !== 0;
+                  setMenuChat({ id: c.id, x: Math.min(conRaton ? e.clientX : r.left + 40, window.innerWidth - 230), y: Math.min(conRaton ? e.clientY : r.bottom - 8, window.innerHeight - 70) });
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -671,6 +730,9 @@ export function Bandeja({
                 Borrado esperando autorización
               </Link>
             )}
+            <button type="button" className={botonPildora} onClick={() => marcarLeido(sel, false)}>
+              Marcar como no leído
+            </button>
             {escribe && mirando && (
               <button
                 type="button"
@@ -902,6 +964,24 @@ export function Bandeja({
         </div>
       )}
 
+      {menuChat &&
+        (() => {
+          const c = datos.conversaciones.find((x) => x.id === menuChat.id);
+          if (!c) return null;
+          return (
+            <div
+              ref={menuChatRef}
+              role="menu"
+              aria-label={`Opciones del chat con ${c.nombre}`}
+              style={{ top: menuChat.y, left: menuChat.x }}
+              className="fixed z-50 flex min-w-52 flex-col rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] p-1 text-[14px] text-[var(--wa-texto)] shadow-[0_8px_24px_var(--wa-sombra)]"
+            >
+              <button type="button" role="menuitem" onClick={() => marcarLeido(c, c.noLeidos > 0)} className={`rounded-md px-3 py-2 text-left hover:bg-[var(--wa-hover)] ${anilloFoco}`}>
+                {c.noLeidos > 0 ? "Marcar como leído" : "Marcar como no leído"}
+              </button>
+            </div>
+          );
+        })()}
       {vincular && sel && (
         <VentanaVincular
           conversacionId={sel.id}

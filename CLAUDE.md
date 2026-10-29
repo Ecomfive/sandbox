@@ -1045,6 +1045,9 @@ convenciones técnicas del código.
   `ver_telefono_dropshipper` en la auditoría. Se quitaron los enlaces `wa.me` y la búsqueda por número; el campo WhatsApp de la ficha del dropshipper arranca vacío y **vacío = no cambiar** (`actualizarDropshipper`).
   El servidor sigue usando el número para enviar. **Etapa 2 pendiente** (aparte, más riesgosa): cifrar el número en la base (clave del servidor + huella para emparejar) y decidir quién más puede descifrarlo; hoy `whatsapp_conversaciones.telefono`
   y `dropshippers.contacto_telefono` siguen en texto normal y las funciones SQL de WhatsApp, los KPIs, la importación de chats y el emparejamiento dependen de ellos.
+  **Marcar como no leído** (29 oct 2026): clic derecho (o tecla de menú / Mayús + F10) sobre un chat de la lista abre un menú con «Marcar como no leído» —o «Marcar como leído» si tiene mensajes sin leer—, y el encabezado del chat
+  trae el mismo botón. `marcarChatLeido(id, leido)` (`bandeja/actions.ts`; basta poder abrir el CRM, como abrir un chat) deja `no_leidos` en 1 como mínimo y pone `estado = abierta` (así vuelve a «Sin responder»); la lista cambia al
+  instante. Un chat **abierto se cierra** al marcarlo no leído: mientras está abierto, el refresco de cada 8 s lo vuelve a marcar leído (`abrirConversacion`).
   **Vincular un chat con su dropshipper** (29 oct 2026, migración 0177 `dropshipper_telefonos`: otros números por dropshipper, únicos, RLS sin políticas): un chat se enlaza solo si el número que escribe es el principal
   (`dropshippers.contacto_telefono`) o uno de los otros de un dropshipper (`dropshipperPorTelefonos`, `src/lib/whatsapp/vinculo.ts`, que usan los mensajes que llegan y «Importar chat»). **Desde el chat**
   (`bandeja/vincular-chat.tsx`, `vincular-actions.ts`, solo a quien puede escribir en el área del chat): en «No está en el CRM», `sugerirDropshippersParaChat` propone hasta 3 dropshippers cuyo nombre o tienda se
