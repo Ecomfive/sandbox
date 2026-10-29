@@ -565,3 +565,40 @@ test("apagar un privado: la reserva del correo se quita (va marcada como quitada
   assert.ok((privado.private_product_inventories as Obj[]).every((x) => x.deleted_at));
   assert.equal(privado.archived, true);
 });
+
+test("stock: deja la bodega con las unidades pedidas (entrada o salida), lo comprueba y devuelve las bodegas releídas", async () => {
+  const d = crearDropi();
+  d.productos.set(8406, productoBase(8406));
+  const [sube] = await aplicar(d, [{ ...base, id: "s1", tipo: "stock", producto: 8406, datos: { bodega: 81, nombreBodega: "Proveedor Ecomfive", unidades: 300, antes: 224, concepto: "Llegó la OC-1234" } }]);
+  assert.equal(sube.ok, true, String(sube.error));
+  assert.equal(sube.antes, 224);
+  assert.equal(sube.stock, 300);
+  assert.equal(sube.aviso, null);
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 300 });
+  assert.deepEqual(sube.bodegas, [{ id: 81, nombre: "Proveedor Ecomfive", stock: 300 }]);
+  // El sistema mostraba otra cosa (vendió entre la lectura y el «Aplicar»): igual queda en lo pedido, y se avisa.
+  const [baja] = await aplicar(d, [{ ...base, id: "s2", tipo: "stock", producto: 8406, datos: { bodega: 81, nombreBodega: "", unidades: 10, antes: 280, concepto: "Conteo" } }]);
+  assert.equal(baja.ok, true, String(baja.error));
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 10 });
+  assert.match(String(baja.aviso), /había 300/);
+  // Un reintento con el mismo pedido no mueve nada (no hay otro PUT).
+  const puts = d.llamadas.filter((l) => l === "PUT /products/8406").length;
+  const [igual] = await aplicar(d, [{ ...base, id: "s3", tipo: "stock", producto: 8406, datos: { bodega: 81, nombreBodega: "", unidades: 10, antes: 10, concepto: "Conteo" } }]);
+  assert.equal(igual.ok, true);
+  assert.equal(d.llamadas.filter((l) => l === "PUT /products/8406").length, puts);
+});
+
+test("stock: no toca un producto de otro proveedor ni la bodega de Dropi", async () => {
+  const d = crearDropi();
+  d.productos.set(8406, productoBase(8406, { user_id: 77 }));
+  d.productos.set(8407, productoBase(8407));
+  const [ajeno, b280] = await aplicar(d, [
+    { ...base, id: "s1", tipo: "stock", producto: 8406, datos: { bodega: 81, nombreBodega: "", unidades: 5, antes: 224, concepto: "x" } },
+    { ...base, id: "s2", tipo: "stock", producto: 8407, datos: { bodega: 280, nombreBodega: "", unidades: 5, antes: 0, concepto: "x" } },
+  ]);
+  assert.equal(ajeno.ok, false);
+  assert.match(String(ajeno.error), /no es de este proveedor/);
+  assert.equal(b280.ok, false);
+  assert.match(String(b280.error), /no es de ECOMFIVE/);
+  assert.equal(d.llamadas.filter((l) => l.startsWith("PUT")).length, 0);
+});

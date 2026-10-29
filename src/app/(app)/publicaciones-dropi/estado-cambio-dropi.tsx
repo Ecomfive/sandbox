@@ -1,4 +1,5 @@
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
@@ -12,6 +13,7 @@ export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
   if (c.tipo === "archivar") return <EstadoArchivar c={c} />;
   if (c.tipo === "crear") return <EstadoCrear c={c} />;
   if (c.tipo === "privatizar") return <EstadoPrivatizar c={c} />;
+  if (c.tipo === "stock") return <EstadoStock c={c} />;
   const guia = c.nombreGuia ? ` · guía «${c.nombreGuia}»` : "";
   // Qué lleva el cambio: el nombre, el precio y/o el precio sugerido.
   const que = [
@@ -58,6 +60,27 @@ function EstadoApagar({ c }: { c: CambioDropiVista }) {
       {c.error
         ? `${c.estado === "error" ? "No se pudo apagar en Dropi" : "Apagado a medias en Dropi"}: ${c.error} Se reintenta al pulsar «Aplicar en Dropi».`
         : "Apagado pendiente: pulsa «Aplicar en Dropi» con Dropi abierto (saca el stock y archiva)."}
+    </span>
+  );
+}
+
+/** Cómo va un cambio de stock (migración 0173): hecho, pendiente o con error (se reintenta). */
+function EstadoStock({ c }: { c: CambioDropiVista }) {
+  const d = c.stock;
+  const que = d ? `${codigoBodega(d.bodega)} a ${d.unidades.toLocaleString("es-PA")} u.` : "stock";
+  if (c.estado === "aplicado")
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-success">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+        Stock cambiado en Dropi el {fecha(c.aplicadoEn ?? c.creadoEn)} ({que}).
+      </span>
+    );
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-destructive">
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+      {c.estado === "error"
+        ? `No se pudo cambiar el stock en Dropi (${que}): ${c.error ?? "sin detalle"} Se vuelve a intentar al pulsar «Aplicar en Dropi».`
+        : `Stock pendiente en Dropi (${que}): pulsa «Aplicar en Dropi» con Dropi abierto.`}
     </span>
   );
 }

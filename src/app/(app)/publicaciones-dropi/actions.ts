@@ -6,10 +6,11 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { ESTADOS_PUBLICACION, fulfillmentFijo, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
-import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
+import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
-import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
+import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
+import { faltantesStock, normalizarDatosStock } from "@/lib/publicaciones/stock-dropi";
 import { faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
@@ -860,6 +861,46 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
     });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente para ese correo: pulsa «Aplicar en Dropi» con Dropi abierto." : "Privatización pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
+}
+
+/**
+ * «Cambiar stock en Dropi» (pedido de Alcides, 28 oct 2026): deja pendiente para «Aplicar en Dropi» que una bodega de ECOMFIVE quede con esas unidades.
+ * El sistema no cambia su stock al pedirlo (el stock es el que lee Dropi): cambia cuando el favorito lo confirma. La bodega tiene que ser una de
+ * ECOMFIVE del país (las de la lectura de «Mis productos»; nunca la B280) y la publicación tiene que existir en Dropi.
+ */
+export async function cambiarStockDropi(id: string, crudo: unknown): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (antes.estado_publicacion === "borrador") return { error: "Todavía no está publicada en Dropi: el stock se pone al publicarla." };
+  if (antes.duplicada_de) return { error: "Es una duplicada: el stock se cambia en la publicación que vale." };
+  const ids = idsDeDropi((antes.dropi_id as string | null) ?? null);
+  if (!ids.length) return { error: "La publicación no tiene ID de Dropi." };
+  const supabase = createServiceClient();
+  const pedido = normalizarDatosStock(crudo);
+  // Las bodegas de ECOMFIVE del país y lo que la última lectura mostraba de este producto (el «antes»; la cuenta de verdad la hace el favorito).
+  const { data: lecturas } = await supabase.from("dropi_productos_proveedor").select("dropi_producto_id, bodegas").eq("pais_id", antes.pais_id).limit(1000);
+  const bodegas = new Map<number, string>();
+  let actual: { id: number; stock: number }[] = [];
+  for (const l of lecturas ?? []) {
+    const bs = Array.isArray(l.bodegas) ? (l.bodegas as { id: number; nombre?: string; stock?: number }[]) : [];
+    for (const b of bs) if (Number(b.id) !== BODEGA_DROPI) bodegas.set(Number(b.id), String(b.nombre ?? ""));
+    if (Number(l.dropi_producto_id) === ids[0]) actual = bs.map((b) => ({ id: Number(b.id), stock: Number(b.stock) || 0 }));
+  }
+  const d = { ...pedido, nombreBodega: bodegas.get(pedido.bodega) ?? pedido.nombreBodega, antes: lecturas ? (actual.find((b) => b.id === pedido.bodega)?.stock ?? 0) : null };
+  const faltan = faltantesStock(d, [...bodegas.keys()].map((b) => ({ id: b })));
+  if (faltan.length) return { error: faltan[0] };
+  const r = await encolarStock(supabase, { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, d, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  if ("error" in r) return { error: r.error };
+  const bodega = `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}`;
+  await registrarAuditoria({
+    accion: "dropi_stock_pendiente",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: stock en ${bodega} ${d.antes !== null ? `de ${d.antes} ` : ""}a ${d.unidades} u. («${d.concepto}») · pendiente para «Aplicar en Dropi»`,
+  });
+  revalidatePath(RUTA);
+  return { detalle: `Stock de ${codigoBodega(d.bodega)} a ${d.unidades.toLocaleString("es-PA")} u. pendiente: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }
 
 /**

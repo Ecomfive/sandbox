@@ -7,6 +7,8 @@ import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { normalizarDatosCrear } from "@/lib/publicaciones/crear-dropi";
 import { normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
+import { normalizarDatosStock } from "@/lib/publicaciones/stock-dropi";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "publicaciones-dropi";
@@ -18,7 +20,7 @@ const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 /** Un cambio que espera «Aplicar en Dropi», para la lista de la barra de la página: qué es, qué pasaría al deshacerlo y si todavía se puede. */
 export interface CambioPendienteVista {
   id: string;
-  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar";
+  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar" | "stock";
   publicacion: string;
   /** Lo que lleva el cambio, una línea por dato («Nombre: «A» → «B»», «Precio $5.00 → $6.00»…). */
   lineas: string[];
@@ -63,7 +65,7 @@ const pubDe = (f: Fila) => {
   const p = f.dropi_publicaciones;
   return (Array.isArray(p) ? p[0] : p) as { nombre?: string; precio_venta?: number | string | null; descripcion?: string | null; estado?: string | null; estado_publicacion?: string | null } | null;
 };
-const TIPOS_COLA = ["cambio", "republicar", "apagar", "archivar", "crear", "privatizar"] as const;
+const TIPOS_COLA = ["cambio", "republicar", "apagar", "archivar", "crear", "privatizar", "stock"] as const;
 const tipoDe = (f: Fila) => ((TIPOS_COLA as readonly unknown[]).includes(f.tipo) ? (f.tipo as (typeof TIPOS_COLA)[number]) : "cambio");
 const cantidadFotos = (f: Fila) => (Array.isArray(f.fotos) ? f.fotos.length : 0);
 
@@ -107,6 +109,14 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
         if (f.nuevo_dropi_id) {
           deshacible = false;
           motivoNo = `Ya se creó el producto privado en Dropi (ID ${f.nuevo_dropi_id}): no se puede deshacer desde aquí.`;
+        }
+      } else if (tipo === "stock") {
+        const d = normalizarDatosStock(f.datos);
+        lineas.push(`Stock en ${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»`);
+        alDeshacer = "Se quita de la cola; el stock del sistema no cambia (es el que lee Dropi). Dropi no se había tocado.";
+        if (intentos > 0) {
+          deshacible = false;
+          motivoNo = "Ya se intentó en Dropi (el stock pudo haber cambiado): no se puede deshacer desde aquí.";
         }
       } else if (tipo === "apagar") {
         lineas.push(`Apagar: sacar todo el stock${f.quitar_privados === true ? ", quitar la privatización" : ""} y archivar`);
@@ -183,6 +193,7 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   if (tipo === "apagar" && intentos > 0) return { error: "Ya se intentó en Dropi (el stock puede estar en cero): no se puede deshacer desde aquí." };
   if (tipo === "republicar" && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó en Dropi (puede haber un producto nuevo): no se puede deshacer desde aquí." };
   if (tipo === "archivar" && intentos > 0) return { error: "Ya se intentó en Dropi: no se puede deshacer desde aquí." };
+  if (tipo === "stock" && intentos > 0) return { error: "Ya se intentó en Dropi (el stock pudo haber cambiado): no se puede deshacer desde aquí." };
   if (tipo === "crear" && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó a publicar en Dropi (puede existir el producto): no se puede deshacer desde aquí." };
   // Una privatización que falló antes de crear nada en Dropi (un correo equivocado, por ejemplo) sí se puede deshacer: el stock solo se mueve después de crear el privado.
   if (tipo === "privatizar" && f.nuevo_dropi_id) return { error: `Ya se creó el producto privado en Dropi (ID ${f.nuevo_dropi_id}): no se puede deshacer desde aquí.` };
@@ -236,7 +247,7 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   const { error: errorCola } = await (tipo === "cambio" ? q : tipo === "privatizar" ? q.is("nuevo_dropi_id", null) : q.eq("intentos", 0));
   if (errorCola) return { error: "No se pudo quitar el cambio de la cola." };
   await registrarAuditoria({
-    accion: tipo === "apagar" ? "dropi_apagar_cancelado" : tipo === "republicar" ? "dropi_republicar_cancelado" : tipo === "archivar" ? "dropi_archivar_cancelado" : tipo === "crear" ? "dropi_crear_cancelado" : tipo === "privatizar" ? "dropi_privatizar_cancelado" : "dropi_cambio_deshecho",
+    accion: tipo === "apagar" ? "dropi_apagar_cancelado" : tipo === "republicar" ? "dropi_republicar_cancelado" : tipo === "archivar" ? "dropi_archivar_cancelado" : tipo === "crear" ? "dropi_crear_cancelado" : tipo === "privatizar" ? "dropi_privatizar_cancelado" : tipo === "stock" ? "dropi_stock_cancelado" : "dropi_cambio_deshecho",
     entidad: "dropi_publicaciones",
     entidadId: pubId,
     detalle: `${nombrePub} · deshecho antes de aplicarse en Dropi${restaurado.length ? `: ${restaurado.join(" y ")}` : ""}`,
@@ -246,7 +257,7 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   const resumen =
     tipo === "apagar"
       ? "vuelve a verse como antes"
-      : tipo === "republicar" || tipo === "privatizar"
+      : tipo === "republicar" || tipo === "privatizar" || tipo === "stock"
         ? "se quitó de la cola"
         : tipo === "crear"
           ? "queda «Sin publicar», guardada con todos sus datos"

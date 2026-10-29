@@ -19,12 +19,16 @@
  * Un cambio de tipo «privatizar» (26 oct 2026, migración 0155; `privatizar`, con `PRIVATIZAR_JS`) deja un producto a un solo dropshipper: comprueba
  * su correo en Dropi, crea el producto privado (copia del público), le pone fotos, garantías y stock, se lo asigna en «Productos privados» y le
  * saca esas unidades al público. Devuelve el ID nuevo aunque falle un paso después, y si ya le sacó el stock al público (`salida`).
+ *
+ * Un cambio de tipo «stock» (28 oct 2026, migración 0173; `stock`, con `STOCK_JS`) deja una bodega de ECOMFIVE con las unidades pedidas: lee el stock de
+ * Dropi en ese momento, hace la entrada o la salida que falte y lo vuelve a leer para comprobar. Si ya tiene esas unidades, no guarda nada.
  */
 
 import { APAGAR_JS } from "./apagar-dropi";
 import { CREAR_JS } from "./crear-dropi";
 import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { CLAVE_FOTO_JS, REPUBLICAR_JS } from "./republicar-dropi";
+import { STOCK_JS } from "./stock-dropi";
 
 /** El armado del guardado de Dropi, en JavaScript simple para el favorito (el mismo de `armarGuardadoProducto`). */
 export const ARMAR_JS = [
@@ -64,6 +68,7 @@ const CODIGO = [
   "function idCreado(j){var o=j&&j.objects,c=[o&&o.id,o&&o.product&&o.product.id,o&&o.product_id,Array.isArray(o)&&o[0]&&o[0].id,typeof o==='number'?o:null,j&&j.id,j&&j.product&&j.product.id,j&&j.data&&j.data.id];for(var i=0;i<c.length;i++){var n=Number(c[i]);if(n>0&&n<1e8&&Math.floor(n)===n)return n}return 0}",
   "function sinId(g){var j=g.j,m=j&&(j.message||j.msg||j.error);return'Dropi no devolvió el ID del producto nuevo (respondió '+g.s+(m?': '+String(m).slice(0,150):'')+(j&&typeof j==='object'?'; llaves: '+Object.keys(j).slice(0,8).join(', ')+(j.objects&&typeof j.objects==='object'?' / objects: '+Object.keys(j.objects).slice(0,8).join(', '):''):'; sin cuerpo')+'). No se creó nada en el sistema.'}",
   REPUBLICAR_JS,
+  STOCK_JS,
   PRIVATIZAR_JS,
   APAGAR_JS,
   CREAR_JS,
@@ -222,7 +227,20 @@ const CODIGO = [
   "if(!yaAsignado(w,Number(u.id)))return fin('Dropi no muestra la reserva para '+d.correo+' en el '+id+'.');",
   "if(tn<d.unidades)return fin('El '+id+' tiene '+tn+' unidades en Dropi y se esperaban '+d.unidades+'.');",
   "return{ok:true,nuevo:id,stock:tn,salida:true,aviso:avisos.length?avisos.join(' '):null}}",
+  // Stock (28 oct 2026): dejar la bodega con las unidades pedidas (entrada o salida por la diferencia con lo que Dropi tiene ahora) y comprobar.
+  "async function stock(c,bp){",
+  "var d=c.datos;if(!d||!d.bodega||!(Number(d.unidades)>=0))return{ok:false,error:'El cambio no trae la bodega ni las unidades.'};",
+  "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
+  "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
+  "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
+  "var r=ajuste(o,bp,d);if(r.error)return{ok:false,error:r.error};",
+  "if(r.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)}}",
+  "var v=await pedir('/products/'+c.producto),n=v.j&&v.j.objects;if(!v.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
+  "var q=stockDe(n)[String(d.bodega)]||0;if(q!==Number(d.unidades))return{ok:false,error:'Dropi muestra '+q+' unidades en esa bodega y se pidieron '+d.unidades+'.'};",
+  "var bs=(Array.isArray(n.warehouse_product)?n.warehouse_product:[]).map(function(w){var x=w.warehouse||{};return{id:Number(w.warehouse_id),nombre:x.name!=null?String(x.name):'',stock:Number(w.stock)||0}});",
+  "return{ok:true,antes:r.antes,stock:q,bodegas:bs,aviso:d.antes!=null&&Number(d.antes)!==r.antes?'En Dropi había '+r.antes+' (el sistema mostraba '+d.antes+').':null}}",
   "async function aplicar(c,bp){",
+  "if(c.tipo==='stock')return stock(c,bp);",
   "if(c.tipo==='privatizar')return privatizar(c,bp);",
   "if(c.tipo==='apagar')return apagar(c,bp);",
   "if(c.tipo==='republicar')return republicar(c,bp);",

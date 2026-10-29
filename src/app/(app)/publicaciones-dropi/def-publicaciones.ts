@@ -130,6 +130,8 @@ export interface FilaPublicacion {
   archivadoPendiente: "archivar" | "restaurar" | null;
   /** Privatizaciones esperando «Aplicar en Dropi» (migración 0155): a quién se le deja, cuántas unidades y bajo qué nombre. */
   privatizaciones: { correo: string; dropshipper: string; unidades: number; nombre: string }[];
+  /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */
+  stockPendiente: { bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
   grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
   /** Público o privado: el elegido en la ficha (el sistema manda, 24 oct 2026); si no hay nada anotado, lo que dice Dropi. */

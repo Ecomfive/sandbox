@@ -39,7 +39,8 @@ import { InsigniaConectado } from "./insignia-conectado";
 import { BotonApagarDropi, puedeApagar } from "./apagar-dropi";
 import { BotonPrivatizarDropi, puedePrivatizar } from "./privatizar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
-import { codigoBodega, fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
+import { BodegasStockDropi } from "./stock-dropi";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
 import { PublicacionesDelProducto } from "./mismo-producto";
@@ -756,31 +757,8 @@ function ContenidoFicha({
                 )}
               </span>
             </div>
-            {/* Lo que dice «Mis productos» de Dropi (22 oct 2026): cada lectura pone «Dónde está» con la bodega de más stock. */}
-            {p.bodegasDropi && p.bodegasDropi.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                <span className={labelClassSm}>Bodegas en Dropi</span>
-                {p.bodegasDropi.length ? (
-                  <ul className="flex flex-col divide-y divide-border rounded-lg bg-muted px-4 text-sm">
-                    {p.bodegasDropi.map((b) => (
-                      <li key={b.id} className="flex items-center justify-between gap-3 py-2">
-                        <span className="min-w-0 truncate">
-                          <span className="font-mono font-semibold">{codigoBodega(b.id)}</span> · {b.nombre}
-                        </span>
-                        <span className="font-semibold tabular-nums">{b.stock.toLocaleString("es-PA")} u.</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Dropi no la tiene en ninguna bodega.</span>
-                )}
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {p.bodegasDropi.length > 1 && `Total ${(p.stockProveedor ?? 0).toLocaleString("es-PA")} u. · `}
-                  {p.stockPrivadoProveedor ? `${p.stockPrivadoProveedor.toLocaleString("es-PA")} reservadas a privados · ` : ""}
-                  {p.leidoProveedor && `Actualizado desde Dropi el ${fechaHoraLectura(p.leidoProveedor)}`}
-                </span>
-              </div>
-            )}
+            {/* Lo que dice «Mis productos» de Dropi (22 oct 2026) y, desde el 28 oct 2026, el lápiz que cambia el stock de una bodega de ECOMFIVE por «Aplicar en Dropi». */}
+            <BodegasStockDropi p={p} bodegasEcomfive={opcionesCrear.bodegas} puedeEscribir={puedeEscribir} />
           </Seccion>
 
           {/* Lo que viene en camino del producto vinculado: solo unidades, del país seleccionado (las órdenes que ya salieron y no han llegado). */}

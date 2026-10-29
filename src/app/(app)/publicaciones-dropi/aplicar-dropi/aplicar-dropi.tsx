@@ -5,9 +5,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-aplicar-dropi";
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
-type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean };
+type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean; antes?: number; stock?: number };
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "sin_dropi"; mensaje: string }
@@ -96,7 +97,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     dropi.postMessage(
       {
         tipo: "pendientes",
-        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar }) => ({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos: tipo === "privatizar" ? privatizar : datos })),
+        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock }) => ({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : datos })),
       },
       origen,
     );
@@ -170,7 +171,9 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
                               ? `Publicada en Dropi con el ID ${r.nuevo ?? "—"}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
                               : c.tipo === "privatizar"
                                 ? `Privatizada: producto privado ID ${r.nuevo ?? "—"} para ${c.privatizar?.dropshipper || c.privatizar?.correo}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
-                                : "Cambiado en Dropi"
+                                : c.tipo === "stock"
+                                  ? `Stock en Dropi: ${r.antes ?? "—"} → ${r.stock ?? c.stock?.unidades ?? "—"} u.${r.aviso ? ` ${r.aviso}` : ""}`
+                                  : "Cambiado en Dropi"
                       : (c.tipo === "crear" || c.tipo === "privatizar") && r.nuevo
                         ? `Se creó el ID ${r.nuevo} en Dropi, pero falló un paso: ${r.error ?? "sin detalle"} Se sigue desde ahí en el próximo «Aplicar en Dropi».`
                         : `No se pudo: ${r.error ?? "sin detalle"}`
@@ -222,6 +225,18 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
         <span className="text-xs text-muted-foreground">
           ID {c.producto} (público){c.nuevo ? ` · ya creado el privado ID ${c.nuevo}: sigue desde ahí` : ": se crea el privado en Dropi, se le asigna el correo y se le sacan las unidades al público"}
         </span>
+      </>
+    );
+  }
+  if (c.tipo === "stock") {
+    const d = c.stock;
+    return (
+      <>
+        <span className="font-medium">Stock: {c.publicacion}</span>
+        <span className="text-xs tabular-nums">
+          {d ? `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»` : ""}
+        </span>
+        <span className="text-xs text-muted-foreground">ID {c.producto}: entrada o salida por la diferencia con lo que Dropi tenga en ese momento</span>
       </>
     );
   }
@@ -301,7 +316,7 @@ function ElegirCambios({ cambios, alAplicar, cerrar }: { cambios: CambioParaDrop
               <button
                 type="button"
                 aria-pressed={pospuesto}
-                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.tipo === "republicar" ? `republicar ${c.publicacion}` : c.tipo === "archivar" ? `${c.restaurar ? "sacar de Archivados" : "archivar"} ${c.publicacion}` : c.tipo === "crear" ? `publicar ${c.datos?.nombre || c.publicacion}` : c.tipo === "privatizar" ? `privatizar ${c.publicacion} a ${c.privatizar?.dropshipper || c.privatizar?.correo}` : (c.nombre ?? c.publicacion)}`}
+                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.tipo === "republicar" ? `republicar ${c.publicacion}` : c.tipo === "archivar" ? `${c.restaurar ? "sacar de Archivados" : "archivar"} ${c.publicacion}` : c.tipo === "crear" ? `publicar ${c.datos?.nombre || c.publicacion}` : c.tipo === "privatizar" ? `privatizar ${c.publicacion} a ${c.privatizar?.dropshipper || c.privatizar?.correo}` : c.tipo === "stock" ? `stock de ${c.publicacion}` : (c.nombre ?? c.publicacion)}`}
                 onClick={() => alternar(c.id)}
                 className={`inline-flex min-h-9 shrink-0 items-center rounded-md border px-3 py-1.5 text-xs font-medium ${anilloFoco} ${pospuesto ? "border-foreground bg-accent text-foreground" : "border-border bg-card hover:bg-muted"}`}
               >
