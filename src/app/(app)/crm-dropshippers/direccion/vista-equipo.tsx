@@ -7,6 +7,7 @@ import { KpiCard, KpiGrid, type Tono } from "@/components/ui/kpi-card";
 import { duracionCorta, META_RESPUESTA_MIN, tonoRespuesta, type FilaEquipo, type TonoTiempo } from "@/lib/crm/equipo";
 import { nPedidos } from "@/lib/crm/salud";
 import type { DatosEquipo } from "./datos-equipo";
+import { rutaVista } from "./ruta";
 
 const AREA: Record<string, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
 const KPI_TONO: Record<TonoTiempo, Tono> = { exito: "success", aviso: "warning", peligro: "destructive", neutro: "neutral" };
@@ -89,7 +90,7 @@ export function VistaEquipo({ datos, periodos, codigoPais }: { datos: DatosEquip
         {periodos.map((d) => (
           <Link
             key={d}
-            href={`/crm-dropshippers/direccion?vista=equipo&dias=${d}`}
+            href={rutaVista("equipo", { dias: d })}
             aria-current={d === datos.dias ? "page" : undefined}
             className={`inline-flex h-[34px] items-center rounded-lg border px-3 text-[13px] ${d === datos.dias ? "border-accent bg-accent" : "border-border bg-card hover:bg-muted"} ${anilloFoco}`}
           >

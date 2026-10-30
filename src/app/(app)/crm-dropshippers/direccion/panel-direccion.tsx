@@ -13,6 +13,7 @@ import { asignarResponsable, atenderAlerta, crearTareaDeAlerta } from "./actions
 import type { AlertaDireccion, DatosDireccion, FilaDireccion } from "./datos-direccion";
 import type { DatosProductos } from "./datos-productos";
 import { descargarLista } from "./lista-csv";
+import { rutaVista } from "./ruta";
 import { TONO_STOCK, textoCamino } from "./vista-productos";
 import { ETIQUETA_ESTADO_STOCK } from "@/lib/crm/productos";
 
@@ -68,16 +69,22 @@ function Indicador({ titulo, valor, subtexto, tono, activo, alPulsar }: { titulo
 }
 
 /**
- * CRM › Dirección: indicadores de la cartera, la cola «Qué atender hoy», la salud por bandas, los pedidos por semana y la lista de clientes
- * con su salud (cada fila se abre para ver de qué sale el puntaje).
+ * Dirección (en la Bandeja desde el 30 oct 2026): los indicadores de la cartera arriba y, según `modo`, el **Resumen** (la cola «Qué atender
+ * hoy», la salud por bandas y los pedidos por semana) o los **Clientes** (la lista con su salud; cada fila se abre para ver de qué sale el
+ * puntaje). En el Resumen, un indicador lleva a Clientes con ese segmento; en Clientes, lo filtra.
  */
 export function PanelDireccion({
+  modo,
+  segmentoInicial,
   datos,
   productos,
   codigoPais,
   escribe,
   usuarioId,
 }: {
+  modo: "resumen" | "clientes";
+  /** El segmento con que abre la lista de Clientes (el que se tocó en el Resumen). */
+  segmentoInicial: Segmento | null;
   datos: DatosDireccion;
   /** Lo que vende cada cliente y qué recomendarle (fase 3); null sin las migraciones 0198 y 0201. */
   productos: DatosProductos | null;
@@ -86,10 +93,11 @@ export function PanelDireccion({
   usuarioId: string;
 }) {
   const { mostrarToast } = useToast();
+  const router = useRouter();
   const [pendiente, empezar] = useTransition();
   const [quitadas, setQuitadas] = useState<Set<string>>(new Set());
   const [filtroAlerta, setFiltroAlerta] = useState<FiltroAlerta>("todas");
-  const [segmento, setSegmento] = useState<Segmento | "todos">("todos");
+  const [segmento, setSegmento] = useState<Segmento | "todos">(segmentoInicial ?? "todos");
   const [busca, setBusca] = useState("");
   const [tipo, setTipo] = useState<"todos" | "vip" | "regular">("todos");
   const [orden, setOrden] = useState<Orden>("salud");
@@ -98,6 +106,7 @@ export function PanelDireccion({
   const [tareaDe, setTareaDe] = useState<AlertaDireccion | null>(null);
 
   const { filas, hoy } = datos;
+  const enLista = modo === "clientes";
   const alertas = datos.alertas.filter((a) => !quitadas.has(a.clave));
   const visiblesAlerta = alertas.filter((a) => pasaFiltro(a, filtroAlerta));
 
@@ -134,6 +143,8 @@ export function PanelDireccion({
 
   const maxSemana = Math.max(1, ...datos.semanas.map((s) => s.pedidos));
   const elegirSegmento = (s: Segmento | "todos") => {
+    // En el Resumen no hay lista: el indicador lleva a Clientes con ese segmento.
+    if (modo === "resumen") return router.push(s === "todos" ? rutaVista("clientes") : rutaVista("clientes", { segmento: s }));
     setSegmento((x) => (x === s ? "todos" : s));
     setMostrar(POR_PAGINA);
   };
@@ -150,16 +161,17 @@ export function PanelDireccion({
   return (
     <>
       <div className="flex flex-wrap gap-3 [&>*]:max-w-80 [&>*]:min-w-0 [&>*]:flex-[1_1_11rem]">
-        <Indicador titulo="Cartera con Dropi" valor={filas.length} subtexto={datos.sinCuenta ? `${datos.sinCuenta} sin cuenta vinculada en ${codigoPais}` : `Con cuenta vinculada en ${codigoPais}`} tono="neutral" activo={segmento === "todos"} alPulsar={() => elegirSegmento("todos")} />
-        <Indicador titulo="Activos" valor={cuenta("activo")} subtexto="Piden con normalidad" tono="success" activo={segmento === "activo"} alPulsar={() => elegirSegmento("activo")} />
-        <Indicador titulo="En riesgo" valor={cuenta("riesgo")} subtexto="Bajaron sus pedidos o dejaron de pedir" tono="warning" activo={segmento === "riesgo"} alPulsar={() => elegirSegmento("riesgo")} />
-        <Indicador titulo="Dormidos" valor={cuenta("dormido")} subtexto={cuenta("perdido") ? `De 21 a 59 días sin pedir · ${cuenta("perdido")} perdidos (60 o más)` : "De 21 a 59 días sin pedir"} tono="destructive" activo={segmento === "dormido"} alPulsar={() => elegirSegmento("dormido")} />
-        <Indicador titulo="Sin pedidos" valor={cuenta("sin_pedidos")} subtexto="Con cuenta y sin pedidos registrados" tono="neutral" activo={segmento === "sin_pedidos"} alPulsar={() => elegirSegmento("sin_pedidos")} />
+        <Indicador titulo="Cartera con Dropi" valor={filas.length} subtexto={datos.sinCuenta ? `${datos.sinCuenta} sin cuenta vinculada en ${codigoPais}` : `Con cuenta vinculada en ${codigoPais}`} tono="neutral" activo={enLista && segmento === "todos"} alPulsar={() => elegirSegmento("todos")} />
+        <Indicador titulo="Activos" valor={cuenta("activo")} subtexto="Piden con normalidad" tono="success" activo={enLista && segmento === "activo"} alPulsar={() => elegirSegmento("activo")} />
+        <Indicador titulo="En riesgo" valor={cuenta("riesgo")} subtexto="Bajaron sus pedidos o dejaron de pedir" tono="warning" activo={enLista && segmento === "riesgo"} alPulsar={() => elegirSegmento("riesgo")} />
+        <Indicador titulo="Dormidos" valor={cuenta("dormido")} subtexto={cuenta("perdido") ? `De 21 a 59 días sin pedir · ${cuenta("perdido")} perdidos (60 o más)` : "De 21 a 59 días sin pedir"} tono="destructive" activo={enLista && segmento === "dormido"} alPulsar={() => elegirSegmento("dormido")} />
+        <Indicador titulo="Sin pedidos" valor={cuenta("sin_pedidos")} subtexto="Con cuenta y sin pedidos registrados" tono="neutral" activo={enLista && segmento === "sin_pedidos"} alPulsar={() => elegirSegmento("sin_pedidos")} />
         <div className={claseKpi("info", false)}>
           <ContenidoKpi titulo="Pedidos en 30 días" valor={pedidos30.toLocaleString("es")} subtexto={`${textoCambio(cambioTotal)} frente a los 30 anteriores · ${vip} VIP o BLACK`} tono="info" />
         </div>
       </div>
 
+      {modo === "resumen" && (
       <div className="grid grid-cols-1 items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_360px]">
         <section aria-labelledby="t-atender" className="rounded-[10px] border border-border bg-card">
           <CabeceraTarjeta id="t-atender" titulo="Qué atender hoy">
@@ -269,7 +281,9 @@ export function PanelDireccion({
           </section>
         </div>
       </div>
+      )}
 
+      {enLista && (
       <section aria-labelledby="t-clientes" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 id="t-clientes" className="m-0 text-base font-semibold">
@@ -379,6 +393,7 @@ export function PanelDireccion({
           </div>
         )}
       </section>
+      )}
 
       {tareaDe && (
         <FormTarea

@@ -15,7 +15,6 @@ import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { MODULO_DIRECCION } from "@/lib/crm/areas";
 import { PESTANAS_SOLO_ADMIN, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
@@ -65,8 +64,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ? [
         ...pestanasOcultasDe(usuario.afinado),
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
-        // Los KPIs de atención y el panel de Dirección son del CEO (módulo crm-direccion).
-        ...(usuario.modulos.includes(MODULO_DIRECCION) ? [] : ["/crm-dropshippers/kpis", "/crm-dropshippers/direccion"]),
+        // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);

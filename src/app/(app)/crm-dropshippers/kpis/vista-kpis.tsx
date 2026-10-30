@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { BotonBarra, MarcoTabla, Pastilla, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
+import { rutaVista } from "../direccion/ruta";
 
 /** Lo que devuelve `whatsapp_kpis` (migración 0164). Los minutos llegan como número o null; los conteos, como número. */
 export interface KpisWhatsapp {
@@ -47,7 +48,7 @@ function medianaGeneral(numeros: KpisWhatsapp["numeros"]): number | null {
   return peso ? con.reduce((s, n) => s + Number(n.mediana_min) * (n.consultas - n.sin_responder), 0) / peso : null;
 }
 
-/** CRM › KPIs de atención: indicadores generales, por número, por persona y por día. */
+/** KPIs de atención (en el Resumen de la Bandeja de Dirección desde el 30 oct 2026): indicadores generales, por número, por persona y por día. */
 export function VistaKpis({ datos, dias, periodos }: { datos: KpisWhatsapp; dias: number; periodos: number[] }) {
   const router = useRouter();
   const numeros = datos?.numeros ?? [];
@@ -62,7 +63,7 @@ export function VistaKpis({ datos, dias, periodos }: { datos: KpisWhatsapp; dias
     <>
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Periodo">
         {periodos.map((p) => (
-          <BotonBarra key={p} activo={p === dias} onClick={() => router.push(`/crm-dropshippers/kpis?dias=${p}`)}>
+          <BotonBarra key={p} activo={p === dias} onClick={() => router.push(rutaVista("resumen", { dias: p }))}>
             Últimos {p} días
           </BotonBarra>
         ))}

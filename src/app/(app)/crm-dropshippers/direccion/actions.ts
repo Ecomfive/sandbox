@@ -9,8 +9,8 @@ import { DIAS_ATENDIDA, ETIQUETA_ALERTA, SUGERENCIA_ALERTA, type TipoAlerta } fr
 import { avisarTarea } from "@/lib/crm/tareas-servidor";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
+import { RUTA_DIRECCION as RUTA } from "./ruta";
 
-const RUTA = "/crm-dropshippers/direccion";
 const ES_ID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
 const TIPOS: TipoAlerta[] = ["caida", "dormido", "devoluciones", "sin_primer_pedido"];
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;

@@ -8,6 +8,7 @@ import { KpiCard, KpiGrid, type Tono } from "@/components/ui/kpi-card";
 import { entregasPor, MIN_CERRADOS, sumarEntregas, TASA_BUENA, TASA_REGULAR, tonoEntrega, type Entregas, type FilaEntregas, type TonoEntrega } from "@/lib/crm/automatizar";
 import { ETIQUETA_SEGMENTO, nPedidos } from "@/lib/crm/salud";
 import type { FilaDireccion } from "./datos-direccion";
+import { rutaVista } from "./ruta";
 
 const KPI: Record<TonoEntrega, Tono> = { exito: "success", aviso: "warning", peligro: "destructive", neutro: "neutral" };
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
@@ -43,7 +44,7 @@ export function VistaEntregas({ filas, clientes, dias, periodos, codigoPais }: {
         {periodos.map((d) => (
           <Link
             key={d}
-            href={`/crm-dropshippers/direccion?vista=entregas&dias=${d}`}
+            href={rutaVista("entregas", { dias: d })}
             aria-current={d === dias ? "page" : undefined}
             className={`inline-flex h-[34px] items-center rounded-lg border px-3 text-[13px] ${d === dias ? "border-accent bg-accent" : "border-border bg-card hover:bg-muted"} ${anilloFoco}`}
           >
