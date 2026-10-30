@@ -13,8 +13,8 @@ import { enviarArchivoInterno, prepararArchivoInterno } from "./interno-actions"
 /** Lo que se acepta al elegir un archivo para mandar por WhatsApp (el servidor vuelve a revisar el contenido). */
 export const ACEPTAR_ENVIO = "image/jpeg,image/png,audio/*,video/mp4,video/3gpp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.m4a,.aac,.ogg,.amr";
 
-/** Lo que se acepta en el chat interno: fotos JPG o PNG y audios (el servidor vuelve a revisar el contenido). */
-export const ACEPTAR_INTERNO = "image/jpeg,image/png,audio/*,.m4a,.aac,.ogg,.mp3";
+/** Lo que se acepta en el chat interno: fotos JPG o PNG, audios y documentos (el servidor vuelve a revisar el contenido). Sin video. */
+export const ACEPTAR_INTERNO = "image/jpeg,image/png,audio/*,.m4a,.aac,.ogg,.mp3,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt";
 
 const tamanoLegible = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 

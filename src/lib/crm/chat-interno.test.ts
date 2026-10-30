@@ -20,7 +20,7 @@ test("un teléfono de verdad o uno mal formado no es de una sala", () => {
 });
 
 test("las salas y sus áreas", () => {
-  assert.equal(SALAS.length, 4);
+  assert.equal(SALAS.length, 7);
   assert.ok(SALAS.every(esSala));
   assert.equal(esSala("xyz"), false);
   assert.equal(AREAS_DE_SALA.acd.length, 3);
@@ -28,9 +28,17 @@ test("las salas y sus áreas", () => {
 });
 
 test("cada área ve a las otras y a todas, en ese orden", () => {
-  assert.deepEqual(opcionesDeSalas("direccion").map((o) => [o.sala, o.etiqueta]), [["ad", "Atención"], ["cd", "Comercial"], ["acd", "Todas las áreas"]]);
-  assert.deepEqual(opcionesDeSalas("atencion").map((o) => [o.sala, o.etiqueta]), [["ac", "Comercial"], ["ad", "Dirección"], ["acd", "Todas las áreas"]]);
-  assert.deepEqual(opcionesDeSalas("comercial").map((o) => [o.sala, o.etiqueta]), [["ac", "Atención"], ["cd", "Dirección"], ["acd", "Todas las áreas"]]);
+  assert.deepEqual(opcionesDeSalas("direccion").map((o) => [o.sala, o.etiqueta]), [["d", "Solo Dirección"], ["ad", "Atención"], ["cd", "Comercial"], ["acd", "Todas las áreas"]]);
+  assert.deepEqual(opcionesDeSalas("atencion").map((o) => [o.sala, o.etiqueta]), [["a", "Solo Atención"], ["ac", "Comercial"], ["ad", "Dirección"], ["acd", "Todas las áreas"]]);
+  assert.deepEqual(opcionesDeSalas("comercial").map((o) => [o.sala, o.etiqueta]), [["c", "Solo Comercial"], ["ac", "Atención"], ["cd", "Dirección"], ["acd", "Todas las áreas"]]);
+});
+
+test("una sala de una sola área es solo de esa área", () => {
+  assert.deepEqual(salaDeTelefono("interno:d:direccion"), { sala: "d", area: "direccion" });
+  assert.equal(salaDeTelefono("interno:d:atencion"), null);
+  assert.equal(opcionesDeSalas("direccion")[0].detalle, "Solo las personas de Dirección");
+  // La de una sola área solo la ofrece a quien es de esa área.
+  assert.ok(!opcionesDeSalas("atencion").some((o) => o.sala === "d"));
 });
 
 test("el nombre de la sala depende de quién la mira", () => {
