@@ -11,6 +11,10 @@ import { Ventana } from "@/components/ui/ventana";
 import { ETIQUETA_ALERTA, ETIQUETA_BANDA, ETIQUETA_SEGMENTO, SUGERENCIA_ALERTA, type Banda, type Prioridad, type Segmento, type TipoAlerta } from "@/lib/crm/salud";
 import { asignarResponsable, atenderAlerta, crearTareaDeAlerta } from "./actions";
 import type { AlertaDireccion, DatosDireccion, FilaDireccion } from "./datos-direccion";
+import type { DatosProductos } from "./datos-productos";
+import { descargarLista } from "./lista-csv";
+import { TONO_STOCK, textoCamino } from "./vista-productos";
+import { ETIQUETA_ESTADO_STOCK } from "@/lib/crm/productos";
 
 type TonoPastilla = "neutro" | "exito" | "aviso" | "peligro" | "oscuro";
 
@@ -67,13 +71,27 @@ function Indicador({ titulo, valor, subtexto, tono, activo, alPulsar }: { titulo
  * CRM › Dirección: indicadores de la cartera, la cola «Qué atender hoy», la salud por bandas, los pedidos por semana y la lista de clientes
  * con su salud (cada fila se abre para ver de qué sale el puntaje).
  */
-export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { datos: DatosDireccion; codigoPais: string; escribe: boolean; usuarioId: string }) {
+export function PanelDireccion({
+  datos,
+  productos,
+  codigoPais,
+  escribe,
+  usuarioId,
+}: {
+  datos: DatosDireccion;
+  /** Lo que vende cada cliente y qué recomendarle (fase 3); null sin la migración 0200. */
+  productos: DatosProductos | null;
+  codigoPais: string;
+  escribe: boolean;
+  usuarioId: string;
+}) {
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
   const [quitadas, setQuitadas] = useState<Set<string>>(new Set());
   const [filtroAlerta, setFiltroAlerta] = useState<FiltroAlerta>("todas");
   const [segmento, setSegmento] = useState<Segmento | "todos">("todos");
   const [busca, setBusca] = useState("");
+  const [tipo, setTipo] = useState<"todos" | "vip" | "regular">("todos");
   const [orden, setOrden] = useState<Orden>("salud");
   const [abierto, setAbierto] = useState<string | null>(null);
   const [mostrar, setMostrar] = useState(POR_PAGINA);
@@ -92,12 +110,27 @@ export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { dato
 
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    const l = filas.filter((f) => (segmento === "todos" || f.segmento === segmento) && (!q || `${f.nombre} ${f.codigo} ${f.responsable ?? ""}`.toLowerCase().includes(q)));
+    const esVip = (f: FilaDireccion) => f.nivel === "vip" || f.nivel === "black";
+    const l = filas.filter(
+      (f) =>
+        (segmento === "todos" || f.segmento === segmento) &&
+        (tipo === "todos" || (tipo === "vip") === esVip(f)) &&
+        (!q || `${f.nombre} ${f.codigo} ${f.responsable ?? ""}`.toLowerCase().includes(q)),
+    );
     const salud = (f: FilaDireccion) => f.salud.puntaje ?? 1000;
     return l.sort((a, b) =>
       orden === "pedidos" ? b.pedidos30 - a.pedidos30 : orden === "caida" ? (cambio(a) ?? 1e9) - (cambio(b) ?? 1e9) : salud(a) - salud(b) || b.pedidos30 - a.pedidos30,
     );
-  }, [filas, segmento, busca, orden]);
+  }, [filas, segmento, tipo, busca, orden]);
+
+  function descargar() {
+    const nombre = [segmento === "todos" ? "todos" : ETIQUETA_SEGMENTO[segmento], tipo === "vip" ? "VIP o BLACK" : tipo === "regular" ? "regulares" : "", busca.trim() ? `«${busca.trim()}»` : ""].filter(Boolean).join(" · ");
+    empezar(async () => {
+      const r = await descargarLista(lista, nombre, `dropshippers-${segmento}`);
+      if ("error" in r) return mostrarToast(r.error, "destructive");
+      mostrarToast(`Lista de ${lista.length} dropshippers descargada${r.conTelefono ? " con su WhatsApp" : ""}.`);
+    });
+  }
 
   const maxSemana = Math.max(1, ...datos.semanas.map((s) => s.pedidos));
   const elegirSegmento = (s: Segmento | "todos") => {
@@ -248,6 +281,14 @@ export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { dato
               <input type="search" value={busca} onChange={(e) => (setBusca(e.target.value), setMostrar(POR_PAGINA))} placeholder="Nombre, código o responsable" className={`${fieldClass} w-full sm:w-64`} />
             </label>
             <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Tipo</span>
+              <select value={tipo} onChange={(e) => (setTipo(e.target.value as typeof tipo), setMostrar(POR_PAGINA))} className={fieldClass}>
+                <option value="todos">Todos</option>
+                <option value="vip">VIP o BLACK</option>
+                <option value="regular">Regulares</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
               <span className={labelClassSm}>Ordenar</span>
               <select value={orden} onChange={(e) => setOrden(e.target.value as Orden)} className={fieldClass}>
                 <option value="salud">Peor salud primero</option>
@@ -255,6 +296,11 @@ export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { dato
                 <option value="pedidos">Más pedidos primero</option>
               </select>
             </label>
+            {escribe && (
+              <BotonBarra onClick={descargar} disabled={pendiente || lista.length === 0} title="Un CSV con los que se ven en la lista, para una difusión. No envía nada.">
+                Descargar lista ({lista.length})
+              </BotonBarra>
+            )}
           </div>
         </div>
         <MarcoTabla ariaLabel="Clientes con su salud">
@@ -314,7 +360,7 @@ export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { dato
                       {abiertoAqui && (
                         <tr>
                           <td colSpan={7} className="border-b border-border bg-card px-4 py-4">
-                            <DetalleSalud f={f} personas={datos.personas} escribe={escribe} />
+                            <DetalleSalud f={f} personas={datos.personas} escribe={escribe} extra={productos?.porCliente[f.id]} />
                           </td>
                         </tr>
                       )}
@@ -387,7 +433,65 @@ function LoLleva({ f, personas, escribe }: { f: FilaDireccion; personas: { id: s
 }
 
 /** De qué sale el puntaje de un dropshipper: cada factor con su barra y su dato; y quién lo lleva. */
-function DetalleSalud({ f, personas, escribe }: { f: FilaDireccion; personas: { id: string; nombre: string }[]; escribe: boolean }) {
+/** Lo que vende (con el stock de cada producto) y qué recomendarle. */
+function VendeYRecomendados({ extra }: { extra: DatosProductos["porCliente"][string] | undefined }) {
+  if (!extra) return null;
+  return (
+    <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 lg:grid-cols-2">
+      <div className="flex flex-col gap-1.5">
+        <p className="m-0 text-xs font-semibold tracking-[0.04em] text-muted-foreground uppercase">Lo que vende (30 días)</p>
+        {extra.vende.length === 0 ? (
+          <p className="m-0 text-sm text-muted-foreground">Sin pedidos en 30 días.</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+            {extra.vende.map((v) => (
+              <li key={v.productoId} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+                <span className="min-w-0">
+                  {v.nombre} <span className="text-xs text-muted-foreground">· {v.pedidos} pedidos ({Math.round(v.parte * 100)} %)</span>
+                </span>
+                <span className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <Pastilla tono={TONO_STOCK[v.estado]}>
+                    {ETIQUETA_ESTADO_STOCK[v.estado]}
+                    {v.diasInventario !== null && v.estado !== "agotado" ? ` · ${v.diasInventario} d` : ""}
+                  </Pastilla>
+                  {(v.estado === "agotado" || v.estado === "se_acaba" || v.estado === "reponer") && <span className="text-muted-foreground">En camino: {textoCamino(v.camino)}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <p className="m-0 text-xs font-semibold tracking-[0.04em] text-muted-foreground uppercase">Para recomendarle</p>
+        {extra.recomendados.length === 0 ? (
+          <p className="m-0 text-sm text-muted-foreground">Nada con stock que vendan otros y él no.</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+            {extra.recomendados.map((r) => (
+              <li key={r.productoId}>
+                <span className="font-medium">{r.nombre}</span>
+                {r.stock !== null && <span className="text-xs text-muted-foreground"> · {r.stock.toLocaleString("es")} u. en stock</span>}
+                <span className="block text-xs text-muted-foreground">{r.razon}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DetalleSalud({
+  f,
+  personas,
+  escribe,
+  extra,
+}: {
+  f: FilaDireccion;
+  personas: { id: string; nombre: string }[];
+  escribe: boolean;
+  extra: DatosProductos["porCliente"][string] | undefined;
+}) {
   const enlace = (
     <Link href={`/crm-dropshippers?abrir=${f.id}`} className={`text-sm font-medium text-primario hover:underline ${anilloFoco}`}>
       Abrir su ficha
@@ -400,6 +504,9 @@ function DetalleSalud({ f, personas, escribe }: { f: FilaDireccion; personas: { 
         <div className="flex flex-wrap items-center gap-4">
           <LoLleva f={f} personas={personas} escribe={escribe} />
           {enlace}
+        </div>
+        <div className="w-full">
+          <VendeYRecomendados extra={extra} />
         </div>
       </div>
     );
@@ -430,6 +537,7 @@ function DetalleSalud({ f, personas, escribe }: { f: FilaDireccion; personas: { 
           </div>
         ))}
       </div>
+      <VendeYRecomendados extra={extra} />
     </div>
   );
 }

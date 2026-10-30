@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
 import { accesoCrm } from "@/lib/crm/areas";
+import { puedeVerTelefonos } from "@/lib/whatsapp/telefono-oculto";
 import { DIAS_ATENDIDA, ETIQUETA_ALERTA, SUGERENCIA_ALERTA, type TipoAlerta } from "@/lib/crm/salud";
 import { avisarTarea } from "@/lib/crm/tareas-servidor";
 import { getPaisActual } from "@/lib/pais";
@@ -114,4 +115,35 @@ export async function asignarResponsable(dropshipperId: string, perfilId: string
   await registrarAuditoria({ accion: "crm_responsable_dropshipper", entidad: "dropshippers", entidadId: dropshipperId, detalle: `${d.nombre}: lo lleva ${p ? p.nombre || p.email : "nadie"}` });
   revalidatePath(RUTA);
   return { ok: true };
+}
+
+export interface ContactoLista {
+  id: string;
+  correo: string | null;
+  /** Solo si quien la pide puede ver números (`puedeVerTelefonos`); si no, null. */
+  telefono: string | null;
+}
+
+/**
+ * La lista de un segmento para una difusión (fase 3, 30 oct 2026): el correo de cada dropshipper y su WhatsApp si quien la pide puede ver
+ * números (los números no salen en ninguna pantalla para los demás). No envía nada: la pantalla arma el CSV. Queda en la auditoría.
+ */
+export async function contactosParaLista(ids: string[], segmento: string): Promise<{ contactos: ContactoLista[]; conTelefono: boolean } | { error: string }> {
+  const u = await usuarioDireccion();
+  if (!u) return { error: "Solo Dirección puede descargar listas." };
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 3000 || !ids.every(ES_ID)) return { error: "Lista no válida." };
+  const conTelefono = puedeVerTelefonos(u);
+  const supabase = createServiceClient();
+  const filas: { id: string; contacto_email: string | null; contacto_telefono: string | null }[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase.from("dropshippers").select("id, contacto_email, contacto_telefono").in("id", ids.slice(i, i + 200));
+    if (error) return { error: "No se pudo armar la lista." };
+    filas.push(...((data ?? []) as typeof filas));
+  }
+  await registrarAuditoria({
+    accion: "crm_lista_difusion",
+    entidad: "dropshippers",
+    detalle: `Lista de ${filas.length} dropshippers (${String(segmento).slice(0, 120)})${conTelefono ? ", con WhatsApp" : ", sin WhatsApp"}`,
+  });
+  return { conTelefono, contactos: filas.map((f) => ({ id: f.id, correo: f.contacto_email, telefono: conTelefono ? f.contacto_telefono : null })) };
 }

@@ -1028,6 +1028,11 @@ convenciones técnicas del código.
   respuestas por persona de `whatsapp_kpis` (cruzadas por nombre de autor con `perfiles.nombre`), chats asignados y `esperando_desde` por tramos,
   tareas por `responsable_id` y la cartera por responsable de la fase 1. «Lo lleva» (`asignarResponsable`) escribe `dropshippers.responsable_id`
   (antes no se podía elegir en ninguna pantalla). El reparto automático de chats quedó para después (pedido de Hernán: los chats no cambian).
+  **Fase 3** (migración 0200): `crm_ordenes_items.producto_id` (el `product_id` del pedido de Dropi; `crm_sincronizar_ordenes` lo guarda y la
+  migración la corre una vez para completarlo) y `crm_productos_por_dropshipper(p_pais, p_dias)`. `datos-productos.ts` lo cruza con el stock
+  de `cargarResumenVentas` y lo en camino de `cargarEnCamino` (por el SKU vinculado en Gestión de IDs); lógica pura en `src/lib/crm/productos.ts`
+  (estado del stock, lo que vende cada uno, recomendados por clientes parecidos). Vista `?vista=productos`. «Descargar lista» (`lista-csv.ts` +
+  `contactosParaLista`): CSV del filtro, con WhatsApp solo si `puedeVerTelefonos`; queda en auditoría. Las difusiones no se envían (pedido de Hernán).
   **360dialog y un solo número** (migración 0168, 28 oct 2026): el área es de cada conversación (`whatsapp_conversaciones.area`; un
   trigger le pone la del número al crearla) y se cambia con `pasarConversacionDeArea` (botón «Pasar a otra área» del chat, nota + auditoría). Todo
   filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Paneles y supervisión** (29 oct 2026, pedido de
