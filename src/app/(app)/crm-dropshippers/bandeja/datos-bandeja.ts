@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
-import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, numerosDeAreas, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, numerosDeAreas, veMarcasDeBorrado, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
 import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
@@ -207,8 +207,11 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas.filter((x): x is { plataforma: string | null; pais: string } => !!x.pais)),
     };
   });
-  // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
-  const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null);
+  // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna. Solo las ve quien tiene
+  // únicamente Atención: para Comercial, Dirección y administradores la marca no viaja.
+  const marcadas = veMarcasDeBorrado(accesoCrm(usuario))
+    ? await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null)
+    : { data: [], error: { message: "sin marcas" } };
   if (!marcadas.error) {
     const porId = new Map((marcadas.data ?? []).map((x) => [x.id as string, { por: (x.borrada_en_app_por as string | null) ?? null, en: x.borrada_en_app_en as string }]));
     for (const c of conversaciones) c.borradaEnApp = porId.get(c.id) ?? null;
@@ -371,6 +374,8 @@ export async function cargarConversacion(
   dropshipperId: string | null,
   antesDe?: string,
   limite = MENSAJES_POR_VEZ,
+  /** Si sale la marca de «lo eliminó en WhatsApp» (`veMarcasDeBorrado`: solo Atención). Sin pedirlo, no sale. */
+  verBorrados = false,
 ): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null }> {
   let consulta = supabase
     .from("whatsapp_mensajes")
@@ -386,7 +391,7 @@ export async function cargarConversacion(
       ? supabase.from("casos_dropshipper").select("numero, titulo, prioridad").eq("dropshipper_id", dropshipperId).neq("estado", "resuelto").order("abierto_en", { ascending: false }).limit(5)
       : Promise.resolve({ data: null }),
     // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
-    supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
+    verBorrados ? supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null) : Promise.resolve({ data: [], error: null }),
   ]);
   const [ocultos, pendientes, reaccionesR, editadosR] = await Promise.all([
     mensajesOcultos(supabase, id),

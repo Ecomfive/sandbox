@@ -1171,12 +1171,17 @@ export function Bandeja({
           ? [
               ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
               { texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
-              {
-                texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
-                corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
-                icono: ArchivarIcon,
-                alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
-              },
+              // La marca de «borrado en la app» solo la ve Atención (`veMarcasDeBorrado`): el botón también es suyo.
+              ...(miArea === "atencion"
+                ? [
+                    {
+                      texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
+                      corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
+                      icono: ArchivarIcon,
+                      alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
+                    },
+                  ]
+                : []),
               ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),

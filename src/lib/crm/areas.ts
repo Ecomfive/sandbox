@@ -99,6 +99,13 @@ export function areaPropia(acceso: AccesoCrm): AreaCrm {
  */
 export const supervisaArea = (acceso: AccesoCrm, area: AreaCrm) => area !== areaPropia(acceso);
 
+/**
+ * Quién ve las marcas de «borrado» (pedido de Jhokser, 30 oct 2026): lo que se borró en la app de WhatsApp Business (un mensaje «para todos» o un chat entero) sale
+ * marcado **solo para quien tiene únicamente Atención** (Nicole y su equipo). Comercial, Dirección y los administradores (que tienen las tres áreas) ven los chats y los
+ * mensajes como si nada se hubiera borrado. Lo decide el servidor: a los demás ni siquiera viaja la marca.
+ */
+export const veMarcasDeBorrado = (acceso: AccesoCrm) => acceso.atencion && !acceso.comercial && !acceso.direccion;
+
 /** Acciones de la auditoría que son del trabajo comercial y no se muestran a Atención. */
 export const ACCIONES_COMERCIALES = [
   "crear_seguimiento_dropshipper",

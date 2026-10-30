@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { accesoCrm, supervisaArea, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
+import { accesoCrm, supervisaArea, veMarcasDeBorrado, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
@@ -78,7 +78,7 @@ export async function ultimosMensajesDropshipper(
     .maybeSingle();
   if (error || !c) return null;
   const numero = c.whatsapp_numeros as unknown as { nombre: string } | { nombre: string }[];
-  const { mensajes } = await cargarConversacion(supabase, c.id as string, null);
+  const { mensajes } = await cargarConversacion(supabase, c.id as string, null, undefined, undefined, veMarcasDeBorrado(accesoCrm(u)));
   return {
     conversacionId: c.id as string,
     numero: (Array.isArray(numero) ? numero[0]?.nombre : numero?.nombre) ?? "WhatsApp",
@@ -125,7 +125,7 @@ export async function abrirConversacion(id: string): Promise<{ mensajes: Mensaje
   const c = await conversacionPermitida(supabase, id, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
   if (!supervisaArea(accesoCrm(u), c.area)) await supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", id).gt("no_leidos", 0);
-  return cargarConversacion(supabase, id, c.dropshipperId);
+  return cargarConversacion(supabase, id, c.dropshipperId, undefined, undefined, veMarcasDeBorrado(accesoCrm(u)));
 }
 
 /** «Ver mensajes anteriores»: los 300 de antes de `antesDe` (un chat importado del celular puede tener años de mensajes). */
@@ -135,7 +135,7 @@ export async function mensajesAnteriores(id: string, antesDe: string): Promise<{
   if (Number.isNaN(Date.parse(String(antesDe)))) return { error: "Fecha no válida." };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
-  const { mensajes, hayAnteriores } = await cargarConversacion(supabase, id, null, new Date(antesDe).toISOString());
+  const { mensajes, hayAnteriores } = await cargarConversacion(supabase, id, null, new Date(antesDe).toISOString(), undefined, veMarcasDeBorrado(accesoCrm(u)));
   return { mensajes, hayAnteriores };
 }
 
@@ -322,6 +322,7 @@ export async function pasarConversacionDeArea(id: string, area: string): Promise
 export async function marcarChatBorradoEnApp(id: string, borrado: boolean): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  if (!veMarcasDeBorrado(accesoCrm(u))) return { error: "Esta marca la ve y la pone el equipo de Atención." };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const autor = u.nombre || u.email;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, numerosDeAreas, supervisaArea } from "./areas";
+import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, numerosDeAreas, supervisaArea, veMarcasDeBorrado } from "./areas";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del CRM)
 const atencion = accesoCrm({ modulos: ["crm-dropshippers"], modulosSoloLectura: [] });
@@ -77,4 +77,13 @@ test("cada quien ve solo los números de WhatsApp de sus áreas", () => {
   assert.deepEqual(numerosDeAreas(numeros, areasVisibles(atencion)).map((n) => n.id), ["a"]);
   assert.deepEqual(numerosDeAreas(numeros, areasVisibles(comercial)).map((n) => n.id), ["a", "c"]);
   assert.deepEqual(numerosDeAreas(numeros, ["direccion", "comercial", "atencion"]).map((n) => n.id), ["a", "c", "d"]);
+});
+
+test("las marcas de «borrado en WhatsApp» las ve solo quien tiene únicamente Atención", () => {
+  const todo = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial", "crm-direccion"], modulosSoloLectura: [] });
+  assert.equal(veMarcasDeBorrado(atencion), true);
+  assert.equal(veMarcasDeBorrado(comercial), false);
+  assert.equal(veMarcasDeBorrado(comercialLectura), false);
+  assert.equal(veMarcasDeBorrado(todo), false);
+  assert.equal(veMarcasDeBorrado(sinAcceso), false);
 });
