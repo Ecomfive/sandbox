@@ -1289,7 +1289,7 @@ convenciones técnicas del código.
   la conversación más reciente en los números de las áreas de la persona). La ficha muestra los últimos mensajes
   (`conversacion-whatsapp.tsx`, `ultimosMensajesDropshipper`, sin marcarlos leídos). Pestañas: Dropshippers, Bandeja de WhatsApp,
   Casos, Ranking (`/crm-dropshippers/ranking`, la portada anterior con `ResumenCrm`) y Vínculos; `/crm-dropshippers/directorio`
-  redirige a la lista con `?abrir=`/`?buscar=` (buscar abre la ficha del que se llama así).
+  redirige a la lista con `?abrir=`/`?buscar=` (buscar abre la ficha del que se llama así). **La bandeja se abre desde una burbuja flotante** (30 oct 2026, pedido de Jhokser; sin migración): `BurbujaWhatsapp` (`burbuja-whatsapp.tsx`, en `ListaDropshippers`) reemplaza el botón grande de arriba; es un enlace redondo verde (`--wa-acento`, con `bandeja-wa`) con el número de chats sin responder (`sinResponder`) en una insignia roja, `fixed` (`z-30`: sobre la lista, bajo las fichas), que se arrastra con el ratón o el dedo (Pointer Events; un clic sin arrastrar abre la bandeja) o con Mayús + flechas, y recuerda su sitio en `localStorage` (`crm-burbuja-whatsapp-v1`, por navegador); siempre se mantiene dentro de la ventana.
 - **Testing Lab › Instagram** (`/instagram`, módulo `instagram`, migración 0106, 14 oct 2026). Una fuente más de Fuentes: lo que el
   equipo ve en Instagram y comparte **por mensaje directo con la cuenta de fuentes** (`@ecomfive.fuentes`, cuenta profesional ligada
   al Business Manager) cae solo en `instagram_capturas`. Meta llama al webhook **`/api/instagram/webhook`**
