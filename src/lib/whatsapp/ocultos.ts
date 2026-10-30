@@ -37,3 +37,15 @@ export async function estaOculto(supabase: SupabaseClient, mensajeId: string, co
   ]);
   return !!((!m.error && m.data?.oculto_en) || (!c.error && c.data?.oculta_en));
 }
+
+/** Cuándo se marcó este chat como borrado en la app de WhatsApp Business (migración 0171); `null` si no, o sin la columna. */
+export async function corteDeBorradoEnApp(supabase: SupabaseClient, conversacionId: string): Promise<string | null> {
+  const { data, error } = await supabase.from("whatsapp_conversaciones").select("borrada_en_app_en").eq("id", conversacionId).maybeSingle();
+  return error ? null : ((data?.borrada_en_app_en as string | null) ?? null);
+}
+
+/** Los mensajes de un chat que su autor eliminó «para todos» en WhatsApp (migración 0171); vacío sin la columna. */
+export async function mensajesEliminadosEnWhatsapp(supabase: SupabaseClient, conversacionId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", conversacionId).not("eliminado_en_whatsapp_en", "is", null);
+  return new Set(error ? [] : (data ?? []).map((m) => m.id as string));
+}

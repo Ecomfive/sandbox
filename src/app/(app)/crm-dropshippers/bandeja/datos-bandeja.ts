@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
-import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, numerosDeAreas, veMarcasDeBorrado, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, numerosDeAreas, pierdeLoBorrado, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { chatVisibleParaAtencion, mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
-import { borradosPendientes, conversacionesOcultas, mensajesOcultos } from "@/lib/whatsapp/ocultos";
+import { borradosPendientes, conversacionesOcultas, corteDeBorradoEnApp, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { esGrupo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { dondeVende, paisesDondeVende, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
@@ -150,6 +151,7 @@ export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u)
  */
 export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<DatosBandeja | null> {
   const areas = areasDe(usuario);
+  const sinBorrados = pierdeLoBorrado(accesoCrm(usuario));
   const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (numerosR.error) return null;
   const numeros = (numerosR.data ?? []) as NumeroVista[];
@@ -207,11 +209,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas.filter((x): x is { plataforma: string | null; pais: string } => !!x.pais)),
     };
   });
-  // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna. Solo las ve quien tiene
-  // únicamente Atención: para Comercial, Dirección y administradores la marca no viaja.
-  const marcadas = veMarcasDeBorrado(accesoCrm(usuario))
-    ? await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null)
-    : { data: [], error: { message: "sin marcas" } };
+  // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
+  const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null);
   if (!marcadas.error) {
     const porId = new Map((marcadas.data ?? []).map((x) => [x.id as string, { por: (x.borrada_en_app_por as string | null) ?? null, en: x.borrada_en_app_en as string }]));
     for (const c of conversaciones) c.borradaEnApp = porId.get(c.id) ?? null;
@@ -287,7 +286,10 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   return {
     numeros: numerosDeAreas(numeros, areas),
     numerosEmpresa: numeros.map((n) => ({ id: n.id, nombre: n.nombre, area: n.area })),
-    conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)),
+    // Lo borrado en la app de WhatsApp Business: a quien tiene solo Atención el chat marcado desaparece (y no ve la marca); los demás lo ven intacto, con su marca.
+    conversaciones: conversaciones
+      .filter((c) => !ocultas.has(c.id) && (!sinBorrados || chatVisibleParaAtencion(c.ultimoMensajeEn, c.borradaEnApp?.en ?? null)))
+      .map((c) => (sinBorrados && c.borradaEnApp ? { ...c, borradaEnApp: null } : c)),
     colores,
   };
 }
@@ -374,8 +376,8 @@ export async function cargarConversacion(
   dropshipperId: string | null,
   antesDe?: string,
   limite = MENSAJES_POR_VEZ,
-  /** Si sale la marca de «lo eliminó en WhatsApp» (`veMarcasDeBorrado`: solo Atención). Sin pedirlo, no sale. */
-  verBorrados = false,
+  /** Para quien tiene solo Atención (`pierdeLoBorrado`): los mensajes eliminados en WhatsApp y lo anterior al borrado del chat no salen. Sin pedirlo, sale todo, con su marca. */
+  sinBorrados = false,
 ): Promise<{ mensajes: MensajeVista[]; hayAnteriores: boolean; dropshipper: ResumenDropshipper | null }> {
   let consulta = supabase
     .from("whatsapp_mensajes")
@@ -391,7 +393,7 @@ export async function cargarConversacion(
       ? supabase.from("casos_dropshipper").select("numero, titulo, prioridad").eq("dropshipper_id", dropshipperId).neq("estado", "resuelto").order("abierto_en", { ascending: false }).limit(5)
       : Promise.resolve({ data: null }),
     // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
-    verBorrados ? supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null) : Promise.resolve({ data: [], error: null }),
+    supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
   ]);
   const [ocultos, pendientes, reaccionesR, editadosR] = await Promise.all([
     mensajesOcultos(supabase, id),
@@ -405,13 +407,14 @@ export async function cargarConversacion(
   const reaccionA = new Map((reaccionesR.error ? [] : (reaccionesR.data ?? [])).map((x) => [x.id as string, x.reaccion_a as string]));
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
   const traidos = mensajesR.data ?? [];
+  const corteBorrado = sinBorrados ? await corteDeBorradoEnApp(supabase, id) : null;
   const autores = [...new Set(traidos.map((m) => m.autor_id as string | null).filter((x): x is string => !!x))];
   const [cargos, fotosR] = autores.length
     ? await Promise.all([cargosDelEquipo(supabase), supabase.from("perfiles").select("id, avatar_url").in("id", autores)])
     : [new Map<string, string>(), { data: [] as { id: string; avatar_url: string | null }[] }];
   const fotos = new Map((fotosR.data ?? []).map((p) => [p.id as string, (p.avatar_url as string | null) ?? null]));
   const mensajes: MensajeVista[] = traidos
-    .filter((m) => !ocultos.has(m.id as string))
+    .filter((m) => !ocultos.has(m.id as string) && (!sinBorrados || mensajeVisibleParaAtencion({ id: m.id as string, momento: m.momento as string }, eliminados, corteBorrado)))
     .map((m) => ({
       id: m.id as string,
       direccion: m.direccion as MensajeVista["direccion"],

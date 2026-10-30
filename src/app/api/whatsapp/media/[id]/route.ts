@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getUsuarioActual } from "@/lib/auth";
-import { MODULO_ATENCION, MODULO_COMERCIAL } from "@/lib/crm/areas";
+import { accesoCrm, MODULO_ATENCION, MODULO_COMERCIAL, pierdeLoBorrado } from "@/lib/crm/areas";
+import { mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { createServiceClient } from "@/lib/supabase/server";
-import { estaOculto } from "@/lib/whatsapp/ocultos";
+import { corteDeBorradoEnApp, estaOculto, mensajesEliminadosEnWhatsapp } from "@/lib/whatsapp/ocultos";
 import { config360, urlDescarga360, urlMedia360 } from "@/lib/whatsapp/proveedor";
 import { conversacionPermitida } from "@/app/(app)/crm-dropshippers/bandeja/datos-bandeja";
 
@@ -29,6 +30,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!m?.media_id || !c) return new NextResponse("Not Found", { status: 404 });
   // Lo que se autorizó borrar (migración 0172) ya no se entrega.
   if (await estaOculto(supabase, id, m.conversacion_id as string)) return new NextResponse("Not Found", { status: 404 });
+  // Lo eliminado en WhatsApp (o lo de antes de borrar el chat) tampoco se le entrega a quien tiene solo Atención.
+  if (pierdeLoBorrado(accesoCrm(u))) {
+    const [eliminados, corte, { data: fila }] = await Promise.all([
+      mensajesEliminadosEnWhatsapp(supabase, m.conversacion_id as string),
+      corteDeBorradoEnApp(supabase, m.conversacion_id as string),
+      supabase.from("whatsapp_mensajes").select("momento").eq("id", id).maybeSingle(),
+    ]);
+    if (!mensajeVisibleParaAtencion({ id, momento: String(fila?.momento ?? "") }, eliminados, corte)) return new NextResponse("Not Found", { status: 404 });
+  }
   const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
   // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169): vive en el bucket, en la carpeta del chat.
   if (String(m.media_id).startsWith("storage:")) {
