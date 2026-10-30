@@ -408,14 +408,17 @@ export function Bandeja({
   const [areaElegida, setAreaTablero] = useState<AreaCrm>(miArea);
   const areaTablero = verComo ?? areaElegida;
   const [soloMios, setSoloMios] = useState(false);
-  // La vista elegida se recuerda en el navegador; si no se puede leer, se abre la lista.
+  // La vista elegida se recuerda en el navegador. Sin elección guardada, Atención abre en el tablero: es su bandeja de entrada (30 oct 2026,
+  // pedido de Hernán); las demás áreas, en la lista. Si no se puede leer, lo mismo.
   useEffect(() => {
+    let guardada: string | null = null;
     try {
-      if (window.localStorage.getItem(CLAVE_VISTA) === "tablero") setVistaBandeja("tablero");
+      guardada = window.localStorage.getItem(CLAVE_VISTA);
     } catch {
-      // Sin almacenamiento: la lista de siempre.
+      // Sin almacenamiento: lo de cada área.
     }
-  }, []);
+    if (guardada === "tablero" || (guardada !== "lista" && miArea === "atencion")) setVistaBandeja("tablero");
+  }, [miArea]);
   function cambiarVista(v: "lista" | "tablero") {
     setVistaBandeja(v);
     try {
@@ -1329,7 +1332,12 @@ export function Bandeja({
             Ver como
             <select
               value={verComo ?? ""}
-              onChange={(e) => setVerComo((e.target.value || null) as AreaCrm | null)}
+              onChange={(e) => {
+                const area = (e.target.value || null) as AreaCrm | null;
+                setVerComo(area);
+                // «Ver como» Atención la muestra tal como la ve Atención: en el tablero.
+                if (area === "atencion") setVistaBandeja("tablero");
+              }}
               title="Ver la bandeja tal como la ve un área, para revisarla sin entrar con su usuario"
               className={`h-10 rounded-lg border-0 px-2 text-[13px] font-semibold ${verComo ? "bg-[var(--wa-acento-suave)] text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-texto)]"} ${anilloFoco}`}
             >
