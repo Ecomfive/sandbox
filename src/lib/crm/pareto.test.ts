@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fraseDelAnalisis, guiasPorMes, mesesPorGrupo, pareto, paretoDe, paretoDeProductos, posicionEn, tamanoDelTop, textoParte, ultimosMeses } from "./pareto";
+import { fraseDelAnalisis, guiasPorMes, mesesPorGrupo, pareto, paretoDe, paretoDeProductos, posicionEn, tamanoDelTop, textoParte, ultimosMeses, cobertura } from "./pareto";
 
 // 10 dropshippers: el primero hace 50, el segundo 30, luego 5, 4, 3, 3, 2, 1, 1, 1 = 100 guías.
 const cien = [50, 30, 5, 4, 3, 3, 2, 1, 1, 1].map((valor, i) => ({ id: `d${i + 1}`, valor }));
@@ -146,4 +146,16 @@ test("el Pareto de los productos de un dropshipper", () => {
   assert.equal(r.grupos.resto.n, 2);
   assert.equal(r.nombres.get("1"), "Faja");
   assert.equal(r.filas[0].parte, 0.7);
+});
+
+test("desde qué mes hay guías: la cobertura de los datos", () => {
+  const meses = ["2026-08-01", "2026-09-01", "2026-10-01", "2026-11-01"];
+  // Los primeros meses sin nada: hay datos desde septiembre (3 meses con el actual).
+  const series = new Map([["a", [0, 0, 4, 1]], ["b", [0, 2, 0, 0]]]);
+  assert.deepEqual(cobertura(series, meses), { desde: "2026-09-01", meses: 3 });
+  // Con guías desde el primer mes, cubre todo.
+  assert.deepEqual(cobertura(new Map([["a", [1, 0, 0, 0]]]), meses), { desde: "2026-08-01", meses: 4 });
+  // Sin guías, o sin series, no hay cobertura.
+  assert.equal(cobertura(new Map([["a", [0, 0, 0, 0]]]), meses), null);
+  assert.equal(cobertura(new Map(), meses), null);
 });

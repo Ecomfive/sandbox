@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { anilloFoco } from "@/components/ui/field";
 import {
+  cobertura,
   fraseDelAnalisis,
   GRUPOS_PARETO,
   LIMITE_80,
@@ -99,6 +100,10 @@ export function SeccionParetoResumen({ datos, pareto }: { datos: DatosDireccion;
   const porId = useMemo(() => new Map(datos.filas.map((f) => [f.id, f])), [datos.filas]);
   const nombreDe = useMemo(() => (id: string) => porId.get(id)?.nombre ?? "Sin ficha", [porId]);
   const porMes = useMemo(() => (sinDatos ? [] : mesesPorGrupo(series, r, meses, pareto.meses).map((m) => ({ ...m, nombre: nombreMes(m.mes) }))), [series, r, meses, pareto, sinDatos]);
+  // Qué meses abarca el periodo elegido y desde cuándo hay guías: si los datos empiezan después del comienzo del periodo, los periodos largos se parecen al corto.
+  const mesesDelPeriodo = sinDatos ? [] : pareto.meses.slice(Math.max(0, pareto.meses.length - meses));
+  const datosDesde = useMemo(() => (sinDatos ? null : cobertura(series, pareto.meses)), [series, pareto, sinDatos]);
+  const faltanDatos = !!datosDesde && datosDesde.meses < meses;
   const aEnRiesgo = r.filas.filter((f) => f.grupo === "top" && porId.get(f.id) && enRiesgo(porId.get(f.id)!));
   const parteEnRiesgo = aEnRiesgo.reduce((s, f) => s + f.parte, 0);
 
@@ -131,6 +136,18 @@ export function SeccionParetoResumen({ datos, pareto }: { datos: DatosDireccion;
           <p className="m-0 text-sm text-muted-foreground">Sin guías en {meses} meses.</p>
         ) : (
           <>
+            <p className="m-0 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Últimos {meses} meses · {nombreMes(mesesDelPeriodo[0])} a {nombreMes(mesesDelPeriodo[mesesDelPeriodo.length - 1])}
+            </p>
+            {faltanDatos && (
+              <p role="status" className="m-0 flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-warning" />
+                <span>
+                  Solo hay guías desde {nombreMes(datosDesde.desde)} ({datosDesde.meses} {datosDesde.meses === 1 ? "mes" : "meses"}): antes de eso no hay datos, así que los periodos de más de {datosDesde.meses}{" "}
+                  {datosDesde.meses === 1 ? "mes" : "meses"} dan las mismas cifras.
+                </span>
+              </p>
+            )}
             <p className="m-0 text-base font-semibold">{fraseDelAnalisis(r, "los dropshippers", "las guías")}</p>
             <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
               {GRUPOS_PARETO.map((g) => (
