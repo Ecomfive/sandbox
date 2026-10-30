@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * La antigua pestaña CRM › Dirección. Desde el 30 oct 2026 (pedido de Hernán) el panel es la Bandeja de Dirección: esta dirección lleva allá con
- * la misma vista (la de antes sin vista, que juntaba resumen y lista, abre el Resumen).
+ * la misma vista (sin vista, Clientes).
  */
 export default async function DireccionCrmPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   await requireModulo(MODULO_DIRECCION);
   const { vista, dias } = await searchParams;
-  const destino: VistaDireccion = VISTAS_DIRECCION.find((v) => v.valor === vista && v.valor !== "chats")?.valor ?? "resumen";
+  const destino: VistaDireccion = VISTAS_DIRECCION.find((v) => v.valor === vista && v.valor !== "chats")?.valor ?? "clientes";
   redirect(rutaVista(destino, typeof dias === "string" ? { dias } : {}));
 }

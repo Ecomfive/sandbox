@@ -3,21 +3,25 @@
 /** La Bandeja: para quien tiene «CRM: dirección (CEO)» abre el panel; «Chats» lleva a la bandeja de WhatsApp de siempre. */
 export const RUTA_DIRECCION = "/crm-dropshippers/bandeja";
 
-/** Las vistas del panel de Dirección en la Bandeja, en el orden de sus pestañas. «Chats» es la bandeja de WhatsApp. */
+/**
+ * Las vistas del panel de Dirección en la Bandeja, en el orden de sus pestañas. «KPIs de atención» era una pestaña aparte del CRM; «Chats» es la
+ * bandeja de WhatsApp.
+ */
 export const VISTAS_DIRECCION = [
-  { valor: "resumen", etiqueta: "Resumen" },
   { valor: "clientes", etiqueta: "Clientes" },
   { valor: "productos", etiqueta: "Productos" },
   { valor: "entregas", etiqueta: "Entregas" },
   { valor: "equipo", etiqueta: "Equipo" },
   { valor: "duplicados", etiqueta: "Duplicados" },
   { valor: "automatizaciones", etiqueta: "Automatizaciones" },
+  { valor: "kpis", etiqueta: "KPIs de atención" },
   { valor: "chats", etiqueta: "Chats" },
 ] as const;
 export type VistaDireccion = (typeof VISTAS_DIRECCION)[number]["valor"];
 
-/** La dirección de una vista (con sus parámetros, como `dias` o `segmento`). */
+/** La dirección de una vista (con sus parámetros, como `dias`). Clientes, la primera, va sin `vista`. */
 export function rutaVista(vista: VistaDireccion, extra: Record<string, string | number> = {}): string {
-  const q = new URLSearchParams({ vista, ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, String(v)])) });
-  return `${RUTA_DIRECCION}?${q.toString()}`;
+  const q = new URLSearchParams({ ...(vista === "clientes" ? {} : { vista }), ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, String(v)])) });
+  const s = q.toString();
+  return s ? `${RUTA_DIRECCION}?${s}` : RUTA_DIRECCION;
 }

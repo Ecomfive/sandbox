@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { Fragment, useMemo, useState, useTransition } from "react";
-import { BotonBarra, MarcoTabla, Pastilla, claseTd, claseTh } from "@/components/panel/piezas-panel";
+import { MarcoTabla, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { useToast } from "@/components/ui/toast";
 import { DIAS_SE_ACABA, ETIQUETA_ESTADO_STOCK, type EstadoStock, type ProductoCartera } from "@/lib/crm/productos";
 import { ETIQUETA_SEGMENTO, nPedidos } from "@/lib/crm/salud";
 import type { FilaDireccion } from "./datos-direccion";
 import type { DatosProductos } from "./datos-productos";
 import { descargarLista } from "./lista-csv";
+import { Boton, Chip, Cifra, Cifras, Insignia, type TonoDireccion } from "./piezas-direccion";
 
-type TonoPastilla = "neutro" | "exito" | "aviso" | "peligro" | "oscuro";
-export const TONO_STOCK: Record<EstadoStock, TonoPastilla> = { agotado: "peligro", se_acaba: "peligro", reponer: "aviso", ok: "exito", sin_dato: "neutro" };
+export const TONO_STOCK: Record<EstadoStock, TonoDireccion> = { agotado: "peligro", se_acaba: "peligro", reponer: "aviso", ok: "exito", sin_dato: "neutro" };
 const fechaCorta = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLocaleDateString("es", { day: "numeric", month: "short", timeZone: "UTC" });
 
 /** «500 u. · llega 12 nov», «500 u. sin fecha» o «Nada». */
@@ -69,11 +68,11 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
           No hay ventas de Dropi cargadas para {codigoPais} (Desempeño › Ventas Dropi): sin ellas no se sabe el stock ni cuánto dura.
         </p>
       )}
-      <KpiGrid>
-        <KpiCard titulo={`Se acaban en ${DIAS_SE_ACABA} días o ya se agotaron`} valor={enRiesgo.length} subtexto={`${sinCamino} sin nada en camino`} tono={enRiesgo.length ? "destructive" : "success"} />
-        <KpiCard titulo="Dropshippers afectados" valor={afectados.size} subtexto={`${pedidosEnRiesgo.toLocaleString("es")} pedidos en 30 días de esos productos`} tono={afectados.size ? "warning" : "neutral"} />
-        <KpiCard titulo="Productos que vende la cartera" valor={datos.productos.length} subtexto="Con pedidos en los últimos 30 días" />
-      </KpiGrid>
+      <Cifras>
+        <Cifra titulo={`Se acaban en ${DIAS_SE_ACABA} días o agotados`} valor={enRiesgo.length} nota={`${sinCamino} sin nada en camino`} tono={enRiesgo.length ? "peligro" : "exito"} />
+        <Cifra titulo="Dropshippers afectados" valor={afectados.size} nota={`${pedidosEnRiesgo.toLocaleString("es")} pedidos en 30 días de esos productos`} tono={afectados.size ? "aviso" : "neutro"} />
+        <Cifra titulo="Productos que vende la cartera" valor={datos.productos.length} nota="Con pedidos en los últimos 30 días" tono="info" />
+      </Cifras>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar productos">
@@ -84,9 +83,9 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
               ["reponer", "Reponer pronto"],
             ] as [Filtro, string][]
           ).map(([v, e]) => (
-            <BotonBarra key={v} activo={filtro === v} onClick={() => (setFiltro(v), setMostrar(POR_PAGINA))}>
+            <Chip key={v} activo={filtro === v} onClick={() => (setFiltro(v), setMostrar(POR_PAGINA))}>
               {e}
-            </BotonBarra>
+            </Chip>
           ))}
         </div>
         <label className="flex min-w-0 flex-[1_1_12rem] flex-col gap-1 sm:flex-none">
@@ -128,7 +127,7 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
                       <td className={claseTd}>
                         <span className="flex items-center gap-2">
                           <span className="tabular-nums">{p.stock === null ? "—" : p.stock.toLocaleString("es")}</span>
-                          <Pastilla tono={TONO_STOCK[p.estado]}>{ETIQUETA_ESTADO_STOCK[p.estado]}</Pastilla>
+                          <Insignia tono={TONO_STOCK[p.estado]}>{ETIQUETA_ESTADO_STOCK[p.estado]}</Insignia>
                         </span>
                       </td>
                       <td className={`${claseTd} tabular-nums`}>{p.diasInventario === null ? "—" : p.diasInventario}</td>
@@ -142,9 +141,9 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
                           <div className="flex flex-col gap-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <p className="m-0 text-sm font-medium">Quién lo vende ({p.clientes.length})</p>
-                              <BotonBarra onClick={() => descargar(p)} disabled={pendiente}>
+                              <Boton onClick={() => descargar(p)} disabled={pendiente}>
                                 {pendiente ? "Preparando…" : "Descargar la lista"}
-                              </BotonBarra>
+                              </Boton>
                             </div>
                             <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-1 p-0 text-sm sm:grid-cols-2 xl:grid-cols-3">
                               {p.clientes.slice(0, 30).map((c) => {
@@ -175,9 +174,9 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
       </MarcoTabla>
       {lista.length > mostrar && (
         <div className="flex justify-center">
-          <BotonBarra onClick={() => setMostrar((m) => m + POR_PAGINA)}>
+          <Boton onClick={() => setMostrar((m) => m + POR_PAGINA)}>
             Ver {Math.min(POR_PAGINA, lista.length - mostrar)} más de {lista.length - mostrar}
-          </BotonBarra>
+          </Boton>
         </div>
       )}
       <p className="m-0 text-xs text-muted-foreground">

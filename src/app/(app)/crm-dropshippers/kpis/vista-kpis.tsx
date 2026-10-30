@@ -48,7 +48,7 @@ function medianaGeneral(numeros: KpisWhatsapp["numeros"]): number | null {
   return peso ? con.reduce((s, n) => s + Number(n.mediana_min) * (n.consultas - n.sin_responder), 0) / peso : null;
 }
 
-/** KPIs de atención (en el Resumen de la Bandeja de Dirección desde el 30 oct 2026): indicadores generales, por número, por persona y por día. */
+/** KPIs de atención (una pestaña de la Bandeja de Dirección desde el 30 oct 2026): indicadores generales, por número, por persona y por día. */
 export function VistaKpis({ datos, dias, periodos }: { datos: KpisWhatsapp; dias: number; periodos: number[] }) {
   const router = useRouter();
   const numeros = datos?.numeros ?? [];
@@ -63,7 +63,7 @@ export function VistaKpis({ datos, dias, periodos }: { datos: KpisWhatsapp; dias
     <>
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Periodo">
         {periodos.map((p) => (
-          <BotonBarra key={p} activo={p === dias} onClick={() => router.push(rutaVista("resumen", { dias: p }))}>
+          <BotonBarra key={p} activo={p === dias} onClick={() => router.push(rutaVista("kpis", { dias: p }))}>
             Últimos {p} días
           </BotonBarra>
         ))}

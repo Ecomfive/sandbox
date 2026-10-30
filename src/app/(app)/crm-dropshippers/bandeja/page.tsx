@@ -5,7 +5,8 @@ import { accesoCrm, areaPropia, areasVisibles } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { config360 } from "@/lib/whatsapp/proveedor";
-import { ContenidoDireccion, PestanasDireccion } from "../direccion/contenido-direccion";
+import { getPaisActual } from "@/lib/pais";
+import { ContenidoDireccion, EncabezadoBandejaDireccion } from "../direccion/contenido-direccion";
 import { VISTAS_DIRECCION, type VistaDireccion } from "../direccion/ruta";
 import { Bandeja } from "./bandeja";
 import { cargarBandeja } from "./datos-bandeja";
@@ -18,35 +19,31 @@ export const maxDuration = 300;
 
 /**
  * CRM Dropshippers › Bandeja de WhatsApp (26 oct 2026): los chats de los números de la empresa, para contestar desde el sistema.
- * **Dirección** (quien tiene «CRM: dirección (CEO)», 30 oct 2026, pedido de Hernán): su bandeja de entrada es el panel de Dirección, como el
- * prototipo (Resumen con los KPIs de atención, Clientes, Productos, Entregas, Equipo, Duplicados y Automatizaciones); «Chats» es esta misma
- * bandeja de WhatsApp. Un enlace para abrir un chat (`?abrir=`) va directo a Chats. Los demás ven la bandeja de siempre.
+ * **Dirección** (quien tiene «CRM: dirección (CEO)», 30 oct 2026, pedido de Hernán): su bandeja de entrada es el panel de Dirección con el diseño
+ * del prototipo (Clientes, Productos, Entregas, Equipo, Duplicados, Automatizaciones y KPIs de atención); «Chats» es esta misma bandeja de
+ * WhatsApp. Un enlace para abrir un chat (`?abrir=`) va directo a Chats. Los demás ven la bandeja de siempre.
  */
 export default async function BandejaWhatsappPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("crm-dropshippers");
-  const { abrir, vista: vistaParam, dias, segmento } = await searchParams;
+  const { abrir, vista: vistaParam, dias } = await searchParams;
   const a = accesoCrm(usuario);
   const vistaDireccion: VistaDireccion | null = !a.direccion
     ? null
     : typeof abrir === "string"
       ? "chats"
-      : (VISTAS_DIRECCION.find((v) => v.valor === vistaParam)?.valor ?? "resumen");
+      : (VISTAS_DIRECCION.find((v) => v.valor === vistaParam)?.valor ?? "clientes");
   if (vistaDireccion && vistaDireccion !== "chats")
     return (
-      <Pagina ancho="ancha" className="flex flex-col gap-5">
-        <EncabezadoPagina titulo="Bandeja de entrada">La salud de la cartera, qué atender hoy, cómo trabaja el equipo y tus chats.</EncabezadoPagina>
-        <PestanasDireccion vista={vistaDireccion} />
-        <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} segmento={segmento} />
+      <Pagina ancho="ancha" className="flex flex-col gap-6">
+        <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} />
       </Pagina>
     );
-  const datos = await cargarBandeja(createServiceClient(), usuario);
+  const supabase = createServiceClient();
+  const [datos, pais] = await Promise.all([cargarBandeja(supabase, usuario), vistaDireccion ? getPaisActual(supabase) : null]);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       {vistaDireccion ? (
-        <>
-          <EncabezadoPagina titulo="Bandeja de entrada">La salud de la cartera, qué atender hoy, cómo trabaja el equipo y tus chats.</EncabezadoPagina>
-          <PestanasDireccion vista={vistaDireccion} />
-        </>
+        <EncabezadoBandejaDireccion vista={vistaDireccion} pais={pais?.nombre ?? ""} />
       ) : (
         <EncabezadoPagina titulo="Bandeja de WhatsApp">Los chats de los dropshippers con los números de la empresa: se contestan desde aquí, sin el celular.</EncabezadoPagina>
       )}

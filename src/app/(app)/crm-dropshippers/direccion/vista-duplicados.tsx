@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Pastilla } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { ETIQUETA_MOTIVO } from "@/lib/crm/automatizar";
 import type { DuplicadosVista } from "./datos-fase4";
+import { Cifra, Cifras, Insignia } from "./piezas-direccion";
 
 const fecha = (iso: string | null) => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "sin fecha");
 
@@ -16,6 +16,12 @@ export function VistaDuplicados({ datos }: { datos: DuplicadosVista }) {
   const fuertes = datos.grupos.filter((g) => g.motivos.some((m) => m !== "nombre")).length;
   return (
     <>
+      <Cifras>
+        <Cifra titulo="Grupos que parecen duplicados" valor={datos.grupos.length} nota="Para revisar a mano" tono={datos.grupos.length ? "aviso" : "exito"} />
+        <Cifra titulo="Por WhatsApp, correo o tienda" valor={fuertes} nota="Muy probablemente la misma persona" tono={fuertes ? "peligro" : "neutro"} />
+        <Cifra titulo="Solo por el nombre" valor={datos.grupos.length - fuertes} nota="Puede ser casualidad" tono="neutro" />
+        <Cifra titulo="Fichas involucradas" valor={datos.grupos.reduce((s, g) => s + g.ids.length, 0)} nota="Dropshippers en esos grupos" tono="info" />
+      </Cifras>
       <p className="m-0 text-sm text-muted-foreground">
         {datos.grupos.length === 0
           ? "No hay dropshippers que parezcan repetidos."
@@ -23,12 +29,12 @@ export function VistaDuplicados({ datos }: { datos: DuplicadosVista }) {
       </p>
       <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-3 p-0">
         {datos.grupos.map((g) => (
-          <li key={g.ids.join("-")} className="flex flex-col gap-2 rounded-[10px] border border-border bg-card p-3.5">
+          <li key={g.ids.join("-")} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
             <div className="flex flex-wrap gap-1.5">
               {g.motivos.map((m) => (
-                <Pastilla key={m} tono={m === "nombre" ? "neutro" : "aviso"}>
+                <Insignia key={m} tono={m === "nombre" ? "neutro" : "aviso"}>
                   {ETIQUETA_MOTIVO[m]}
-                </Pastilla>
+                </Insignia>
               ))}
             </div>
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">

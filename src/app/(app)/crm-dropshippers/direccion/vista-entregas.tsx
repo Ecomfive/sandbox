@@ -2,21 +2,21 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BotonBarra, MarcoTabla, Pastilla, claseTd, claseTh } from "@/components/panel/piezas-panel";
+import { MarcoTabla, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
-import { KpiCard, KpiGrid, type Tono } from "@/components/ui/kpi-card";
 import { entregasPor, MIN_CERRADOS, sumarEntregas, TASA_BUENA, TASA_REGULAR, tonoEntrega, type Entregas, type FilaEntregas, type TonoEntrega } from "@/lib/crm/automatizar";
 import { ETIQUETA_SEGMENTO, nPedidos } from "@/lib/crm/salud";
 import type { FilaDireccion } from "./datos-direccion";
 import { rutaVista } from "./ruta";
+import { Chip, ChipEnlace, Cifra, Cifras, Insignia, type TonoDireccion } from "./piezas-direccion";
 
-const KPI: Record<TonoEntrega, Tono> = { exito: "success", aviso: "warning", peligro: "destructive", neutro: "neutral" };
+const KPI: Record<TonoEntrega, TonoDireccion> = { exito: "exito", aviso: "aviso", peligro: "peligro", neutro: "neutro" };
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
 const parte = (a: number, b: number) => (b ? a / b : null);
 
 function Tasa({ e }: { e: Entregas }) {
   const tono = tonoEntrega(e);
-  return tono === "neutro" ? <span className="text-muted-foreground">{pct(e.tasa)}</span> : <Pastilla tono={tono}>{pct(e.tasa)}</Pastilla>;
+  return tono === "neutro" ? <span className="text-muted-foreground">{pct(e.tasa)}</span> : <Insignia tono={tono}>{pct(e.tasa)}</Insignia>;
 }
 
 /**
@@ -40,29 +40,24 @@ export function VistaEntregas({ filas, clientes, dias, periodos, codigoPais }: {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Periodo">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Periodo">
         {periodos.map((d) => (
-          <Link
-            key={d}
-            href={rutaVista("entregas", { dias: d })}
-            aria-current={d === dias ? "page" : undefined}
-            className={`inline-flex h-[34px] items-center rounded-lg border px-3 text-[13px] ${d === dias ? "border-accent bg-accent" : "border-border bg-card hover:bg-muted"} ${anilloFoco}`}
-          >
+          <ChipEnlace key={d} href={rutaVista("entregas", { dias: d })} activo={d === dias}>
             Últimos {d} días
-          </Link>
+          </ChipEnlace>
         ))}
       </div>
 
-      <KpiGrid>
-        <KpiCard titulo="Entregados (de los cerrados)" valor={pct(total.tasa)} subtexto={`${total.entregados.toLocaleString("es")} de ${(total.entregados + total.devueltos).toLocaleString("es")} · meta ${Math.round(TASA_BUENA * 100)} %`} tono={KPI[tonoEntrega(total)]} />
-        <KpiCard titulo="Devueltos" valor={total.devueltos.toLocaleString("es")} subtexto={`${pct(parte(total.devueltos, total.entregados + total.devueltos))} de los cerrados`} tono="warning" />
-        <KpiCard titulo="Cancelados" valor={total.cancelados.toLocaleString("es")} subtexto={`${pct(parte(total.cancelados, total.pedidos))} de ${nPedidos(total.pedidos)}`} />
-        <KpiCard titulo="Con novedad" valor={total.novedades.toLocaleString("es")} subtexto={`${total.enCamino.toLocaleString("es")} todavía en camino`} tono={total.novedades ? "warning" : "neutral"} />
-        <KpiCard titulo="Dropshippers que entregan mal" valor={malos} subtexto={`Menos de ${Math.round(TASA_REGULAR * 100)} % entregado (con ${MIN_CERRADOS} cerrados o más)`} tono={malos ? "destructive" : "success"} />
-      </KpiGrid>
+      <Cifras>
+        <Cifra titulo="Entregados (de los cerrados)" valor={pct(total.tasa)} nota={`${total.entregados.toLocaleString("es")} de ${(total.entregados + total.devueltos).toLocaleString("es")} · meta ${Math.round(TASA_BUENA * 100)} %`} tono={KPI[tonoEntrega(total)]} />
+        <Cifra titulo="Devueltos" valor={total.devueltos.toLocaleString("es")} nota={`${pct(parte(total.devueltos, total.entregados + total.devueltos))} de los cerrados`} tono="aviso" />
+        <Cifra titulo="Cancelados" valor={total.cancelados.toLocaleString("es")} nota={`${pct(parte(total.cancelados, total.pedidos))} de ${nPedidos(total.pedidos)}`} />
+        <Cifra titulo="Con novedad" valor={total.novedades.toLocaleString("es")} nota={`${total.enCamino.toLocaleString("es")} todavía en camino`} tono={total.novedades ? "aviso" : "neutro"} />
+        <Cifra titulo="Entregan mal" valor={malos} nota={`Menos de ${Math.round(TASA_REGULAR * 100)} % entregado (10+ cerrados)`} tono={malos ? "peligro" : "exito"} />
+      </Cifras>
 
       <section aria-labelledby="t-transp" className="flex flex-col gap-2">
-        <h2 id="t-transp" className="m-0 text-base font-semibold">
+        <h2 id="t-transp" className="m-0 text-lg font-semibold">
           Por transportadora
         </h2>
         <MarcoTabla ariaLabel="Entregas por transportadora">
@@ -98,12 +93,12 @@ export function VistaEntregas({ filas, clientes, dias, periodos, codigoPais }: {
 
       <section aria-labelledby="t-ds-entregas" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="t-ds-entregas" className="m-0 text-base font-semibold">
+          <h2 id="t-ds-entregas" className="m-0 text-lg font-semibold">
             Por dropshipper <span className="font-normal text-muted-foreground">· los que peor entregan primero</span>
           </h2>
-          <BotonBarra activo={verTodos} onClick={() => setVerTodos((v) => !v)}>
+          <Chip activo={verTodos} onClick={() => setVerTodos((v) => !v)}>
             {verTodos ? `Solo con ${MIN_CERRADOS} cerrados o más` : "Ver también los de pocos pedidos"}
-          </BotonBarra>
+          </Chip>
         </div>
         <MarcoTabla ariaLabel="Entregas por dropshipper">
           <table className="w-full min-w-[56rem] border-collapse">

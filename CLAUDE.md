@@ -1017,16 +1017,18 @@ convenciones técnicas del código.
   él; `areasVisibles` le da las tres áreas. Coexistencia: el webhook guarda los `smb_message_echoes` (lo mandado desde la app del celular)
   como salientes con `whatsapp_registrar_saliente_celular` (autor «Desde el celular»). **KPIs de atención**: la función
   `whatsapp_kpis(p_desde, p_areas)` devuelve por número, por persona y por día las consultas (primer entrante tras un saliente), sin
-  responder y la mediana hasta la primera respuesta; se ven en el Resumen de la Bandeja de Dirección (`kpis/vista-kpis.tsx`).
+  responder y la mediana hasta la primera respuesta; se ven en la pestaña «KPIs de atención» de la Bandeja de Dirección (`kpis/vista-kpis.tsx`).
   **Bandeja de Dirección** (30 oct 2026, pedido de Hernán): quien tiene `crm-direccion` abre en `/crm-dropshippers/bandeja` el panel de
-  Dirección con pestañas como el prototipo (`direccion/ruta.ts` › `VISTAS_DIRECCION`, `?vista=`: resumen, clientes, productos, entregas,
-  equipo, duplicados, automatizaciones y chats = la bandeja de WhatsApp; `?abrir=` va directo a chats). `direccion/contenido-direccion.tsx`
+  Dirección con el diseño del prototipo (`direccion/ruta.ts` › `VISTAS_DIRECCION`, `?vista=`: clientes —sin `vista`—, productos, entregas,
+  equipo, duplicados, automatizaciones, kpis y chats = la bandeja de WhatsApp; `?abrir=` va directo a chats). `direccion/contenido-direccion.tsx`
   carga cada vista. Las pestañas `/crm-dropshippers/direccion` y `/crm-dropshippers/kpis` ya no existen: sus páginas redirigen ahí.
   **Panel de Dirección** (migración 0197, 30 oct 2026, fase 1 del panel del CEO; prototipo en https://claude.ai/artifact/EgMSyATkMEUXzk9LsX8Wkj):
   hoy, la Bandeja de Dirección. `crm_salud_dropshippers(p_pais)` da por dropshipper los
   pedidos de 14/30 días y los anteriores, primer y último pedido y entregados/devueltos de 60 días (sin cancelados, por `dropshipper_cuentas`);
   `crm_pedidos_semanales`. El puntaje, el segmento y las alertas son de `src/lib/crm/salud.ts` (puro, con pruebas). «Atendida» y «Crear tarea»
-  (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. Para «Sin
+  (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. **Diseño** (30 oct 2026, pedido de Hernán: «que se vea como el prototipo»): piezas de
+  `direccion/piezas-direccion.tsx` (`EncabezadoDireccion`, `Cifra`, `Tarjeta`, `Chip`, `Insignia`, `Barra`) y la ficha del cliente al lado de la lista
+  (`FichaCliente`). La salud toma la peor tendencia (30 o 14 días) y con «Caída» no pasa de 69 (`Salud.tope`). Para «Sin
   primer pedido» se usa `fecha_ingreso`/`captado_en`, nunca `creado_en` (los de ClickUp se crearon todos al importarlos). No toca la Bandeja.
   **Fase 2** (sin migración): vista `?vista=equipo&dias=7|30|90` (`datos-equipo.ts` + `vista-equipo.tsx`, lógica pura en `src/lib/crm/equipo.ts`):
   respuestas por persona de `whatsapp_kpis` (cruzadas por nombre de autor con `perfiles.nombre`), chats asignados y `esperando_desde` por tramos,
@@ -2179,6 +2181,10 @@ convenciones técnicas del código.
   líneas por dato): `DatosDropshipper` (`ficha-lateral.tsx`) es una `<dl>` de dos columnas (una sola bajo 360 px); cada fila es el ícono del dato (el `dt`, con el
   nombre en `sr-only`) y su valor en una línea (`truncate`): Nombre, Estado, WhatsApp, Correo (`CorreoIcon`, nuevo), Ingreso («Ingresó el …»), Último pedido,
   Ciudad y Tiendas; Productos y Etiquetas a todo el ancho. `DatoEditable` dice «Sin ciudad» cuando falta y muestra tiendas y productos como pastillas (`EN_PASTILLAS`).
+  **Ciudad con su país** (30 oct 2026, pedido de Alcides: para verlo en un evento o un viaje): al editar «Ciudad», `CampoCiudad` (`dato-editable.tsx`, combobox
+  con flechas, Enter y Escape) propone ciudades con `buscarCiudades` (`dato-actions.ts`): el buscador público de Open-Meteo (`geocoding-api.open-meteo.com`, sin
+  clave, por `descargarPublico`; solo viaja lo escrito; en memoria del servidor) y `leerCiudades` (`src/lib/crm/ciudades.ts`, con prueba): primero las de
+  `CIUDAD_GRANDE` habitantes o más, de los `PAISES_CERCANOS` antes que las demás. Se guarda «Ciudad, País»; si no aparece, se guarda lo escrito.
   **Sin botón «Editar»** (30 oct 2026, pedido de Jhokser): `PanelEditar` y la acción `editarDropshipper` se quitaron. `CampoDato` (`src/lib/crm/dato-dropshipper.ts`, con prueba) ahora cubre `nombre`, `estado`, `telefono`, `tiendas`, `ciudad`, `ingreso`, `productos` y `correo`, y `cambiarDatoDropshipper` aplica la regla de cada uno: el nombre no queda vacío, el estado es de la lista (auditoría `cambiar_estado_dropshipper`), tiendas y productos son texto separado por comas (`listaDeTexto`; la primera tienda también va a `tienda`), y el WhatsApp se normaliza con `normalizarTelefono` (sin prefijo, el primer país donde vende), no puede ser de otro dropshipper (`telefonoDeOtro`), enlaza sus chats (`enlazarChatsPorTelefono`) y **nunca vuelve a la pantalla ni se escribe en la auditoría** (`NUMERO_REGISTRADO`; el campo arranca vacío y vacío no borra). El tipo de cliente ya se cambiaba con su pastilla. `DatosDropshipper` (`ficha-lateral.tsx`) dibuja todas las filas con `DatoEditable` (el estado es una lista que guarda al elegir).
   **Datos editables en la ficha** (29 oct 2026, pedido de Alcides): en el bloque «Datos» (`DatosDropshipper`, `ficha-lateral.tsx`, también en la ficha del chat)
   Ciudad, Ingreso (`fecha_ingreso`) y Correo se ven como texto y se editan con un clic sobre el dato, como una celda de Compras (al pasar el cursor se marca y sale el lápiz; Enter o clic fuera guardan, Escape cancela; `DatoEditable`, `dato-editable.tsx`; `cambiarDatoDropshipper`, `dato-actions.ts`;
