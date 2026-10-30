@@ -393,9 +393,10 @@ export function PanelDireccion({
                       const activo = sel === f.id;
                       const tono = tonoPuntaje(f.salud.puntaje);
                       return (
-                        <tr key={f.id} className={`border-t border-border ${activo ? "bg-accent" : "hover:bg-muted/60"}`}>
+                        // Toda la fila abre la ficha (1 nov 2026, pedido de Hernán); el botón del nombre queda para el teclado y su clic sube a la fila.
+                        <tr key={f.id} onClick={() => verCliente(f.id)} className={`cursor-pointer border-t border-border ${activo ? "bg-accent" : "hover:bg-muted/60"}`}>
                           <td className="py-1.5 pr-3 pl-4">
-                            <button type="button" aria-pressed={activo} onClick={() => verCliente(f.id)} className={`flex min-h-11 flex-col items-start justify-center rounded text-left ${anilloFoco}`}>
+                            <button type="button" aria-pressed={activo} className={`flex min-h-11 flex-col items-start justify-center rounded text-left ${anilloFoco}`}>
                               <span className="flex items-center gap-1.5 font-semibold">
                                 {f.nombre} <TipoCliente nivel={f.nivel} />
                                 {grupoDe.get(f.id) && <Insignia tono={TONO_GRUPO[grupoDe.get(f.id)!]}>{ROTULO_GRUPO[grupoDe.get(f.id)!]}</Insignia>}
