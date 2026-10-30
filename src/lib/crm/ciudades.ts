@@ -4,6 +4,7 @@
  * `dato-actions.ts`) y aquí se lee y se ordena lo que devuelve: primero las ciudades grandes (de los países donde trabajamos antes que las demás) y después
  * los pueblos, para que «Caracas» dé Caracas, Venezuela y no un caserío de Colombia que se llama igual. Lógica pura, con prueba.
  */
+import { normalPais } from "@/lib/paises-mundo";
 
 export interface CiudadSugerida {
   /** Lo que se guarda: «Santiago de Cali, Colombia». */
@@ -71,4 +72,15 @@ export function leerCiudades(respuesta: unknown, max = 6): CiudadSugerida[] {
     )
     .slice(0, max)
     .map(({ etiqueta, nombre, region, pais, codigo }) => ({ etiqueta, nombre, region, pais, codigo }));
+}
+
+/**
+ * El código del país de una ciudad guardada como «Ciudad, País» («Santiago de Cali, Colombia» → «CO»), para dibujar su bandera. Compara el país (lo que va
+ * después de la última coma) sin mayúsculas ni acentos contra `paises` (la lista de `paisesDelMundo`). Sin coma o sin país conocido, `null`.
+ */
+export function codigoPaisDeCiudad(ciudad: string | null, paises: readonly { codigo: string; nombre: string }[]): string | null {
+  if (!ciudad || !ciudad.includes(",")) return null;
+  const pais = normalPais(ciudad.slice(ciudad.lastIndexOf(",") + 1));
+  if (!pais) return null;
+  return paises.find((p) => normalPais(p.nombre) === pais)?.codigo ?? null;
 }

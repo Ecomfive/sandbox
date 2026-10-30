@@ -3,10 +3,12 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
-import { LapizIcon } from "@/lib/nav-icons";
+import { CerrarIcon, EnlaceIcon, LapizIcon } from "@/lib/nav-icons";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CAMPOS_DATO, NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
-import { textoParaBuscar, type CiudadSugerida } from "@/lib/crm/ciudades";
+import { codigoPaisDeCiudad, textoParaBuscar, type CiudadSugerida } from "@/lib/crm/ciudades";
+import { enlaceDeTienda, nombreDeEnlace } from "@/lib/crm/tiendas";
+import { paisesDelMundo } from "@/lib/paises-mundo";
 import { bandera } from "@/lib/whatsapp/origen-chat";
 import { buscarCiudades, cambiarDatoDropshipper } from "./dato-actions";
 import { ESTADOS, etiquetaEstado } from "./def-crm";
@@ -16,7 +18,7 @@ const EJEMPLO: Record<CampoDato, string> = {
   nombre: "Ej: Ana Pérez",
   estado: "",
   telefono: "Nuevo número con prefijo, ej: +57 300 111 2233",
-  tiendas: "Separadas por coma, ej: Yappea, Clovin web",
+  tiendas: "Nombre o enlace, ej: mitienda.com",
   ciudad: "Ej: Ciudad de Panamá",
   ingreso: "",
   productos: "Separados por coma, ej: Crema, Aceite",
@@ -37,8 +39,15 @@ function Valor({ campo, valor }: { campo: CampoDato; valor: string | null }) {
         ))}
       </span>
     );
+  // La ciudad guardada con su país lleva la bandera («🇨🇴 Santiago de Cali, Colombia»; 30 oct 2026, pedido de Alcides).
+  const codigo = campo === "ciudad" ? codigoPaisDeCiudad(valor, paisesDelMundo()) : null;
   // Una sola línea por dato (30 oct 2026, pedido de Alcides): si no cabe, se corta con «…».
-  return <span className={`min-w-0 truncate ${valor ? "" : "text-muted-foreground"}`}>{mostrar(campo, valor)}</span>;
+  return (
+    <span className={`min-w-0 truncate ${valor ? "" : "text-muted-foreground"}`}>
+      {codigo && <span aria-hidden="true">{bandera(codigo)} </span>}
+      {mostrar(campo, valor)}
+    </span>
+  );
 }
 
 function mostrar(campo: CampoDato, valor: string | null): string {
@@ -69,6 +78,9 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
   const descartar = useRef(false);
   const idError = useId();
   const nombre = CAMPOS_DATO[campo].etiqueta.toLowerCase();
+
+  // Las tiendas tienen su propio editor: varias, una por una, y las que son enlace se abren con un clic.
+  if (campo === "tiendas") return <DatoTiendas dropshipperId={dropshipperId} inicial={valor} puede={puede} />;
 
   if (!puede)
     return (
@@ -329,6 +341,133 @@ function CampoCiudad({
         ))}
       </ul>
       {aviso && abierta && <span className="text-xs text-muted-foreground">{aviso}</span>}
+    </span>
+  );
+}
+
+const clasePastilla = "inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-card px-1.5 py-px text-[12px] leading-snug";
+
+/** Una tienda en la ficha: si es un enlace, se abre en una pestaña nueva; si no, su nombre. */
+function PastillaTienda({ tienda, alQuitar }: { tienda: string; alQuitar?: () => void }) {
+  const enlace = enlaceDeTienda(tienda);
+  return (
+    <span className={clasePastilla}>
+      {enlace ? (
+        <a href={enlace} target="_blank" rel="noopener noreferrer" className={`inline-flex min-w-0 items-center gap-1 text-primario hover:underline ${anilloFoco}`}>
+          <EnlaceIcon className="h-3 w-3 flex-none" aria-hidden="true" />
+          <span className="truncate">{nombreDeEnlace(enlace)}</span>
+          <span className="sr-only"> (se abre en una pestaña nueva)</span>
+        </a>
+      ) : (
+        <span className="truncate">{tienda}</span>
+      )}
+      {alQuitar && (
+        <button type="button" onClick={alQuitar} aria-label={`Quitar ${enlace ? nombreDeEnlace(enlace) : tienda}`} className={`-mr-0.5 flex h-4 w-4 flex-none items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}>
+          <CerrarIcon className="h-3 w-3" aria-hidden="true" />
+        </button>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Las tiendas del dropshipper (30 oct 2026, pedido de Alcides): cada una es un nombre o el enlace de su tienda, que se abre con un clic. Con el lápiz se
+ * editan: se agregan una por una (Enter; también varias separadas por coma) y se quitan con su ✕; cada cambio se guarda al momento. Escape o «Listo» cierran.
+ */
+function DatoTiendas({ dropshipperId, inicial, puede }: { dropshipperId: string; inicial: string | null; puede: boolean }) {
+  const [tiendas, setTiendas] = useState<string[]>(inicial ? inicial.split(", ") : []);
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [ocupado, empezar] = useTransition();
+  const lapiz = useRef<HTMLButtonElement>(null);
+  const idError = useId();
+
+  function guardar(nuevas: string[]) {
+    setError(null);
+    empezar(async () => {
+      const r = await cambiarDatoDropshipper(dropshipperId, "tiendas", nuevas.join(", ")).catch(() => ({ error: "No se pudo guardar." }));
+      if ("error" in r) return setError(r.error);
+      setTiendas(r.valor ? r.valor.split(", ") : []);
+    });
+  }
+  function agregar() {
+    const nuevas = texto.split(",").map((t) => t.trim()).filter(Boolean);
+    if (!nuevas.length) return false;
+    setTexto("");
+    guardar([...tiendas, ...nuevas]);
+    return true;
+  }
+  function cerrar() {
+    if (texto.trim()) agregar();
+    setEditando(false);
+    setError(null);
+    requestAnimationFrame(() => lapiz.current?.focus());
+  }
+
+  if (!editando)
+    return (
+      <span className="flex min-w-0 flex-wrap items-center gap-1 px-1.5 py-0.5">
+        {tiendas.length ? tiendas.map((t) => <PastillaTienda key={t} tienda={t} />) : <span className="text-muted-foreground">Sin tiendas</span>}
+        {puede && (
+          <Tooltip texto="Editar tiendas">
+            <button
+              ref={lapiz}
+              type="button"
+              onClick={() => setEditando(true)}
+              aria-label="Editar tiendas"
+              className={`flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+            >
+              <LapizIcon width={12} height={12} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        )}
+      </span>
+    );
+
+  return (
+    <span className="flex min-w-0 flex-col gap-1.5 px-1.5 py-0.5">
+      {tiendas.length > 0 && (
+        <span className="flex flex-wrap gap-1">
+          {tiendas.map((t) => (
+            <PastillaTienda key={t} tienda={t} alQuitar={ocupado ? undefined : () => guardar(tiendas.filter((x) => x !== t))} />
+          ))}
+        </span>
+      )}
+      <span className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          aria-label="Agregar una tienda: su nombre o el enlace"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? idError : undefined}
+          placeholder="Nombre o enlace, ej: mitienda.com"
+          autoFocus
+          autoComplete="off"
+          readOnly={ocupado}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (!agregar()) cerrar();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              setTexto("");
+              cerrar();
+            }
+          }}
+          className={`${fieldClassSm} w-full min-w-0 text-[13px]`}
+        />
+        <button type="button" onClick={cerrar} disabled={ocupado} className={`flex-none rounded-md border border-border-control bg-card px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}>
+          Listo
+        </button>
+      </span>
+      {error && (
+        <span id={idError} role="alert" className="text-xs text-destructive">
+          {error}
+        </span>
+      )}
     </span>
   );
 }

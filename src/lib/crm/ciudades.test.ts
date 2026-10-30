@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { leerCiudades, textoParaBuscar } from "./ciudades";
+import { codigoPaisDeCiudad, leerCiudades, textoParaBuscar } from "./ciudades";
 
 test("lo escrito: al menos 2 letras y no más de 60", () => {
   assert.equal(textoParaBuscar("  San   José "), "San José");
@@ -57,4 +57,18 @@ test("sin repetir, con tope y descartando lo incompleto", () => {
   assert.deepEqual(r, [{ etiqueta: "Caracas, Venezuela", nombre: "Caracas", region: "Distrito Federal", pais: "Venezuela", codigo: "VE" }]);
   assert.deepEqual(leerCiudades(null), []);
   assert.deepEqual(leerCiudades({ results: "x" }), []);
+});
+
+test("el país de una ciudad guardada, para su bandera", () => {
+  const paises = [
+    { codigo: "CO", nombre: "Colombia" },
+    { codigo: "CR", nombre: "Costa Rica" },
+    { codigo: "PE", nombre: "Perú" },
+  ];
+  assert.equal(codigoPaisDeCiudad("Santiago de Cali, Colombia", paises), "CO");
+  assert.equal(codigoPaisDeCiudad("San José, costa rica ", paises), "CR");
+  assert.equal(codigoPaisDeCiudad("Lima, Peru", paises), "PE");
+  assert.equal(codigoPaisDeCiudad("Cali", paises), null);
+  assert.equal(codigoPaisDeCiudad("Cali, Narnia", paises), null);
+  assert.equal(codigoPaisDeCiudad(null, paises), null);
 });
