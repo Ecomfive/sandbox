@@ -1251,6 +1251,8 @@ convenciones técnicas del código.
   editable (`TipoCliente`; sin ficha cargada, `PastillaTipo soloDestacados`), el estado, «Captado el…» y `EquipoDelChat`; la ficha ya no los repite ni muestra las tiendas de ClickUp.
   **Flecha de subió/bajó** (`FlechaCambioTipo`, `tipo-cliente.tsx`): `FilaDropshipper.cambioTipo` = `cambioDeTipo` (`src/lib/crm/cambio-tipo.ts`, con prueba) sobre las líneas
   `tipo_cliente_dropshipper` de la auditoría (`obtenerDatosCrm`); solo si sigue en el nivel al que llegó.
+  **«Respondieron», solo 7 días** (30 oct 2026, pedido de Alcides: un chat nunca se cierra): `EquipoDelChat` muestra `respondieronRecientes` (`src/lib/crm/respondieron.ts`,
+  con prueba; `DIAS_RESPONDIERON` = 7, por el último mensaje de cada persona). «Lo atiende» (`quienesAtienden`) sigue mirando todo el chat.
   **Quién atiende, en globitos** (29 oct 2026, pedido de Alcides): arriba de la ficha del chat, `EquipoDelChat` (`ficha-chat.tsx`) dibuja «Lo atiende»
   (`quienesAtienden`, `src/lib/crm/respondieron.ts`, con prueba: quien lo lleva o intervino + la persona cuyo cargo es del área del chat) y «Respondieron» con
   `GloboPersona` / `GloboCelular` (`bandeja/globo-persona.tsx`: foto de `perfiles.avatar_url` o iniciales, tooltip «Nombre · Cargo»). `MensajeVista.autorFoto`,

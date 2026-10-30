@@ -50,6 +50,19 @@ export interface QuienRespondio {
  * Las personas del equipo que le escribieron al dropshipper en este chat, una vez cada una y la más reciente primero. Solo los mensajes
  * salientes con autor: las notas privadas no son respuestas y lo que se mandó desde la app del celular no dice quién fue.
  */
+/** «Respondieron» cuenta solo a quien respondió en estos últimos días (30 oct 2026, pedido de Alcides: un chat nunca se cierra, y alguien que respondió hace
+ * un mes no dice nada de quién lo atiende hoy). */
+export const DIAS_RESPONDIERON = 7;
+
+/** Los que respondieron dentro de los últimos `dias` días (por su último mensaje), en el mismo orden. Un momento que no se puede leer no cuenta. */
+export function respondieronRecientes<T extends { ultimo: string }>(lista: readonly T[], ahora: number = Date.now(), dias: number = DIAS_RESPONDIERON): T[] {
+  const desde = ahora - dias * 86_400_000;
+  return lista.filter((r) => {
+    const t = Date.parse(r.ultimo);
+    return Number.isFinite(t) && t >= desde;
+  });
+}
+
 export function quienesRespondieron(mensajes: readonly { direccion: string; autor: string | null; autorCargo?: string | null; autorFoto?: string | null; momento: string }[]): QuienRespondio[] {
   const porNombre = new Map<string, QuienRespondio>();
   for (const m of mensajes) {

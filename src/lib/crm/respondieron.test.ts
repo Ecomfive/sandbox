@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { areaDeModulos, cargoDePersona, quienesAtienden, quienesRespondieron } from "./respondieron";
+import { areaDeModulos, cargoDePersona, quienesAtienden, quienesRespondieron, respondieronRecientes } from "./respondieron";
 
 test("el área de una persona es la de más arriba que tiene", () => {
   assert.equal(areaDeModulos(["crm-dropshippers"]), "atencion");
@@ -55,4 +55,17 @@ test("quién atiende: la persona del área y quien intervino", () => {
   // Nadie del área: la última persona que respondió.
   assert.deepEqual(quienesAtienden(null, [alcides], "comercial").map((p) => p.nombre), ["Alcides Andrade"]);
   assert.deepEqual(quienesAtienden(null, [celular], "atencion"), []);
+});
+
+test("respondieron: solo los de los últimos 7 días", () => {
+  const ahora = Date.parse("2026-10-30T12:00:00Z");
+  const lista = [
+    { nombre: "Alcides", ultimo: "2026-10-30T11:00:00Z" },
+    { nombre: "Desde el celular", ultimo: "2026-10-23T12:00:00Z" },
+    { nombre: "Nicole", ultimo: "2026-10-23T11:59:59Z" },
+    { nombre: "Raro", ultimo: "no es fecha" },
+  ];
+  assert.deepEqual(respondieronRecientes(lista, ahora).map((r) => r.nombre), ["Alcides", "Desde el celular"]);
+  assert.deepEqual(respondieronRecientes(lista, ahora, 1).map((r) => r.nombre), ["Alcides"]);
+  assert.deepEqual(respondieronRecientes([], ahora), []);
 });
