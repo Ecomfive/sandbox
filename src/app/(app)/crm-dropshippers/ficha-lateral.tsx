@@ -16,7 +16,7 @@ import {
 } from "@/lib/nav-icons";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { ActividadDropshipper } from "./actividad-dropshipper";
-import { BotonEscalar, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
+import { BotonEscalar } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
 import { DatoEditable } from "./dato-editable";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
@@ -138,12 +138,6 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
         <CuentasDropshipper key={`cuentas-${d.id}`} d={d} codigoPais={codigoPais} puedeEscribir={acceso.escribeAtencion} />
       </Bloque>
 
-      {acceso.comercial && (
-        <Bloque icono={AlertaIcon} titulo="Seguimientos">
-          <SeguimientosDropshipper key={`seguimientos-${d.id}`} dropshipperId={d.id} puedeEscribir={acceso.escribeComercial} version={version} />
-        </Bloque>
-      )}
-
       <Bloque icono={EstadoIcon} titulo="Ventas en Dropi">
         <VentasDropiDropshipperBloque key={`ventas-dropi-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
       </Bloque>
@@ -172,7 +166,6 @@ export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDrops
           <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
         </>
       )}
-      {acceso.escribeComercial && <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />}
     </>
   );
 }
