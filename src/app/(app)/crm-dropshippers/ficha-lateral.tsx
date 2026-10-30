@@ -26,12 +26,12 @@ import { PanelCaso, PanelEditar, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import { ConversacionWhatsapp } from "./conversacion-whatsapp";
 import { EtiquetasDropshipper } from "./etiquetas-dropshipper";
+import { TipoCliente } from "./tipo-cliente";
 import {
   etiquetaAntiguedad,
   etiquetaCanal,
   etiquetaEstado,
   etiquetaEstadoCaso,
-  etiquetaNivel,
   etiquetaTipoCaso,
   etiquetaUltimoPedido,
   type FilaCaso,
@@ -83,7 +83,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       <div className="flex flex-col gap-2 border-b border-border p-3.5">
         <div className="flex flex-wrap gap-1.5">
           <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-          <Pastilla tono={d.nivel === "vip" ? "oscuro" : "neutro"}>{etiquetaNivel(d.nivel)}</Pastilla>
+          <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} puede={acceso.escribeAtencion || acceso.escribeComercial} />
           {abiertos.length > 0 && (
             <Pastilla>
               <Punto />

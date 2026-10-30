@@ -198,7 +198,7 @@ export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: 
                   <Opciones lista={ESTADOS} />
                 </select>
               </Campo>
-              <Campo etiqueta="Nivel" id="campo-nivel-editar">
+              <Campo etiqueta="Tipo de cliente" id="campo-nivel-editar">
                 <select id="campo-nivel-editar" name="nivel" defaultValue={d.nivel} className={`${fieldClass} w-full`}>
                   <Opciones lista={NIVELES} />
                 </select>

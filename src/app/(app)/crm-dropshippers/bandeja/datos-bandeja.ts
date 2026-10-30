@@ -29,6 +29,8 @@ export interface ConversacionVista {
   codigo: string | null;
   /** Su dropshipper es VIP (de los que más pedidos mueven; se marca en el CRM o en «Más» de la ficha del chat). */
   vip: boolean;
+  /** Su tipo de cliente (Rookie `regular`, VIP o Black), del dropshipper vinculado. */
+  tipoCliente: string | null;
   tiendas: string[];
   asignadaA: string | null;
   asignadaAId: string | null;
@@ -171,7 +173,9 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       nombrePerfil: (c.nombre_perfil as string | null) ?? null,
       dropshipperId: (c.dropshipper_id as string | null) ?? null,
       codigo: d?.codigo ?? null,
-      vip: d?.nivel === "vip",
+      // Black cuenta como VIP para el plazo de respuesta.
+      vip: d?.nivel === "vip" || d?.nivel === "black",
+      tipoCliente: d?.nivel ?? null,
       tiendas: d?.tiendas?.length ? d.tiendas : d?.tienda ? [d.tienda] : [],
       asignadaA: uno(c.perfiles as Uno<{ nombre: string | null }>)?.nombre ?? null,
       asignadaAId: (c.asignada_a as string | null) ?? null,

@@ -20,7 +20,7 @@ import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { avisoSupervision, BUCKET_ARCHIVOS, chatParaEnviar, mandarMedioGuardado, MAX_PIE, NOMBRE_AREA, permisoDeSubida } from "./enviar-medio";
 import { obtenerDatosCrm } from "../datos-crm";
 import type { FilaCaso, FilaDropshipper } from "../def-crm";
-import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type ConversacionVista, type DatosBandeja, type MensajeVista, type NumeroVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
+import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type DatosBandeja, type MensajeVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;

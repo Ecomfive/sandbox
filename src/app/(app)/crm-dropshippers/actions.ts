@@ -210,7 +210,7 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
 
   if (!ES_ID(id)) return { error: "Dropshipper no válido." };
   if (!nombre) return { error: "Escribe el nombre del dropshipper." };
-  if (!esUnoDe(ESTADOS, estado) || !esUnoDe(NIVELES, nivel)) return { error: "Revisa el estado y el nivel." };
+  if (!esUnoDe(ESTADOS, estado) || !esUnoDe(NIVELES, nivel)) return { error: "Revisa el estado y el tipo de cliente." };
   if (contacto_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contacto_email)) return { error: "El correo no es válido." };
 
   const supabase = createServiceClient();
@@ -267,8 +267,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
     despues.Estado = etiquetaEstado(estado);
   }
   if (actual.nivel !== nivel) {
-    antes.Nivel = etiquetaNivel(actual.nivel);
-    despues.Nivel = etiquetaNivel(nivel);
+    antes["Tipo de cliente"] = etiquetaNivel(actual.nivel);
+    despues["Tipo de cliente"] = etiquetaNivel(nivel);
   }
   const cambioDeEstado = Object.keys(despues).length > 0;
   await registrarAuditoria({

@@ -16,10 +16,11 @@ export const ESTADOS = [
   { valor: "inactivo", etiqueta: "Inactivo" },
 ] as const;
 
+/** El «Tipo de cliente» (migración 0195, 29 oct 2026): Rookie (el normal; se guarda `regular`), VIP y Black, el más alto. */
 export const NIVELES = [
-  { valor: "nuevo", etiqueta: "Nuevo" },
-  { valor: "regular", etiqueta: "Regular" },
+  { valor: "regular", etiqueta: "Rookie" },
   { valor: "vip", etiqueta: "VIP" },
+  { valor: "black", etiqueta: "Black" },
 ] as const;
 
 export const TIPOS_CASO = [
@@ -267,7 +268,7 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       valores: (d) => [d.nivel],
       opciones: () => NIVELES.map((n) => ({ valor: n.valor, etiqueta: n.etiqueta })),
       agrupable: true,
-      ordenGrupos: ["vip", "regular", "nuevo"],
+      ordenGrupos: ["black", "vip", "regular"],
     },
     {
       id: "responsable",

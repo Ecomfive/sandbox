@@ -1212,6 +1212,9 @@ convenciones técnicas del código.
   suma la auditoría de sus chats (`whatsapp_conversaciones` de las áreas que ve la persona, sin mensajes ni «abrir el chat»); `ActividadDelEquipoFicha` solo sale en un chat sin dropshipper.
   **Actividad del equipo** (`bandeja/equipo-actions.ts`, 29 oct 2026, pedido de Alcides): solo la auditoría del chat (`whatsapp_conversaciones`) y de su dropshipper
   (`dropshippers`), armada con `formatearEventoAuditoria` (antes → después); no repite los mensajes del chat y oculta `ACCIONES_COMERCIALES` a quien no ve lo comercial.
+  **Tipo de cliente** (migración 0195, 29 oct 2026, pedido de Alcides): `dropshippers.nivel` = `regular` (se muestra «Rookie»), `vip` o `black`; «Nuevo» pasó a Rookie.
+  `TipoCliente` / `PastillaTipo` (`crm-dropshippers/tipo-cliente.tsx`) en la ficha del CRM y del chat, con `cambiarTipoCliente` (`tareas/actions.ts`, auditoría
+  `tipo_cliente_dropshipper`). Black cuenta como VIP para el plazo de respuesta. Ya no hay «Marcar como VIP» en «Más».
   **Quién atiende, en globitos** (29 oct 2026, pedido de Alcides): arriba de la ficha del chat, `EquipoDelChat` (`ficha-chat.tsx`) dibuja «Lo atiende»
   (`quienesAtienden`, `src/lib/crm/respondieron.ts`, con prueba: quien lo lleva o intervino + la persona cuyo cargo es del área del chat) y «Respondieron» con
   `GloboPersona` / `GloboCelular` (`bandeja/globo-persona.tsx`: foto de `perfiles.avatar_url` o iniciales, tooltip «Nombre · Cargo»). `MensajeVista.autorFoto`,

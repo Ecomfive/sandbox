@@ -1,5 +1,6 @@
 "use client";
 
+import { PastillaTipo } from "./tipo-cliente";
 import type { ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { ChevronRightIcon } from "@/lib/nav-icons";
@@ -86,7 +87,7 @@ export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaD
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-sm font-medium">{d.nombre}</span>
-            {d.nivel === "vip" && <span className="shrink-0 rounded-[5px] bg-primario-suave px-1.5 text-[11px] font-semibold text-primario">VIP</span>}
+            <PastillaTipo nivel={d.nivel} soloDestacados />
             {d.fase !== "activo" && <span className="shrink-0 rounded-[5px] bg-azul-soft px-1.5 text-[11px] font-medium text-azul">{etiquetaFase(d.fase)}</span>}
             {d.estado !== "activo" && d.fase === "activo" && <span className="shrink-0 rounded-[5px] bg-muted px-1.5 text-[11px] font-medium text-muted-foreground capitalize">{d.estado}</span>}
           </span>
