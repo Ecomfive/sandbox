@@ -14,7 +14,8 @@ import { enCaminoDeCompuesto, juntarEtapaCotizacion } from "@/lib/compras/en-cam
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
 import { enDropiSinPublicacion, type ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
-import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
+import { masReciente } from "@/lib/publicaciones/cambio-precio";
+import { cargarCambiosDropi, cargarPreciosAplicados } from "@/lib/publicaciones/cambios-dropi";
 import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
@@ -288,7 +289,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     const b = await supabase.from("dropi_publicaciones").select("id, datos_dropi").in("id", idsBorrador);
     if (!b.error) for (const x of b.data ?? []) datosBorradores.set(x.id as string, x.datos_dropi);
   }
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoYCotizando, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoYCotizando, enDropiCatalogo, proveedor, cambiosDropi, preciosAplicados] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -302,6 +303,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarNuestrosEnDropi(supabase, paisId),
     cargarProductosProveedor(supabase, paisId),
     cargarCambiosDropi(supabase, paisId),
+    cargarPreciosAplicados(supabase, paisId),
   ]);
   const { camino: enCaminoPorSku, cotizando: cotizandoPorSku, etapasCotizando } = enCaminoYCotizando;
   const r = reglas.reglas;
@@ -374,7 +376,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       ultimaRevision: (d.ultima_revision as string | null) ?? null,
       proximaRevision: proxima,
       ultimoCambioPrecio: (d.ultimo_cambio_precio as string | null) ?? null,
-      cambioPrecioDropi: ultimoCambioDe(idsDropi(d), precios.cambios),
+      // El más reciente entre lo que vio la lectura del catálogo y lo aplicado desde el sistema (30 oct 2026).
+      cambioPrecioDropi: masReciente([ultimoCambioDe(idsDropi(d), precios.cambios), preciosAplicados.get(d.id as string)]),
       lecturaDropiDesde: precios.desde,
       revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
       // Sin foto propia, la del producto vinculado (pedido de Hernán, 23 oct 2026): así no queda el cuadro vacío.

@@ -1,3 +1,4 @@
+import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requirePestana } from "@/lib/auth";
@@ -72,6 +73,7 @@ export default async function SinStockPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Sin stock" oculto />
+      {!alertasR.error && <ContadorPestana href="/compras/sin-stock" cantidad={alertas.filter((a) => a.estado === "abierta").length} />}
       {alertasR.error ? (
         <p role="note" className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
           <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning" />

@@ -4,6 +4,8 @@
 // resultado (aplicar-actions.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import type { CambioPrecio } from "./competencia-publicaciones";
 import type { DatosCrearDropi, FotoCrear } from "./crear-dropi";
 import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
 import { normalizarDatosDevolver } from "./apagar-dropi";
@@ -393,6 +395,39 @@ export async function enviarNombreADropi(
 }
 
 /** El último cambio en Dropi de cada publicación del país y cuántos siguen pendientes. Sin la migración 0137, vacío. */
+/**
+ * El último precio aplicado en Dropi desde el sistema, por publicación (30 oct 2026, pedido de Hernán): «Aplicar en Dropi» lo cambia al
+ * momento y la lectura del catálogo lo ve recién en su próxima vuelta (o nunca, si no se corre). Las republicaciones no cuentan: su precio
+ * queda en la publicación nueva. Si falla, sin ninguno (la ficha sigue con lo de la lectura).
+ */
+export async function cargarPreciosAplicados(supabase: SupabaseClient, paisId: string): Promise<Map<string, CambioPrecio>> {
+  const r = new Map<string, CambioPrecio>();
+  try {
+    const filas = await traerTodasLasFilas<{ publicacion_id: string; tipo: string | null; precio: number; precio_antes: number | null; aplicado_en: string; creado_por_nombre: string | null }>((d, h) =>
+      supabase
+        .from("dropi_cambios_pendientes")
+        .select("publicacion_id, tipo, precio, precio_antes, aplicado_en, creado_por_nombre")
+        .eq("pais_id", paisId)
+        .eq("estado", "aplicado")
+        .not("precio", "is", null)
+        .not("aplicado_en", "is", null)
+        .order("aplicado_en", { ascending: false })
+        .range(d, h),
+    );
+    for (const f of filas) {
+      if ((f.tipo && f.tipo !== "cambio") || r.has(f.publicacion_id)) continue;
+      const despues = Number(f.precio);
+      const antes = f.precio_antes === null ? null : Number(f.precio_antes);
+      // Un nombre que se mandó con el mismo precio no es un cambio de precio.
+      if (antes !== null && Math.abs(antes - despues) <= 0.004) continue;
+      r.set(f.publicacion_id, { fecha: f.aplicado_en, antes, despues, origen: "sistema", por: f.creado_por_nombre });
+    }
+  } catch {
+    // Sin los aplicados: queda lo que vio la lectura del catálogo.
+  }
+  return r;
+}
+
 export async function cargarCambiosDropi(
   supabase: SupabaseClient,
   paisId: string,

@@ -18,6 +18,7 @@ import {
   numeroPublicacion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
+import { masReciente } from "@/lib/publicaciones/cambio-precio";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
@@ -286,6 +287,8 @@ function ContenidoFicha({
   const precio = n(d.precio_venta);
   const utilidad = precio === null ? null : precio - (n(d.costo_mercancia) ?? 0) - (fijo ?? n(d.fulfillment) ?? 0);
   const margen = precio && utilidad !== null ? utilidad / precio : null;
+  // La fecha anotada (sin montos) solo si es más nueva que el cambio con montos.
+  const cambioPrecio = masReciente([p.cambioPrecioDropi, p.ultimoCambioPrecio ? { fecha: p.ultimoCambioPrecio, antes: null, despues: null } : null]);
 
   const salir = (accion: () => void) => {
     if (pendiente) return;
@@ -709,20 +712,31 @@ function ContenidoFicha({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Último cambio de precio</dt>
-                {/* Lo detecta la lectura del catálogo de Dropi (Análisis de competencia): ya no se anota a mano. */}
+                {/* El más reciente (30 oct 2026): el que vio la lectura del catálogo de Dropi, el aplicado desde el sistema o la fecha anotada. */}
                 <dd className="text-xs">
-                  {p.cambioPrecioDropi ? (
+                  {cambioPrecio ? (
                     <>
-                      <span className="block font-semibold">{fechaLarga(p.cambioPrecioDropi.fecha)}</span>
+                      <span className="block font-semibold">{fechaLarga(cambioPrecio.fecha)}</span>
                       <span className="block text-muted-foreground">
-                        de <Monto valor={p.cambioPrecioDropi.antes} /> a <Monto valor={p.cambioPrecioDropi.despues} /> en Dropi
+                        {cambioPrecio.despues === null ? (
+                          <>
+                            ahora a <Monto valor={p.precioVenta} />
+                          </>
+                        ) : (
+                          <>
+                            {cambioPrecio.antes !== null && (
+                              <>
+                                de <Monto valor={cambioPrecio.antes} />{" "}
+                              </>
+                            )}
+                            a <Monto valor={cambioPrecio.despues} />{" "}
+                            {cambioPrecio.origen === "sistema" ? `· aplicado desde el sistema${cambioPrecio.por ? ` (lo pidió ${cambioPrecio.por})` : ""}` : "en Dropi"}
+                          </>
+                        )}
                       </span>
                     </>
                   ) : (
-                    <>
-                      <span className="block">{p.lecturaDropiDesde ? `Sin cambios en Dropi desde el ${fechaLarga(p.lecturaDropiDesde)}` : "Sin datos de Dropi"}</span>
-                      {p.ultimoCambioPrecio && <span className="block text-muted-foreground">Antes: {fechaLarga(p.ultimoCambioPrecio)}</span>}
-                    </>
+                    <span className="block">{p.lecturaDropiDesde ? `Sin cambios en Dropi desde el ${fechaLarga(p.lecturaDropiDesde)}` : "Sin datos de Dropi"}</span>
                   )}
                 </dd>
               </div>

@@ -64,6 +64,26 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
   return { contadores, total, paraTi: 0 };
 }
 
+/**
+ * De dónde sale el número de cada página del menú, para el globito al pasar el cursor (30 oct 2026, pedido de Hernán: en Compras no se
+ * sabía en qué pestaña estaban los pendientes). Dice qué se cuenta y en qué pestaña se atiende.
+ */
+const DE_DONDE: Record<string, string> = {
+  "/alertas": "alertas de inventario abiertas",
+  "/pedidos-dropi": "pedidos con novedad",
+  "/retiros": "saldos sin registrar y retiros de Dropi sin vincular",
+  "/inventario": "lotes vencidos o por vencer",
+  "/analisis-competencia": "competidores nuevos",
+  "/publicaciones-dropi": "tareas atrasadas o crédito de IA por acabarse",
+  "/compras": "productos sin stock por revisar, en la pestaña «Sin stock»",
+};
+
+/** El texto del globito: «12 pendientes: productos sin stock por revisar, en la pestaña «Sin stock»». */
+export function textoDeDonde(href: string | undefined, cantidad: number): string {
+  const donde = href ? DE_DONDE[href] : undefined;
+  return donde ? `${textoPendientes(cantidad)}: ${donde}` : textoPendientes(cantidad);
+}
+
 /** «99+» para no ensanchar la pastilla. */
 export function textoContador(cantidad: number): string {
   return cantidad > 99 ? "99+" : String(cantidad);

@@ -500,6 +500,12 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         ? `ID ${f.dropi_producto_id} · ${[f.nombre ? `«${f.nombre}»` : "", f.nombre_guia ? `guía «${f.nombre_guia}»` : "", f.precio != null ? `precio $${Number(f.precio).toFixed(2)}` : "", f.precio_sugerido != null ? `sugerido $${Number(f.precio_sugerido).toFixed(2)}` : "", f.descripcion ? "descripción" : ""].filter(Boolean).join(" · ")} (desde Dropi)`
         : `ID ${f.dropi_producto_id} · ${r.error}`,
     });
+    // Un precio aplicado es un cambio de precio de hoy (30 oct 2026): la ficha no espera a que lo vea la lectura del catálogo.
+    if (r.ok && f.precio != null)
+      await supabase
+        .from("dropi_publicaciones")
+        .update({ ultimo_cambio_precio: new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" }) })
+        .eq("id", f.publicacion_id as string);
     // Lo aplicado en Dropi deja hechas las tareas abiertas que pedían eso mismo en esa publicación (migración 0128): el precio, las
     // de subir o bajar el precio; el nombre, la de optimizar el título; la descripción y las fotos, las suyas. Así nadie tiene que
     // pulsar «Ya lo hice» después de «Aplicar en Dropi».

@@ -8,6 +8,7 @@ import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { normalizarDatosCrear } from "@/lib/publicaciones/crear-dropi";
 import { normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { normalizarDatosStock } from "@/lib/publicaciones/stock-dropi";
+import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -128,7 +129,10 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
       } else if (tipo === "republicar") {
         lineas.push("Republicar: crear el producto de nuevo en Dropi y archivar el actual sin stock");
         alDeshacer = "Se quita de la cola; no cambia nada en el sistema.";
-        if (intentos > 0 || f.nuevo_dropi_id) {
+        // Si se detuvo antes de crear nada (variaciones, la B280…), Dropi no se tocó: se quita de la cola y se republica a mano.
+        if (intentos > 0 && republicacionSinTocarDropi(f.error as string | null, f.nuevo_dropi_id)) {
+          alDeshacer = "Se quita de la cola; no cambia nada en el sistema. Dropi no se tocó: el intento se detuvo antes de crear nada, así que se republica a mano en Dropi.";
+        } else if (intentos > 0 || f.nuevo_dropi_id) {
           deshacible = false;
           motivoNo = "Ya se empezó en Dropi (puede haber un producto nuevo): no se puede deshacer desde aquí.";
         }
@@ -191,7 +195,8 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   const nombrePub = pub?.nombre ?? "Publicación";
 
   if (tipo === "apagar" && intentos > 0) return { error: "Ya se intentó en Dropi (el stock puede estar en cero): no se puede deshacer desde aquí." };
-  if (tipo === "republicar" && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó en Dropi (puede haber un producto nuevo): no se puede deshacer desde aquí." };
+  const republicarSinTocar = tipo === "republicar" && intentos > 0 && republicacionSinTocarDropi(f.error as string | null, f.nuevo_dropi_id);
+  if (tipo === "republicar" && !republicarSinTocar && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó en Dropi (puede haber un producto nuevo): no se puede deshacer desde aquí." };
   if (tipo === "archivar" && intentos > 0) return { error: "Ya se intentó en Dropi: no se puede deshacer desde aquí." };
   if (tipo === "stock" && intentos > 0) return { error: "Ya se intentó en Dropi (el stock pudo haber cambiado): no se puede deshacer desde aquí." };
   if (tipo === "crear" && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó a publicar en Dropi (puede existir el producto): no se puede deshacer desde aquí." };
@@ -244,7 +249,8 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
 
   // Se quita de la cola (con «reemplazado», que ya sale de las listas y libera los índices); solo si Dropi sigue sin tocarse.
   const q = supabase.from("dropi_cambios_pendientes").update({ estado: "reemplazado" }).eq("id", cambioId).in("estado", ["pendiente", "error"]);
-  const { error: errorCola } = await (tipo === "cambio" ? q : tipo === "privatizar" ? q.is("nuevo_dropi_id", null) : q.eq("intentos", 0));
+  // Una republicación detenida antes de tocar Dropi: solo si nadie la volvió a intentar mientras tanto (mismos intentos, sin producto nuevo).
+  const { error: errorCola } = await (tipo === "cambio" ? q : tipo === "privatizar" ? q.is("nuevo_dropi_id", null) : republicarSinTocar ? q.is("nuevo_dropi_id", null).eq("intentos", intentos) : q.eq("intentos", 0));
   if (errorCola) return { error: "No se pudo quitar el cambio de la cola." };
   await registrarAuditoria({
     accion: tipo === "apagar" ? "dropi_apagar_cancelado" : tipo === "republicar" ? "dropi_republicar_cancelado" : tipo === "archivar" ? "dropi_archivar_cancelado" : tipo === "crear" ? "dropi_crear_cancelado" : tipo === "privatizar" ? "dropi_privatizar_cancelado" : tipo === "stock" ? "dropi_stock_cancelado" : "dropi_cambio_deshecho",
