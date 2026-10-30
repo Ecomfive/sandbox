@@ -242,9 +242,9 @@ export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { dato
             Clientes {segmento !== "todos" && <span className="font-normal text-muted-foreground">· {ETIQUETA_SEGMENTO[segmento]}</span>}
           </h2>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-[1_1_12rem] flex-col gap-1 sm:flex-none">
               <span className={labelClassSm}>Buscar</span>
-              <input type="search" value={busca} onChange={(e) => (setBusca(e.target.value), setMostrar(POR_PAGINA))} placeholder="Nombre, código o responsable" className={`${fieldClass} w-64`} />
+              <input type="search" value={busca} onChange={(e) => (setBusca(e.target.value), setMostrar(POR_PAGINA))} placeholder="Nombre, código o responsable" className={`${fieldClass} w-full sm:w-64`} />
             </label>
             <label className="flex flex-col gap-1">
               <span className={labelClassSm}>Ordenar</span>
