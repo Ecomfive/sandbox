@@ -665,7 +665,10 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
-  const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno && c.salaInterna).map((c) => ({ sala: c.salaInterna as string, noLeidos: c.noLeidos })), [datos.conversaciones]);
+  const chatsInternos = useMemo(
+    () => datos.conversaciones.filter((c) => c.interno && c.salaInterna).map((c) => ({ sala: c.salaInterna as string, noLeidos: c.noLeidos, remitentes: c.pendientesDe ?? [] })),
+    [datos.conversaciones],
+  );
   // Los chats internos (WhatsApp entre áreas) no son clientes: no van en las listas ni en los conteos; se abren con «Interno». Solo los de los
   // paneles a la vista: con «Ver como», los conteos de los filtros son los de esa área, como los ve ella.
   const delNumero = useMemo(
