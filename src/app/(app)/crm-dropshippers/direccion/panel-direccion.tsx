@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { BotonBarra, CabeceraTarjeta, MarcoTabla, Pastilla, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
@@ -8,7 +9,7 @@ import { ContenidoKpi, claseKpi, type Tono } from "@/components/ui/kpi-card";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { ETIQUETA_ALERTA, ETIQUETA_BANDA, ETIQUETA_SEGMENTO, SUGERENCIA_ALERTA, type Banda, type Prioridad, type Segmento, type TipoAlerta } from "@/lib/crm/salud";
-import { atenderAlerta, crearTareaDeAlerta } from "./actions";
+import { asignarResponsable, atenderAlerta, crearTareaDeAlerta } from "./actions";
 import type { AlertaDireccion, DatosDireccion, FilaDireccion } from "./datos-direccion";
 
 type TonoPastilla = "neutro" | "exito" | "aviso" | "peligro" | "oscuro";
@@ -313,7 +314,7 @@ export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { dato
                       {abiertoAqui && (
                         <tr>
                           <td colSpan={7} className="border-b border-border bg-card px-4 py-4">
-                            <DetalleSalud f={f} />
+                            <DetalleSalud f={f} personas={datos.personas} escribe={escribe} />
                           </td>
                         </tr>
                       )}
@@ -351,15 +352,55 @@ export function PanelDireccion({ datos, codigoPais, escribe, usuarioId }: { dato
   );
 }
 
-/** De qué sale el puntaje de un dropshipper: cada factor con su barra y su dato. */
-function DetalleSalud({ f }: { f: FilaDireccion }) {
+/** «Lo lleva»: quién del equipo lleva a este dropshipper (de ahí sale su cartera en la vista Equipo). Solo Dirección con escritura lo cambia. */
+function LoLleva({ f, personas, escribe }: { f: FilaDireccion; personas: { id: string; nombre: string }[]; escribe: boolean }) {
+  const router = useRouter();
+  const { mostrarToast } = useToast();
+  const [pendiente, empezar] = useTransition();
+  if (!escribe) return <span className="text-sm text-muted-foreground">Lo lleva: {f.responsable ?? "nadie"}</span>;
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground">Lo lleva</span>
+      <select
+        value={f.responsableId ?? ""}
+        disabled={pendiente}
+        onChange={(e) => {
+          const id = e.target.value || null;
+          empezar(async () => {
+            const r = await asignarResponsable(f.id, id);
+            if ("error" in r) return mostrarToast(r.error, "destructive");
+            mostrarToast(id ? `${f.nombre} ahora lo lleva ${personas.find((p) => p.id === id)?.nombre ?? "esa persona"}.` : `${f.nombre} quedó sin responsable.`);
+            router.refresh();
+          });
+        }}
+        className={`${fieldClass} w-auto`}
+      >
+        <option value="">{!f.responsableId && f.responsable ? `Nadie (su chat lo tiene ${f.responsable})` : "Nadie"}</option>
+        {personas.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.nombre}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** De qué sale el puntaje de un dropshipper: cada factor con su barra y su dato; y quién lo lleva. */
+function DetalleSalud({ f, personas, escribe }: { f: FilaDireccion; personas: { id: string; nombre: string }[]; escribe: boolean }) {
+  const enlace = (
+    <Link href={`/crm-dropshippers?abrir=${f.id}`} className={`text-sm font-medium text-primario hover:underline ${anilloFoco}`}>
+      Abrir su ficha
+    </Link>
+  );
   if (f.salud.puntaje === null)
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <span className="text-muted-foreground">Todavía no tiene pedidos en Dropi en este país: no hay salud que medir.</span>
-        <Link href={`/crm-dropshippers?abrir=${f.id}`} className={`text-sm font-medium text-primario hover:underline ${anilloFoco}`}>
-          Abrir su ficha
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <LoLleva f={f} personas={personas} escribe={escribe} />
+          {enlace}
+        </div>
       </div>
     );
   return (
@@ -368,9 +409,10 @@ function DetalleSalud({ f }: { f: FilaDireccion }) {
         <p className="m-0 text-sm">
           Salud <span className="font-semibold tabular-nums">{f.salud.puntaje}</span> · <Pastilla tono={TONO_BANDA[f.salud.banda]}>{ETIQUETA_BANDA[f.salud.banda]}</Pastilla>
         </p>
-        <Link href={`/crm-dropshippers?abrir=${f.id}`} className={`text-sm font-medium text-primario hover:underline ${anilloFoco}`}>
-          Abrir su ficha
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <LoLleva f={f} personas={personas} escribe={escribe} />
+          {enlace}
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {f.salud.factores.map((x) => (

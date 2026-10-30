@@ -1024,6 +1024,10 @@ convenciones técnicas del código.
   `crm_pedidos_semanales`. El puntaje, el segmento y las alertas son de `src/lib/crm/salud.ts` (puro, con pruebas). «Atendida» y «Crear tarea»
   (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. Para «Sin
   primer pedido» se usa `fecha_ingreso`/`captado_en`, nunca `creado_en` (los de ClickUp se crearon todos al importarlos). No toca la Bandeja.
+  **Fase 2** (sin migración): vista `?vista=equipo&dias=7|30|90` (`datos-equipo.ts` + `vista-equipo.tsx`, lógica pura en `src/lib/crm/equipo.ts`):
+  respuestas por persona de `whatsapp_kpis` (cruzadas por nombre de autor con `perfiles.nombre`), chats asignados y `esperando_desde` por tramos,
+  tareas por `responsable_id` y la cartera por responsable de la fase 1. «Lo lleva» (`asignarResponsable`) escribe `dropshippers.responsable_id`
+  (antes no se podía elegir en ninguna pantalla). El reparto automático de chats quedó para después (pedido de Hernán: los chats no cambian).
   **360dialog y un solo número** (migración 0168, 28 oct 2026): el área es de cada conversación (`whatsapp_conversaciones.area`; un
   trigger le pone la del número al crearla) y se cambia con `pasarConversacionDeArea` (botón «Pasar a otra área» del chat, nota + auditoría). Todo
   filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Paneles y supervisión** (29 oct 2026, pedido de
