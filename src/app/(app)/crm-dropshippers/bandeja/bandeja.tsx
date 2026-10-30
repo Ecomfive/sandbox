@@ -1041,10 +1041,10 @@ export function Bandeja({
    * Se abre como en la lista y el clic derecho da el mismo menú. Debajo, los botones de su columna, como en el prototipo
    * (https://claude.ai/artifact/WhfJpQZQf6AdvSxsmzfZFa, 30 oct 2026): Por atender → «Responder»; En conversación → «Ver chat» y «Resolver»
    * (pasa a Cerrados); Cerrados → «Ver chat» y «Reabrir». Resolver y reabrir los ve quien puede escribir en el CRM (el servidor comprueba que pueda en el área
-   * del chat: Dirección, también en los de Comercial y Atención; 30 oct 2026, pedido de Hernán), nunca en «Ver como», que es solo para revisar.
+   * del chat: Dirección, también en los de Comercial y Atención; 30 oct 2026, pedido de Hernán). También en «Ver como»: así se ve lo mismo que ve esa área.
    */
   function tarjetaChat(c: ConversacionVista, columna: ColumnaTablero) {
-    const puedeCambiar = escribe && !verComo;
+    const puedeCambiar = escribe;
     const claseBoton = `inline-flex h-8 items-center rounded-md px-2.5 text-[12.5px] font-semibold ${anilloFoco}`;
     const principal = `${claseBoton} bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-60`;
     const secundario = `${claseBoton} border border-[var(--wa-borde)] bg-[var(--wa-fondo)] text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60`;
@@ -1335,7 +1335,7 @@ export function Bandeja({
             Viendo como {areaChat(verComo).etiqueta}
           </span>
           <span className="min-w-[14rem] flex-1">
-            Sus chats, su orden, sus filtros y su tablero. Solo para revisar: lo que abras no se marca leído y para contestar hay que «Intervenir».
+            Sus chats, su orden, sus filtros y su tablero. Lo que abras no se marca leído y para contestar hay que «Intervenir»; desde el tablero puedes resolver o reabrir.
           </span>
           <button
             type="button"
